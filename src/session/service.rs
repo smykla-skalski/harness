@@ -88,9 +88,7 @@ pub fn start_session(
     storage::append_log_entry(
         project_dir,
         &state.session_id,
-        SessionTransition::SessionStarted {
-            context: context.to_string(),
-        },
+        log_session_started(context),
         Some(leader_id),
         None,
     )?;
@@ -128,27 +126,16 @@ pub fn join_session(
     let mut joined_agent_id = None;
 
     let state = storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        let agent_id = next_available_agent_id(runtime_name, &state.agents);
-        state.agents.insert(
-            agent_id.clone(),
-            AgentRegistration {
-                agent_id: agent_id.clone(),
-                name: display_name.clone(),
-                runtime: runtime_name.to_string(),
-                role,
-                capabilities: capabilities.to_vec(),
-                joined_at: now.clone(),
-                updated_at: now.clone(),
-                status: AgentStatus::Active,
-                agent_session_id: agent_session_id.clone(),
-                last_activity_at: Some(now.clone()),
-                current_task_id: None,
-                runtime_capabilities: runtime_capabilities(runtime_name),
-            },
-        );
+        let agent_id = apply_join_session(
+            state,
+            &display_name,
+            runtime_name,
+            role,
+            capabilities,
+            agent_session_id.as_deref(),
+            &now,
+        )?;
         joined_agent_id = Some(agent_id);
-        refresh_session(state, &now);
         Ok(())
     })?;
 
@@ -156,11 +143,7 @@ pub fn join_session(
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::AgentJoined {
-            agent_id,
-            role,
-            runtime: runtime_name.to_string(),
-        },
+        log_agent_joined(&agent_id, role, runtime_name),
         None,
         None,
     )?;
@@ -177,33 +160,13 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
     let now = utc_now();
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::EndSession)?;
-
-        let active_tasks = state.tasks.values().any(|task| {
-            matches!(
-                task.status,
-                TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
-            )
-        });
-        if active_tasks {
-            return Err(CliErrorKind::session_agent_conflict(
-                "cannot end session with in-progress tasks",
-            )
-            .into());
-        }
-
-        touch_agent(state, actor_id, &now);
-        state.status = SessionStatus::Ended;
-        state.archived_at = Some(now.clone());
-        refresh_session(state, &now);
-        Ok(())
+        apply_end_session(state, actor_id, &now)
     })?;
 
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::SessionEnded,
+        log_session_ended(),
         Some(actor_id),
         None,
     )?;
@@ -228,44 +191,14 @@ pub fn assign_role(
     let mut from_role = SessionRole::Worker;
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::AssignRole)?;
-        if role == SessionRole::Leader {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "use transfer-leader to assign leader role to '{agent_id}'"
-            ))
-            .into());
-        }
-        if state.leader_id.as_deref() == Some(agent_id) {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "cannot change role for current leader '{agent_id}'; use transfer-leader"
-            ))
-            .into());
-        }
-
-        require_active_target_agent(state, agent_id)?;
-        let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "agent '{agent_id}' not found"
-            )))
-        })?;
-        from_role = agent.role;
-        agent.role = role;
-        agent.updated_at.clone_from(&now);
-        agent.last_activity_at = Some(now.clone());
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
+        from_role = apply_assign_role(state, agent_id, role, actor_id, &now)?;
         Ok(())
     })?;
 
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::RoleChanged {
-            agent_id: agent_id.to_string(),
-            from: from_role,
-            to: role,
-        },
+        log_role_changed(agent_id, from_role, role),
         Some(actor_id),
         reason,
     )?;
@@ -286,54 +219,13 @@ pub fn remove_agent(
     let now = utc_now();
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::RemoveAgent)?;
-        if state.leader_id.as_deref() == Some(agent_id) {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "cannot remove current leader '{agent_id}'; transfer leadership first"
-            ))
-            .into());
-        }
-
-        {
-            let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
-                CliError::from(CliErrorKind::session_agent_conflict(format!(
-                    "agent '{agent_id}' not found"
-                )))
-            })?;
-            agent.status = AgentStatus::Removed;
-            agent.updated_at.clone_from(&now);
-            agent.last_activity_at = Some(now.clone());
-            agent.current_task_id = None;
-        }
-        clear_pending_leader_transfer(state, agent_id);
-
-        for task in state.tasks.values_mut() {
-            if task.assigned_to.as_deref() == Some(agent_id)
-                && matches!(
-                    task.status,
-                    TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
-                )
-            {
-                task.status = TaskStatus::Open;
-                task.assigned_to = None;
-                task.updated_at.clone_from(&now);
-                task.blocked_reason = None;
-                task.completed_at = None;
-            }
-        }
-
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
-        Ok(())
+        apply_remove_agent(state, agent_id, actor_id, &now)
     })?;
 
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::AgentRemoved {
-            agent_id: agent_id.to_string(),
-        },
+        log_agent_removed(agent_id),
         Some(actor_id),
         None,
     )?;
@@ -356,9 +248,7 @@ pub fn transfer_leader(
     let mut transfer = None;
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::TransferLeader)?;
-        transfer = Some(plan_leader_transfer(
+        transfer = Some(apply_transfer_leader(
             state,
             new_leader_id,
             actor_id,
@@ -437,32 +327,7 @@ pub fn create_task_with_source(
     let mut created_item = None;
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::CreateTask)?;
-
-        let task_id = next_task_id(&state.tasks);
-        let item_timestamps = now.clone();
-        let item = WorkItem {
-            task_id: task_id.clone(),
-            title: spec.title.to_string(),
-            context: spec.context.map(ToString::to_string),
-            severity: spec.severity,
-            status: TaskStatus::Open,
-            assigned_to: None,
-            created_at: item_timestamps.clone(),
-            updated_at: item_timestamps,
-            created_by: Some(actor_id.to_string()),
-            notes: Vec::new(),
-            suggested_fix: spec.suggested_fix.map(ToString::to_string),
-            source: spec.source,
-            blocked_reason: None,
-            completed_at: None,
-            checkpoint_summary: None,
-        };
-        state.tasks.insert(task_id, item.clone());
-        created_item = Some(item);
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
+        created_item = Some(apply_create_task(state, spec, actor_id, &now)?);
         Ok(())
     })?;
 
@@ -471,21 +336,13 @@ pub fn create_task_with_source(
             "task creation did not persist state".to_string(),
         ))
     })?;
-    let transition = if spec.source == TaskSource::Observe {
-        SessionTransition::ObserveTaskCreated {
-            task_id: item.task_id.clone(),
-            title: item.title.clone(),
-            severity: spec.severity,
-            issue_id: spec.observe_issue_id.map(ToString::to_string),
-        }
-    } else {
-        SessionTransition::TaskCreated {
-            task_id: item.task_id.clone(),
-            title: item.title.clone(),
-            severity: spec.severity,
-        }
-    };
-    storage::append_log_entry(project_dir, session_id, transition, Some(actor_id), None)?;
+    storage::append_log_entry(
+        project_dir,
+        session_id,
+        log_task_created(spec, &item),
+        Some(actor_id),
+        None,
+    )?;
 
     Ok(item)
 }
@@ -504,48 +361,13 @@ pub fn assign_task(
     let now = utc_now();
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::AssignTask)?;
-        require_active_target_agent(state, agent_id)?;
-
-        let previous_assignee = state
-            .tasks
-            .get(task_id)
-            .ok_or_else(|| task_not_found(task_id))?
-            .assigned_to
-            .clone();
-        if let Some(previous_assignee) = previous_assignee.as_deref() {
-            clear_agent_current_task(state, previous_assignee, task_id, &now);
-        }
-
-        let task = state
-            .tasks
-            .get_mut(task_id)
-            .ok_or_else(|| task_not_found(task_id))?;
-        task.assigned_to = Some(agent_id.to_string());
-        task.status = TaskStatus::InProgress;
-        task.updated_at.clone_from(&now);
-        task.blocked_reason = None;
-        task.completed_at = None;
-
-        if let Some(agent) = state.agents.get_mut(agent_id) {
-            agent.current_task_id = Some(task_id.to_string());
-            agent.updated_at.clone_from(&now);
-            agent.last_activity_at = Some(now.clone());
-        }
-
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
-        Ok(())
+        apply_assign_task(state, task_id, agent_id, actor_id, &now)
     })?;
 
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::TaskAssigned {
-            task_id: task_id.to_string(),
-            agent_id: agent_id.to_string(),
-        },
+        log_task_assigned(task_id, agent_id),
         Some(actor_id),
         None,
     )?;
@@ -588,71 +410,14 @@ pub fn update_task(
     let mut from_status = TaskStatus::Open;
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
-
-        let assigned_to = state
-            .tasks
-            .get(task_id)
-            .ok_or_else(|| task_not_found(task_id))?
-            .assigned_to
-            .clone();
-        let task = state
-            .tasks
-            .get_mut(task_id)
-            .ok_or_else(|| task_not_found(task_id))?;
-
-        from_status = task.status;
-        task.status = status;
-        task.updated_at.clone_from(&now);
-        if let Some(text) = note {
-            task.notes.push(TaskNote {
-                timestamp: now.clone(),
-                agent_id: Some(actor_id.to_string()),
-                text: text.to_string(),
-            });
-        }
-
-        match status {
-            TaskStatus::Done => {
-                task.completed_at = Some(now.clone());
-                task.blocked_reason = None;
-            }
-            TaskStatus::Blocked => {
-                task.blocked_reason = note.map(ToString::to_string);
-                task.completed_at = None;
-            }
-            TaskStatus::Open | TaskStatus::InProgress | TaskStatus::InReview => {
-                task.blocked_reason = None;
-                task.completed_at = None;
-            }
-        }
-
-        if let Some(assigned_to) = assigned_to.as_deref() {
-            if status == TaskStatus::InProgress {
-                if let Some(agent) = state.agents.get_mut(assigned_to) {
-                    agent.current_task_id = Some(task_id.to_string());
-                    agent.updated_at.clone_from(&now);
-                    agent.last_activity_at = Some(now.clone());
-                }
-            } else {
-                clear_agent_current_task(state, assigned_to, task_id, &now);
-            }
-        }
-
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
+        from_status = apply_update_task(state, task_id, status, note, actor_id, &now)?;
         Ok(())
     })?;
 
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::TaskStatusChanged {
-            task_id: task_id.to_string(),
-            from: from_status,
-            to: status,
-        },
+        log_task_status_changed(task_id, from_status, status),
         Some(actor_id),
         None,
     )?;
@@ -678,45 +443,9 @@ pub fn record_task_checkpoint(
     let mut checkpoint = None;
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
-
-        let assigned_to = state
-            .tasks
-            .get(task_id)
-            .ok_or_else(|| task_not_found(task_id))?
-            .assigned_to
-            .clone();
-        let created = TaskCheckpoint {
-            checkpoint_id: generate_checkpoint_id(task_id),
-            task_id: task_id.to_string(),
-            recorded_at: now.clone(),
-            actor_id: Some(actor_id.to_string()),
-            summary: summary.to_string(),
-            progress,
-        };
-
-        let task = state
-            .tasks
-            .get_mut(task_id)
-            .ok_or_else(|| task_not_found(task_id))?;
-        if task.status == TaskStatus::Open {
-            task.status = TaskStatus::InProgress;
-        }
-        task.updated_at.clone_from(&now);
-        task.checkpoint_summary = Some(TaskCheckpointSummary::from(&created));
-
-        if let Some(assigned_to) = assigned_to.as_deref()
-            && let Some(agent) = state.agents.get_mut(assigned_to)
-        {
-            agent.current_task_id = Some(task_id.to_string());
-            agent.updated_at.clone_from(&now);
-            agent.last_activity_at = Some(now.clone());
-        }
-
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
-        checkpoint = Some(created);
+        checkpoint = Some(apply_record_checkpoint(
+            state, task_id, actor_id, summary, progress, &now,
+        )?);
         Ok(())
     })?;
 
@@ -729,11 +458,7 @@ pub fn record_task_checkpoint(
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::TaskCheckpointRecorded {
-            task_id: task_id.to_string(),
-            checkpoint_id: checkpoint.checkpoint_id.clone(),
-            progress,
-        },
+        log_checkpoint_recorded(task_id, &checkpoint.checkpoint_id, progress),
         Some(actor_id),
         None,
     )?;
@@ -759,25 +484,9 @@ pub fn send_signal(
     let mut target_agent_session_id = None;
 
     storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        require_permission(state, actor_id, SessionAction::SendSignal)?;
-        let target_agent = state.agents.get(agent_id).ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "agent '{agent_id}' not found"
-            )))
-        })?;
-        if target_agent.status != AgentStatus::Active {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "agent '{agent_id}' is {}",
-                agent_status_label(target_agent.status)
-            ))
-            .into());
-        }
-
-        runtime_name.clone_from(&target_agent.runtime);
-        target_agent_session_id.clone_from(&target_agent.agent_session_id);
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
+        let (name, session_id) = apply_send_signal_state(state, agent_id, actor_id, &now)?;
+        runtime_name = name;
+        target_agent_session_id = session_id;
         Ok(())
     })?;
 
@@ -815,11 +524,7 @@ pub fn send_signal(
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::SignalSent {
-            signal_id: signal.signal_id.clone(),
-            agent_id: agent_id.to_string(),
-            command: command.to_string(),
-        },
+        log_signal_sent(&signal.signal_id, agent_id, command),
         Some(actor_id),
         None,
     )?;
@@ -944,11 +649,7 @@ pub fn record_signal_acknowledgment(
     storage::append_log_entry(
         project_dir,
         session_id,
-        SessionTransition::SignalAcknowledged {
-            signal_id: signal_id.to_string(),
-            agent_id: agent_id.to_string(),
-            result,
-        },
+        log_signal_acknowledged(signal_id, agent_id, result),
         Some(agent_id),
         None,
     )
@@ -1083,6 +784,530 @@ pub fn resolve_session_project_dir(
         .project
         .project_dir
         .unwrap_or(resolved.project.context_root))
+}
+
+// ---------------------------------------------------------------------------
+// Extracted state-mutation functions
+//
+// These apply business logic to an in-memory `SessionState` without touching
+// storage. Both the file-based path (`storage::update_state` closures) and the
+// daemon-direct path (SQLite writes) call these same functions so the rules
+// are defined once.
+// ---------------------------------------------------------------------------
+
+/// Build the initial state for a new session (leader + metadata).
+#[expect(dead_code, reason = "used by daemon-direct path in upcoming step 4")]
+pub(crate) fn build_new_session(
+    context: &str,
+    session_id: &str,
+    runtime_name: &str,
+    agent_session_id: Option<&str>,
+    now: &str,
+) -> SessionState {
+    build_initial_state(context, session_id, runtime_name, agent_session_id, now)
+}
+
+/// Register a new agent into an existing session state. Returns the assigned
+/// agent ID.
+pub(crate) fn apply_join_session(
+    state: &mut SessionState,
+    display_name: &str,
+    runtime_name: &str,
+    role: SessionRole,
+    capabilities: &[String],
+    agent_session_id: Option<&str>,
+    now: &str,
+) -> Result<String, CliError> {
+    require_active(state)?;
+    let agent_id = next_available_agent_id(runtime_name, &state.agents);
+    state.agents.insert(
+        agent_id.clone(),
+        AgentRegistration {
+            agent_id: agent_id.clone(),
+            name: display_name.to_string(),
+            runtime: runtime_name.to_string(),
+            role,
+            capabilities: capabilities.to_vec(),
+            joined_at: now.to_string(),
+            updated_at: now.to_string(),
+            status: AgentStatus::Active,
+            agent_session_id: agent_session_id.map(ToString::to_string),
+            last_activity_at: Some(now.to_string()),
+            current_task_id: None,
+            runtime_capabilities: runtime_capabilities(runtime_name),
+        },
+    );
+    refresh_session(state, now);
+    Ok(agent_id)
+}
+
+/// Mark a session as ended. Validates permissions and active-task constraints.
+pub(crate) fn apply_end_session(
+    state: &mut SessionState,
+    actor_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::EndSession)?;
+
+    let active_tasks = state.tasks.values().any(|task| {
+        matches!(
+            task.status,
+            TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
+        )
+    });
+    if active_tasks {
+        return Err(
+            CliErrorKind::session_agent_conflict("cannot end session with in-progress tasks")
+                .into(),
+        );
+    }
+
+    touch_agent(state, actor_id, now);
+    state.status = SessionStatus::Ended;
+    state.archived_at = Some(now.to_string());
+    refresh_session(state, now);
+    Ok(())
+}
+
+/// Change an agent's role. Returns the previous role.
+pub(crate) fn apply_assign_role(
+    state: &mut SessionState,
+    agent_id: &str,
+    role: SessionRole,
+    actor_id: &str,
+    now: &str,
+) -> Result<SessionRole, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::AssignRole)?;
+    if role == SessionRole::Leader {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "use transfer-leader to assign leader role to '{agent_id}'"
+        ))
+        .into());
+    }
+    if state.leader_id.as_deref() == Some(agent_id) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "cannot change role for current leader '{agent_id}'; use transfer-leader"
+        ))
+        .into());
+    }
+
+    require_active_target_agent(state, agent_id)?;
+    let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    let from_role = agent.role;
+    agent.role = role;
+    agent.updated_at = now.to_string();
+    agent.last_activity_at = Some(now.to_string());
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok(from_role)
+}
+
+/// Remove an agent, returning its in-progress tasks to Open.
+pub(crate) fn apply_remove_agent(
+    state: &mut SessionState,
+    agent_id: &str,
+    actor_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::RemoveAgent)?;
+    if state.leader_id.as_deref() == Some(agent_id) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "cannot remove current leader '{agent_id}'; transfer leadership first"
+        ))
+        .into());
+    }
+
+    {
+        let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "agent '{agent_id}' not found"
+            )))
+        })?;
+        agent.status = AgentStatus::Removed;
+        agent.updated_at = now.to_string();
+        agent.last_activity_at = Some(now.to_string());
+        agent.current_task_id = None;
+    }
+    clear_pending_leader_transfer(state, agent_id);
+
+    for task in state.tasks.values_mut() {
+        if task.assigned_to.as_deref() == Some(agent_id)
+            && matches!(
+                task.status,
+                TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
+            )
+        {
+            task.status = TaskStatus::Open;
+            task.assigned_to = None;
+            task.updated_at = now.to_string();
+            task.blocked_reason = None;
+            task.completed_at = None;
+        }
+    }
+
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok(())
+}
+
+/// Plan and optionally apply a leader transfer. Returns the transfer plan
+/// so the caller can emit the right log entries.
+pub(crate) fn apply_transfer_leader(
+    state: &mut SessionState,
+    new_leader_id: &str,
+    actor_id: &str,
+    reason: Option<&str>,
+    now: &str,
+) -> Result<LeaderTransferPlan, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::TransferLeader)?;
+    plan_leader_transfer(state, new_leader_id, actor_id, reason, now)
+}
+
+/// Create a work item. Returns the new `WorkItem`.
+pub(crate) fn apply_create_task(
+    state: &mut SessionState,
+    spec: &TaskSpec<'_>,
+    actor_id: &str,
+    now: &str,
+) -> Result<WorkItem, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::CreateTask)?;
+
+    let task_id = next_task_id(&state.tasks);
+    let item = WorkItem {
+        task_id: task_id.clone(),
+        title: spec.title.to_string(),
+        context: spec.context.map(ToString::to_string),
+        severity: spec.severity,
+        status: TaskStatus::Open,
+        assigned_to: None,
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
+        created_by: Some(actor_id.to_string()),
+        notes: Vec::new(),
+        suggested_fix: spec.suggested_fix.map(ToString::to_string),
+        source: spec.source,
+        blocked_reason: None,
+        completed_at: None,
+        checkpoint_summary: None,
+    };
+    state.tasks.insert(task_id, item.clone());
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok(item)
+}
+
+/// Assign a task to an agent.
+pub(crate) fn apply_assign_task(
+    state: &mut SessionState,
+    task_id: &str,
+    agent_id: &str,
+    actor_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::AssignTask)?;
+    require_active_target_agent(state, agent_id)?;
+
+    let previous_assignee = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .assigned_to
+        .clone();
+    if let Some(previous_assignee) = previous_assignee.as_deref() {
+        clear_agent_current_task(state, previous_assignee, task_id, now);
+    }
+
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    task.assigned_to = Some(agent_id.to_string());
+    task.status = TaskStatus::InProgress;
+    task.updated_at = now.to_string();
+    task.blocked_reason = None;
+    task.completed_at = None;
+
+    if let Some(agent) = state.agents.get_mut(agent_id) {
+        agent.current_task_id = Some(task_id.to_string());
+        agent.updated_at = now.to_string();
+        agent.last_activity_at = Some(now.to_string());
+    }
+
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok(())
+}
+
+/// Update a task's status. Returns the previous status.
+pub(crate) fn apply_update_task(
+    state: &mut SessionState,
+    task_id: &str,
+    status: TaskStatus,
+    note: Option<&str>,
+    actor_id: &str,
+    now: &str,
+) -> Result<TaskStatus, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
+
+    let assigned_to = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .assigned_to
+        .clone();
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+
+    let from_status = task.status;
+    task.status = status;
+    task.updated_at = now.to_string();
+    if let Some(text) = note {
+        task.notes.push(TaskNote {
+            timestamp: now.to_string(),
+            agent_id: Some(actor_id.to_string()),
+            text: text.to_string(),
+        });
+    }
+
+    match status {
+        TaskStatus::Done => {
+            task.completed_at = Some(now.to_string());
+            task.blocked_reason = None;
+        }
+        TaskStatus::Blocked => {
+            task.blocked_reason = note.map(ToString::to_string);
+            task.completed_at = None;
+        }
+        TaskStatus::Open | TaskStatus::InProgress | TaskStatus::InReview => {
+            task.blocked_reason = None;
+            task.completed_at = None;
+        }
+    }
+
+    if let Some(assigned_to) = assigned_to.as_deref() {
+        if status == TaskStatus::InProgress {
+            if let Some(agent) = state.agents.get_mut(assigned_to) {
+                agent.current_task_id = Some(task_id.to_string());
+                agent.updated_at = now.to_string();
+                agent.last_activity_at = Some(now.to_string());
+            }
+        } else {
+            clear_agent_current_task(state, assigned_to, task_id, now);
+        }
+    }
+
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok(from_status)
+}
+
+/// Record a task checkpoint in state. Returns the `TaskCheckpoint`.
+pub(crate) fn apply_record_checkpoint(
+    state: &mut SessionState,
+    task_id: &str,
+    actor_id: &str,
+    summary: &str,
+    progress: u8,
+    now: &str,
+) -> Result<TaskCheckpoint, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
+
+    let assigned_to = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .assigned_to
+        .clone();
+    let created = TaskCheckpoint {
+        checkpoint_id: generate_checkpoint_id(task_id),
+        task_id: task_id.to_string(),
+        recorded_at: now.to_string(),
+        actor_id: Some(actor_id.to_string()),
+        summary: summary.to_string(),
+        progress,
+    };
+
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    if task.status == TaskStatus::Open {
+        task.status = TaskStatus::InProgress;
+    }
+    task.updated_at = now.to_string();
+    task.checkpoint_summary = Some(TaskCheckpointSummary::from(&created));
+
+    if let Some(assigned_to) = assigned_to.as_deref()
+        && let Some(agent) = state.agents.get_mut(assigned_to)
+    {
+        agent.current_task_id = Some(task_id.to_string());
+        agent.updated_at = now.to_string();
+        agent.last_activity_at = Some(now.to_string());
+    }
+
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok(created)
+}
+
+/// Validate and extract signal target info from state. Returns
+/// `(runtime_name, target_agent_session_id)`.
+pub(crate) fn apply_send_signal_state(
+    state: &mut SessionState,
+    agent_id: &str,
+    actor_id: &str,
+    now: &str,
+) -> Result<(String, Option<String>), CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::SendSignal)?;
+    let target_agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    if target_agent.status != AgentStatus::Active {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is {}",
+            agent_status_label(target_agent.status)
+        ))
+        .into());
+    }
+
+    let runtime_name = target_agent.runtime.clone();
+    let target_agent_session_id = target_agent.agent_session_id.clone();
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+    Ok((runtime_name, target_agent_session_id))
+}
+
+// ---------------------------------------------------------------------------
+// Log-entry builders (shared between file and daemon paths)
+// ---------------------------------------------------------------------------
+
+pub(crate) fn log_session_started(context: &str) -> SessionTransition {
+    SessionTransition::SessionStarted {
+        context: context.to_string(),
+    }
+}
+
+pub(crate) fn log_agent_joined(
+    agent_id: &str,
+    role: SessionRole,
+    runtime: &str,
+) -> SessionTransition {
+    SessionTransition::AgentJoined {
+        agent_id: agent_id.to_string(),
+        role,
+        runtime: runtime.to_string(),
+    }
+}
+
+pub(crate) fn log_session_ended() -> SessionTransition {
+    SessionTransition::SessionEnded
+}
+
+pub(crate) fn log_role_changed(
+    agent_id: &str,
+    from: SessionRole,
+    to: SessionRole,
+) -> SessionTransition {
+    SessionTransition::RoleChanged {
+        agent_id: agent_id.to_string(),
+        from,
+        to,
+    }
+}
+
+pub(crate) fn log_agent_removed(agent_id: &str) -> SessionTransition {
+    SessionTransition::AgentRemoved {
+        agent_id: agent_id.to_string(),
+    }
+}
+
+pub(crate) fn log_task_created(spec: &TaskSpec<'_>, item: &WorkItem) -> SessionTransition {
+    if spec.source == TaskSource::Observe {
+        SessionTransition::ObserveTaskCreated {
+            task_id: item.task_id.clone(),
+            title: item.title.clone(),
+            severity: spec.severity,
+            issue_id: spec.observe_issue_id.map(ToString::to_string),
+        }
+    } else {
+        SessionTransition::TaskCreated {
+            task_id: item.task_id.clone(),
+            title: item.title.clone(),
+            severity: spec.severity,
+        }
+    }
+}
+
+pub(crate) fn log_task_assigned(task_id: &str, agent_id: &str) -> SessionTransition {
+    SessionTransition::TaskAssigned {
+        task_id: task_id.to_string(),
+        agent_id: agent_id.to_string(),
+    }
+}
+
+pub(crate) fn log_task_status_changed(
+    task_id: &str,
+    from: TaskStatus,
+    to: TaskStatus,
+) -> SessionTransition {
+    SessionTransition::TaskStatusChanged {
+        task_id: task_id.to_string(),
+        from,
+        to,
+    }
+}
+
+pub(crate) fn log_checkpoint_recorded(
+    task_id: &str,
+    checkpoint_id: &str,
+    progress: u8,
+) -> SessionTransition {
+    SessionTransition::TaskCheckpointRecorded {
+        task_id: task_id.to_string(),
+        checkpoint_id: checkpoint_id.to_string(),
+        progress,
+    }
+}
+
+pub(crate) fn log_signal_sent(
+    signal_id: &str,
+    agent_id: &str,
+    command: &str,
+) -> SessionTransition {
+    SessionTransition::SignalSent {
+        signal_id: signal_id.to_string(),
+        agent_id: agent_id.to_string(),
+        command: command.to_string(),
+    }
+}
+
+pub(crate) fn log_signal_acknowledged(
+    signal_id: &str,
+    agent_id: &str,
+    result: AckResult,
+) -> SessionTransition {
+    SessionTransition::SignalAcknowledged {
+        signal_id: signal_id.to_string(),
+        agent_id: agent_id.to_string(),
+        result,
+    }
 }
 
 fn create_initial_session(
@@ -1297,18 +1522,18 @@ fn agent_is_unresponsive(state: &SessionState, agent_id: &str, now: &str) -> boo
 }
 
 #[derive(Debug)]
-struct LeaderTransferOutcome {
-    old_leader: String,
-    new_leader_id: String,
-    confirmed_by: Option<String>,
-    reason: Option<String>,
-    log_request_before_transfer: bool,
+pub(crate) struct LeaderTransferOutcome {
+    pub(crate) old_leader: String,
+    pub(crate) new_leader_id: String,
+    pub(crate) confirmed_by: Option<String>,
+    pub(crate) reason: Option<String>,
+    pub(crate) log_request_before_transfer: bool,
 }
 
 #[derive(Debug)]
-struct LeaderTransferPlan {
-    pending_request: Option<PendingLeaderTransfer>,
-    outcome: Option<LeaderTransferOutcome>,
+pub(crate) struct LeaderTransferPlan {
+    pub(crate) pending_request: Option<PendingLeaderTransfer>,
+    pub(crate) outcome: Option<LeaderTransferOutcome>,
 }
 
 fn plan_leader_transfer(
