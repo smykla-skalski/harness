@@ -66,8 +66,8 @@ private extension PreferencesPreviewSupport {
         authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
         authTokenPresent: true,
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
-        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-        cacheEntryCount: 4,
+        databasePath: "/Users/example/Library/Application Support/harness/daemon/harness.db",
+        databaseSizeBytes: 1_740_800,
         lastEvent: nil
       )
 
@@ -77,8 +77,8 @@ private extension PreferencesPreviewSupport {
       authTokenPath: template.authTokenPath,
       authTokenPresent: template.authTokenPresent,
       eventsPath: template.eventsPath,
-      cacheRoot: template.cacheRoot,
-      cacheEntryCount: template.cacheEntryCount,
+      databasePath: template.databasePath,
+      databaseSizeBytes: template.databaseSizeBytes,
       lastEvent: events.first ?? template.lastEvent
     )
   }

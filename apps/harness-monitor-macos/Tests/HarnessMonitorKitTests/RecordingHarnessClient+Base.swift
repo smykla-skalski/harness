@@ -51,8 +51,8 @@ extension RecordingHarnessClient {
         authTokenPath: "/tmp/token",
         authTokenPresent: true,
         eventsPath: "/tmp/harness/daemon/events.jsonl",
-        cacheRoot: "/tmp/harness/daemon/cache/projects",
-        cacheEntryCount: 2,
+        databasePath: "/tmp/harness/daemon/harness.db",
+        databaseSizeBytes: 1_740_800,
         lastEvent: DaemonAuditEvent(
           recordedAt: "2026-03-28T14:00:00Z",
           level: "info",
@@ -171,6 +171,41 @@ extension RecordingHarnessClient {
         command: request.command,
         actor: request.actor
       )
+    )
+    let signal = SessionSignalRecord(
+      runtime: detail.agents.first(where: { $0.agentId == request.agentId })?.runtime ?? "codex",
+      agentId: request.agentId,
+      sessionId: sessionID,
+      status: .pending,
+      signal: Signal(
+        signalId: "sig-\(detail.signals.count + 1)",
+        version: 1,
+        createdAt: "2026-03-28T14:25:00Z",
+        expiresAt: "2026-03-28T14:40:00Z",
+        sourceAgent: request.actor,
+        command: request.command,
+        priority: .normal,
+        payload: SignalPayload(
+          message: request.message,
+          actionHint: request.actionHint,
+          relatedFiles: [],
+          metadata: .null
+        ),
+        delivery: DeliveryConfig(
+          maxRetries: 3,
+          retryCount: 0,
+          idempotencyKey: "\(sessionID):\(request.agentId):\(request.command)"
+        )
+      ),
+      acknowledgment: nil
+    )
+    detail = SessionDetail(
+      session: detail.session,
+      agents: detail.agents,
+      tasks: detail.tasks,
+      signals: detail.signals + [signal],
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
     )
     return detail
   }
