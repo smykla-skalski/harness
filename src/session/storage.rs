@@ -519,6 +519,7 @@ mod tests {
             schema_version: CURRENT_VERSION,
             state_version: 0,
             session_id: session_id.to_string(),
+            title: "test title".into(),
             context: "test".into(),
             status: SessionStatus::Active,
             created_at: "2026-01-01T00:00:00Z".into(),
@@ -610,6 +611,7 @@ mod tests {
                     &project,
                     "sess-1",
                     SessionTransition::SessionStarted {
+                        title: "test title".into(),
                         context: "test".into(),
                     },
                     Some("leader"),

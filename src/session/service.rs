@@ -55,6 +55,7 @@ pub struct ResolvedRuntimeSessionAgent {
 /// Panics if the new session state has no leader.
 pub fn start_session(
     context: &str,
+    title: &str,
     project_dir: &Path,
     runtime_name: Option<&str>,
     session_id: Option<&str>,
@@ -67,6 +68,7 @@ pub fn start_session(
 
     if let Some(client) = DaemonClient::try_connect() {
         return client.start_session(&protocol::SessionStartRequest {
+            title: title.to_string(),
             context: context.to_string(),
             runtime: runtime_name.to_string(),
             session_id: session_id.map(ToString::to_string),
@@ -84,6 +86,7 @@ pub fn start_session(
         agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
     let state = create_initial_session(
         context,
+        title,
         runtime_name,
         session_id,
         leader_agent_session_id.as_deref(),
@@ -100,7 +103,7 @@ pub fn start_session(
     storage::append_log_entry(
         project_dir,
         &state.session_id,
-        log_session_started(context),
+        log_session_started(title, context),
         Some(leader_id),
         None,
     )?;
@@ -1009,12 +1012,20 @@ pub fn resolve_session_project_dir(
 /// Build the initial state for a new session (leader + metadata).
 pub(crate) fn build_new_session(
     context: &str,
+    title: &str,
     session_id: &str,
     runtime_name: &str,
     agent_session_id: Option<&str>,
     now: &str,
 ) -> SessionState {
-    build_initial_state(context, session_id, runtime_name, agent_session_id, now)
+    build_initial_state(
+        context,
+        title,
+        session_id,
+        runtime_name,
+        agent_session_id,
+        now,
+    )
 }
 
 /// Register a new agent into an existing session state. Returns the assigned
@@ -1443,8 +1454,9 @@ pub(crate) fn build_signal(
 // Log-entry builders (shared between file and daemon paths)
 // ---------------------------------------------------------------------------
 
-pub(crate) fn log_session_started(context: &str) -> SessionTransition {
+pub(crate) fn log_session_started(title: &str, context: &str) -> SessionTransition {
     SessionTransition::SessionStarted {
+        title: title.to_string(),
         context: context.to_string(),
     }
 }
@@ -1571,6 +1583,7 @@ fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
         schema_version: CURRENT_VERSION,
         state_version: 0,
         session_id: detail.session.session_id.clone(),
+        title: detail.session.title.clone(),
         context: detail.session.context.clone(),
         status: detail.session.status,
         created_at: detail.session.created_at.clone(),
@@ -1595,6 +1608,7 @@ fn summary_to_session_state(summary: &protocol::SessionSummary) -> SessionState 
         schema_version: CURRENT_VERSION,
         state_version: 0,
         session_id: summary.session_id.clone(),
+        title: summary.title.clone(),
         context: summary.context.clone(),
         status: summary.status,
         created_at: summary.created_at.clone(),
@@ -1650,6 +1664,7 @@ fn resolve_runtime_session_via_daemon(
 
 fn create_initial_session(
     context: &str,
+    title: &str,
     runtime_name: &str,
     session_id: Option<&str>,
     agent_session_id: Option<&str>,
@@ -1660,8 +1675,14 @@ fn create_initial_session(
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string)
     {
-        let candidate =
-            build_initial_state(context, &session_id, runtime_name, agent_session_id, now);
+        let candidate = build_initial_state(
+            context,
+            title,
+            &session_id,
+            runtime_name,
+            agent_session_id,
+            now,
+        );
         if !storage::create_state(project_dir, &session_id, &candidate)? {
             return Err(CliErrorKind::session_agent_conflict(format!(
                 "session '{session_id}' already exists"
@@ -1673,8 +1694,14 @@ fn create_initial_session(
 
     for _ in 0..8 {
         let session_id = generate_session_id();
-        let candidate =
-            build_initial_state(context, &session_id, runtime_name, agent_session_id, now);
+        let candidate = build_initial_state(
+            context,
+            title,
+            &session_id,
+            runtime_name,
+            agent_session_id,
+            now,
+        );
         if storage::create_state(project_dir, &session_id, &candidate)? {
             return Ok(candidate);
         }
@@ -1728,6 +1755,7 @@ fn require_permission(
 
 fn build_initial_state(
     context: &str,
+    title: &str,
     session_id: &str,
     runtime_name: &str,
     agent_session_id: Option<&str>,
@@ -1757,6 +1785,7 @@ fn build_initial_state(
         schema_version: CURRENT_VERSION,
         state_version: 1,
         session_id: session_id.to_string(),
+        title: title.to_string(),
         context: context.to_string(),
         status: SessionStatus::Active,
         created_at: now.to_string(),
@@ -2130,7 +2159,8 @@ mod tests {
     #[test]
     fn start_creates_session_with_leader() {
         with_temp_project(|project| {
-            let state = start_session("test goal", project, Some("claude"), None).expect("start");
+            let state =
+                start_session("test goal", "", project, Some("claude"), None).expect("start");
             assert_eq!(state.status, SessionStatus::Active);
             assert_eq!(state.agents.len(), 1);
             assert_eq!(state.metrics.agent_count, 1);
@@ -2146,7 +2176,8 @@ mod tests {
     #[test]
     fn join_adds_agent() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("s1")).expect("start");
+            let state =
+                start_session("test", "", project, Some("claude"), Some("s1")).expect("start");
             let state = join_session(
                 &state.session_id,
                 SessionRole::Worker,
@@ -2164,9 +2195,9 @@ mod tests {
     #[test]
     fn start_session_rejects_duplicate_session_id() {
         with_temp_project(|project| {
-            start_session("goal1", project, Some("claude"), Some("dup")).expect("first");
+            start_session("goal1", "", project, Some("claude"), Some("dup")).expect("first");
             let error =
-                start_session("goal2", project, Some("codex"), Some("dup")).expect_err("dup");
+                start_session("goal2", "", project, Some("codex"), Some("dup")).expect_err("dup");
 
             assert_eq!(error.code(), "KSRCLI092");
             assert_eq!(
@@ -2183,8 +2214,8 @@ mod tests {
             let escape_dir = tmp_root.join("unsafe-session");
             let unsafe_id = escape_dir.to_string_lossy().into_owned();
 
-            let error =
-                start_session("goal", project, Some("claude"), Some(&unsafe_id)).expect_err("id");
+            let error = start_session("goal", "", project, Some("claude"), Some(&unsafe_id))
+                .expect_err("id");
 
             assert_eq!(error.code(), "KSRCLI059");
             assert!(!escape_dir.join("state.json").exists());
@@ -2194,11 +2225,11 @@ mod tests {
     #[test]
     fn start_session_requires_known_runtime() {
         with_temp_project(|project| {
-            let missing_runtime = start_session("goal", project, None, Some("no-runtime"))
+            let missing_runtime = start_session("goal", "", project, None, Some("no-runtime"))
                 .expect_err("runtime is required");
             assert_eq!(missing_runtime.code(), "KSRCLI092");
 
-            let unknown_runtime = start_session("goal", project, Some("unknown"), Some("bad"))
+            let unknown_runtime = start_session("goal", "", project, Some("unknown"), Some("bad"))
                 .expect_err("unknown runtime should be rejected");
             assert_eq!(unknown_runtime.code(), "KSRCLI092");
         });
@@ -2207,8 +2238,8 @@ mod tests {
     #[test]
     fn auto_generated_session_ids_are_unique() {
         with_temp_project(|project| {
-            let first = start_session("goal1", project, Some("claude"), None).expect("first");
-            let second = start_session("goal2", project, Some("codex"), None).expect("second");
+            let first = start_session("goal1", "", project, Some("claude"), None).expect("first");
+            let second = start_session("goal2", "", project, Some("codex"), None).expect("second");
             assert_ne!(first.session_id, second.session_id);
         });
     }
@@ -2216,7 +2247,7 @@ mod tests {
     #[test]
     fn join_same_runtime_keeps_distinct_agents() {
         with_temp_project(|project| {
-            start_session("test", project, Some("claude"), Some("join-unique")).expect("start");
+            start_session("test", "", project, Some("claude"), Some("join-unique")).expect("start");
 
             let (first, second) =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
@@ -2255,7 +2286,7 @@ mod tests {
     #[test]
     fn join_records_runtime_session_id_when_available() {
         with_temp_project(|project| {
-            start_session("test", project, Some("claude"), Some("join-runtime")).unwrap();
+            start_session("test", "", project, Some("claude"), Some("join-runtime")).unwrap();
 
             let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
                 join_session(
@@ -2284,7 +2315,8 @@ mod tests {
     #[test]
     fn end_session_requires_leader() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("s2")).expect("start");
+            let state =
+                start_session("test", "", project, Some("claude"), Some("s2")).expect("start");
             let joined = join_session(
                 &state.session_id,
                 SessionRole::Worker,
@@ -2308,7 +2340,8 @@ mod tests {
     #[test]
     fn task_lifecycle() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("s3")).expect("start");
+            let state =
+                start_session("test", "", project, Some("claude"), Some("s3")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
 
             let item = create_task(
@@ -2345,7 +2378,8 @@ mod tests {
     #[test]
     fn remove_agent_returns_tasks() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("s4")).expect("start");
+            let state =
+                start_session("test", "", project, Some("claude"), Some("s4")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let joined =
                 join_session("s4", SessionRole::Worker, "codex", &[], None, project).expect("join");
@@ -2378,7 +2412,7 @@ mod tests {
     fn removed_agent_loses_mutation_permissions() {
         with_temp_project(|project| {
             let state =
-                start_session("test", project, Some("claude"), Some("perm")).expect("start");
+                start_session("test", "", project, Some("claude"), Some("perm")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let joined = join_session("perm", SessionRole::Worker, "codex", &[], None, project)
                 .expect("join");
@@ -2417,7 +2451,7 @@ mod tests {
     fn assign_role_rejects_leader_changes() {
         with_temp_project(|project| {
             let state =
-                start_session("test", project, Some("claude"), Some("roles")).expect("start");
+                start_session("test", "", project, Some("claude"), Some("roles")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let joined = join_session("roles", SessionRole::Worker, "codex", &[], None, project)
                 .expect("join");
@@ -2445,7 +2479,7 @@ mod tests {
     fn assign_task_requires_active_assignee() {
         with_temp_project(|project| {
             let state =
-                start_session("test", project, Some("claude"), Some("assign")).expect("start");
+                start_session("test", "", project, Some("claude"), Some("assign")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let joined = join_session("assign", SessionRole::Worker, "codex", &[], None, project)
                 .expect("join");
@@ -2476,8 +2510,8 @@ mod tests {
     #[test]
     fn transfer_leader_requires_active_target() {
         with_temp_project(|project| {
-            let state =
-                start_session("test", project, Some("claude"), Some("transfer")).expect("start");
+            let state = start_session("test", "", project, Some("claude"), Some("transfer"))
+                .expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let joined = join_session("transfer", SessionRole::Worker, "codex", &[], None, project)
                 .expect("join");
@@ -2499,8 +2533,14 @@ mod tests {
     #[test]
     fn observer_transfer_leader_creates_pending_request() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("transfer-pending"))
-                .expect("start");
+            let state = start_session(
+                "test",
+                "",
+                project,
+                Some("claude"),
+                Some("transfer-pending"),
+            )
+            .expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let observer =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
@@ -2545,8 +2585,14 @@ mod tests {
     #[test]
     fn current_leader_confirms_pending_transfer() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("transfer-confirm"))
-                .expect("start");
+            let state = start_session(
+                "test",
+                "",
+                project,
+                Some("claude"),
+                Some("transfer-confirm"),
+            )
+            .expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let observer =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
@@ -2613,8 +2659,14 @@ mod tests {
     #[test]
     fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("transfer-timeout"))
-                .expect("start");
+            let state = start_session(
+                "test",
+                "",
+                project,
+                Some("claude"),
+                Some("transfer-timeout"),
+            )
+            .expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let observer =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
@@ -2662,9 +2714,9 @@ mod tests {
     #[test]
     fn list_sessions_returns_all_when_requested() {
         with_temp_project(|project| {
-            let first =
-                start_session("goal1", project, Some("claude"), Some("ls1")).expect("start one");
-            start_session("goal2", project, Some("codex"), Some("ls2")).expect("start two");
+            let first = start_session("goal1", "", project, Some("claude"), Some("ls1"))
+                .expect("start one");
+            start_session("goal2", "", project, Some("codex"), Some("ls2")).expect("start two");
             end_session("ls1", first.leader_id.as_deref().expect("leader"), project).expect("end");
 
             let active_only = list_sessions(project, false).expect("active list");
@@ -2677,7 +2729,8 @@ mod tests {
     #[test]
     fn checkpoint_record_updates_task_summary_and_log() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("s5")).expect("start");
+            let state =
+                start_session("test", "", project, Some("claude"), Some("s5")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let task = create_task(
                 "s5",
@@ -2720,7 +2773,8 @@ mod tests {
     #[test]
     fn send_signal_lists_pending_signal_for_target_agent() {
         with_temp_project(|project| {
-            let state = start_session("test", project, Some("claude"), Some("s6")).expect("start");
+            let state =
+                start_session("test", "", project, Some("claude"), Some("s6")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
             let joined =
                 join_session("s6", SessionRole::Worker, "codex", &[], None, project).expect("join");
@@ -2753,7 +2807,7 @@ mod tests {
     #[test]
     fn send_signal_denies_worker_actor() {
         with_temp_project(|project| {
-            start_session("test", project, Some("claude"), Some("s7")).expect("start");
+            start_session("test", "", project, Some("claude"), Some("s7")).expect("start");
             let joined =
                 join_session("s7", SessionRole::Worker, "codex", &[], None, project).expect("join");
             let worker_id = joined
