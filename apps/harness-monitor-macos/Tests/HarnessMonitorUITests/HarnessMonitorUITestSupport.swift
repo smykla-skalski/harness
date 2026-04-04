@@ -2,17 +2,27 @@ import XCTest
 
 @MainActor
 class HarnessMonitorUITestCase: XCTestCase {
-  static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
-  static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
-  static let uiTimeout: TimeInterval = 10
+  nonisolated static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
+  nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  nonisolated static let uiTimeout: TimeInterval = 10
 
   override func setUpWithError() throws {
     continueAfterFailure = false
-  }
-
-  override func tearDown() async throws {
-    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-    await MainActor.run { terminateIfRunning(app) }
+    addTeardownBlock { @MainActor in
+      let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+      switch app.state {
+      case .runningForeground, .runningBackground:
+        app.terminate()
+        let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
+        while Date.now < deadline, app.state != .notRunning {
+          RunLoop.current.run(until: Date.now.addingTimeInterval(0.1))
+        }
+      case .notRunning, .unknown:
+        break
+      @unknown default:
+        break
+      }
+    }
   }
 }
 
@@ -196,13 +206,29 @@ extension HarnessMonitorUITestCase {
   }
 
   func button(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    let mainWindowButton = mainWindow(in: app)
-      .descendants(matching: .button)
-      .matching(identifier: identifier)
-      .firstMatch
-    if mainWindowButton.exists {
-      return mainWindowButton
+    let roles: [XCUIElement.ElementType] = [
+      .button,
+      .radioButton,
+      .cell,
+    ]
+
+    for role in roles {
+      let mainWindowMatch = mainWindow(in: app)
+        .descendants(matching: role)
+        .matching(identifier: identifier)
+        .firstMatch
+      if mainWindowMatch.exists {
+        return mainWindowMatch
+      }
+
+      let appMatch = app.descendants(matching: role)
+        .matching(identifier: identifier)
+        .firstMatch
+      if appMatch.exists {
+        return appMatch
+      }
     }
+
     return app.buttons.matching(identifier: identifier).firstMatch
   }
 
