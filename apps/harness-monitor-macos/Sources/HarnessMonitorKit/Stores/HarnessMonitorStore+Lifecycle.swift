@@ -138,7 +138,10 @@ extension HarnessMonitorStore {
         timeline: measuredTimeline.value,
         showingCachedData: false
       )
-      Task { await self.cacheSessionDetail(measuredDetail.value, timeline: measuredTimeline.value) }
+      scheduleCacheWrite { service in
+        let insertedCount = await service.cacheSessionDetail(measuredDetail.value, timeline: measuredTimeline.value)
+        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+      }
     } catch {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
@@ -184,7 +187,10 @@ extension HarnessMonitorStore {
     let didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
     isShowingCachedData = false
     if didChange {
-      Task { await self.cacheSessionList(sessions, projects: projects) }
+      scheduleCacheWrite { service in
+        let insertedCount = await service.cacheSessionList(sessions, projects: projects)
+        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+      }
     }
 
     if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
@@ -199,7 +205,12 @@ extension HarnessMonitorStore {
       return
     }
     let project = sessionIndex.projects.first { $0.projectId == summary.projectId }
-    Task { await self.cacheSessionSummary(summary, project: project) }
+    scheduleCacheWrite { service in
+      let isInsert = await service.cacheSessionSummary(summary, project: project)
+      if isInsert {
+        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: 1)
+      }
+    }
   }
 
   func applySelectedSessionSnapshot(
@@ -239,7 +250,10 @@ extension HarnessMonitorStore {
       guard sessionID == selectedSessionID else {
         applySessionSummaryUpdate(payload.detail.session)
         if let timeline = payload.timeline {
-          Task { await self.cacheSessionDetail(payload.detail, timeline: timeline, markViewed: false) }
+          scheduleCacheWrite { service in
+            let insertedCount = await service.cacheSessionDetail(payload.detail, timeline: timeline, markViewed: false)
+            self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+          }
         }
         return
       }
@@ -252,7 +266,10 @@ extension HarnessMonitorStore {
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
       if let freshTimeline = payload.timeline {
-        Task { await self.cacheSessionDetail(payload.detail, timeline: freshTimeline) }
+        scheduleCacheWrite { service in
+          let insertedCount = await service.cacheSessionDetail(payload.detail, timeline: freshTimeline)
+          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+        }
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
@@ -278,7 +295,10 @@ extension HarnessMonitorStore {
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
       if let freshTimeline = payload.timeline {
-        Task { await self.cacheSessionDetail(payload.detail, timeline: freshTimeline) }
+        scheduleCacheWrite { service in
+          let insertedCount = await service.cacheSessionDetail(payload.detail, timeline: freshTimeline)
+          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+        }
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
@@ -425,7 +445,10 @@ extension HarnessMonitorStore {
         }
         timeline = measuredTimeline.value
         if let selectedSession {
-          Task { await self.cacheSessionDetail(selectedSession, timeline: measuredTimeline.value) }
+          scheduleCacheWrite { service in
+            let insertedCount = await service.cacheSessionDetail(selectedSession, timeline: measuredTimeline.value)
+            self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+          }
         }
       } catch {
         lastError = error.localizedDescription

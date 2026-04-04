@@ -35,10 +35,7 @@ struct SessionsBoardView: View {
   }
 
   private func selectSession(_ sessionID: String) {
-    store.primeSessionSelection(sessionID)
-    Task {
-      await store.selectSession(sessionID)
-    }
+    Task { await store.selectSession(sessionID) }
   }
 
   private func startDaemon() async {
