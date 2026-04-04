@@ -231,8 +231,7 @@ struct SidebarView: View {
       isBookmarked: store.isBookmarked(sessionId: session.sessionId),
       isSelected: isSelected
     )
-    .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
-    .padding(.vertical, HarnessMonitorTheme.itemSpacing)
+    .padding(HarnessMonitorTheme.cardPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background {
       if isSelected {
