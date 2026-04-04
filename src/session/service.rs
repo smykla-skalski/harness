@@ -483,6 +483,19 @@ pub fn list_tasks(
     status_filter: Option<TaskStatus>,
     project_dir: &Path,
 ) -> Result<Vec<WorkItem>, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let detail = client.get_session_detail(session_id)?;
+        let mut items: Vec<WorkItem> = detail
+            .tasks
+            .into_iter()
+            .filter(|task| status_filter.is_none_or(|status| task.status == status))
+            .collect();
+        items.sort_unstable_by_key(|item| {
+            (Reverse(item.severity), Reverse(item.updated_at.clone()))
+        });
+        return Ok(items);
+    }
+
     let state = load_state_or_err(session_id, project_dir)?;
     let mut items: Vec<WorkItem> = state
         .tasks
@@ -691,6 +704,17 @@ pub fn list_signals(
     agent_filter: Option<&str>,
     project_dir: &Path,
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let detail = client.get_session_detail(session_id)?;
+        let mut signals: Vec<SessionSignalRecord> = detail
+            .signals
+            .into_iter()
+            .filter(|signal| agent_filter.is_none_or(|filter| signal.agent_id == filter))
+            .collect();
+        signals.sort_by(|left, right| right.signal.created_at.cmp(&left.signal.created_at));
+        return Ok(signals);
+    }
+
     let state = load_state_or_err(session_id, project_dir)?;
     let mut signals = Vec::new();
 
@@ -728,6 +752,10 @@ pub fn resolve_session_agent_for_runtime_session(
     runtime_name: &str,
     runtime_session_id: &str,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        return resolve_runtime_session_via_daemon(client, runtime_name, runtime_session_id);
+    }
+
     let active_session_ids: Vec<_> = storage::load_active_registry_for(project_dir)
         .sessions
         .into_keys()
@@ -865,6 +893,13 @@ fn signal_records_for_dirs(
 /// # Errors
 /// Returns `CliError` if the session is not found.
 pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionState, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let detail = client.get_session_detail(session_id)?;
+        let mut state = detail_to_session_state(&detail);
+        state.metrics = SessionMetrics::recalculate(&state);
+        return Ok(state);
+    }
+
     let mut state = load_state_or_err(session_id, project_dir)?;
     state.metrics = SessionMetrics::recalculate(&state);
     Ok(state)
@@ -875,6 +910,17 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
 /// # Errors
 /// Returns `CliError` on storage failures.
 pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<SessionState>, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let summaries = client.list_sessions()?;
+        let mut sessions: Vec<SessionState> = summaries
+            .into_iter()
+            .filter(|summary| include_all || summary.status == SessionStatus::Active)
+            .map(|summary| summary_to_session_state(&summary))
+            .collect();
+        sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+        return Ok(sessions);
+    }
+
     let session_ids = if include_all {
         storage::list_known_session_ids(project_dir)?
     } else {
@@ -903,6 +949,17 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
 /// # Errors
 /// Returns `CliError` on discovery failures.
 pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let summaries = client.list_sessions()?;
+        let mut sessions: Vec<SessionState> = summaries
+            .into_iter()
+            .filter(|summary| include_all || summary.status == SessionStatus::Active)
+            .map(|summary| summary_to_session_state(&summary))
+            .collect();
+        sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+        return Ok(sessions);
+    }
+
     let resolved = daemon_index::discover_sessions(include_all)?;
     let mut sessions: Vec<SessionState> = resolved
         .into_iter()
@@ -1491,6 +1548,103 @@ pub(crate) fn log_signal_acknowledged(
         signal_id: signal_id.to_string(),
         agent_id: agent_id.to_string(),
         result,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Daemon response conversions
+// ---------------------------------------------------------------------------
+
+/// Reconstruct a `SessionState` from a daemon `SessionDetail` response.
+fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
+    let agents = detail
+        .agents
+        .iter()
+        .map(|agent| (agent.agent_id.clone(), agent.clone()))
+        .collect();
+    let tasks = detail
+        .tasks
+        .iter()
+        .map(|task| (task.task_id.clone(), task.clone()))
+        .collect();
+    SessionState {
+        schema_version: CURRENT_VERSION,
+        state_version: 0,
+        session_id: detail.session.session_id.clone(),
+        context: detail.session.context.clone(),
+        status: detail.session.status,
+        created_at: detail.session.created_at.clone(),
+        updated_at: detail.session.updated_at.clone(),
+        agents,
+        tasks,
+        leader_id: detail.session.leader_id.clone(),
+        archived_at: None,
+        last_activity_at: detail.session.last_activity_at.clone(),
+        observe_id: detail.session.observe_id.clone(),
+        pending_leader_transfer: detail.session.pending_leader_transfer.clone(),
+        metrics: detail.session.metrics.clone(),
+    }
+}
+
+/// Reconstruct a minimal `SessionState` from a daemon `SessionSummary`.
+///
+/// The summary doesn't contain agents or tasks - only the session-level
+/// fields and metrics. This is sufficient for list display.
+fn summary_to_session_state(summary: &protocol::SessionSummary) -> SessionState {
+    SessionState {
+        schema_version: CURRENT_VERSION,
+        state_version: 0,
+        session_id: summary.session_id.clone(),
+        context: summary.context.clone(),
+        status: summary.status,
+        created_at: summary.created_at.clone(),
+        updated_at: summary.updated_at.clone(),
+        agents: BTreeMap::new(),
+        tasks: BTreeMap::new(),
+        leader_id: summary.leader_id.clone(),
+        archived_at: None,
+        last_activity_at: summary.last_activity_at.clone(),
+        observe_id: summary.observe_id.clone(),
+        pending_leader_transfer: summary.pending_leader_transfer.clone(),
+        metrics: summary.metrics.clone(),
+    }
+}
+
+fn resolve_runtime_session_via_daemon(
+    client: &DaemonClient,
+    runtime_name: &str,
+    runtime_session_id: &str,
+) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
+    let summaries = client.list_sessions()?;
+    let mut matches = Vec::new();
+    for summary in &summaries {
+        if summary.status != SessionStatus::Active {
+            continue;
+        }
+        let Ok(detail) = client.get_session_detail(&summary.session_id) else {
+            continue;
+        };
+        for agent in &detail.agents {
+            if agent.status != AgentStatus::Active || agent.runtime != runtime_name {
+                continue;
+            }
+            let matches_runtime = agent.agent_session_id.as_deref() == Some(runtime_session_id)
+                || (agent.agent_session_id.is_none() && summary.session_id == runtime_session_id);
+            if matches_runtime {
+                matches.push(ResolvedRuntimeSessionAgent {
+                    orchestration_session_id: summary.session_id.clone(),
+                    agent_id: agent.agent_id.clone(),
+                });
+            }
+        }
+    }
+    match matches.len() {
+        0 => Ok(None),
+        1 => Ok(matches.into_iter().next()),
+        _ => Err(CliErrorKind::session_ambiguous(format!(
+            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' maps to multiple orchestration sessions"
+        ))
+        .into()),
     }
 }
 
