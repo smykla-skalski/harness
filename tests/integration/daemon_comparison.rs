@@ -35,15 +35,25 @@ fn seed_workspace(tmp: &std::path::Path) {
             .expect("git init");
     }
 
-    let state_a =
-        session_service::start_session("comparison-a", &project_a, Some("claude"), Some("cmp1"))
-            .expect("start cmp1");
+    let state_a = session_service::start_session(
+        "comparison-a",
+        "",
+        &project_a,
+        Some("claude"),
+        Some("cmp1"),
+    )
+    .expect("start cmp1");
     session_service::join_session("cmp1", SessionRole::Worker, "codex", &[], None, &project_a)
         .expect("join cmp1");
 
-    let state_b =
-        session_service::start_session("comparison-b", &project_b, Some("claude"), Some("cmp2"))
-            .expect("start cmp2");
+    let state_b = session_service::start_session(
+        "comparison-b",
+        "",
+        &project_b,
+        Some("claude"),
+        Some("cmp2"),
+    )
+    .expect("start cmp2");
 
     for (session_id, project_dir, session_state) in [
         ("cmp1", project_a.as_path(), &state_a),
