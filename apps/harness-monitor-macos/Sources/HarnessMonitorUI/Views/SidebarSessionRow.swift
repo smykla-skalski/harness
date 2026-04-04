@@ -5,6 +5,7 @@ struct SidebarSessionRow: View {
   let session: SessionSummary
   let isBookmarked: Bool
   let isSelected: Bool
+  let isHovered: Bool
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -40,9 +41,13 @@ struct SidebarSessionRow: View {
         footerLabel("\(session.metrics.activeAgentCount) active")
         footerLabel("\(session.metrics.inProgressTaskCount) moving")
         Spacer(minLength: 0)
-        footerLabel(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
+        Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
+          .scaledFont(.caption.weight(.medium))
+          .lineLimit(1)
+          .foregroundStyle(isSelected || isHovered ? selectedSecondaryTextStyle : HarnessMonitorTheme.ink.opacity(0.35))
       }
       .frame(maxWidth: .infinity)
+      .animation(.easeInOut(duration: 0.15), value: isHovered)
       }
     }
     .foregroundStyle(isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
@@ -53,7 +58,7 @@ struct SidebarSessionRow: View {
     Text(value)
       .scaledFont(.caption.weight(.medium))
       .lineLimit(1)
-      .foregroundStyle(selectedSecondaryTextStyle)
+      .foregroundStyle(isSelected || isHovered ? selectedSecondaryTextStyle : HarnessMonitorTheme.ink.opacity(0.35))
   }
 
   private var selectedSecondaryTextStyle: Color {
@@ -66,7 +71,8 @@ struct SidebarSessionRow: View {
     SidebarSessionRow(
       session: PreviewFixtures.summary,
       isBookmarked: true,
-      isSelected: true
+      isSelected: true,
+      isHovered: false
     )
     .padding()
     .background(
@@ -77,7 +83,8 @@ struct SidebarSessionRow: View {
     SidebarSessionRow(
       session: PreviewFixtures.overflowSessions[3],
       isBookmarked: false,
-      isSelected: false
+      isSelected: false,
+      isHovered: false
     )
     .padding()
     .background(
