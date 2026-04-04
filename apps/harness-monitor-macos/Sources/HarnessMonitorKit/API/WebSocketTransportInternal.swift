@@ -87,6 +87,7 @@ extension WebSocketTransport {
   }
 
   func reconnectInternal() async throws {
+    HarnessMonitorLogger.websocket.info("WebSocket reconnecting")
     heartbeatTask?.cancel()
     webSocketTask?.cancel(with: .goingAway, reason: nil)
     let wsURL = wsEndpoint()

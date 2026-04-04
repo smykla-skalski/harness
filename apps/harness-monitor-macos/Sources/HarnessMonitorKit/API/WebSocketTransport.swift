@@ -41,6 +41,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
 
   public func connect() async throws {
     let wsURL = wsEndpoint()
+    HarnessMonitorLogger.websocket.info("WebSocket connecting to \(wsURL.absoluteString, privacy: .public)")
     var request = URLRequest(url: wsURL)
     request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
     let task = session.webSocketTask(with: request)
@@ -51,6 +52,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   }
 
   public func disconnect() {
+    HarnessMonitorLogger.websocket.info("WebSocket disconnected")
     receiveTask?.cancel()
     heartbeatTask?.cancel()
     webSocketTask?.cancel(with: .normalClosure, reason: nil)
