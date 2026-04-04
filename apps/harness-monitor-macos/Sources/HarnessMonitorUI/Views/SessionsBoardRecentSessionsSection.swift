@@ -31,24 +31,27 @@ struct SessionsBoardRecentSessionsSection: View {
                   .frame(width: 8)
                   .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                  HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+                  HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
                     Text(session.context)
                       .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
                       .foregroundStyle(HarnessMonitorTheme.ink)
                       .multilineTextAlignment(.leading)
+                    Spacer(minLength: 12)
                     Text(session.status.title)
                       .scaledFont(.caption2.weight(.bold))
                       .foregroundStyle(statusColor(for: session.status))
                   }
-                  Text(sessionMetadata(session))
-                    .scaledFont(.caption.monospaced())
-                    .truncationMode(.middle)
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                  HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
+                    Text(sessionMetadata(session))
+                      .scaledFont(.caption.monospaced())
+                      .truncationMode(.middle)
+                      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                    Spacer(minLength: 0)
+                    Text(formatTimestamp(session.updatedAt, configuration: dateTimeConfiguration))
+                      .scaledFont(.caption.weight(.semibold))
+                      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                  }
                 }
-                Spacer()
-                Text(formatTimestamp(session.updatedAt, configuration: dateTimeConfiguration))
-                  .scaledFont(.caption.weight(.semibold))
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               }
               .frame(maxWidth: .infinity, alignment: .leading)
               .padding(HarnessMonitorTheme.cardPadding)
