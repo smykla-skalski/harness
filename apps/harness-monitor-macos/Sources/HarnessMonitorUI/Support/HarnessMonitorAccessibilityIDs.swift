@@ -84,6 +84,7 @@ enum HarnessMonitorAccessibility {
   static let sidebarStartDaemonButtonFrame = "harness.sidebar.action.start.frame"
   static let sidebarInstallLaunchAgentButtonFrame = "harness.sidebar.action.install.frame"
   static let sidebarDaemonStatusBadge = "harness.sidebar.daemon-status-badge"
+  static let sidebarLaunchdStatusIcon = "harness.sidebar.daemon-launchd-icon"
   static let connectionBadge = "harness.toolbar.connection-badge"
   static let transportBadge = "harness.sidebar.transport-badge"
   static let latencyBadge = "harness.sidebar.latency-badge"

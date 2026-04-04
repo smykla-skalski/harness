@@ -1,6 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private final class DaemonLaunchdIconBundleToken {}
+
+private let daemonLaunchdIconBundle = Bundle(for: DaemonLaunchdIconBundleToken.self)
+
 struct DaemonCardHeader: View {
   let connectionLabel: String
   let isLoading: Bool
@@ -23,12 +27,25 @@ struct DaemonCardHeader: View {
       }
       Spacer()
       HStack(spacing: 8) {
-        Image(systemName: isLaunchAgentInstalled ? "autostartstop" : "person.fill")
-          .scaledFont(.system(.callout, weight: .semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .opacity(0.55)
-          .help(isLaunchAgentInstalled ? "Launchd managed daemon" : "Manually started daemon")
-          .accessibilityLabel(isLaunchAgentInstalled ? "Launchd mode" : "Manual mode")
+        Group {
+          if isLaunchAgentInstalled {
+            Image("LaunchDaemonRocket", bundle: daemonLaunchdIconBundle)
+              .renderingMode(.template)
+              .resizable()
+              .scaledToFit()
+              .frame(width: 18, height: 18)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .opacity(0.6)
+              .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarLaunchdStatusIcon)
+          } else {
+            Image(systemName: "person.fill")
+              .scaledFont(.system(.callout, weight: .semibold))
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .opacity(0.55)
+          }
+        }
+        .help(isLaunchAgentInstalled ? "Launchd managed daemon" : "Manually started daemon")
+        .accessibilityLabel(isLaunchAgentInstalled ? "Launchd mode" : "Manual mode")
 
         DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarStartDaemonButtonFrame) {
           DaemonStateToggleControl(
