@@ -188,7 +188,10 @@ extension HarnessMonitorStore {
 
   func applySessionSummaryUpdate(_ summary: SessionSummary) {
     sessionIndex.applySessionSummary(summary)
-    cacheSessionList(sessionIndex.sessions, projects: sessionIndex.projects)
+    cacheSessionSummary(
+      summary,
+      project: sessionIndex.projects.first { $0.projectId == summary.projectId }
+    )
   }
 
   func applySelectedSessionSnapshot(

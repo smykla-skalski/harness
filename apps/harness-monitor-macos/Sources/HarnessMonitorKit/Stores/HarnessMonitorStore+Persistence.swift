@@ -9,36 +9,18 @@ extension HarnessMonitorStore {
     guard let modelContext, persistenceError == nil else { return }
 
     do {
-      for project in projects {
-        let projectId = project.projectId
-        var descriptor = FetchDescriptor<CachedProject>(
-          predicate: #Predicate { $0.projectId == projectId }
-        )
-        descriptor.fetchLimit = 1
+      var insertedSessionCount = 0
 
-        if let existing = try modelContext.fetch(descriptor).first {
-          existing.update(from: project)
-        } else {
-          modelContext.insert(project.toCachedProject())
-        }
+      for project in projects {
+        try upsertCachedProject(project, in: modelContext)
       }
 
       for session in sessions {
-        let sessionId = session.sessionId
-        var descriptor = FetchDescriptor<CachedSession>(
-          predicate: #Predicate { $0.sessionId == sessionId }
-        )
-        descriptor.fetchLimit = 1
-
-        if let existing = try modelContext.fetch(descriptor).first {
-          existing.update(from: session)
-        } else {
-          modelContext.insert(session.toCachedSession())
-        }
+        insertedSessionCount += try upsertCachedSession(session, in: modelContext) ? 1 : 0
       }
 
       try modelContext.save()
-      refreshPersistedSessionMetadata()
+      updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedSessionCount)
     } catch {
       modelContext.rollback()
       recordPersistenceFailure(
@@ -56,19 +38,19 @@ extension HarnessMonitorStore {
     guard let modelContext, persistenceError == nil else { return }
 
     do {
-      let sessionId = detail.session.sessionId
-      var descriptor = FetchDescriptor<CachedSession>(
-        predicate: #Predicate { $0.sessionId == sessionId }
-      )
-      descriptor.fetchLimit = 1
-
       let cached: CachedSession
-      if let existing = try modelContext.fetch(descriptor).first {
+      let insertedSessionCount: Int
+      if let existing = try cachedSession(
+        sessionID: detail.session.sessionId,
+        in: modelContext
+      ) {
         existing.update(from: detail.session)
         cached = existing
+        insertedSessionCount = 0
       } else {
         cached = detail.session.toCachedSession()
         modelContext.insert(cached)
+        insertedSessionCount = 1
       }
 
       if markViewed {
@@ -83,11 +65,34 @@ extension HarnessMonitorStore {
       syncObserver(detail.observer, on: cached, in: modelContext)
 
       try modelContext.save()
-      refreshPersistedSessionMetadata()
+      updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedSessionCount)
     } catch {
       modelContext.rollback()
       recordPersistenceFailure(
         action: "Cached session detail could not be updated.",
+        underlyingError: error
+      )
+    }
+  }
+
+  func cacheSessionSummary(
+    _ summary: SessionSummary,
+    project: ProjectSummary?
+  ) {
+    guard let modelContext, persistenceError == nil else { return }
+
+    do {
+      if let project {
+        try upsertCachedProject(project, in: modelContext)
+      }
+
+      let insertedSessionCount = try upsertCachedSession(summary, in: modelContext) ? 1 : 0
+      try modelContext.save()
+      updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedSessionCount)
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Cached session summary could not be updated.",
         underlyingError: error
       )
     }
@@ -214,6 +219,58 @@ extension HarnessMonitorStore {
       || !session.signals.isEmpty
       || !session.timelineEntries.isEmpty
       || !session.agentActivity.isEmpty
+  }
+
+  private func updatePersistedSessionMetadataAfterSave(insertedSessionCount: Int) {
+    persistedSessionCount += insertedSessionCount
+    lastPersistedSnapshotAt = .now
+  }
+
+  private func upsertCachedProject(
+    _ project: ProjectSummary,
+    in context: ModelContext
+  ) throws {
+    if let existing = try cachedProject(projectID: project.projectId, in: context) {
+      existing.update(from: project)
+    } else {
+      context.insert(project.toCachedProject())
+    }
+  }
+
+  @discardableResult
+  private func upsertCachedSession(
+    _ summary: SessionSummary,
+    in context: ModelContext
+  ) throws -> Bool {
+    if let existing = try cachedSession(sessionID: summary.sessionId, in: context) {
+      existing.update(from: summary)
+      return false
+    }
+
+    context.insert(summary.toCachedSession())
+    return true
+  }
+
+  private func cachedProject(
+    projectID: String,
+    in context: ModelContext
+  ) throws -> CachedProject? {
+    var descriptor = FetchDescriptor<CachedProject>(
+      predicate: #Predicate { $0.projectId == projectID }
+    )
+    descriptor.fetchLimit = 1
+    return try context.fetch(descriptor).first
+  }
+
+  private func cachedSession(
+    sessionID: String,
+    in context: ModelContext
+  ) throws -> CachedSession? {
+    var descriptor = FetchDescriptor<CachedSession>(
+      predicate: #Predicate { $0.sessionId == sessionID }
+    )
+    descriptor.fetchLimit = 1
+    return try context.fetch(descriptor).first
   }
 }
 
