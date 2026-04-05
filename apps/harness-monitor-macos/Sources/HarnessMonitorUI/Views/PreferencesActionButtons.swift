@@ -60,6 +60,16 @@ struct PreferencesActionButtons: View {
         ) {
           isRemoveLaunchAgentConfirmationPresented = true
         }
+        HarnessMonitorActionButton(
+          title: "Reset Onboarding",
+          tint: .secondary,
+          variant: .bordered,
+          accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
+            "Reset Onboarding"
+          )
+        ) {
+          UserDefaults.standard.set(false, forKey: "harnessMonitor.board.onboardingDismissed")
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

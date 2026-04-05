@@ -18,6 +18,7 @@ struct HarnessMonitorAppConfiguration {
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
       HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
+      "harnessMonitor.board.onboardingDismissed": false,
     ])
 
     let environment = HarnessMonitorEnvironment.current

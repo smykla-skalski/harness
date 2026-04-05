@@ -3,6 +3,8 @@ import SwiftUI
 
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
+  @AppStorage("harnessMonitor.board.onboardingDismissed")
+  private var isOnboardingDismissed = false
 
   private var isLoading: Bool {
     store.isDaemonActionInFlight || store.isRefreshing || store.connectionState == .connecting
@@ -11,7 +13,7 @@ struct SessionsBoardView: View {
   var body: some View {
     HarnessMonitorColumnScrollView(constrainContentWidth: true) {
       VStack(alignment: .leading, spacing: 24) {
-        if store.sessions.isEmpty {
+        if !isOnboardingDismissed {
           SessionsBoardOnboardingCard(
             connectionState: store.connectionState,
             isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
@@ -19,7 +21,8 @@ struct SessionsBoardView: View {
             isLoading: isLoading,
             startDaemon: startDaemon,
             installLaunchAgent: installLaunchAgent,
-            refresh: refresh
+            refresh: refresh,
+            dismiss: { isOnboardingDismissed = true }
           )
         }
         SessionsBoardRecentSessionsSection(
