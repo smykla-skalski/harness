@@ -145,8 +145,9 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [swiftui-state-management.md](.claude/rules/swiftui-state-management.md) | `apps/harness-monitor-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
 | [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-monitor-macos/Sources/**` | View composition, ForEach identity, modifier branches |
 | [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
+| [xcuitest-speed.md](.claude/rules/xcuitest-speed.md) | `apps/harness-monitor-macos/Tests/**` | Animation suppression, .firstMatch, coordinate taps, single-launch tests, scroll patterns |
 
-Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines). Consult for rationale or edge cases.
+Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines) and `tmp/investigations/xcuitest-speed/`. Consult for rationale or edge cases.
 
 ## Gotchas
 
