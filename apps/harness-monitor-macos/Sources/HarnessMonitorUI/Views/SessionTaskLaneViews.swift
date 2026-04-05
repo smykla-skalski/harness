@@ -24,6 +24,7 @@ struct SessionTaskListSection: View {
         } description: {
           Text("Create a task from the Action Console in the inspector.")
         }
+        .foregroundStyle(.tertiary)
         .frame(
           maxWidth: .infinity,
           minHeight: emptyStateMinHeight,

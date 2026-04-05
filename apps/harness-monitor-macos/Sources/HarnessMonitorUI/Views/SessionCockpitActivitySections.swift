@@ -23,6 +23,7 @@ struct SessionCockpitSignalsSection: View {
         } description: {
           Text("Signals appear when agents send or receive commands.")
         }
+        .foregroundStyle(.tertiary)
         .frame(maxWidth: .infinity)
       }
       LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
