@@ -44,6 +44,7 @@ enum HarnessMonitorAccessibility {
   static let onboardingStartButtonFrame = "harness.board.action.start.frame"
   static let onboardingInstallButtonFrame = "harness.board.action.install.frame"
   static let onboardingRefreshButtonFrame = "harness.board.action.refresh.frame"
+  static let onboardingDismissButton = "harness.board.onboarding-card.dismiss"
   static let sessionsBoardRoot = "harness.board.root"
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let contentRoot = "harness.content.root"
