@@ -317,7 +317,9 @@ private struct ToolbarDaemonIndicatorIcon: View {
           .font(.caption.weight(.semibold))
       }
     }
+    .frame(width: 16)
     .foregroundStyle(indicator.foregroundColor)
+    .animation(nil, value: indicator)
     .accessibilityHidden(true)
   }
 }
