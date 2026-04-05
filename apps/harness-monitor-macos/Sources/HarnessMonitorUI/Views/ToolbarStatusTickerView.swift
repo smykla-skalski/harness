@@ -47,14 +47,18 @@ struct ToolbarStatusTickerView: View {
   }
 
   var body: some View {
-    ZStack {
+    ZStack(alignment: .trailing) {
+      ForEach(messages) { message in
+        tickerLabel(message)
+          .hidden()
+          .accessibilityHidden(true)
+      }
       if let message = currentMessage {
         tickerLabel(message)
-        .id(message.id)
-        .transition(.push(from: direction.pushEdge))
+          .id(message.id)
+          .transition(.push(from: direction.pushEdge))
       }
     }
-    .frame(maxWidth: .infinity, alignment: .trailing)
     .frame(height: Self.tickerHeight)
     .clipped()
     .task(id: messages.count) {
