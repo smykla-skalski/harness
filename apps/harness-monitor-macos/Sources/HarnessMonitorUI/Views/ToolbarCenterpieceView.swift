@@ -240,6 +240,7 @@ private struct ToolbarStatusDropdown: View {
         } label: {
           Text(String(repeating: " ", count: 30))
             .font(.subheadline)
+            .frame(maxHeight: .infinity)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
