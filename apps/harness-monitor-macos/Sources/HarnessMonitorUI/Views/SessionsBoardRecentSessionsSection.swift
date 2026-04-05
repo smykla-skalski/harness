@@ -75,7 +75,7 @@ private struct DashboardSessionCard: View {
               .truncationMode(.middle)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             Spacer(minLength: 0)
-            Text(formatTimestamp(session.updatedAt, configuration: dateTimeConfiguration))
+            Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
               .scaledFont(.caption.weight(.semibold))
               .foregroundStyle(isHovered ? HarnessMonitorTheme.secondaryInk : HarnessMonitorTheme.ink.opacity(0.35))
               .animation(.easeInOut(duration: 0.15), value: isHovered)

@@ -123,6 +123,14 @@ extension EnvironmentValues {
   return formatter
 }()
 
+@MainActor private let spaceSeparatedFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = Locale(identifier: "en_US_POSIX")
+  formatter.timeZone = TimeZone(secondsFromGMT: 0)
+  formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+  return formatter
+}()
+
 @MainActor
 func formatTimestamp(_ value: String?) -> String {
   formatTimestamp(value, configuration: .stored())
@@ -169,5 +177,7 @@ func formatTimestamp(
 
 @MainActor
 private func parsedTimestampDate(from value: String) -> Date? {
-  iso8601FractionalFormatter.date(from: value) ?? iso8601Formatter.date(from: value)
+  iso8601FractionalFormatter.date(from: value)
+    ?? iso8601Formatter.date(from: value)
+    ?? spaceSeparatedFormatter.date(from: value)
 }
