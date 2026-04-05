@@ -224,35 +224,64 @@ private struct ToolbarStatusDropdown: View {
   let daemonIndicator: ToolbarDaemonIndicator
 
   var body: some View {
-    HStack(spacing: 8) {
-      ZStack(alignment: .trailing) {
-        Menu {
-          ForEach(messages) { message in
-            Button {
-            } label: {
-              if let systemImage = message.systemImage {
-                Label(message.text, systemImage: systemImage)
-              } else {
-                Text(message.text)
-              }
-            }
-          }
-        } label: {
-          Text(String(repeating: " ", count: 30))
-            .font(.subheadline)
-            .frame(maxHeight: .infinity)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-
+    ToolbarStatusMenuArea(messages: messages) {
+      HStack(spacing: 8) {
         ToolbarStatusTickerView(messages: messages, direction: .up)
-          .allowsHitTesting(false)
+        ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
       }
-
-      ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
-        .allowsHitTesting(false)
     }
+    .frame(maxHeight: .infinity)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
+  }
+}
+
+private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
+  let messages: [ToolbarStatusMessage]
+  @ViewBuilder let content: Content
+
+  func makeNSView(context: Context) -> ToolbarStatusMenuNSView {
+    let view = ToolbarStatusMenuNSView()
+    let hosting = NSHostingView(rootView: content)
+    hosting.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(hosting)
+    NSLayoutConstraint.activate([
+      hosting.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      hosting.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+    ])
+    view.hostingView = hosting
+    view.messages = messages
+    view.setAccessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
+    return view
+  }
+
+  func updateNSView(_ nsView: ToolbarStatusMenuNSView, context: Context) {
+    nsView.messages = messages
+    if let hosting = nsView.hostingView as? NSHostingView<Content> {
+      hosting.rootView = content
+    }
+  }
+}
+
+final class ToolbarStatusMenuNSView: NSView {
+  var messages: [ToolbarStatusMessage] = []
+  var hostingView: NSView?
+
+  override func mouseDown(with event: NSEvent) {
+    let menu = NSMenu()
+    for message in messages {
+      let item = NSMenuItem(title: message.text, action: nil, keyEquivalent: "")
+      if let systemImage = message.systemImage {
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        if let image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)?
+          .withSymbolConfiguration(config)
+        {
+          item.image = image
+        }
+      }
+      menu.addItem(item)
+    }
+    let point = NSPoint(x: 0, y: bounds.height)
+    menu.popUp(positioning: nil, at: point, in: self)
   }
 }
 
