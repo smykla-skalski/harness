@@ -97,7 +97,6 @@ public struct ContentView: View {
         .toolbar {
           navigationToolbar
           centerpieceToolbar
-          statusTickerToolbar
         }
         .toolbar(id: "harness.main") {
           primaryToolbar
@@ -182,13 +181,6 @@ private extension ContentView {
     )
   }
 
-  @ToolbarContentBuilder var centerpieceToolbar: some ToolbarContent {
-    ContentCenterpieceToolbar(
-      model: toolbarCenterpieceModel,
-      displayMode: toolbarCenterpieceDisplayMode
-    )
-  }
-
   private var statusTickerMessages: [ToolbarStatusMessage] {
     [
       .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
@@ -197,8 +189,12 @@ private extension ContentView {
     ]
   }
 
-  @ToolbarContentBuilder var statusTickerToolbar: some ToolbarContent {
-    ToolbarStatusTickerToolbar(messages: statusTickerMessages)
+  @ToolbarContentBuilder var centerpieceToolbar: some ToolbarContent {
+    ContentCenterpieceToolbar(
+      model: toolbarCenterpieceModel,
+      displayMode: toolbarCenterpieceDisplayMode,
+      statusMessages: statusTickerMessages
+    )
   }
 
   @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {
