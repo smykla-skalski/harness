@@ -39,6 +39,8 @@ public struct PreferencesView: View {
         PreferencesGeneralSection(store: store, themeMode: $themeMode)
       case .connection:
         PreferencesConnectionSection(store: store)
+      case .database:
+        PreferencesDatabaseSection(store: store)
       case .diagnostics:
         PreferencesDiagnosticsSection(store: store)
       }
