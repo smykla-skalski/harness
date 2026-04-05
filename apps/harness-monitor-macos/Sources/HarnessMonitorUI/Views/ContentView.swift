@@ -189,11 +189,22 @@ private extension ContentView {
     ]
   }
 
+  private var daemonIndicator: ToolbarDaemonIndicator {
+    guard store.connectionState == .online else {
+      return .offline
+    }
+    if store.daemonStatus?.launchAgent.installed == true {
+      return .launchdConnected
+    }
+    return .manualConnected
+  }
+
   @ToolbarContentBuilder var centerpieceToolbar: some ToolbarContent {
     ContentCenterpieceToolbar(
       model: toolbarCenterpieceModel,
       displayMode: toolbarCenterpieceDisplayMode,
-      statusMessages: statusTickerMessages
+      statusMessages: statusTickerMessages,
+      daemonIndicator: daemonIndicator
     )
   }
 

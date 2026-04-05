@@ -49,17 +49,7 @@ struct ToolbarStatusTickerView: View {
   var body: some View {
     ZStack {
       if let message = currentMessage {
-        HStack(spacing: 5) {
-          Text(message.text)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-          if let systemImage = message.systemImage {
-            Image(systemName: systemImage)
-              .font(.caption2.weight(.semibold))
-              .foregroundStyle(message.tint)
-          }
-        }
+        tickerLabel(message)
         .id(message.id)
         .transition(.push(from: direction.pushEdge))
       }
@@ -80,6 +70,13 @@ struct ToolbarStatusTickerView: View {
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(currentMessage?.text ?? "No status")
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
+  }
+
+  private func tickerLabel(_ message: ToolbarStatusMessage) -> some View {
+    Text(message.text)
+      .font(.subheadline)
+      .foregroundStyle(.secondary)
+      .lineLimit(1)
   }
 }
 
