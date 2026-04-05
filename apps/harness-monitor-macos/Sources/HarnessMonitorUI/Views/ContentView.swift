@@ -183,9 +183,9 @@ private extension ContentView {
 
   private var statusTickerMessages: [ToolbarStatusMessage] {
     [
-      .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-      .init(text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
-      .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
+      .init(id: "status.running", text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+      .init(id: "status.sessions", text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+      .init(id: "status.daemon", text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
     ]
   }
 

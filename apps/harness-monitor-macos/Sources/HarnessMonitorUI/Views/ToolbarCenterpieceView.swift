@@ -202,24 +202,27 @@ private struct ToolbarCenterpieceView: View {
         Spacer(minLength: 20)
 
         HStack(spacing: 8) {
-          Menu {
-            ForEach(statusMessages) { message in
-              if let systemImage = message.systemImage {
-                Label(message.text, systemImage: systemImage)
-              } else {
-                Text(message.text)
+          ToolbarStatusTickerView(messages: statusMessages, direction: .up)
+            .overlay {
+              Menu {
+                ForEach(statusMessages) { message in
+                  if let systemImage = message.systemImage {
+                    Label(message.text, systemImage: systemImage)
+                  } else {
+                    Text(message.text)
+                  }
+                }
+                Divider()
+                Button {
+                } label: {
+                  Label("Show All Messages", systemImage: "list.bullet")
+                }
+              } label: {
+                Color.clear
               }
+              .menuStyle(.borderlessButton)
+              .menuIndicator(.hidden)
             }
-            Divider()
-            Button {
-            } label: {
-              Label("Show All Messages", systemImage: "list.bullet")
-            }
-          } label: {
-            ToolbarStatusTickerView(messages: statusMessages, direction: .up)
-          }
-          .menuStyle(.borderlessButton)
-          .menuIndicator(.hidden)
 
           ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
         }
