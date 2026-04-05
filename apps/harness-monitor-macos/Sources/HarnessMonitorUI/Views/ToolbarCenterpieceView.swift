@@ -201,42 +201,73 @@ private struct ToolbarCenterpieceView: View {
       if !statusMessages.isEmpty {
         Spacer(minLength: 20)
 
-        HStack(spacing: 8) {
-          ToolbarStatusTickerView(messages: statusMessages, direction: .up)
-            .overlay {
-              Menu {
-                ForEach(statusMessages) { message in
-                  if let systemImage = message.systemImage {
-                    Label(message.text, systemImage: systemImage)
-                  } else {
-                    Text(message.text)
-                  }
-                }
-                Divider()
-                Button {
-                } label: {
-                  Label("Show All Messages", systemImage: "list.bullet")
-                }
-              } label: {
-                Color.clear
-              }
-              .menuStyle(.borderlessButton)
-              .menuIndicator(.hidden)
-            }
-
-          ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
-        }
+        ToolbarStatusDropdown(
+          messages: statusMessages,
+          daemonIndicator: daemonIndicator
+        )
         .frame(width: Self.tickerWidth, alignment: .trailing)
       }
     }
     .padding(.horizontal, Self.baseHorizontalPadding)
     .frame(width: Self.centerpieceWidth)
     .frame(height: Self.toolbarHeight)
-    .accessibilityElement(children: .combine)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
     .accessibilityLabel(model.accessibilityLabel)
     .accessibilityValue(model.accessibilityValue)
     .help("Live harness summary")
+  }
+}
+
+private struct ToolbarStatusDropdown: View {
+  let messages: [ToolbarStatusMessage]
+  let daemonIndicator: ToolbarDaemonIndicator
+  @State private var currentIndex: Int = 0
+  private static let cycleInterval: TimeInterval = 4
+
+  private var currentMessage: ToolbarStatusMessage? {
+    guard !messages.isEmpty else { return nil }
+    return messages[currentIndex % messages.count]
+  }
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Menu {
+        ForEach(messages) { message in
+          if let systemImage = message.systemImage {
+            Label(message.text, systemImage: systemImage)
+          } else {
+            Text(message.text)
+          }
+        }
+        Divider()
+        Button {
+        } label: {
+          Label("Show All Messages", systemImage: "list.bullet")
+        }
+      } label: {
+        Text(currentMessage?.text ?? "")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .contentTransition(.numericText())
+      }
+      .menuStyle(.borderlessButton)
+      .menuIndicator(.hidden)
+
+      ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
+    .task {
+      guard messages.count > 1 else { return }
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(Self.cycleInterval))
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+          currentIndex = (currentIndex + 1) % messages.count
+        }
+      }
+    }
   }
 }
 
