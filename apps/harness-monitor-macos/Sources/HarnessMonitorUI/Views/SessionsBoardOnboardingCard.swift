@@ -96,7 +96,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
     ) {
       SessionsBoardOnboardingStepCard(
         title: "1. Start the daemon",
-        detail: "Boot the local HTTP and SSE bridge.",
+        detail: "Boot the local HTTP and SSE bridge",
         isReady: connectionState == .online
       ) {
         HarnessMonitorAsyncActionButton(
@@ -118,7 +118,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
       }
       SessionsBoardOnboardingStepCard(
         title: "2. Install launchd",
-        detail: "Keep the daemon available across app restarts.",
+        detail: "Keep the daemon available across app restarts",
         isReady: isLaunchAgentInstalled
       ) {
         HarnessMonitorAsyncActionButton(
@@ -139,7 +139,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
       }
       SessionsBoardOnboardingStepCard(
         title: "3. Start a harness session",
-        detail: "Sessions appear here as soon as the daemon indexes them.",
+        detail: "Sessions appear here as soon as the daemon indexes them",
         isReady: hasSessions
       ) {
         HarnessMonitorAsyncActionButton(
@@ -177,7 +177,7 @@ private struct SessionsBoardOnboardingStepCard<Action: View>: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      HStack(alignment: .top) {
+      HStack {
         Text(title)
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
@@ -195,7 +195,7 @@ private struct SessionsBoardOnboardingStepCard<Action: View>: View {
       action
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
-    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+    .frame(maxWidth: .infinity, minHeight: 72, maxHeight: .infinity, alignment: .topLeading)
     .padding(.leading, HarnessMonitorTheme.spacingLG)
     .overlay(alignment: .leading) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
