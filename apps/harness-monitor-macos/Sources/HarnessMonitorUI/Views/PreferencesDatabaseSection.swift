@@ -165,7 +165,6 @@ struct PreferencesDatabaseSection: View {
     } header: {
       Text("Statistics")
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesDatabaseStatistics)
   }
 
   // MARK: - Operations
@@ -246,7 +245,6 @@ struct PreferencesDatabaseSection: View {
     } header: {
       Text("Operations")
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesDatabaseOperations)
   }
 
   // MARK: - Health
@@ -305,7 +303,6 @@ struct PreferencesDatabaseSection: View {
     } header: {
       Text("Health")
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesDatabaseHealth)
   }
 
   // MARK: - Helpers
