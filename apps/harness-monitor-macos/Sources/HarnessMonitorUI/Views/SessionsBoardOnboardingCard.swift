@@ -47,7 +47,7 @@ private struct SessionsBoardOnboardingHeader: View {
           .accessibilityAddTraits(.isHeader)
         Text(
           "Harness Monitor only reads live state from the local daemon. "
-            + "Start the control plane once, then keep it resident with a launch agent."
+            + "Start the control plane once, then keep it resident with a launch agent"
         )
         .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -100,11 +100,8 @@ private struct SessionsBoardOnboardingStepsGrid: View {
       ) {
         HarnessMonitorAsyncActionButton(
           title: "Start Daemon",
-          tint: connectionState == .online
-            ? .secondary
-            : nil,
-          variant: connectionState == .online
-            ? .bordered : .prominent,
+          tint: nil,
+          variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.start",
           fillsWidth: false,
@@ -122,7 +119,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
       ) {
         HarnessMonitorAsyncActionButton(
           title: "Install Launch Agent",
-          tint: .secondary,
+          tint: nil,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.install",
@@ -141,15 +138,16 @@ private struct SessionsBoardOnboardingStepsGrid: View {
         detail: "Sessions appear here as soon as the daemon indexes them",
         isReady: hasSessions
       ) {
-        HarnessMonitorAsyncActionButton(
-          title: "Refresh Index",
-          tint: .secondary,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: "harness.board.action.refresh",
-          fillsWidth: false,
-          action: refresh
-        )
+        Button {
+          Task { await refresh() }
+        } label: {
+          Text("Refresh Index")
+            .lineLimit(1)
+            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+        }
+        .harnessFilterChipButtonStyle(isSelected: false)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .accessibilityIdentifier("harness.board.action.refresh")
         .accessibilityFrameMarker(HarnessMonitorAccessibility.onboardingRefreshButtonFrame)
       }
     }
@@ -190,11 +188,12 @@ private struct SessionsBoardOnboardingStepCard<Action: View>: View {
         .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(2)
-      Spacer(minLength: 0)
-      action
-        .frame(maxWidth: .infinity, alignment: .trailing)
+      action.hidden()
     }
-    .frame(maxWidth: .infinity, minHeight: 72, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .overlay(alignment: .bottomTrailing) {
+      action
+    }
     .padding(.leading, HarnessMonitorTheme.spacingLG)
     .overlay(alignment: .leading) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
