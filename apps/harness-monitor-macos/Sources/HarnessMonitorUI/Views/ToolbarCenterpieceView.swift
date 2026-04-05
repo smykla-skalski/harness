@@ -168,22 +168,23 @@ private struct ToolbarCenterpieceView: View {
   private static let toolbarHeight: CGFloat = 32
   private static let baseHorizontalPadding: CGFloat = 12
 
+  private static let tickerWidth: CGFloat = 220
+  private static let centerpieceWidth: CGFloat = 560
+
   var body: some View {
     HStack(spacing: 0) {
       ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
-        .layoutPriority(1)
+        .fixedSize(horizontal: true, vertical: false)
 
       if !statusMessages.isEmpty {
-        Divider()
-          .frame(height: 14)
-          .padding(.horizontal, 10)
+        Spacer(minLength: 20)
 
         ToolbarStatusTickerView(messages: statusMessages, direction: .up)
-          .layoutPriority(0)
+          .frame(width: Self.tickerWidth, alignment: .trailing)
       }
     }
     .padding(.horizontal, Self.baseHorizontalPadding)
-    .fixedSize(horizontal: true, vertical: false)
+    .frame(width: Self.centerpieceWidth)
     .frame(height: Self.toolbarHeight)
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
