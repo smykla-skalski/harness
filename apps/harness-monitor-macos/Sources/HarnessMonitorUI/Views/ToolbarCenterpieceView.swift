@@ -244,8 +244,10 @@ private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
     let hosting = NSHostingView(rootView: content)
     hosting.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(hosting)
+    hosting.setContentHuggingPriority(.required, for: .horizontal)
+    hosting.setContentCompressionResistancePriority(.required, for: .horizontal)
     NSLayoutConstraint.activate([
-      hosting.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       hosting.centerYAnchor.constraint(equalTo: view.centerYAnchor),
     ])
     view.hostingView = hosting
@@ -269,7 +271,12 @@ final class ToolbarStatusMenuNSView: NSView {
   override func mouseDown(with event: NSEvent) {
     let menu = NSMenu()
     for message in messages {
-      let item = NSMenuItem(title: message.text, action: nil, keyEquivalent: "")
+      let item = NSMenuItem(
+        title: message.text,
+        action: #selector(statusItemTapped(_:)),
+        keyEquivalent: ""
+      )
+      item.target = self
       if let systemImage = message.systemImage {
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         if let image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)?
@@ -283,6 +290,8 @@ final class ToolbarStatusMenuNSView: NSView {
     let point = NSPoint(x: 0, y: bounds.height)
     menu.popUp(positioning: nil, at: point, in: self)
   }
+
+  @objc private func statusItemTapped(_ sender: NSMenuItem) {}
 }
 
 private let centerpieceBundleRef = Bundle(for: ToolbarCenterpieceBundleToken.self)
