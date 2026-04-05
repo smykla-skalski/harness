@@ -75,7 +75,8 @@ public struct ContentView: View {
     } detail: {
       ContentDetailChrome(
         persistenceError: store.persistenceError,
-        sessionDataAvailability: store.sessionDataAvailability
+        sessionDataAvailability: store.sessionDataAvailability,
+        sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
       ) {
         SessionContentContainer(
           store: store,
