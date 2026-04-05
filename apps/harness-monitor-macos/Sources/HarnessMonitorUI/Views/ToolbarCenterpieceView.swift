@@ -159,13 +159,10 @@ private struct ToolbarCenterpieceView: View {
   let displayMode: ToolbarCenterpieceDisplayMode
   private static let toolbarHeight: CGFloat = 32
   private static let baseHorizontalPadding: CGFloat = 12
-  @Environment(\.fontScale)
-  private var fontScale
-
   var body: some View {
     ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
       .layoutPriority(1)
-      .padding(.horizontal, Self.baseHorizontalPadding / fontScale)
+      .padding(.horizontal, Self.baseHorizontalPadding)
       .fixedSize(horizontal: true, vertical: false)
       .frame(height: Self.toolbarHeight)
       .accessibilityElement(children: .ignore)
@@ -197,19 +194,19 @@ private struct ToolbarCenterpieceMetricToken: View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       if !displayMode.showsMetricLabels {
         Image(systemName: metric.kind.symbolName)
-          .scaledFont(.caption.weight(.bold))
+          .font(.caption.weight(.bold))
           .foregroundStyle(metric.kind.tint)
           .accessibilityHidden(true)
       }
 
       Text("\(metric.value)")
-        .scaledFont(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
+        .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
         .foregroundStyle(metric.kind.tint)
         .contentTransition(.numericText())
 
       if displayMode.showsMetricLabels {
         Text(labelText)
-          .scaledFont(.caption2.weight(.bold))
+          .font(.caption2.weight(.bold))
           .tracking(HarnessMonitorTheme.uppercaseTracking)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
