@@ -19,22 +19,26 @@ struct ToolbarStatusMessage: Equatable, Identifiable {
   }
 }
 
-struct ToolbarStatusTickerToolbar: ToolbarContent {
-  let messages: [ToolbarStatusMessage]
+enum ToolbarTickerDirection {
+  case up
+  case down
 
-  var body: some ToolbarContent {
-    ToolbarItem(placement: .automatic) {
-      ToolbarStatusTickerView(messages: messages)
+  var pushEdge: Edge {
+    switch self {
+    case .up:
+      .bottom
+    case .down:
+      .top
     }
   }
 }
 
-private struct ToolbarStatusTickerView: View {
+struct ToolbarStatusTickerView: View {
   let messages: [ToolbarStatusMessage]
+  var direction: ToolbarTickerDirection = .up
+  var cycleInterval: TimeInterval = 4
   @State private var currentIndex: Int = 0
-  @State private var tickerID: String = ""
-  private static let tickerHeight: CGFloat = 20
-  private static let cycleInterval: TimeInterval = 4
+  private static let tickerHeight: CGFloat = 16
 
   private var currentMessage: ToolbarStatusMessage? {
     guard !messages.isEmpty else { return nil }
@@ -43,7 +47,7 @@ private struct ToolbarStatusTickerView: View {
   }
 
   var body: some View {
-    Group {
+    ZStack {
       if let message = currentMessage {
         HStack(spacing: 5) {
           if let systemImage = message.systemImage {
@@ -56,29 +60,20 @@ private struct ToolbarStatusTickerView: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
-        .id(tickerID)
-        .transition(
-          .asymmetric(
-            insertion: .move(edge: .bottom).combined(with: .opacity),
-            removal: .move(edge: .top).combined(with: .opacity)
-          )
-        )
+        .id(message.id)
+        .transition(.push(from: direction.pushEdge))
       }
     }
     .frame(height: Self.tickerHeight)
     .clipped()
     .fixedSize(horizontal: true, vertical: false)
-    .onAppear {
-      tickerID = currentMessage?.id ?? ""
-    }
     .task(id: messages.count) {
       guard messages.count > 1 else { return }
       while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(Self.cycleInterval))
+        try? await Task.sleep(for: .seconds(cycleInterval))
         guard !Task.isCancelled else { return }
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
           currentIndex = (currentIndex + 1) % messages.count
-          tickerID = currentMessage?.id ?? ""
         }
       }
     }
@@ -88,37 +83,30 @@ private struct ToolbarStatusTickerView: View {
   }
 }
 
-#Preview("Status Ticker - Cycling") {
-  NavigationSplitView {
-    List { Text("Sidebar") }
-      .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-  } detail: {
-    Text("Detail content")
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-  .toolbar {
-    ToolbarStatusTickerToolbar(messages: [
-      .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-      .init(text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
-      .init(text: "Build succeeded", systemImage: "checkmark.circle.fill", tint: .green),
-      .init(text: "Indexing workspace", systemImage: "magnifyingglass", tint: .orange),
-    ])
-  }
-  .frame(width: 900, height: 400)
-}
+#Preview("Ticker - Split Flap Up") {
+  VStack(spacing: 24) {
+    ToolbarStatusTickerView(
+      messages: [
+        .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+        .init(text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+        .init(text: "Build succeeded", systemImage: "checkmark.circle.fill", tint: .green),
+        .init(text: "Indexing workspace", systemImage: "magnifyingglass", tint: .orange),
+      ],
+      direction: .up,
+      cycleInterval: 2
+    )
+    .background(.quaternary, in: Capsule())
 
-#Preview("Status Ticker - Single Message") {
-  NavigationSplitView {
-    List { Text("Sidebar") }
-      .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-  } detail: {
-    Text("Detail content")
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    ToolbarStatusTickerView(
+      messages: [
+        .init(text: "Scrolling down", systemImage: "arrow.down", tint: .blue),
+        .init(text: "Next message", systemImage: "text.bubble", tint: .green),
+        .init(text: "Third entry", systemImage: "3.circle", tint: .orange),
+      ],
+      direction: .down,
+      cycleInterval: 2
+    )
+    .background(.quaternary, in: Capsule())
   }
-  .toolbar {
-    ToolbarStatusTickerToolbar(messages: [
-      .init(text: "Ready", systemImage: "checkmark.circle.fill", tint: .green),
-    ])
-  }
-  .frame(width: 900, height: 400)
+  .padding(24)
 }

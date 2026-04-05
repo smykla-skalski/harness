@@ -3,18 +3,25 @@ import SwiftUI
 struct ContentCenterpieceToolbar: ToolbarContent {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
+  var statusMessages: [ToolbarStatusMessage] = []
 
   init(
     model: ToolbarCenterpieceModel = .preview,
-    displayMode: ToolbarCenterpieceDisplayMode = .standard
+    displayMode: ToolbarCenterpieceDisplayMode = .standard,
+    statusMessages: [ToolbarStatusMessage] = []
   ) {
     self.model = model
     self.displayMode = displayMode
+    self.statusMessages = statusMessages
   }
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .principal) {
-      ToolbarCenterpieceView(model: model, displayMode: displayMode)
+      ToolbarCenterpieceView(
+        model: model,
+        displayMode: displayMode,
+        statusMessages: statusMessages
+      )
     }
   }
 }
@@ -157,19 +164,32 @@ enum ToolbarCenterpieceDisplayMode: String {
 private struct ToolbarCenterpieceView: View {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
+  var statusMessages: [ToolbarStatusMessage] = []
   private static let toolbarHeight: CGFloat = 32
   private static let baseHorizontalPadding: CGFloat = 12
+
   var body: some View {
-    ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
-      .layoutPriority(1)
-      .padding(.horizontal, Self.baseHorizontalPadding)
-      .fixedSize(horizontal: true, vertical: false)
-      .frame(height: Self.toolbarHeight)
-      .accessibilityElement(children: .ignore)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
-      .accessibilityLabel(model.accessibilityLabel)
-      .accessibilityValue(model.accessibilityValue)
-      .help("Live harness summary")
+    HStack(spacing: 0) {
+      ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
+        .layoutPriority(1)
+
+      if !statusMessages.isEmpty {
+        Divider()
+          .frame(height: 14)
+          .padding(.horizontal, 10)
+
+        ToolbarStatusTickerView(messages: statusMessages, direction: .up)
+          .layoutPriority(0)
+      }
+    }
+    .padding(.horizontal, Self.baseHorizontalPadding)
+    .fixedSize(horizontal: true, vertical: false)
+    .frame(height: Self.toolbarHeight)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
+    .accessibilityLabel(model.accessibilityLabel)
+    .accessibilityValue(model.accessibilityValue)
+    .help("Live harness summary")
   }
 }
 
@@ -240,13 +260,22 @@ private struct ToolbarCenterpieceMetricToken: View {
           .init(kind: .blocked, value: 1),
         ]
       ),
-      displayMode: .compact
+      displayMode: .compact,
+      statusMessages: [
+        .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+        .init(text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+        .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
+      ]
     )
   }
   .frame(width: 900, height: 400)
 }
 
 #Preview("Centerpiece - All Modes") {
+  let demoMessages: [ToolbarStatusMessage] = [
+    .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+    .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
+  ]
   VStack(spacing: 24) {
     ForEach(
       Array(
@@ -264,7 +293,8 @@ private struct ToolbarCenterpieceMetricToken: View {
           .foregroundStyle(.secondary)
         ToolbarCenterpieceView(
           model: .preview,
-          displayMode: pair.1
+          displayMode: pair.1,
+          statusMessages: demoMessages
         )
         .background(.quaternary, in: Capsule())
       }
