@@ -52,6 +52,7 @@ struct HarnessMonitorAsyncActionButton: View {
   enum Variant: Equatable {
     case prominent
     case bordered
+    case borderless
   }
 
   let title: String

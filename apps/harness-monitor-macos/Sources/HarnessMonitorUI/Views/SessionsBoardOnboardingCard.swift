@@ -138,16 +138,17 @@ private struct SessionsBoardOnboardingStepsGrid: View {
         detail: "Sessions appear here as soon as the daemon indexes them",
         isReady: hasSessions
       ) {
-        Button {
-          Task { await refresh() }
-        } label: {
-          Text("Refresh Index")
-            .lineLimit(1)
-            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
-        }
-        .harnessFilterChipButtonStyle(isSelected: false)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .accessibilityIdentifier("harness.board.action.refresh")
+        HarnessMonitorAsyncActionButton(
+          title: "Refresh Index",
+          tint: nil,
+          variant: .bordered,
+          isLoading: isLoading,
+          accessibilityIdentifier: "harness.board.action.refresh",
+          fillsWidth: false,
+          action: refresh
+        )
+        .foregroundStyle(.primary)
+        .tint(nil)
         .accessibilityFrameMarker(HarnessMonitorAccessibility.onboardingRefreshButtonFrame)
       }
     }
