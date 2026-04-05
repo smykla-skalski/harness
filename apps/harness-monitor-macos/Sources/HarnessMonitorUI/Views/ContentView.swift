@@ -97,6 +97,7 @@ public struct ContentView: View {
         .toolbar {
           navigationToolbar
           centerpieceToolbar
+          statusTickerToolbar
         }
         .toolbar(id: "harness.main") {
           primaryToolbar
@@ -186,6 +187,18 @@ private extension ContentView {
       model: toolbarCenterpieceModel,
       displayMode: toolbarCenterpieceDisplayMode
     )
+  }
+
+  private var statusTickerMessages: [ToolbarStatusMessage] {
+    [
+      .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+      .init(text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+      .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
+    ]
+  }
+
+  @ToolbarContentBuilder var statusTickerToolbar: some ToolbarContent {
+    ToolbarStatusTickerToolbar(messages: statusTickerMessages)
   }
 
   @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {

@@ -78,6 +78,7 @@ enum HarnessMonitorAccessibility {
   static let toolbarCenterpiece = "harness.toolbar.centerpiece"
   static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
   static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
+  static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let endSessionButton = "harness.session.action.end"
