@@ -393,6 +393,41 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(didCompact, "Expected the narrow toolbar to keep the centerpiece visible")
     XCTAssertEqual(centerpieceState.label, "projects=1, sessions=1, openWork=2, blocked=1")
   }
+
+  func testToolbarStatusTickerShowsDropdownOnClick() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
+    let ticker = element(in: app, identifier: Accessibility.toolbarStatusTicker)
+
+    let tickerExists = ticker.waitForExistence(timeout: Self.uiTimeout)
+    if !tickerExists {
+      attachWindowScreenshot(in: app, named: "status-ticker-not-found")
+      attachAppHierarchy(in: app, named: "status-ticker-not-found-hierarchy")
+    }
+    XCTAssertTrue(tickerExists, "Status ticker element not found")
+    attachWindowScreenshot(in: app, named: "status-ticker-before-click")
+
+    if ticker.isHittable {
+      ticker.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: ticker) {
+      coordinate.tap()
+    } else {
+      XCTFail("Could not tap status ticker")
+      return
+    }
+
+    let menuItem = app.menuItems["Show All Messages"]
+    let menuAppeared = menuItem.waitForExistence(timeout: Self.uiTimeout)
+
+    if !menuAppeared {
+      attachWindowScreenshot(in: app, named: "status-ticker-after-click")
+      attachAppHierarchy(in: app, named: "status-ticker-menu-hierarchy")
+    }
+
+    XCTAssertTrue(menuAppeared, "Expected the status ticker dropdown menu to appear on click")
+  }
 }
 
 private extension HarnessMonitorToolbarUITests {
