@@ -17,21 +17,11 @@ struct SessionCockpitHeaderCard: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-            Circle()
-              .fill(statusColor(for: detail.session.status))
-              .frame(width: 12, height: 12)
-              .accessibilityHidden(true)
-            Text(detail.session.status.title)
-              .scaledFont(.caption.weight(.bold))
-              .tracking(HarnessMonitorTheme.uppercaseTracking)
-              .foregroundStyle(statusColor(for: detail.session.status))
-            Text(detail.session.displayTitle)
-              .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
-              .italic(detail.session.title.isEmpty)
-              .foregroundStyle(detail.session.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
-              .lineLimit(2)
-          }
+          Text(detail.session.displayTitle)
+            .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
+            .italic(detail.session.title.isEmpty)
+            .foregroundStyle(detail.session.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
+            .lineLimit(2)
           Text(sessionHeaderMetadata(detail.session))
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
