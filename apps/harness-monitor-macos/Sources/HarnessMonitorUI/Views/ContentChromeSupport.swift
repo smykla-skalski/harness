@@ -68,6 +68,7 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
 struct ContentDetailChrome<Content: View>: View {
   let persistenceError: String?
   let sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability
+  let sessionStatus: SessionStatus?
   @ViewBuilder let content: Content
 
   var body: some View {
@@ -78,9 +79,41 @@ struct ContentDetailChrome<Content: View>: View {
       if sessionDataAvailability != .live {
         SessionDataAvailabilityBanner(availability: sessionDataAvailability)
       }
+      if let sessionStatus {
+        SessionStatusBanner(status: sessionStatus)
+      }
       content
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+struct SessionStatusBanner: View {
+  let status: SessionStatus
+
+  private var color: Color { statusColor(for: status) }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+      Text(status.title.uppercased())
+        .font(.system(size: 9, weight: .bold))
+        .tracking(HarnessMonitorTheme.uppercaseTracking)
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingXS)
+    .background(color.opacity(0.12))
+    .foregroundStyle(color)
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(color.opacity(0.3))
+        .frame(height: 1)
+        .accessibilityHidden(true)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Session status")
+    .accessibilityValue(status.title)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionStatusBanner)
   }
 }
 

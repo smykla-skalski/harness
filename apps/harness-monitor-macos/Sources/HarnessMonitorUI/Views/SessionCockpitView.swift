@@ -17,7 +17,7 @@ struct SessionCockpitView: View {
   let inspectObserver: () -> Void
 
   var body: some View {
-    HarnessMonitorColumnScrollView {
+    HarnessMonitorColumnScrollView(verticalPadding: HarnessMonitorTheme.spacingXL) {
       VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(
           detail: detail,
