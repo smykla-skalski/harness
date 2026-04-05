@@ -240,11 +240,6 @@ private struct ToolbarStatusDropdown: View {
             Text(message.text)
           }
         }
-        Divider()
-        Button {
-        } label: {
-          Label("Show All Messages", systemImage: "list.bullet")
-        }
       } label: {
         Text(currentMessage?.text ?? "")
           .font(.subheadline)
