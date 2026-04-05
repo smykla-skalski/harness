@@ -1,6 +1,6 @@
-import HarnessMonitorKit
 import AppKit
 import Darwin
+import HarnessMonitorKit
 
 @MainActor
 final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
@@ -12,10 +12,30 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   override init() {
     super.init()
     installSignalHandlers()
+    if ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1" {
+      disableAnimationsForUITesting()
+    }
   }
 
   func bind(store: HarnessMonitorStore) {
     self.store = store
+  }
+
+  private func disableAnimationsForUITesting() {
+    NSAnimationContext.current.duration = 0
+    NotificationCenter.default.addObserver(
+      forName: NSWindow.didBecomeKeyNotification,
+      object: nil,
+      queue: .main
+    ) { notification in
+      let window = notification.object as? NSWindow
+      MainActor.assumeIsolated {
+        window?.animationBehavior = .none
+      }
+    }
+    for window in NSApplication.shared.windows {
+      window.animationBehavior = .none
+    }
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(
