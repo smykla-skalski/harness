@@ -9,10 +9,11 @@ struct SessionsBoardOnboardingCard: View {
   let startDaemon: HarnessMonitorAsyncActionButton.Action
   let installLaunchAgent: HarnessMonitorAsyncActionButton.Action
   let refresh: HarnessMonitorAsyncActionButton.Action
+  let dismiss: @MainActor () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      SessionsBoardOnboardingHeader(isLaunchAgentInstalled: isLaunchAgentInstalled)
+      SessionsBoardOnboardingHeader(isLaunchAgentInstalled: isLaunchAgentInstalled, dismiss: dismiss)
       SessionsBoardOnboardingStepsGrid(
         connectionState: connectionState,
         isLaunchAgentInstalled: isLaunchAgentInstalled,
@@ -36,6 +37,7 @@ struct SessionsBoardOnboardingCard: View {
 
 private struct SessionsBoardOnboardingHeader: View {
   let isLaunchAgentInstalled: Bool
+  let dismiss: @MainActor () -> Void
 
   var body: some View {
     HStack(alignment: .top) {
@@ -52,11 +54,27 @@ private struct SessionsBoardOnboardingHeader: View {
         .lineSpacing(2)
       }
       Spacer()
-      Text(isLaunchAgentInstalled ? "Persistent" : "Manual")
-        .scaledFont(.caption.bold())
-        .harnessPillPadding()
-        .background(HarnessMonitorTheme.accent, in: Capsule())
-        .foregroundStyle(HarnessMonitorTheme.onContrast)
+      HStack(spacing: 8) {
+        Text(isLaunchAgentInstalled ? "Persistent" : "Manual")
+          .scaledFont(.caption.bold())
+          .harnessPillPadding()
+          .background(HarnessMonitorTheme.accent, in: Capsule())
+          .foregroundStyle(HarnessMonitorTheme.onContrast)
+        Button {
+          dismiss()
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 20, height: 20)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .contentShape(Circle())
+        }
+        .accessibilityLabel("Dismiss setup guide")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.onboardingDismissButton)
+        .help("Dismiss setup guide")
+        .harnessDismissButtonStyle()
+      }
     }
   }
 }
@@ -160,14 +178,8 @@ private struct SessionsBoardOnboardingStepCard<Action: View>: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(alignment: .top) {
-        HStack {
-          Circle()
-            .fill(isReady ? HarnessMonitorTheme.success : HarnessMonitorTheme.caution)
-            .frame(width: 10, height: 10)
-            .accessibilityHidden(true)
-          Text(title)
-            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        }
+        Text(title)
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
         Text(isReady ? "Ready" : "Pending")
           .scaledFont(.caption.bold())
@@ -226,7 +238,8 @@ private func sessionsBoardOnboardingPreview(
     isLoading: isLoading,
     startDaemon: {},
     installLaunchAgent: {},
-    refresh: {}
+    refresh: {},
+    dismiss: {}
   )
   .padding(24)
   .frame(width: 920)
