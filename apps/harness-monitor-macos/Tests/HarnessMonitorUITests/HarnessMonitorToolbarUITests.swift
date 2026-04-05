@@ -409,21 +409,40 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(tickerExists, "Status ticker element not found")
     attachWindowScreenshot(in: app, named: "status-ticker-before-click")
 
-    if ticker.isHittable {
-      ticker.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: ticker) {
-      coordinate.tap()
-    } else {
-      XCTFail("Could not tap status ticker")
+    let window = mainWindow(in: app)
+    guard window.waitForExistence(timeout: Self.uiTimeout) else {
+      XCTFail("Window not found")
       return
     }
+    let tickerFrame = ticker.frame
+    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+    let toolbar = window.toolbars.firstMatch
+    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
+    let tapY = tickerFrame.minY - window.frame.minY - 4
+    let tapPoint = origin.withOffset(CGVector(
+      dx: tickerFrame.midX - window.frame.minX,
+      dy: tapY
+    ))
+    tapPoint.tap()
 
     let menuItem = app.menuItems["Running Harness Monitor"]
-    let menuAppeared = menuItem.waitForExistence(timeout: Self.uiTimeout)
+    let menuAppeared = menuItem.waitForExistence(timeout: 3)
 
     if !menuAppeared {
       attachWindowScreenshot(in: app, named: "status-ticker-after-click")
       attachAppHierarchy(in: app, named: "status-ticker-menu-hierarchy")
+
+      let toolbar = window.toolbars.firstMatch
+      let diagnostics = """
+        ticker: \(tickerFrame)
+        toolbar: \(toolbar.frame)
+        window: \(window.frame)
+        tapY offset from window: \(tickerFrame.minY - window.frame.minY - 6)
+        """
+      let attachment = XCTAttachment(string: diagnostics)
+      attachment.name = "status-ticker-tap-diagnostics"
+      attachment.lifetime = .keepAlways
+      add(attachment)
     }
 
     XCTAssertTrue(menuAppeared, "Expected the status ticker dropdown menu to appear on click")
