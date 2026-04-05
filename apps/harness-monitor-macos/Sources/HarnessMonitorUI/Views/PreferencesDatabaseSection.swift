@@ -8,6 +8,7 @@ struct PreferencesDatabaseSection: View {
   @State private var isClearCacheConfirmationPresented = false
   @State private var isClearUserDataConfirmationPresented = false
   @State private var isClearAllConfirmationPresented = false
+  @State private var selectedStatisticsTab: StatisticsTab = .cache
 
   var body: some View {
     Form {
@@ -71,100 +72,121 @@ struct PreferencesDatabaseSection: View {
   // MARK: - Statistics
 
   private var statisticsSection: some View {
-    Section {
-      LabeledContent("Cached Sessions") {
-        Text("\(databaseStats?.sessionCount ?? 0)")
-          .monospacedDigit()
+    HarnessMonitorTabbedContent(
+      title: "Statistics",
+      selection: $selectedStatisticsTab,
+      tabTitle: \.title,
+      alignment: .trailing
+    ) { tab in
+      switch tab {
+      case .cache:
+        cacheStatisticsRows
+      case .userData:
+        userDataStatisticsRows
+      case .storage:
+        storageStatisticsRows
       }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Cached Sessions")
-      )
-      LabeledContent("Cached Projects") {
-        Text("\(databaseStats?.projectCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Cached Projects")
-      )
-      LabeledContent("Agents") {
-        Text("\(databaseStats?.agentCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Agents")
-      )
-      LabeledContent("Tasks") {
-        Text("\(databaseStats?.taskCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Tasks")
-      )
-      LabeledContent("Signals") {
-        Text("\(databaseStats?.signalCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Signals")
-      )
-      LabeledContent("Timeline Entries") {
-        Text("\(databaseStats?.timelineCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Timeline Entries")
-      )
-      Divider()
-      LabeledContent("Bookmarks") {
-        Text("\(databaseStats?.bookmarkCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Bookmarks")
-      )
-      LabeledContent("Notes") {
-        Text("\(databaseStats?.noteCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Notes")
-      )
-      LabeledContent("Recent Searches") {
-        Text("\(databaseStats?.searchCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Recent Searches")
-      )
-      LabeledContent("Filter Preferences") {
-        Text("\(databaseStats?.filterPreferenceCount ?? 0)")
-          .monospacedDigit()
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Filter Preferences")
-      )
-      Divider()
-      LabeledContent("App Cache Size") {
-        Text(databaseStats?.appCacheSizeFormatted ?? "--")
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("App Cache Size")
-      )
-      LabeledContent("Daemon DB Size") {
-        Text(databaseStats?.daemonDatabaseSizeFormatted ?? "--")
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Daemon DB Size")
-      )
-      LabeledContent("Last Cached") {
-        Text(databaseStats?.lastCachedFormatted ?? "Never")
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesMetricCard("Last Cached")
-      )
-    } header: {
-      Text("Statistics")
     }
+  }
+
+  @ViewBuilder
+  private var cacheStatisticsRows: some View {
+    LabeledContent("Cached Sessions") {
+      Text("\(databaseStats?.sessionCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Cached Sessions")
+    )
+    LabeledContent("Cached Projects") {
+      Text("\(databaseStats?.projectCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Cached Projects")
+    )
+    LabeledContent("Agents") {
+      Text("\(databaseStats?.agentCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Agents")
+    )
+    LabeledContent("Tasks") {
+      Text("\(databaseStats?.taskCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Tasks")
+    )
+    LabeledContent("Signals") {
+      Text("\(databaseStats?.signalCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Signals")
+    )
+    LabeledContent("Timeline Entries") {
+      Text("\(databaseStats?.timelineCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Timeline Entries")
+    )
+  }
+
+  @ViewBuilder
+  private var userDataStatisticsRows: some View {
+    LabeledContent("Bookmarks") {
+      Text("\(databaseStats?.bookmarkCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Bookmarks")
+    )
+    LabeledContent("Notes") {
+      Text("\(databaseStats?.noteCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Notes")
+    )
+    LabeledContent("Recent Searches") {
+      Text("\(databaseStats?.searchCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Recent Searches")
+    )
+    LabeledContent("Filter Preferences") {
+      Text("\(databaseStats?.filterPreferenceCount ?? 0)")
+        .monospacedDigit()
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Filter Preferences")
+    )
+  }
+
+  @ViewBuilder
+  private var storageStatisticsRows: some View {
+    LabeledContent("App Cache Size") {
+      Text(databaseStats?.appCacheSizeFormatted ?? "--")
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("App Cache Size")
+    )
+    LabeledContent("Daemon DB Size") {
+      Text(databaseStats?.daemonDatabaseSizeFormatted ?? "--")
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Daemon DB Size")
+    )
+    LabeledContent("Last Cached") {
+      Text(databaseStats?.lastCachedFormatted ?? "Never")
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesMetricCard("Last Cached")
+    )
   }
 
   // MARK: - Operations
@@ -311,6 +333,22 @@ struct PreferencesDatabaseSection: View {
     isLoadingStats = true
     databaseStats = await store.gatherDatabaseStatistics()
     isLoadingStats = false
+  }
+}
+
+private enum StatisticsTab: String, CaseIterable, Identifiable {
+  case cache
+  case userData
+  case storage
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .cache: "Cache"
+    case .userData: "User Data"
+    case .storage: "Storage"
+    }
   }
 }
 
