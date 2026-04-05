@@ -54,9 +54,9 @@ struct ToolbarStatusTickerView: View {
         .transition(.push(from: direction.pushEdge))
       }
     }
+    .frame(maxWidth: .infinity, alignment: .trailing)
     .frame(height: Self.tickerHeight)
     .clipped()
-    .fixedSize(horizontal: true, vertical: false)
     .task(id: messages.count) {
       guard messages.count > 1 else { return }
       while !Task.isCancelled {
