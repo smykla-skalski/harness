@@ -32,6 +32,8 @@ private struct HarnessMonitorActionButtonStyleModifier: ViewModifier {
       .borderedProminent
     case .bordered:
       .bordered
+    case .borderless:
+      .borderless
     }
   }
 
@@ -122,7 +124,7 @@ private struct HarnessMonitorSystemButtonChromeModifier: ViewModifier {
     guard !isEnabled else { return tint }
     switch HarnessMonitorControlMetrics.disabledButtonChromeBehavior {
     case .regularize:
-      return nil
+      return .secondary
     case .preserveConfiguredStyle:
       return tint
     }
