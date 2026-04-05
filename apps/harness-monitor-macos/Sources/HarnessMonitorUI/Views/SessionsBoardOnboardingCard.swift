@@ -64,10 +64,9 @@ private struct SessionsBoardOnboardingHeader: View {
           dismiss()
         } label: {
           Image(systemName: "xmark.circle.fill")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 20, height: 20)
+            .scaledFont(.title3)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .frame(minWidth: 24, minHeight: 24)
             .contentShape(Circle())
         }
         .accessibilityLabel("Dismiss setup guide")
