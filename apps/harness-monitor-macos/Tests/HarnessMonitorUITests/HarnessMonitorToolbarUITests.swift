@@ -418,7 +418,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       return
     }
 
-    let menuItem = app.menuItems["Show All Messages"]
+    let menuItem = app.menuItems["Running Harness Monitor"]
     let menuAppeared = menuItem.waitForExistence(timeout: Self.uiTimeout)
 
     if !menuAppeared {
