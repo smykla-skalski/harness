@@ -46,6 +46,11 @@ public enum HarnessMonitorSchemaV2: VersionedSchema {
 public enum HarnessMonitorSchemaV3: VersionedSchema {
   public static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
 
+  public static var versionString: String {
+    let v = versionIdentifier
+    return "\(v.major).\(v.minor).\(v.patch)"
+  }
+
   public static var models: [any PersistentModel.Type] {
     [
       HarnessMonitorSchemaV3.CachedProject.self,
