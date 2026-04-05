@@ -3,6 +3,7 @@ import SwiftUI
 enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case general
   case connection
+  case database
   case diagnostics
 
   var id: String { rawValue }
@@ -11,6 +12,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .general: "General"
     case .connection: "Connection"
+    case .database: "Database"
     case .diagnostics: "Diagnostics"
     }
   }
@@ -19,6 +21,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .general: "gearshape"
     case .connection: "bolt.horizontal.circle"
+    case .database: "cylinder.split.1x2"
     case .diagnostics: "stethoscope"
     }
   }

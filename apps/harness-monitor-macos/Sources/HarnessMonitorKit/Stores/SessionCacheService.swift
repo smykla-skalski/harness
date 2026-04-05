@@ -13,6 +13,22 @@ public actor SessionCacheService {
     let timeline: [TimelineEntry]
   }
 
+  public struct CacheCounts: Sendable {
+    public let sessions: Int
+    public let projects: Int
+    public let agents: Int
+    public let tasks: Int
+    public let signals: Int
+    public let timeline: Int
+    public let observers: Int
+    public let activities: Int
+
+    public static let zero = CacheCounts(
+      sessions: 0, projects: 0, agents: 0, tasks: 0,
+      signals: 0, timeline: 0, observers: 0, activities: 0
+    )
+  }
+
   // MARK: - Reads
 
   func loadSessionDetail(
@@ -327,6 +343,38 @@ public actor SessionCacheService {
       }
     } else if let observer {
       session.observer = observer.toCachedObserver()
+    }
+  }
+
+  // MARK: - Database management
+
+  func recordCounts() -> CacheCounts {
+    CacheCounts(
+      sessions: (try? modelContext.fetchCount(FetchDescriptor<CachedSession>())) ?? 0,
+      projects: (try? modelContext.fetchCount(FetchDescriptor<CachedProject>())) ?? 0,
+      agents: (try? modelContext.fetchCount(FetchDescriptor<CachedAgent>())) ?? 0,
+      tasks: (try? modelContext.fetchCount(FetchDescriptor<CachedWorkItem>())) ?? 0,
+      signals: (try? modelContext.fetchCount(FetchDescriptor<CachedSignalRecord>())) ?? 0,
+      timeline: (try? modelContext.fetchCount(FetchDescriptor<CachedTimelineEntry>())) ?? 0,
+      observers: (try? modelContext.fetchCount(FetchDescriptor<CachedObserver>())) ?? 0,
+      activities: (try? modelContext.fetchCount(FetchDescriptor<CachedAgentActivity>())) ?? 0
+    )
+  }
+
+  func deleteAllCacheData() -> Bool {
+    do {
+      let sessions = try modelContext.fetch(FetchDescriptor<CachedSession>())
+      for session in sessions {
+        modelContext.delete(session)
+      }
+      let projects = try modelContext.fetch(FetchDescriptor<CachedProject>())
+      for project in projects {
+        modelContext.delete(project)
+      }
+      try modelContext.save()
+      return true
+    } catch {
+      return false
     }
   }
 }

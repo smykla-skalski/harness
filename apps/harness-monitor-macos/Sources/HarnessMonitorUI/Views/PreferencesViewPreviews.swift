@@ -19,6 +19,15 @@ import SwiftUI
   )
 }
 
+#Preview("Preferences Window - Database") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  preferencesWindowPreview(
+    section: .database,
+    themeMode: $themeMode
+  )
+}
+
 #Preview("Preferences Window - Diagnostics") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 
