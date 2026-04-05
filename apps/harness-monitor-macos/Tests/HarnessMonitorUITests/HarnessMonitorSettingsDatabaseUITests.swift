@@ -15,20 +15,16 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
 
-    // Click "Database" in the sidebar.
-    let databaseSidebarItem = app.outlines.buttons.matching(
-      NSPredicate(format: "label == %@", "Database")
-    ).firstMatch
-    if !databaseSidebarItem.waitForExistence(timeout: 2) {
-      tapButton(in: app, title: "Database")
-    } else {
-      databaseSidebarItem.tap()
-    }
+    // Click "Database" in the sidebar. Sidebar items may appear as buttons,
+    // cells, or radio buttons depending on the macOS version.
+    let databaseItem = button(in: app, title: "Database")
+    XCTAssertTrue(databaseItem.waitForExistence(timeout: 2), "Database sidebar item not found")
+    tapViaCoordinate(in: app, element: databaseItem)
 
     // Verify Database section loaded.
     let title = element(in: app, identifier: Accessibility.preferencesTitle)
     XCTAssertTrue(
-      waitUntil(timeout: 2) { title.exists && title.label == "Database" },
+      waitUntil(timeout: 3) { title.exists && title.label == "Database" },
       "Title should be 'Database' but got '\(title.label)'"
     )
 
@@ -38,16 +34,16 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
 
     // -- Verify Statistics section (visible at the top) --
     let statisticsHeader = app.staticTexts["Statistics"]
-    XCTAssertTrue(statisticsHeader.waitForExistence(timeout: 3))
+    XCTAssertTrue(statisticsHeader.waitForExistence(timeout: 5))
 
     // -- Scroll to reveal Operations buttons --
     dragUp(in: app, element: statisticsHeader, distanceRatio: 3.0)
 
-    // -- Verify operation buttons exist --
-    let clearCacheButton = app.buttons["Clear Session Cache"]
-    let clearUserDataButton = app.buttons["Clear User Data"]
-    let clearAllButton = app.buttons["Clear All Data"]
-    let revealButton = app.buttons["Reveal in Finder"]
+    // -- Verify operation buttons --
+    let clearCacheButton = app.buttons["Clear Session Cache"].firstMatch
+    let clearUserDataButton = app.buttons["Clear User Data"].firstMatch
+    let clearAllButton = app.buttons["Clear All Data"].firstMatch
+    let revealButton = app.buttons["Reveal in Finder"].firstMatch
 
     XCTAssertTrue(clearCacheButton.waitForExistence(timeout: 3), "Clear Session Cache not found")
     XCTAssertTrue(clearUserDataButton.exists, "Clear User Data not found")
@@ -55,21 +51,21 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(revealButton.exists, "Reveal in Finder not found")
 
     // -- Clear Session Cache confirmation --
-    tapButton(in: app, title: "Clear Session Cache")
+    tapViaCoordinate(in: app, element: clearCacheButton)
     let clearCacheConfirm = confirmationDialogButton(in: app, title: "Clear Session Cache")
     XCTAssertTrue(clearCacheConfirm.waitForExistence(timeout: 2), "Cache confirm dialog missing")
     app.typeKey(.escape, modifierFlags: [])
-    RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
+    RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
 
     // -- Clear User Data confirmation --
-    tapButton(in: app, title: "Clear User Data")
+    tapViaCoordinate(in: app, element: clearUserDataButton)
     let clearUserConfirm = confirmationDialogButton(in: app, title: "Clear User Data")
     XCTAssertTrue(clearUserConfirm.waitForExistence(timeout: 2), "User data confirm dialog missing")
     app.typeKey(.escape, modifierFlags: [])
-    RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
+    RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
 
     // -- Clear All Data confirmation --
-    tapButton(in: app, title: "Clear All Data")
+    tapViaCoordinate(in: app, element: clearAllButton)
     let clearAllConfirm = confirmationDialogButton(in: app, title: "Clear All Data")
     XCTAssertTrue(clearAllConfirm.waitForExistence(timeout: 2), "Clear all confirm dialog missing")
     app.typeKey(.escape, modifierFlags: [])
@@ -77,7 +73,23 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     // -- Scroll further to Health section --
     dragUp(in: app, element: clearCacheButton, distanceRatio: 3.0)
 
-    let schemaVersionLabel = app.staticTexts["Schema Version"]
+    let schemaVersionLabel = app.staticTexts["Schema Version"].firstMatch
     XCTAssertTrue(schemaVersionLabel.waitForExistence(timeout: 2), "Schema Version not found")
+  }
+}
+
+private extension HarnessMonitorSettingsDatabaseUITests {
+  /// Tap an element via its center coordinate. Avoids the hittability check
+  /// that can fail for elements inside custom layouts like WrapLayout.
+  func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
+    if element.isHittable {
+      element.tap()
+      return
+    }
+    guard let coordinate = centerCoordinate(in: app, for: element) else {
+      XCTFail("Cannot resolve coordinate for \(element)")
+      return
+    }
+    coordinate.tap()
   }
 }

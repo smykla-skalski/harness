@@ -11,6 +11,7 @@ struct HarnessMonitorWindowRootView: View {
     ContentView(store: store)
       .frame(minWidth: 900, minHeight: 600)
       .modifier(HarnessMonitorSceneAppearanceModifier(themeMode: $themeMode))
+      .modifier(HarnessMonitorUITestAnimationModifier())
       .task {
         delegate.bind(store: store)
         await store.bootstrapIfNeeded()
@@ -29,6 +30,20 @@ struct HarnessMonitorSettingsRootView: View {
     )
     .frame(minWidth: 680, minHeight: 440)
     .modifier(HarnessMonitorSceneAppearanceModifier(themeMode: $themeMode))
+    .modifier(HarnessMonitorUITestAnimationModifier())
+  }
+}
+
+private struct HarnessMonitorUITestAnimationModifier: ViewModifier {
+  private static let isUITesting =
+    ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+
+  func body(content: Content) -> some View {
+    if Self.isUITesting {
+      content.transaction { $0.disablesAnimations = true }
+    } else {
+      content
+    }
   }
 }
 
