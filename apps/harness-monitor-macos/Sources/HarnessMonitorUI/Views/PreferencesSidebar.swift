@@ -48,10 +48,17 @@ extension View {
 
 struct PreferencesSidebarList: View {
   @Binding var selection: PreferencesSection
+  @Environment(\.fontScale) private var fontScale
+
+  private var rowPadding: CGFloat {
+    HarnessMonitorTheme.spacingXS * fontScale
+  }
 
   var body: some View {
     List(PreferencesSection.allCases, selection: $selection) { section in
       Label(section.title, systemImage: section.systemImage)
+        .scaledFont(.body)
+        .padding(.vertical, rowPadding)
         .tag(section)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.preferencesSectionButton(section.rawValue)
@@ -60,11 +67,7 @@ struct PreferencesSidebarList: View {
           selection == section ? "selected" : "not selected"
         )
     }
-    .scaledFont(.body)
     .listStyle(.sidebar)
-    .controlSize(.small)
-    .environment(\.sidebarRowSize, .small)
-    .environment(\.defaultMinListRowHeight, PreferencesChromeMetrics.sidebarMinRowHeight)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.preferencesSidebar)
   }
 }

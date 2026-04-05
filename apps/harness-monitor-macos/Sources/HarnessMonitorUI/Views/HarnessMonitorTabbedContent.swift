@@ -43,7 +43,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
     } header: {
       HStack(alignment: .center, spacing: 0) {
         Text(title)
-          .scaledFont(.subheadline)
+          .scaledFont(.body)
         if alignment == .trailing {
           Spacer(minLength: 0)
         }
@@ -55,7 +55,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
             }
           } label: {
             Text(tabTitle(tab))
-              .scaledFont(.subheadline)
+              .scaledFont(.body)
               .fontWeight(isSelected ? .semibold : .regular)
               .foregroundStyle(isSelected ? .primary : .secondary)
               .padding(.horizontal, HarnessMonitorTheme.spacingMD)
