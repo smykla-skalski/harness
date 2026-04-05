@@ -1,18 +1,38 @@
 import SwiftUI
 
+private final class ToolbarCenterpieceBundleToken {}
+
+enum ToolbarDaemonIndicator: Equatable {
+  case offline
+  case launchdConnected
+  case manualConnected
+
+  var foregroundColor: Color {
+    switch self {
+    case .offline:
+      .secondary
+    case .launchdConnected, .manualConnected:
+      HarnessMonitorTheme.success
+    }
+  }
+}
+
 struct ContentCenterpieceToolbar: ToolbarContent {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
   var statusMessages: [ToolbarStatusMessage] = []
+  var daemonIndicator: ToolbarDaemonIndicator = .offline
 
   init(
     model: ToolbarCenterpieceModel = .preview,
     displayMode: ToolbarCenterpieceDisplayMode = .standard,
-    statusMessages: [ToolbarStatusMessage] = []
+    statusMessages: [ToolbarStatusMessage] = [],
+    daemonIndicator: ToolbarDaemonIndicator = .offline
   ) {
     self.model = model
     self.displayMode = displayMode
     self.statusMessages = statusMessages
+    self.daemonIndicator = daemonIndicator
   }
 
   var body: some ToolbarContent {
@@ -20,7 +40,8 @@ struct ContentCenterpieceToolbar: ToolbarContent {
       ToolbarCenterpieceView(
         model: model,
         displayMode: displayMode,
-        statusMessages: statusMessages
+        statusMessages: statusMessages,
+        daemonIndicator: daemonIndicator
       )
     }
   }
@@ -165,10 +186,11 @@ private struct ToolbarCenterpieceView: View {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
   var statusMessages: [ToolbarStatusMessage] = []
+  var daemonIndicator: ToolbarDaemonIndicator = .offline
   private static let toolbarHeight: CGFloat = 32
   private static let baseHorizontalPadding: CGFloat = 12
 
-  private static let tickerWidth: CGFloat = 220
+  private static let tickerWidth: CGFloat = 240
   private static let centerpieceWidth: CGFloat = 560
 
   var body: some View {
@@ -179,8 +201,29 @@ private struct ToolbarCenterpieceView: View {
       if !statusMessages.isEmpty {
         Spacer(minLength: 20)
 
-        ToolbarStatusTickerView(messages: statusMessages, direction: .up)
-          .frame(width: Self.tickerWidth, alignment: .trailing)
+        HStack(spacing: 8) {
+          Menu {
+            ForEach(statusMessages) { message in
+              if let systemImage = message.systemImage {
+                Label(message.text, systemImage: systemImage)
+              } else {
+                Text(message.text)
+              }
+            }
+            Divider()
+            Button {
+            } label: {
+              Label("Show All Messages", systemImage: "list.bullet")
+            }
+          } label: {
+            ToolbarStatusTickerView(messages: statusMessages, direction: .up)
+          }
+          .menuStyle(.borderlessButton)
+          .menuIndicator(.hidden)
+
+          ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
+        }
+        .frame(width: Self.tickerWidth, alignment: .trailing)
       }
     }
     .padding(.horizontal, Self.baseHorizontalPadding)
@@ -191,6 +234,34 @@ private struct ToolbarCenterpieceView: View {
     .accessibilityLabel(model.accessibilityLabel)
     .accessibilityValue(model.accessibilityValue)
     .help("Live harness summary")
+  }
+}
+
+private let centerpieceBundleRef = Bundle(for: ToolbarCenterpieceBundleToken.self)
+
+private struct ToolbarDaemonIndicatorIcon: View {
+  let indicator: ToolbarDaemonIndicator
+
+  var body: some View {
+    Group {
+      switch indicator {
+      case .offline:
+        Circle()
+          .fill(Color.secondary.opacity(0.5))
+          .frame(width: 8, height: 8)
+      case .launchdConnected:
+        Image("LaunchDaemonRocket", bundle: centerpieceBundleRef)
+          .renderingMode(.template)
+          .resizable()
+          .scaledToFit()
+          .frame(height: 14)
+      case .manualConnected:
+        Image(systemName: "person.fill")
+          .font(.caption.weight(.semibold))
+      }
+    }
+    .foregroundStyle(indicator.foregroundColor)
+    .accessibilityHidden(true)
   }
 }
 
