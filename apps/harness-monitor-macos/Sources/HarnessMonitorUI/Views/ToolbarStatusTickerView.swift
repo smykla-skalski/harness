@@ -50,15 +50,15 @@ struct ToolbarStatusTickerView: View {
     ZStack {
       if let message = currentMessage {
         HStack(spacing: 5) {
+          Text(message.text)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
           if let systemImage = message.systemImage {
             Image(systemName: systemImage)
               .font(.caption2.weight(.semibold))
               .foregroundStyle(message.tint)
           }
-          Text(message.text)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
         }
         .id(message.id)
         .transition(.push(from: direction.pushEdge))
