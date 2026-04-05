@@ -189,8 +189,6 @@ private struct ToolbarCenterpieceView: View {
   var daemonIndicator: ToolbarDaemonIndicator = .offline
   private static let toolbarHeight: CGFloat = 32
   private static let baseHorizontalPadding: CGFloat = 12
-
-  private static let tickerWidth: CGFloat = 240
   private static let centerpieceWidth: CGFloat = 560
 
   var body: some View {
@@ -205,12 +203,11 @@ private struct ToolbarCenterpieceView: View {
           messages: statusMessages,
           daemonIndicator: daemonIndicator
         )
-        .frame(width: Self.tickerWidth, alignment: .trailing)
+        .fixedSize(horizontal: true, vertical: false)
       }
     }
     .padding(.leading, Self.baseHorizontalPadding)
-    .frame(width: Self.centerpieceWidth)
-    .frame(height: Self.toolbarHeight)
+    .frame(width: Self.centerpieceWidth, height: Self.toolbarHeight)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
     .accessibilityLabel(model.accessibilityLabel)
@@ -235,8 +232,7 @@ private struct ToolbarStatusDropdown: View {
         ToolbarStatusTickerView(messages: messages, direction: .up)
         ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
       }
-      .padding(.leading, 8)
-      .padding(.trailing, 12)
+      .padding(.horizontal, 12)
     }
     .frame(maxHeight: .infinity)
     .background {
@@ -265,6 +261,7 @@ private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
     hosting.setContentHuggingPriority(.required, for: .horizontal)
     hosting.setContentCompressionResistancePriority(.required, for: .horizontal)
     NSLayoutConstraint.activate([
+      hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       hosting.centerYAnchor.constraint(equalTo: view.centerYAnchor),
     ])
@@ -289,6 +286,7 @@ private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
     if let hosting = nsView.hostingView as? NSHostingView<Content> {
       hosting.rootView = content
     }
+    nsView.invalidateIntrinsicContentSize()
   }
 }
 
@@ -307,6 +305,11 @@ final class ToolbarStatusMenuNSView: NSView {
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("Not supported")
+  }
+
+  override var intrinsicContentSize: NSSize {
+    let width = hostingView?.fittingSize.width ?? NSView.noIntrinsicMetric
+    return NSSize(width: width, height: NSView.noIntrinsicMetric)
   }
 
   override var acceptsFirstResponder: Bool { true }
