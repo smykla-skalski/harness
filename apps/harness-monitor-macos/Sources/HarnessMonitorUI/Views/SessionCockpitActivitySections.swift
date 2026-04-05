@@ -153,7 +153,6 @@ struct SessionCockpitTimelineSection: View {
         }
         .scrollIndicators(.automatic)
         .frame(
-          minHeight: SessionCockpitLayout.timelineSectionMinHeight,
           maxHeight: SessionCockpitLayout.timelineSectionMaxHeight,
           alignment: .top
         )
