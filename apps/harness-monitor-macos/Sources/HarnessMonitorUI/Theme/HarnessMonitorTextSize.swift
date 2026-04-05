@@ -106,8 +106,13 @@ private struct HarnessMonitorNativeFormControlModifier: ViewModifier {
 }
 
 private struct HarnessMonitorFormContainerModifier: ViewModifier {
+  @Environment(\.fontScale)
+  private var scale
+
   func body(content: Content) -> some View {
+    let font: Font = scale == 1.0 ? .body : .body.scaled(by: scale)
     content
+      .font(font)
       .formStyle(.grouped)
       .scrollIndicators(.automatic)
   }

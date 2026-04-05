@@ -60,6 +60,7 @@ struct PreferencesSidebarList: View {
           selection == section ? "selected" : "not selected"
         )
     }
+    .scaledFont(.body)
     .listStyle(.sidebar)
     .controlSize(.small)
     .environment(\.sidebarRowSize, .small)
