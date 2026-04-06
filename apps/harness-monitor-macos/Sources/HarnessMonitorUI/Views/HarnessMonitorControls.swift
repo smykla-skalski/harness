@@ -120,6 +120,14 @@ private struct HarnessMonitorSystemButtonChromeModifier: ViewModifier {
   @Environment(\.isEnabled)
   private var isEnabled
 
+  private var effectiveStyle: HarnessMonitorSystemButtonChromeStyle {
+    guard !isEnabled,
+          HarnessMonitorControlMetrics.disabledButtonChromeBehavior == .regularize,
+          style == .borderedProminent
+    else { return style }
+    return .bordered
+  }
+
   private var effectiveTint: Color? {
     guard !isEnabled else { return tint }
     switch HarnessMonitorControlMetrics.disabledButtonChromeBehavior {
@@ -133,7 +141,7 @@ private struct HarnessMonitorSystemButtonChromeModifier: ViewModifier {
   @ViewBuilder
   func body(content: Content) -> some View {
     // Keep the underlying AppKit button style stable across enabled-state changes.
-    switch style {
+    switch effectiveStyle {
     case .borderless:
       if let effectiveTint {
         content.buttonStyle(.borderless).tint(effectiveTint)
