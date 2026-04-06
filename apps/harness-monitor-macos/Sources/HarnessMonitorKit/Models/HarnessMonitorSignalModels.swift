@@ -201,6 +201,24 @@ public struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
   public var id: String { entryId }
 }
 
+public struct LogLevelResponse: Codable, Equatable, Sendable {
+  public let level: String
+  public let filter: String
+
+  public init(level: String, filter: String) {
+    self.level = level
+    self.filter = filter
+  }
+}
+
+public struct SetLogLevelRequest: Codable, Equatable, Sendable {
+  public let level: String
+
+  public init(level: String) {
+    self.level = level
+  }
+}
+
 public struct SessionsUpdatedPayload: Codable, Equatable, Sendable {
   public let projects: [ProjectSummary]
   public let sessions: [SessionSummary]
@@ -266,6 +284,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case sessionsUpdated(SessionsUpdatedPayload)
     case sessionUpdated(SessionUpdatedPayload)
     case sessionExtensions(SessionExtensionsPayload)
+    case logLevelChanged(LogLevelResponse)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -315,6 +334,12 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         kind: .sessionExtensions(
           try streamEvent.decodePayload(as: SessionExtensionsPayload.self)
         )
+      )
+    case "log_level_changed":
+      self.init(
+        recordedAt: streamEvent.recordedAt,
+        sessionId: nil,
+        kind: .logLevelChanged(try streamEvent.decodePayload(as: LogLevelResponse.self))
       )
     default:
       self.init(

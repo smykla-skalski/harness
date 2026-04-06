@@ -73,6 +73,7 @@ extension HarnessMonitorStore {
 
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
+      daemonLogLevel = measuredDiagnostics.value.health?.logLevel
       recordRequestSuccess(
         latencyMs: measuredDiagnostics.latencyMs,
         updatesLatency: true
@@ -300,6 +301,8 @@ extension HarnessMonitorStore {
       }
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
+    case .logLevelChanged(let response):
+      daemonLogLevel = response.level
     case .unknown:
       break
     }
@@ -307,7 +310,7 @@ extension HarnessMonitorStore {
 
   private func applySessionPushEvent(_ event: DaemonPushEvent) {
     switch event.kind {
-    case .ready, .sessionsUpdated, .unknown:
+    case .ready, .sessionsUpdated, .logLevelChanged, .unknown:
       break
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {

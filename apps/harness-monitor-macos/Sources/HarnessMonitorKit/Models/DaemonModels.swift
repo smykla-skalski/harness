@@ -246,6 +246,7 @@ public struct HealthResponse: Codable, Equatable, Sendable {
   public let pid: Int
   public let endpoint: String
   public let startedAt: String
+  public let logLevel: String?
   public let projectCount: Int
   public let worktreeCount: Int
   public let sessionCount: Int
@@ -256,6 +257,7 @@ public struct HealthResponse: Codable, Equatable, Sendable {
     pid: Int,
     endpoint: String,
     startedAt: String,
+    logLevel: String? = nil,
     projectCount: Int,
     worktreeCount: Int = 0,
     sessionCount: Int
@@ -265,13 +267,15 @@ public struct HealthResponse: Codable, Equatable, Sendable {
     self.pid = pid
     self.endpoint = endpoint
     self.startedAt = startedAt
+    self.logLevel = logLevel
     self.projectCount = projectCount
     self.worktreeCount = worktreeCount
     self.sessionCount = sessionCount
   }
 
   enum CodingKeys: String, CodingKey {
-    case status, version, pid, endpoint, startedAt, projectCount, worktreeCount, sessionCount
+    case status, version, pid, endpoint, startedAt, logLevel, projectCount, worktreeCount,
+      sessionCount
   }
 
   public init(from decoder: Decoder) throws {
@@ -282,6 +286,7 @@ public struct HealthResponse: Codable, Equatable, Sendable {
       pid: try container.decode(Int.self, forKey: .pid),
       endpoint: try container.decode(String.self, forKey: .endpoint),
       startedAt: try container.decode(String.self, forKey: .startedAt),
+      logLevel: try container.decodeIfPresent(String.self, forKey: .logLevel),
       projectCount: try container.decode(Int.self, forKey: .projectCount),
       worktreeCount: try container.decodeIfPresent(Int.self, forKey: .worktreeCount) ?? 0,
       sessionCount: try container.decode(Int.self, forKey: .sessionCount)

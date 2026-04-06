@@ -54,6 +54,8 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     sessionID: String,
     request: ObserveSessionRequest
   ) async throws -> SessionDetail
+  func logLevel() async throws -> LogLevelResponse
+  func setLogLevel(_ level: String) async throws -> LogLevelResponse
 }
 
 public extension HarnessMonitorClientProtocol {
@@ -239,6 +241,14 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/sessions/\(sessionID)/observe", body: request)
   }
 
+  public func logLevel() async throws -> LogLevelResponse {
+    try await get("/v1/daemon/log-level")
+  }
+
+  public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
+    try await put("/v1/daemon/log-level", body: SetLogLevelRequest(level: level))
+  }
+
   private func get<Response: Decodable>(_ path: String) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "GET"
@@ -251,6 +261,17 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   ) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "POST"
+    request.httpBody = try encoder.encode(AnyEncodable(body))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return try await send(request)
+  }
+
+  private func put<RequestBody: Encodable, Response: Decodable>(
+    _ path: String,
+    body: RequestBody
+  ) async throws -> Response {
+    var request = try makeRequest(path: path)
+    request.httpMethod = "PUT"
     request.httpBody = try encoder.encode(AnyEncodable(body))
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     return try await send(request)

@@ -252,6 +252,14 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   ) async throws -> SessionDetail {
     try await sessionDetail(id: "")
   }
+
+  public func logLevel() async throws -> LogLevelResponse {
+    LogLevelResponse(level: "info", filter: "harness=info")
+  }
+
+  public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
+    LogLevelResponse(level: level, filter: "harness=\(level)")
+  }
 }
 
 public actor PreviewDaemonController: DaemonControlling {

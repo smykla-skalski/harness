@@ -34,15 +34,17 @@ public struct PreferencesView: View {
         )
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      switch selectedSection {
-      case .general:
-        PreferencesGeneralSection(store: store, themeMode: $themeMode)
-      case .connection:
-        PreferencesConnectionSection(store: store)
-      case .database:
-        PreferencesDatabaseSection(store: store)
-      case .diagnostics:
-        PreferencesDiagnosticsSection(store: store)
+      Group {
+        switch selectedSection {
+        case .general:
+          PreferencesGeneralSection(store: store, themeMode: $themeMode)
+        case .connection:
+          PreferencesConnectionSection(store: store)
+        case .database:
+          PreferencesDatabaseSection(store: store)
+        case .diagnostics:
+          PreferencesDiagnosticsSection(store: store)
+        }
       }
     }
     .navigationSplitViewStyle(.balanced)

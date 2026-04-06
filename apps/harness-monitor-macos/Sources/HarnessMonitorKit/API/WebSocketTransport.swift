@@ -306,4 +306,15 @@ extension WebSocketTransport {
     let value = try await send(method: "session.observe", params: params)
     return try decode(value)
   }
+
+  public func logLevel() async throws -> LogLevelResponse {
+    let value = try await send(method: "daemon.log_level")
+    return try decode(value)
+  }
+
+  public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
+    let params = JSONValue.object(["level": .string(level)])
+    let value = try await send(method: "daemon.set_log_level", params: params)
+    return try decode(value)
+  }
 }
