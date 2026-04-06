@@ -3,6 +3,8 @@ use std::process::ExitCode;
 
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::time::ChronoUtc;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::reload;
 
 use harness::app::cli;
 use harness::errors;
@@ -10,19 +12,27 @@ use harness::errors;
 fn main() -> ExitCode {
     let filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("harness=info"));
+    let (filter_layer, handle) = reload::Layer::new(filter);
+    harness::set_log_filter_handle(handle);
 
     if std::env::var("HARNESS_LOG_FORMAT").ok().as_deref() == Some("json") {
-        tracing_subscriber::fmt()
-            .json()
-            .with_writer(io::stderr)
-            .with_env_filter(filter)
+        tracing_subscriber::registry()
+            .with(filter_layer)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .with_writer(io::stderr),
+            )
             .init();
     } else {
-        tracing_subscriber::fmt()
-            .with_writer(io::stderr)
-            .with_env_filter(filter)
-            .with_target(false)
-            .with_timer(ChronoUtc::rfc_3339())
+        tracing_subscriber::registry()
+            .with(filter_layer)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(io::stderr)
+                    .with_target(false)
+                    .with_timer(ChronoUtc::rfc_3339()),
+            )
             .init();
     }
 

@@ -17,8 +17,9 @@ use crate::errors::CliError;
 use super::http::DaemonHttpState;
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskUpdateRequest, WsErrorPayload, WsPushEvent, WsRequest, WsResponse,
+    SessionEndRequest, SetLogLevelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, WsErrorPayload, WsPushEvent,
+    WsRequest, WsResponse,
 };
 use super::service;
 
@@ -371,8 +372,21 @@ fn dispatch_inner(
 ) -> WsResponse {
     match request.method.as_str() {
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
-        "health" | "diagnostics" | "daemon.stop" | "projects" | "sessions" | "session.detail"
-        | "session.timeline" => dispatch_read_query(request, state),
+        "health" | "diagnostics" | "daemon.stop" | "daemon.log_level" | "projects" | "sessions"
+        | "session.detail" | "session.timeline" => dispatch_read_query(request, state),
+        "daemon.set_log_level" => {
+            let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
+                Ok(body) => body,
+                Err(error) => {
+                    return error_response(
+                        &request.id,
+                        "INVALID_PARAMS",
+                        &format!("invalid set_log_level params: {error}"),
+                    );
+                }
+            };
+            dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
+        }
         "session.subscribe" => handle_session_subscribe(request, connection),
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
         "stream.subscribe" => handle_stream_subscribe(request, connection),
@@ -445,6 +459,7 @@ fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsRespon
         }),
         "diagnostics" => dispatch_query(&request.id, || service::diagnostics_report(db_ref)),
         "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
+        "daemon.log_level" => dispatch_query(&request.id, service::get_log_level),
         "projects" => dispatch_query(&request.id, || service::list_projects(db_ref)),
         "sessions" => dispatch_query(&request.id, || service::list_sessions(true, db_ref)),
         "session.detail" => match extract_session_id(&request.params) {

@@ -17,6 +17,7 @@ pub struct HealthResponse {
     pub pid: u32,
     pub endpoint: String,
     pub started_at: String,
+    pub log_level: String,
     pub project_count: usize,
     pub worktree_count: usize,
     pub session_count: usize,
@@ -25,6 +26,17 @@ pub struct HealthResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonControlResponse {
     pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogLevelResponse {
+    pub level: String,
+    pub filter: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetLogLevelRequest {
+    pub level: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
