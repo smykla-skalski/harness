@@ -71,6 +71,11 @@ extension HarnessMonitorStore {
     set { connection.subscribedSessionIDs = newValue }
   }
 
+  public var daemonLogLevel: String? {
+    get { connection.daemonLogLevel }
+    set { connection.daemonLogLevel = newValue }
+  }
+
   public var isShowingCachedData: Bool {
     get { connection.isShowingCachedData }
     set { connection.isShowingCachedData = newValue }

@@ -82,6 +82,7 @@ public final class HarnessMonitorStore {
     public var connectionMetrics: ConnectionMetrics = .initial
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
+    public var daemonLogLevel: String?
     public var isShowingCachedData = false
     public var persistedSessionCount = 0
     public var lastPersistedSnapshotAt: Date?
