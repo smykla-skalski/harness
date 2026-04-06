@@ -30,10 +30,14 @@ struct PreferencesPathsSection: View {
   }
 
   private func pathRow(_ title: String, value: String) -> some View {
-    LabeledContent(title) {
+    HStack {
+      Text(title)
+      Spacer()
       Text(value)
         .scaledFont(.caption.monospaced())
+        .lineLimit(1)
         .truncationMode(.middle)
+        .foregroundStyle(.secondary)
         .textSelection(.enabled)
     }
   }
