@@ -22,10 +22,11 @@ use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
     AgentRemoveRequest, DaemonControlResponse, DaemonDiagnosticsReport, HealthResponse,
-    LeaderTransferRequest, ObserveSessionRequest, ProjectSummary, ReadyEventPayload,
-    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionExtensionsPayload, SessionSummary,
-    SessionUpdatedPayload, SessionsUpdatedPayload, SignalSendRequest, StreamEvent,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
+    LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
+    ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
+    SessionExtensionsPayload, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
+    SetLogLevelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -285,6 +286,7 @@ pub fn health_response(
         pid: manifest.pid,
         endpoint: manifest.endpoint.clone(),
         started_at: manifest.started_at.clone(),
+        log_level: current_log_level(),
         project_count,
         worktree_count,
         session_count,
@@ -356,6 +358,96 @@ pub fn request_shutdown() -> Result<DaemonControlResponse, CliError> {
     Ok(DaemonControlResponse {
         status: "stopping".into(),
     })
+}
+
+const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error"];
+
+fn current_log_level() -> String {
+    crate::log_filter_handle().map_or_else(
+        || "info".to_string(),
+        |handle| {
+            handle
+                .with_current(|filter| {
+                    let filter_string = filter.to_string();
+                    for level in VALID_LOG_LEVELS {
+                        if filter_string.contains(level) {
+                            return (*level).to_string();
+                        }
+                    }
+                    "info".to_string()
+                })
+                .unwrap_or_else(|_| "info".to_string())
+        },
+    )
+}
+
+/// Return the current daemon log level and filter directive.
+///
+/// # Errors
+/// Returns `CliError` if the filter handle is unavailable.
+pub fn get_log_level() -> Result<LogLevelResponse, CliError> {
+    let handle = crate::log_filter_handle()
+        .ok_or_else(|| CliErrorKind::workflow_io("log filter handle unavailable"))?;
+    let filter = handle
+        .with_current(ToString::to_string)
+        .unwrap_or_else(|_| "harness=info".to_string());
+    Ok(LogLevelResponse {
+        level: current_log_level(),
+        filter,
+    })
+}
+
+fn validate_and_reload_filter(level: &str) -> Result<LogLevelResponse, CliError> {
+    let handle = crate::log_filter_handle()
+        .ok_or_else(|| CliErrorKind::workflow_io("log filter handle unavailable"))?;
+    let directive = format!("harness={level}");
+    let new_filter = tracing_subscriber::EnvFilter::new(&directive);
+    handle
+        .reload(new_filter)
+        .map_err(|error| CliErrorKind::workflow_io(format!("reload log filter: {error}")))?;
+    Ok(LogLevelResponse {
+        level: level.to_string(),
+        filter: directive,
+    })
+}
+
+/// Update the daemon log level at runtime.
+///
+/// # Errors
+/// Returns `CliError` on invalid level or reload failure.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+pub fn set_log_level(
+    request: &SetLogLevelRequest,
+    sender: &broadcast::Sender<StreamEvent>,
+) -> Result<LogLevelResponse, CliError> {
+    let level = request.level.to_lowercase();
+    if !VALID_LOG_LEVELS.contains(&level.as_str()) {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "invalid log level '{}', expected one of: {}",
+            request.level,
+            VALID_LOG_LEVELS.join(", ")
+        ))
+        .into());
+    }
+
+    let response = validate_and_reload_filter(&level)?;
+
+    let payload = serde_json::to_value(&response).unwrap_or_default();
+    let event = StreamEvent {
+        event: "log_level_changed".into(),
+        recorded_at: utc_now(),
+        session_id: None,
+        payload,
+    };
+    let _ = sender.send(event);
+
+    let _ = state::append_event("info", &format!("log level changed to {level}"));
+    tracing::info!(%level, "daemon log level changed");
+
+    Ok(response)
 }
 
 /// List discovered projects known to the daemon.

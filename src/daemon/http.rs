@@ -17,8 +17,8 @@ use crate::errors::{CliError, CliErrorKind};
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
     SessionEndRequest, SessionJoinRequest, SessionMutationResponse, SessionStartRequest,
-    SignalAckRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskUpdateRequest,
+    SetLogLevelRequest, SignalAckRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -47,6 +47,10 @@ pub async fn serve(
         .route("/v1/health", get(get_health))
         .route("/v1/diagnostics", get(get_diagnostics))
         .route("/v1/daemon/stop", post(post_stop_daemon))
+        .route(
+            "/v1/daemon/log-level",
+            get(get_log_level).put(put_log_level),
+        )
         .route("/v1/projects", get(get_projects))
         .route("/v1/sessions", get(get_sessions).post(post_session_start))
         .route("/v1/sessions/{session_id}", get(get_session))
@@ -153,6 +157,40 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
         &request_id,
         start,
         service::request_shutdown(),
+    )
+}
+
+async fn get_log_level(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        "/v1/daemon/log-level",
+        &request_id,
+        start,
+        service::get_log_level(),
+    )
+}
+
+async fn put_log_level(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SetLogLevelRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "PUT",
+        "/v1/daemon/log-level",
+        &request_id,
+        start,
+        service::set_log_level(&request, &state.sender),
     )
 }
 
