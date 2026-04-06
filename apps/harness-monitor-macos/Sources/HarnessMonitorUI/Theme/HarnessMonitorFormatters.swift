@@ -181,3 +181,12 @@ private func parsedTimestampDate(from value: String) -> Date? {
     ?? iso8601Formatter.date(from: value)
     ?? spaceSeparatedFormatter.date(from: value)
 }
+
+private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+
+func abbreviateHomePath(_ path: String) -> String {
+  if path.hasPrefix(homeDirectory) {
+    return "~/" + path.dropFirst(homeDirectory.count)
+  }
+  return path
+}
