@@ -62,57 +62,6 @@ struct DaemonCardHeader: View {
   }
 }
 
-struct DaemonMetricsStrip: View {
-  let projectCount: Int
-  let worktreeCount: Int
-  let sessionCount: Int
-  let launchdState: String
-
-  var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-        projectsBadge
-        worktreesBadge
-        sessionsBadge
-        launchdBadge
-      }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-          projectsBadge
-          worktreesBadge
-          sessionsBadge
-        }
-        launchdBadge
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private var projectsBadge: some View {
-    DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarDaemonBadgeFrame("Projects")) {
-      DaemonStatBadge(title: "Projects", value: "\(projectCount)")
-    }
-  }
-
-  private var sessionsBadge: some View {
-    DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarDaemonBadgeFrame("Sessions")) {
-      DaemonStatBadge(title: "Sessions", value: "\(sessionCount)")
-    }
-  }
-
-  private var worktreesBadge: some View {
-    DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarDaemonBadgeFrame("Worktrees")) {
-      DaemonStatBadge(title: "Worktrees", value: "\(worktreeCount)")
-    }
-  }
-
-  private var launchdBadge: some View {
-    DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarDaemonBadgeFrame("Launchd")) {
-      DaemonStatBadge(title: "Launchd", value: launchdState)
-    }
-  }
-}
-
 struct DaemonActionButtons: View {
   let isLaunchAgentInstalled: Bool
   let isLoading: Bool
