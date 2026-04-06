@@ -300,23 +300,27 @@ struct PreferencesDatabaseSection: View {
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.preferencesMetricCard("Schema Version")
         )
-      LabeledContent("Store Path") {
+      HStack {
+        Text("Store Path")
+        Spacer()
         Text(databaseStats?.appCacheStorePath ?? "Unavailable")
-          .scaledFont(.caption)
-          .monospaced()
-          .truncationMode(.middle)
+          .scaledFont(.caption.monospaced())
           .lineLimit(1)
+          .truncationMode(.middle)
+          .foregroundStyle(.secondary)
           .textSelection(.enabled)
       }
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.preferencesMetricCard("Store Path")
       )
-      LabeledContent("Daemon DB Path") {
+      HStack {
+        Text("Daemon DB Path")
+        Spacer()
         Text(databaseStats?.daemonDatabasePath ?? "Unavailable")
-          .scaledFont(.caption)
-          .monospaced()
-          .truncationMode(.middle)
+          .scaledFont(.caption.monospaced())
           .lineLimit(1)
+          .truncationMode(.middle)
+          .foregroundStyle(.secondary)
           .textSelection(.enabled)
       }
       .accessibilityIdentifier(
