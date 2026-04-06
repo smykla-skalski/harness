@@ -3,8 +3,12 @@ import SwiftUI
 
 struct SessionMetricGrid: View {
   let metrics: SessionMetrics
-  @ScaledMetric(relativeTo: .caption)
-  private var barWidth: CGFloat = 8
+  @ScaledMetric(relativeTo: .body)
+  private var badgeMinWidth: CGFloat = 28
+  @ScaledMetric(relativeTo: .body)
+  private var badgePaddingH: CGFloat = 8
+  @ScaledMetric(relativeTo: .body)
+  private var badgePaddingV: CGFloat = 4
   var body: some View {
     HarnessMonitorAdaptiveGridLayout(
       minimumColumnWidth: 130,
@@ -40,25 +44,39 @@ struct SessionMetricGrid: View {
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
-      RoundedRectangle(cornerRadius: 999, style: .continuous)
-        .fill(tint)
-        .frame(width: barWidth)
-        .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text(title.uppercased())
-          .scaledFont(.caption.weight(.semibold))
-          .tracking(HarnessMonitorTheme.uppercaseTracking)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Text(value)
-          .scaledFont(.system(.title, design: .rounded, weight: .heavy))
-          .foregroundStyle(tint)
-          .contentTransition(.numericText())
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
+      knockoutBadge(value: value, tint: tint)
+      Text(title.uppercased())
+        .scaledFont(.caption.weight(.semibold))
+        .tracking(HarnessMonitorTheme.uppercaseTracking)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
+  }
+
+  private func knockoutBadge(value: String, tint: Color) -> some View {
+    Text(value)
+      .scaledFont(.system(.body, design: .rounded, weight: .heavy))
+      .monospacedDigit()
+      .padding(.horizontal, badgePaddingH)
+      .padding(.vertical, badgePaddingV)
+      .frame(minWidth: badgeMinWidth)
+      .foregroundStyle(.clear)
+      .background {
+        ZStack {
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(tint)
+          Text(value)
+            .scaledFont(.system(.body, design: .rounded, weight: .heavy))
+            .monospacedDigit()
+            .contentTransition(.numericText())
+            .blendMode(.destinationOut)
+        }
+        .compositingGroup()
+      }
+      .accessibilityLabel(value)
+      .accessibilityValue("")
   }
 }
 
