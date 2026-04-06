@@ -16,36 +16,42 @@ struct SessionMetricGrid: View {
       spacing: HarnessMonitorTheme.sectionSpacing
     ) {
       metricCard(
-        title: "Agents",
-        value: "\(metrics.agentCount)",
+        singular: "Agent",
+        plural: "Agents",
+        count: metrics.agentCount,
         tint: HarnessMonitorTheme.accent
       )
       metricCard(
-        title: "Active",
-        value: "\(metrics.activeAgentCount)",
+        singular: "Active",
+        plural: "Active",
+        count: metrics.activeAgentCount,
         tint: HarnessMonitorTheme.success
       )
       metricCard(
-        title: "In Flight",
-        value: "\(metrics.inProgressTaskCount)",
+        singular: "In Flight",
+        plural: "In Flight",
+        count: metrics.inProgressTaskCount,
         tint: HarnessMonitorTheme.warmAccent
       )
       metricCard(
-        title: "Blocked",
-        value: "\(metrics.blockedTaskCount)",
+        singular: "Blocked",
+        plural: "Blocked",
+        count: metrics.blockedTaskCount,
         tint: HarnessMonitorTheme.danger
       )
       metricCard(
-        title: "Completed",
-        value: "\(metrics.completedTaskCount)",
+        singular: "Completed",
+        plural: "Completed",
+        count: metrics.completedTaskCount,
         tint: HarnessMonitorTheme.ink
       )
     }
   }
 
-  private func metricCard(title: String, value: String, tint: Color) -> some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-      knockoutBadge(value: value, tint: tint)
+  private func metricCard(singular: String, plural: String, count: Int, tint: Color) -> some View {
+    let title = count == 1 ? singular : plural
+    return HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
+      knockoutBadge(value: "\(count)", tint: tint)
       Text(title.uppercased())
         .scaledFont(.caption.weight(.semibold))
         .tracking(HarnessMonitorTheme.uppercaseTracking)
