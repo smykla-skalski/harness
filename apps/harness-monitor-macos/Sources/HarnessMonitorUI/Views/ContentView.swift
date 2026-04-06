@@ -7,8 +7,10 @@ public struct ContentView: View {
   private var openWindow
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode = .standard
-  @SceneStorage("showInspector")
+  @AppStorage("showInspector")
   private var showInspector = true
+  @AppStorage("inspectorWidth")
+  private var inspectorWidth: Double = 380
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
 
@@ -106,7 +108,17 @@ public struct ContentView: View {
     }
     .inspector(isPresented: $showInspector) {
       InspectorColumnView(store: store)
-        .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
+        .inspectorColumnWidth(min: 320, ideal: inspectorWidth, max: 500)
+        .background {
+          GeometryReader { proxy in
+            Color.clear.preference(key: InspectorWidthKey.self, value: proxy.size.width)
+          }
+        }
+        .onPreferenceChange(InspectorWidthKey.self) { width in
+          if width >= 320, width != inspectorWidth {
+            inspectorWidth = width
+          }
+        }
         .toolbar(id: "harness.inspector") {
           inspectorToolbar
         }
@@ -287,6 +299,14 @@ private extension ContentView {
 }
 
 private struct ToolbarWidthKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = nextValue()
+  }
+}
+
+private struct InspectorWidthKey: PreferenceKey {
   static let defaultValue: CGFloat = 0
 
   static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
