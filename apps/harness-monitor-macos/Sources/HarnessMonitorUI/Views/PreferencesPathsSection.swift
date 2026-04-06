@@ -33,7 +33,7 @@ struct PreferencesPathsSection: View {
     HStack {
       Text(title)
       Spacer()
-      Text(value)
+      Text(abbreviateHomePath(value))
         .scaledFont(.caption.monospaced())
         .lineLimit(1)
         .truncationMode(.middle)

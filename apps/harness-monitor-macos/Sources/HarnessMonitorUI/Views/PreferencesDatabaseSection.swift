@@ -303,7 +303,7 @@ struct PreferencesDatabaseSection: View {
       HStack {
         Text("Store Path")
         Spacer()
-        Text(databaseStats?.appCacheStorePath ?? "Unavailable")
+        Text(abbreviateHomePath(databaseStats?.appCacheStorePath ?? "Unavailable"))
           .scaledFont(.caption.monospaced())
           .lineLimit(1)
           .truncationMode(.middle)
@@ -316,7 +316,7 @@ struct PreferencesDatabaseSection: View {
       HStack {
         Text("Daemon DB Path")
         Spacer()
-        Text(databaseStats?.daemonDatabasePath ?? "Unavailable")
+        Text(abbreviateHomePath(databaseStats?.daemonDatabasePath ?? "Unavailable"))
           .scaledFont(.caption.monospaced())
           .lineLimit(1)
           .truncationMode(.middle)
