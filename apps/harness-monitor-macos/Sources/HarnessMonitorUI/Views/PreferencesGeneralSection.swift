@@ -57,6 +57,7 @@ struct PreferencesGeneralSection: View {
     Binding(
       get: { store.daemonLogLevel ?? "info" },
       set: { newValue in
+        store.daemonLogLevel = newValue
         Task { await store.setDaemonLogLevel(newValue) }
       }
     )
