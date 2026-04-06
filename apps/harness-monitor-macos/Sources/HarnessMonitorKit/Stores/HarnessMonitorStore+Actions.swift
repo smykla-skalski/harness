@@ -348,6 +348,18 @@ extension HarnessMonitorStore {
     pendingConfirmation = .removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
   }
 
+  public func setDaemonLogLevel(_ level: String) async {
+    guard let client else {
+      return
+    }
+    do {
+      let response = try await client.setLogLevel(level)
+      daemonLogLevel = response.level
+    } catch {
+      lastError = error.localizedDescription
+    }
+  }
+
   public func cancelConfirmation() {
     pendingConfirmation = nil
   }

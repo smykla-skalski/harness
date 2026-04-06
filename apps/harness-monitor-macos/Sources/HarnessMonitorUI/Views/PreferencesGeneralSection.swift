@@ -51,6 +51,17 @@ struct PreferencesGeneralSection: View {
     effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt
   }
 
+  private static let logLevels = ["trace", "debug", "info", "warn", "error"]
+
+  private var daemonLogLevelBinding: Binding<String> {
+    Binding(
+      get: { store.daemonLogLevel ?? "info" },
+      set: { newValue in
+        Task { await store.setDaemonLogLevel(newValue) }
+      }
+    )
+  }
+
   private var isLoading: Bool {
     store.isDaemonActionInFlight
       || store.isDiagnosticsRefreshInFlight
@@ -84,7 +95,7 @@ struct PreferencesGeneralSection: View {
       } header: {
         Text("Appearance")
       } footer: {
-        Text("Applies to every Harness Monitor window on this Mac.")
+        Text("Applies to every Harness Monitor window on this Mac")
       }
 
       Section {
@@ -118,7 +129,24 @@ struct PreferencesGeneralSection: View {
       } header: {
         Text("Date & Time")
       } footer: {
-        Text("Every timestamp in Harness Monitor uses this timezone-aware display format.")
+        Text("Every timestamp in Harness Monitor uses this timezone-aware display format")
+          .accessibilityIdentifier("harness.preferences.footer.datetime")
+      }
+
+      Section {
+        Picker("Log level", selection: daemonLogLevelBinding) {
+          ForEach(Self.logLevels, id: \.self) { level in
+            Text(level.uppercased()).tag(level)
+          }
+        }
+        .harnessNativeFormControl()
+        .disabled(store.connectionState != .online)
+        .accessibilityIdentifier("harness.preferences.daemon.logLevel")
+      } header: {
+        Text("Daemon")
+      } footer: {
+        Text("Changes apply immediately and reset when the daemon restarts")
+          .accessibilityIdentifier("harness.preferences.footer.daemon")
       }
 
       Section {
