@@ -5,9 +5,6 @@ struct SessionMetricGrid: View {
   let metrics: SessionMetrics
   @ScaledMetric(relativeTo: .caption)
   private var barWidth: CGFloat = 8
-  @ScaledMetric(relativeTo: .title)
-  private var cardMinHeight: CGFloat = 60
-
   var body: some View {
     HarnessMonitorAdaptiveGridLayout(
       minimumColumnWidth: 130,
@@ -47,7 +44,6 @@ struct SessionMetricGrid: View {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
         .frame(width: barWidth)
-        .frame(minHeight: cardMinHeight)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         Text(title.uppercased())
