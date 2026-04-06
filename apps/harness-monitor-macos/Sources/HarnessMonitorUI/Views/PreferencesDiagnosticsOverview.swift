@@ -49,9 +49,10 @@ struct PreferencesDiagnosticsOverview: View {
             .tracking(HarnessMonitorTheme.uppercaseTracking)
         }
         Text(lastEvent.message)
-        Text(formatTimestamp(lastEvent.recordedAt, configuration: dateTimeConfiguration))
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(.secondary)
+        LabeledContent("Recorded At") {
+          Text(formatTimestamp(lastEvent.recordedAt, configuration: dateTimeConfiguration))
+            .scaledFont(.caption.monospaced())
+        }
       }
     }
   }
