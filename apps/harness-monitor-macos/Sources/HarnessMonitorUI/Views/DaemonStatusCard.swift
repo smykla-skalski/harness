@@ -5,9 +5,6 @@ struct DaemonStatusCard: View {
   let connectionState: HarnessMonitorStore.ConnectionState
   let isBusy: Bool
   let isRefreshing: Bool
-  let projectCount: Int
-  let worktreeCount: Int
-  let sessionCount: Int
   let isLaunchAgentInstalled: Bool
   let startDaemon: HarnessMonitorAsyncActionButton.Action
   let stopDaemon: HarnessMonitorAsyncActionButton.Action
@@ -36,13 +33,6 @@ struct DaemonStatusCard: View {
             .transition(.move(edge: .top).combined(with: .opacity))
         }
       }
-
-      DaemonMetricsStrip(
-        projectCount: projectCount,
-        worktreeCount: worktreeCount,
-        sessionCount: sessionCount,
-        launchdState: daemonLaunchdState
-      )
 
       DaemonActionButtons(
         isLaunchAgentInstalled: isLaunchAgentInstalled,
@@ -111,50 +101,6 @@ extension DaemonStatusCard {
     }
   }
 
-  fileprivate var daemonLaunchdState: String {
-    isLaunchAgentInstalled ? "Installed" : "Manual"
-  }
-}
-
-struct DaemonStatBadge: View {
-  let title: String
-  let value: String
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title.uppercased())
-        .scaledFont(.caption2.weight(.semibold))
-        .tracking(HarnessMonitorTheme.uppercaseTracking)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(value)
-        .scaledFont(.system(.callout, design: .rounded, weight: .bold))
-        .lineLimit(1)
-        .minimumScaleFactor(0.82)
-        .contentTransition(.numericText())
-    }
-    .frame(maxWidth: .infinity, alignment: .topLeading)
-    .padding(.horizontal, HarnessMonitorTheme.cardPadding)
-    .padding(.vertical, HarnessMonitorTheme.itemSpacing)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(.primary.opacity(backgroundFillOpacity))
-    }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(title)
-    .accessibilityValue(value)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarDaemonBadge(title))
-  }
-
-  private var backgroundFillOpacity: Double {
-    if reduceTransparency {
-      return colorSchemeContrast == .increased ? 0.18 : 0.14
-    }
-    return colorSchemeContrast == .increased ? 0.09 : 0.05
-  }
 }
 
 struct DaemonSidebarLayoutProbe<Content: View>: View {
@@ -221,9 +167,6 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     connectionState: .online,
     isBusy: false,
     isRefreshing: false,
-    projectCount: 4,
-    worktreeCount: 6,
-    sessionCount: 18,
     isLaunchAgentInstalled: true
   )
 }
@@ -233,9 +176,6 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     connectionState: .connecting,
     isBusy: true,
     isRefreshing: false,
-    projectCount: 4,
-    worktreeCount: 6,
-    sessionCount: 18,
     isLaunchAgentInstalled: true
   )
 }
@@ -245,9 +185,6 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     connectionState: .offline("Daemon is offline. Launch it from the control deck."),
     isBusy: false,
     isRefreshing: false,
-    projectCount: 0,
-    worktreeCount: 0,
-    sessionCount: 0,
     isLaunchAgentInstalled: false
   )
 }
@@ -257,18 +194,12 @@ private func daemonStatusCardPreview(
   connectionState: HarnessMonitorStore.ConnectionState,
   isBusy: Bool,
   isRefreshing: Bool,
-  projectCount: Int,
-  worktreeCount: Int,
-  sessionCount: Int,
   isLaunchAgentInstalled: Bool
 ) -> some View {
   DaemonStatusCard(
     connectionState: connectionState,
     isBusy: isBusy,
     isRefreshing: isRefreshing,
-    projectCount: projectCount,
-    worktreeCount: worktreeCount,
-    sessionCount: sessionCount,
     isLaunchAgentInstalled: isLaunchAgentInstalled,
     startDaemon: {},
     stopDaemon: {},
