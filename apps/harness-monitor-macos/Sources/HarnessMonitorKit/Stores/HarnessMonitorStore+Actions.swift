@@ -349,13 +349,17 @@ extension HarnessMonitorStore {
   }
 
   public func setDaemonLogLevel(_ level: String) async {
+    let previousLevel = daemonLogLevel
+    daemonLogLevel = level
     guard let client else {
+      daemonLogLevel = previousLevel
       return
     }
     do {
       let response = try await client.setLogLevel(level)
       daemonLogLevel = response.level
     } catch {
+      daemonLogLevel = previousLevel
       lastError = error.localizedDescription
     }
   }
