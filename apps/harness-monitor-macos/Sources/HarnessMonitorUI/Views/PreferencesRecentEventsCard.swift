@@ -13,20 +13,18 @@ struct PreferencesRecentEventsSection: View {
           .foregroundStyle(.secondary)
       } else {
         ForEach(events) { event in
-          VStack(alignment: .leading, spacing: 4) {
-            HStack {
-              Text(event.level.uppercased())
-                .scaledFont(.caption.bold())
-                .tracking(HarnessMonitorTheme.uppercaseTracking)
-                .foregroundStyle(
-                  eventLevelColor(event.level)
-                )
-              Spacer()
-              Text(formatTimestamp(event.recordedAt, configuration: dateTimeConfiguration))
-                .scaledFont(.caption.monospaced())
-                .foregroundStyle(.secondary)
-            }
+          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+            Image(systemName: eventLevelIcon(event.level))
+              .foregroundStyle(eventLevelColor(event.level))
+              .scaledFont(.caption)
+              .frame(width: 16)
+              .accessibilityHidden(true)
             Text(event.message)
+              .lineLimit(1)
+            Spacer()
+            Text(formatTimestamp(event.recordedAt, configuration: dateTimeConfiguration))
+              .scaledFont(.caption.monospaced())
+              .foregroundStyle(.secondary)
           }
           .accessibilityElement(children: .combine)
         }
@@ -34,11 +32,25 @@ struct PreferencesRecentEventsSection: View {
     }
   }
 
+  private func eventLevelIcon(_ level: String) -> String {
+    switch level {
+    case "trace": "circle.dotted"
+    case "debug": "ant.fill"
+    case "info": "info.circle.fill"
+    case "warn": "exclamationmark.triangle.fill"
+    case "error": "exclamationmark.octagon.fill"
+    default: "questionmark.circle"
+    }
+  }
+
   private func eventLevelColor(_ level: String) -> Color {
     switch level {
+    case "trace": .gray
+    case "debug": .secondary
+    case "info": .blue
     case "warn": HarnessMonitorTheme.caution
     case "error": HarnessMonitorTheme.danger
-    default: .primary
+    default: .secondary
     }
   }
 }
