@@ -126,14 +126,6 @@ enum HarnessMonitorAccessibility {
     "harness.sidebar.filter.\(filter)"
   }
 
-  static func sidebarDaemonBadge(_ key: String) -> String {
-    "harness.sidebar.daemon-badge.\(slug(key))"
-  }
-
-  static func sidebarDaemonBadgeFrame(_ key: String) -> String {
-    "\(sidebarDaemonBadge(key)).frame"
-  }
-
   static func sessionTaskCard(_ taskID: String) -> String {
     "harness.session.task.\(slug(taskID))"
   }
