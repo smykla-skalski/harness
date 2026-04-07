@@ -9,6 +9,10 @@ public enum HarnessMonitorBackdropDefaults {
   public static let modeKey = "harnessBackdropMode"
 }
 
+public enum HarnessMonitorToolbarStyleDefaults {
+  public static let modeKey = "harnessToolbarStyle"
+}
+
 public enum HarnessMonitorBackgroundDefaults {
   public static let imageKey = "harnessBackgroundImage"
 }
@@ -298,6 +302,20 @@ public enum HarnessMonitorBackdropMode: String, CaseIterable, Identifiable {
     case .none: "None"
     case .window: "Window"
     case .content: "Content"
+    }
+  }
+}
+
+public enum HarnessMonitorToolbarStyle: String, CaseIterable, Identifiable {
+  case glass
+  case flat
+
+  public var id: String { rawValue }
+
+  public var label: String {
+    switch self {
+    case .glass: "Glass"
+    case .flat: "Flat"
     }
   }
 }
