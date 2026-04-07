@@ -59,10 +59,28 @@ private struct PreferencesBackgroundTile: View {
   let select: () -> Void
   @State private var loadedImage: Image?
 
+  private static let selectionRingWidth: CGFloat = 3
+
+  private var outerShape: RoundedRectangle {
+    RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+  }
+
   var body: some View {
     Button(action: select) {
       ZStack(alignment: .topTrailing) {
         previewContent
+          .frame(maxWidth: .infinity)
+          .frame(height: isSelected ? previewHeight - 2 * Self.selectionRingWidth : previewHeight)
+          .clipped()
+          .clipShape(
+            RoundedRectangle(
+              cornerRadius: isSelected
+                ? HarnessMonitorTheme.cornerRadiusLG - Self.selectionRingWidth
+                : HarnessMonitorTheme.cornerRadiusLG,
+              style: .continuous
+            )
+          )
+          .padding(isSelected ? Self.selectionRingWidth : 0)
 
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
           .font(.system(size: 18, weight: .semibold))
@@ -72,28 +90,20 @@ private struct PreferencesBackgroundTile: View {
           .accessibilityHidden(true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .clipShape(
-        RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-          style: .continuous
-        )
-      )
-      .overlay {
-        RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-          style: .continuous
-        )
-        .strokeBorder(
-          isSelected ? HarnessMonitorTheme.accent.opacity(0.5) : HarnessMonitorTheme.controlBorder.opacity(0.55),
-          lineWidth: isSelected ? 1.5 : 1
-        )
+      .frame(height: previewHeight)
+      .background {
+        outerShape
+          .fill(isSelected ? HarnessMonitorTheme.accent : Color.clear)
       }
-      .contentShape(
-        RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-          style: .continuous
-        )
-      )
+      .clipShape(outerShape)
+      .overlay {
+        outerShape
+          .strokeBorder(
+            isSelected ? Color.clear : HarnessMonitorTheme.controlBorder.opacity(0.55),
+            lineWidth: isSelected ? 0 : 1
+          )
+      }
+      .contentShape(outerShape)
     }
     .buttonStyle(.plain)
     .harnessInteractiveCardButtonStyle(
@@ -122,13 +132,9 @@ private struct PreferencesBackgroundTile: View {
         .resizable()
         .interpolation(.high)
         .aspectRatio(contentMode: .fill)
-        .frame(maxWidth: .infinity)
-        .frame(height: previewHeight)
         .accessibilityHidden(true)
     } else {
       Color.secondary.opacity(0.08)
-        .frame(maxWidth: .infinity)
-        .frame(height: previewHeight)
         .overlay {
           HarnessMonitorSpinner(size: 16)
         }
