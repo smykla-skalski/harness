@@ -236,13 +236,11 @@ private extension ContentView {
       messages.append(.init(id: "loading.extensions", text: "Loading observers and signals", systemImage: "antenna.radiowaves.left.and.right", tint: .orange))
     }
 
-    if messages.isEmpty {
-      messages.append(contentsOf: [
-        .init(id: "status.running", text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-        .init(id: "status.sessions", text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
-        .init(id: "status.daemon", text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
-      ])
-    }
+    messages.append(contentsOf: [
+      .init(id: "status.running", text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+      .init(id: "status.sessions", text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+      .init(id: "status.daemon", text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
+    ])
 
     return messages
   }
