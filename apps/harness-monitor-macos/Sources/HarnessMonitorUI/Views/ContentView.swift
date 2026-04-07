@@ -13,6 +13,7 @@ public struct ContentView: View {
   private var inspectorWidth: Double = 380
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
+  @State private var toolbarGlassState = "unknown"
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -101,7 +102,7 @@ public struct ContentView: View {
           navigationToolbar
           centerpieceToolbar
         }
-        .toolbar(id: "harness.main") {
+        .toolbar {
           primaryToolbar
         }
       }
@@ -119,13 +120,9 @@ public struct ContentView: View {
             inspectorWidth = width
           }
         }
-        .toolbar(id: "harness.inspector") {
-          inspectorToolbar
-        }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-    .containerBackground(.windowBackground, for: .window)
+    .background { ToolbarGlassStateMonitor() }
     .background {
       GeometryReader { proxy in
         Color.clear.preference(
@@ -170,6 +167,15 @@ public struct ContentView: View {
           identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
           text: toolbarCenterpieceDisplayMode.rawValue
         )
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.toolbarGlassState,
+          text: toolbarGlassState
+        )
+      }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .toolbarGlassStateDidChange)) { notification in
+      if let value = notification.object as? String {
+        toolbarGlassState = value
       }
     }
     .toolbarBaselineOverlay()
@@ -221,63 +227,30 @@ private extension ContentView {
     )
   }
 
-  @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {
-    if !showInspector {
-      ToolbarItem(id: "refresh", placement: .primaryAction) {
-        RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
-          .help("Refresh sessions")
-      }
+  @ToolbarContentBuilder var primaryToolbar: some ToolbarContent {
+    ToolbarItemGroup(placement: .primaryAction) {
+      RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
+        .help("Refresh sessions")
 
-      ToolbarItem(id: "settings", placement: .primaryAction) {
-        Button {
-          openWindow(id: HarnessMonitorWindowID.preferences)
-        } label: {
-          Label("Settings", systemImage: "gearshape")
-        }
-        .help("Open settings")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.daemonPreferencesButton)
+      Button {
+        openWindow(id: HarnessMonitorWindowID.preferences)
+      } label: {
+        Label("Settings", systemImage: "gearshape")
       }
-
-      ToolbarSpacer(.fixed)
-
-      ToolbarItem(id: "inspector", placement: .primaryAction) {
-        Button(action: toggleInspector) {
-          Label("Show Inspector", systemImage: "sidebar.trailing")
-        }
-        .help("Show inspector")
-      }
+      .help("Open settings")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.daemonPreferencesButton)
     }
-  }
 
-  @ToolbarContentBuilder var inspectorToolbar: some CustomizableToolbarContent {
-    if showInspector {
-      ToolbarSpacer(.flexible, placement: .primaryAction)
+    ToolbarSpacer(.fixed, placement: .primaryAction)
 
-      ToolbarItem(id: "inspector.refresh", placement: .primaryAction) {
-        RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
-          .help("Refresh sessions")
+    ToolbarItemGroup(placement: .primaryAction) {
+      Button(action: toggleInspector) {
+        Label(
+          showInspector ? "Hide Inspector" : "Show Inspector",
+          systemImage: "sidebar.trailing"
+        )
       }
-
-      ToolbarItem(id: "inspector.settings", placement: .primaryAction) {
-        Button {
-          openWindow(id: HarnessMonitorWindowID.preferences)
-        } label: {
-          Label("Settings", systemImage: "gearshape")
-        }
-        .help("Open settings")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.daemonPreferencesButton)
-      }
-
-      ToolbarSpacer(.fixed)
-
-      ToolbarItem(id: "inspector.hide", placement: .primaryAction) {
-        Button {
-          showInspector = false
-        } label: {
-          Label("Hide Inspector", systemImage: "sidebar.trailing")
-        }
-        .help("Hide inspector")
-      }
+      .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 
