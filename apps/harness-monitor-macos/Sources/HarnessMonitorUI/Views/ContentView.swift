@@ -60,6 +60,7 @@ public struct ContentView: View {
     [
       "toolbarTitle=native-window",
       "windowTitle=\(windowTitle)",
+      "toolbarStyle=\(toolbarStyle.rawValue)",
     ].joined(separator: ", ")
   }
 
@@ -147,10 +148,7 @@ public struct ContentView: View {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .toolbarBackgroundVisibility(
-      toolbarStyle == .flat ? .visible : .automatic,
-      for: .windowToolbar
-    )
+    .modifier(ToolbarBackgroundStyleModifier(style: toolbarStyle))
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { windowWidth in
@@ -308,6 +306,22 @@ private extension ContentView {
 
   func toggleSleepPrevention() {
     store.sleepPreventionEnabled.toggle()
+  }
+}
+
+private struct ToolbarBackgroundStyleModifier: ViewModifier {
+  let style: HarnessMonitorToolbarStyle
+
+  func body(content: Content) -> some View {
+    content
+      .toolbarBackground(
+        style == .flat ? Color(nsColor: .windowBackgroundColor) : Color.clear,
+        for: .windowToolbar
+      )
+      .toolbarBackgroundVisibility(
+        style == .flat ? .visible : .automatic,
+        for: .windowToolbar
+      )
   }
 }
 
