@@ -337,11 +337,13 @@ private struct DetailBackgroundExtension<Content: View>: View {
   @ViewBuilder let content: Content
 
   var body: some View {
-    if isGlass {
-      content.backgroundExtensionEffect()
-    } else {
-      content
-    }
+    content
+      .background(alignment: .top) {
+        (isGlass ? Color.clear : Color(nsColor: .windowBackgroundColor))
+          .frame(height: 0)
+          .ignoresSafeArea(.container, edges: .top)
+      }
+      .backgroundExtensionEffect()
   }
 }
 
