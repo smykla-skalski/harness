@@ -100,6 +100,7 @@
 		820D99E8CF8086F1CD96316E /* HarnessMonitorKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 09069D489D24200773820893 /* HarnessMonitorKit.framework */; };
 		868DB7A49D2ABA10EC625669 /* HarnessMonitorStore+ConnectionTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 280643BCAAE15C5DE59A9548 /* HarnessMonitorStore+ConnectionTelemetry.swift */; };
 		86E9515B141E48BCC6DB0BE7 /* SessionCockpitSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB40388072276BDE8667DC29 /* SessionCockpitSupport.swift */; };
+		876A3B7DF9E46E157FDA5320 /* HarnessCornerAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92F77298438F1472B200E97F /* HarnessCornerAnimation.swift */; };
 		88ECC8B054E0E49C69A58B77 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F181CC71AF8F04C79E026133 /* PreferencesView.swift */; };
 		8959911A4DAF5826282A4830 /* PreferencesPreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F6C88C0DF83003B80943217 /* PreferencesPreviewSupport.swift */; };
 		8B8291D47C0B0708AD17FCB9 /* PreferencesActionButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0586AF1E51CB81CF1255F9E /* PreferencesActionButtons.swift */; };
@@ -378,6 +379,7 @@
 		8CF9D1C0DE3F82A7FC04CEB2 /* HarnessMonitorFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorFormatters.swift; sourceTree = "<group>"; };
 		91919FD8204152E459478258 /* SessionMetricGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMetricGrid.swift; sourceTree = "<group>"; };
 		9268399EDC3EF58D89FB2343 /* InspectorTaskAgentCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorTaskAgentCards.swift; sourceTree = "<group>"; };
+		92F77298438F1472B200E97F /* HarnessCornerAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessCornerAnimation.swift; sourceTree = "<group>"; };
 		954ED64503890DF34181E962 /* DaemonModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonModels.swift; sourceTree = "<group>"; };
 		9699F85E4E89ECE627588155 /* HarnessMonitorAppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorAppConfiguration.swift; sourceTree = "<group>"; };
 		97812099F9E7ED0F33A84FA7 /* SwiftData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData.framework; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
@@ -663,6 +665,7 @@
 				574C8D3FA7EBA076276F88CC /* ContentView.swift */,
 				B258002596D2527077521A64 /* DaemonStatusCard.swift */,
 				F7354483EE6A96D07E8D8499 /* DaemonStatusCardSupport.swift */,
+				92F77298438F1472B200E97F /* HarnessCornerAnimation.swift */,
 				1DE066EEE1A610EC1B6C081E /* HarnessCornerOverlay.swift */,
 				C509A7081C16E7DF38051EE7 /* HarnessMonitorActionControls.swift */,
 				979175EA64F8CCDEF5EA6655 /* HarnessMonitorAdaptiveGridLayout.swift */,
@@ -1150,6 +1153,7 @@
 				019DEC3F8A74A00D3BDA3775 /* ContentView.swift in Sources */,
 				318E80EE214FFE7328AABC20 /* DaemonStatusCard.swift in Sources */,
 				81284584C10BBB69CAD60EDB /* DaemonStatusCardSupport.swift in Sources */,
+				876A3B7DF9E46E157FDA5320 /* HarnessCornerAnimation.swift in Sources */,
 				5AE09ED8CD281C107F3AB6A7 /* HarnessCornerOverlay.swift in Sources */,
 				31E3BD9D98A59F72EB5263B0 /* HarnessMonitorAccessibilityIDs.swift in Sources */,
 				BEB571819D979A58F23FE74C /* HarnessMonitorAccessibilitySupport.swift in Sources */,

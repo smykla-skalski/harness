@@ -193,6 +193,18 @@ public struct ContentView: View {
       )
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .harnessCornerOverlay(
+      isPresented: true,
+      configuration: .init(
+        width: 120,
+        height: 120,
+        contentPadding: 0,
+        appliesGlass: false,
+        accessibilityLabel: "Ambient animation"
+      )
+    ) {
+      HarnessCornerAnimation()
+    }
     .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
     .modifier(
       ContentAnnouncementsModifier(

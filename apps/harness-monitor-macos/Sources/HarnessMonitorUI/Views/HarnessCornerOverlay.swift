@@ -4,6 +4,7 @@ struct HarnessCornerOverlayConfiguration {
   var width: CGFloat = 280
   var height: CGFloat? = nil
   var edgePadding: CGFloat = HarnessMonitorTheme.spacingLG
+  var contentPadding: CGFloat = HarnessMonitorTheme.cardPadding
   var cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusMD
   var appliesGlass: Bool = true
   var glassProminence: HarnessMonitorFloatingGlassProminence = .regular
@@ -67,7 +68,7 @@ private struct HarnessCornerOverlayContainer<Content: View>: View {
     content
       .frame(width: configuration.width)
       .frame(height: configuration.height)
-      .padding(HarnessMonitorTheme.cardPadding)
+      .padding(configuration.contentPadding)
       .modifier(
         HarnessCornerOverlaySurfaceModifier(
           cornerRadius: configuration.cornerRadius,
