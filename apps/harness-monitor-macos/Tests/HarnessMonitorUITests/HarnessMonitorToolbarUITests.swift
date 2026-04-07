@@ -251,21 +251,77 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let window = mainWindow(in: app)
     let toolbar = window.toolbars.firstMatch
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
+    let centerpieceFrame = frameElement(in: app, identifier: Accessibility.toolbarCenterpieceFrame)
+    let metricsFrame = frameElement(in: app, identifier: Accessibility.toolbarCenterpieceMetricsFrame)
+    let statusTicker = frameElement(in: app, identifier: Accessibility.toolbarStatusTickerFrame)
+    let statusTickerContent = frameElement(
+      in: app,
+      identifier: Accessibility.toolbarStatusTickerContentFrame
+    )
+    let statusTickerHover = frameElement(
+      in: app,
+      identifier: Accessibility.toolbarStatusTickerHoverFrame
+    )
 
     XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(centerpieceFrame.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(statusTicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(statusTickerContent.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(statusTickerHover.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(metricsFrame.waitForExistence(timeout: Self.uiTimeout))
 
-    let centerOffset = abs(centerpiece.frame.midX - toolbar.frame.midX)
-    let verticalOffset = abs(centerpiece.frame.midY - toolbar.frame.midY)
+    let centerOffset = abs(centerpieceFrame.frame.midX - toolbar.frame.midX)
+    let verticalOffset = abs(centerpieceFrame.frame.midY - toolbar.frame.midY)
+    let leadingInset = metricsFrame.frame.minX - centerpieceFrame.frame.minX
+    let interiorGap = statusTicker.frame.minX - metricsFrame.frame.maxX
+    let trailingInset = centerpieceFrame.frame.maxX - statusTicker.frame.maxX
+    let statusLeadingInset = statusTickerContent.frame.minX - statusTicker.frame.minX
+    let statusTrailingInset = statusTicker.frame.maxX - statusTickerContent.frame.maxX
+    let hoverLeadingInset = statusTickerHover.frame.minX - statusTicker.frame.minX
+    let hoverTrailingInset = statusTicker.frame.maxX - statusTickerHover.frame.maxX
+    let hoverTopInset = statusTickerHover.frame.minY - statusTicker.frame.minY
+    let hoverBottomInset = statusTicker.frame.maxY - statusTickerHover.frame.maxY
+    let expectedLeadingInset: CGFloat = 12
+    let leadingInsetTolerance: CGFloat = 1
+    let expectedStatusHorizontalInset: CGFloat = 12
+    let expectedHoverInset: CGFloat = 4
+    let statusInsetTolerance: CGFloat = 1
     let diagnostics = """
       toolbar: \(toolbar.frame)
       centerpiece: \(centerpiece.frame)
+      centerpieceFrame: \(centerpieceFrame.frame)
+      metricsFrame: \(metricsFrame.frame)
+      statusTicker: \(statusTicker.frame)
+      statusTickerContent: \(statusTickerContent.frame)
+      statusTickerHover: \(statusTickerHover.frame)
       centerOffset: \(centerOffset)
       verticalOffset: \(verticalOffset)
+      leadingInset: \(leadingInset)
+      interiorGap: \(interiorGap)
+      trailingInset: \(trailingInset)
+      statusLeadingInset: \(statusLeadingInset)
+      statusTrailingInset: \(statusTrailingInset)
+      hoverLeadingInset: \(hoverLeadingInset)
+      hoverTrailingInset: \(hoverTrailingInset)
+      hoverTopInset: \(hoverTopInset)
+      hoverBottomInset: \(hoverBottomInset)
       """
 
-    if centerOffset > 120 || verticalOffset > 8 || centerpiece.frame.width < 180 {
+    if centerOffset > 120
+      || verticalOffset > 8
+      || abs(leadingInset - expectedLeadingInset) > leadingInsetTolerance
+      || interiorGap < 20
+      || trailingInset < 10
+      || abs(statusLeadingInset - expectedStatusHorizontalInset) > statusInsetTolerance
+      || abs(statusTrailingInset - expectedStatusHorizontalInset) > statusInsetTolerance
+      || abs(hoverLeadingInset - expectedHoverInset) > statusInsetTolerance
+      || abs(hoverTrailingInset - expectedHoverInset) > statusInsetTolerance
+      || abs(hoverTopInset - expectedHoverInset) > statusInsetTolerance
+      || abs(hoverBottomInset - expectedHoverInset) > statusInsetTolerance
+      || centerpieceFrame.frame.width < 180
+    {
       attachWindowScreenshot(in: app, named: "toolbar-centerpiece")
       let attachment = XCTAttachment(string: diagnostics)
       attachment.name = "toolbar-centerpiece-diagnostics"
@@ -274,7 +330,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     }
 
     XCTAssertGreaterThanOrEqual(
-      centerpiece.frame.width,
+      centerpieceFrame.frame.width,
       180,
       "Expected the toolbar centerpiece to keep the stats visible in a compact capsule"
     )
@@ -287,6 +343,86 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       verticalOffset,
       8,
       "Expected the toolbar centerpiece to stay vertically centered in the toolbar"
+    )
+    XCTAssertGreaterThanOrEqual(
+      leadingInset,
+      expectedLeadingInset - leadingInsetTolerance,
+      "Expected the metrics row to keep the calculated leading inset inside the centerpiece capsule"
+    )
+    XCTAssertLessThanOrEqual(
+      leadingInset,
+      expectedLeadingInset + leadingInsetTolerance,
+      "Expected the metrics row leading inset to match the capsule height-derived target"
+    )
+    XCTAssertGreaterThanOrEqual(
+      interiorGap,
+      20,
+      "Expected the metrics row and status ticker to keep a visible interior gap"
+    )
+    XCTAssertGreaterThanOrEqual(
+      trailingInset,
+      10,
+      "Expected the status ticker to keep a trailing inset inside the centerpiece capsule"
+    )
+    XCTAssertGreaterThanOrEqual(
+      statusLeadingInset,
+      expectedStatusHorizontalInset - statusInsetTolerance,
+      "Expected the status hover capsule to keep the calculated leading inset"
+    )
+    XCTAssertLessThanOrEqual(
+      statusLeadingInset,
+      expectedStatusHorizontalInset + statusInsetTolerance,
+      "Expected the status hover capsule leading inset to match the vertical inset"
+    )
+    XCTAssertGreaterThanOrEqual(
+      statusTrailingInset,
+      expectedStatusHorizontalInset - statusInsetTolerance,
+      "Expected the status hover capsule to keep the calculated trailing inset"
+    )
+    XCTAssertLessThanOrEqual(
+      statusTrailingInset,
+      expectedStatusHorizontalInset + statusInsetTolerance,
+      "Expected the status hover capsule trailing inset to match the vertical inset"
+    )
+    XCTAssertGreaterThanOrEqual(
+      hoverLeadingInset,
+      expectedHoverInset - statusInsetTolerance,
+      "Expected the hover plate leading inset to match the top/bottom inset"
+    )
+    XCTAssertLessThanOrEqual(
+      hoverLeadingInset,
+      expectedHoverInset + statusInsetTolerance,
+      "Expected the hover plate leading inset to stay aligned with the top/bottom inset"
+    )
+    XCTAssertGreaterThanOrEqual(
+      hoverTrailingInset,
+      expectedHoverInset - statusInsetTolerance,
+      "Expected the hover plate trailing inset to match the top/bottom inset"
+    )
+    XCTAssertLessThanOrEqual(
+      hoverTrailingInset,
+      expectedHoverInset + statusInsetTolerance,
+      "Expected the hover plate trailing inset to stay aligned with the top/bottom inset"
+    )
+    XCTAssertGreaterThanOrEqual(
+      hoverTopInset,
+      expectedHoverInset - statusInsetTolerance,
+      "Expected the hover plate top inset to stay at the calculated inset"
+    )
+    XCTAssertLessThanOrEqual(
+      hoverTopInset,
+      expectedHoverInset + statusInsetTolerance,
+      "Expected the hover plate top inset to stay at the calculated inset"
+    )
+    XCTAssertGreaterThanOrEqual(
+      hoverBottomInset,
+      expectedHoverInset - statusInsetTolerance,
+      "Expected the hover plate bottom inset to stay at the calculated inset"
+    )
+    XCTAssertLessThanOrEqual(
+      hoverBottomInset,
+      expectedHoverInset + statusInsetTolerance,
+      "Expected the hover plate bottom inset to stay at the calculated inset"
     )
   }
 
