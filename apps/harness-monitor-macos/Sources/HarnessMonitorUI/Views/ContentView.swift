@@ -196,8 +196,8 @@ public struct ContentView: View {
     .harnessCornerOverlay(
       isPresented: true,
       configuration: .init(
-        width: 120,
-        height: 120,
+        width: 200,
+        height: 200,
         contentPadding: 0,
         appliesGlass: false,
         accessibilityLabel: "Ambient animation"
