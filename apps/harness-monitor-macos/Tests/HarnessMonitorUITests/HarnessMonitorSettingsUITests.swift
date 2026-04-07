@@ -28,8 +28,10 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       title: "General",
       within: settingsWindow
     )
+    let appearanceSection = element(in: app, identifier: Accessibility.preferencesAppearanceSection)
 
     XCTAssertTrue(generalSection.exists)
+    XCTAssertTrue(appearanceSection.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(title.exists)
     XCTAssertEqual(title.label, "General")
     XCTAssertEqual(
@@ -37,6 +39,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       preferencesStateLabel(
         mode: "auto",
         section: "general",
+        backdrop: "none",
         background: "auroraVeil",
         textSize: "Default",
         controlSize: "small",
@@ -102,15 +105,15 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
   }
 
   func testSettingsThemeModePickerKeepsNativeChromeContractInAutoMode() throws {
-    assertSettingsThemeModeContract(expectedMode: "auto")
+    assertAppearanceSettingsContract(expectedMode: "auto")
   }
 
   func testSettingsThemeModePickerKeepsNativeChromeContractInDarkMode() throws {
-    assertSettingsThemeModeContract(expectedMode: "dark")
+    assertAppearanceSettingsContract(expectedMode: "dark")
   }
 
   func testSettingsThemeModePickerKeepsNativeChromeContractInLightMode() throws {
-    assertSettingsThemeModeContract(expectedMode: "light")
+    assertAppearanceSettingsContract(expectedMode: "light")
   }
 
   func testRepeatedThemeModeChangesKeepSettingsAndCockpitResponsive() throws {
@@ -129,6 +132,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    selectAppearanceSection(in: app)
 
     let expectedModes: [(title: String, rawValue: String)] = [
       ("Dark", "dark"),
@@ -149,7 +153,8 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
         waitUntil(timeout: Self.uiTimeout) {
           preferencesState.label == self.preferencesStateLabel(
             mode: expectedMode.rawValue,
-            section: "general",
+            section: "appearance",
+            backdrop: "none",
             background: "auroraVeil",
             textSize: "Default",
             controlSize: "small",
@@ -190,6 +195,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       .firstMatch
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    selectAppearanceSection(in: app)
     XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
 
     for option in ["Window", "Content", "None", "Window", "None"] {
@@ -201,7 +207,11 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
       XCTAssertTrue(
         waitUntil(timeout: Self.uiTimeout) {
-          (backdropPicker.value as? String) == option
+          let currentBackdropPicker = self.element(
+            in: app,
+            identifier: Accessibility.preferencesBackdropModePicker
+          )
+          return (currentBackdropPicker.value as? String) == option
         },
         "Backdrop picker did not settle after selecting \(option); got '\(backdropPicker.value ?? "nil")'"
       )
@@ -234,7 +244,6 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    let backdropPicker = element(in: app, identifier: Accessibility.preferencesBackdropModePicker)
     let gallery = element(in: app, identifier: Accessibility.preferencesBackgroundGallery)
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
@@ -242,7 +251,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
+    selectAppearanceSection(in: app)
     XCTAssertTrue(gallery.waitForExistence(timeout: Self.uiTimeout))
 
     for background in ["blueMarble", "gangesDelta", "auroraVeil"] {
@@ -250,15 +259,10 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
       XCTAssertTrue(
         waitUntil(timeout: Self.uiTimeout) {
-          (backdropPicker.value as? String) == "Window"
-        },
-        "Backdrop picker did not auto-enable after selecting \(background); got '\(backdropPicker.value ?? "nil")'"
-      )
-      XCTAssertTrue(
-        waitUntil(timeout: Self.uiTimeout) {
           preferencesState.label == self.preferencesStateLabel(
             mode: "auto",
-            section: "general",
+            section: "appearance",
+            backdrop: "window",
             background: background,
             textSize: "Default",
             controlSize: "small",
@@ -297,14 +301,13 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    let backdropPicker = element(in: app, identifier: Accessibility.preferencesBackdropModePicker)
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
+    selectAppearanceSection(in: app)
 
     let background = try selectFirstExistingBackground(
       in: app,
@@ -317,15 +320,10 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        (backdropPicker.value as? String) == "Window"
-      },
-      "Backdrop picker did not auto-enable after selecting \(background); got '\(backdropPicker.value ?? "nil")'"
-    )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
         preferencesState.label == self.preferencesStateLabel(
           mode: "auto",
-          section: "general",
+          section: "appearance",
+          backdrop: "window",
           background: background,
           textSize: "Default",
           controlSize: "small",
@@ -351,7 +349,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
   }
 
   func testSettingsTextSizePickerKeepsNativeChromeContractAtLargestSize() throws {
-    assertSettingsThemeModeContract(
+    assertAppearanceSettingsContract(
       expectedMode: "auto",
       textSizeOverride: "6",
       expectedTextSize: "Largest",
@@ -360,7 +358,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
   }
 
   func testSettingsTimeZonePickerSupportsCustomZoneContract() throws {
-    assertSettingsThemeModeContract(
+    assertGeneralSettingsContract(
       expectedMode: "auto",
       timeZoneModeOverride: "custom",
       customTimeZoneOverride: "Europe/Warsaw",
@@ -371,20 +369,87 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 }
 
 private extension HarnessMonitorSettingsUITests {
-  func assertSettingsThemeModeContract(
+  func assertAppearanceSettingsContract(
     expectedMode: String,
     textSizeOverride: String? = nil,
     expectedTextSize: String = "Default",
-    expectedControlSize: String = "small",
+    expectedControlSize: String = "small"
+  ) {
+    var additionalEnvironment = ["HARNESS_MONITOR_THEME_MODE_OVERRIDE": expectedMode]
+    if let textSizeOverride {
+      additionalEnvironment[textSizeOverrideKey] = textSizeOverride
+    }
+
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: additionalEnvironment
+    )
+
+    openSettings(in: app)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
+    let modePicker = element(in: app, identifier: Accessibility.preferencesThemeModePicker)
+    let textSizePicker = element(in: app, identifier: Accessibility.preferencesTextSizePicker)
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
+
+    selectAppearanceSection(in: app)
+
+    XCTAssertTrue(modePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(textSizePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      preferencesState.label,
+      preferencesStateLabel(
+        mode: expectedMode,
+        section: "appearance",
+        backdrop: "none",
+        background: "auroraVeil",
+        textSize: expectedTextSize,
+        controlSize: expectedControlSize,
+        timeZoneMode: "local",
+        timeZone: "local"
+      )
+    )
+    XCTAssertEqual(
+      appChromeState.label,
+      "contentChrome=native, interactiveRows=button, controlGlass=native"
+    )
+
+    closeSettings(in: app, preferencesRoot: preferencesRoot)
+
+    let sessionRow = previewSessionTrigger(in: app)
+    let observeSummaryButton = app.buttons
+      .matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
+
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(sessionRow.value as? String, "interactive=button")
+
+    tapPreviewSession(in: app)
+
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      observeSummaryButton.value as? String,
+      "interactive=button, chrome=content-card"
+    )
+    XCTAssertEqual(
+      sessionRow.value as? String,
+      "selected, interactive=button, selectionChrome=translucent"
+    )
+  }
+
+  func assertGeneralSettingsContract(
+    expectedMode: String,
     timeZoneModeOverride: String? = nil,
     customTimeZoneOverride: String? = nil,
     expectedTimeZoneMode: String = "local",
     expectedTimeZone: String = "local"
   ) {
     var additionalEnvironment = ["HARNESS_MONITOR_THEME_MODE_OVERRIDE": expectedMode]
-    if let textSizeOverride {
-      additionalEnvironment[textSizeOverrideKey] = textSizeOverride
-    }
     if let timeZoneModeOverride {
       additionalEnvironment[timeZoneModeOverrideKey] = timeZoneModeOverride
     }
@@ -402,8 +467,6 @@ private extension HarnessMonitorSettingsUITests {
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
     let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
-    let modePicker = element(in: app, identifier: Accessibility.preferencesThemeModePicker)
-    let textSizePicker = element(in: app, identifier: Accessibility.preferencesTextSizePicker)
     let timeZonePicker = element(in: app, identifier: Accessibility.preferencesTimeZoneModePicker)
     let customTimeZonePicker = element(
       in: app,
@@ -413,17 +476,19 @@ private extension HarnessMonitorSettingsUITests {
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(modePicker.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(textSizePicker.waitForExistence(timeout: Self.uiTimeout))
+
+    selectGeneralSection(in: app)
+
     XCTAssertTrue(timeZonePicker.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(
       preferencesState.label,
       preferencesStateLabel(
         mode: expectedMode,
         section: "general",
+        backdrop: "none",
         background: "auroraVeil",
-        textSize: expectedTextSize,
-        controlSize: expectedControlSize,
+        textSize: "Default",
+        controlSize: "small",
         timeZoneMode: expectedTimeZoneMode,
         timeZone: expectedTimeZone
       )
@@ -460,6 +525,7 @@ private extension HarnessMonitorSettingsUITests {
   func preferencesStateLabel(
     mode: String,
     section: String,
+    backdrop: String,
     background: String,
     textSize: String,
     controlSize: String,
@@ -469,6 +535,7 @@ private extension HarnessMonitorSettingsUITests {
     [
       "mode=\(mode)",
       "section=\(section)",
+      "backdrop=\(backdrop)",
       "background=\(background)",
       "textSize=\(textSize)",
       "controlSize=\(controlSize)",
@@ -476,6 +543,57 @@ private extension HarnessMonitorSettingsUITests {
       "timeZone=\(timeZone)",
       "preferencesChrome=native",
     ].joined(separator: ", ")
+  }
+
+  func selectAppearanceSection(in app: XCUIApplication) {
+    selectPreferencesSection(
+      in: app,
+      identifier: Accessibility.preferencesAppearanceSection,
+      expectedTitle: "Appearance"
+    )
+  }
+
+  func selectGeneralSection(in app: XCUIApplication) {
+    selectPreferencesSection(
+      in: app,
+      identifier: Accessibility.preferencesGeneralSection,
+      expectedTitle: "General"
+    )
+  }
+
+  func selectPreferencesSection(
+    in app: XCUIApplication,
+    identifier: String,
+    expectedTitle: String
+  ) {
+    let title = element(in: app, identifier: Accessibility.preferencesTitle)
+    if title.exists, title.label == expectedTitle {
+      return
+    }
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let settingsWindow = window(in: app, containing: preferencesRoot)
+    let section = sidebarSectionElement(
+      in: app,
+      title: expectedTitle,
+      within: settingsWindow
+    )
+
+    XCTAssertTrue(section.waitForExistence(timeout: Self.uiTimeout))
+    if section.isHittable {
+      section.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: section) {
+      coordinate.tap()
+    } else {
+      tapElement(in: app, identifier: identifier)
+    }
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        title.exists && title.label == expectedTitle
+      },
+      "Preferences title did not switch to \(expectedTitle); got '\(title.label)'"
+    )
   }
 
   func selectFirstExistingBackground(

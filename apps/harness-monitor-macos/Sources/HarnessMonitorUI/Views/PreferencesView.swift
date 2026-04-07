@@ -4,24 +4,16 @@ import SwiftUI
 public struct PreferencesView: View {
   let store: HarnessMonitorStore
   @Binding var themeMode: HarnessMonitorThemeMode
-  @State private var selectedSection: PreferencesSection = .general
+  @Binding var selectedSection: PreferencesSection
 
-  public init(store: HarnessMonitorStore, themeMode: Binding<HarnessMonitorThemeMode>) {
-    self.init(
-      store: store,
-      themeMode: themeMode,
-      initialSection: .general
-    )
-  }
-
-  init(
+  public init(
     store: HarnessMonitorStore,
     themeMode: Binding<HarnessMonitorThemeMode>,
-    initialSection: PreferencesSection
+    selectedSection: Binding<PreferencesSection>
   ) {
     self.store = store
     _themeMode = themeMode
-    _selectedSection = State(initialValue: initialSection)
+    _selectedSection = selectedSection
   }
 
   public var body: some View {
@@ -37,7 +29,9 @@ public struct PreferencesView: View {
       Group {
         switch selectedSection {
         case .general:
-          PreferencesGeneralSection(store: store, themeMode: $themeMode)
+          PreferencesGeneralSection(store: store)
+        case .appearance:
+          PreferencesAppearanceSection(themeMode: $themeMode)
         case .connection:
           PreferencesConnectionSection(store: store)
         case .database:

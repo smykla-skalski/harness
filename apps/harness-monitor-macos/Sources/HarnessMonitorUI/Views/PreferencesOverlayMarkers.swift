@@ -5,6 +5,8 @@ struct PreferencesOverlayMarkers: View {
   let selectedSection: PreferencesSection
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
+  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
+  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
@@ -24,6 +26,7 @@ struct PreferencesOverlayMarkers: View {
     return [
       "mode=\(themeMode.rawValue)",
       "section=\(selectedSection.rawValue)",
+      "backdrop=\(backdropModeRawValue)",
       "background=\(backgroundSelection.preferencesStateValue)",
       "textSize=\(HarnessMonitorTextSize.label(for: textSizeIndex))",
       "controlSize=" +

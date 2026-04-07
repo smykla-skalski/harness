@@ -47,6 +47,7 @@ struct HarnessMonitorWindowRootView: View {
 struct HarnessMonitorSettingsRootView: View {
   let store: HarnessMonitorStore
   @Binding var themeMode: HarnessMonitorThemeMode
+  @State private var selectedSection: PreferencesSection = .general
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -63,7 +64,8 @@ struct HarnessMonitorSettingsRootView: View {
   var body: some View {
     PreferencesView(
       store: store,
-      themeMode: $themeMode
+      themeMode: $themeMode,
+      selectedSection: $selectedSection
     )
     .frame(minWidth: 680, minHeight: 440)
     .modifier(

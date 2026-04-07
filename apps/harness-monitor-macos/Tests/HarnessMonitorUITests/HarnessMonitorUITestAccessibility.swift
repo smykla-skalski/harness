@@ -107,6 +107,7 @@ enum HarnessMonitorUITestAccessibility {
   static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
   static let preferencesGeneralSection = "harness.preferences.section.general"
+  static let preferencesAppearanceSection = "harness.preferences.section.appearance"
   static let preferencesConnectionSection = "harness.preferences.section.connection"
   static let preferencesDatabaseSection = "harness.preferences.section.database"
   static let preferencesDiagnosticsSection = "harness.preferences.section.diagnostics"
