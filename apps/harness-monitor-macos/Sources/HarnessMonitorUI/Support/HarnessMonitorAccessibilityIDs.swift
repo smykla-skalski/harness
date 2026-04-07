@@ -74,7 +74,6 @@ enum HarnessMonitorAccessibility {
   static let preferencesThemeModePicker = "harness.preferences.theme-mode"
   static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
   static let preferencesBackgroundGallery = "harness.preferences.background-gallery"
-  static let preferencesSystemBackgroundsDisclosure = "harness.preferences.background-system-disclosure"
   static let preferencesTextSizePicker = "harness.preferences.text-size"
   static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
