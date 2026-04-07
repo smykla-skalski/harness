@@ -1,8 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesGeneralSection: View {
-  let store: HarnessMonitorStore
+struct PreferencesAppearanceSection: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
@@ -10,6 +9,57 @@ struct PreferencesGeneralSection: View {
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+
+  private var selectedBackground: HarnessMonitorBackgroundSelection {
+    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        Picker("Theme mode", selection: $themeMode) {
+          ForEach(HarnessMonitorThemeMode.allCases) {
+            Text($0.label).tag($0)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesThemeModePicker)
+
+        Picker("Text size", selection: $textSizeIndex) {
+          ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
+            Text(level.label).tag(index)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTextSizePicker)
+
+        Picker("Backdrop", selection: $backdropModeRawValue) {
+          ForEach(HarnessMonitorBackdropMode.allCases) { mode in
+            Text(mode.label).tag(mode.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
+
+        PreferencesBackgroundGallery(
+          selection: $backgroundImageRawValue,
+          backdropModeRawValue: $backdropModeRawValue,
+          selectedBackground: selectedBackground
+        )
+      } header: {
+        Text("Appearance")
+      } footer: {
+        Text(
+          "Theme mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off."
+        )
+      }
+    }
+    .preferencesDetailFormStyle()
+  }
+}
+
+struct PreferencesGeneralSection: View {
+  let store: HarnessMonitorStore
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
@@ -80,50 +130,8 @@ struct PreferencesGeneralSection: View {
     )
   }
 
-  private var selectedBackground: HarnessMonitorBackgroundSelection {
-    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
-  }
-
   var body: some View {
     Form {
-      Section {
-        Picker("Mode", selection: $themeMode) {
-          ForEach(HarnessMonitorThemeMode.allCases) {
-            Text($0.label).tag($0)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesThemeModePicker)
-
-        Picker("Text size", selection: $textSizeIndex) {
-          ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
-            Text(level.label).tag(index)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTextSizePicker)
-
-        Picker("Backdrop", selection: $backdropModeRawValue) {
-          ForEach(HarnessMonitorBackdropMode.allCases) { mode in
-            Text(mode.label).tag(mode.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
-
-        PreferencesBackgroundGallery(
-          selection: $backgroundImageRawValue,
-          backdropModeRawValue: $backdropModeRawValue,
-          selectedBackground: selectedBackground
-        )
-      } header: {
-        Text("Appearance")
-      } footer: {
-        Text(
-          "Mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off."
-        )
-      }
-
       Section {
         Picker("Time zone", selection: $timeZoneModeRawValue) {
           ForEach(HarnessMonitorDateTimeZoneMode.allCases) { mode in
@@ -235,12 +243,16 @@ struct PreferencesGeneralSection: View {
   }
 }
 
-#Preview("Preferences General Section") {
+#Preview("Preferences Appearance Section") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .dark
 
+  PreferencesAppearanceSection(themeMode: $themeMode)
+    .frame(width: 720)
+}
+
+#Preview("Preferences General Section") {
   PreferencesGeneralSection(
-    store: PreferencesPreviewSupport.makeStore(),
-    themeMode: $themeMode
+    store: PreferencesPreviewSupport.makeStore()
   )
   .frame(width: 720)
 }
