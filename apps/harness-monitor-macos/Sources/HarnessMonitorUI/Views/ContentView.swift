@@ -17,15 +17,10 @@ public struct ContentView: View {
   private var showInspector = true
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
+  @State private var widthPersistTask: Task<Void, Never>?
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
-  @AppStorage(HarnessMonitorToolbarStyleDefaults.modeKey)
-  private var toolbarStyleRawValue = HarnessMonitorToolbarStyle.glass.rawValue
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
-
-  private var toolbarStyle: HarnessMonitorToolbarStyle {
-    HarnessMonitorToolbarStyle(rawValue: toolbarStyleRawValue) ?? .glass
-  }
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -60,7 +55,6 @@ public struct ContentView: View {
     [
       "toolbarTitle=native-window",
       "windowTitle=\(windowTitle)",
-      "toolbarStyle=\(toolbarStyle.rawValue)",
     ].joined(separator: ", ")
   }
 
@@ -123,13 +117,18 @@ public struct ContentView: View {
           .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
           } action: { width in
+            widthPersistTask?.cancel()
             guard width >= HarnessMonitorInspectorLayout.minWidth,
               width <= HarnessMonitorInspectorLayout.maxWidth,
               abs(width - inspectorColumnWidth) > 1
             else {
               return
             }
-            inspectorColumnWidth = width
+            widthPersistTask = Task { @MainActor in
+              try? await Task.sleep(for: .milliseconds(250))
+              guard !Task.isCancelled else { return }
+              inspectorColumnWidth = width
+            }
           }
           .inspectorColumnWidth(
             min: HarnessMonitorInspectorLayout.minWidth,
@@ -139,6 +138,8 @@ public struct ContentView: View {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
+    .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+    .containerBackground(.windowBackground, for: .window)
     .navigationTitle(windowTitle)
     .toolbar {
       navigationToolbar
@@ -329,19 +330,6 @@ private extension ContentView {
 
   func toggleSleepPrevention() {
     store.sleepPreventionEnabled.toggle()
-  }
-}
-
-private struct DetailBackgroundExtension<Content: View>: View {
-  let isGlass: Bool
-  @ViewBuilder let content: Content
-
-  var body: some View {
-    if isGlass {
-      content.backgroundExtensionEffect()
-    } else {
-      content
-    }
   }
 }
 
