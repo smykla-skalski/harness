@@ -244,6 +244,24 @@ private extension ContentView {
     ToolbarSpacer(.fixed, placement: .primaryAction)
 
     ToolbarItemGroup(placement: .primaryAction) {
+      Button(action: toggleSleepPrevention) {
+        Label(
+          store.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
+          systemImage: store.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+        )
+      }
+      .tint(store.sleepPreventionEnabled ? .orange : nil)
+      .help(
+        store.sleepPreventionEnabled
+          ? "Preventing sleep - click to disable"
+          : "Allow sleep - click to prevent"
+      )
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
+    }
+
+    ToolbarSpacer(.fixed, placement: .primaryAction)
+
+    ToolbarItemGroup(placement: .primaryAction) {
       Button(action: toggleInspector) {
         Label(
           showInspector ? "Hide Inspector" : "Show Inspector",
@@ -274,8 +292,8 @@ private extension ContentView {
 private struct ToolbarWidthKey: PreferenceKey {
   static let defaultValue: CGFloat = 0
 
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-    value = nextValue()
+  func toggleSleepPrevention() {
+    store.sleepPreventionEnabled.toggle()
   }
 }
 

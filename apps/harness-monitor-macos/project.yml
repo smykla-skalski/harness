@@ -36,6 +36,7 @@ targets:
       - Sources/HarnessMonitorKit
     dependencies:
       - sdk: SwiftData.framework
+      - sdk: IOKit.framework
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
