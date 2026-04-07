@@ -43,6 +43,12 @@ public enum HarnessMonitorPaths {
     Self.daemonRoot(using: environment).appendingPathComponent("auth-token")
   }
 
+  public static func thumbnailCacheRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
+    Self.harnessRoot(using: environment)
+      .appendingPathComponent("cache", isDirectory: true)
+      .appendingPathComponent("thumbnails", isDirectory: true)
+  }
+
   public static func launchAgentURL(using environment: HarnessMonitorEnvironment = .current) -> URL {
     environment.homeDirectory
       .appendingPathComponent("Library", isDirectory: true)
