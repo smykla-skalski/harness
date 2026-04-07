@@ -214,6 +214,14 @@ extension RecordingHarnessClient {
     return detail
   }
 
+  func logLevel() async throws -> LogLevelResponse {
+    LogLevelResponse(level: "info", filter: "harness=info")
+  }
+
+  func setLogLevel(_ level: String) async throws -> LogLevelResponse {
+    LogLevelResponse(level: level, filter: "harness=\(level)")
+  }
+
   func sleepIfNeeded(_ delay: Duration?) async throws {
     guard let delay else {
       return

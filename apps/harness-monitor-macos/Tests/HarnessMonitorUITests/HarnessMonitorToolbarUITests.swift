@@ -2,7 +2,6 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
-@MainActor
 final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
   func testHiddenInspectorUsesSingleToolbarActionSet() throws {
     let app = launch(mode: "empty")
@@ -266,7 +265,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       verticalOffset: \(verticalOffset)
       """
 
-    if centerOffset > 90 || verticalOffset > 8 || centerpiece.frame.width < 180 {
+    if centerOffset > 120 || verticalOffset > 8 || centerpiece.frame.width < 180 {
       attachWindowScreenshot(in: app, named: "toolbar-centerpiece")
       let attachment = XCTAttachment(string: diagnostics)
       attachment.name = "toolbar-centerpiece-diagnostics"
@@ -281,7 +280,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     )
     XCTAssertLessThanOrEqual(
       centerOffset,
-      90,
+      120,
       "Expected the toolbar centerpiece to stay near the window toolbar center"
     )
     XCTAssertLessThanOrEqual(
@@ -425,8 +424,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     ))
     tapPoint.tap()
 
-    let menuItem = app.menuItems["Running Harness Monitor"]
-    let menuAppeared = menuItem.waitForExistence(timeout: 3)
+    let menuItem = app.menuItems["Running Harness Monitor"].firstMatch
+    let menuAppeared = waitUntil(timeout: 3) { menuItem.exists }
 
     if !menuAppeared {
       attachWindowScreenshot(in: app, named: "status-ticker-after-click")

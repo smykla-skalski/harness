@@ -321,9 +321,15 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
 
     tapPreviewSession(in: app)
 
-    let observeButton = app.buttons["Observe"]
+    let observeButton = app.buttons["Observe"].firstMatch
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.uiTimeout))
-    observeButton.tap()
+    if observeButton.isHittable {
+      observeButton.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: observeButton) {
+      coordinate.tap()
+    } else {
+      XCTFail("Failed to tap Observe button")
+    }
 
     let toast = element(in: app, identifier: Accessibility.actionToast)
     XCTAssertTrue(
@@ -331,10 +337,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       "Toast should appear after action"
     )
 
-    let dismissed = XCTNSPredicateExpectation(
-      predicate: NSPredicate(format: "exists == false"),
-      object: toast
-    )
-    wait(for: [dismissed], timeout: 8)
+    let dismissed = waitUntil(timeout: 8) { !toast.exists }
+    XCTAssertTrue(dismissed, "Toast should dismiss after appearing")
   }
 }

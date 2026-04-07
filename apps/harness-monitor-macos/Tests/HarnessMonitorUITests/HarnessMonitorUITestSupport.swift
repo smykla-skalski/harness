@@ -391,13 +391,21 @@ extension HarnessMonitorUITestCase {
     pollInterval: TimeInterval = 0.1,
     condition: @escaping () -> Bool
   ) -> Bool {
+    if condition() {
+      return true
+    }
+
     let deadline = Date.now.addingTimeInterval(timeout)
     while Date.now < deadline {
+      let remaining = deadline.timeIntervalSinceNow
+      let nextPollInterval = min(pollInterval, max(remaining, 0.01))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(nextPollInterval))
+
       if condition() {
         return true
       }
-      RunLoop.current.run(until: Date.now.addingTimeInterval(pollInterval))
     }
+
     return condition()
   }
 
