@@ -481,6 +481,9 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
   func observeSession(
     sessionID _: String, request _: ObserveSessionRequest
   ) async throws -> SessionDetail { throw error }
+
+  func logLevel() async throws -> LogLevelResponse { throw error }
+  func setLogLevel(_ level: String) async throws -> LogLevelResponse { throw error }
 }
 
 @MainActor
