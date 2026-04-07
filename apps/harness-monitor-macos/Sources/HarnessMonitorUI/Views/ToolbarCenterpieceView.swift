@@ -193,6 +193,7 @@ private struct ToolbarCenterpieceView: View {
   // surface on all sides.
   private static let metricsLeadingInset: CGFloat = 16
   private static let centerpieceWidth: CGFloat = 560
+  private static let statusDropdownWidth: CGFloat = 260
 
   var body: some View {
     ZStack {
@@ -204,13 +205,14 @@ private struct ToolbarCenterpieceView: View {
           .fixedSize(horizontal: true, vertical: false)
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceMetricsFrame)
 
-        if !statusMessages.isEmpty {
-          Spacer(minLength: 20)
+        Spacer(minLength: 0)
 
+        if !statusMessages.isEmpty {
           ToolbarStatusDropdown(
             messages: statusMessages,
             daemonIndicator: daemonIndicator
           )
+          .frame(width: Self.statusDropdownWidth)
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
         }
       }
@@ -230,7 +232,6 @@ private struct ToolbarStatusDropdown: View {
   let daemonIndicator: ToolbarDaemonIndicator
   @State private var isHovered = false
   @State private var isPressed = false
-  // Horizontal content padding inside the capsule, equal on left and right.
   private static let contentHorizontalInset: CGFloat = 16
 
   private var highlightOpacity: Double {
@@ -238,20 +239,24 @@ private struct ToolbarStatusDropdown: View {
   }
 
   var body: some View {
-    ToolbarStatusMenuArea(messages: messages, isHovered: $isHovered, isPressed: $isPressed) {
-      HStack(spacing: 8) {
-        ToolbarStatusTickerView(messages: messages, direction: .up)
-        ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
-      }
-      .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
-      .padding(.horizontal, Self.contentHorizontalInset)
+    HStack(spacing: 8) {
+      Spacer(minLength: 0)
+      ToolbarStatusTickerView(messages: messages, direction: .up)
+        .lineLimit(1)
+        .truncationMode(.tail)
+      ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
     }
-    .frame(maxHeight: .infinity)
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
+    .padding(.horizontal, Self.contentHorizontalInset)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background {
       Capsule()
         .fill(Color.primary.opacity(highlightOpacity))
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.1), value: isPressed)
+    }
+    .overlay {
+      ToolbarStatusMenuHitArea(messages: messages, isHovered: $isHovered, isPressed: $isPressed)
     }
     .overlay {
       Color.clear
@@ -264,26 +269,13 @@ private struct ToolbarStatusDropdown: View {
   }
 }
 
-private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
+private struct ToolbarStatusMenuHitArea: NSViewRepresentable {
   let messages: [ToolbarStatusMessage]
   @Binding var isHovered: Bool
   @Binding var isPressed: Bool
-  @ViewBuilder let content: Content
 
   func makeNSView(context: Context) -> ToolbarStatusMenuNSView {
     let view = ToolbarStatusMenuNSView()
-    let hosting = NSHostingView(rootView: content)
-    hosting.translatesAutoresizingMaskIntoConstraints = false
-    view.addSubview(hosting)
-    hosting.setContentHuggingPriority(.required, for: .horizontal)
-    hosting.setContentCompressionResistancePriority(.required, for: .horizontal)
-    NSLayoutConstraint.activate([
-      hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      hosting.topAnchor.constraint(equalTo: view.topAnchor),
-      hosting.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-    ])
-    view.hostingView = hosting
     view.messages = messages
     let hoverBinding = $isHovered
     let pressBinding = $isPressed
@@ -295,21 +287,24 @@ private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
     return view
   }
 
+  func sizeThatFits(_ proposal: ProposedViewSize, nsView: ToolbarStatusMenuNSView, context: Context) -> CGSize? {
+    CGSize(
+      width: proposal.width ?? 0,
+      height: proposal.height ?? 0
+    )
+  }
+
   func updateNSView(_ nsView: ToolbarStatusMenuNSView, context: Context) {
     nsView.messages = messages
     let hoverBinding = $isHovered
     let pressBinding = $isPressed
     nsView.onHoverChanged = { hoverBinding.wrappedValue = $0 }
     nsView.onPressChanged = { pressBinding.wrappedValue = $0 }
-    if let hosting = nsView.hostingView as? NSHostingView<Content> {
-      hosting.rootView = content
-    }
   }
 }
 
 final class ToolbarStatusMenuNSView: NSView {
   var messages: [ToolbarStatusMessage] = []
-  var hostingView: NSView?
   var onHoverChanged: ((Bool) -> Void)?
   var onPressChanged: ((Bool) -> Void)?
   private var currentTrackingArea: NSTrackingArea?
