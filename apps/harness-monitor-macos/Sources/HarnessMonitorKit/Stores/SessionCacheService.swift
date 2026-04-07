@@ -1,8 +1,13 @@
 import Foundation
 import SwiftData
 
-@ModelActor
 public actor SessionCacheService {
+  private let modelContainer: ModelContainer
+
+  public init(modelContainer: ModelContainer) {
+    self.modelContainer = modelContainer
+  }
+
   struct SessionMetadata: Sendable {
     let count: Int
     let lastCachedAt: Date?
@@ -29,17 +34,24 @@ public actor SessionCacheService {
     )
   }
 
+  private func makeContext() -> ModelContext {
+    let context = ModelContext(modelContainer)
+    context.autosaveEnabled = false
+    return context
+  }
+
   // MARK: - Reads
 
   func loadSessionDetail(
     sessionID: String
   ) -> CachedSessionSnapshot? {
+    let context = makeContext()
     var descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { $0.sessionId == sessionID }
     )
     descriptor.fetchLimit = 1
 
-    guard let cached = try? modelContext.fetch(descriptor).first else {
+    guard let cached = try? context.fetch(descriptor).first else {
       return nil
     }
 
@@ -53,6 +65,7 @@ public actor SessionCacheService {
     sessions: [SessionSummary],
     projects: [ProjectSummary]
   )? {
+    let context = makeContext()
     let sessionDescriptor = FetchDescriptor<CachedSession>(
       sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
     )
@@ -61,8 +74,8 @@ public actor SessionCacheService {
     )
 
     guard
-      let sessions = try? modelContext.fetch(sessionDescriptor),
-      let projects = try? modelContext.fetch(projectDescriptor),
+      let sessions = try? context.fetch(sessionDescriptor),
+      let projects = try? context.fetch(projectDescriptor),
       !sessions.isEmpty
     else {
       return nil
@@ -75,21 +88,23 @@ public actor SessionCacheService {
   }
 
   func recentlyViewedSessionIDs(limit: Int) -> [String] {
+    let context = makeContext()
     var descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { $0.lastViewedAt != nil },
       sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
     )
     descriptor.fetchLimit = limit
-    return ((try? modelContext.fetch(descriptor)) ?? []).map(\.sessionId)
+    return ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
   }
 
   func sessionMetadata() -> SessionMetadata {
-    let count = (try? modelContext.fetchCount(FetchDescriptor<CachedSession>())) ?? 0
+    let context = makeContext()
+    let count = (try? context.fetchCount(FetchDescriptor<CachedSession>())) ?? 0
     var latestDescriptor = FetchDescriptor<CachedSession>(
       sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
     )
     latestDescriptor.fetchLimit = 1
-    let latest = try? modelContext.fetch(latestDescriptor).first
+    let latest = try? context.fetch(latestDescriptor).first
 
     return SessionMetadata(count: count, lastCachedAt: latest?.lastCachedAt)
   }
@@ -97,25 +112,30 @@ public actor SessionCacheService {
   func hydrationQueue(for summaries: [SessionSummary]) -> [SessionSummary] {
     guard !summaries.isEmpty else { return [] }
 
+    let context = makeContext()
     let summaryIds = summaries.map(\.sessionId)
     let descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { summaryIds.contains($0.sessionId) }
     )
     guard
-      let cached = try? modelContext.fetch(descriptor)
+      let cached = try? context.fetch(descriptor)
     else {
       return summaries
     }
 
-    let cachedBySessionID = Dictionary(
-      uniqueKeysWithValues: cached.map { ($0.sessionId, $0) }
-    )
+    var snapshotState: [String: (updatedAt: String?, hasTimeline: Bool)] = [:]
+    for session in cached {
+      snapshotState[session.sessionId] = (
+        updatedAt: session.updatedAt,
+        hasTimeline: hasDetailSnapshot(sessionId: session.sessionId, context: context)
+      )
+    }
 
     return summaries.filter { summary in
-      guard let existing = cachedBySessionID[summary.sessionId] else {
+      guard let state = snapshotState[summary.sessionId] else {
         return true
       }
-      return existing.updatedAt != summary.updatedAt || !hasDetailSnapshot(sessionId: existing.sessionId)
+      return state.updatedAt != summary.updatedAt || !state.hasTimeline
     }
   }
 
@@ -125,8 +145,9 @@ public actor SessionCacheService {
     _ sessions: [SessionSummary],
     projects: [ProjectSummary]
   ) -> Int {
-    let projectMap = buildProjectMap()
-    let sessionMap = buildSessionMap()
+    let context = makeContext()
+    let projectMap = buildProjectMap(context: context)
+    let sessionMap = buildSessionMap(context: context)
 
     var insertedSessionCount = 0
 
@@ -134,7 +155,7 @@ public actor SessionCacheService {
       if let existing = projectMap[project.projectId] {
         existing.update(from: project)
       } else {
-        modelContext.insert(project.toCachedProject())
+        context.insert(project.toCachedProject())
       }
     }
 
@@ -142,12 +163,12 @@ public actor SessionCacheService {
       if let existing = sessionMap[session.sessionId] {
         existing.update(from: session)
       } else {
-        modelContext.insert(session.toCachedSession())
+        context.insert(session.toCachedSession())
         insertedSessionCount += 1
       }
     }
 
-    try? modelContext.save()
+    try? context.save()
     return insertedSessionCount
   }
 
@@ -157,15 +178,16 @@ public actor SessionCacheService {
     timeline: [TimelineEntry],
     markViewed: Bool = true
   ) -> Int {
+    let context = makeContext()
     let cached: CachedSession
     let insertedCount: Int
-    if let existing = fetchCachedSession(sessionID: detail.session.sessionId) {
+    if let existing = fetchCachedSession(sessionID: detail.session.sessionId, context: context) {
       existing.update(from: detail.session)
       cached = existing
       insertedCount = 0
     } else {
       cached = detail.session.toCachedSession()
-      modelContext.insert(cached)
+      context.insert(cached)
       insertedCount = 1
     }
 
@@ -173,14 +195,14 @@ public actor SessionCacheService {
       cached.lastViewedAt = .now
     }
 
-    syncAgents(detail.agents, on: cached)
-    syncTasks(detail.tasks, on: cached)
-    syncSignals(detail.signals, on: cached)
-    syncTimeline(timeline, on: cached)
-    syncActivity(detail.agentActivity, on: cached)
-    syncObserver(detail.observer, on: cached)
+    syncAgents(detail.agents, on: cached, context: context)
+    syncTasks(detail.tasks, on: cached, context: context)
+    syncSignals(detail.signals, on: cached, context: context)
+    syncTimeline(timeline, on: cached, context: context)
+    syncActivity(detail.agentActivity, on: cached, context: context)
+    syncObserver(detail.observer, on: cached, context: context)
 
-    try? modelContext.save()
+    try? context.save()
     return insertedCount
   }
 
@@ -188,74 +210,79 @@ public actor SessionCacheService {
     _ summary: SessionSummary,
     project: ProjectSummary?
   ) -> Bool {
+    let context = makeContext()
     if let project {
-      upsertProject(project)
+      upsertProject(project, context: context)
     }
 
-    let isInsert = upsertSession(summary)
-    try? modelContext.save()
+    let isInsert = upsertSession(summary, context: context)
+    try? context.save()
     return isInsert
   }
 
   // MARK: - Private helpers
 
-  private func buildProjectMap() -> [String: CachedProject] {
-    guard let projects = try? modelContext.fetch(FetchDescriptor<CachedProject>()) else {
+  private func buildProjectMap(context: ModelContext) -> [String: CachedProject] {
+    guard let projects = try? context.fetch(FetchDescriptor<CachedProject>()) else {
       return [:]
     }
     return Dictionary(uniqueKeysWithValues: projects.map { ($0.projectId, $0) })
   }
 
-  private func buildSessionMap() -> [String: CachedSession] {
-    guard let sessions = try? modelContext.fetch(FetchDescriptor<CachedSession>()) else {
+  private func buildSessionMap(context: ModelContext) -> [String: CachedSession] {
+    guard let sessions = try? context.fetch(FetchDescriptor<CachedSession>()) else {
       return [:]
     }
     return Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
   }
 
-  private func fetchCachedSession(sessionID: String) -> CachedSession? {
+  private func fetchCachedSession(sessionID: String, context: ModelContext) -> CachedSession? {
     var descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { $0.sessionId == sessionID }
     )
     descriptor.fetchLimit = 1
-    return try? modelContext.fetch(descriptor).first
+    return try? context.fetch(descriptor).first
   }
 
-  private func hasDetailSnapshot(sessionId: String) -> Bool {
+  private func hasDetailSnapshot(sessionId: String, context: ModelContext) -> Bool {
     var descriptor = FetchDescriptor<CachedTimelineEntry>(
       predicate: #Predicate { $0.sessionId == sessionId }
     )
     descriptor.fetchLimit = 1
-    return ((try? modelContext.fetchCount(descriptor)) ?? 0) > 0
+    return ((try? context.fetchCount(descriptor)) ?? 0) > 0
   }
 
-  private func upsertProject(_ project: ProjectSummary) {
+  private func upsertProject(_ project: ProjectSummary, context: ModelContext) {
     var descriptor = FetchDescriptor<CachedProject>(
       predicate: #Predicate { $0.projectId == project.projectId }
     )
     descriptor.fetchLimit = 1
 
-    if let existing = try? modelContext.fetch(descriptor).first {
+    if let existing = try? context.fetch(descriptor).first {
       existing.update(from: project)
     } else {
-      modelContext.insert(project.toCachedProject())
+      context.insert(project.toCachedProject())
     }
   }
 
   @discardableResult
-  private func upsertSession(_ summary: SessionSummary) -> Bool {
-    if let existing = fetchCachedSession(sessionID: summary.sessionId) {
+  private func upsertSession(_ summary: SessionSummary, context: ModelContext) -> Bool {
+    if let existing = fetchCachedSession(sessionID: summary.sessionId, context: context) {
       existing.update(from: summary)
       return false
     }
 
-    modelContext.insert(summary.toCachedSession())
+    context.insert(summary.toCachedSession())
     return true
   }
 
   // MARK: - Sync helpers
 
-  private func syncAgents(_ agents: [AgentRegistration], on session: CachedSession) {
+  private func syncAgents(
+    _ agents: [AgentRegistration],
+    on session: CachedSession,
+    context: ModelContext
+  ) {
     let existingById = Dictionary(
       uniqueKeysWithValues: session.agents.map { ($0.agentId, $0) }
     )
@@ -270,11 +297,15 @@ public actor SessionCacheService {
     }
 
     for existing in session.agents where !incomingIds.contains(existing.agentId) {
-      modelContext.delete(existing)
+      context.delete(existing)
     }
   }
 
-  private func syncTasks(_ tasks: [WorkItem], on session: CachedSession) {
+  private func syncTasks(
+    _ tasks: [WorkItem],
+    on session: CachedSession,
+    context: ModelContext
+  ) {
     let existingById = Dictionary(
       uniqueKeysWithValues: session.tasks.map { ($0.taskId, $0) }
     )
@@ -289,11 +320,15 @@ public actor SessionCacheService {
     }
 
     for existing in session.tasks where !incomingIds.contains(existing.taskId) {
-      modelContext.delete(existing)
+      context.delete(existing)
     }
   }
 
-  private func syncSignals(_ signals: [SessionSignalRecord], on session: CachedSession) {
+  private func syncSignals(
+    _ signals: [SessionSignalRecord],
+    on session: CachedSession,
+    context: ModelContext
+  ) {
     let existingById = Dictionary(
       uniqueKeysWithValues: session.signals.map { ($0.signalId, $0) }
     )
@@ -308,13 +343,17 @@ public actor SessionCacheService {
     }
 
     for existing in session.signals where !incomingIds.contains(existing.signalId) {
-      modelContext.delete(existing)
+      context.delete(existing)
     }
   }
 
   private static let maxCachedTimelineEntries = 300
 
-  private func syncTimeline(_ entries: [TimelineEntry], on session: CachedSession) {
+  private func syncTimeline(
+    _ entries: [TimelineEntry],
+    on session: CachedSession,
+    context: ModelContext
+  ) {
     let cappedEntries = Array(entries.suffix(Self.maxCachedTimelineEntries))
 
     let existingById = Dictionary(
@@ -331,16 +370,17 @@ public actor SessionCacheService {
     }
 
     for existing in session.timelineEntries where !incomingIds.contains(existing.entryId) {
-      modelContext.delete(existing)
+      context.delete(existing)
     }
   }
 
   private func syncActivity(
     _ activities: [AgentToolActivitySummary],
-    on session: CachedSession
+    on session: CachedSession,
+    context: ModelContext
   ) {
     for existing in session.agentActivity {
-      modelContext.delete(existing)
+      context.delete(existing)
     }
     session.agentActivity = []
 
@@ -349,12 +389,16 @@ public actor SessionCacheService {
     }
   }
 
-  private func syncObserver(_ observer: ObserverSummary?, on session: CachedSession) {
+  private func syncObserver(
+    _ observer: ObserverSummary?,
+    on session: CachedSession,
+    context: ModelContext
+  ) {
     if let existingObserver = session.observer {
       if let observer {
         existingObserver.update(from: observer)
       } else {
-        modelContext.delete(existingObserver)
+        context.delete(existingObserver)
         session.observer = nil
       }
     } else if let observer {
@@ -365,29 +409,31 @@ public actor SessionCacheService {
   // MARK: - Database management
 
   func recordCounts() -> CacheCounts {
-    CacheCounts(
-      sessions: (try? modelContext.fetchCount(FetchDescriptor<CachedSession>())) ?? 0,
-      projects: (try? modelContext.fetchCount(FetchDescriptor<CachedProject>())) ?? 0,
-      agents: (try? modelContext.fetchCount(FetchDescriptor<CachedAgent>())) ?? 0,
-      tasks: (try? modelContext.fetchCount(FetchDescriptor<CachedWorkItem>())) ?? 0,
-      signals: (try? modelContext.fetchCount(FetchDescriptor<CachedSignalRecord>())) ?? 0,
-      timeline: (try? modelContext.fetchCount(FetchDescriptor<CachedTimelineEntry>())) ?? 0,
-      observers: (try? modelContext.fetchCount(FetchDescriptor<CachedObserver>())) ?? 0,
-      activities: (try? modelContext.fetchCount(FetchDescriptor<CachedAgentActivity>())) ?? 0
+    let context = makeContext()
+    return CacheCounts(
+      sessions: (try? context.fetchCount(FetchDescriptor<CachedSession>())) ?? 0,
+      projects: (try? context.fetchCount(FetchDescriptor<CachedProject>())) ?? 0,
+      agents: (try? context.fetchCount(FetchDescriptor<CachedAgent>())) ?? 0,
+      tasks: (try? context.fetchCount(FetchDescriptor<CachedWorkItem>())) ?? 0,
+      signals: (try? context.fetchCount(FetchDescriptor<CachedSignalRecord>())) ?? 0,
+      timeline: (try? context.fetchCount(FetchDescriptor<CachedTimelineEntry>())) ?? 0,
+      observers: (try? context.fetchCount(FetchDescriptor<CachedObserver>())) ?? 0,
+      activities: (try? context.fetchCount(FetchDescriptor<CachedAgentActivity>())) ?? 0
     )
   }
 
   func deleteAllCacheData() -> Bool {
+    let context = makeContext()
     do {
-      let sessions = try modelContext.fetch(FetchDescriptor<CachedSession>())
+      let sessions = try context.fetch(FetchDescriptor<CachedSession>())
       for session in sessions {
-        modelContext.delete(session)
+        context.delete(session)
       }
-      let projects = try modelContext.fetch(FetchDescriptor<CachedProject>())
+      let projects = try context.fetch(FetchDescriptor<CachedProject>())
       for project in projects {
-        modelContext.delete(project)
+        context.delete(project)
       }
-      try modelContext.save()
+      try context.save()
       return true
     } catch {
       return false

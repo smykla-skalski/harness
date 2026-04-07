@@ -280,6 +280,59 @@ struct SessionCacheMemoryTests {
     #expect(queue.first?.sessionId == "sess-scope-1")
   }
 
+  // MARK: - Identity map release
+
+  @Test("Sequential cache operations release context between calls")
+  func sequentialOperationsReleaseContext() async throws {
+    let store = makeStore()
+    let project = makeProject(totalSessionCount: 20, activeSessionCount: 20)
+
+    for index in 0..<20 {
+      let session = makeSession(.init(
+        sessionId: "seq-\(index)",
+        context: "Sequential \(index)",
+        status: .active,
+        leaderId: "leader-seq-\(index)",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
+      let detail = makeSessionDetail(
+        summary: session,
+        workerID: "worker-seq-\(index)",
+        workerName: "Worker \(index)"
+      )
+      let timeline = (0..<50).map { entryIndex in
+        TimelineEntry(
+          entryId: "seq-\(index)-entry-\(entryIndex)",
+          recordedAt: "2026-04-01T00:00:00Z",
+          kind: "task_checkpoint",
+          sessionId: "seq-\(index)",
+          agentId: "leader-seq-\(index)",
+          taskId: nil,
+          summary: "Entry \(entryIndex)",
+          payload: .object([:])
+        )
+      }
+
+      await store.cacheSessionList([session], projects: [project])
+      await store.cacheSessionDetail(detail, timeline: timeline)
+    }
+
+    let sessionDescriptor = FetchDescriptor<CachedSession>()
+    let storedSessions = try container.mainContext.fetch(sessionDescriptor)
+    #expect(storedSessions.count == 20)
+
+    let timelineDescriptor = FetchDescriptor<CachedTimelineEntry>()
+    let storedTimeline = try container.mainContext.fetch(timelineDescriptor)
+    #expect(storedTimeline.count == 20 * 50)
+
+    let agentDescriptor = FetchDescriptor<CachedAgent>()
+    let storedAgents = try container.mainContext.fetch(agentDescriptor)
+    #expect(storedAgents.count == 20 * 2)
+  }
+
   // MARK: - Recently viewed session IDs
 
   @Test("Hydration scoped to recently viewed sessions")
