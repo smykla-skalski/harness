@@ -3,24 +3,21 @@ import SwiftData
 import SwiftUI
 
 struct TaskUserNotesSection: View {
+  let store: HarnessMonitorStore
   let taskID: String
   let sessionID: String
-  let addNote: @MainActor (String, String, String) -> Bool
-  let deleteNote: @MainActor (UserNote) -> Void
   @Query private var userNotes: [UserNote]
   @State private var newNoteText = ""
   @FocusState private var isNoteFieldFocused: Bool
 
   init(
+    store: HarnessMonitorStore,
     taskID: String,
-    sessionID: String,
-    addNote: @escaping @MainActor (String, String, String) -> Bool,
-    deleteNote: @escaping @MainActor (UserNote) -> Void
+    sessionID: String
   ) {
+    self.store = store
     self.taskID = taskID
     self.sessionID = sessionID
-    self.addNote = addNote
-    self.deleteNote = deleteNote
     let targetKind = "task"
     let targetID = taskID
     let selectedSessionID = sessionID
@@ -45,7 +42,7 @@ struct TaskUserNotesSection: View {
                 .foregroundStyle(HarnessMonitorTheme.secondaryInk)
                 .frame(maxWidth: .infinity, alignment: .leading)
               Button {
-                deleteNote(note)
+                _ = store.deleteNote(note)
               } label: {
                 Image(systemName: "xmark.circle.fill")
                   .scaledFont(.caption)
@@ -67,7 +64,6 @@ struct TaskUserNotesSection: View {
         TextField("Add a note", text: $newNoteText)
           .harnessNativeFormControl()
           .focused($isNoteFieldFocused)
-          .textFieldStyle(.roundedBorder)
           .submitLabel(.done)
           .accessibilityIdentifier(HarnessMonitorAccessibility.taskNoteField)
           .onSubmit { submitNote() }
@@ -82,7 +78,12 @@ struct TaskUserNotesSection: View {
   private func submitNote() {
     let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
-    guard addNote(text, taskID, sessionID) else {
+    guard store.addNote(
+      text: text,
+      targetKind: "task",
+      targetId: taskID,
+      sessionId: sessionID
+    ) else {
       return
     }
 

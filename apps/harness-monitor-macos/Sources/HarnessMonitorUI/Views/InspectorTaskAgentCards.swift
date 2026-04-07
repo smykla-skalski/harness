@@ -2,11 +2,10 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct TaskInspectorCard: View {
+  let store: HarnessMonitorStore
   let task: WorkItem
   let notesSessionID: String?
   let isPersistenceAvailable: Bool
-  let addNote: @MainActor (String, String, String) -> Bool
-  let deleteNote: @MainActor (UserNote) -> Void
 
   private var facts: [InspectorFact] {
     [
@@ -83,10 +82,9 @@ struct TaskInspectorCard: View {
       InspectorSection(title: "Your Notes") {
         if let notesSessionID, isPersistenceAvailable {
           TaskUserNotesSection(
+            store: store,
             taskID: task.taskId,
-            sessionID: notesSessionID,
-            addNote: addNote,
-            deleteNote: deleteNote
+            sessionID: notesSessionID
           )
         } else {
           PersistenceUnavailableNotesState()
@@ -104,11 +102,9 @@ struct TaskInspectorCard: View {
 }
 
 struct AgentInspectorCard: View {
+  let store: HarnessMonitorStore
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let sendSignal: @MainActor (String, String, String?) async -> Void
   @State private var signalCommand = "inject_context"
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
@@ -203,22 +199,23 @@ struct AgentInspectorCard: View {
           .submitLabel(.send)
         Button("Send Signal") {
           Task {
-            await sendSignal(
-              signalCommand,
-              signalMessage,
-              signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            await store.sendSignal(
+              agentID: agent.agentId,
+              command: signalCommand,
+              message: signalMessage,
+              actionHint: signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil : signalActionHint
             )
           }
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(
-          signalCommand.isEmpty || signalMessage.isEmpty || isSessionActionInFlight
-            || isSessionReadOnly
+          signalCommand.isEmpty || signalMessage.isEmpty || store.isSessionActionInFlight
+            || store.isSessionReadOnly
         )
         .accessibilityIdentifier(HarnessMonitorAccessibility.signalSendButton)
       }
-      .disabled(isSessionReadOnly || isSessionActionInFlight)
+      .disabled(store.isSessionReadOnly || store.isSessionActionInFlight)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(

@@ -10,6 +10,7 @@ struct HarnessMonitorWindowRootView: View {
   var body: some View {
     ContentView(store: store)
       .frame(minWidth: 900, minHeight: 600)
+      .instantFocusRing()
       .modifier(HarnessMonitorSceneAppearanceModifier(themeMode: $themeMode))
       .modifier(HarnessMonitorUITestAnimationModifier())
       .task {
@@ -29,6 +30,7 @@ struct HarnessMonitorSettingsRootView: View {
       themeMode: $themeMode
     )
     .frame(minWidth: 680, minHeight: 440)
+    .instantFocusRing()
     .modifier(HarnessMonitorSceneAppearanceModifier(themeMode: $themeMode))
     .modifier(HarnessMonitorUITestAnimationModifier())
   }

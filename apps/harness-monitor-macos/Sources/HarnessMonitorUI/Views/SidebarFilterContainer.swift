@@ -21,23 +21,11 @@ struct SidebarFilterContainer: View {
 
   var body: some View {
     SidebarFilterSection(
-      filteredSessionCount: store.filteredSessionCount,
-      totalSessionCount: store.sessions.count,
-      searchText: store.searchText,
+      store: store,
       draftSearchText: $draftSearchText,
-      sessionFilter: store.sessionFilter,
-      sessionFocusFilter: store.sessionFocusFilter,
-      sessionSortOrder: $store.sessionSortOrder,
-      isPersistenceAvailable: store.isPersistenceAvailable,
       recentSearchQueries: recentSearchQueries,
       isExpanded: isExpanded,
-      resetFilters: store.resetFilters,
-      toggleExpanded: { isExpanded.toggle() },
-      submitSearch: submitSearch,
-      setSessionFilter: setSessionFilter(_:),
-      setSessionFocusFilter: setSessionFocusFilter(_:),
-      applyRecentSearch: applyRecentSearch(_:),
-      clearSearchHistory: clearSearchHistory
+      toggleExpanded: { isExpanded.toggle() }
     )
     .task(id: draftSearchText) {
       try? await Task.sleep(for: .milliseconds(300))
@@ -52,28 +40,6 @@ struct SidebarFilterContainer: View {
         draftSearchText = newValue
       }
     }
-  }
-
-  private func submitSearch() {
-    store.searchText = draftSearchText
-    _ = store.recordSearch(draftSearchText)
-  }
-
-  private func setSessionFilter(_ filter: HarnessMonitorStore.SessionFilter) {
-    store.sessionFilter = filter
-  }
-
-  private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
-    store.sessionFocusFilter = filter
-  }
-
-  private func applyRecentSearch(_ query: String) {
-    draftSearchText = query
-    store.searchText = query
-  }
-
-  private func clearSearchHistory() {
-    _ = store.clearSearchHistory()
   }
 }
 

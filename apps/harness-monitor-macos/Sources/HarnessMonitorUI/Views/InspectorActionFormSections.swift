@@ -212,13 +212,13 @@ struct InspectorTaskActionsSection: View {
 }
 
 struct InspectorRoleActionsSection: View {
+  let store: HarnessMonitorStore
   let agent: AgentRegistration
   let leaderID: String?
   @Binding var role: SessionRole
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let changeSelectedRole: () -> Void
-  let requestRemoveAgentConfirmation: (String) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -238,7 +238,7 @@ struct InspectorRoleActionsSection: View {
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(isSessionActionInFlight || isSessionReadOnly)
       Button("Remove Agent") {
-        requestRemoveAgentConfirmation(agent.agentId)
+        store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .red)
       .disabled(agent.agentId == leaderID || isSessionActionInFlight || isSessionReadOnly)

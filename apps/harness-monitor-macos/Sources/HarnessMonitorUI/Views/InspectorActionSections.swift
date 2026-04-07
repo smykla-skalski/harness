@@ -2,76 +2,50 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct InspectorActionSections: View {
+  @Bindable var store: HarnessMonitorStore
   let detail: SessionDetail
   let selectedTask: WorkItem?
   let selectedAgent: AgentRegistration?
   let selectedObserver: ObserverSummary?
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let lastAction: String
-  let lastError: String?
-  let availableActionActors: [AgentRegistration]
-  @Binding var actionActorID: String
-  let requestRemoveAgentConfirmation: (String) -> Void
-  let createTaskAction: (String, String?, TaskSeverity) async -> Bool
-  let assignTaskAction: (String, String) async -> Bool
-  let updateTaskStatusAction: (String, TaskStatus, String?) async -> Bool
-  let checkpointTaskAction: (String, String, Int) async -> Bool
-  let changeRoleAction: (String, SessionRole) async -> Bool
-  let transferLeaderAction: (String, String?) async -> Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       InspectorActionStatusBanner(
-        isSessionReadOnly: isSessionReadOnly,
-        isSessionActionInFlight: isSessionActionInFlight,
-        lastAction: lastAction,
-        lastError: lastError,
-        availableActionActors: availableActionActors,
-        actionActorID: $actionActorID
+        isSessionReadOnly: store.isSessionReadOnly,
+        isSessionActionInFlight: store.isSessionActionInFlight,
+        lastAction: store.lastAction,
+        lastError: store.lastError,
+        availableActionActors: store.availableActionActors,
+        actionActorID: $store.selectedActionActorID
       )
-      InspectorCreateTaskConsole(
-        isSessionReadOnly: isSessionReadOnly,
-        isSessionActionInFlight: isSessionActionInFlight,
-        createTaskAction: createTaskAction
-      )
+      InspectorCreateTaskConsole(store: store)
 
       if let selectedTask {
         InspectorTaskMutationConsole(
+          store: store,
           selectedTask: selectedTask,
           tasks: detail.tasks,
-          agents: detail.agents,
-          isSessionReadOnly: isSessionReadOnly,
-          isSessionActionInFlight: isSessionActionInFlight,
-          assignTaskAction: assignTaskAction,
-          updateTaskStatusAction: updateTaskStatusAction,
-          checkpointTaskAction: checkpointTaskAction
+          agents: detail.agents
         )
       }
 
       if let selectedAgent {
         InspectorRoleMutationConsole(
+          store: store,
           selectedAgent: selectedAgent,
-          leaderID: detail.session.leaderId,
-          isSessionReadOnly: isSessionReadOnly,
-          isSessionActionInFlight: isSessionActionInFlight,
-          changeRoleAction: changeRoleAction,
-          requestRemoveAgentConfirmation: requestRemoveAgentConfirmation
+          leaderID: detail.session.leaderId
         )
       }
 
       InspectorLeaderTransferConsole(
+        store: store,
         detail: detail,
-        actionActorID: actionActorID,
-        isSessionReadOnly: isSessionReadOnly,
-        isSessionActionInFlight: isSessionActionInFlight,
-        transferLeaderAction: transferLeaderAction
+        actionActorID: store.selectedActionActorID
       )
 
       if let selectedObserver {
         InspectorObserverSummarySection(observer: selectedObserver)
       }
     }
-    .textFieldStyle(.roundedBorder)
   }
 }
