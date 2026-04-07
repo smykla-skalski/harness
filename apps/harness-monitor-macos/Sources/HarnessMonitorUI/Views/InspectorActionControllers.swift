@@ -2,9 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct InspectorCreateTaskConsole: View {
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let createTaskAction: (String, String?, TaskSeverity) async -> Bool
+  let store: HarnessMonitorStore
 
   @State private var createTitle = ""
   @State private var createContext = ""
@@ -15,8 +13,8 @@ struct InspectorCreateTaskConsole: View {
       createTitle: $createTitle,
       createContext: $createContext,
       createSeverity: $createSeverity,
-      isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
+      isSessionReadOnly: store.isSessionReadOnly,
+      isSessionActionInFlight: store.isSessionActionInFlight,
       submitCreateTask: submitCreateTask
     )
   }
@@ -32,10 +30,10 @@ struct InspectorCreateTaskConsole: View {
       return
     }
 
-    let success = await createTaskAction(
-      title,
-      context.isEmpty ? nil : context,
-      createSeverity
+    let success = await store.createTask(
+      title: title,
+      context: context.isEmpty ? nil : context,
+      severity: createSeverity
     )
     if success {
       createTitle = ""
@@ -46,14 +44,10 @@ struct InspectorCreateTaskConsole: View {
 }
 
 struct InspectorTaskMutationConsole: View {
+  let store: HarnessMonitorStore
   let selectedTask: WorkItem
   let tasks: [WorkItem]
   let agents: [AgentRegistration]
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let assignTaskAction: (String, String) async -> Bool
-  let updateTaskStatusAction: (String, TaskStatus, String?) async -> Bool
-  let checkpointTaskAction: (String, String, Int) async -> Bool
 
   @State private var taskID = ""
   @State private var assigneeID = ""
@@ -81,8 +75,8 @@ struct InspectorTaskMutationConsole: View {
       statusNote: $statusNote,
       checkpointSummary: $checkpointSummary,
       checkpointProgress: $checkpointProgress,
-      isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
+      isSessionReadOnly: store.isSessionReadOnly,
+      isSessionActionInFlight: store.isSessionActionInFlight,
       assignSelectedTask: submitAssignSelectedTask,
       updateSelectedTask: submitUpdateSelectedTask,
       checkpointSelectedTask: submitCheckpointSelectedTask
@@ -125,7 +119,7 @@ struct InspectorTaskMutationConsole: View {
       return
     }
 
-    _ = await assignTaskAction(taskID, assigneeID)
+    _ = await store.assignTask(taskID: taskID, agentID: assigneeID)
     syncDefaults()
   }
 
@@ -135,10 +129,10 @@ struct InspectorTaskMutationConsole: View {
     }
 
     let note = statusNote.trimmingCharacters(in: .whitespacesAndNewlines)
-    let success = await updateTaskStatusAction(
-      taskID,
-      taskStatus,
-      note.isEmpty ? nil : note
+    let success = await store.updateTaskStatus(
+      taskID: taskID,
+      status: taskStatus,
+      note: note.isEmpty ? nil : note
     )
     if success {
       statusNote = ""
@@ -152,7 +146,11 @@ struct InspectorTaskMutationConsole: View {
       return
     }
 
-    let success = await checkpointTaskAction(taskID, summary, Int(checkpointProgress))
+    let success = await store.checkpointTask(
+      taskID: taskID,
+      summary: summary,
+      progress: Int(checkpointProgress)
+    )
     if success {
       checkpointSummary = ""
     }
@@ -161,12 +159,9 @@ struct InspectorTaskMutationConsole: View {
 }
 
 struct InspectorRoleMutationConsole: View {
+  let store: HarnessMonitorStore
   let selectedAgent: AgentRegistration
   let leaderID: String?
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let changeRoleAction: (String, SessionRole) async -> Bool
-  let requestRemoveAgentConfirmation: (String) -> Void
 
   @State private var role: SessionRole = .worker
 
@@ -176,13 +171,13 @@ struct InspectorRoleMutationConsole: View {
 
   var body: some View {
     InspectorRoleActionsSection(
+      store: store,
       agent: selectedAgent,
       leaderID: leaderID,
       role: $role,
-      isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
-      changeSelectedRole: submitChangeSelectedRole,
-      requestRemoveAgentConfirmation: requestRemoveAgentConfirmation
+      isSessionReadOnly: store.isSessionReadOnly,
+      isSessionActionInFlight: store.isSessionActionInFlight,
+      changeSelectedRole: submitChangeSelectedRole
     )
     .task(id: stateKey) {
       role = selectedAgent.role
@@ -194,17 +189,15 @@ struct InspectorRoleMutationConsole: View {
   }
 
   private func changeSelectedRole() async {
-    _ = await changeRoleAction(selectedAgent.agentId, role)
+    _ = await store.changeRole(agentID: selectedAgent.agentId, role: role)
     role = selectedAgent.role
   }
 }
 
 struct InspectorLeaderTransferConsole: View {
+  let store: HarnessMonitorStore
   let detail: SessionDetail
   let actionActorID: String
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let transferLeaderAction: (String, String?) async -> Bool
 
   @State private var transferLeaderID = ""
   @State private var transferReason = ""
@@ -233,8 +226,8 @@ struct InspectorLeaderTransferConsole: View {
       transferReason: $transferReason,
       transferLeaderButtonTitle: transferLeaderButtonTitle,
       actionActorID: actionActorID,
-      isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
+      isSessionReadOnly: store.isSessionReadOnly,
+      isSessionActionInFlight: store.isSessionActionInFlight,
       submitTransferLeader: submitTransferLeader
     )
     .task(id: stateKey) {
@@ -264,9 +257,9 @@ struct InspectorLeaderTransferConsole: View {
       return
     }
 
-    let success = await transferLeaderAction(
-      transferLeaderID,
-      reason.isEmpty ? nil : reason
+    let success = await store.transferLeader(
+      newLeaderID: transferLeaderID,
+      reason: reason.isEmpty ? nil : reason
     )
     if success {
       transferReason = ""

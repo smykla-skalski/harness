@@ -10,7 +10,7 @@ private enum InspectorChromeMetrics {
 }
 
 struct InspectorColumnView: View {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
 
   private var resolvedPrimaryContent: InspectorPrimaryContent {
     InspectorPrimaryContent(
@@ -32,47 +32,17 @@ struct InspectorColumnView: View {
       topScrollEdgeEffect: .hard
     ) {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
-        InspectorPrimaryContentHost(
-          content: resolvedPrimaryContent,
-          isSessionReadOnly: store.isSessionReadOnly,
-          isSessionActionInFlight: store.isSessionActionInFlight,
-          addNote: addTaskNote,
-          deleteNote: deleteNote,
-          sendSignal: sendSignal
-        )
-        .animation(.spring(duration: 0.2), value: resolvedPrimaryContent.identity)
+        inspectorPrimaryContent
+          .id(resolvedPrimaryContent.identity)
+          .transition(.opacity.animation(.easeOut(duration: 0.08)))
 
         if let detail = store.selectedSession {
           InspectorActionSections(
+            store: store,
             detail: detail,
             selectedTask: store.selectedTask,
             selectedAgent: store.selectedAgent,
-            selectedObserver: selectedObserver,
-            isSessionReadOnly: store.isSessionReadOnly,
-            isSessionActionInFlight: store.isSessionActionInFlight,
-            lastAction: store.lastAction,
-            lastError: store.lastError,
-            availableActionActors: store.availableActionActors,
-            actionActorID: $store.selectedActionActorID,
-            requestRemoveAgentConfirmation: store.requestRemoveAgentConfirmation(agentID:),
-            createTaskAction: { title, context, severity in
-              await store.createTask(title: title, context: context, severity: severity)
-            },
-            assignTaskAction: { taskID, agentID in
-              await store.assignTask(taskID: taskID, agentID: agentID)
-            },
-            updateTaskStatusAction: { taskID, status, note in
-              await store.updateTaskStatus(taskID: taskID, status: status, note: note)
-            },
-            checkpointTaskAction: { taskID, summary, progress in
-              await store.checkpointTask(taskID: taskID, summary: summary, progress: progress)
-            },
-            changeRoleAction: { agentID, role in
-              await store.changeRole(agentID: agentID, role: role)
-            },
-            transferLeaderAction: { newLeaderID, reason in
-              await store.transferLeader(newLeaderID: newLeaderID, reason: reason)
-            }
+            selectedObserver: selectedObserver
           )
         }
       }
@@ -85,105 +55,32 @@ struct InspectorColumnView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorRoot)
   }
 
-  private func addTaskNote(_ text: String, targetID: String, sessionID: String) -> Bool {
-    store.addNote(
-      text: text,
-      targetKind: "task",
-      targetId: targetID,
-      sessionId: sessionID
-    )
-  }
-
-  private func deleteNote(_ note: UserNote) {
-    _ = store.deleteNote(note)
-  }
-
-  private func sendSignal(
-    agentID: String,
-    command: String,
-    message: String,
-    actionHint: String?
-  ) async {
-    await store.sendSignal(
-      agentID: agentID,
-      command: command,
-      message: message,
-      actionHint: actionHint
-    )
-  }
-}
-
-private struct InspectorPrimaryContentHost: View {
-  let content: InspectorPrimaryContent
-  let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let addNote: @MainActor (String, String, String) -> Bool
-  let deleteNote: @MainActor (UserNote) -> Void
-  let sendSignal: @MainActor (String, String, String, String?) async -> Void
-
-  var body: some View {
-    ZStack(alignment: .topLeading) {
-      InspectorPrimaryLayer(isActive: content.isEmpty) {
-        if content.isEmpty {
-          InspectorPrimaryEmptyState()
-        }
-      }
-      InspectorPrimaryLayer(isActive: content.loadingSummary != nil) {
-        if let loadingSummary = content.loadingSummary {
-          InspectorPrimaryLoadingState(summary: loadingSummary)
-        }
-      }
-      InspectorPrimaryLayer(isActive: content.sessionDetail != nil) {
-        if let sessionDetail = content.sessionDetail {
-          SessionInspectorSummaryCard(detail: sessionDetail)
-        }
-      }
-      InspectorPrimaryLayer(isActive: content.taskSelection != nil) {
-        if let taskSelection = content.taskSelection {
-          TaskInspectorCard(
-            task: taskSelection.task,
-            notesSessionID: taskSelection.notesSessionID,
-            isPersistenceAvailable: taskSelection.isPersistenceAvailable,
-            addNote: addNote,
-            deleteNote: deleteNote
-          )
-        }
-      }
-      InspectorPrimaryLayer(isActive: content.agentSelection != nil) {
-        if let agentSelection = content.agentSelection {
-          AgentInspectorCard(
-            agent: agentSelection.agent,
-            activity: agentSelection.activity,
-            isSessionReadOnly: isSessionReadOnly,
-            isSessionActionInFlight: isSessionActionInFlight
-          ) { command, message, actionHint in
-            await sendSignal(agentSelection.agent.agentId, command, message, actionHint)
-          }
-        }
-      }
-      InspectorPrimaryLayer(isActive: content.signal != nil) {
-        if let signal = content.signal {
-          SignalInspectorCard(signal: signal)
-        }
-      }
-      InspectorPrimaryLayer(isActive: content.observer != nil) {
-        if let observer = content.observer {
-          ObserverInspectorCard(observer: observer)
-        }
-      }
+  @ViewBuilder private var inspectorPrimaryContent: some View {
+    switch resolvedPrimaryContent {
+    case .empty:
+      InspectorPrimaryEmptyState()
+    case .loading(let summary):
+      InspectorPrimaryLoadingState(summary: summary)
+    case .session(let detail):
+      SessionInspectorSummaryCard(detail: detail)
+    case .task(let selection):
+      TaskInspectorCard(
+        store: store,
+        task: selection.task,
+        notesSessionID: selection.notesSessionID,
+        isPersistenceAvailable: selection.isPersistenceAvailable
+      )
+    case .agent(let selection):
+      AgentInspectorCard(
+        store: store,
+        agent: selection.agent,
+        activity: selection.activity
+      )
+    case .signal(let signal):
+      SignalInspectorCard(signal: signal)
+    case .observer(let observer):
+      ObserverInspectorCard(observer: observer)
     }
-  }
-}
-
-private struct InspectorPrimaryLayer<Content: View>: View {
-  let isActive: Bool
-  @ViewBuilder let content: Content
-
-  var body: some View {
-    content
-      .opacity(isActive ? 1 : 0)
-      .allowsHitTesting(isActive)
-      .accessibilityHidden(!isActive)
   }
 }
 
@@ -268,48 +165,6 @@ private enum InspectorPrimaryContent {
     case .observer(let observer):
       return "observer:\(observer.observeId)"
     }
-  }
-
-  var isEmpty: Bool {
-    if case .empty = self {
-      return true
-    }
-    return false
-  }
-
-  var loadingSummary: SessionSummary? {
-    guard case .loading(let summary) = self else {
-      return nil
-    }
-    return summary
-  }
-
-  var sessionDetail: SessionDetail? {
-    guard case .session(let detail) = self else {
-      return nil
-    }
-    return detail
-  }
-
-  var taskSelection: InspectorTaskSelection? {
-    guard case .task(let selection) = self else {
-      return nil
-    }
-    return selection
-  }
-
-  var agentSelection: InspectorAgentSelection? {
-    guard case .agent(let selection) = self else {
-      return nil
-    }
-    return selection
-  }
-
-  var signal: SessionSignalRecord? {
-    guard case .signal(let signal) = self else {
-      return nil
-    }
-    return signal
   }
 
   var observer: ObserverSummary? {

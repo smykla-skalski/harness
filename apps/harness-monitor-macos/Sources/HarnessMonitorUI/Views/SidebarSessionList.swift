@@ -4,39 +4,27 @@ import SwiftData
 import SwiftUI
 
 struct SidebarFilterSection: View {
-  let filteredSessionCount: Int
-  let totalSessionCount: Int
-  let searchText: String
+  @Bindable var store: HarnessMonitorStore
   @Binding var draftSearchText: String
-  let sessionFilter: HarnessMonitorStore.SessionFilter
-  let sessionFocusFilter: SessionFocusFilter
-  @Binding var sessionSortOrder: SessionSortOrder
-  let isPersistenceAvailable: Bool
   let recentSearchQueries: [String]
   let isExpanded: Bool
-  let resetFilters: () -> Void
   let toggleExpanded: () -> Void
-  let submitSearch: () -> Void
-  let setSessionFilter: (HarnessMonitorStore.SessionFilter) -> Void
-  let setSessionFocusFilter: (SessionFocusFilter) -> Void
-  let applyRecentSearch: (String) -> Void
-  let clearSearchHistory: () -> Void
 
   private var activeFilterSummary: String {
     let isAnyFilterActive =
-      !searchText.isEmpty
-      || sessionFilter != .active
-      || sessionFocusFilter != .all
+      !store.searchText.isEmpty
+      || store.sessionFilter != .active
+      || store.sessionFocusFilter != .all
     if isAnyFilterActive {
-      return "\(filteredSessionCount) visible of \(totalSessionCount)"
+      return "\(store.filteredSessionCount) visible of \(store.sessions.count)"
     }
-    return "\(totalSessionCount) indexed"
+    return "\(store.sessions.count) indexed"
   }
 
   private var isFiltered: Bool {
-    !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || sessionFilter != .active
-      || sessionFocusFilter != .all
+    !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || store.sessionFilter != .active
+      || store.sessionFocusFilter != .all
   }
 
   var body: some View {
@@ -45,7 +33,7 @@ struct SidebarFilterSection: View {
         activeFilterSummary: activeFilterSummary,
         isFiltered: isFiltered,
         isExpanded: isExpanded,
-        resetFilters: resetFilters,
+        resetFilters: { store.resetFilters() },
         toggleExpanded: toggleExpanded
       )
 
@@ -57,30 +45,30 @@ struct SidebarFilterSection: View {
               submitSearch: submitSearch
             )
 
-            if searchText.isEmpty, isPersistenceAvailable {
+            if store.searchText.isEmpty, store.isPersistenceAvailable {
               RecentSearchChipsSection(
                 recentSearchQueries: recentSearchQueries,
-                applyRecentSearch: applyRecentSearch,
-                clearSearchHistory: clearSearchHistory
+                applyRecentSearch: applyRecentSearch(_:),
+                clearSearchHistory: { _ = store.clearSearchHistory() }
               )
             }
           }
 
           SidebarFilterControlsBar(
             sessionFilter: Binding(
-              get: { sessionFilter },
+              get: { store.sessionFilter },
               set: { newValue in
                 withAnimation(.spring(duration: 0.2)) {
-                  setSessionFilter(newValue)
+                  store.sessionFilter = newValue
                 }
               }
             ),
-            sessionSortOrder: $sessionSortOrder,
+            sessionSortOrder: $store.sessionSortOrder,
             sessionFocusFilter: Binding(
-              get: { sessionFocusFilter },
+              get: { store.sessionFocusFilter },
               set: { newValue in
                 withAnimation(.spring(duration: 0.2)) {
-                  setSessionFocusFilter(newValue)
+                  store.sessionFocusFilter = newValue
                 }
               }
             )
@@ -102,6 +90,16 @@ struct SidebarFilterSection: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sidebarFiltersCard).frame")
+  }
+
+  private func submitSearch() {
+    store.searchText = draftSearchText
+    _ = store.recordSearch(draftSearchText)
+  }
+
+  private func applyRecentSearch(_ query: String) {
+    draftSearchText = query
+    store.searchText = query
   }
 }
 
@@ -170,7 +168,7 @@ private struct SidebarFilterHeader: View {
 }
 
 // Collapses content toward the header: scale from top + fade.
-// Stays within the VStack layout frame — no overflow past card edges.
+// Stays within the VStack layout frame - no overflow past card edges.
 private struct FilterContentTransition: Transition {
   func body(content: Content, phase: TransitionPhase) -> some View {
     content
