@@ -22,6 +22,7 @@ struct HarnessMonitorAppConfiguration {
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
       "harnessMonitor.board.onboardingDismissed": false,
       "showInspector": true,
+      "inspectorColumnWidth": 420.0,
     ])
 
     let environment = HarnessMonitorEnvironment.current
