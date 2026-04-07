@@ -10,6 +10,15 @@ import SwiftUI
   )
 }
 
+#Preview("Preferences Window - Appearance") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  preferencesWindowPreview(
+    section: .appearance,
+    themeMode: $themeMode
+  )
+}
+
 #Preview("Preferences Window - Connection") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 
@@ -55,10 +64,36 @@ private func preferencesWindowPreview(
   themeMode: Binding<HarnessMonitorThemeMode>,
   store: HarnessMonitorStore = PreferencesPreviewSupport.makeStore()
 ) -> some View {
-  PreferencesView(
-    store: store,
+  PreferencesWindowPreviewContainer(
+    initialSection: section,
     themeMode: themeMode,
-    initialSection: section
+    store: store
   )
-  .frame(width: 780, height: 560)
+}
+
+private struct PreferencesWindowPreviewContainer: View {
+  let initialSection: PreferencesSection
+  let themeMode: Binding<HarnessMonitorThemeMode>
+  let store: HarnessMonitorStore
+  @State private var selectedSection: PreferencesSection
+
+  init(
+    initialSection: PreferencesSection,
+    themeMode: Binding<HarnessMonitorThemeMode>,
+    store: HarnessMonitorStore
+  ) {
+    self.initialSection = initialSection
+    self.themeMode = themeMode
+    self.store = store
+    _selectedSection = State(initialValue: initialSection)
+  }
+
+  var body: some View {
+    PreferencesView(
+      store: store,
+      themeMode: themeMode,
+      selectedSection: $selectedSection
+    )
+    .frame(width: 780, height: 560)
+  }
 }

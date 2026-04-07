@@ -1,16 +1,18 @@
 import SwiftUI
 
-enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
+public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case general
+  case appearance
   case connection
   case database
   case diagnostics
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
   var title: String {
     switch self {
     case .general: "General"
+    case .appearance: "Appearance"
     case .connection: "Connection"
     case .database: "Database"
     case .diagnostics: "Diagnostics"
@@ -20,6 +22,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   var systemImage: String {
     switch self {
     case .general: "gearshape"
+    case .appearance: "paintbrush"
     case .connection: "bolt.horizontal.circle"
     case .database: "cylinder.split.1x2"
     case .diagnostics: "stethoscope"

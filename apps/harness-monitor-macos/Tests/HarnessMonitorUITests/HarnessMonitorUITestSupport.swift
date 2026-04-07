@@ -362,6 +362,22 @@ extension HarnessMonitorUITestCase {
     start.press(forDuration: 0.01, thenDragTo: end)
   }
 
+  func dragDown(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
+    let scrollDistance = max(120, element.frame.height * distanceRatio)
+    if element.isHittable {
+      element.scroll(byDeltaX: 0, deltaY: scrollDistance)
+      return
+    }
+
+    guard let start = centerCoordinate(in: app, for: element) else {
+      XCTFail("Failed to resolve drag origin for \(element)")
+      return
+    }
+
+    let end = start.withOffset(CGVector(dx: 0, dy: scrollDistance))
+    start.press(forDuration: 0.01, thenDragTo: end)
+  }
+
   func attachWindowScreenshot(
     in app: XCUIApplication,
     named name: String,
