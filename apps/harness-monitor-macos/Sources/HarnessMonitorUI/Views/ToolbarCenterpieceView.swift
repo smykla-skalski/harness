@@ -179,7 +179,7 @@ enum ToolbarCenterpieceDisplayMode: String {
     }
   }
 
-  var showsMetricLabels: Bool { self == .standard }
+  var showsMetricLabels: Bool { false }
 }
 
 private struct ToolbarCenterpieceView: View {
@@ -188,10 +188,10 @@ private struct ToolbarCenterpieceView: View {
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
   private static let toolbarHeight: CGFloat = 32
-  // Rounded subheadline cap height is ~7.75pt. Matching the visible glyph inset
-  // inside a 32pt capsule gives (32 - 7.75) / 2 ~= 12.12pt, rounded to 12pt.
-  private static let metricsLeadingInset: CGFloat = 12
-  private static let trailingInset: CGFloat = 12
+  // Leading inset matches the vertical centering gap inside the glass capsule
+  // so the first metric token sits at equal distance from the bubble's inner
+  // surface on all sides.
+  private static let metricsLeadingInset: CGFloat = 16
   private static let centerpieceWidth: CGFloat = 560
 
   var body: some View {
@@ -203,7 +203,6 @@ private struct ToolbarCenterpieceView: View {
         ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
           .fixedSize(horizontal: true, vertical: false)
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceMetricsFrame)
-          .padding(.leading, Self.metricsLeadingInset)
 
         if !statusMessages.isEmpty {
           Spacer(minLength: 20)
@@ -216,7 +215,7 @@ private struct ToolbarCenterpieceView: View {
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
         }
       }
-      .padding(.trailing, Self.trailingInset)
+      .padding(.leading, Self.metricsLeadingInset)
     }
     .frame(width: Self.centerpieceWidth, height: Self.toolbarHeight)
     .accessibilityElement(children: .contain)
@@ -232,11 +231,8 @@ private struct ToolbarStatusDropdown: View {
   let daemonIndicator: ToolbarDaemonIndicator
   @State private var isHovered = false
   @State private var isPressed = false
-  // Match visible text padding to the rounded subheadline cap-height inset.
-  private static let contentHorizontalInset: CGFloat = 12
-  // The hover plate sits inside the 32pt host with a 24pt inner capsule:
-  // (32 - 24) / 2 = 4pt on each edge.
-  private static let hoverPlateInset: CGFloat = 4
+  // Horizontal content padding inside the capsule, equal on left and right.
+  private static let contentHorizontalInset: CGFloat = 16
 
   private var highlightOpacity: Double {
     isPressed ? 0.12 : isHovered ? 0.08 : 0
@@ -255,13 +251,12 @@ private struct ToolbarStatusDropdown: View {
     .background {
       Capsule()
         .fill(Color.primary.opacity(highlightOpacity))
-        .padding(Self.hoverPlateInset)
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.1), value: isPressed)
     }
     .overlay {
       Color.clear
-        .padding(Self.hoverPlateInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerHoverFrame)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
@@ -286,7 +281,8 @@ private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
     NSLayoutConstraint.activate([
       hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      hosting.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      hosting.topAnchor.constraint(equalTo: view.topAnchor),
+      hosting.bottomAnchor.constraint(equalTo: view.bottomAnchor),
     ])
     view.hostingView = hosting
     view.messages = messages
@@ -422,6 +418,7 @@ private let centerpieceBundleRef = Bundle(for: ToolbarCenterpieceBundleToken.sel
 
 private struct ToolbarDaemonIndicatorIcon: View {
   let indicator: ToolbarDaemonIndicator
+  private static let containerWidth: CGFloat = 16
 
   var body: some View {
     Group {
@@ -441,6 +438,7 @@ private struct ToolbarDaemonIndicatorIcon: View {
           .font(.caption.weight(.semibold))
       }
     }
+    .frame(width: Self.containerWidth, alignment: .trailing)
     .foregroundStyle(indicator.foregroundColor)
     .animation(nil, value: indicator)
     .accessibilityHidden(true)
