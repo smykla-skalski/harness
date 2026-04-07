@@ -602,16 +602,16 @@ private extension HarnessMonitorSettingsUITests {
   ) throws -> String {
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesWindow = window(in: app, containing: preferencesRoot)
-    let disclosure = button(in: app, identifier: Accessibility.preferencesSystemBackgroundsDisclosure)
+    let nativeTab = app.buttons.matching(NSPredicate(format: "label == %@", "Native")).firstMatch
 
-    XCTAssertTrue(disclosure.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(nativeTab.waitForExistence(timeout: Self.uiTimeout))
 
-    for _ in 0..<4 where !disclosure.isHittable {
+    for _ in 0..<4 where !nativeTab.isHittable {
       dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
     }
 
-    XCTAssertTrue(disclosure.isHittable, "System wallpapers toggle never became hittable")
-    disclosure.tap()
+    XCTAssertTrue(nativeTab.isHittable, "Native background tab never became hittable")
+    nativeTab.tap()
 
     for _ in 0..<4 {
       for candidate in candidates {
