@@ -3,7 +3,8 @@ import SwiftUI
 struct HarnessCornerOverlayConfiguration {
   var width: CGFloat = 280
   var height: CGFloat? = nil
-  var edgePadding: CGFloat = HarnessMonitorTheme.spacingLG
+  var trailingPadding: CGFloat = HarnessMonitorTheme.spacingLG
+  var bottomPadding: CGFloat = HarnessMonitorTheme.spacingLG
   var contentPadding: CGFloat = HarnessMonitorTheme.cardPadding
   var cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusMD
   var appliesGlass: Bool = true
@@ -42,7 +43,8 @@ struct HarnessCornerOverlayModifier<OverlayContent: View>: ViewModifier {
             .interaction,
             RoundedRectangle(cornerRadius: configuration.cornerRadius, style: .continuous)
           )
-          .padding(configuration.edgePadding)
+          .padding(.trailing, configuration.trailingPadding)
+          .padding(.bottom, configuration.bottomPadding)
           .transition(reduceMotion ? .opacity : overlayTransition)
         }
       }
