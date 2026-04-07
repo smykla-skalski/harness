@@ -18,6 +18,10 @@ struct HarnessMonitorApp: App {
   private var inspectorVisibility: Binding<Bool>?
 
   init() {
+    UserDefaults.standard.register(defaults: [
+      "NSUseAnimatedFocusRing": false
+    ])
+
     let configuration = HarnessMonitorAppConfiguration.resolve()
     container = configuration.container
     isUITesting = configuration.isUITesting

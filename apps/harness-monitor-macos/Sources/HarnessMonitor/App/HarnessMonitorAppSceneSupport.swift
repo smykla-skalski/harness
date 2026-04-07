@@ -39,9 +39,11 @@ struct HarnessMonitorSettingsRootView: View {
 private struct HarnessMonitorUITestAnimationModifier: ViewModifier {
   private static let isUITesting =
     ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+  private static let keepAnimations =
+    ProcessInfo.processInfo.environment["HARNESS_MONITOR_KEEP_ANIMATIONS"] == "1"
 
   func body(content: Content) -> some View {
-    if Self.isUITesting {
+    if Self.isUITesting && !Self.keepAnimations {
       content.transaction { $0.disablesAnimations = true }
     } else {
       content

@@ -6,6 +6,41 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
 
+  func testSidebarSearchFieldFocusRingAppearsImmediatelyOnFirstClick() throws {
+    let app = launch(mode: "preview")
+
+    let searchField = editableField(in: app, identifier: "harness.sidebar.search")
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
+
+    if fieldHasFocusRingPixels(searchField, in: app) {
+      tapPreviewSession(in: app)
+      XCTAssertTrue(
+        waitUntil(timeout: 1, pollInterval: 0.02) {
+          !self.fieldHasFocusRingPixels(searchField, in: app)
+        },
+        "Search field unexpectedly remained focused before the click-latency check"
+      )
+    }
+
+    if searchField.isHittable {
+      searchField.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: searchField) {
+      coordinate.tap()
+    } else {
+      XCTFail("Failed to tap sidebar search field")
+    }
+
+    let focusRingAppearedQuickly = waitUntil(timeout: 0.12, pollInterval: 0.01) {
+      self.fieldHasFocusRingPixels(searchField, in: app)
+    }
+
+    attachWindowScreenshot(in: app, named: "focus-ring-sidebar-search-click")
+    XCTAssertTrue(
+      focusRingAppearedQuickly,
+      "Sidebar search field focus ring did not appear within 120ms of the first click"
+    )
+  }
+
   /// Verify the focus ring around a sidebar session card follows the
   /// rounded rectangle shape of the card rather than being a plain
   /// rectangle.
@@ -63,6 +98,35 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
   }
 
   // MARK: - Helpers
+
+  private func fieldHasFocusRingPixels(
+    _ field: XCUIElement,
+    in app: XCUIApplication
+  ) -> Bool {
+    let screenshot = field.screenshot()
+    guard let cgImage = screenshot.image.cgImage(
+      forProposedRect: nil,
+      context: nil,
+      hints: nil
+    ) else { return false }
+
+    let probes: [(Int, Int)] = [
+      (2, max(cgImage.height / 2, 2)),
+      (max(cgImage.width / 2, 2), 2),
+      (max(cgImage.width - 3, 2), max(cgImage.height / 2, 2)),
+      (max(cgImage.width / 2, 2), max(cgImage.height - 3, 2)),
+    ]
+
+    for (probeX, probeY) in probes
+    where probeX > 0 && probeY > 0 && probeX < cgImage.width && probeY < cgImage.height {
+      let color = pixelColor(in: cgImage, x: probeX, y: probeY)
+      if color.blue > 0.4 && color.blue > color.red * 1.3 {
+        return true
+      }
+    }
+
+    return false
+  }
 
   /// Returns true if the area around the session row contains the
   /// characteristic blue focus ring color.
