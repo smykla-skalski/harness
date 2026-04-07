@@ -258,7 +258,6 @@ struct InspectorLeaderTransferSection: View {
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let submitTransferLeader: () -> Void
-  @FocusState private var isReasonFocused: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -282,7 +281,6 @@ struct InspectorLeaderTransferSection: View {
       .harnessNativeFormControl()
       TextField("Reason", text: $transferReason, axis: .vertical)
         .harnessNativeFormControl()
-        .focused($isReasonFocused)
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)
       Button(transferLeaderButtonTitle, action: submitTransferLeader)

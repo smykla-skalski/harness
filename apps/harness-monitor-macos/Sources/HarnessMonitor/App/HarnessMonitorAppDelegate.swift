@@ -12,7 +12,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   override init() {
     super.init()
     installSignalHandlers()
-    if ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1" {
+    if ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+      && ProcessInfo.processInfo.environment["HARNESS_MONITOR_KEEP_ANIMATIONS"] != "1"
+    {
       disableAnimationsForUITesting()
     }
   }
