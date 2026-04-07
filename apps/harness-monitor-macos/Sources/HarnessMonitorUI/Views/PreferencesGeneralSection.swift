@@ -36,14 +36,6 @@ struct PreferencesAppearanceSection: View {
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTextSizePicker)
 
-        Picker("Backdrop", selection: $backdropModeRawValue) {
-          ForEach(HarnessMonitorBackdropMode.allCases) { mode in
-            Text(mode.label).tag(mode.rawValue)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
-
         Picker("Toolbar", selection: $toolbarStyleRawValue) {
           ForEach(HarnessMonitorToolbarStyle.allCases) { style in
             Text(style.label).tag(style.rawValue)
@@ -51,11 +43,19 @@ struct PreferencesAppearanceSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesToolbarStylePicker)
+
+        Picker("Backdrop", selection: $backdropModeRawValue) {
+          ForEach(HarnessMonitorBackdropMode.allCases) { mode in
+            Text(mode.label).tag(mode.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
       } header: {
         Text("Appearance")
       } footer: {
         Text(
-          "Theme mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off. Toolbar switches between translucent glass and a flat system background."
+          "Theme mode and text size apply to every Harness Monitor window. Toolbar switches between translucent glass and a flat system background. Backdrop controls where the softened background image renders - the background image section is only active when a backdrop mode is selected."
         )
       }
 
@@ -68,12 +68,17 @@ struct PreferencesAppearanceSection: View {
     }
   }
 
+  private var isBackdropDisabled: Bool {
+    HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none
+  }
+
   private var backgroundImageSection: some View {
     HarnessMonitorTabbedContent(
       title: "Background image",
       selection: $selectedBackgroundTab,
       tabTitle: \.title,
-      alignment: .trailing
+      alignment: .trailing,
+      tabsDisabled: isBackdropDisabled
     ) { tab in
       PreferencesBackgroundGallery(
         selection: $backgroundImageRawValue,

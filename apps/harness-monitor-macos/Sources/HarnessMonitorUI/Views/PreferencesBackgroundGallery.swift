@@ -12,6 +12,14 @@ struct PreferencesBackgroundGallery: View {
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
 
+  private var isBackdropDisabled: Bool {
+    HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none
+  }
+
+  private var hasStoredRecents: Bool {
+    !recentStorageValues.isEmpty
+  }
+
   private var options: [HarnessMonitorBackgroundSelection] {
     switch collection {
     case .featured: HarnessMonitorBackgroundSelection.bundledLibrary
@@ -35,7 +43,37 @@ struct PreferencesBackgroundGallery: View {
   ]
 
   var body: some View {
-    if options.isEmpty {
+    if isBackdropDisabled {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        if hasStoredRecents {
+          recentBackgroundsRow
+            .saturation(0)
+            .allowsHitTesting(false)
+        }
+
+        VStack(spacing: HarnessMonitorTheme.spacingSM) {
+          Image(systemName: "photo.on.rectangle.angled")
+            .font(.system(size: 36))
+            .foregroundStyle(.tertiary)
+          Text("Background image requires a backdrop")
+            .scaledFont(.headline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: true, vertical: false)
+          Text("Set the backdrop to Window or Content to choose a background image")
+            .scaledFont(.subheadline)
+            .foregroundStyle(.tertiary)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, HarnessMonitorTheme.spacingXL)
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
+      .task(id: recentStorageValues) {
+        guard hasStoredRecents else { return }
+        await BackgroundThumbnailCache.shared.prefetch(recentItems)
+      }
+    } else if options.isEmpty {
       ContentUnavailableView(
         "No wallpapers found",
         systemImage: "photo",
