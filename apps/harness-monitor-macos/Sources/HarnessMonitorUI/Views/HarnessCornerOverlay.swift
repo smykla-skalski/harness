@@ -87,11 +87,6 @@ private struct HarnessCornerOverlaySurfaceModifier: ViewModifier {
   let appliesGlass: Bool
   let prominence: HarnessMonitorFloatingGlassProminence
 
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-  @Environment(\.colorScheme)
-  private var colorScheme
-
   func body(content: Content) -> some View {
     if appliesGlass {
       content
@@ -101,29 +96,9 @@ private struct HarnessCornerOverlaySurfaceModifier: ViewModifier {
         )
     } else {
       content
-        .background {
-          RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(opaqueFallbackColor)
-        }
-        .overlay {
-          RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .strokeBorder(
-              borderColor,
-              lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
-            )
-        }
     }
   }
 
-  private var opaqueFallbackColor: Color {
-    Color(nsColor: .windowBackgroundColor)
-      .opacity(colorScheme == .dark ? 0.92 : 0.96)
-  }
-
-  private var borderColor: Color {
-    HarnessMonitorTheme.controlBorder
-      .opacity(colorSchemeContrast == .increased ? 0.42 : 0.24)
-  }
 }
 
 extension View {
