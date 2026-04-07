@@ -100,21 +100,16 @@ struct ContentDetailChrome<Content: View>: View {
         SessionStatusBanner(status: sessionStatus, isStale: isStale)
       }
     }
+    .detailBannerDivider()
   }
 }
 
 struct SessionStatusBanner: View {
   let status: SessionStatus
   let isStale: Bool
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
 
   private var color: Color {
     isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
-  }
-
-  private var dividerOpacity: Double {
-    colorSchemeContrast == .increased ? 0.24 : 0.16
   }
 
   var body: some View {
@@ -133,12 +128,6 @@ struct SessionStatusBanner: View {
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .foregroundStyle(color)
     .modifier(SessionStatusBannerSurfaceModifier(tint: color))
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(color.opacity(dividerOpacity))
-        .frame(height: 1)
-        .accessibilityHidden(true)
-    }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Session status")
     .accessibilityValue(isStale ? "\(status.title), estimated" : status.title)
