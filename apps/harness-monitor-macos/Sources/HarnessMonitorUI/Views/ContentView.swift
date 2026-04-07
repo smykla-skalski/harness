@@ -198,6 +198,8 @@ public struct ContentView: View {
       configuration: .init(
         width: 200,
         height: 200,
+        trailingPadding: 4,
+        bottomPadding: 4,
         contentPadding: 0,
         appliesGlass: false,
         accessibilityLabel: "Ambient animation"
