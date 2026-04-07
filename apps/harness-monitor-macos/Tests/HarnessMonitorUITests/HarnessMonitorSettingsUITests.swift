@@ -172,6 +172,52 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testRepeatedBackdropModeChangesKeepSettingsAndCockpitResponsive() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE": "none"]
+    )
+
+    openSettings(in: app)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let backdropPicker = element(in: app, identifier: Accessibility.preferencesBackdropModePicker)
+    let observeSummaryButton = app.buttons
+      .matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
+
+    for option in ["Window", "Content", "None", "Window", "None"] {
+      selectMenuOption(
+        in: app,
+        controlIdentifier: Accessibility.preferencesBackdropModePicker,
+        optionTitle: option
+      )
+
+      XCTAssertTrue(
+        waitUntil(timeout: Self.uiTimeout) {
+          (backdropPicker.value as? String) == option
+        },
+        "Backdrop picker did not settle after selecting \(option); got '\(backdropPicker.value ?? "nil")'"
+      )
+    }
+
+    closeSettings(in: app, preferencesRoot: preferencesRoot)
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+
+    tapPreviewSession(in: app)
+
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      sessionRow.value as? String,
+      "selected, interactive=button, selectionChrome=translucent"
+    )
+  }
+
   func testSettingsTextSizePickerKeepsNativeChromeContractAtLargestSize() throws {
     assertSettingsThemeModeContract(
       expectedMode: "auto",

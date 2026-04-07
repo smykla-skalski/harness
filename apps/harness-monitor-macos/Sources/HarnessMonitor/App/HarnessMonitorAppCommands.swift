@@ -5,9 +5,10 @@ import SwiftUI
 struct HarnessMonitorAppCommands: Commands {
   @Environment(\.openWindow)
   private var openWindow
+  @AppStorage("showInspector")
+  private var showInspector = true
   let store: HarnessMonitorStore
   let textSizeIndex: Int
-  let inspectorVisibility: Binding<Bool>?
   let increaseTextSize: () -> Void
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
@@ -25,10 +26,6 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var canDecreaseTextSize: Bool {
     HarnessMonitorTextSize.canDecrease(textSizeIndex)
-  }
-
-  private var isInspectorVisible: Bool {
-    inspectorVisibility?.wrappedValue == true
   }
 
   var body: some Commands {
@@ -119,12 +116,11 @@ struct HarnessMonitorAppCommands: Commands {
       Divider()
 
       Button {
-        inspectorVisibility?.wrappedValue.toggle()
+        showInspector.toggle()
       } label: {
-        Text(isInspectorVisible ? "Hide Inspector" : "Show Inspector")
+        Text(showInspector ? "Hide Inspector" : "Show Inspector")
       }
       .keyboardShortcut("i", modifiers: [.command, .option])
-      .disabled(inspectorVisibility == nil)
     }
   }
 }
