@@ -67,15 +67,13 @@ private struct PreferencesBackgroundTile: View {
           .shadow(radius: 8, y: 2)
           .accessibilityHidden(true)
       }
-      .padding(HarnessMonitorTheme.spacingSM)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background {
+      .clipShape(
         RoundedRectangle(
           cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
           style: .continuous
         )
-        .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.12) : Color.secondary.opacity(0.05))
-      }
+      )
       .overlay {
         RoundedRectangle(
           cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
@@ -114,27 +112,17 @@ private struct PreferencesBackgroundTile: View {
         .aspectRatio(contentMode: .fill)
         .frame(maxWidth: .infinity)
         .frame(height: previewHeight)
-        .clipShape(
-          RoundedRectangle(
-            cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-            style: .continuous
-          )
-        )
         .accessibilityHidden(true)
     } else {
-      RoundedRectangle(
-        cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-        style: .continuous
-      )
-      .fill(Color.secondary.opacity(0.12))
-      .frame(maxWidth: .infinity)
-      .frame(height: previewHeight)
-      .overlay {
-        Image(systemName: "photo")
-          .font(.system(size: 20, weight: .medium))
-          .foregroundStyle(.secondary)
-      }
-      .accessibilityHidden(true)
+      Color.secondary.opacity(0.12)
+        .frame(maxWidth: .infinity)
+        .frame(height: previewHeight)
+        .overlay {
+          Image(systemName: "photo")
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityHidden(true)
     }
   }
 }
