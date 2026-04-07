@@ -131,28 +131,15 @@ private struct PreferencesBackgroundTile: View {
 
   var body: some View {
     Button(action: select) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        ZStack(alignment: .topTrailing) {
-          previewImage
+      ZStack(alignment: .topTrailing) {
+        previewImage
 
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(isSelected ? HarnessMonitorTheme.accent : .white.opacity(0.88))
-            .padding(HarnessMonitorTheme.spacingSM)
-            .shadow(radius: 8, y: 2)
-            .accessibilityHidden(true)
-        }
-
-        VStack(alignment: .leading, spacing: 2) {
-          Text(background.label)
-            .fontWeight(.semibold)
-            .foregroundStyle(.primary)
-            .lineLimit(1)
-          Text(background.subtitle)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-        }
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 18, weight: .semibold))
+          .foregroundStyle(isSelected ? HarnessMonitorTheme.accent : .white.opacity(0.88))
+          .padding(HarnessMonitorTheme.spacingSM)
+          .shadow(radius: 8, y: 2)
+          .accessibilityHidden(true)
       }
       .padding(HarnessMonitorTheme.spacingSM)
       .frame(maxWidth: .infinity, alignment: .leading)

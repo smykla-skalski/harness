@@ -95,6 +95,14 @@ struct PreferencesGeneralSection: View {
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesThemeModePicker)
 
+        Picker("Text size", selection: $textSizeIndex) {
+          ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
+            Text(level.label).tag(index)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTextSizePicker)
+
         Picker("Backdrop", selection: $backdropModeRawValue) {
           ForEach(HarnessMonitorBackdropMode.allCases) { mode in
             Text(mode.label).tag(mode.rawValue)
@@ -108,14 +116,6 @@ struct PreferencesGeneralSection: View {
           backdropModeRawValue: $backdropModeRawValue,
           selectedBackground: selectedBackground
         )
-
-        Picker("Text size", selection: $textSizeIndex) {
-          ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
-            Text(level.label).tag(index)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTextSizePicker)
       } header: {
         Text("Appearance")
       } footer: {
