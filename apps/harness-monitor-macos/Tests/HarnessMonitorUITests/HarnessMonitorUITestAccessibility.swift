@@ -92,6 +92,7 @@ enum HarnessMonitorUITestAccessibility {
   static let preferencesForwardButton = "harness.preferences.nav.forward"
   static let preferencesTitle = "harness.preferences.title"
   static let preferencesThemeModePicker = "harness.preferences.theme-mode"
+  static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
   static let preferencesTextSizePicker = "harness.preferences.text-size"
   static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
