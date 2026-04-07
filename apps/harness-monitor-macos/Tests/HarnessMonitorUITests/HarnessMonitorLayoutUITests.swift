@@ -250,6 +250,47 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(cardOffset, 120, "Inspector content too far below toolbar")
   }
 
+  func testInspectorCanBeResizedWiderByDraggingDivider() throws {
+    let app = launch(mode: "empty")
+    let window = mainWindow(in: app)
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+
+    let initialWidth = inspectorRoot.frame.width
+    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+    let dividerOffsetX = max(2, inspectorRoot.frame.minX - window.frame.minX - 2)
+    let dividerOffsetY = max(2, inspectorRoot.frame.midY - window.frame.minY)
+    let start = origin.withOffset(CGVector(dx: dividerOffsetX, dy: dividerOffsetY))
+    let end = start.withOffset(CGVector(dx: -140, dy: 0))
+
+    start.press(forDuration: 0.01, thenDragTo: end)
+
+    let widenedInspector = waitUntil(timeout: Self.uiTimeout) {
+      inspectorRoot.frame.width >= initialWidth + 80
+    }
+
+    if !widenedInspector {
+      attachWindowScreenshot(in: app, named: "inspector-wide-width")
+      let attachment = XCTAttachment(
+        string: """
+          initial inspector width: \(initialWidth)
+          final inspector frame: \(inspectorRoot.exists ? String(describing: inspectorRoot.frame) : "missing")
+          divider drag start: \(dividerOffsetX), \(dividerOffsetY)
+          """
+      )
+      attachment.name = "inspector-wide-width-diagnostics"
+      attachment.lifetime = .keepAlways
+      add(attachment)
+    }
+
+    XCTAssertTrue(
+      widenedInspector,
+      "Expected the inspector divider drag to widen the column"
+    )
+  }
+
   func testInspectorToolbarControlsStayWithinInspectorColumn() throws {
     let app = launch(mode: "empty")
 

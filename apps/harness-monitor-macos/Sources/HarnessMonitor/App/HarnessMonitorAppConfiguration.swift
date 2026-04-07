@@ -14,12 +14,14 @@ struct HarnessMonitorAppConfiguration {
   static func resolve() -> Self {
     UserDefaults.standard.register(defaults: [
       HarnessMonitorBackdropDefaults.modeKey: HarnessMonitorBackdropMode.none.rawValue,
+      HarnessMonitorBackgroundDefaults.imageKey: HarnessMonitorBackgroundSelection.defaultSelection.storageValue,
       HarnessMonitorTextSize.storageKey: HarnessMonitorTextSize.defaultIndex,
       HarnessMonitorDateTimeConfiguration.timeZoneModeKey:
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
       HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
       "harnessMonitor.board.onboardingDismissed": false,
+      "showInspector": true,
     ])
 
     let environment = HarnessMonitorEnvironment.current
@@ -42,6 +44,16 @@ struct HarnessMonitorAppConfiguration {
         rawValue: environment.values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] ?? ""
       ) ?? .none)
       : .none
+    let initialBackgroundImage =
+      isUITesting
+      ? HarnessMonitorBackgroundSelection.decode(
+        environment.values["HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"] ?? ""
+      )
+      : .defaultSelection
+    let initialShowInspector =
+      isUITesting
+      ? uiTestBoolOverride(from: environment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]) ?? true
+      : true
     let persistenceSetup = HarnessMonitorPersistenceSetup.resolve(
       environment: environment,
       launchMode: launchMode
@@ -76,6 +88,14 @@ struct HarnessMonitorAppConfiguration {
         forKey: HarnessMonitorBackdropDefaults.modeKey
       )
       UserDefaults.standard.set(
+        initialBackgroundImage.storageValue,
+        forKey: HarnessMonitorBackgroundDefaults.imageKey
+      )
+      UserDefaults.standard.set(
+        initialShowInspector,
+        forKey: "showInspector"
+      )
+      UserDefaults.standard.set(
         uiTestTimeZoneMode.rawValue,
         forKey: HarnessMonitorDateTimeConfiguration.timeZoneModeKey
       )
@@ -95,6 +115,21 @@ struct HarnessMonitorAppConfiguration {
         isUITesting: isUITesting
       )
     )
+  }
+
+  private static func uiTestBoolOverride(from rawValue: String?) -> Bool? {
+    guard let rawValue else {
+      return nil
+    }
+
+    switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "1", "true", "yes", "on":
+      return true
+    case "0", "false", "no", "off":
+      return false
+    default:
+      return nil
+    }
   }
 }
 
