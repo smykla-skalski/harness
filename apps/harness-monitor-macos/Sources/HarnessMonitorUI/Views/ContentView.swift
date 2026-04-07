@@ -91,7 +91,7 @@ public struct ContentView: View {
       timeline: store.timeline
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .modifier(ConditionalBackgroundExtensionModifier(isEnabled: toolbarStyle == .glass))
+    .backgroundExtensionEffect()
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
       if store.inspectorSelection != .none {
@@ -148,6 +148,10 @@ public struct ContentView: View {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
+    .toolbarBackground(
+      toolbarStyle == .flat ? Color(nsColor: .windowBackgroundColor) : .clear,
+      for: .windowToolbar
+    )
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { windowWidth in
@@ -329,19 +333,6 @@ private extension ContentView {
 
   func toggleSleepPrevention() {
     store.sleepPreventionEnabled.toggle()
-  }
-}
-
-private struct ConditionalBackgroundExtensionModifier: ViewModifier {
-  let isEnabled: Bool
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isEnabled {
-      content.backgroundExtensionEffect()
-    } else {
-      content
-    }
   }
 }
 
