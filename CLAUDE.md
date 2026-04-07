@@ -126,6 +126,7 @@ Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review
 - `.claude/rules/swiftui-view-structure.md` - structs over free functions, stable ForEach identity, no identity-breaking modifier branches, @ViewBuilder usage, no wrapper containers, accessibility probe patterns, dead code
 - `.claude/rules/swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping
 - `.claude/rules/swiftui-button-styling.md` - no .plain, ButtonStyle over ViewModifier, no redundant .contentShape, native glass styles
+- `.claude/rules/swiftui-idle-cpu.md` - no repeatForever on always-visible views, cached formatters, no gratuitous periodic animations
 
 These rules auto-activate when editing `apps/harness-monitor-macos/Sources/**/*.swift`.
 
@@ -145,6 +146,7 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [swiftui-state-management.md](.claude/rules/swiftui-state-management.md) | `apps/harness-monitor-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
 | [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-monitor-macos/Sources/**` | View composition, ForEach identity, modifier branches |
 | [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
+| [swiftui-idle-cpu.md](.claude/rules/swiftui-idle-cpu.md) | `apps/harness-monitor-macos/Sources/**` | No repeatForever on idle views, cached formatters, no periodic animations |
 | [xcuitest-speed.md](.claude/rules/xcuitest-speed.md) | `apps/harness-monitor-macos/Tests/**` | Animation suppression, .firstMatch, coordinate taps, single-launch tests, scroll patterns |
 
 Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines) and `tmp/investigations/xcuitest-speed/`. Consult for rationale or edge cases.
