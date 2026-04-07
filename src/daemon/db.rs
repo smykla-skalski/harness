@@ -908,6 +908,42 @@ impl DaemonDb {
         Ok(signals)
     }
 
+    /// Whether any agent in the session shares a runtime session ID with a
+    /// different orchestration session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn session_has_shared_runtime_signal_dir(
+        &self,
+        state: &SessionState,
+    ) -> Result<bool, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT COUNT(DISTINCT session_id)
+                 FROM agents
+                 WHERE runtime = ?1 AND agent_session_id = ?2",
+            )
+            .map_err(|error| db_error(format!("prepare shared runtime lookup: {error}")))?;
+
+        for agent in state.agents.values() {
+            let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
+                continue;
+            };
+
+            let count: i64 = statement
+                .query_row(rusqlite::params![agent.runtime, agent_session_id], |row| {
+                    row.get(0)
+                })
+                .map_err(|error| db_error(format!("query shared runtime lookup: {error}")))?;
+            if count > 1 {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
     /// Index conversation events for a session agent.
     ///
     /// # Errors

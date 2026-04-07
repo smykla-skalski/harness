@@ -9,7 +9,7 @@ use serde_json::Value;
 use crate::agents::runtime;
 use crate::agents::runtime::signal::{
     AckResult, DeliveryConfig, Signal, SignalPayload, SignalPriority, read_acknowledged_signals,
-    read_acknowledgments, read_pending_signals,
+    read_acknowledgments, read_pending_signals, signal_matches_session,
 };
 use crate::agents::service as agents_service;
 use crate::daemon::client::DaemonClient;
@@ -731,7 +731,12 @@ pub fn list_signals(
         let signal_dirs: Vec<_> =
             runtime::signal_session_keys(session_id, agent.agent_session_id.as_deref())
                 .into_iter()
-                .map(|signal_session_id| runtime.signal_dir(project_dir, &signal_session_id))
+                .map(|signal_session_id| {
+                    (
+                        signal_session_id.clone(),
+                        runtime.signal_dir(project_dir, &signal_session_id),
+                    )
+                })
                 .collect();
         signals.extend(signal_records_for_dirs(
             &agent.runtime,
@@ -844,19 +849,24 @@ fn signal_records_for_dirs(
     runtime_name: &str,
     agent_id: &str,
     session_id: &str,
-    signal_dirs: &[PathBuf],
+    signal_dirs: &[(String, PathBuf)],
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
     let mut signals_by_id = BTreeMap::new();
     let mut acknowledgments_by_id = BTreeMap::new();
 
-    for signal_dir in signal_dirs {
+    for (signal_session_id, signal_dir) in signal_dirs {
         for signal in read_pending_signals(signal_dir)? {
-            signals_by_id
-                .entry(signal.signal_id.clone())
-                .or_insert((signal, false));
+            signals_by_id.entry(signal.signal_id.clone()).or_insert((
+                signal,
+                false,
+                signal_session_id.clone(),
+            ));
         }
         for signal in read_acknowledged_signals(signal_dir)? {
-            signals_by_id.insert(signal.signal_id.clone(), (signal, true));
+            signals_by_id.insert(
+                signal.signal_id.clone(),
+                (signal, true, signal_session_id.clone()),
+            );
         }
         for acknowledgment in read_acknowledgments(signal_dir)? {
             acknowledgments_by_id
@@ -867,8 +877,17 @@ fn signal_records_for_dirs(
 
     Ok(signals_by_id
         .into_values()
-        .map(|(signal, was_acknowledged)| {
+        .filter_map(|(signal, was_acknowledged, signal_session_id)| {
             let acknowledgment = acknowledgments_by_id.remove(&signal.signal_id);
+            if !signal_matches_session(
+                &signal,
+                acknowledgment.as_ref(),
+                session_id,
+                agent_id,
+                &signal_session_id,
+            ) {
+                return None;
+            }
             let status = acknowledgment.as_ref().map_or_else(
                 || {
                     if was_acknowledged {
@@ -879,14 +898,14 @@ fn signal_records_for_dirs(
                 },
                 |ack| SessionSignalStatus::from_ack_result(ack.result),
             );
-            SessionSignalRecord {
+            Some(SessionSignalRecord {
                 runtime: runtime_name.to_string(),
                 agent_id: agent_id.to_string(),
                 session_id: session_id.to_string(),
                 status,
                 signal,
                 acknowledgment,
-            }
+            })
         })
         .collect())
 }
@@ -2801,6 +2820,72 @@ mod tests {
             assert_eq!(signals[0].status, SessionSignalStatus::Pending);
             assert_eq!(signals[0].runtime, "codex");
             assert_eq!(signals[0].signal.command, "inject_context");
+        });
+    }
+
+    #[test]
+    fn list_signals_filters_shared_runtime_session_history() {
+        with_temp_project(|project| {
+            let session_one = start_session("test", "", project, Some("claude"), Some("s6-alpha"))
+                .expect("start alpha");
+            let leader_one = session_one.leader_id.expect("alpha leader id");
+            let joined_one =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
+                    join_session("s6-alpha", SessionRole::Worker, "codex", &[], None, project)
+                        .expect("join alpha worker")
+                });
+            let worker_one = joined_one
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex"))
+                .expect("alpha worker id")
+                .clone();
+
+            let session_two = start_session("test", "", project, Some("claude"), Some("s6-beta"))
+                .expect("start beta");
+            let leader_two = session_two.leader_id.expect("beta leader id");
+            let joined_two =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
+                    join_session("s6-beta", SessionRole::Worker, "codex", &[], None, project)
+                        .expect("join beta worker")
+                });
+            let worker_two = joined_two
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex"))
+                .expect("beta worker id")
+                .clone();
+
+            send_signal(
+                "s6-alpha",
+                &worker_one,
+                "inject_context",
+                "alpha task queued",
+                Some("review alpha"),
+                &leader_one,
+                project,
+            )
+            .expect("alpha signal");
+            send_signal(
+                "s6-beta",
+                &worker_two,
+                "inject_context",
+                "beta task queued",
+                Some("review beta"),
+                &leader_two,
+                project,
+            )
+            .expect("beta signal");
+
+            let alpha_signals =
+                list_signals("s6-alpha", Some(&worker_one), project).expect("alpha signals");
+            let beta_signals =
+                list_signals("s6-beta", Some(&worker_two), project).expect("beta signals");
+
+            assert_eq!(alpha_signals.len(), 1);
+            assert_eq!(alpha_signals[0].signal.payload.message, "alpha task queued");
+            assert_eq!(beta_signals.len(), 1);
+            assert_eq!(beta_signals[0].signal.payload.message, "beta task queued");
         });
     }
 

@@ -134,6 +134,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _sessionSummaries: [SessionSummary]?
   private var _sessionDetailsByID: [String: SessionDetail] = [:]
   private var _detailDelays: [String: Duration] = [:]
+  private var _sessionDetailScopesByID: [String: [String?]] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
   private var _globalStreamEvents: [DaemonPushEvent] = []
@@ -310,6 +311,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredSessions() -> [SessionSummary]? { lock.withLock { _sessionSummaries } }
   func configuredSessionDetail(id: String) -> SessionDetail? { lock.withLock { _sessionDetailsByID[id] } }
   func configuredDetailDelay(for sessionID: String) -> Duration? { lock.withLock { _detailDelays[sessionID] } }
+  func sessionDetailScopes(for sessionID: String) -> [String?] {
+    lock.withLock { _sessionDetailScopesByID[sessionID] ?? [] }
+  }
   func configuredTimeline(for sessionID: String) -> [TimelineEntry]? { lock.withLock { _timelinesBySessionID[sessionID] } }
   func configuredTimelineDelay(for sessionID: String) -> Duration? { lock.withLock { _timelineDelays[sessionID] } }
   func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { _globalStreamEvents } }
@@ -357,6 +361,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       case .timeline(let sessionID):
         _timelineCallCounts[sessionID, default: 0]
       }
+    }
+  }
+
+  func recordSessionDetailScope(id: String, scope: String?) {
+    lock.withLock {
+      _sessionDetailScopesByID[id, default: []].append(scope)
     }
   }
 

@@ -76,6 +76,30 @@ pub enum AckResult {
     Expired,
 }
 
+/// Whether a signal belongs to one orchestration session when it was loaded
+/// from a possibly shared runtime-session signal directory.
+#[must_use]
+pub fn signal_matches_session(
+    signal: &Signal,
+    acknowledgment: Option<&SignalAck>,
+    orchestration_session_id: &str,
+    agent_id: &str,
+    signal_session_id: &str,
+) -> bool {
+    if signal_session_id == orchestration_session_id {
+        return true;
+    }
+
+    if let Some(idempotency_key) = signal.delivery.idempotency_key.as_deref() {
+        let mut parts = idempotency_key.splitn(3, ':');
+        return parts.next() == Some(orchestration_session_id)
+            && parts.next() == Some(agent_id)
+            && parts.next().is_some();
+    }
+
+    acknowledgment.is_some_and(|ack| ack.session_id == orchestration_session_id)
+}
+
 /// Compute the pending signals directory for an agent session.
 #[must_use]
 pub fn pending_dir(signal_dir: &Path) -> PathBuf {

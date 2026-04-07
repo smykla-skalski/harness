@@ -304,6 +304,71 @@ struct HarnessMonitorStoreLifecycleTests {
     store.stopAllStreams()
   }
 
+  @Test("Selected session update with deferred extensions preserves visible signals")
+  func selectedSessionUpdateWithDeferredExtensionsPreservesVisibleSignals() async {
+    let client = RecordingHarnessClient()
+    let updatedSummary = SessionSummary(
+      projectId: PreviewFixtures.summary.projectId,
+      projectName: PreviewFixtures.summary.projectName,
+      projectDir: PreviewFixtures.summary.projectDir,
+      contextRoot: PreviewFixtures.summary.contextRoot,
+      checkoutId: PreviewFixtures.summary.checkoutId,
+      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
+      isWorktree: PreviewFixtures.summary.isWorktree,
+      worktreeName: PreviewFixtures.summary.worktreeName,
+      sessionId: PreviewFixtures.summary.sessionId,
+      title: PreviewFixtures.summary.title,
+      context: "Cockpit context updated",
+      status: PreviewFixtures.summary.status,
+      createdAt: PreviewFixtures.summary.createdAt,
+      updatedAt: "2026-03-31T12:04:00Z",
+      lastActivityAt: "2026-03-31T12:04:00Z",
+      leaderId: PreviewFixtures.summary.leaderId,
+      observeId: PreviewFixtures.summary.observeId,
+      pendingLeaderTransfer: PreviewFixtures.summary.pendingLeaderTransfer,
+      metrics: PreviewFixtures.summary.metrics
+    )
+    let coreOnlyDetail = SessionDetail(
+      session: updatedSummary,
+      agents: PreviewFixtures.detail.agents,
+      tasks: PreviewFixtures.detail.tasks,
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+
+    client.configureSessions(
+      summaries: [PreviewFixtures.summary],
+      detailsByID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail],
+      timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
+    )
+    client.configureSessionStream(
+      events: [
+        .sessionUpdated(
+          recordedAt: "2026-03-31T12:04:00Z",
+          sessionId: PreviewFixtures.summary.sessionId,
+          detail: coreOnlyDetail,
+          extensionsPending: true
+        )
+      ],
+      for: PreviewFixtures.summary.sessionId
+    )
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    try? await Task.sleep(for: .milliseconds(60))
+
+    #expect(store.selectedSession?.session.context == "Cockpit context updated")
+    #expect(store.selectedSession?.signals == PreviewFixtures.signals)
+    #expect(store.timeline == PreviewFixtures.timeline)
+
+    store.stopAllStreams()
+  }
+
   @Test("Preview store factory preloads cockpit state without bootstrap")
   func previewStoreFactoryPreloadsCockpitState() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
