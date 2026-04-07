@@ -17,7 +17,6 @@ public struct ContentView: View {
   private var showInspector = true
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
-  @State private var widthPersistTask: Task<Void, Never>?
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -99,7 +98,7 @@ public struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      Group {
+      ZStack {
         if toolbarGlassReproConfiguration.disablesContentDetailChrome {
           sessionContent
         } else {
@@ -117,18 +116,13 @@ public struct ContentView: View {
           .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
           } action: { width in
-            widthPersistTask?.cancel()
             guard width >= HarnessMonitorInspectorLayout.minWidth,
               width <= HarnessMonitorInspectorLayout.maxWidth,
               abs(width - inspectorColumnWidth) > 1
             else {
               return
             }
-            widthPersistTask = Task { @MainActor in
-              try? await Task.sleep(for: .milliseconds(250))
-              guard !Task.isCancelled else { return }
-              inspectorColumnWidth = width
-            }
+            inspectorColumnWidth = width
           }
           .inspectorColumnWidth(
             min: HarnessMonitorInspectorLayout.minWidth,
