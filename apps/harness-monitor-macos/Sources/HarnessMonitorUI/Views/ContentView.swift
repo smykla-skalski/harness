@@ -19,7 +19,13 @@ public struct ContentView: View {
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
+  @AppStorage(HarnessMonitorToolbarStyleDefaults.modeKey)
+  private var toolbarStyleRawValue = HarnessMonitorToolbarStyle.glass.rawValue
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
+
+  private var toolbarStyle: HarnessMonitorToolbarStyle {
+    HarnessMonitorToolbarStyle(rawValue: toolbarStyleRawValue) ?? .glass
+  }
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -141,6 +147,10 @@ public struct ContentView: View {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
+    .toolbarBackgroundVisibility(
+      toolbarStyle == .flat ? .visible : .automatic,
+      for: .windowToolbar
+    )
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { windowWidth in

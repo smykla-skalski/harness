@@ -9,6 +9,8 @@ struct PreferencesAppearanceSection: View {
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorToolbarStyleDefaults.modeKey)
+  private var toolbarStyleRawValue = HarnessMonitorToolbarStyle.glass.rawValue
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
 
   private var selectedBackground: HarnessMonitorBackgroundSelection {
@@ -41,11 +43,19 @@ struct PreferencesAppearanceSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
+
+        Picker("Toolbar", selection: $toolbarStyleRawValue) {
+          ForEach(HarnessMonitorToolbarStyle.allCases) { style in
+            Text(style.label).tag(style.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesToolbarStylePicker)
       } header: {
         Text("Appearance")
       } footer: {
         Text(
-          "Theme mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off."
+          "Theme mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off. Toolbar switches between translucent glass and a flat system background."
         )
       }
 
