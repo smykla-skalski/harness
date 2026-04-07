@@ -91,7 +91,6 @@ public struct ContentView: View {
       timeline: store.timeline
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .backgroundExtensionEffect()
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
       if store.inspectorSelection != .none {
@@ -100,21 +99,13 @@ public struct ContentView: View {
       }
       return .ignored
     }
-    .navigationTitle(windowTitle)
-    .toolbar {
-      navigationToolbar
-      centerpieceToolbar
-    }
-    .toolbar {
-      primaryToolbar
-    }
 
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      Group {
+      DetailBackgroundExtension(isGlass: toolbarStyle == .glass) {
         if toolbarGlassReproConfiguration.disablesContentDetailChrome {
           sessionContent
         } else {
@@ -148,10 +139,14 @@ public struct ContentView: View {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .toolbarBackground(
-      toolbarStyle == .flat ? Color(nsColor: .windowBackgroundColor) : .clear,
-      for: .windowToolbar
-    )
+    .navigationTitle(windowTitle)
+    .toolbar {
+      navigationToolbar
+      centerpieceToolbar
+    }
+    .toolbar {
+      primaryToolbar
+    }
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { windowWidth in
@@ -333,6 +328,19 @@ private extension ContentView {
 
   func toggleSleepPrevention() {
     store.sleepPreventionEnabled.toggle()
+  }
+}
+
+private struct DetailBackgroundExtension<Content: View>: View {
+  let isGlass: Bool
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    if isGlass {
+      content.backgroundExtensionEffect()
+    } else {
+      content
+    }
   }
 }
 
