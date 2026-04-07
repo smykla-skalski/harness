@@ -304,7 +304,6 @@ private struct ToolbarStatusMenuArea<Content: View>: NSViewRepresentable {
     if let hosting = nsView.hostingView as? NSHostingView<Content> {
       hosting.rootView = content
     }
-    nsView.invalidateIntrinsicContentSize()
   }
 }
 
@@ -326,8 +325,7 @@ final class ToolbarStatusMenuNSView: NSView {
   }
 
   override var intrinsicContentSize: NSSize {
-    let width = hostingView?.fittingSize.width ?? NSView.noIntrinsicMetric
-    return NSSize(width: width, height: NSView.noIntrinsicMetric)
+    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
   }
 
   override var acceptsFirstResponder: Bool { true }
