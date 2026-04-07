@@ -16,6 +16,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
   let tabTitle: (Tab) -> String
   let distribution: HarnessMonitorTabbedContentDistribution
   let alignment: HarnessMonitorTabbedContentAlignment
+  let tabsDisabled: Bool
   @ViewBuilder let content: (Tab) -> Content
 
   @Namespace private var tabNamespace
@@ -27,6 +28,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
     tabTitle: @escaping (Tab) -> String,
     distribution: HarnessMonitorTabbedContentDistribution = .fitContent,
     alignment: HarnessMonitorTabbedContentAlignment = .leading,
+    tabsDisabled: Bool = false,
     @ViewBuilder content: @escaping (Tab) -> Content
   ) {
     self.title = title
@@ -34,6 +36,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
     self.tabTitle = tabTitle
     self.distribution = distribution
     self.alignment = alignment
+    self.tabsDisabled = tabsDisabled
     self.content = content
   }
 
@@ -48,7 +51,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
           Spacer(minLength: 0)
         }
         ForEach(Array(Tab.allCases) as! [Tab]) { tab in
-          let isSelected = selection == tab
+          let isSelected = !tabsDisabled && selection == tab
           Button {
             withAnimation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.15)) {
               selection = tab
@@ -57,7 +60,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
             Text(tabTitle(tab))
               .scaledFont(.body)
               .fontWeight(isSelected ? .semibold : .regular)
-              .foregroundStyle(isSelected ? .primary : .secondary)
+              .foregroundStyle(isSelected ? .primary : (tabsDisabled ? .tertiary : .secondary))
               .padding(.horizontal, HarnessMonitorTheme.spacingMD)
               .padding(.vertical, HarnessMonitorTheme.spacingSM)
               .frame(maxWidth: distribution == .fillEqually ? .infinity : nil)
@@ -77,6 +80,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
               .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
+          .disabled(tabsDisabled)
           .accessibilityLabel(tabTitle(tab))
           .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         }
