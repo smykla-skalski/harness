@@ -188,25 +188,36 @@ private struct ToolbarCenterpieceView: View {
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
   private static let toolbarHeight: CGFloat = 32
-  private static let baseHorizontalPadding: CGFloat = 12
+  // Rounded subheadline cap height is ~7.75pt. Matching the visible glyph inset
+  // inside a 32pt capsule gives (32 - 7.75) / 2 ~= 12.12pt, rounded to 12pt.
+  private static let metricsLeadingInset: CGFloat = 12
+  private static let trailingInset: CGFloat = 12
   private static let centerpieceWidth: CGFloat = 560
 
   var body: some View {
-    HStack(spacing: 0) {
-      ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
-        .fixedSize(horizontal: true, vertical: false)
+    ZStack {
+      Color.clear
+        .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceFrame)
 
-      if !statusMessages.isEmpty {
-        Spacer(minLength: 20)
+      HStack(spacing: 0) {
+        ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
+          .fixedSize(horizontal: true, vertical: false)
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceMetricsFrame)
+          .padding(.leading, Self.metricsLeadingInset)
 
-        ToolbarStatusDropdown(
-          messages: statusMessages,
-          daemonIndicator: daemonIndicator
-        )
-        .fixedSize(horizontal: true, vertical: false)
+        if !statusMessages.isEmpty {
+          Spacer(minLength: 20)
+
+          ToolbarStatusDropdown(
+            messages: statusMessages,
+            daemonIndicator: daemonIndicator
+          )
+          .fixedSize(horizontal: true, vertical: false)
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
+        }
       }
+      .padding(.trailing, Self.trailingInset)
     }
-    .padding(.leading, Self.baseHorizontalPadding)
     .frame(width: Self.centerpieceWidth, height: Self.toolbarHeight)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
@@ -221,6 +232,11 @@ private struct ToolbarStatusDropdown: View {
   let daemonIndicator: ToolbarDaemonIndicator
   @State private var isHovered = false
   @State private var isPressed = false
+  // Match visible text padding to the rounded subheadline cap-height inset.
+  private static let contentHorizontalInset: CGFloat = 12
+  // The hover plate sits inside the 32pt host with a 24pt inner capsule:
+  // (32 - 24) / 2 = 4pt on each edge.
+  private static let hoverPlateInset: CGFloat = 4
 
   private var highlightOpacity: Double {
     isPressed ? 0.12 : isHovered ? 0.08 : 0
@@ -232,14 +248,21 @@ private struct ToolbarStatusDropdown: View {
         ToolbarStatusTickerView(messages: messages, direction: .up)
         ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
       }
-      .padding(.horizontal, 12)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
+      .padding(.horizontal, Self.contentHorizontalInset)
     }
     .frame(maxHeight: .infinity)
     .background {
       Capsule()
         .fill(Color.primary.opacity(highlightOpacity))
+        .padding(Self.hoverPlateInset)
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.1), value: isPressed)
+    }
+    .overlay {
+      Color.clear
+        .padding(Self.hoverPlateInset)
+        .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerHoverFrame)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
     .accessibilityAddTraits(.isButton)

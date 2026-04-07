@@ -4,6 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 private let textSizeOverrideKey = "HARNESS_MONITOR_TEXT_SIZE_OVERRIDE"
 private let timeZoneModeOverrideKey = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"
 private let customTimeZoneOverrideKey = "HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE"
+private let backgroundImageOverrideKey = "HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"
 
 @MainActor
 final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
@@ -36,6 +37,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       preferencesStateLabel(
         mode: "auto",
         section: "general",
+        background: "auroraVeil",
         textSize: "Default",
         controlSize: "small",
         timeZoneMode: "local",
@@ -148,6 +150,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
           preferencesState.label == self.preferencesStateLabel(
             mode: expectedMode.rawValue,
             section: "general",
+            background: "auroraVeil",
             textSize: "Default",
             controlSize: "small",
             timeZoneMode: "local",
@@ -203,6 +206,135 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
         "Backdrop picker did not settle after selecting \(option); got '\(backdropPicker.value ?? "nil")'"
       )
     }
+
+    closeSettings(in: app, preferencesRoot: preferencesRoot)
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+
+    tapPreviewSession(in: app)
+
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      sessionRow.value as? String,
+      "selected, interactive=button, selectionChrome=translucent"
+    )
+  }
+
+  func testBackgroundSelectionKeepsSettingsAndCockpitResponsive() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        backgroundImageOverrideKey: "auroraVeil",
+        "HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE": "none",
+      ]
+    )
+
+    openSettings(in: app)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let backdropPicker = element(in: app, identifier: Accessibility.preferencesBackdropModePicker)
+    let gallery = element(in: app, identifier: Accessibility.preferencesBackgroundGallery)
+    let observeSummaryButton = app.buttons
+      .matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(gallery.waitForExistence(timeout: Self.uiTimeout))
+
+    for background in ["blueMarble", "gangesDelta", "auroraVeil"] {
+      tapElement(in: app, identifier: Accessibility.preferencesBackgroundTile(background))
+
+      XCTAssertTrue(
+        waitUntil(timeout: Self.uiTimeout) {
+          (backdropPicker.value as? String) == "Window"
+        },
+        "Backdrop picker did not auto-enable after selecting \(background); got '\(backdropPicker.value ?? "nil")'"
+      )
+      XCTAssertTrue(
+        waitUntil(timeout: Self.uiTimeout) {
+          preferencesState.label == self.preferencesStateLabel(
+            mode: "auto",
+            section: "general",
+            background: background,
+            textSize: "Default",
+            controlSize: "small",
+            timeZoneMode: "local",
+            timeZone: "local"
+          )
+        },
+        "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
+      )
+    }
+
+    closeSettings(in: app, preferencesRoot: preferencesRoot)
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+
+    tapPreviewSession(in: app)
+
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      sessionRow.value as? String,
+      "selected, interactive=button, selectionChrome=translucent"
+    )
+  }
+
+  func testMacOSWallpaperSelectionKeepsSettingsAndCockpitResponsive() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        backgroundImageOverrideKey: "auroraVeil",
+        "HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE": "none",
+      ]
+    )
+
+    openSettings(in: app)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let backdropPicker = element(in: app, identifier: Accessibility.preferencesBackdropModePicker)
+    let observeSummaryButton = app.buttons
+      .matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
+
+    let background = try selectFirstExistingBackground(
+      in: app,
+      candidates: [
+        "system:big-sur-aerial",
+        "system:sonoma",
+        "system:imac-blue",
+      ]
+    )
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        (backdropPicker.value as? String) == "Window"
+      },
+      "Backdrop picker did not auto-enable after selecting \(background); got '\(backdropPicker.value ?? "nil")'"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        preferencesState.label == self.preferencesStateLabel(
+          mode: "auto",
+          section: "general",
+          background: background,
+          textSize: "Default",
+          controlSize: "small",
+          timeZoneMode: "local",
+          timeZone: "local"
+        )
+      },
+      "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
+    )
 
     closeSettings(in: app, preferencesRoot: preferencesRoot)
 
@@ -289,6 +421,7 @@ private extension HarnessMonitorSettingsUITests {
       preferencesStateLabel(
         mode: expectedMode,
         section: "general",
+        background: "auroraVeil",
         textSize: expectedTextSize,
         controlSize: expectedControlSize,
         timeZoneMode: expectedTimeZoneMode,
@@ -327,6 +460,7 @@ private extension HarnessMonitorSettingsUITests {
   func preferencesStateLabel(
     mode: String,
     section: String,
+    background: String,
     textSize: String,
     controlSize: String,
     timeZoneMode: String,
@@ -335,12 +469,45 @@ private extension HarnessMonitorSettingsUITests {
     [
       "mode=\(mode)",
       "section=\(section)",
+      "background=\(background)",
       "textSize=\(textSize)",
       "controlSize=\(controlSize)",
       "timeZoneMode=\(timeZoneMode)",
       "timeZone=\(timeZone)",
       "preferencesChrome=native",
     ].joined(separator: ", ")
+  }
+
+  func selectFirstExistingBackground(
+    in app: XCUIApplication,
+    candidates: [String]
+  ) throws -> String {
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesWindow = window(in: app, containing: preferencesRoot)
+    let disclosure = button(in: app, identifier: Accessibility.preferencesSystemBackgroundsDisclosure)
+
+    XCTAssertTrue(disclosure.waitForExistence(timeout: Self.uiTimeout))
+
+    for _ in 0..<4 where !disclosure.isHittable {
+      dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
+    }
+
+    XCTAssertTrue(disclosure.isHittable, "System wallpapers toggle never became hittable")
+    disclosure.tap()
+
+    for _ in 0..<4 {
+      for candidate in candidates {
+        let tile = element(in: app, identifier: Accessibility.preferencesBackgroundTile(candidate))
+        if tile.waitForExistence(timeout: 1), tile.isHittable {
+          tile.tap()
+          return candidate
+        }
+      }
+
+      dragUp(in: app, element: mainWindow(in: app), distanceRatio: 0.22)
+    }
+
+    throw XCTSkip("No expected macOS wallpaper tiles were available on this machine.")
   }
 
   func openSettings(in app: XCUIApplication) {

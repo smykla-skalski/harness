@@ -1,6 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private enum HarnessMonitorInspectorLayout {
+  static let minWidth: CGFloat = 320
+  static let idealWidth: CGFloat = 420
+  static let maxWidth: CGFloat = 760
+}
+
 public struct ContentView: View {
   @Bindable var store: HarnessMonitorStore
   @Environment(\.openWindow)
@@ -9,8 +15,6 @@ public struct ContentView: View {
   @State private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode = .standard
   @AppStorage("showInspector")
   private var showInspector = true
-  @AppStorage("inspectorWidth")
-  private var inspectorWidth: Double = 380
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -116,15 +120,11 @@ public struct ContentView: View {
       }
       .inspector(isPresented: $showInspector) {
         InspectorColumnView(store: store)
-          .inspectorColumnWidth(min: 320, ideal: inspectorWidth, max: 500)
-          .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-          } action: { width in
-            guard width >= 320, abs(width - inspectorWidth) >= 1 else {
-              return
-            }
-            inspectorWidth = width.rounded()
-          }
+          .inspectorColumnWidth(
+            min: HarnessMonitorInspectorLayout.minWidth,
+            ideal: HarnessMonitorInspectorLayout.idealWidth,
+            max: HarnessMonitorInspectorLayout.maxWidth
+          )
       }
     }
     .navigationSplitViewStyle(.prominentDetail)

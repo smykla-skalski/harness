@@ -8,10 +8,16 @@ struct HarnessMonitorWindowRootView: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
+  @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var backdropMode: HarnessMonitorBackdropMode {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
+  }
+
+  private var backgroundImage: HarnessMonitorBackgroundSelection {
+    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
 
   var body: some View {
@@ -24,7 +30,12 @@ struct HarnessMonitorWindowRootView: View {
           appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
         )
       )
-      .modifier(HarnessMonitorWindowBackdropModifier(mode: backdropMode))
+      .modifier(
+        HarnessMonitorWindowBackdropModifier(
+          mode: backdropMode,
+          backgroundImage: backgroundImage
+        )
+      )
       .modifier(HarnessMonitorUITestAnimationModifier())
       .task {
         delegate.bind(store: store)
@@ -36,6 +47,18 @@ struct HarnessMonitorWindowRootView: View {
 struct HarnessMonitorSettingsRootView: View {
   let store: HarnessMonitorStore
   @Binding var themeMode: HarnessMonitorThemeMode
+  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
+  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
+  @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
+
+  private var backdropMode: HarnessMonitorBackdropMode {
+    HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
+  }
+
+  private var backgroundImage: HarnessMonitorBackgroundSelection {
+    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  }
 
   var body: some View {
     PreferencesView(
@@ -43,6 +66,12 @@ struct HarnessMonitorSettingsRootView: View {
       themeMode: $themeMode
     )
     .frame(minWidth: 680, minHeight: 440)
+    .modifier(
+      HarnessMonitorWindowBackdropModifier(
+        mode: backdropMode,
+        backgroundImage: backgroundImage
+      )
+    )
     .instantFocusRing()
     .modifier(
       HarnessMonitorSceneAppearanceModifier(
@@ -161,6 +190,7 @@ private struct OptionalPreferredColorSchemeModifier: ViewModifier {
 
 private struct HarnessMonitorWindowBackdropModifier: ViewModifier {
   let mode: HarnessMonitorBackdropMode
+  let backgroundImage: HarnessMonitorBackgroundSelection
 
   @ViewBuilder
   func body(content: Content) -> some View {
@@ -169,17 +199,18 @@ private struct HarnessMonitorWindowBackdropModifier: ViewModifier {
       content
     case .window:
       content.containerBackground(for: .window) {
-        HarnessMonitorWindowBackdropView()
+        HarnessMonitorWindowBackdropView(backgroundImage: backgroundImage)
       }
     case .content:
       content.background {
-        HarnessMonitorWindowBackdropView()
+        HarnessMonitorWindowBackdropView(backgroundImage: backgroundImage)
       }
     }
   }
 }
 
 private struct HarnessMonitorWindowBackdropView: View {
+  let backgroundImage: HarnessMonitorBackgroundSelection
   @Environment(\.colorScheme)
   private var colorScheme
   @Environment(\.accessibilityReduceTransparency)
@@ -210,8 +241,39 @@ private struct HarnessMonitorWindowBackdropView: View {
     return colorScheme == .dark ? 0.07 : 0.05
   }
 
+  private var imageWashOpacity: Double {
+    if reduceTransparency {
+      return colorScheme == .dark ? 0.54 : 0.42
+    }
+    return colorScheme == .dark ? 0.24 : 0.16
+  }
+
+  private var imageOpacity: Double {
+    if reduceTransparency {
+      return colorScheme == .dark ? 0.56 : 0.48
+    }
+    return colorScheme == .dark ? 0.94 : 0.86
+  }
+
+  private var blurRadius: CGFloat {
+    reduceTransparency ? 0 : 10
+  }
+
   var body: some View {
     ZStack {
+      if let image = HarnessMonitorUIAssets.backgroundImage(for: backgroundImage) {
+        image
+          .resizable()
+          .interpolation(.high)
+          .aspectRatio(contentMode: .fill)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .scaleEffect(1.03)
+          .saturation(colorScheme == .dark ? 1.0 : 0.9)
+          .contrast(colorScheme == .dark ? 1.02 : 0.98)
+          .opacity(imageOpacity)
+          .blur(radius: blurRadius)
+      }
+
       LinearGradient(
         colors: [
           baseBackground,
@@ -221,6 +283,9 @@ private struct HarnessMonitorWindowBackdropView: View {
         startPoint: .top,
         endPoint: .bottom
       )
+
+      Rectangle()
+        .fill(baseBackground.opacity(imageWashOpacity))
 
       RadialGradient(
         colors: [

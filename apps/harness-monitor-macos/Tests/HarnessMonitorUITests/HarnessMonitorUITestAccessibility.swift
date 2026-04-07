@@ -13,9 +13,14 @@ enum HarnessMonitorUITestAccessibility {
   static let navigateBackButton = "harness.toolbar.navigate-back"
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
   static let toolbarCenterpiece = "harness.toolbar.centerpiece"
+  static let toolbarCenterpieceFrame = "harness.toolbar.centerpiece.frame"
   static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
   static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
+  static let toolbarCenterpieceMetricsFrame = "harness.toolbar.centerpiece.metrics.frame"
   static let toolbarStatusTicker = "harness.toolbar.status-ticker"
+  static let toolbarStatusTickerFrame = "harness.toolbar.status-ticker.frame"
+  static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"
+  static let toolbarStatusTickerHoverFrame = "harness.toolbar.status-ticker.hover.frame"
   static let preferencesButton = "harness.toolbar.preferences"
   static let refreshButton = "harness.toolbar.refresh"
   static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
@@ -96,6 +101,8 @@ enum HarnessMonitorUITestAccessibility {
   static let preferencesTitle = "harness.preferences.title"
   static let preferencesThemeModePicker = "harness.preferences.theme-mode"
   static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
+  static let preferencesBackgroundGallery = "harness.preferences.background-gallery"
+  static let preferencesSystemBackgroundsDisclosure = "harness.preferences.background-system-disclosure"
   static let preferencesTextSizePicker = "harness.preferences.text-size"
   static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
@@ -128,6 +135,10 @@ enum HarnessMonitorUITestAccessibility {
   static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
   static let actionToast = "harness.action-toast"
 
+  static func preferencesBackgroundTile(_ key: String) -> String {
+    "harness.preferences.background.\(slug(key))"
+  }
+
   static func sidebarSortSegment(_ order: String) -> String {
     "harness.sidebar.sort.\(slug(order))"
   }
@@ -142,6 +153,8 @@ enum HarnessMonitorUITestAccessibility {
       lowercased
       .replacing(" ", with: "-")
       .replacing("_", with: "-")
+      .replacing(":", with: "-")
+      .replacing("/", with: "-")
       .replacing(".", with: "")
   }
 }

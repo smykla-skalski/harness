@@ -6,6 +6,8 @@ struct PreferencesGeneralSection: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
+  @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
@@ -78,6 +80,10 @@ struct PreferencesGeneralSection: View {
     )
   }
 
+  private var selectedBackground: HarnessMonitorBackgroundSelection {
+    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  }
+
   var body: some View {
     Form {
       Section {
@@ -97,6 +103,12 @@ struct PreferencesGeneralSection: View {
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
 
+        PreferencesBackgroundGallery(
+          selection: $backgroundImageRawValue,
+          backdropModeRawValue: $backdropModeRawValue,
+          selectedBackground: selectedBackground
+        )
+
         Picker("Text size", selection: $textSizeIndex) {
           ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
             Text(level.label).tag(index)
@@ -108,7 +120,7 @@ struct PreferencesGeneralSection: View {
         Text("Appearance")
       } footer: {
         Text(
-          "Mode and text size apply to every Harness Monitor window. Backdrop lets you compare no app backdrop, a window-level backdrop, and a root-content backdrop live."
+          "Mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off."
         )
       }
 

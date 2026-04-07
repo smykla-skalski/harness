@@ -81,16 +81,23 @@ struct ContentDetailChrome<Content: View>: View {
     persistenceError != nil || sessionDataAvailability != .live || sessionStatus != nil
   }
 
+  private var isStale: Bool {
+    sessionDataAvailability != .live
+  }
+
   private var topChrome: some View {
     VStack(spacing: 0) {
       if let persistenceError {
         PersistenceUnavailableBanner(message: persistenceError)
       }
-      if sessionDataAvailability != .live {
-        SessionDataAvailabilityBanner(availability: sessionDataAvailability)
+      if isStale {
+        SessionDataAvailabilityBanner(
+          availability: sessionDataAvailability,
+          showsDivider: sessionStatus == nil
+        )
       }
       if let sessionStatus {
-        SessionStatusBanner(status: sessionStatus)
+        SessionStatusBanner(status: sessionStatus, isStale: isStale)
       }
     }
   }
@@ -98,16 +105,25 @@ struct ContentDetailChrome<Content: View>: View {
 
 struct SessionStatusBanner: View {
   let status: SessionStatus
+  let isStale: Bool
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
-  private var color: Color { statusColor(for: status) }
+  private var color: Color {
+    isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
+  }
+
   private var dividerOpacity: Double {
     colorSchemeContrast == .increased ? 0.24 : 0.16
   }
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+      if isStale {
+        Image(systemName: "clock.badge.questionmark")
+          .font(.system(size: 8, weight: .bold))
+          .accessibilityHidden(true)
+      }
       Text(status.title.uppercased())
         .font(.system(size: 9, weight: .bold))
         .tracking(HarnessMonitorTheme.uppercaseTracking)
@@ -125,38 +141,24 @@ struct SessionStatusBanner: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Session status")
-    .accessibilityValue(status.title)
+    .accessibilityValue(isStale ? "\(status.title), estimated" : status.title)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionStatusBanner)
   }
 }
 
 private struct SessionStatusBannerSurfaceModifier: ViewModifier {
   let tint: Color
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
-  private var fallbackFillOpacity: Double {
-    colorSchemeContrast == .increased ? 0.45 : 0.35
-  }
-
-  private var glassTintOpacity: Double {
+  private var fillOpacity: Double {
     colorSchemeContrast == .increased ? 0.40 : 0.30
   }
 
   func body(content: Content) -> some View {
-    if reduceTransparency {
-      content.background {
-        Rectangle()
-          .fill(tint.opacity(fallbackFillOpacity))
-      }
-    } else {
-      content
-        .glassEffect(
-          .regular.tint(tint.opacity(glassTintOpacity)),
-          in: .rect(cornerRadius: 0, style: .continuous)
-        )
+    content.background {
+      Rectangle()
+        .fill(tint.opacity(fillOpacity))
     }
   }
 }
@@ -168,6 +170,18 @@ private struct DetailBannerDividerModifier: ViewModifier {
         .fill(HarnessMonitorTheme.controlBorder.opacity(0.9))
         .frame(height: 1)
         .accessibilityHidden(true)
+    }
+  }
+}
+
+private struct ConditionalDividerModifier: ViewModifier {
+  let showsDivider: Bool
+
+  func body(content: Content) -> some View {
+    if showsDivider {
+      content.detailBannerDivider()
+    } else {
+      content
     }
   }
 }
@@ -252,6 +266,7 @@ private struct ToolbarBaselineDivider: View {
 
 struct SessionDataAvailabilityBanner: View {
   let availability: HarnessMonitorStore.SessionDataAvailability
+  let showsDivider: Bool
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -271,7 +286,7 @@ struct SessionDataAvailabilityBanner: View {
     .accessibilityValue(Text(message))
     .accessibilityIdentifier(HarnessMonitorAccessibility.persistedDataBanner)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.persistedDataBannerFrame)
-    .detailBannerDivider()
+    .modifier(ConditionalDividerModifier(showsDivider: showsDivider))
   }
 
   private var symbolName: String {
