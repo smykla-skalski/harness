@@ -221,11 +221,30 @@ private extension ContentView {
   }
 
   private var statusTickerMessages: [ToolbarStatusMessage] {
-    [
-      .init(id: "status.running", text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-      .init(id: "status.sessions", text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
-      .init(id: "status.daemon", text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
-    ]
+    var messages: [ToolbarStatusMessage] = []
+
+    if store.connectionState == .connecting {
+      messages.append(.init(id: "loading.connecting", text: "Connecting to the control plane", systemImage: "network", tint: .orange))
+    }
+    if store.isRefreshing {
+      messages.append(.init(id: "loading.refreshing", text: "Refreshing session index", systemImage: "arrow.trianglehead.2.clockwise", tint: .orange))
+    }
+    if store.isSelectionLoading {
+      messages.append(.init(id: "loading.session", text: "Loading session detail", systemImage: "doc.text.magnifyingglass", tint: .orange))
+    }
+    if store.isExtensionsLoading {
+      messages.append(.init(id: "loading.extensions", text: "Loading observers and signals", systemImage: "antenna.radiowaves.left.and.right", tint: .orange))
+    }
+
+    if messages.isEmpty {
+      messages.append(contentsOf: [
+        .init(id: "status.running", text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
+        .init(id: "status.sessions", text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+        .init(id: "status.daemon", text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
+      ])
+    }
+
+    return messages
   }
 
   private var daemonIndicator: ToolbarDaemonIndicator {
