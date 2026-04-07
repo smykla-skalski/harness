@@ -333,7 +333,10 @@ extension HarnessMonitorStore {
 
       let prioritySessions: [SessionSummary]
       if let cacheService = self.cacheService {
-        let recentIDs = Set(await cacheService.recentlyViewedSessionIDs(limit: 10))
+        var recentIDs = Set(await cacheService.recentlyViewedSessionIDs(limit: 10))
+        if let selected = self.selectedSessionID {
+          recentIDs.insert(selected)
+        }
         prioritySessions = sessions.filter { recentIDs.contains($0.sessionId) }
       } else {
         prioritySessions = []
