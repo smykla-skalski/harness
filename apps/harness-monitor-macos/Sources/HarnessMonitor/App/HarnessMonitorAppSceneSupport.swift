@@ -217,6 +217,7 @@ private struct HarnessMonitorWindowBackdropView: View {
   private var colorScheme
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
+  @State private var loadedImage: Image?
 
   private var baseBackground: Color {
     Color(nsColor: .windowBackgroundColor)
@@ -263,8 +264,8 @@ private struct HarnessMonitorWindowBackdropView: View {
 
   var body: some View {
     ZStack {
-      if let image = HarnessMonitorUIAssets.backgroundImage(for: backgroundImage) {
-        image
+      if let loadedImage {
+        loadedImage
           .resizable()
           .interpolation(.high)
           .aspectRatio(contentMode: .fill)
@@ -320,5 +321,15 @@ private struct HarnessMonitorWindowBackdropView: View {
     }
     .ignoresSafeArea()
     .accessibilityHidden(true)
+    .task(id: backgroundImage.storageValue) {
+      loadedImage = nil
+      guard let cgImage = await BackgroundThumbnailCache.shared.fullImage(
+        for: backgroundImage
+      ) else {
+        return
+      }
+      let size = NSSize(width: cgImage.width, height: cgImage.height)
+      loadedImage = Image(nsImage: NSImage(cgImage: cgImage, size: size))
+    }
   }
 }
