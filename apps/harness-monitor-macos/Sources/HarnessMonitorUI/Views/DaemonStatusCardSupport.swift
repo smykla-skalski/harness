@@ -100,9 +100,6 @@ private struct DaemonStateToggleControl: View {
   let statusTitle: String
   let statusColor: Color
   @State private var isHovered = false
-  @State private var idleHintMorphProgress: CGFloat = 0
-  @State private var idleHintScale: CGFloat = 1
-  @State private var idleHintReturningToDot = false
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @Environment(\.accessibilityReduceTransparency)
@@ -126,7 +123,6 @@ private struct DaemonStateToggleControl: View {
         powerLayer
       }
       .frame(width: 24, height: 24)
-      .scaleEffect(idleHintEffectiveScale)
       .opacity(isLoading ? 0.7 : 1)
       .contentShape(Circle())
     }
@@ -154,19 +150,6 @@ private struct DaemonStateToggleControl: View {
       .frame(width: 12, height: 12)
     }
     .harnessUITestValue(isHovered ? "chrome=power" : "chrome=status-dot")
-    .task(id: idleHintTaskID) {
-      guard let cycleSeconds = idleHintCycleSeconds else {
-        resetIdleHintState()
-        return
-      }
-
-      while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(cycleSeconds))
-        if Task.isCancelled { break }
-        guard idleHintCycleSeconds != nil, !isHovered else { continue }
-        await runIdleHintAnimation()
-      }
-    }
   }
 
   private var fillOpacity: Double {
@@ -214,78 +197,12 @@ private struct DaemonStateToggleControl: View {
     return .interactiveSpring(response: 0.42, dampingFraction: 0.78, blendDuration: 0.18)
   }
 
-  private var idleHintCycleSeconds: Double? {
-    guard !isLoading else { return nil }
-    return isDaemonOnline ? 30 : 10
-  }
-
-  private var idleHintTaskID: String {
-    if isLoading { return "disabled" }
-    return isDaemonOnline ? "online-30" : "offline-10"
-  }
-
   private var morphProgress: CGFloat {
-    let progress = isHovered ? 1 : idleHintMorphProgress
-    return min(max(progress, 0), 1)
-  }
-
-  private var idleHintEffectiveScale: CGFloat {
-    isHovered ? 1 : idleHintScale
-  }
-
-  @MainActor
-  private func runIdleHintAnimation() async {
-    withAnimation(.interpolatingSpring(stiffness: 260, damping: 15)) {
-      idleHintMorphProgress = 1
-      idleHintScale = 1.14
-    }
-    try? await Task.sleep(for: .milliseconds(120))
-    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
-
-    withAnimation(.interpolatingSpring(stiffness: 340, damping: 20)) {
-      idleHintScale = 0.95
-    }
-    try? await Task.sleep(for: .milliseconds(110))
-    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
-
-    withAnimation(.interpolatingSpring(stiffness: 280, damping: 18)) {
-      idleHintScale = 1
-    }
-    try? await Task.sleep(for: .milliseconds(280))
-    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
-
-    idleHintReturningToDot = true
-    withAnimation(.interpolatingSpring(stiffness: 260, damping: 15)) {
-      idleHintMorphProgress = 0
-      idleHintScale = 1.14
-    }
-    try? await Task.sleep(for: .milliseconds(120))
-    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
-
-    withAnimation(.interpolatingSpring(stiffness: 340, damping: 20)) {
-      idleHintScale = 0.95
-    }
-    try? await Task.sleep(for: .milliseconds(110))
-    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
-
-    withAnimation(.interpolatingSpring(stiffness: 280, damping: 18)) {
-      idleHintScale = 1
-    }
-    try? await Task.sleep(for: .milliseconds(120))
-    idleHintReturningToDot = false
-  }
-
-  private func resetIdleHintState() {
-    idleHintMorphProgress = 0
-    idleHintScale = 1
-    idleHintReturningToDot = false
+    isHovered ? 1 : 0
   }
 
   private var powerRotationDegrees: Double {
-    if idleHintReturningToDot && !isHovered {
-      return Double(95 * (1 - morphProgress))
-    }
-    return Double(-95 + (95 * morphProgress))
+    Double(-95 + (95 * morphProgress))
   }
 }
 
