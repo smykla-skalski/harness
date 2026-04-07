@@ -38,6 +38,9 @@ struct PreferencesBackgroundGallery: View {
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
+      .task(id: collection) {
+        await BackgroundThumbnailCache.shared.prefetch(options)
+      }
     }
   }
 
@@ -54,11 +57,12 @@ private struct PreferencesBackgroundTile: View {
   let isSelected: Bool
   let previewHeight: CGFloat
   let select: () -> Void
+  @State private var loadedImage: Image?
 
   var body: some View {
     Button(action: select) {
       ZStack(alignment: .topTrailing) {
-        previewImage
+        previewContent
 
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
           .font(.system(size: 18, weight: .semibold))
@@ -101,12 +105,20 @@ private struct PreferencesBackgroundTile: View {
     .accessibilityValue(isSelected ? "selected" : background.subtitle)
     .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundTile(background.accessibilityKey))
+    .task(id: background.storageValue) {
+      loadedImage = nil
+      guard let cgImage = await BackgroundThumbnailCache.shared.thumbnail(for: background) else {
+        return
+      }
+      let size = NSSize(width: cgImage.width, height: cgImage.height)
+      loadedImage = Image(nsImage: NSImage(cgImage: cgImage, size: size))
+    }
   }
 
   @ViewBuilder
-  private var previewImage: some View {
-    if let image = HarnessMonitorUIAssets.backgroundImage(for: background) {
-      image
+  private var previewContent: some View {
+    if let loadedImage {
+      loadedImage
         .resizable()
         .interpolation(.high)
         .aspectRatio(contentMode: .fill)
@@ -114,13 +126,11 @@ private struct PreferencesBackgroundTile: View {
         .frame(height: previewHeight)
         .accessibilityHidden(true)
     } else {
-      Color.secondary.opacity(0.12)
+      Color.secondary.opacity(0.08)
         .frame(maxWidth: .infinity)
         .frame(height: previewHeight)
         .overlay {
-          Image(systemName: "photo")
-            .font(.system(size: 20, weight: .medium))
-            .foregroundStyle(.secondary)
+          HarnessMonitorSpinner(size: 16)
         }
         .accessibilityHidden(true)
     }
