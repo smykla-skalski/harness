@@ -13,13 +13,13 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
         titleVisibility: .visible
       ) {
         switch store.pendingConfirmation {
-        case .endSession:
+        case .endSession(_, let actorID):
           Button("End Session Now", role: .destructive) {
-            Task { await store.confirmPendingAction() }
+            Task { await store.endSelectedSession(actor: actorID) }
           }
-        case .removeAgent:
+        case .removeAgent(_, let agentID, let actorID):
           Button("Remove Agent Now", role: .destructive) {
-            Task { await store.confirmPendingAction() }
+            Task { await store.removeAgent(agentID: agentID, actor: actorID) }
           }
         case nil:
           EmptyView()
