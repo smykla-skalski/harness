@@ -89,18 +89,25 @@ struct ContentDetailChrome<Content: View>: View {
     VStack(spacing: 0) {
       if let persistenceError {
         PersistenceUnavailableBanner(message: persistenceError)
+        chromeDivider
       }
       if isStale {
-        SessionDataAvailabilityBanner(
-          availability: sessionDataAvailability,
-          showsDivider: sessionStatus == nil
-        )
+        SessionDataAvailabilityBanner(availability: sessionDataAvailability)
+        chromeDivider
       }
       if let sessionStatus {
         SessionStatusBanner(status: sessionStatus, isStale: isStale)
+        chromeDivider
       }
     }
-    .detailBannerDivider()
+    .background(Color(nsColor: .windowBackgroundColor))
+  }
+
+  private var chromeDivider: some View {
+    Rectangle()
+      .fill(HarnessMonitorTheme.controlBorder.opacity(0.9))
+      .frame(height: 1)
+      .accessibilityHidden(true)
   }
 }
 
@@ -140,14 +147,14 @@ private struct SessionStatusBannerSurfaceModifier: ViewModifier {
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
-  private var fillOpacity: Double {
-    colorSchemeContrast == .increased ? 0.40 : 0.30
+  private var tintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.18 : 0.14
   }
 
   func body(content: Content) -> some View {
     content.background {
-      Rectangle()
-        .fill(tint.opacity(fillOpacity))
+      Color(nsColor: .windowBackgroundColor)
+        .overlay(tint.opacity(tintOpacity))
     }
   }
 }
@@ -159,18 +166,6 @@ private struct DetailBannerDividerModifier: ViewModifier {
         .fill(HarnessMonitorTheme.controlBorder.opacity(0.9))
         .frame(height: 1)
         .accessibilityHidden(true)
-    }
-  }
-}
-
-private struct ConditionalDividerModifier: ViewModifier {
-  let showsDivider: Bool
-
-  func body(content: Content) -> some View {
-    if showsDivider {
-      content.detailBannerDivider()
-    } else {
-      content
     }
   }
 }
@@ -255,7 +250,6 @@ private struct ToolbarBaselineDivider: View {
 
 struct SessionDataAvailabilityBanner: View {
   let availability: HarnessMonitorStore.SessionDataAvailability
-  let showsDivider: Bool
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -275,7 +269,6 @@ struct SessionDataAvailabilityBanner: View {
     .accessibilityValue(Text(message))
     .accessibilityIdentifier(HarnessMonitorAccessibility.persistedDataBanner)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.persistedDataBannerFrame)
-    .modifier(ConditionalDividerModifier(showsDivider: showsDivider))
   }
 
   private var symbolName: String {
@@ -344,7 +337,6 @@ struct PersistenceUnavailableBanner: View {
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
     .accessibilityIdentifier(HarnessMonitorAccessibility.persistenceBanner)
-    .detailBannerDivider()
   }
 }
 
