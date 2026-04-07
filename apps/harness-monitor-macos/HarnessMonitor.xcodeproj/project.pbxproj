@@ -19,6 +19,7 @@
 		0D94EDF049C1E216A1A9CAD6 /* HarnessMonitorStore+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0D11A80FACDE6DC5A420C8 /* HarnessMonitorStore+Actions.swift */; };
 		10DD0D931897B4913CB9B239 /* HarnessMonitorStoreActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886FE61B2CA390274FA94A17 /* HarnessMonitorStoreActionTests.swift */; };
 		118E9DDA7F4FB18E41824D11 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CF36D41E55BA5AF7F79BAE98 /* Assets.xcassets */; };
+		14F05273583C1FEC07BDB504 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C92556F4D47D324A6E5E73D /* IOKit.framework */; };
 		195CC3A0249942F5E1F3C823 /* PreferencesGeneralSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5912816D49135FDB26BBCFA /* PreferencesGeneralSection.swift */; };
 		1A408D005649BB1E207DC213 /* HarnessMonitorPreviewStoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA8312016110DFE59E7CD94 /* HarnessMonitorPreviewStoreFactory.swift */; };
 		1A83D566AFBA71D18E906DDA /* HarnessMonitorAppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9699F85E4E89ECE627588155 /* HarnessMonitorAppConfiguration.swift */; };
@@ -161,6 +162,7 @@
 		E26300215BCCA02C4E93E58C /* ManifestWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05111A8A9A29ED087FD9D443 /* ManifestWatcher.swift */; };
 		E4DD704B4C31371CAB816391 /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FD80682916667B6B21F9E2 /* DaemonController.swift */; };
 		E514BFCF933790043BB87453 /* ToolbarCenterpieceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07E29C046A6B69D433F89D96 /* ToolbarCenterpieceView.swift */; };
+		E58A220AB3EC4D3F7CCF5C2B /* SleepAssertion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F2FA200DDFAA287904B447 /* SleepAssertion.swift */; };
 		E7D1B11195239DA9FD89BB90 /* HarnessMonitorAppStoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C455AFFDC1CCFF5F2DC0B4 /* HarnessMonitorAppStoreFactory.swift */; };
 		E897CD3592C070D375C68F46 /* HarnessMonitorNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B59E3AD71F2105CE1FCE29B3 /* HarnessMonitorNavigationUITests.swift */; };
 		EAF883C7C6D2E23C73ADF8F5 /* ConnectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4394E5AC936F20011EAC8F9 /* ConnectionViews.swift */; };
@@ -288,6 +290,7 @@
 		0A061927439209F181DFFC95 /* HarnessMonitorAppSceneSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorAppSceneSupport.swift; sourceTree = "<group>"; };
 		0A0D11A80FACDE6DC5A420C8 /* HarnessMonitorStore+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Actions.swift"; sourceTree = "<group>"; };
 		0C23AE1475112382D66C6C22 /* WebSocketTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketTransport.swift; sourceTree = "<group>"; };
+		0C92556F4D47D324A6E5E73D /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		0E0231ACBCCF2303FE5C4CD4 /* WebSocketProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketProtocol.swift; sourceTree = "<group>"; };
 		10DF564102122118B0A5356D /* HarnessMonitorStoreConnectionMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreConnectionMetricsTests.swift; sourceTree = "<group>"; };
 		13132B0BE8337982E3308DC9 /* SessionCacheMemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCacheMemoryTests.swift; sourceTree = "<group>"; };
@@ -310,6 +313,7 @@
 		305B28753BFB80FF104606E6 /* HarnessMonitorAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorAppDelegate.swift; sourceTree = "<group>"; };
 		31ACA5D8C0E5478E1E6EF85A /* HarnessMonitorTabbedContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTabbedContent.swift; sourceTree = "<group>"; };
 		33D462EFFA63D469B4BDA605 /* InspectorActionFormSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorActionFormSections.swift; sourceTree = "<group>"; };
+		33F2FA200DDFAA287904B447 /* SleepAssertion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepAssertion.swift; sourceTree = "<group>"; };
 		34124E189669D2E9E3083320 /* HarnessMonitorGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorGlass.swift; sourceTree = "<group>"; };
 		34961D014CCCF5EABEE57DA4 /* InspectorActionControllers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorActionControllers.swift; sourceTree = "<group>"; };
 		36D7AEC6128DC640EEEE20F9 /* InspectorSupportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorSupportViews.swift; sourceTree = "<group>"; };
@@ -482,6 +486,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				00CEFE78CB7E8A4CB30447DA /* SwiftData.framework in Frameworks */,
+				14F05273583C1FEC07BDB504 /* IOKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -594,6 +599,7 @@
 				8BCBC5959481D5B05E95B487 /* PreviewFixtures.swift */,
 				2447F124535B2753426DF2ED /* PreviewFixtures+Cockpit.swift */,
 				44861023A11A393ECA8859C2 /* PreviewServices.swift */,
+				33F2FA200DDFAA287904B447 /* SleepAssertion.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -601,6 +607,7 @@
 		62A4A3AA2D146716F17EF767 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				0C92556F4D47D324A6E5E73D /* IOKit.framework */,
 				97812099F9E7ED0F33A84FA7 /* SwiftData.framework */,
 			);
 			name = Frameworks;
@@ -1236,6 +1243,7 @@
 				2F17892802C1804874984B20 /* PreviewServices.swift in Sources */,
 				A0B0FD5E7036C0B8BE948924 /* ServerSentEvents.swift in Sources */,
 				444DBC759EA418F438C69E78 /* SessionCacheService.swift in Sources */,
+				E58A220AB3EC4D3F7CCF5C2B /* SleepAssertion.swift in Sources */,
 				ABF1815C358F938D7B10A954 /* UserModels.swift in Sources */,
 				BBE0E57EB390139EA3386662 /* WebSocketProtocol.swift in Sources */,
 				BA6D0794F68112AFCE830E05 /* WebSocketTransport.swift in Sources */,

@@ -122,6 +122,9 @@ public final class HarnessMonitorStore {
     get { pendingConfirmation != nil }
     set { if !newValue { cancelConfirmation() } }
   }
+  public var sleepPreventionEnabled = false {
+    didSet { sleepAssertion.update(hasActiveSessions: sleepPreventionEnabled) }
+  }
   public var navigationBackStack: [String?] = []
   public var navigationForwardStack: [String?] = []
   var connectionProbeInterval: Duration = .seconds(10)
@@ -149,6 +152,7 @@ public final class HarnessMonitorStore {
   var isNavigatingHistory = false
   private var hasBootstrapped = false
   private var lastActionDismissTask: Task<Void, Never>?
+  private let sleepAssertion = SleepAssertion()
 
   public init(
     daemonController: any DaemonControlling,
