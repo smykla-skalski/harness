@@ -27,6 +27,18 @@ struct HarnessMonitorStoreTests {
     #expect(store.actionActorID == PreviewFixtures.summary.leaderId)
   }
 
+  @Test("Selecting a session over HTTP requests the full detail payload")
+  func selectSessionWithHTTPTransportRequestsFullDetail() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == [nil])
+    #expect(store.selectedSession?.signals == PreviewFixtures.signals)
+    #expect(store.isExtensionsLoading == false)
+  }
+
   @Test("Grouped sessions filter by search text and status")
   func groupedSessionsFiltersBySearchTextAndStatus() async {
     let store = await makeBootstrappedStore()

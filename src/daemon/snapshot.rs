@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::agents::runtime::event::ConversationEventKind;
 use crate::agents::runtime::signal::{
-    read_acknowledged_signals, read_acknowledgments, read_pending_signals,
+    read_acknowledged_signals, read_acknowledgments, read_pending_signals, signal_matches_session,
 };
 use crate::agents::runtime::signal_session_keys;
 use crate::errors::{CliError, CliErrorKind};
@@ -162,14 +162,11 @@ fn build_session_detail(
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
     tasks.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
 
-    let (signals, agent_activity) = if let Some(db) = db {
-        let signals = db.load_signals(&resolved.state.session_id)?;
-        let activity = db.load_agent_activity(&resolved.state.session_id)?;
-        (signals, activity)
+    let signals = load_signals_for_resolved(resolved, db)?;
+    let agent_activity = if let Some(db) = db {
+        db.load_agent_activity(&resolved.state.session_id)?
     } else {
-        let signals = load_signals_for(&resolved.project, &resolved.state)?;
-        let activity = load_agent_activity_for(&resolved.project, &resolved.state)?;
-        (signals, activity)
+        load_agent_activity_for(&resolved.project, &resolved.state)?
     };
 
     Ok(SessionDetail {
@@ -213,14 +210,11 @@ pub fn build_session_extensions(
     resolved: &ResolvedSession,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionExtensionsPayload, CliError> {
-    let (signals, agent_activity) = if let Some(db) = db {
-        let signals = db.load_signals(&resolved.state.session_id)?;
-        let activity = db.load_agent_activity(&resolved.state.session_id)?;
-        (signals, activity)
+    let signals = load_signals_for_resolved(resolved, db)?;
+    let agent_activity = if let Some(db) = db {
+        db.load_agent_activity(&resolved.state.session_id)?
     } else {
-        let signals = load_signals_for(&resolved.project, &resolved.state)?;
-        let activity = load_agent_activity_for(&resolved.project, &resolved.state)?;
-        (signals, activity)
+        load_agent_activity_for(&resolved.project, &resolved.state)?
     };
     let observer = load_observer_summary(&resolved.project, &resolved.state)?;
 
@@ -230,6 +224,29 @@ pub fn build_session_extensions(
         observer,
         agent_activity: Some(agent_activity),
     })
+}
+
+fn load_signals_for_resolved(
+    resolved: &ResolvedSession,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<Vec<SessionSignalRecord>, CliError> {
+    let file_signals = || load_signals_for(&resolved.project, &resolved.state);
+
+    let Some(db) = db else {
+        return file_signals();
+    };
+
+    let indexed_signals = db.load_signals(&resolved.state.session_id)?;
+    let should_refresh_from_files =
+        indexed_signals.is_empty() || db.session_has_shared_runtime_signal_dir(&resolved.state)?;
+
+    if !should_refresh_from_files {
+        return Ok(indexed_signals);
+    }
+
+    let signals = file_signals()?;
+    db.sync_signal_index(&resolved.state.session_id, &signals)?;
+    Ok(signals)
 }
 
 fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
@@ -443,14 +460,19 @@ pub fn load_signals_for(
         for signal_session_id in
             signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
         {
-            let signal_dir = root.join(&agent.runtime).join(signal_session_id);
+            let signal_dir = root.join(&agent.runtime).join(&signal_session_id);
             for signal in read_pending_signals(&signal_dir)? {
-                signals_by_id
-                    .entry(signal.signal_id.clone())
-                    .or_insert((signal, false));
+                signals_by_id.entry(signal.signal_id.clone()).or_insert((
+                    signal,
+                    false,
+                    signal_session_id.clone(),
+                ));
             }
             for signal in read_acknowledged_signals(&signal_dir)? {
-                signals_by_id.insert(signal.signal_id.clone(), (signal, true));
+                signals_by_id.insert(
+                    signal.signal_id.clone(),
+                    (signal, true, signal_session_id.clone()),
+                );
             }
             for acknowledgment in read_acknowledgments(&signal_dir)? {
                 acknowledgments_by_id
@@ -459,8 +481,17 @@ pub fn load_signals_for(
             }
         }
 
-        for (signal, was_acknowledged) in signals_by_id.into_values() {
+        for (signal, was_acknowledged, signal_session_id) in signals_by_id.into_values() {
             let acknowledgment = acknowledgments_by_id.remove(&signal.signal_id);
+            if !signal_matches_session(
+                &signal,
+                acknowledgment.as_ref(),
+                &state.session_id,
+                agent_id,
+                &signal_session_id,
+            ) {
+                continue;
+            }
             let status = acknowledgment.as_ref().map_or_else(
                 || {
                     if was_acknowledged {
@@ -505,7 +536,7 @@ mod tests {
     };
     use crate::session::types::{
         AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole,
-        SessionSignalStatus, SessionState, SessionStatus,
+        SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
     };
 
     fn write_json(path: &Path, value: &impl serde::Serialize) {
@@ -583,7 +614,11 @@ mod tests {
         state
     }
 
-    fn sample_signal(signal_id: &str, message: &str) -> Signal {
+    fn sample_signal_with_idempotency(
+        signal_id: &str,
+        message: &str,
+        idempotency_key: Option<&str>,
+    ) -> Signal {
         Signal {
             signal_id: signal_id.into(),
             version: 1,
@@ -601,9 +636,13 @@ mod tests {
             delivery: DeliveryConfig {
                 max_retries: 3,
                 retry_count: 0,
-                idempotency_key: None,
+                idempotency_key: idempotency_key.map(ToString::to_string),
             },
         }
+    }
+
+    fn sample_signal(signal_id: &str, message: &str) -> Signal {
+        sample_signal_with_idempotency(signal_id, message, None)
     }
 
     fn observer_state(session_id: &str) -> ObserverState {
@@ -916,6 +955,204 @@ mod tests {
                     detail.agent_activity[0].latest_tool_name.as_deref(),
                     Some("Read")
                 );
+            },
+        );
+    }
+
+    #[test]
+    fn load_signals_for_filters_shared_runtime_session_history() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-alpha");
+                let shared_runtime_session = "codex-shared-session";
+                let session_one = "sess-alpha";
+                let session_two = "sess-beta";
+
+                let alpha_state =
+                    sample_state_for_runtime(session_one, "codex", shared_runtime_session);
+                let beta_state =
+                    sample_state_for_runtime(session_two, "codex", shared_runtime_session);
+
+                let shared_signal_dir = context_root
+                    .join("agents")
+                    .join("signals")
+                    .join("codex")
+                    .join(shared_runtime_session);
+                write_signal_file(
+                    &shared_signal_dir,
+                    &sample_signal_with_idempotency(
+                        "sig-alpha",
+                        "signal for alpha",
+                        Some("sess-alpha:codex-worker:inject_context"),
+                    ),
+                )
+                .expect("write alpha signal");
+                write_signal_file(
+                    &shared_signal_dir,
+                    &sample_signal_with_idempotency(
+                        "sig-beta",
+                        "signal for beta",
+                        Some("sess-beta:codex-worker:inject_context"),
+                    ),
+                )
+                .expect("write beta signal");
+
+                let project = DiscoveredProject {
+                    project_id: "project-alpha".into(),
+                    name: "project-alpha".into(),
+                    project_dir: None,
+                    repository_root: None,
+                    checkout_id: "project-alpha".into(),
+                    checkout_name: "Repository".into(),
+                    context_root,
+                    is_worktree: false,
+                    worktree_name: None,
+                };
+
+                let alpha_signals =
+                    load_signals_for(&project, &alpha_state).expect("alpha signals");
+                let beta_signals = load_signals_for(&project, &beta_state).expect("beta signals");
+
+                assert_eq!(alpha_signals.len(), 1);
+                assert_eq!(alpha_signals[0].signal.signal_id, "sig-alpha");
+                assert_eq!(beta_signals.len(), 1);
+                assert_eq!(beta_signals[0].signal.signal_id, "sig-beta");
+            },
+        );
+    }
+
+    #[test]
+    fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-alpha");
+                let shared_runtime_session = "codex-shared-session";
+                let session_one = "sess-alpha";
+                let session_two = "sess-beta";
+                let alpha_state =
+                    sample_state_for_runtime(session_one, "codex", shared_runtime_session);
+                let beta_state =
+                    sample_state_for_runtime(session_two, "codex", shared_runtime_session);
+                let project = DiscoveredProject {
+                    project_id: "project-alpha".into(),
+                    name: "project-alpha".into(),
+                    project_dir: None,
+                    repository_root: None,
+                    checkout_id: "project-alpha".into(),
+                    checkout_name: "Repository".into(),
+                    context_root,
+                    is_worktree: false,
+                    worktree_name: None,
+                };
+
+                let shared_signal_dir = project
+                    .context_root
+                    .join("agents")
+                    .join("signals")
+                    .join("codex")
+                    .join(shared_runtime_session);
+                write_signal_file(
+                    &shared_signal_dir,
+                    &sample_signal_with_idempotency(
+                        "sig-alpha",
+                        "signal for alpha",
+                        Some("sess-alpha:codex-worker:inject_context"),
+                    ),
+                )
+                .expect("write alpha signal");
+                write_signal_file(
+                    &shared_signal_dir,
+                    &sample_signal_with_idempotency(
+                        "sig-beta",
+                        "signal for beta",
+                        Some("sess-beta:codex-worker:inject_context"),
+                    ),
+                )
+                .expect("write beta signal");
+
+                let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open db");
+                db.sync_project(&project).expect("sync project");
+                db.sync_session(&project.project_id, &alpha_state)
+                    .expect("sync alpha state");
+                db.sync_session(&project.project_id, &beta_state)
+                    .expect("sync beta state");
+                db.sync_signal_index(
+                    session_one,
+                    &[
+                        SessionSignalRecord {
+                            runtime: "codex".into(),
+                            agent_id: "codex-worker".into(),
+                            session_id: session_one.into(),
+                            status: SessionSignalStatus::Pending,
+                            signal: sample_signal_with_idempotency(
+                                "sig-alpha",
+                                "stale alpha row",
+                                Some("sess-alpha:codex-worker:inject_context"),
+                            ),
+                            acknowledgment: None,
+                        },
+                        SessionSignalRecord {
+                            runtime: "codex".into(),
+                            agent_id: "codex-worker".into(),
+                            session_id: session_one.into(),
+                            status: SessionSignalStatus::Pending,
+                            signal: sample_signal_with_idempotency(
+                                "sig-beta",
+                                "misattributed beta row",
+                                Some("sess-beta:codex-worker:inject_context"),
+                            ),
+                            acknowledgment: None,
+                        },
+                    ],
+                )
+                .expect("seed stale alpha index");
+
+                let alpha_detail = session_detail_from_resolved_with_db(
+                    &ResolvedSession {
+                        project: project.clone(),
+                        state: alpha_state,
+                    },
+                    &db,
+                )
+                .expect("alpha detail");
+                let beta_detail = session_detail_from_resolved_with_db(
+                    &ResolvedSession {
+                        project: project.clone(),
+                        state: beta_state,
+                    },
+                    &db,
+                )
+                .expect("beta detail");
+
+                assert_eq!(alpha_detail.signals.len(), 1);
+                assert_eq!(alpha_detail.signals[0].signal.signal_id, "sig-alpha");
+                assert_eq!(
+                    alpha_detail.signals[0].signal.payload.message,
+                    "signal for alpha"
+                );
+                assert_eq!(beta_detail.signals.len(), 1);
+                assert_eq!(beta_detail.signals[0].signal.signal_id, "sig-beta");
+                assert_eq!(
+                    beta_detail.signals[0].signal.payload.message,
+                    "signal for beta"
+                );
+
+                let alpha_index = db.load_signals(session_one).expect("reload alpha index");
+                let beta_index = db.load_signals(session_two).expect("reload beta index");
+                assert_eq!(alpha_index.len(), 1);
+                assert_eq!(alpha_index[0].signal.signal_id, "sig-alpha");
+                assert_eq!(beta_index.len(), 1);
+                assert_eq!(beta_index[0].signal.signal_id, "sig-beta");
             },
         );
     }
