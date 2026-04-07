@@ -4,90 +4,28 @@ struct PreferencesBackgroundGallery: View {
   @Binding var selection: String
   @Binding var backdropModeRawValue: String
   let selectedBackground: HarnessMonitorBackgroundSelection
-  @State private var isSystemWallpapersExpanded = false
+  let collection: BackgroundCollection
   @ScaledMetric(relativeTo: .body) private var previewHeight = 96.0
 
-  private let featuredBackgrounds = HarnessMonitorBackgroundSelection.bundledLibrary
-  private let systemBackgrounds = HarnessMonitorBackgroundSelection.systemLibrary
+  private var options: [HarnessMonitorBackgroundSelection] {
+    switch collection {
+    case .featured: HarnessMonitorBackgroundSelection.bundledLibrary
+    case .native: HarnessMonitorBackgroundSelection.systemLibrary
+    }
+  }
+
   private let columns = [
     GridItem(.adaptive(minimum: 180, maximum: 220), spacing: HarnessMonitorTheme.spacingMD)
   ]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Background image")
-        .font(.headline)
-
-      if !systemBackgrounds.isEmpty {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          Button(action: toggleSystemWallpapers) {
-            HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-              Image(systemName: isSystemWallpapersExpanded ? "chevron.down" : "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 12, alignment: .center)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
-
-              VStack(alignment: .leading, spacing: 2) {
-                Text("macOS wallpapers")
-                  .font(.subheadline.weight(.semibold))
-                Text("Expand to browse the wallpapers bundled with macOS on this Mac")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-
-              Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
-          }
-          .buttonStyle(.plain)
-          .accessibilityLabel("macOS wallpapers")
-          .accessibilityValue(isSystemWallpapersExpanded ? "expanded" : "collapsed")
-          .accessibilityHint("Shows wallpapers bundled with macOS on this Mac")
-          .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesSystemBackgroundsDisclosure)
-
-          if isSystemWallpapersExpanded {
-            gallerySection(
-              title: "macOS wallpapers",
-              subtitle: "Read live from /System/Library/Desktop Pictures on this Mac",
-              options: systemBackgrounds
-            )
-            .padding(.leading, HarnessMonitorTheme.spacingLG)
-          }
-        }
-      }
-
-      gallerySection(
-        title: "Featured collection",
-        subtitle: "Curated backgrounds bundled with Harness Monitor",
-        options: featuredBackgrounds
+    if options.isEmpty {
+      ContentUnavailableView(
+        "No wallpapers found",
+        systemImage: "photo",
+        description: Text("macOS wallpapers were not found on this Mac")
       )
-    }
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
-    .onAppear(perform: expandSystemWallpapersIfNeeded)
-    .onChange(of: selectedBackground.storageValue) { _, _ in
-      expandSystemWallpapersIfNeeded()
-    }
-  }
-
-  @ViewBuilder
-  private func gallerySection(
-    title: String,
-    subtitle: String,
-    options: [HarnessMonitorBackgroundSelection]
-  ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title)
-          .font(.subheadline.weight(.semibold))
-        Text(subtitle)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-
+    } else {
       LazyVGrid(columns: columns, alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         ForEach(options) { background in
           PreferencesBackgroundTile(
@@ -98,6 +36,8 @@ struct PreferencesBackgroundGallery: View {
           )
         }
       }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
     }
   }
 
@@ -106,20 +46,6 @@ struct PreferencesBackgroundGallery: View {
     if HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none {
       backdropModeRawValue = HarnessMonitorBackdropMode.window.rawValue
     }
-  }
-
-  private func toggleSystemWallpapers() {
-    withAnimation(.easeInOut(duration: 0.18)) {
-      isSystemWallpapersExpanded.toggle()
-    }
-  }
-
-  private func expandSystemWallpapersIfNeeded() {
-    guard case .system = selectedBackground.source else {
-      return
-    }
-
-    isSystemWallpapersExpanded = true
   }
 }
 

@@ -9,6 +9,7 @@ struct PreferencesAppearanceSection: View {
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
 
   private var selectedBackground: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
@@ -40,12 +41,6 @@ struct PreferencesAppearanceSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
-
-        PreferencesBackgroundGallery(
-          selection: $backgroundImageRawValue,
-          backdropModeRawValue: $backdropModeRawValue,
-          selectedBackground: selectedBackground
-        )
       } header: {
         Text("Appearance")
       } footer: {
@@ -53,9 +48,63 @@ struct PreferencesAppearanceSection: View {
           "Theme mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off."
         )
       }
+
+      backgroundImageSection
     }
     .preferencesDetailFormStyle()
+    .onAppear(perform: selectTabForCurrentBackground)
+    .onChange(of: selectedBackground.storageValue) { _, _ in
+      selectTabForCurrentBackground()
+    }
   }
+
+  private var backgroundImageSection: some View {
+    HarnessMonitorTabbedContent(
+      title: "Background image",
+      selection: $selectedBackgroundTab,
+      tabTitle: \.title,
+      alignment: .trailing
+    ) { tab in
+      PreferencesBackgroundGallery(
+        selection: $backgroundImageRawValue,
+        backdropModeRawValue: $backdropModeRawValue,
+        selectedBackground: selectedBackground,
+        collection: tab.collection
+      )
+    }
+  }
+
+  private func selectTabForCurrentBackground() {
+    if case .system = selectedBackground.source {
+      selectedBackgroundTab = .native
+    }
+  }
+}
+
+private enum BackgroundCollectionTab: String, CaseIterable, Identifiable {
+  case featured
+  case native
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .featured: "Featured"
+    case .native: "Native"
+    }
+  }
+
+  var collection: BackgroundCollection {
+    switch self {
+    case .featured: .featured
+    case .native: .native
+    }
+  }
+}
+
+enum BackgroundCollection {
+  case featured
+  case native
 }
 
 struct PreferencesGeneralSection: View {
