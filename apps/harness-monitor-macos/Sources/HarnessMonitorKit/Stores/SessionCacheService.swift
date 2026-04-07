@@ -74,6 +74,14 @@ public actor SessionCacheService {
     )
   }
 
+  func recentlyViewedSessionIDs(limit: Int) -> [String] {
+    var descriptor = FetchDescriptor<CachedSession>(
+      sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
+    )
+    descriptor.fetchLimit = limit
+    return ((try? modelContext.fetch(descriptor)) ?? []).map(\.sessionId)
+  }
+
   func sessionMetadata() -> SessionMetadata {
     let count = (try? modelContext.fetchCount(FetchDescriptor<CachedSession>())) ?? 0
     var latestDescriptor = FetchDescriptor<CachedSession>(
@@ -88,8 +96,12 @@ public actor SessionCacheService {
   func hydrationQueue(for summaries: [SessionSummary]) -> [SessionSummary] {
     guard !summaries.isEmpty else { return [] }
 
+    let summaryIds = summaries.map(\.sessionId)
+    let descriptor = FetchDescriptor<CachedSession>(
+      predicate: #Predicate { summaryIds.contains($0.sessionId) }
+    )
     guard
-      let cached = try? modelContext.fetch(FetchDescriptor<CachedSession>())
+      let cached = try? modelContext.fetch(descriptor)
     else {
       return summaries
     }
@@ -102,7 +114,7 @@ public actor SessionCacheService {
       guard let existing = cachedBySessionID[summary.sessionId] else {
         return true
       }
-      return existing.updatedAt != summary.updatedAt || !hasDetailSnapshot(existing)
+      return existing.updatedAt != summary.updatedAt || !hasDetailSnapshot(sessionId: existing.sessionId)
     }
   }
 
@@ -208,13 +220,12 @@ public actor SessionCacheService {
     return try? modelContext.fetch(descriptor).first
   }
 
-  private func hasDetailSnapshot(_ session: CachedSession) -> Bool {
-    session.observer != nil
-      || !session.agents.isEmpty
-      || !session.tasks.isEmpty
-      || !session.signals.isEmpty
-      || !session.timelineEntries.isEmpty
-      || !session.agentActivity.isEmpty
+  private func hasDetailSnapshot(sessionId: String) -> Bool {
+    var descriptor = FetchDescriptor<CachedTimelineEntry>(
+      predicate: #Predicate { $0.sessionId == sessionId }
+    )
+    descriptor.fetchLimit = 1
+    return ((try? modelContext.fetchCount(descriptor)) ?? 0) > 0
   }
 
   private func upsertProject(_ project: ProjectSummary) {
@@ -300,13 +311,17 @@ public actor SessionCacheService {
     }
   }
 
+  private static let maxCachedTimelineEntries = 300
+
   private func syncTimeline(_ entries: [TimelineEntry], on session: CachedSession) {
+    let cappedEntries = Array(entries.suffix(Self.maxCachedTimelineEntries))
+
     let existingById = Dictionary(
       uniqueKeysWithValues: session.timelineEntries.map { ($0.entryId, $0) }
     )
-    let incomingIds = Set(entries.map(\.entryId))
+    let incomingIds = Set(cappedEntries.map(\.entryId))
 
-    for entry in entries {
+    for entry in cappedEntries {
       if let existing = existingById[entry.entryId] {
         existing.update(from: entry)
       } else {

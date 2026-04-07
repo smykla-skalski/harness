@@ -331,7 +331,15 @@ extension HarnessMonitorStore {
 
       defer { self.sessionSnapshotHydrationTask = nil }
 
-      let hydrationQueue = await self.persistedSnapshotHydrationQueue(for: sessions)
+      let prioritySessions: [SessionSummary]
+      if let cacheService = self.cacheService {
+        let recentIDs = Set(await cacheService.recentlyViewedSessionIDs(limit: 10))
+        prioritySessions = sessions.filter { recentIDs.contains($0.sessionId) }
+      } else {
+        prioritySessions = []
+      }
+
+      let hydrationQueue = await self.persistedSnapshotHydrationQueue(for: prioritySessions)
       guard !hydrationQueue.isEmpty else { return }
 
       for summary in hydrationQueue {
