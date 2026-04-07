@@ -116,7 +116,6 @@ private struct InspectorPrimaryLoadingState: View {
         .foregroundStyle(summary.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
       Text("Loading live task, agent, and signal detail for the selected session.")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      HarnessMonitorLoadingStateView(title: "Loading session detail")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(

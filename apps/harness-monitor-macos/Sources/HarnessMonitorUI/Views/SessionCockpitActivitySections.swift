@@ -13,11 +13,7 @@ struct SessionCockpitSignalsSection: View {
       Text("Signals")
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      if signals.isEmpty && isExtensionsLoading {
-        HarnessMonitorLoadingStateView(title: "Loading signals")
-          .frame(maxWidth: .infinity)
-          .transition(.opacity)
-      } else if signals.isEmpty {
+      if signals.isEmpty && !isExtensionsLoading {
         ContentUnavailableView {
           Label("No signals", systemImage: "antenna.radiowaves.left.and.right")
         } description: {

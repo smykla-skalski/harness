@@ -193,7 +193,13 @@ public struct ContentView: View {
       )
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .harnessCornerAnimation(.dancingLlama)
+    .harnessCornerAnimation(
+      .dancingLlama,
+      isPresented: store.isSelectionLoading
+        || store.isExtensionsLoading
+        || store.isRefreshing
+        || store.connectionState == .connecting
+    )
     .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
     .modifier(
       ContentAnnouncementsModifier(

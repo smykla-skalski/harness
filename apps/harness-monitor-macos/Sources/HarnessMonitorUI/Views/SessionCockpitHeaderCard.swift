@@ -42,20 +42,8 @@ struct SessionCockpitHeaderCard: View {
         }
       }
 
-      Group {
-        if isSessionActionInFlight || isSelectionLoading {
-          HarnessMonitorLoadingStateView(title: "Refreshing live session detail")
-            .transition(.move(edge: .top).combined(with: .opacity))
-        }
-      }
-      .animation(.spring(duration: 0.3), value: isSessionActionInFlight)
-      .animation(.spring(duration: 0.3), value: isSelectionLoading)
-
       if let observer = detail.observer {
         observerSummary(observer)
-          .transition(.opacity)
-      } else if isExtensionsLoading && detail.session.observeId != nil {
-        HarnessMonitorLoadingStateView(title: "Loading observer")
           .transition(.opacity)
       }
 
