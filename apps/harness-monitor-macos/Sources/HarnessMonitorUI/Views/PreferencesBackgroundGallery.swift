@@ -6,12 +6,28 @@ struct PreferencesBackgroundGallery: View {
   let selectedBackground: HarnessMonitorBackgroundSelection
   let collection: BackgroundCollection
   @ScaledMetric(relativeTo: .body) private var previewHeight = 96.0
+  @AppStorage(HarnessMonitorBackgroundDefaults.recentKey)
+  private var recentStorageValues = ""
+
+  private static let maxRecents = 8
+  private static let recentTileWidth: CGFloat = 140
 
   private var options: [HarnessMonitorBackgroundSelection] {
     switch collection {
     case .featured: HarnessMonitorBackgroundSelection.bundledLibrary
     case .native: HarnessMonitorBackgroundSelection.systemLibrary
     }
+  }
+
+  private var recentItems: [HarnessMonitorBackgroundSelection] {
+    let stored = recentStorageValues.isEmpty
+      ? []
+      : recentStorageValues.split(separator: "|").map(String.init)
+    var items = [selectedBackground]
+    for value in stored where value != selectedBackground.storageValue {
+      items.append(HarnessMonitorBackgroundSelection.decode(value))
+    }
+    return Array(items.prefix(Self.maxRecents))
   }
 
   private let columns = [
@@ -26,20 +42,49 @@ struct PreferencesBackgroundGallery: View {
         description: Text("macOS wallpapers were not found on this Mac")
       )
     } else {
-      LazyVGrid(columns: columns, alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        ForEach(options) { background in
-          PreferencesBackgroundTile(
-            background: background,
-            isSelected: background.storageValue == selectedBackground.storageValue,
-            previewHeight: previewHeight,
-            select: { select(background) }
-          )
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        recentBackgroundsRow
+
+        LazyVGrid(columns: columns, alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+          ForEach(options) { background in
+            PreferencesBackgroundTile(
+              background: background,
+              isSelected: background.storageValue == selectedBackground.storageValue,
+              previewHeight: previewHeight,
+              select: { select(background) }
+            )
+          }
         }
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
       .task(id: collection) {
         await BackgroundThumbnailCache.shared.prefetch(options)
+      }
+      .task(id: recentStorageValues) {
+        await BackgroundThumbnailCache.shared.prefetch(recentItems)
+      }
+    }
+  }
+
+  private var recentBackgroundsRow: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text("Recent")
+        .scaledFont(.subheadline)
+        .foregroundStyle(.secondary)
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          ForEach(recentItems) { background in
+            PreferencesBackgroundTile(
+              background: background,
+              isSelected: background.storageValue == selectedBackground.storageValue,
+              previewHeight: previewHeight * 0.7,
+              select: { select(background) }
+            )
+            .frame(width: Self.recentTileWidth)
+          }
+        }
       }
     }
   }
@@ -49,6 +94,17 @@ struct PreferencesBackgroundGallery: View {
     if HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none {
       backdropModeRawValue = HarnessMonitorBackdropMode.window.rawValue
     }
+    updateRecents(with: background)
+  }
+
+  private func updateRecents(with background: HarnessMonitorBackgroundSelection) {
+    var stored = recentStorageValues.isEmpty
+      ? []
+      : recentStorageValues.split(separator: "|").map(String.init)
+    stored.removeAll { $0 == background.storageValue }
+    stored.insert(background.storageValue, at: 0)
+    stored = Array(stored.prefix(Self.maxRecents))
+    recentStorageValues = stored.joined(separator: "|")
   }
 }
 
