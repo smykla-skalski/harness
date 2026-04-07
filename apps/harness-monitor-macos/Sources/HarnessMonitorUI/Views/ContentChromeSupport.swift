@@ -138,11 +138,11 @@ private struct SessionStatusBannerSurfaceModifier: ViewModifier {
   private var colorSchemeContrast
 
   private var fallbackFillOpacity: Double {
-    colorSchemeContrast == .increased ? 0.18 : 0.14
+    colorSchemeContrast == .increased ? 0.45 : 0.35
   }
 
   private var glassTintOpacity: Double {
-    colorSchemeContrast == .increased ? 0.14 : 0.10
+    colorSchemeContrast == .increased ? 0.40 : 0.30
   }
 
   func body(content: Content) -> some View {
@@ -262,9 +262,10 @@ struct SessionDataAvailabilityBanner: View {
         .scaledFont(.caption.weight(.medium))
       Spacer(minLength: 0)
     }
-    .harnessCellPadding()
-    .background(HarnessMonitorTheme.caution.opacity(0.12))
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .foregroundStyle(HarnessMonitorTheme.caution)
+    .modifier(SessionStatusBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
@@ -331,9 +332,10 @@ struct PersistenceUnavailableBanner: View {
         .scaledFont(.caption.weight(.medium))
       Spacer(minLength: 0)
     }
-    .harnessCellPadding()
-    .background(HarnessMonitorTheme.caution.opacity(0.18))
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .foregroundStyle(HarnessMonitorTheme.caution)
+    .modifier(SessionStatusBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
