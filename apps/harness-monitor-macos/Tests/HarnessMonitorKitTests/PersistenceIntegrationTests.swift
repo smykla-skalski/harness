@@ -452,7 +452,12 @@ struct PersistenceIntegrationTests {
     await store.cacheSessionList([session], projects: [project])
     #expect(await store.persistedSnapshotHydrationQueue(for: [session]).isEmpty == false)
 
-    await store.cacheSessionDetail(detail, timeline: [], markViewed: false)
+    let timeline = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: "leader-hydration",
+      summary: "Hydration checkpoint"
+    )
+    await store.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
     #expect(await store.persistedSnapshotHydrationQueue(for: [session]).isEmpty)
   }
 

@@ -76,6 +76,7 @@ public actor SessionCacheService {
 
   func recentlyViewedSessionIDs(limit: Int) -> [String] {
     var descriptor = FetchDescriptor<CachedSession>(
+      predicate: #Predicate { $0.lastViewedAt != nil },
       sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
     )
     descriptor.fetchLimit = limit
