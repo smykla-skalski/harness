@@ -108,6 +108,7 @@ enum HarnessMonitorAccessibility {
   static let reconnectionProgress = "harness.sidebar.reconnection-progress"
   static let actionToast = "harness.action-toast"
   static let connectionCard = "harness.preferences.connection-card"
+  static let cornerOverlay = "harness.corner-overlay"
   static let preferencesDatabaseStatistics = "harness.preferences.database.statistics"
   static let preferencesDatabaseOperations = "harness.preferences.database.operations"
   static let preferencesDatabaseHealth = "harness.preferences.database.health"
