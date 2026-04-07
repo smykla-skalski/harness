@@ -2,17 +2,6 @@ import HarnessMonitorKit
 import Observation
 import SwiftUI
 
-public struct InspectorVisibilityKey: FocusedValueKey {
-  public typealias Value = Binding<Bool>
-}
-
-extension FocusedValues {
-  public var inspectorVisibility: Binding<Bool>? {
-    get { self[InspectorVisibilityKey.self] }
-    set { self[InspectorVisibilityKey.self] = newValue }
-  }
-}
-
 struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   @Bindable var store: HarnessMonitorStore
 
@@ -232,7 +221,11 @@ private struct ToolbarBaselineOverlayModifier: ViewModifier {
     content
       .coordinateSpace(name: ToolbarBaselineCoordinateSpace.name)
       .onPreferenceChange(ToolbarBaselineFramePreferenceKey.self) { frames in
-        sidebarMaxX = max(frames[.sidebar]?.maxX ?? 0, 0)
+        let nextSidebarMaxX = max(frames[.sidebar]?.maxX ?? 0, 0)
+        guard abs(nextSidebarMaxX - sidebarMaxX) >= 1 else {
+          return
+        }
+        sidebarMaxX = nextSidebarMaxX.rounded(.towardZero)
       }
       .overlay(alignment: .topLeading) {
         GeometryReader { proxy in

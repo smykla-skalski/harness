@@ -101,49 +101,42 @@ public struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      if toolbarGlassReproConfiguration.disablesContentDetailChrome {
-        sessionContent
-      } else {
-        ContentDetailChrome(
-          persistenceError: store.persistenceError,
-          sessionDataAvailability: store.sessionDataAvailability,
-          sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
-        ) {
+      Group {
+        if toolbarGlassReproConfiguration.disablesContentDetailChrome {
           sessionContent
+        } else {
+          ContentDetailChrome(
+            persistenceError: store.persistenceError,
+            sessionDataAvailability: store.sessionDataAvailability,
+            sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
+          ) {
+            sessionContent
+          }
         }
       }
-    }
-    .inspector(isPresented: $showInspector) {
-      InspectorColumnView(store: store)
-        .inspectorColumnWidth(min: 320, ideal: inspectorWidth, max: 500)
-        .background {
-          GeometryReader { proxy in
-            Color.clear.preference(key: InspectorWidthKey.self, value: proxy.size.width)
+      .inspector(isPresented: $showInspector) {
+        InspectorColumnView(store: store)
+          .inspectorColumnWidth(min: 320, ideal: inspectorWidth, max: 500)
+          .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+          } action: { width in
+            guard width >= 320, abs(width - inspectorWidth) >= 1 else {
+              return
+            }
+            inspectorWidth = width.rounded()
           }
-        }
-        .onPreferenceChange(InspectorWidthKey.self) { width in
-          if width >= 320, width != inspectorWidth {
-            inspectorWidth = width
-          }
-        }
+      }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .background {
-      GeometryReader { proxy in
-        Color.clear.preference(
-          key: ToolbarWidthKey.self,
-          value: proxy.size.width
-        )
-      }
-    }
-    .onPreferenceChange(ToolbarWidthKey.self) { windowWidth in
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { windowWidth in
       let nextMode = ToolbarCenterpieceDisplayMode.forWindowWidth(windowWidth)
       guard nextMode != toolbarCenterpieceDisplayMode else {
         return
       }
       toolbarCenterpieceDisplayMode = nextMode
     }
-    .focusedSceneValue(\.inspectorVisibility, $showInspector)
     .onAppear {
       if let restoredSessionID, store.selectedSessionID == nil {
         Task { await store.selectSession(restoredSessionID) }
@@ -268,6 +261,8 @@ private extension ContentView {
           systemImage: "sidebar.trailing"
         )
       }
+      .accessibilityLabel(showInspector ? "Hide Inspector" : "Show Inspector")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorToggleButton)
       .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
@@ -287,21 +282,9 @@ private extension ContentView {
   func toggleInspector() {
     showInspector.toggle()
   }
-}
-
-private struct ToolbarWidthKey: PreferenceKey {
-  static let defaultValue: CGFloat = 0
 
   func toggleSleepPrevention() {
     store.sleepPreventionEnabled.toggle()
-  }
-}
-
-private struct InspectorWidthKey: PreferenceKey {
-  static let defaultValue: CGFloat = 0
-
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-    value = nextValue()
   }
 }
 
