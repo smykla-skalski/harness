@@ -20,6 +20,7 @@ struct HarnessMonitorAppConfiguration {
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
       HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
+      HarnessMonitorToolbarStyleDefaults.modeKey: HarnessMonitorToolbarStyle.glass.rawValue,
       "harnessMonitor.board.onboardingDismissed": false,
       "showInspector": true,
       "inspectorColumnWidth": 420.0,
@@ -51,6 +52,12 @@ struct HarnessMonitorAppConfiguration {
         environment.values["HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"] ?? ""
       )
       : .defaultSelection
+    let initialToolbarStyle =
+      isUITesting
+      ? (HarnessMonitorToolbarStyle(
+        rawValue: environment.values["HARNESS_MONITOR_TOOLBAR_STYLE_OVERRIDE"] ?? ""
+      ) ?? .glass)
+      : .glass
     let initialShowInspector =
       isUITesting
       ? uiTestBoolOverride(from: environment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]) ?? true
@@ -91,6 +98,10 @@ struct HarnessMonitorAppConfiguration {
       UserDefaults.standard.set(
         initialBackgroundImage.storageValue,
         forKey: HarnessMonitorBackgroundDefaults.imageKey
+      )
+      UserDefaults.standard.set(
+        initialToolbarStyle.rawValue,
+        forKey: HarnessMonitorToolbarStyleDefaults.modeKey
       )
       UserDefaults.standard.set(
         initialShowInspector,
