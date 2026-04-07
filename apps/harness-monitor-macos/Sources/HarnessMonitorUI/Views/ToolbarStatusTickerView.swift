@@ -48,11 +48,6 @@ struct ToolbarStatusTickerView: View {
 
   var body: some View {
     ZStack(alignment: .trailing) {
-      ForEach(messages) { message in
-        tickerLabel(message)
-          .hidden()
-          .accessibilityHidden(true)
-      }
       if let message = currentMessage {
         tickerLabel(message)
           .id(message.id)
@@ -61,14 +56,18 @@ struct ToolbarStatusTickerView: View {
     }
     .frame(height: Self.tickerHeight)
     .clipped()
-    .task(id: messages.count) {
-      guard messages.count > 1 else { return }
+    .task {
       while !Task.isCancelled {
         try? await Task.sleep(for: .seconds(cycleInterval))
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, messages.count > 1 else { continue }
         withAnimation(.easeInOut(duration: 0.25)) {
           currentIndex = (currentIndex + 1) % messages.count
         }
+      }
+    }
+    .onChange(of: messages.count) { _, newCount in
+      if currentIndex >= newCount {
+        currentIndex = 0
       }
     }
     .accessibilityElement(children: .ignore)
