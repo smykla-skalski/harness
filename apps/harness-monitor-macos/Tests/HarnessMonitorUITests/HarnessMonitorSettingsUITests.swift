@@ -111,6 +111,67 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     assertSettingsThemeModeContract(expectedMode: "light")
   }
 
+  func testRepeatedThemeModeChangesKeepSettingsAndCockpitResponsive() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_THEME_MODE_OVERRIDE": "auto"]
+    )
+
+    openSettings(in: app)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let observeSummaryButton = app.buttons
+      .matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+
+    let expectedModes: [(title: String, rawValue: String)] = [
+      ("Dark", "dark"),
+      ("Light", "light"),
+      ("Auto", "auto"),
+      ("Dark", "dark"),
+      ("Auto", "auto"),
+    ]
+
+    for expectedMode in expectedModes {
+      selectMenuOption(
+        in: app,
+        controlIdentifier: Accessibility.preferencesThemeModePicker,
+        optionTitle: expectedMode.title
+      )
+
+      XCTAssertTrue(
+        waitUntil(timeout: Self.uiTimeout) {
+          preferencesState.label == self.preferencesStateLabel(
+            mode: expectedMode.rawValue,
+            section: "general",
+            textSize: "Default",
+            controlSize: "small",
+            timeZoneMode: "local",
+            timeZone: "local"
+          )
+        },
+        "Preferences state did not settle after selecting \(expectedMode.title); got '\(preferencesState.label)'"
+      )
+    }
+
+    closeSettings(in: app, preferencesRoot: preferencesRoot)
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+
+    tapPreviewSession(in: app)
+
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      sessionRow.value as? String,
+      "selected, interactive=button, selectionChrome=translucent"
+    )
+  }
+
   func testSettingsTextSizePickerKeepsNativeChromeContractAtLargestSize() throws {
     assertSettingsThemeModeContract(
       expectedMode: "auto",

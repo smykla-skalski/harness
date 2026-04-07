@@ -72,6 +72,27 @@ struct ContentDetailChrome<Content: View>: View {
   @ViewBuilder let content: Content
 
   var body: some View {
+    contentWithTopChrome
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  @ViewBuilder
+  private var contentWithTopChrome: some View {
+    if showsTopChrome {
+      content
+        .safeAreaInset(edge: .top, spacing: 0) {
+          topChrome
+        }
+    } else {
+      content
+    }
+  }
+
+  private var showsTopChrome: Bool {
+    persistenceError != nil || sessionDataAvailability != .live || sessionStatus != nil
+  }
+
+  private var topChrome: some View {
     VStack(spacing: 0) {
       if let persistenceError {
         PersistenceUnavailableBanner(message: persistenceError)
@@ -82,16 +103,19 @@ struct ContentDetailChrome<Content: View>: View {
       if let sessionStatus {
         SessionStatusBanner(status: sessionStatus)
       }
-      content
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 
 struct SessionStatusBanner: View {
   let status: SessionStatus
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
 
   private var color: Color { statusColor(for: status) }
+  private var dividerOpacity: Double {
+    colorSchemeContrast == .increased ? 0.24 : 0.16
+  }
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -102,11 +126,11 @@ struct SessionStatusBanner: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
-    .background(color.opacity(0.12))
     .foregroundStyle(color)
+    .modifier(SessionStatusBannerSurfaceModifier(tint: color))
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(color.opacity(0.3))
+        .fill(color.opacity(dividerOpacity))
         .frame(height: 1)
         .accessibilityHidden(true)
     }
@@ -114,6 +138,37 @@ struct SessionStatusBanner: View {
     .accessibilityLabel("Session status")
     .accessibilityValue(status.title)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionStatusBanner)
+  }
+}
+
+private struct SessionStatusBannerSurfaceModifier: ViewModifier {
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
+    colorSchemeContrast == .increased ? 0.18 : 0.14
+  }
+
+  private var glassTintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.14 : 0.10
+  }
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content.background {
+        Rectangle()
+          .fill(tint.opacity(fallbackFillOpacity))
+      }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(tint.opacity(glassTintOpacity)),
+          in: .rect(cornerRadius: 0, style: .continuous)
+        )
+    }
   }
 }
 

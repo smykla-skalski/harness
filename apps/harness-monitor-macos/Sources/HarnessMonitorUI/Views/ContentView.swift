@@ -13,7 +13,7 @@ public struct ContentView: View {
   private var inspectorWidth: Double = 380
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
-  @State private var toolbarGlassState = "unknown"
+  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -71,39 +71,45 @@ public struct ContentView: View {
   }
 
   public var body: some View {
+    let sessionContent = SessionContentContainer(
+      store: store,
+      detail: selectedDetail,
+      summary: selectedSessionSummary,
+      timeline: store.timeline
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .backgroundExtensionEffect()
+    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
+    .onKeyPress(.escape) {
+      if store.inspectorSelection != .none {
+        store.inspectorSelection = .none
+        return .handled
+      }
+      return .ignored
+    }
+    .navigationTitle(windowTitle)
+    .toolbar {
+      navigationToolbar
+      centerpieceToolbar
+    }
+    .toolbar {
+      primaryToolbar
+    }
+
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      ContentDetailChrome(
-        persistenceError: store.persistenceError,
-        sessionDataAvailability: store.sessionDataAvailability,
-        sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
-      ) {
-        SessionContentContainer(
-          store: store,
-          detail: selectedDetail,
-          summary: selectedSessionSummary,
-          timeline: store.timeline
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .backgroundExtensionEffect()
-        .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
-        .onKeyPress(.escape) {
-          if store.inspectorSelection != .none {
-            store.inspectorSelection = .none
-            return .handled
-          }
-          return .ignored
-        }
-        .navigationTitle(windowTitle)
-        .toolbar {
-          navigationToolbar
-          centerpieceToolbar
-        }
-        .toolbar {
-          primaryToolbar
+      if toolbarGlassReproConfiguration.disablesContentDetailChrome {
+        sessionContent
+      } else {
+        ContentDetailChrome(
+          persistenceError: store.persistenceError,
+          sessionDataAvailability: store.sessionDataAvailability,
+          sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
+        ) {
+          sessionContent
         }
       }
     }
@@ -122,7 +128,6 @@ public struct ContentView: View {
         }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .background { ToolbarGlassStateMonitor() }
     .background {
       GeometryReader { proxy in
         Color.clear.preference(
@@ -167,18 +172,13 @@ public struct ContentView: View {
           identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
           text: toolbarCenterpieceDisplayMode.rawValue
         )
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.toolbarGlassState,
-          text: toolbarGlassState
-        )
       }
     }
-    .onReceive(NotificationCenter.default.publisher(for: .toolbarGlassStateDidChange)) { notification in
-      if let value = notification.object as? String {
-        toolbarGlassState = value
-      }
-    }
-    .toolbarBaselineOverlay()
+    .modifier(
+      OptionalToolbarBaselineOverlayModifier(
+        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
+      )
+    )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
     .modifier(
