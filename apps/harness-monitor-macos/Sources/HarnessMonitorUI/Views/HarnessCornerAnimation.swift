@@ -14,7 +14,7 @@ struct HarnessCornerAnimationDescriptor: Equatable {
     assetName: "DancingLlama",
     width: 200,
     height: 200,
-    trailingPadding: 4,
+    trailingPadding: -30,
     bottomPadding: 4,
     speed: 1,
     accessibilityLabel: "Dancing llama"
