@@ -3,6 +3,8 @@ import HarnessMonitorKit
 import ImageIO
 import os
 
+private let log = Logger(subsystem: "io.harnessmonitor", category: "thumbnail")
+
 public actor BackgroundThumbnailCache {
   public static let shared = BackgroundThumbnailCache()
 
@@ -73,17 +75,17 @@ public actor BackgroundThumbnailCache {
     }
 
     guard let nsImage = HarnessMonitorUIAssets.bundle.image(forResource: image.assetName) else {
-      HarnessMonitorLogger.thumbnail.warning("Bundled image not found: \(image.assetName)")
+      log.warning("Bundled image not found: \(image.assetName)")
       return nil
     }
 
     guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-      HarnessMonitorLogger.thumbnail.warning("Failed to get CGImage from bundled: \(image.assetName)")
+      log.warning("Failed to get CGImage from bundled: \(image.assetName)")
       return nil
     }
 
     guard let thumbnail = downsample(cgImage: cgImage) else {
-      HarnessMonitorLogger.thumbnail.warning("Failed to downsample bundled: \(image.assetName)")
+      log.warning("Failed to downsample bundled: \(image.assetName)")
       return nil
     }
 
@@ -126,7 +128,7 @@ public actor BackgroundThumbnailCache {
     }
 
     guard let thumbnail = downsampleFile(at: wallpaper.imagePath) else {
-      HarnessMonitorLogger.thumbnail.warning("Failed to generate thumbnail: \(wallpaper.imagePath)")
+      log.warning("Failed to generate thumbnail: \(wallpaper.imagePath)")
       return nil
     }
 
@@ -173,13 +175,13 @@ public actor BackgroundThumbnailCache {
 
     let hasAllowedPrefix = Self.allowedPathPrefixes.contains { resolvedPath.hasPrefix($0) }
     guard hasAllowedPrefix else {
-      HarnessMonitorLogger.thumbnail.warning("Path outside allowed directories: \(resolvedPath)")
+      log.warning("Path outside allowed directories: \(resolvedPath)")
       return false
     }
 
     let pathExtension = (resolvedPath as NSString).pathExtension.lowercased()
     guard Self.allowedExtensions.contains(pathExtension) else {
-      HarnessMonitorLogger.thumbnail.warning("Disallowed extension: \(pathExtension)")
+      log.warning("Disallowed extension: \(pathExtension)")
       return false
     }
 
@@ -188,12 +190,12 @@ public actor BackgroundThumbnailCache {
       let fileType = attributes[.type] as? FileAttributeType,
       fileType == .typeRegular
     else {
-      HarnessMonitorLogger.thumbnail.warning("Not a regular file: \(resolvedPath)")
+      log.warning("Not a regular file: \(resolvedPath)")
       return false
     }
 
     if let fileSize = attributes[.size] as? Int64, fileSize > Self.maxFileSize {
-      HarnessMonitorLogger.thumbnail.warning(
+      log.warning(
         "File too large (\(fileSize) bytes): \(resolvedPath)"
       )
       return false
@@ -215,7 +217,7 @@ public actor BackgroundThumbnailCache {
     guard CGImageSourceGetStatus(source) == .statusComplete,
           CGImageSourceGetCount(source) > 0
     else {
-      HarnessMonitorLogger.thumbnail.warning("Invalid image source: \(path)")
+      log.warning("Invalid image source: \(path)")
       return nil
     }
 
@@ -312,7 +314,7 @@ public actor BackgroundThumbnailCache {
         at: cacheDirectory, withIntermediateDirectories: true
       )
     } catch {
-      HarnessMonitorLogger.thumbnail.warning("Failed to create cache directory: \(error)")
+      log.warning("Failed to create cache directory: \(error)")
       return
     }
 
@@ -333,7 +335,7 @@ public actor BackgroundThumbnailCache {
       try jpegData.write(to: tmpJPEG, options: .atomic)
       _ = try FileManager.default.replaceItemAt(jpegURL, withItemAt: tmpJPEG)
     } catch {
-      HarnessMonitorLogger.thumbnail.warning("Failed to write thumbnail: \(error)")
+      log.warning("Failed to write thumbnail: \(error)")
       try? FileManager.default.removeItem(at: tmpJPEG)
       return
     }
@@ -343,7 +345,7 @@ public actor BackgroundThumbnailCache {
       try metaContent.write(to: tmpMeta, atomically: true, encoding: .utf8)
       _ = try FileManager.default.replaceItemAt(metaURL, withItemAt: tmpMeta)
     } catch {
-      HarnessMonitorLogger.thumbnail.warning("Failed to write meta: \(error)")
+      log.warning("Failed to write meta: \(error)")
       try? FileManager.default.removeItem(at: tmpMeta)
     }
   }
