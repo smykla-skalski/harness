@@ -19,6 +19,7 @@ public struct ContentView: View {
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
+  @State private var showLlama = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var selectedDetail: SessionDetail? {
@@ -130,6 +131,9 @@ public struct ContentView: View {
             max: HarnessMonitorInspectorLayout.maxWidth
           )
       }
+      .toolbar {
+        primaryToolbar
+      }
     }
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
@@ -138,9 +142,6 @@ public struct ContentView: View {
     .toolbar {
       navigationToolbar
       centerpieceToolbar
-    }
-    .toolbar {
-      primaryToolbar
     }
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
@@ -189,11 +190,12 @@ public struct ContentView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .harnessCornerAnimation(
       .dancingLlama,
-      isPresented: store.isSelectionLoading
+      isPresented: showLlama
+        || store.isSelectionLoading
         || store.isExtensionsLoading
         || store.isRefreshing
         || store.connectionState == .connecting,
-      presentationDelay: .milliseconds(400)
+      presentationDelay: showLlama ? nil : .milliseconds(400)
     )
     .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
     .modifier(
@@ -289,6 +291,19 @@ private extension ContentView {
           : "Allow sleep - click to prevent"
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
+    }
+
+    ToolbarSpacer(.fixed, placement: .primaryAction)
+
+    ToolbarItemGroup(placement: .primaryAction) {
+      Button { showLlama.toggle() } label: {
+        Label(
+          showLlama ? "Hide Llama" : "Show Llama",
+          systemImage: showLlama ? "hare.fill" : "hare"
+        )
+      }
+      .tint(showLlama ? .purple : nil)
+      .help(showLlama ? "Hide dancing llama" : "Show dancing llama")
     }
 
     ToolbarSpacer(.fixed, placement: .primaryAction)
