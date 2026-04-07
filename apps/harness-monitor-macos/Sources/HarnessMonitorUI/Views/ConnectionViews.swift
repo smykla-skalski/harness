@@ -61,7 +61,7 @@ struct ActivityPulse: View {
   private var outerSize: CGFloat = 16
   @ScaledMetric(relativeTo: .caption)
   private var innerSize: CGFloat = 7
-  @State private var isPulsing = false
+  @State private var flashTrigger = 0
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
@@ -83,20 +83,16 @@ struct ActivityPulse: View {
     isActive ? activeColor : inactiveColor
   }
 
+  private var outerOpacity: Double {
+    isActive ? 0.18 : 0.10
+  }
+
   var body: some View {
     ZStack {
       Circle()
-        .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
+        .fill(baseColor.opacity(outerOpacity))
         .frame(width: outerSize, height: outerSize)
-        .scaleEffect(reduceMotion ? 1.0 : (isPulsing ? 1.3 : 1.0))
-        .animation(
-          reduceMotion
-            ? .easeOut(duration: 0.3)
-            : isPulsing
-              ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
-              : .easeOut(duration: 0.3),
-          value: isPulsing
-        )
+        .animation(.easeOut(duration: 0.3), value: isActive)
       Circle()
         .fill(baseColor)
         .frame(width: innerSize, height: innerSize)
@@ -108,10 +104,53 @@ struct ActivityPulse: View {
     }
     .frame(width: outerSize, height: outerSize)
     .onChange(of: isActive) { _, active in
-      isPulsing = active
+      guard active else { return }
+      flashTrigger += 1
     }
-    .onAppear {
-      isPulsing = isActive
+    .modifier(ActivityPulseFlashModifier(trigger: flashTrigger, reduceMotion: reduceMotion))
+  }
+}
+
+private struct ActivityPulseFlashModifier: ViewModifier {
+  let trigger: Int
+  let reduceMotion: Bool
+
+  private enum Phase: CaseIterable {
+    case idle, bright, settle
+
+    var scale: CGFloat {
+      switch self {
+      case .idle: 1.0
+      case .bright: 1.15
+      case .settle: 1.0
+      }
+    }
+
+    var brightness: Double {
+      switch self {
+      case .idle: 0
+      case .bright: 0.12
+      case .settle: 0
+      }
+    }
+  }
+
+  func body(content: Content) -> some View {
+    if reduceMotion {
+      content
+    } else {
+      content
+        .phaseAnimator(Phase.allCases, trigger: trigger) { view, phase in
+          view
+            .scaleEffect(phase.scale)
+            .brightness(phase.brightness)
+        } animation: { phase in
+          switch phase {
+          case .idle: .easeOut(duration: 0.3)
+          case .bright: .easeIn(duration: 0.12)
+          case .settle: .easeOut(duration: 0.3)
+          }
+        }
     }
   }
 }
