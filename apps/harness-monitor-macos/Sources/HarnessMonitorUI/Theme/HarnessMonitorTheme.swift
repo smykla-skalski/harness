@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -6,39 +5,9 @@ final class HarnessMonitorUIBundleToken {}
 
 public enum HarnessMonitorUIAssets {
   public static let bundle = Bundle(for: HarnessMonitorUIBundleToken.self)
-  @MainActor
-  private static let systemImageCache = NSCache<NSString, NSImage>()
 
   public static func image(named name: String) -> Image {
     Image(name, bundle: bundle)
-  }
-
-  @MainActor
-  public static func backgroundImage(for selection: HarnessMonitorBackgroundSelection) -> Image? {
-    switch selection.source {
-    case .bundled(let background):
-      return Self.image(named: background.assetName)
-    case .system(let wallpaper):
-      guard let systemImage = systemImage(at: wallpaper.imagePath) else {
-        return nil
-      }
-      return Image(nsImage: systemImage)
-    }
-  }
-
-  @MainActor
-  public static func systemImage(at path: String) -> NSImage? {
-    let cacheKey = path as NSString
-    if let cached = systemImageCache.object(forKey: cacheKey) {
-      return cached
-    }
-
-    guard let image = NSImage(contentsOfFile: path) else {
-      return nil
-    }
-
-    systemImageCache.setObject(image, forKey: cacheKey)
-    return image
   }
 }
 
