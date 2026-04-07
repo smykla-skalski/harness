@@ -257,7 +257,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
     let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    let hideInspectorButton = button(in: app, title: "Hide Inspector")
+    let hideInspectorButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
 
     XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.uiTimeout))

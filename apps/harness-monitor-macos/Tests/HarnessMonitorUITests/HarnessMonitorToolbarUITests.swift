@@ -5,13 +5,13 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
   func testHiddenInspectorUsesSingleToolbarActionSet() throws {
     let app = launch(mode: "empty")
-    let hideInspectorButton = button(in: app, title: "Hide Inspector")
+    let hideInspectorButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
 
     XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.uiTimeout))
     hideInspectorButton.tap()
 
     let showInspectorButtons = app.toolbars.buttons.matching(
-      NSPredicate(format: "label == %@", "Show Inspector")
+      identifier: Accessibility.inspectorToggleButton
     )
     let refreshButtons = app.toolbars.buttons.matching(identifier: Accessibility.refreshButton)
     let preferencesButtons = app.toolbars.buttons.matching(
@@ -187,7 +187,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       identifier: Accessibility.preferencesButton
     )
     let hideInspectorButtons = app.toolbars.buttons.matching(
-      NSPredicate(format: "label == %@", "Hide Inspector")
+      identifier: Accessibility.inspectorToggleButton
     )
 
     func outerToolbarFrame(for query: XCUIElementQuery) -> CGRect? {

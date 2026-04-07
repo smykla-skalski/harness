@@ -14,8 +14,6 @@ struct HarnessMonitorApp: App {
   @State private var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
-  @FocusedValue(\.inspectorVisibility)
-  private var inspectorVisibility: Binding<Bool>?
 
   init() {
     UserDefaults.standard.register(defaults: [
@@ -41,7 +39,6 @@ struct HarnessMonitorApp: App {
       HarnessMonitorAppCommands(
         store: store,
         textSizeIndex: textSizeIndex,
-        inspectorVisibility: inspectorVisibility,
         increaseTextSize: increaseTextSize,
         decreaseTextSize: decreaseTextSize,
         resetTextSize: resetTextSize,

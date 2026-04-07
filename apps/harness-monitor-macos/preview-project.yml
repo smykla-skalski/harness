@@ -9,11 +9,13 @@ options:
 settings:
   base:
     CLANG_TREAT_WARNINGS_AS_ERRORS: YES
+    CLANG_CXX_LANGUAGE_STANDARD: gnu++20
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
     CODE_SIGNING_ALLOWED: YES
     DEAD_CODE_STRIPPING: YES
     ENABLE_HARDENED_RUNTIME: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_C_LANGUAGE_STANDARD: gnu17
     GENERATE_INFOPLIST_FILE: YES
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     SWIFT_ENABLE_EAGER_LINKING: YES
@@ -24,7 +26,7 @@ settings:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
       ENABLE_TESTABILITY: NO
-      SWIFT_EMIT_LOC_STRINGS: NO
+      SWIFT_EMIT_LOC_STRINGS: YES
 targets:
   HarnessMonitorKit:
     type: framework
@@ -44,7 +46,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.kit
       configs:
         Preview:
-          ENABLE_MODULE_VERIFIER: NO
+          ENABLE_MODULE_VERIFIER: YES
   HarnessMonitorUI:
     type: framework
     platform: macOS
@@ -63,7 +65,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.ui
       configs:
         Preview:
-          ENABLE_MODULE_VERIFIER: NO
+          ENABLE_MODULE_VERIFIER: YES
 schemes:
   HarnessMonitorUIPreviews:
     build:

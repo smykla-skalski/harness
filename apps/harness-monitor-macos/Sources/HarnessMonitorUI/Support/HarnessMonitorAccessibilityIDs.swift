@@ -84,6 +84,7 @@ enum HarnessMonitorAccessibility {
   static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
+  static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   static let endSessionButton = "harness.session.action.end"
   static let pendingLeaderTransferCard = "harness.session.pending-transfer"
