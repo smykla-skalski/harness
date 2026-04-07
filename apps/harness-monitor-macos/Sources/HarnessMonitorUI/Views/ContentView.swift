@@ -105,7 +105,7 @@ public struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      DetailBackgroundExtension(isGlass: toolbarStyle == .glass) {
+      Group {
         if toolbarGlassReproConfiguration.disablesContentDetailChrome {
           sessionContent
         } else {
@@ -197,7 +197,8 @@ public struct ContentView: View {
       isPresented: store.isSelectionLoading
         || store.isExtensionsLoading
         || store.isRefreshing
-        || store.connectionState == .connecting
+        || store.connectionState == .connecting,
+      presentationDelay: .milliseconds(400)
     )
     .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
     .modifier(
