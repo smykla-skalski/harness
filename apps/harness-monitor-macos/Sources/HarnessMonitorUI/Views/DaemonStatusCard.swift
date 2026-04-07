@@ -27,13 +27,6 @@ struct DaemonStatusCard: View {
         statusColor: statusColor
       )
 
-      Group {
-        if isRefreshing || connectionState == .connecting {
-          HarnessMonitorLoadingStateView(title: loadingTitle, chrome: .content)
-            .transition(.move(edge: .top).combined(with: .opacity))
-        }
-      }
-
       DaemonActionButtons(
         isLaunchAgentInstalled: isLaunchAgentInstalled,
         isLoading: isLoading,
@@ -63,15 +56,6 @@ extension DaemonStatusCard {
       "Streaming live session updates"
     case .offline(let message):
       message
-    }
-  }
-
-  fileprivate var loadingTitle: String {
-    switch connectionState {
-    case .connecting:
-      "Connecting to the control plane"
-    default:
-      "Refreshing session index"
     }
   }
 
