@@ -91,7 +91,7 @@ public struct ContentView: View {
       timeline: store.timeline
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .backgroundExtensionEffect()
+    .modifier(ConditionalBackgroundExtensionModifier(isEnabled: toolbarStyle == .glass))
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
       if store.inspectorSelection != .none {
@@ -148,7 +148,6 @@ public struct ContentView: View {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .modifier(ToolbarBackgroundStyleModifier(style: toolbarStyle))
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { windowWidth in
@@ -309,19 +308,16 @@ private extension ContentView {
   }
 }
 
-private struct ToolbarBackgroundStyleModifier: ViewModifier {
-  let style: HarnessMonitorToolbarStyle
+private struct ConditionalBackgroundExtensionModifier: ViewModifier {
+  let isEnabled: Bool
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .toolbarBackground(
-        style == .flat ? Color(nsColor: .windowBackgroundColor) : Color.clear,
-        for: .windowToolbar
-      )
-      .toolbarBackgroundVisibility(
-        style == .flat ? .visible : .automatic,
-        for: .windowToolbar
-      )
+    if isEnabled {
+      content.backgroundExtensionEffect()
+    } else {
+      content
+    }
   }
 }
 
