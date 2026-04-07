@@ -211,7 +211,6 @@ private struct ToolbarCenterpieceView: View {
             messages: statusMessages,
             daemonIndicator: daemonIndicator
           )
-          .fixedSize(horizontal: true, vertical: false)
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
         }
       }
