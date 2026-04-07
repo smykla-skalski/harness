@@ -11,12 +11,15 @@ struct HarnessCornerOverlayConfiguration {
   var glassProminence: HarnessMonitorFloatingGlassProminence = .regular
   var accessibilityLabel: String = "Overlay"
   var accessibilityIdentifier: String = HarnessMonitorAccessibility.cornerOverlay
+  var presentationDelay: Duration?
 }
 
 struct HarnessCornerOverlayModifier<OverlayContent: View>: ViewModifier {
   let isPresented: Bool
   let configuration: HarnessCornerOverlayConfiguration
   let overlayContent: OverlayContent
+
+  @State private var delayedShow = false
 
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
@@ -31,10 +34,17 @@ struct HarnessCornerOverlayModifier<OverlayContent: View>: ViewModifier {
     self.overlayContent = overlayContent()
   }
 
+  private var effectivePresentation: Bool {
+    if configuration.presentationDelay != nil {
+      return delayedShow
+    }
+    return isPresented
+  }
+
   func body(content: Content) -> some View {
     content
       .overlay(alignment: .bottomTrailing) {
-        if isPresented {
+        if effectivePresentation {
           HarnessCornerOverlayContainer(
             configuration: configuration,
             content: overlayContent
@@ -50,8 +60,19 @@ struct HarnessCornerOverlayModifier<OverlayContent: View>: ViewModifier {
       }
       .animation(
         .spring(duration: 0.35, bounce: 0.15),
-        value: isPresented
+        value: effectivePresentation
       )
+      .task(id: isPresented) {
+        guard let delay = configuration.presentationDelay else { return }
+        if isPresented {
+          try? await Task.sleep(for: delay)
+          if !Task.isCancelled {
+            delayedShow = true
+          }
+        } else {
+          delayedShow = false
+        }
+      }
   }
 
   private var overlayTransition: AnyTransition {
@@ -120,7 +141,8 @@ extension View {
 
   func harnessCornerAnimation(
     _ descriptor: HarnessCornerAnimationDescriptor,
-    isPresented: Bool = true
+    isPresented: Bool = true,
+    presentationDelay: Duration? = nil
   ) -> some View {
     harnessCornerOverlay(
       isPresented: isPresented,
@@ -131,7 +153,8 @@ extension View {
         bottomPadding: descriptor.bottomPadding,
         contentPadding: 0,
         appliesGlass: false,
-        accessibilityLabel: descriptor.accessibilityLabel
+        accessibilityLabel: descriptor.accessibilityLabel,
+        presentationDelay: presentationDelay
       )
     ) {
       HarnessCornerAnimation(descriptor: descriptor)
