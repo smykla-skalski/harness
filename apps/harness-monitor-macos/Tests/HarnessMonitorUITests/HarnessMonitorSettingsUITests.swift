@@ -367,42 +367,6 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testToolbarStylePreferenceUpdatesToolbarChromeState() throws {
-    let app = launch(mode: "preview")
-
-    let toolbarChromeState = element(in: app, identifier: Accessibility.toolbarChromeState)
-    XCTAssertTrue(toolbarChromeState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(
-      toolbarChromeState.label.contains("toolbarStyle=glass"),
-      "Default toolbar style should be glass; got '\(toolbarChromeState.label)'"
-    )
-
-    openSettings(in: app)
-    selectAppearanceSection(in: app)
-
-    let toolbarStylePicker = element(
-      in: app,
-      identifier: Accessibility.preferencesToolbarStylePicker
-    )
-    XCTAssertTrue(toolbarStylePicker.waitForExistence(timeout: Self.uiTimeout))
-
-    selectMenuOption(
-      in: app,
-      controlIdentifier: Accessibility.preferencesToolbarStylePicker,
-      optionTitle: "Flat"
-    )
-
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
-
-    XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
-        toolbarChromeState.exists
-          && toolbarChromeState.label.contains("toolbarStyle=flat")
-      },
-      "Toolbar style should be flat after preference change; got '\(toolbarChromeState.label)'"
-    )
-  }
 }
 
 private extension HarnessMonitorSettingsUITests {
