@@ -63,9 +63,6 @@ struct HarnessMonitorLoadingStateView: View {
 
   let title: String
   let chrome: Chrome
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
-  @State private var animates = false
 
   init(title: String) {
     self.init(title: title, chrome: .content)
@@ -84,15 +81,6 @@ struct HarnessMonitorLoadingStateView: View {
     }
     .harnessCellPadding()
     .modifier(HarnessMonitorStatusPillChromeModifier(chrome: chrome, tint: HarnessMonitorTheme.accent))
-    .opacity(animates ? 1 : 0.62)
-    .scaleEffect(reduceMotion ? 1 : (animates ? 1 : 0.97))
-    .animation(
-      reduceMotion
-        ? .easeOut(duration: 0.2)
-        : .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
-      value: animates
-    )
-    .onAppear { animates = true }
   }
 }
 

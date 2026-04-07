@@ -153,6 +153,20 @@ func formatTimestamp(_ date: Date) -> String {
   formatTimestamp(date, configuration: .stored())
 }
 
+@MainActor private let sameYearFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "d MMM HH:mm:ss"
+  return formatter
+}()
+
+@MainActor private let crossYearFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "d MMM yyyy HH:mm:ss"
+  return formatter
+}()
+
 @MainActor
 func formatTimestamp(
   _ date: Date,
@@ -160,18 +174,10 @@ func formatTimestamp(
 ) -> String {
   let timeZone = configuration.effectiveTimeZone
   let calendar = Calendar.autoupdatingCurrent
-  let now = Date.now
-  let formatter = DateFormatter()
-  formatter.locale = .autoupdatingCurrent
+  let isSameYear = calendar.isDate(date, equalTo: .now, toGranularity: .year)
+  let formatter = isSameYear ? sameYearFormatter : crossYearFormatter
   formatter.calendar = calendar
   formatter.timeZone = timeZone
-  formatter.dateFormat =
-    if calendar.isDate(date, equalTo: now, toGranularity: .year) {
-      "d MMM HH:mm:ss"
-    } else {
-      "d MMM yyyy HH:mm:ss"
-    }
-
   return formatter.string(from: date)
 }
 
