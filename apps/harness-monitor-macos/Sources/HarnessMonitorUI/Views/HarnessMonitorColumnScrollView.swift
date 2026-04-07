@@ -22,7 +22,7 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
     readableWidth: Bool = false,
-    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .none,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
     @ViewBuilder content: () -> Content
   ) {
     self.horizontalPadding = horizontalPadding

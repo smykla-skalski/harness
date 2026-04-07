@@ -4,6 +4,8 @@ import SwiftUI
 struct PreferencesGeneralSection: View {
   let store: HarnessMonitorStore
   @Binding var themeMode: HarnessMonitorThemeMode
+  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
+  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
@@ -86,6 +88,15 @@ struct PreferencesGeneralSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesThemeModePicker)
+
+        Picker("Backdrop", selection: $backdropModeRawValue) {
+          ForEach(HarnessMonitorBackdropMode.allCases) { mode in
+            Text(mode.label).tag(mode.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
+
         Picker("Text size", selection: $textSizeIndex) {
           ForEach(Array(HarnessMonitorTextSize.scales.enumerated()), id: \.offset) { index, level in
             Text(level.label).tag(index)
@@ -96,7 +107,9 @@ struct PreferencesGeneralSection: View {
       } header: {
         Text("Appearance")
       } footer: {
-        Text("Applies to every Harness Monitor window on this Mac")
+        Text(
+          "Mode and text size apply to every Harness Monitor window. Backdrop lets you compare no app backdrop, a window-level backdrop, and a root-content backdrop live."
+        )
       }
 
       Section {

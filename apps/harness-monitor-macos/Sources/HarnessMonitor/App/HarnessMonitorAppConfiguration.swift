@@ -13,6 +13,7 @@ struct HarnessMonitorAppConfiguration {
   @MainActor
   static func resolve() -> Self {
     UserDefaults.standard.register(defaults: [
+      HarnessMonitorBackdropDefaults.modeKey: HarnessMonitorBackdropMode.none.rawValue,
       HarnessMonitorTextSize.storageKey: HarnessMonitorTextSize.defaultIndex,
       HarnessMonitorDateTimeConfiguration.timeZoneModeKey:
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
@@ -35,6 +36,12 @@ struct HarnessMonitorAppConfiguration {
         from: environment.values[HarnessMonitorTextSize.uiTestOverrideKey]
       ) ?? HarnessMonitorTextSize.defaultIndex)
       : HarnessMonitorTextSize.defaultIndex
+    let initialBackdropMode =
+      isUITesting
+      ? (HarnessMonitorBackdropMode(
+        rawValue: environment.values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] ?? ""
+      ) ?? .none)
+      : .none
     let persistenceSetup = HarnessMonitorPersistenceSetup.resolve(
       environment: environment,
       launchMode: launchMode
@@ -47,6 +54,15 @@ struct HarnessMonitorAppConfiguration {
     )
 
     if isUITesting {
+      let uiTestTimeZoneMode =
+        HarnessMonitorDateTimeZoneMode(
+          rawValue: environment.values[HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey]
+            ?? ""
+        ) ?? .local
+      let uiTestCustomTimeZone =
+        environment.values[HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey]
+        ?? HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
+
       UserDefaults.standard.set(
         initialThemeMode.rawValue,
         forKey: HarnessMonitorThemeDefaults.modeKey
@@ -55,25 +71,18 @@ struct HarnessMonitorAppConfiguration {
         initialTextSizeIndex,
         forKey: HarnessMonitorTextSize.storageKey
       )
-      if let timeZoneModeOverride =
-        HarnessMonitorDateTimeZoneMode(
-          rawValue: environment.values[HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey]
-            ?? ""
-        )
-      {
-        UserDefaults.standard.set(
-          timeZoneModeOverride.rawValue,
-          forKey: HarnessMonitorDateTimeConfiguration.timeZoneModeKey
-        )
-      }
-      if let customTimeZoneOverride =
-        environment.values[HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey]
-      {
-        UserDefaults.standard.set(
-          customTimeZoneOverride,
-          forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
-        )
-      }
+      UserDefaults.standard.set(
+        initialBackdropMode.rawValue,
+        forKey: HarnessMonitorBackdropDefaults.modeKey
+      )
+      UserDefaults.standard.set(
+        uiTestTimeZoneMode.rawValue,
+        forKey: HarnessMonitorDateTimeConfiguration.timeZoneModeKey
+      )
+      UserDefaults.standard.set(
+        uiTestCustomTimeZone,
+        forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
+      )
     }
 
     return Self(
