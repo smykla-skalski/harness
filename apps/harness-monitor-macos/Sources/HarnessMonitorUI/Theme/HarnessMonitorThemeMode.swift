@@ -15,6 +15,7 @@ public enum HarnessMonitorToolbarStyleDefaults {
 
 public enum HarnessMonitorBackgroundDefaults {
   public static let imageKey = "harnessBackgroundImage"
+  public static let recentKey = "harnessRecentBackgrounds"
 }
 
 public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendable {
