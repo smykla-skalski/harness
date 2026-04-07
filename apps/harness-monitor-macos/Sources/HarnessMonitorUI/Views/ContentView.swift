@@ -15,6 +15,8 @@ public struct ContentView: View {
   @State private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode = .standard
   @AppStorage("showInspector")
   private var showInspector = true
+  @AppStorage("inspectorColumnWidth")
+  private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -120,9 +122,20 @@ public struct ContentView: View {
       }
       .inspector(isPresented: $showInspector) {
         InspectorColumnView(store: store)
+          .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+          } action: { width in
+            guard width >= HarnessMonitorInspectorLayout.minWidth,
+              width <= HarnessMonitorInspectorLayout.maxWidth,
+              abs(width - inspectorColumnWidth) > 1
+            else {
+              return
+            }
+            inspectorColumnWidth = width
+          }
           .inspectorColumnWidth(
             min: HarnessMonitorInspectorLayout.minWidth,
-            ideal: HarnessMonitorInspectorLayout.idealWidth,
+            ideal: inspectorColumnWidth,
             max: HarnessMonitorInspectorLayout.maxWidth
           )
       }
