@@ -48,6 +48,16 @@ public final class HarnessMonitorStore {
     case removeAgent(sessionID: String, agentID: String, actorID: String)
   }
 
+  public enum PresentedSheet: Identifiable, Equatable {
+    case sendSignal(agentID: String)
+
+    public var id: String {
+      switch self {
+      case .sendSignal(let agentID): "sendSignal:\(agentID)"
+      }
+    }
+  }
+
   public struct CheckoutGroup: Identifiable, Equatable {
     public let checkoutId: String
     public let title: String
@@ -117,6 +127,7 @@ public final class HarnessMonitorStore {
   public var lastAction = ""
   public var lastError: String?
   public var persistenceError: String?
+  public var presentedSheet: PresentedSheet?
   public var pendingConfirmation: PendingConfirmation?
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
