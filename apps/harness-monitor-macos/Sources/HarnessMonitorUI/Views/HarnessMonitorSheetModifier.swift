@@ -2,11 +2,21 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct HarnessMonitorSheetModifier: ViewModifier {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
+  let presentedSheet: HarnessMonitorStore.PresentedSheet?
 
   func body(content: Content) -> some View {
     content
-      .sheet(item: $store.presentedSheet) { sheet in
+      .sheet(
+        item: Binding(
+          get: { presentedSheet },
+          set: { sheet in
+            if sheet == nil {
+              store.dismissSheet()
+            }
+          }
+        )
+      ) { sheet in
         HarnessMonitorSheetRouter(store: store, sheet: sheet)
       }
   }

@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 private final class ToolbarCenterpieceBundleToken {}
@@ -13,6 +14,19 @@ enum ToolbarDaemonIndicator: Equatable {
       .secondary
     case .launchdConnected, .manualConnected:
       HarnessMonitorTheme.success
+    }
+  }
+}
+
+extension ToolbarDaemonIndicator {
+  init(_ state: HarnessMonitorStore.DaemonIndicatorState) {
+    switch state {
+    case .offline:
+      self = .offline
+    case .launchdConnected:
+      self = .launchdConnected
+    case .manualConnected:
+      self = .manualConnected
     }
   }
 }

@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 private enum HarnessMonitorInspectorLayout {
@@ -8,7 +9,8 @@ private enum HarnessMonitorInspectorLayout {
 }
 
 public struct ContentView: View {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Environment(\.openWindow)
   private var openWindow
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -22,25 +24,8 @@ public struct ContentView: View {
   @State private var showLlama = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
-  private var selectedDetail: SessionDetail? {
-    guard let sessionID = store.selectedSessionID,
-      let detail = store.selectedSession,
-      detail.session.sessionId == sessionID
-    else {
-      return nil
-    }
-    return detail
-  }
-
-  private var selectedSessionSummary: SessionSummary? {
-    store.selectedSessionSummary
-  }
-
   private var windowTitle: String {
-    if selectedDetail != nil || selectedSessionSummary != nil {
-      return "Cockpit"
-    }
-    return "Dashboard"
+    contentUI.windowTitle
   }
 
   private var appChromeAccessibilityValue: String {
@@ -58,90 +43,47 @@ public struct ContentView: View {
     ].joined(separator: ", ")
   }
 
-  private var toolbarCenterpieceModel: ToolbarCenterpieceModel {
-    ToolbarCenterpieceModel(
-      workspaceName: "Harness Monitor",
-      destinationName: "My Mac",
-      destinationSystemImage: "laptopcomputer",
-      metrics: [
-        .init(kind: .projects, value: store.daemonStatus?.projectCount ?? store.projects.count),
-        .init(kind: .worktrees, value: store.daemonStatus?.worktreeCount ?? store.projects.reduce(0) { $0 + $1.worktrees.count }),
-        .init(kind: .sessions, value: store.daemonStatus?.sessionCount ?? store.sessions.count),
-        .init(kind: .openWork, value: store.totalOpenWorkCount),
-        .init(kind: .blocked, value: store.totalBlockedCount),
-      ]
-    )
-  }
-
   public init(store: HarnessMonitorStore) {
     self.store = store
+    self.contentUI = store.contentUI
   }
 
   public var body: some View {
-    let sessionContent = SessionContentContainer(
-      store: store,
-      detail: selectedDetail,
-      summary: selectedSessionSummary,
-      timeline: store.timeline
-    )
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
-    .onKeyPress(.escape) {
-      if store.inspectorSelection != .none {
-        store.inspectorSelection = .none
-        return .handled
-      }
-      return .ignored
-    }
-
     NavigationSplitView(columnVisibility: $columnVisibility) {
-      SidebarView(store: store)
+      SidebarView(
+        store: store,
+        sessionIndex: store.sessionIndex,
+        sidebarUI: store.sidebarUI
+      )
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         .toolbarBaselineFrame(.sidebar)
     } detail: {
-      ZStack {
-        if toolbarGlassReproConfiguration.disablesContentDetailChrome {
-          sessionContent
-        } else {
-          ContentDetailChrome(
-            persistenceError: store.persistenceError,
-            sessionDataAvailability: store.sessionDataAvailability,
-            sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
-          ) {
-            sessionContent
-          }
-        }
-      }
-      .inspector(isPresented: $showInspector) {
-        InspectorColumnView(store: store)
-          .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-          } action: { width in
-            guard width >= HarnessMonitorInspectorLayout.minWidth,
-              width <= HarnessMonitorInspectorLayout.maxWidth,
-              abs(width - inspectorColumnWidth) > 1
-            else {
-              return
-            }
-            inspectorColumnWidth = width
-          }
-          .inspectorColumnWidth(
-            min: HarnessMonitorInspectorLayout.minWidth,
-            ideal: inspectorColumnWidth,
-            max: HarnessMonitorInspectorLayout.maxWidth
-          )
-      }
-      .toolbar {
-        primaryToolbar
-      }
+      ContentDetailColumn(
+        store: store,
+        contentUI: contentUI,
+        showInspector: $showInspector,
+        inspectorColumnWidth: $inspectorColumnWidth,
+        showLlama: $showLlama,
+        toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
+        openPreferences: openPreferences,
+        refresh: refresh,
+        toggleSleepPrevention: toggleSleepPrevention
+      )
     }
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .navigationTitle(windowTitle)
     .toolbar {
-      navigationToolbar
-      centerpieceToolbar
+      ContentNavigationToolbarItems(
+        contentUI: contentUI,
+        navigateBack: navigateBack,
+        navigateForward: navigateForward
+      )
+      ContentCenterpieceToolbarItems(
+        contentUI: contentUI,
+        displayMode: toolbarCenterpieceDisplayMode
+      )
     }
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
@@ -153,11 +95,11 @@ public struct ContentView: View {
       toolbarCenterpieceDisplayMode = nextMode
     }
     .onAppear {
-      if let restoredSessionID, store.selectedSessionID == nil {
+      if let restoredSessionID, contentUI.selectedSessionID == nil {
         Task { await store.selectSession(restoredSessionID) }
       }
     }
-    .onChange(of: store.selectedSessionID) { _, newID in
+    .onChange(of: contentUI.selectedSessionID) { _, newID in
       restoredSessionID = newID
     }
     .accessibilityElement(children: .contain)
@@ -172,10 +114,7 @@ public struct ContentView: View {
           identifier: HarnessMonitorAccessibility.toolbarChromeState,
           text: toolbarChromeAccessibilityValue
         )
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
-          text: toolbarCenterpieceModel.accessibilityValue
-        )
+        ContentToolbarAccessibilityMarker(contentUI: contentUI)
         AccessibilityTextMarker(
           identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
           text: toolbarCenterpieceDisplayMode.rawValue
@@ -191,85 +130,245 @@ public struct ContentView: View {
     .harnessCornerAnimation(
       .dancingLlama,
       isPresented: showLlama
-        || store.isSelectionLoading
-        || store.isExtensionsLoading
-        || store.isRefreshing
-        || store.connectionState == .connecting,
+        || contentUI.isSelectionLoading
+        || contentUI.isExtensionsLoading
+        || contentUI.isRefreshing
+        || contentUI.connectionState == .connecting,
       presentationDelay: showLlama ? nil : .milliseconds(400)
     )
-    .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
-    .modifier(HarnessMonitorSheetModifier(store: store))
+    .modifier(
+      HarnessMonitorConfirmationDialogModifier(
+        store: store,
+        pendingConfirmation: contentUI.pendingConfirmation
+      )
+    )
+    .modifier(
+      HarnessMonitorSheetModifier(
+        store: store,
+        presentedSheet: contentUI.presentedSheet
+      )
+    )
     .modifier(
       ContentAnnouncementsModifier(
-        connectionState: store.connectionState,
-        lastAction: store.lastAction
+        connectionState: contentUI.connectionState,
+        lastAction: contentUI.lastAction
       )
     )
   }
+
+  private func openPreferences() {
+    openWindow(id: HarnessMonitorWindowID.preferences)
+  }
+
+  func navigateBack() {
+    Task { await store.navigateBack() }
+  }
+
+  func navigateForward() {
+    Task { await store.navigateForward() }
+  }
+
+  func refresh() {
+    Task { await store.refresh() }
+  }
+
+  func toggleSleepPrevention() {
+    store.sleepPreventionEnabled.toggle()
+  }
 }
 
-private extension ContentView {
-  @ToolbarContentBuilder var navigationToolbar: some ToolbarContent {
+private struct ContentDetailColumn: View {
+  let store: HarnessMonitorStore
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Binding var showInspector: Bool
+  @Binding var inspectorColumnWidth: Double
+  @Binding var showLlama: Bool
+  let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
+  let openPreferences: () -> Void
+  let refresh: () -> Void
+  let toggleSleepPrevention: () -> Void
+
+  init(
+    store: HarnessMonitorStore,
+    contentUI: HarnessMonitorStore.ContentUISlice,
+    showInspector: Binding<Bool>,
+    inspectorColumnWidth: Binding<Double>,
+    showLlama: Binding<Bool>,
+    toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration,
+    openPreferences: @escaping () -> Void,
+    refresh: @escaping () -> Void,
+    toggleSleepPrevention: @escaping () -> Void
+  ) {
+    self.store = store
+    self.contentUI = contentUI
+    self._showInspector = showInspector
+    self._inspectorColumnWidth = inspectorColumnWidth
+    self._showLlama = showLlama
+    self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
+    self.openPreferences = openPreferences
+    self.refresh = refresh
+    self.toggleSleepPrevention = toggleSleepPrevention
+  }
+
+  var body: some View {
+    ZStack {
+      if toolbarGlassReproConfiguration.disablesContentDetailChrome {
+        sessionContent
+      } else {
+        ContentDetailChrome(
+          persistenceError: contentUI.persistenceError,
+          sessionDataAvailability: contentUI.sessionDataAvailability,
+          sessionStatus: contentUI.sessionStatus
+        ) {
+          sessionContent
+        }
+      }
+    }
+    .inspector(isPresented: $showInspector) {
+      InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+          proxy.size.width
+        } action: { width in
+          guard width >= HarnessMonitorInspectorLayout.minWidth,
+            width <= HarnessMonitorInspectorLayout.maxWidth,
+            abs(width - inspectorColumnWidth) > 1
+          else {
+            return
+          }
+          inspectorColumnWidth = width
+        }
+        .inspectorColumnWidth(
+          min: HarnessMonitorInspectorLayout.minWidth,
+          ideal: inspectorColumnWidth,
+          max: HarnessMonitorInspectorLayout.maxWidth
+        )
+    }
+    .toolbar {
+      ContentPrimaryToolbarItems(
+        contentUI: contentUI,
+        showLlama: $showLlama,
+        showInspector: $showInspector,
+        openPreferences: openPreferences,
+        refresh: refresh,
+        toggleSleepPrevention: toggleSleepPrevention
+      )
+    }
+  }
+
+  private var sessionContent: some View {
+    SessionContentContainer(
+      store: store,
+      state: SessionContentState(
+        detail: contentUI.selectedDetail,
+        summary: contentUI.selectedSessionSummary,
+        timeline: contentUI.timeline,
+        isSessionReadOnly: contentUI.isSessionReadOnly,
+        isSessionActionInFlight: contentUI.isSessionActionInFlight,
+        isSelectionLoading: contentUI.isSelectionLoading,
+        isExtensionsLoading: contentUI.isExtensionsLoading,
+        lastAction: contentUI.lastAction
+      )
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
+    .onKeyPress(.escape) {
+      if store.inspectorUI.actionContext != nil {
+        store.inspectorSelection = .none
+        return .handled
+      }
+      return .ignored
+    }
+  }
+}
+
+private struct ContentNavigationToolbarItems: ToolbarContent {
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  let navigateBack: () -> Void
+  let navigateForward: () -> Void
+
+  init(
+    contentUI: HarnessMonitorStore.ContentUISlice,
+    navigateBack: @escaping () -> Void,
+    navigateForward: @escaping () -> Void
+  ) {
+    self.contentUI = contentUI
+    self.navigateBack = navigateBack
+    self.navigateForward = navigateForward
+  }
+
+  var body: some ToolbarContent {
     ContentNavigationToolbar(
-      canNavigateBack: store.canNavigateBack,
-      canNavigateForward: store.canNavigateForward,
+      canNavigateBack: contentUI.canNavigateBack,
+      canNavigateForward: contentUI.canNavigateForward,
       navigateBack: navigateBack,
       navigateForward: navigateForward
     )
   }
+}
 
-  private var statusTickerMessages: [ToolbarStatusMessage] {
-    var messages: [ToolbarStatusMessage] = []
+private struct ContentCenterpieceToolbarItems: ToolbarContent {
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  let displayMode: ToolbarCenterpieceDisplayMode
 
-    if store.connectionState == .connecting {
-      messages.append(.init(id: "loading.connecting", text: "Connecting to the control plane", systemImage: "network", tint: .orange))
-    }
-    if store.isRefreshing {
-      messages.append(.init(id: "loading.refreshing", text: "Refreshing session index", systemImage: "arrow.trianglehead.2.clockwise", tint: .orange))
-    }
-    if store.isSelectionLoading {
-      messages.append(.init(id: "loading.session", text: "Loading session detail", systemImage: "doc.text.magnifyingglass", tint: .orange))
-    }
-    if store.isExtensionsLoading {
-      messages.append(.init(id: "loading.extensions", text: "Loading observers and signals", systemImage: "antenna.radiowaves.left.and.right", tint: .orange))
-    }
-
-    messages.append(contentsOf: [
-      .init(id: "status.running", text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-      .init(id: "status.sessions", text: "\(store.sessions.count) sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
-      .init(id: "status.daemon", text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
-    ])
-
-    return messages
+  init(
+    contentUI: HarnessMonitorStore.ContentUISlice,
+    displayMode: ToolbarCenterpieceDisplayMode
+  ) {
+    self.contentUI = contentUI
+    self.displayMode = displayMode
   }
 
-  private var daemonIndicator: ToolbarDaemonIndicator {
-    guard store.connectionState == .online else {
-      return .offline
-    }
-    if store.daemonStatus?.launchAgent.installed == true {
-      return .launchdConnected
-    }
-    return .manualConnected
-  }
-
-  @ToolbarContentBuilder var centerpieceToolbar: some ToolbarContent {
+  var body: some ToolbarContent {
     ContentCenterpieceToolbar(
-      model: toolbarCenterpieceModel,
-      displayMode: toolbarCenterpieceDisplayMode,
-      statusMessages: statusTickerMessages,
-      daemonIndicator: daemonIndicator
+      model: ToolbarCenterpieceModel(
+        workspaceName: "Harness Monitor",
+        destinationName: "My Mac",
+        destinationSystemImage: "laptopcomputer",
+        metrics: [
+          .init(kind: .projects, value: contentUI.toolbarMetrics.projectCount),
+          .init(kind: .worktrees, value: contentUI.toolbarMetrics.worktreeCount),
+          .init(kind: .sessions, value: contentUI.toolbarMetrics.sessionCount),
+          .init(kind: .openWork, value: contentUI.toolbarMetrics.openWorkCount),
+          .init(kind: .blocked, value: contentUI.toolbarMetrics.blockedCount),
+        ]
+      ),
+      displayMode: displayMode,
+      statusMessages: contentUI.statusMessages.map(ToolbarStatusMessage.init),
+      daemonIndicator: ToolbarDaemonIndicator(contentUI.daemonIndicator)
     )
   }
+}
 
-  @ToolbarContentBuilder var primaryToolbar: some ToolbarContent {
+private struct ContentPrimaryToolbarItems: ToolbarContent {
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Binding var showLlama: Bool
+  @Binding var showInspector: Bool
+  let openPreferences: () -> Void
+  let refresh: () -> Void
+  let toggleSleepPrevention: () -> Void
+
+  init(
+    contentUI: HarnessMonitorStore.ContentUISlice,
+    showLlama: Binding<Bool>,
+    showInspector: Binding<Bool>,
+    openPreferences: @escaping () -> Void,
+    refresh: @escaping () -> Void,
+    toggleSleepPrevention: @escaping () -> Void
+  ) {
+    self.contentUI = contentUI
+    self._showLlama = showLlama
+    self._showInspector = showInspector
+    self.openPreferences = openPreferences
+    self.refresh = refresh
+    self.toggleSleepPrevention = toggleSleepPrevention
+  }
+
+  var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
-      RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
+      RefreshToolbarButton(isRefreshing: contentUI.isRefreshing, refresh: refresh)
         .help("Refresh sessions")
 
-      Button {
-        openWindow(id: HarnessMonitorWindowID.preferences)
-      } label: {
+      Button(action: openPreferences) {
         Label("Settings", systemImage: "gearshape")
       }
       .help("Open settings")
@@ -281,13 +380,13 @@ private extension ContentView {
     ToolbarItemGroup(placement: .primaryAction) {
       Button(action: toggleSleepPrevention) {
         Label(
-          store.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: store.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+          contentUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
+          systemImage: contentUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
         )
       }
-      .tint(store.sleepPreventionEnabled ? .orange : nil)
+      .tint(contentUI.sleepPreventionEnabled ? .orange : nil)
       .help(
-        store.sleepPreventionEnabled
+        contentUI.sleepPreventionEnabled
           ? "Preventing sleep - click to disable"
           : "Allow sleep - click to prevent"
       )
@@ -310,7 +409,7 @@ private extension ContentView {
     ToolbarSpacer(.fixed, placement: .primaryAction)
 
     ToolbarItemGroup(placement: .primaryAction) {
-      Button(action: toggleInspector) {
+      Button { showInspector.toggle() } label: {
         Label(
           showInspector ? "Hide Inspector" : "Show Inspector",
           systemImage: "sidebar.trailing"
@@ -321,25 +420,31 @@ private extension ContentView {
       .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
+}
 
-  func navigateBack() {
-    Task { await store.navigateBack() }
+private struct ContentToolbarAccessibilityMarker: View {
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+
+  init(contentUI: HarnessMonitorStore.ContentUISlice) {
+    self.contentUI = contentUI
   }
 
-  func navigateForward() {
-    Task { await store.navigateForward() }
-  }
-
-  func refresh() {
-    Task { await store.refresh() }
-  }
-
-  func toggleInspector() {
-    showInspector.toggle()
-  }
-
-  func toggleSleepPrevention() {
-    store.sleepPreventionEnabled.toggle()
+  var body: some View {
+    AccessibilityTextMarker(
+      identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
+      text: ToolbarCenterpieceModel(
+        workspaceName: "Harness Monitor",
+        destinationName: "My Mac",
+        destinationSystemImage: "laptopcomputer",
+        metrics: [
+          .init(kind: .projects, value: contentUI.toolbarMetrics.projectCount),
+          .init(kind: .worktrees, value: contentUI.toolbarMetrics.worktreeCount),
+          .init(kind: .sessions, value: contentUI.toolbarMetrics.sessionCount),
+          .init(kind: .openWork, value: contentUI.toolbarMetrics.openWorkCount),
+          .init(kind: .blocked, value: contentUI.toolbarMetrics.blockedCount),
+        ]
+      ).accessibilityValue
+    )
   }
 }
 

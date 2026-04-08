@@ -11,18 +11,18 @@ private enum InspectorChromeMetrics {
 
 struct InspectorColumnView: View {
   let store: HarnessMonitorStore
+  @Bindable var inspectorUI: HarnessMonitorStore.InspectorUISlice
 
-  private var resolvedPrimaryContent: InspectorPrimaryContent {
-    InspectorPrimaryContent(
-      selectedSession: store.selectedSession,
-      selectedSessionSummary: store.selectedSessionSummary,
-      inspectorSelection: store.inspectorSelection,
-      isPersistenceAvailable: store.isPersistenceAvailable
-    )
+  init(
+    store: HarnessMonitorStore,
+    inspectorUI: HarnessMonitorStore.InspectorUISlice
+  ) {
+    self.store = store
+    self.inspectorUI = inspectorUI
   }
 
   private var selectedObserver: ObserverSummary? {
-    resolvedPrimaryContent.observer
+    inspectorUI.primaryContent.observer
   }
 
   var body: some View {
@@ -33,16 +33,13 @@ struct InspectorColumnView: View {
     ) {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
         inspectorPrimaryContent
-          .id(resolvedPrimaryContent.identity)
+          .id(inspectorUI.primaryContent.identity)
           .transition(.opacity.animation(.easeOut(duration: 0.08)))
 
-        if let detail = store.selectedSession {
+        if let actionContext = inspectorUI.actionContext {
           InspectorActionSections(
             store: store,
-            detail: detail,
-            selectedTask: store.selectedTask,
-            selectedAgent: store.selectedAgent,
-            selectedObserver: selectedObserver
+            context: actionContext
           )
         }
       }
@@ -56,7 +53,7 @@ struct InspectorColumnView: View {
   }
 
   @ViewBuilder private var inspectorPrimaryContent: some View {
-    switch resolvedPrimaryContent {
+    switch inspectorUI.primaryContent {
     case .empty:
       InspectorPrimaryEmptyState()
     case .loading(let summary):
@@ -119,129 +116,18 @@ private struct InspectorPrimaryLoadingState: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(
-      HarnessMonitorAccessibility.sessionInspectorCard,
+      HarnessMonitorAccessibility.inspectorLoadingState,
       label: "Inspector",
       value: "loading"
     )
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionInspectorCard).frame")
-  }
-}
-
-private struct InspectorTaskSelection {
-  let task: WorkItem
-  let notesSessionID: String?
-  let isPersistenceAvailable: Bool
-}
-
-private struct InspectorAgentSelection {
-  let agent: AgentRegistration
-  let activity: AgentToolActivitySummary?
-}
-
-private enum InspectorPrimaryContent {
-  case empty
-  case loading(SessionSummary)
-  case session(SessionDetail)
-  case task(InspectorTaskSelection)
-  case agent(InspectorAgentSelection)
-  case signal(SessionSignalRecord)
-  case observer(ObserverSummary)
-
-  var identity: String {
-    switch self {
-    case .empty:
-      return "empty"
-    case .loading(let summary):
-      return "loading:\(summary.sessionId)"
-    case .session(let detail):
-      return "session:\(detail.session.sessionId)"
-    case .task(let selection):
-      return "task:\(selection.task.taskId)"
-    case .agent(let selection):
-      return "agent:\(selection.agent.agentId)"
-    case .signal(let signal):
-      return "signal:\(signal.signal.signalId)"
-    case .observer(let observer):
-      return "observer:\(observer.observeId)"
-    }
-  }
-
-  var observer: ObserverSummary? {
-    guard case .observer(let observer) = self else {
-      return nil
-    }
-    return observer
-  }
-
-  init(
-    selectedSession: SessionDetail?,
-    selectedSessionSummary: SessionSummary?,
-    inspectorSelection: HarnessMonitorStore.InspectorSelection,
-    isPersistenceAvailable: Bool
-  ) {
-    guard let selectedSession else {
-      if let selectedSessionSummary {
-        self = .loading(selectedSessionSummary)
-      } else {
-        self = .empty
-      }
-      return
-    }
-
-    self = Self.resolveSelection(
-      selectedSession: selectedSession,
-      inspectorSelection: inspectorSelection,
-      isPersistenceAvailable: isPersistenceAvailable
-    )
-  }
-
-  private static func resolveSelection(
-    selectedSession: SessionDetail,
-    inspectorSelection: HarnessMonitorStore.InspectorSelection,
-    isPersistenceAvailable: Bool
-  ) -> Self {
-    switch inspectorSelection {
-    case .none:
-      return .session(selectedSession)
-    case .task(let taskID):
-      guard let task = selectedSession.tasks.first(where: { $0.taskId == taskID }) else {
-        return .session(selectedSession)
-      }
-      return .task(
-        InspectorTaskSelection(
-          task: task,
-          notesSessionID: selectedSession.session.sessionId,
-          isPersistenceAvailable: isPersistenceAvailable
-        )
-      )
-    case .agent(let agentID):
-      guard let agent = selectedSession.agents.first(where: { $0.agentId == agentID }) else {
-        return .session(selectedSession)
-      }
-      return .agent(
-        InspectorAgentSelection(
-          agent: agent,
-          activity: selectedSession.agentActivity.first(where: { $0.agentId == agent.agentId })
-        )
-      )
-    case .signal(let signalID):
-      guard let signal = selectedSession.signals.first(where: { $0.signal.signalId == signalID }) else {
-        return .session(selectedSession)
-      }
-      return .signal(signal)
-    case .observer:
-      if let observer = selectedSession.observer {
-        return .observer(observer)
-      }
-      return .session(selectedSession)
-    }
+    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.inspectorLoadingState).frame")
   }
 }
 
 #Preview("Inspector - Session") {
   let store = inspectorPreviewStore(selection: .none)
 
-  InspectorColumnView(store: store)
+  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -249,7 +135,7 @@ private enum InspectorPrimaryContent {
 #Preview("Inspector - Task") {
   let store = inspectorPreviewStore(selection: .task(PreviewFixtures.tasks[0].taskId))
 
-  InspectorColumnView(store: store)
+  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -257,7 +143,7 @@ private enum InspectorPrimaryContent {
 #Preview("Inspector - Agent") {
   let store = inspectorPreviewStore(selection: .agent(PreviewFixtures.agents[0].agentId))
 
-  InspectorColumnView(store: store)
+  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -265,7 +151,7 @@ private enum InspectorPrimaryContent {
 #Preview("Inspector - Observer") {
   let store = inspectorPreviewStore(selection: .observer)
 
-  InspectorColumnView(store: store)
+  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -276,7 +162,7 @@ private enum InspectorPrimaryContent {
     modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer
   )
 
-  InspectorColumnView(store: store)
+  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }

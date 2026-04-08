@@ -285,4 +285,50 @@ struct HarnessMonitorStoreFilteringTests {
     ]
     #expect(store.selectedSessionSummary == nil)
   }
+
+  @Test("Sidebar UI list-facing state ignores footer-only metric churn")
+  func sidebarUIListFacingStateIgnoresFooterMetricChurn() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.sidebarUI.selectedSessionID,
+          store.sidebarUI.bookmarkedSessionIds,
+          store.sidebarUI.emptyState,
+          store.sidebarUI.filterSummary
+        )
+      },
+      after: {
+        var metrics = store.connectionMetrics
+        metrics.messagesReceived += 1
+        metrics.messagesPerSecond = 8
+        store.connectionMetrics = metrics
+      }
+    )
+
+    #expect(didChange == false)
+  }
+
+  @Test("Sidebar UI tracks bookmark and filter mutations")
+  func sidebarUITracksBookmarkAndFilterMutations() async {
+    let store = await makeBootstrappedStore()
+
+    let bookmarkInvalidated = await didInvalidate(
+      { store.sidebarUI.bookmarkedSessionIds },
+      after: {
+        store.bookmarkedSessionIds = ["bookmark-observed"]
+      }
+    )
+    #expect(bookmarkInvalidated)
+
+    let filterInvalidated = await didInvalidate(
+      { store.sidebarUI.filterSummary },
+      after: {
+        store.searchText = "preview"
+      }
+    )
+    #expect(filterInvalidated)
+    #expect(store.sidebarUI.filterSummary.isFiltered)
+  }
 }

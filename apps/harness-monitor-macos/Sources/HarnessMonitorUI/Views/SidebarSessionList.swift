@@ -4,34 +4,19 @@ import SwiftData
 import SwiftUI
 
 struct SidebarFilterSection: View {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
+  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
   @Binding var draftSearchText: String
   let recentSearchQueries: [String]
   let isExpanded: Bool
   let toggleExpanded: () -> Void
 
-  private var activeFilterSummary: String {
-    let isAnyFilterActive =
-      !store.searchText.isEmpty
-      || store.sessionFilter != .active
-      || store.sessionFocusFilter != .all
-    if isAnyFilterActive {
-      return "\(store.filteredSessionCount) visible of \(store.sessions.count)"
-    }
-    return "\(store.sessions.count) indexed"
-  }
-
-  private var isFiltered: Bool {
-    !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || store.sessionFilter != .active
-      || store.sessionFocusFilter != .all
-  }
-
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       SidebarFilterHeader(
-        activeFilterSummary: activeFilterSummary,
-        isFiltered: isFiltered,
+        activeFilterSummary: sidebarUI.filterSummary.activeFilterSummary,
+        isFiltered: sidebarUI.filterSummary.isFiltered,
         isExpanded: isExpanded,
         resetFilters: { store.resetFilters() },
         toggleExpanded: toggleExpanded
@@ -45,7 +30,7 @@ struct SidebarFilterSection: View {
               submitSearch: submitSearch
             )
 
-            if store.searchText.isEmpty, store.isPersistenceAvailable {
+            if sessionIndex.searchText.isEmpty, sidebarUI.isPersistenceAvailable {
               RecentSearchChipsSection(
                 recentSearchQueries: recentSearchQueries,
                 applyRecentSearch: applyRecentSearch(_:),
@@ -56,19 +41,19 @@ struct SidebarFilterSection: View {
 
           SidebarFilterControlsBar(
             sessionFilter: Binding(
-              get: { store.sessionFilter },
+              get: { sessionIndex.sessionFilter },
               set: { newValue in
                 withAnimation(.spring(duration: 0.2)) {
-                  store.sessionFilter = newValue
+                  sessionIndex.sessionFilter = newValue
                 }
               }
             ),
-            sessionSortOrder: $store.sessionSortOrder,
+            sessionSortOrder: $sessionIndex.sessionSortOrder,
             sessionFocusFilter: Binding(
-              get: { store.sessionFocusFilter },
+              get: { sessionIndex.sessionFocusFilter },
               set: { newValue in
                 withAnimation(.spring(duration: 0.2)) {
-                  store.sessionFocusFilter = newValue
+                  sessionIndex.sessionFocusFilter = newValue
                 }
               }
             )
@@ -93,13 +78,13 @@ struct SidebarFilterSection: View {
   }
 
   private func submitSearch() {
-    store.searchText = draftSearchText
+    sessionIndex.searchText = draftSearchText
     _ = store.recordSearch(draftSearchText)
   }
 
   private func applyRecentSearch(_ query: String) {
     draftSearchText = query
-    store.searchText = query
+    sessionIndex.searchText = query
   }
 }
 

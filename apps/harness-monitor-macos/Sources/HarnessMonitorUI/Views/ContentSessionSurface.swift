@@ -1,22 +1,31 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionContentContainer: View {
-  let store: HarnessMonitorStore
+struct SessionContentState: Equatable {
   let detail: SessionDetail?
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
+  let isSessionReadOnly: Bool
+  let isSessionActionInFlight: Bool
+  let isSelectionLoading: Bool
+  let isExtensionsLoading: Bool
+  let lastAction: String
+}
+
+struct SessionContentContainer: View {
+  let store: HarnessMonitorStore
+  let state: SessionContentState
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var lastDetail: SessionDetail?
   @State private var lastTimeline: [TimelineEntry] = []
 
   private var activeDetail: SessionDetail? {
-    detail ?? lastDetail
+    state.detail ?? lastDetail
   }
 
   private var activeTimeline: [TimelineEntry] {
-    detail != nil ? timeline : lastTimeline
+    state.detail != nil ? state.timeline : lastTimeline
   }
 
   private var mode: SessionContentMode {
@@ -34,18 +43,22 @@ struct SessionContentContainer: View {
     ZStack(alignment: .topLeading) {
       switch mode {
       case .dashboard:
-        SessionsBoardView(store: store)
+        SessionsBoardView(
+          store: store,
+          sessionIndex: store.sessionIndex,
+          contentUI: store.contentUI
+        )
           .transition(.opacity)
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
           store: store,
           detail: cockpitDetail,
           timeline: activeTimeline,
-          isSessionReadOnly: store.isSessionReadOnly,
-          isSessionActionInFlight: store.isSessionActionInFlight,
-          isSelectionLoading: store.isSelectionLoading,
-          isExtensionsLoading: store.isExtensionsLoading,
-          lastAction: store.lastAction,
+          isSessionReadOnly: state.isSessionReadOnly,
+          isSessionActionInFlight: state.isSessionActionInFlight,
+          isSelectionLoading: state.isSelectionLoading,
+          isExtensionsLoading: state.isExtensionsLoading,
+          lastAction: state.lastAction,
           observeSelectedSession: observeSelectedSession,
           requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
           inspectTask: store.inspect(taskID:),
@@ -58,13 +71,13 @@ struct SessionContentContainer: View {
       }
     }
     .animation(transitionAnimation, value: mode.identity)
-    .onChange(of: detail) { _, newDetail in
+    .onChange(of: state.detail) { _, newDetail in
       if let newDetail {
         lastDetail = newDetail
-        lastTimeline = timeline
+        lastTimeline = state.timeline
       }
     }
-    .onChange(of: summary?.sessionId) { _, newID in
+    .onChange(of: state.summary?.sessionId) { _, newID in
       if newID == nil {
         lastDetail = nil
         lastTimeline = []
@@ -98,9 +111,16 @@ private enum SessionContentMode {
 
   SessionContentContainer(
     store: store,
-    detail: nil,
-    summary: nil,
-    timeline: []
+    state: .init(
+      detail: nil,
+      summary: nil,
+      timeline: [],
+      isSessionReadOnly: false,
+      isSessionActionInFlight: false,
+      isSelectionLoading: false,
+      isExtensionsLoading: false,
+      lastAction: ""
+    )
   )
   .frame(width: 980, height: 720)
 }
@@ -110,9 +130,16 @@ private enum SessionContentMode {
 
   SessionContentContainer(
     store: store,
-    detail: store.selectedSession,
-    summary: store.selectedSessionSummary,
-    timeline: store.timeline
+    state: .init(
+      detail: store.selectedSession,
+      summary: store.selectedSessionSummary,
+      timeline: store.timeline,
+      isSessionReadOnly: false,
+      isSessionActionInFlight: false,
+      isSelectionLoading: false,
+      isExtensionsLoading: false,
+      lastAction: ""
+    )
   )
   .frame(width: 980, height: 720)
 }

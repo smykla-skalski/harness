@@ -82,23 +82,29 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class SessionIndexSlice {
+    public enum Change {
+      case data
+      case projection
+    }
+
+    @ObservationIgnored public var onChanged: ((Change) -> Void)?
     public var projects: [ProjectSummary] = [] {
-      didSet { refreshDerivedStateIfNeeded(oldValue != projects) }
+      didSet { refreshDerivedStateIfNeeded(oldValue != projects, change: .data) }
     }
     public var sessions: [SessionSummary] = [] {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessions) }
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessions, change: .data) }
     }
     public var searchText = "" {
-      didSet { refreshDerivedStateIfNeeded(oldValue != searchText) }
+      didSet { refreshDerivedStateIfNeeded(oldValue != searchText, change: .projection) }
     }
     public var sessionFilter: SessionFilter = .active {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFilter) }
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFilter, change: .projection) }
     }
     public var sessionFocusFilter: SessionFocusFilter = .all {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFocusFilter) }
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFocusFilter, change: .projection) }
     }
     public var sessionSortOrder: SessionSortOrder = .recentActivity {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionSortOrder) }
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessionSortOrder, change: .projection) }
     }
     public private(set) var groupedSessions: [SessionGroup] = []
     public private(set) var filteredSessionCount = 0
@@ -123,7 +129,7 @@ extension HarnessMonitorStore {
       self.projects = projects
       self.sessions = sessions
       suppressDerivedStateRefresh = false
-      rebuildDerivedState()
+      rebuildDerivedState(change: .data)
       return true
     }
 
@@ -152,14 +158,17 @@ extension HarnessMonitorStore {
       return sessionSummariesByID[sessionID]
     }
 
-    private func refreshDerivedStateIfNeeded(_ changed: Bool) {
+    private func refreshDerivedStateIfNeeded(
+      _ changed: Bool,
+      change: Change
+    ) {
       guard changed, !suppressDerivedStateRefresh else {
         return
       }
-      rebuildDerivedState()
+      rebuildDerivedState(change: change)
     }
 
-    private func rebuildDerivedState() {
+    private func rebuildDerivedState(change: Change) {
       totalOpenWorkCount = sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
       totalBlockedCount = sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
       sessionSummariesByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
@@ -193,6 +202,8 @@ extension HarnessMonitorStore {
           checkoutGroups: checkoutGroups
         )
       }
+
+      onChanged?(change)
     }
 
     private func matchesCurrentFilters(_ summary: SessionSummary) -> Bool {

@@ -3,11 +3,23 @@ import SwiftUI
 
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
+  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @AppStorage("harnessMonitor.board.onboardingDismissed")
   private var isOnboardingDismissed = false
 
+  init(
+    store: HarnessMonitorStore,
+    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    contentUI: HarnessMonitorStore.ContentUISlice
+  ) {
+    self.store = store
+    self.sessionIndex = sessionIndex
+    self.contentUI = contentUI
+  }
+
   private var isLoading: Bool {
-    store.isDaemonActionInFlight || store.isRefreshing || store.connectionState == .connecting
+    contentUI.isBusy || contentUI.isRefreshing || contentUI.connectionState == .connecting
   }
 
   var body: some View {
@@ -15,9 +27,9 @@ struct SessionsBoardView: View {
       VStack(alignment: .leading, spacing: 24) {
         if !isOnboardingDismissed {
           SessionsBoardOnboardingCard(
-            connectionState: store.connectionState,
-            isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
-            hasSessions: !store.sessions.isEmpty,
+            connectionState: contentUI.connectionState,
+            isLaunchAgentInstalled: contentUI.isLaunchAgentInstalled,
+            hasSessions: !sessionIndex.sessions.isEmpty,
             isLoading: isLoading,
             startDaemon: startDaemon,
             installLaunchAgent: installLaunchAgent,
@@ -26,7 +38,7 @@ struct SessionsBoardView: View {
           )
         }
         SessionsBoardRecentSessionsSection(
-          sessions: store.sessions,
+          sessions: sessionIndex.sessions,
           selectSession: selectSession
         )
       }
@@ -57,13 +69,13 @@ struct SessionsBoardView: View {
 #Preview("Sessions Board - Dashboard") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
 
-  SessionsBoardView(store: store)
+  SessionsBoardView(store: store, sessionIndex: store.sessionIndex, contentUI: store.contentUI)
     .frame(width: 980, height: 720)
 }
 
 #Preview("Sessions Board - Empty") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
 
-  SessionsBoardView(store: store)
+  SessionsBoardView(store: store, sessionIndex: store.sessionIndex, contentUI: store.contentUI)
     .frame(width: 980, height: 720)
 }
