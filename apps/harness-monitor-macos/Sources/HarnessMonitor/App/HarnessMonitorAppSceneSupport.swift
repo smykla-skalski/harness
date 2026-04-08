@@ -44,11 +44,23 @@ struct HarnessMonitorWindowRootView: View {
       .modifier(HarnessMonitorUITestAnimationModifier())
       .task {
         delegate.bind(store: store)
-        await store.bootstrapIfNeeded()
-        guard let perfScenario, !hasRunPerfScenario else {
+        guard let perfScenario else {
+          await store.bootstrapIfNeeded()
+          return
+        }
+        guard !hasRunPerfScenario else {
           return
         }
         hasRunPerfScenario = true
+        if perfScenario.includesBootstrapInMeasurement {
+          await HarnessMonitorPerfDriver.run(
+            scenario: perfScenario,
+            store: store,
+            openWindow: openWindow
+          )
+          return
+        }
+        await store.bootstrapIfNeeded()
         await HarnessMonitorPerfDriver.run(
           scenario: perfScenario,
           store: store,
@@ -134,6 +146,7 @@ private enum HarnessMonitorPerfDriver {
 
     switch scenario {
     case .launchDashboard:
+      await store.bootstrapIfNeeded()
       await settle()
     case .selectSessionCockpit:
       await settle()
@@ -482,6 +495,21 @@ private struct HarnessMonitorWindowBackdropView: View {
 }
 
 private extension HarnessMonitorPerfScenario {
+  var includesBootstrapInMeasurement: Bool {
+    switch self {
+    case .launchDashboard:
+      true
+    case .selectSessionCockpit,
+      .refreshAndSearch,
+      .sidebarOverflowSearch,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .timelineBurst,
+      .offlineCachedOpen:
+      false
+    }
+  }
+
   var signpostName: StaticString {
     switch self {
     case .launchDashboard: "launch-dashboard"

@@ -168,7 +168,9 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   var defaultPreviewScenario: String {
     switch self {
-    case .launchDashboard, .selectSessionCockpit, .settingsBackdropCycle, .settingsBackgroundCycle:
+    case .launchDashboard, .selectSessionCockpit:
+      return "dashboard-landing"
+    case .settingsBackdropCycle, .settingsBackgroundCycle:
       return "dashboard"
     case .refreshAndSearch, .sidebarOverflowSearch:
       return "overflow"

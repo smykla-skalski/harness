@@ -32,6 +32,26 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
     )
 
+    public static let dashboardLanding = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: PreviewFixtures.projects,
+      sessions: [PreviewFixtures.summary],
+      detail: PreviewFixtures.detail,
+      timeline: PreviewFixtures.timeline,
+      readySessionID: nil,
+      detailsBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
+    )
+
     public static let overflow: Self = {
       let sessions = PreviewFixtures.overflowSessions
       let detailsBySessionID = Dictionary(
@@ -178,6 +198,10 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   private let fixtures: Fixtures
   private let isLaunchAgentInstalled: Bool
+
+  var readySessionID: String? {
+    fixtures.readySessionID
+  }
 
   public init(
     fixtures: Fixtures,
@@ -367,6 +391,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
 public actor PreviewDaemonController: DaemonControlling {
   public enum Mode: Sendable {
+    case dashboardLanding
     case populated
     case overflow
     case signalRegression
@@ -381,6 +406,8 @@ public actor PreviewDaemonController: DaemonControlling {
   public init(mode: Mode = .populated) {
     let fixtures =
       switch mode {
+      case .dashboardLanding:
+        PreviewHarnessClient.Fixtures.dashboardLanding
       case .populated:
         PreviewHarnessClient.Fixtures.populated
       case .overflow:

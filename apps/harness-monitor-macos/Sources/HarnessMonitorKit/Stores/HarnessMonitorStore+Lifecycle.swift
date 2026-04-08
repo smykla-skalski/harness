@@ -97,17 +97,12 @@ extension HarnessMonitorStore {
         }
       } else {
         synchronizeActionActor()
-        if shouldAutoSelectPreviewSession(
+        if let previewReadySessionID = previewReadySessionID(
           client: client,
           sessions: measuredSessions.value
         ) {
-          let requestID = beginSessionLoad()
           Task { @MainActor [weak self] in
-            await self?.loadSession(
-              using: client,
-              sessionID: measuredSessions.value[0].sessionId,
-              requestID: requestID
-            )
+            await self?.selectSession(previewReadySessionID)
           }
         }
       }
@@ -561,11 +556,20 @@ extension HarnessMonitorStore {
     sessionPushFallbackTask = nil
   }
 
-  private func shouldAutoSelectPreviewSession(
+  private func previewReadySessionID(
     client: any HarnessMonitorClientProtocol,
     sessions: [SessionSummary]
-  ) -> Bool {
-    selectedSessionID == nil && client is PreviewHarnessClient && !sessions.isEmpty
+  ) -> String? {
+    guard
+      selectedSessionID == nil,
+      let previewClient = client as? PreviewHarnessClient,
+      let readySessionID = previewClient.readySessionID,
+      sessions.contains(where: { $0.sessionId == readySessionID })
+    else {
+      return nil
+    }
+
+    return readySessionID
   }
 
   func startManifestWatcher() {
