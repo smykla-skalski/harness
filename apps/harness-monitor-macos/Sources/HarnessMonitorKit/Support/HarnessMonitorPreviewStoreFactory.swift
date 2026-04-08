@@ -8,6 +8,7 @@ public enum HarnessMonitorPreviewStoreFactory {
   }()
 
   public enum Scenario: Sendable {
+    case dashboardLanding
     case dashboardLoaded
     case cockpitLoaded
     case offlineCached
@@ -89,6 +90,8 @@ private struct PreviewPersistenceState {
 private extension HarnessMonitorPreviewStoreFactory {
   static func configuration(for scenario: Scenario) -> PreviewStoreConfiguration {
     switch scenario {
+    case .dashboardLanding:
+      return dashboardLandingConfiguration()
     case .dashboardLoaded:
       return dashboardConfiguration()
     case .cockpitLoaded:
@@ -107,6 +110,23 @@ private extension HarnessMonitorPreviewStoreFactory {
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
       mode: .populated,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: nil,
+        selectedDetail: nil,
+        timeline: []
+      )
+    )
+  }
+
+  static func dashboardLandingConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.dashboardLanding
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
+    return liveConfiguration(
+      mode: .dashboardLanding,
       fixtures: fixtures,
       metrics: metrics,
       selection: PreviewSelectionState(

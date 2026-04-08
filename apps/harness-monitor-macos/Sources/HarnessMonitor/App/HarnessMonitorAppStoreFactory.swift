@@ -18,6 +18,7 @@ enum HarnessMonitorAppStoreFactory {
   }
 
   private enum PreviewScenarioOverride: String {
+    case dashboardLanding = "dashboard-landing"
     case dashboard
     case cockpit
     case offlineCached = "offline-cached"
@@ -36,6 +37,8 @@ enum HarnessMonitorAppStoreFactory {
 
     var scenario: HarnessMonitorPreviewStoreFactory.Scenario {
       switch self {
+      case .dashboardLanding:
+        .dashboardLanding
       case .dashboard:
         .dashboardLoaded
       case .cockpit:

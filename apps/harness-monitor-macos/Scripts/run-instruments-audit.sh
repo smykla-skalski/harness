@@ -74,7 +74,10 @@ contains() {
 
 preview_scenario_for() {
   case "$1" in
-    launch-dashboard|select-session-cockpit|settings-backdrop-cycle|settings-background-cycle)
+    launch-dashboard|select-session-cockpit)
+      printf '%s\n' "dashboard-landing"
+      ;;
+    settings-backdrop-cycle|settings-background-cycle)
       printf '%s\n' "dashboard"
       ;;
     refresh-and-search|sidebar-overflow-search)

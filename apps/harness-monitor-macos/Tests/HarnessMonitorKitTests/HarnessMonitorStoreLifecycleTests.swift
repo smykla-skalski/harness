@@ -438,6 +438,41 @@ struct HarnessMonitorStoreLifecycleTests {
     #expect(store.isBookmarked(sessionId: PreviewFixtures.summary.sessionId))
   }
 
+  @Test("Preview bootstrap auto-selects the declared ready session")
+  func previewBootstrapAutoSelectsDeclaredReadySession() async {
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: PreviewHarnessClient())
+    )
+
+    await store.bootstrapIfNeeded()
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.sessions == [PreviewFixtures.summary])
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.selectedSession == PreviewFixtures.detail)
+    #expect(store.timeline == PreviewFixtures.timeline)
+  }
+
+  @Test("Dashboard landing preview bootstraps without auto-selecting a session")
+  func dashboardLandingPreviewBootstrapsWithoutAutoSelectingSession() async {
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(
+        client: PreviewHarnessClient(
+          fixtures: .dashboardLanding,
+          isLaunchAgentInstalled: true
+        )
+      )
+    )
+
+    await store.bootstrapIfNeeded()
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.sessions == [PreviewFixtures.summary])
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.timeline.isEmpty)
+  }
+
   @Test("Preview store factory seeds empty state without stale selection")
   func previewStoreFactorySeedsEmptyState() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)

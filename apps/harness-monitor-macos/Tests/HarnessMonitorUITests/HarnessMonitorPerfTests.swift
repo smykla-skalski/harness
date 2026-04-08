@@ -1,5 +1,7 @@
 import XCTest
 
+private typealias Accessibility = HarnessMonitorUITestAccessibility
+
 @MainActor
 final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
@@ -49,6 +51,44 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
   func testOfflineCachedOpenHitchRate() {
     measureScenario("offline-cached-open", includeMemoryMetric: true)
+  }
+
+  func testLaunchDashboardScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "launch-dashboard")
+    let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
+    let sessionRow = sessionTrigger(in: launched, identifier: Accessibility.previewSessionRow)
+    let sessionInspectorCard = element(in: launched, identifier: Accessibility.sessionInspectorCard)
+
+    waitForScenarioCompletion(
+      app: launched,
+      scenario: "launch-dashboard"
+    )
+
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(sessionInspectorCard.exists)
+
+    launched.terminate()
+  }
+
+  func testSelectSessionCockpitScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "select-session-cockpit")
+    let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
+    let sessionInspectorCard = element(in: launched, identifier: Accessibility.sessionInspectorCard)
+
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(sessionInspectorCard.exists)
+
+    waitForScenarioCompletion(
+      app: launched,
+      scenario: "select-session-cockpit"
+    )
+
+    XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.uiTimeout))
+
+    launched.terminate()
   }
 
   // MARK: - Private
