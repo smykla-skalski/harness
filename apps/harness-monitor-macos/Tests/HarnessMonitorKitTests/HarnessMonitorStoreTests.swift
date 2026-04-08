@@ -27,8 +27,8 @@ struct HarnessMonitorStoreTests {
     #expect(store.actionActorID == PreviewFixtures.summary.leaderId)
   }
 
-  @Test("Selecting a session over HTTP requests the full detail payload")
-  func selectSessionWithHTTPTransportRequestsFullDetail() async {
+  @Test("Selecting a session requests the full detail payload")
+  func selectSessionRequestsFullDetail() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
 

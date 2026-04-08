@@ -124,10 +124,8 @@ extension PreviewFixtures {
     ),
   ]
 
-  public static let detail = SessionDetail(
+  public static let detail = sessionDetail(
     session: summary,
-    agents: agents,
-    tasks: tasks,
     signals: signals,
     observer: observer,
     agentActivity: agentActivity

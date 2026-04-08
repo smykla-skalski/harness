@@ -50,6 +50,9 @@ struct SessionCockpitSignalsSection: View {
             .padding(HarnessMonitorTheme.cardPadding)
           }
           .harnessInteractiveCardButtonStyle()
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.sessionSignalCard(signal.signal.signalId)
+          )
           .contextMenu {
             Button {
               inspectSignal(signal.signal.signalId)
