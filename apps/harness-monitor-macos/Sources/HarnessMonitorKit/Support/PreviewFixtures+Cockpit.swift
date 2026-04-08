@@ -190,4 +190,42 @@ extension PreviewFixtures {
       totalSessionCount: 1
     )
   ]
+
+  public static func timelineBurst(batch: Int) -> [TimelineEntry] {
+    let burstCount = max(batch, 1) * 12
+    let burstEntries = (0..<burstCount).map { index in
+      let totalSeconds = 30 * 60 + index
+      let hour = 15 + totalSeconds / 3600
+      let minute = (totalSeconds % 3600) / 60
+      let second = totalSeconds % 60
+      let recordedAt = String(
+        format: "2026-03-28T%02d:%02d:%02dZ",
+        hour % 24,
+        minute,
+        second
+      )
+      let taskID = index.isMultiple(of: 3) ? "task-ui" : nil
+      let kind = index.isMultiple(of: 4) ? "task_checkpoint" : "tool_result"
+      let entrySummary =
+        index.isMultiple(of: 4)
+        ? "Checkpoint \(min(99, 72 + batch + index % 6))%: timeline diff batch \(batch) committed."
+        : "worker-codex processed preview burst event \(index + 1) in batch \(batch)."
+
+      return TimelineEntry(
+        entryId: "perf-timeline-\(batch)-\(index)",
+        recordedAt: recordedAt,
+        kind: kind,
+        sessionId: summary.sessionId,
+        agentId: index.isMultiple(of: 2) ? "worker-codex" : "leader-claude",
+        taskId: taskID,
+        summary: entrySummary,
+        payload: .object([
+          "batch": .number(Double(batch)),
+          "index": .number(Double(index)),
+        ])
+      )
+    }
+
+    return burstEntries + timeline
+  }
 }

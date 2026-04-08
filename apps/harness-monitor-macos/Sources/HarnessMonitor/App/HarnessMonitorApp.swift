@@ -10,6 +10,8 @@ struct HarnessMonitorApp: App {
   private let container: ModelContainer?
   private let isUITesting: Bool
   private let mainWindowDefaultSize: CGSize
+  private let perfScenario: HarnessMonitorPerfScenario?
+  private let preferencesInitialSection: PreferencesSection
   @State private var store: HarnessMonitorStore
   @State private var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -24,6 +26,8 @@ struct HarnessMonitorApp: App {
     container = configuration.container
     isUITesting = configuration.isUITesting
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
+    perfScenario = configuration.perfScenario
+    preferencesInitialSection = configuration.preferencesInitialSection
     _store = State(initialValue: configuration.store)
     _themeMode = State(initialValue: configuration.initialThemeMode)
   }
@@ -55,7 +59,8 @@ struct HarnessMonitorApp: App {
     Window("Preferences", id: HarnessMonitorWindowID.preferences) {
       HarnessMonitorSettingsRootView(
         store: store,
-        themeMode: $themeMode
+        themeMode: $themeMode,
+        initialSection: preferencesInitialSection
       )
     }
     .windowStyle(.titleBar)
@@ -68,14 +73,16 @@ struct HarnessMonitorApp: App {
       HarnessMonitorWindowRootView(
         delegate: delegate,
         store: store,
-        themeMode: $themeMode
+        themeMode: $themeMode,
+        perfScenario: perfScenario
       )
       .modelContainer(container)
     } else {
       HarnessMonitorWindowRootView(
         delegate: delegate,
         store: store,
-        themeMode: $themeMode
+        themeMode: $themeMode,
+        perfScenario: perfScenario
       )
     }
   }

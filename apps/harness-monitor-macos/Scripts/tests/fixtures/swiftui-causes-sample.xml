@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node xpath="//trace-toc[1]/run[1]/data[1]/table[1]">
+    <schema name="swiftui-causes">
+      <col><mnemonic>source-node</mnemonic></col>
+      <col><mnemonic>destination-node</mnemonic></col>
+      <col><mnemonic>label</mnemonic></col>
+      <col><mnemonic>value-type</mnemonic></col>
+      <col><mnemonic>changed-properties</mnemonic></col>
+    </schema>
+    <row>
+      <string>@State store</string>
+      <string>Text Content</string>
+      <string>Update</string>
+      <string>SessionSummary</string>
+      <string>self</string>
+    </row>
+    <row>
+      <string>@State store</string>
+      <string>Text Content</string>
+      <string>Update</string>
+      <string>SessionSummary</string>
+      <string>self</string>
+    </row>
+    <row>
+      <string>@State store</string>
+      <string>Layout: DynamicLayoutComputer&lt;_ZStackLayout&gt;</string>
+      <string>Creation</string>
+      <sentinel />
+      <sentinel />
+    </row>
+    <row>
+      <string>External Environment</string>
+      <string>Preference List</string>
+      <string>Update</string>
+      <string>PreferenceValues</string>
+      <string>seed</string>
+    </row>
+  </node>
+</trace-query-result>

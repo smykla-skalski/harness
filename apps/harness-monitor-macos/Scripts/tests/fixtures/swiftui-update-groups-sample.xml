@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node xpath="//trace-toc[1]/run[1]/data[1]/table[2]">
+    <schema name="swiftui-update-groups">
+      <col><mnemonic>start</mnemonic></col>
+      <col><mnemonic>duration</mnemonic></col>
+      <col><mnemonic>label</mnemonic></col>
+    </schema>
+    <row>
+      <start-time>1</start-time>
+      <duration>2250000</duration>
+      <string>(RootDisplayList DisplayList)</string>
+    </row>
+    <row>
+      <start-time>2</start-time>
+      <duration>1000000</duration>
+      <string>(RootDisplayList DisplayList)</string>
+    </row>
+    <row>
+      <start-time>3</start-time>
+      <duration>550000</duration>
+      <string>(DynamicContainerInfo DynamicContainer.Info)</string>
+    </row>
+    <row>
+      <start-time>4</start-time>
+      <duration>151000</duration>
+      <string>(ShapeStyleResolver AnyShapeStyle)</string>
+    </row>
+  </node>
+</trace-query-result>
