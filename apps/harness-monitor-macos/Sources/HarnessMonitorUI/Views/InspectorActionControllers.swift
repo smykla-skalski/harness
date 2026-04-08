@@ -243,7 +243,9 @@ struct InspectorLeaderTransferConsole: View {
     }
 
     if transferLeaderID.isEmpty || !detail.agents.contains(where: { $0.agentId == transferLeaderID }) {
-      transferLeaderID = detail.session.leaderId ?? detail.agents.first?.agentId ?? ""
+      transferLeaderID =
+        detail.agents.first(where: { $0.agentId != detail.session.leaderId })?.agentId
+        ?? detail.agents.first?.agentId ?? ""
     }
   }
 
