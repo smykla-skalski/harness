@@ -5,6 +5,8 @@ import HarnessMonitorKit
 @MainActor
 final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let handledSignals = [SIGTERM, SIGINT, SIGHUP]
+  private let hidesDockIconForPerfRuns =
+    ProcessInfo.processInfo.environment["HARNESS_MONITOR_PERF_HIDE_DOCK_ICON"] == "1"
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
   private var store: HarnessMonitorStore?
@@ -17,6 +19,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     {
       disableAnimationsForUITesting()
     }
+  }
+
+  func applicationWillFinishLaunching(_ notification: Notification) {
+    guard hidesDockIconForPerfRuns else {
+      return
+    }
+    NSApplication.shared.setActivationPolicy(.accessory)
   }
 
   func bind(store: HarnessMonitorStore) {
