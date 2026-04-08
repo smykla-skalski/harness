@@ -3,16 +3,24 @@ import Observation
 import SwiftUI
 
 struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
+  let pendingConfirmation: HarnessMonitorStore.PendingConfirmation?
 
   func body(content: Content) -> some View {
     content
       .confirmationDialog(
         title,
-        isPresented: $store.showConfirmation,
+        isPresented: Binding(
+          get: { pendingConfirmation != nil },
+          set: { isPresented in
+            if !isPresented {
+              store.cancelConfirmation()
+            }
+          }
+        ),
         titleVisibility: .visible
       ) {
-        switch store.pendingConfirmation {
+        switch pendingConfirmation {
         case .endSession(_, let actorID):
           Button("End Session Now", role: .destructive) {
             Task { await store.endSelectedSession(actor: actorID) }
@@ -35,7 +43,7 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   }
 
   private var title: String {
-    switch store.pendingConfirmation {
+    switch pendingConfirmation {
     case .endSession: "End Session?"
     case .removeAgent: "Remove Agent?"
     case nil: ""
@@ -43,7 +51,7 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   }
 
   private var message: String {
-    switch store.pendingConfirmation {
+    switch pendingConfirmation {
     case .endSession(let sessionID, let actorID):
       "This ends \(sessionID) using \(actorID). Active task work must already be closed."
     case .removeAgent(_, let agentID, let actorID):

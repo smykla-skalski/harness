@@ -4,15 +4,23 @@ import SwiftData
 import SwiftUI
 
 struct SidebarFilterContainer: View {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
+  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
   @State private var draftSearchText = ""
   @AppStorage("harnessMonitor.sidebar.filtersExpanded")
   private var isExpanded = true
 
-  init(store: HarnessMonitorStore) {
+  init(
+    store: HarnessMonitorStore,
+    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    sidebarUI: HarnessMonitorStore.SidebarUISlice
+  ) {
     self.store = store
+    self.sessionIndex = sessionIndex
+    self.sidebarUI = sidebarUI
   }
 
   private var recentSearchQueries: [String] {
@@ -22,6 +30,8 @@ struct SidebarFilterContainer: View {
   var body: some View {
     SidebarFilterSection(
       store: store,
+      sessionIndex: sessionIndex,
+      sidebarUI: sidebarUI,
       draftSearchText: $draftSearchText,
       recentSearchQueries: recentSearchQueries,
       isExpanded: isExpanded,
@@ -30,12 +40,12 @@ struct SidebarFilterContainer: View {
     .task(id: draftSearchText) {
       try? await Task.sleep(for: .milliseconds(300))
       guard !Task.isCancelled else { return }
-      store.searchText = draftSearchText
+      sessionIndex.searchText = draftSearchText
     }
     .onAppear {
-      draftSearchText = store.searchText
+      draftSearchText = sessionIndex.searchText
     }
-    .onChange(of: store.searchText) { _, newValue in
+    .onChange(of: sessionIndex.searchText) { _, newValue in
       if draftSearchText != newValue {
         draftSearchText = newValue
       }
@@ -51,7 +61,11 @@ struct SidebarFilterContainer: View {
     scenario: .sidebarOverflow
   )
 
-  SidebarFilterContainer(store: store)
+  SidebarFilterContainer(
+    store: store,
+    sessionIndex: store.sessionIndex,
+    sidebarUI: store.sidebarUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .padding(16)
     .frame(width: 340)
@@ -65,7 +79,11 @@ struct SidebarFilterContainer: View {
     scenario: .dashboardLoaded
   )
 
-  SidebarFilterContainer(store: store)
+  SidebarFilterContainer(
+    store: store,
+    sessionIndex: store.sessionIndex,
+    sidebarUI: store.sidebarUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .padding(16)
     .frame(width: 340)

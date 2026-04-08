@@ -89,4 +89,40 @@ struct HarnessMonitorStoreInspectorTests {
     #expect(actors.allSatisfy { $0.status == .active })
     #expect(actors.isEmpty == false)
   }
+
+  @Test("Inspector primary content ignores filter churn when selection is unchanged")
+  func inspectorPrimaryContentIgnoresFilterChurn() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let didChange = await didInvalidate(
+      { store.inspectorUI.primaryContent },
+      after: {
+        store.searchText = "preview"
+      }
+    )
+
+    #expect(didChange == false)
+  }
+
+  @Test("Inspector primary content tracks inspector selection changes")
+  func inspectorPrimaryContentTracksInspectorSelectionChanges() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let didChange = await didInvalidate(
+      { store.inspectorUI.primaryContent },
+      after: {
+        store.inspect(agentID: PreviewFixtures.agents[1].agentId)
+      }
+    )
+
+    #expect(didChange)
+    switch store.inspectorUI.primaryContent {
+    case .agent(let selection):
+      #expect(selection.agent.agentId == PreviewFixtures.agents[1].agentId)
+    default:
+      Issue.record("Expected inspector primary content to resolve the selected agent")
+    }
+  }
 }

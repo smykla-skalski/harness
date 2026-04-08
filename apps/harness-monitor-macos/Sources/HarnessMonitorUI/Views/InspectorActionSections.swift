@@ -2,48 +2,48 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct InspectorActionSections: View {
-  @Bindable var store: HarnessMonitorStore
-  let detail: SessionDetail
-  let selectedTask: WorkItem?
-  let selectedAgent: AgentRegistration?
-  let selectedObserver: ObserverSummary?
+  let store: HarnessMonitorStore
+  let context: HarnessMonitorStore.InspectorActionContext
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       InspectorActionStatusBanner(
-        isSessionReadOnly: store.isSessionReadOnly,
-        isSessionActionInFlight: store.isSessionActionInFlight,
-        lastAction: store.lastAction,
-        lastError: store.lastError,
-        availableActionActors: store.availableActionActors,
-        actionActorID: $store.selectedActionActorID
+        isSessionReadOnly: context.isSessionReadOnly,
+        isSessionActionInFlight: context.isSessionActionInFlight,
+        lastAction: context.lastAction,
+        lastError: context.lastError,
+        availableActionActors: context.availableActionActors,
+        actionActorID: Binding(
+          get: { context.selectedActionActorID },
+          set: { store.selectedActionActorID = $0 }
+        )
       )
       InspectorCreateTaskConsole(store: store)
 
-      if let selectedTask {
+      if let selectedTask = context.selectedTask {
         InspectorTaskMutationConsole(
           store: store,
           selectedTask: selectedTask,
-          tasks: detail.tasks,
-          agents: detail.agents
+          tasks: context.detail.tasks,
+          agents: context.detail.agents
         )
       }
 
-      if let selectedAgent {
+      if let selectedAgent = context.selectedAgent {
         InspectorRoleMutationConsole(
           store: store,
           selectedAgent: selectedAgent,
-          leaderID: detail.session.leaderId
+          leaderID: context.detail.session.leaderId
         )
       }
 
       InspectorLeaderTransferConsole(
         store: store,
-        detail: detail,
-        actionActorID: store.selectedActionActorID
+        detail: context.detail,
+        actionActorID: context.selectedActionActorID
       )
 
-      if let selectedObserver {
+      if let selectedObserver = context.selectedObserver {
         InspectorObserverSummarySection(observer: selectedObserver)
       }
     }

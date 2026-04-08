@@ -3,21 +3,29 @@ import Observation
 import SwiftUI
 
 struct SidebarView: View {
-  @Bindable var store: HarnessMonitorStore
+  let store: HarnessMonitorStore
+  let sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  let sidebarUI: HarnessMonitorStore.SidebarUISlice
 
   var body: some View {
     ScrollView {
-      LazyVStack(alignment: .leading, spacing: 0) {
-        sessionSections
-      }
+      SidebarSessionListSection(
+        store: store,
+        sessionIndex: sessionIndex,
+        sidebarUI: sidebarUI
+      )
       .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
     }
     .scrollEdgeEffectStyle(.soft, for: .top)
     .safeAreaInset(edge: .top, spacing: 0) {
-      sidebarHeader
+      SidebarHeaderSection(
+        store: store,
+        sessionIndex: sessionIndex,
+        sidebarUI: sidebarUI
+      )
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      SidebarFooterAccessory(metrics: store.connectionMetrics)
+      SidebarFooterSection(sidebarUI: sidebarUI)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessMonitorTheme.ink)
@@ -25,81 +33,136 @@ struct SidebarView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
   }
+}
+
+private struct SidebarHeaderSection: View {
+  let store: HarnessMonitorStore
+  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
+
+  init(
+    store: HarnessMonitorStore,
+    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    sidebarUI: HarnessMonitorStore.SidebarUISlice
+  ) {
+    self.store = store
+    self.sessionIndex = sessionIndex
+    self.sidebarUI = sidebarUI
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      DaemonStatusCard(
+        connectionState: sidebarUI.connectionState,
+        isBusy: sidebarUI.isBusy,
+        isRefreshing: sidebarUI.isRefreshing,
+        isLaunchAgentInstalled: sidebarUI.isLaunchAgentInstalled,
+        startDaemon: startDaemon,
+        stopDaemon: stopDaemon,
+        installLaunchAgent: installLaunchAgent
+      )
+      SidebarFilterContainer(
+        store: store,
+        sessionIndex: sessionIndex,
+        sidebarUI: sidebarUI
+      )
+    }
+    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+    .padding(.top, HarnessMonitorTheme.spacingXL)
+    .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+  }
+
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func stopDaemon() async {
+    await store.stopDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+}
+
+private struct SidebarFooterSection: View {
+  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
+
+  init(sidebarUI: HarnessMonitorStore.SidebarUISlice) {
+    self.sidebarUI = sidebarUI
+  }
+
+  var body: some View {
+    SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
+  }
+}
+
+private struct SidebarSessionListSection: View {
+  let store: HarnessMonitorStore
+  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
+
+  init(
+    store: HarnessMonitorStore,
+    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    sidebarUI: HarnessMonitorStore.SidebarUISlice
+  ) {
+    self.store = store
+    self.sessionIndex = sessionIndex
+    self.sidebarUI = sidebarUI
+  }
+
+  var body: some View {
+    LazyVStack(alignment: .leading, spacing: 0) {
+      sessionSections
+    }
+  }
 
   @ViewBuilder private var sessionSections: some View {
-    if store.sessions.isEmpty {
-      VStack {
-        ContentUnavailableView {
-          Label("No sessions indexed yet", systemImage: "tray")
-        } description: {
-          Text("Start the daemon or refresh after launching a harness session.")
-        }
-      }
-      .frame(maxWidth: .infinity)
-      .padding(HarnessMonitorTheme.sectionSpacing)
-      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarEmptyState)
-    } else if store.groupedSessions.isEmpty {
-      VStack {
-        ContentUnavailableView {
-          Label("No sessions match", systemImage: "magnifyingglass")
-        } description: {
-          Text("Try a broader search or clear filters.")
-        }
-      }
-      .frame(maxWidth: .infinity)
-      .padding(HarnessMonitorTheme.sectionSpacing)
-      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarEmptyState)
-    } else if let firstGroup = store.groupedSessions.first {
-      Group {
-        sessionProjectRow(for: firstGroup)
-
-        ForEach(firstGroup.checkoutGroups) { checkoutGroup in
-          sessionCheckoutRow(for: checkoutGroup)
-          ForEach(checkoutGroup.sessions) { session in
-            sessionRow(session)
-          }
-        }
-      }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
-
-      ForEach(Array(store.groupedSessions.dropFirst())) { group in
+    switch sidebarUI.emptyState {
+    case .noSessions:
+      SidebarEmptyState(
+        title: "No sessions indexed yet",
+        systemImage: "tray",
+        message: "Start the daemon or refresh after launching a harness session."
+      )
+    case .noMatches:
+      SidebarEmptyState(
+        title: "No sessions match",
+        systemImage: "magnifyingglass",
+        message: "Try a broader search or clear filters."
+      )
+    case .sessionsAvailable:
+      if let firstGroup = sessionIndex.groupedSessions.first {
         Group {
-          sessionProjectRow(for: group)
-            .padding(.top, HarnessMonitorTheme.sectionSpacing)
+          sessionProjectRow(for: firstGroup)
 
-          ForEach(group.checkoutGroups) { checkoutGroup in
+          ForEach(firstGroup.checkoutGroups) { checkoutGroup in
             sessionCheckoutRow(for: checkoutGroup)
             ForEach(checkoutGroup.sessions) { session in
               sessionRow(session)
             }
           }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
+        .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
+
+        ForEach(Array(sessionIndex.groupedSessions.dropFirst())) { group in
+          Group {
+            sessionProjectRow(for: group)
+              .padding(.top, HarnessMonitorTheme.sectionSpacing)
+
+            ForEach(group.checkoutGroups) { checkoutGroup in
+              sessionCheckoutRow(for: checkoutGroup)
+              ForEach(checkoutGroup.sessions) { session in
+                sessionRow(session)
+              }
+            }
+          }
+        }
       }
     }
-  }
-
-  private var sidebarHeader: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      DaemonStatusCard(
-        connectionState: store.connectionState,
-        isBusy: store.isBusy,
-        isRefreshing: store.isRefreshing,
-        isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
-        startDaemon: startDaemon,
-        stopDaemon: stopDaemon,
-        installLaunchAgent: installLaunchAgent
-      )
-      SidebarFilterContainer(store: store)
-    }
-    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
-    .padding(.top, HarnessMonitorTheme.spacingXL)
-    .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
   }
 
   private func sessionProjectRow(for group: HarnessMonitorStore.SessionGroup) -> some View {
@@ -146,10 +209,10 @@ struct SidebarView: View {
 
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
-    let isSelected = store.selectedSessionID == session.sessionId
+    let isSelected = sidebarUI.selectedSessionID == session.sessionId
     let baseRow = sessionBaseRow(session, isSelected: isSelected)
 
-    if store.isPersistenceAvailable {
+    if sidebarUI.isPersistenceAvailable {
       baseRow
         .accessibilityAction(named: "Toggle Bookmark") {
           store.toggleBookmark(
@@ -164,7 +227,7 @@ struct SidebarView: View {
               projectId: session.projectId
             )
           } label: {
-            if store.isBookmarked(sessionId: session.sessionId) {
+            if sidebarUI.bookmarkedSessionIds.contains(session.sessionId) {
               Label("Remove Bookmark", systemImage: "bookmark.slash")
             } else {
               Label("Bookmark", systemImage: "bookmark")
@@ -194,7 +257,7 @@ struct SidebarView: View {
   ) -> some View {
     let sessionCard = SidebarSessionCardSurface(
       session: session,
-      isBookmarked: store.isBookmarked(sessionId: session.sessionId),
+      isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId),
       isSelected: isSelected
     )
 
@@ -214,7 +277,7 @@ struct SidebarView: View {
       .accessibilityValue(
         sessionAccessibilityValue(
           for: session,
-          selectedSessionID: store.selectedSessionID
+          selectedSessionID: sidebarUI.selectedSessionID
         )
       )
       .accessibilityElement(children: .combine)
@@ -234,17 +297,26 @@ struct SidebarView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
   }
+}
 
-  private func startDaemon() async {
-    await store.startDaemon()
-  }
+private struct SidebarEmptyState: View {
+  let title: String
+  let systemImage: String
+  let message: String
 
-  private func stopDaemon() async {
-    await store.stopDaemon()
-  }
-
-  private func installLaunchAgent() async {
-    await store.installLaunchAgent()
+  var body: some View {
+    VStack {
+      ContentUnavailableView {
+        Label(title, systemImage: systemImage)
+      } description: {
+        Text(message)
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .padding(HarnessMonitorTheme.sectionSpacing)
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarEmptyState)
   }
 }
 

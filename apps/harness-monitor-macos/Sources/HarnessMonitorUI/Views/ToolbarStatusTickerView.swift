@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 struct ToolbarStatusMessage: Equatable, Identifiable {
@@ -16,6 +17,32 @@ struct ToolbarStatusMessage: Equatable, Identifiable {
     self.text = text
     self.systemImage = systemImage
     self.tint = tint
+  }
+}
+
+extension ToolbarStatusMessage {
+  init(_ state: HarnessMonitorStore.StatusMessageState) {
+    self.init(
+      id: state.id,
+      text: state.text,
+      systemImage: state.systemImage,
+      tint: state.tone.color
+    )
+  }
+}
+
+private extension HarnessMonitorStore.StatusMessageTone {
+  var color: Color {
+    switch self {
+    case .secondary:
+      .secondary
+    case .info:
+      .blue
+    case .success:
+      .green
+    case .caution:
+      .orange
+    }
   }
 }
 

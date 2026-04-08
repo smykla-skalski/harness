@@ -103,19 +103,23 @@ extension HarnessMonitorStore {
   // MARK: - Selection
 
   public func primeSessionSelection(_ sessionID: String?) {
-    recordNavigation(to: sessionID)
-    cancelSessionPushFallback()
-    selectedSessionID = sessionID
-    inspectorSelection = .none
-    lastError = nil
-    isExtensionsLoading = false
-    pendingExtensions = nil
+    withUISyncBatch {
+      recordNavigation(to: sessionID)
+      cancelSessionPushFallback()
+      selectedSessionID = sessionID
+      inspectorSelection = .none
+      lastError = nil
+      isExtensionsLoading = false
+      pendingExtensions = nil
+    }
 
     guard let sessionID else {
-      activeSessionLoadRequest = 0
-      isSelectionLoading = false
-      selectedSession = nil
-      timeline = []
+      withUISyncBatch {
+        activeSessionLoadRequest = 0
+        isSelectionLoading = false
+        selectedSession = nil
+        timeline = []
+      }
       stopSessionStream()
       return
     }
@@ -124,9 +128,11 @@ extension HarnessMonitorStore {
       return
     }
 
-    isSelectionLoading = true
-    selectedSession = nil
-    timeline = []
+    withUISyncBatch {
+      isSelectionLoading = true
+      selectedSession = nil
+      timeline = []
+    }
   }
 
   public func selectSession(_ sessionID: String?) async {
@@ -237,9 +243,11 @@ extension HarnessMonitorStore {
 
   func beginSessionLoad() -> UInt64 {
     sessionLoadSequence &+= 1
-    activeSessionLoadRequest = sessionLoadSequence
-    if selectedSession == nil {
-      isSelectionLoading = true
+    withUISyncBatch {
+      activeSessionLoadRequest = sessionLoadSequence
+      if selectedSession == nil {
+        isSelectionLoading = true
+      }
     }
     return sessionLoadSequence
   }
@@ -248,7 +256,9 @@ extension HarnessMonitorStore {
     guard activeSessionLoadRequest == requestID else {
       return
     }
-    isSelectionLoading = false
+    withUISyncBatch {
+      isSelectionLoading = false
+    }
   }
 
   func isCurrentSessionLoad(_ requestID: UInt64, sessionID: String) -> Bool {
@@ -260,9 +270,11 @@ extension HarnessMonitorStore {
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       guard selectedSessionID == sessionID else { return }
-      selectedSession = cached.detail
-      timeline = cached.timeline
-      isSelectionLoading = false
+      withUISyncBatch {
+        selectedSession = cached.detail
+        timeline = cached.timeline
+        isSelectionLoading = false
+      }
     }
   }
 
@@ -282,32 +294,42 @@ extension HarnessMonitorStore {
         showingCachedData: true
       )
     } else {
-      isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+      withUISyncBatch {
+        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+      }
     }
 
-    activeSessionLoadRequest = 0
-    isSelectionLoading = false
+    withUISyncBatch {
+      activeSessionLoadRequest = 0
+      isSelectionLoading = false
+    }
   }
 
   func restorePersistedSessionState() async {
     await refreshPersistedSessionMetadata()
 
     if sessions.isEmpty, let cached = await loadCachedSessionList() {
-      sessionIndex.replaceSnapshot(
-        projects: cached.projects,
-        sessions: cached.sessions
-      )
+      withUISyncBatch {
+        sessionIndex.replaceSnapshot(
+          projects: cached.projects,
+          sessions: cached.sessions
+        )
+      }
     }
 
     if case .offline = connectionState {
-      isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+      withUISyncBatch {
+        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+      }
     }
 
     if let selectedSessionID, selectedSession?.session.sessionId != selectedSessionID {
       await restorePersistedSessionSelection(sessionID: selectedSessionID)
     } else {
-      activeSessionLoadRequest = 0
-      isSelectionLoading = false
+      withUISyncBatch {
+        activeSessionLoadRequest = 0
+        isSelectionLoading = false
+      }
     }
 
     synchronizeActionActor()

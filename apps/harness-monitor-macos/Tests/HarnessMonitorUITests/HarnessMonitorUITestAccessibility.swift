@@ -75,6 +75,7 @@ enum HarnessMonitorUITestAccessibility {
   static let contentRootFrame = "harness.content.root.frame"
   static let inspectorRoot = "harness.inspector.root"
   static let inspectorEmptyState = "harness.inspector.empty-state"
+  static let inspectorLoadingState = "harness.inspector.loading-state"
   static let sessionInspectorCard = "harness.inspector.session-card"
   static let taskInspectorCard = "harness.inspector.task-card"
   static let taskNoteField = "harness.inspector.task-note-field"

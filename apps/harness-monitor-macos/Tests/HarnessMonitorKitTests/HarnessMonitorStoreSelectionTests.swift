@@ -350,6 +350,42 @@ struct HarnessMonitorStoreSelectionTests {
     )
   }
 
+  @Test("Content toolbar metrics ignore bookmark and filter churn")
+  func contentToolbarMetricsIgnoreBookmarkAndFilterChurn() async {
+    let store = await makeBootstrappedStore()
+
+    let bookmarkInvalidated = await didInvalidate(
+      { store.contentUI.toolbarMetrics },
+      after: {
+        store.bookmarkedSessionIds = ["bookmark-content"]
+      }
+    )
+    #expect(bookmarkInvalidated == false)
+
+    let filterInvalidated = await didInvalidate(
+      { store.contentUI.toolbarMetrics },
+      after: {
+        store.searchText = "preview"
+      }
+    )
+    #expect(filterInvalidated == false)
+  }
+
+  @Test("Content UI selection state tracks session selection changes")
+  func contentUISelectionStateTracksSessionSelectionChanges() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      { store.contentUI.selectedSessionID },
+      after: {
+        await store.selectSession(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange)
+    #expect(store.contentUI.selectedSessionID == PreviewFixtures.summary.sessionId)
+  }
+
   private func configuredSelectionClient(
     summaries: [SessionSummary],
     detailsByID: [String: SessionDetail],

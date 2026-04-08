@@ -1,6 +1,24 @@
 import Foundation
+import Observation
 
 @testable import HarnessMonitorKit
+
+private final class ObservationInvalidationFlag: @unchecked Sendable {
+  private let lock = NSLock()
+  private var invalidated = false
+
+  func markInvalidated() {
+    lock.lock()
+    invalidated = true
+    lock.unlock()
+  }
+
+  func currentValue() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return invalidated
+  }
+}
 
 actor RecordingDaemonController: DaemonControlling {
   private let client: any HarnessMonitorClientProtocol
@@ -504,4 +522,24 @@ func makeBootstrappedStore(
   let store = HarnessMonitorStore(daemonController: daemon)
   await store.bootstrap()
   return store
+}
+
+@MainActor
+func didInvalidate<TrackedValue>(
+  _ trackedValue: () -> TrackedValue,
+  after mutation: () async -> Void
+) async -> Bool {
+  let flag = ObservationInvalidationFlag()
+  _ = withObservationTracking(
+    {
+      trackedValue()
+    },
+    onChange: {
+      flag.markInvalidated()
+    }
+  )
+  await mutation()
+  await Task.yield()
+  await Task.yield()
+  return flag.currentValue()
 }

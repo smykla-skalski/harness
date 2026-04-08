@@ -87,6 +87,22 @@ struct HarnessMonitorStoreMetricsTests {
     store.stopAllStreams()
   }
 
+  @Test("Sidebar footer connection metrics are observable")
+  func sidebarFooterConnectionMetricsAreObservable() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      { store.sidebarUI.connectionMetrics },
+      after: {
+        var metrics = store.connectionMetrics
+        metrics.messagesReceived += 1
+        store.connectionMetrics = metrics
+      }
+    )
+
+    #expect(didChange)
+  }
+
   private func makeEvent(name: String, sessionID: String?) -> DaemonPushEvent {
     switch name {
     case "ready":

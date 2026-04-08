@@ -9,7 +9,9 @@ extension HarnessMonitorStore {
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
     self.client = client
-    connectionState = .online
+    withUISyncBatch {
+      connectionState = .online
+    }
     await refreshPersistedSessionMetadata()
 
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
@@ -71,9 +73,11 @@ extension HarnessMonitorStore {
       let measuredProjects = try await projectResponse
       let measuredSessions = try await sessionResponse
 
-      diagnostics = measuredDiagnostics.value
-      health = measuredDiagnostics.value.health
-      daemonLogLevel = measuredDiagnostics.value.health?.logLevel
+      withUISyncBatch {
+        diagnostics = measuredDiagnostics.value
+        health = measuredDiagnostics.value.health
+        daemonLogLevel = measuredDiagnostics.value.health?.logLevel
+      }
       recordRequestSuccess(
         latencyMs: measuredDiagnostics.latencyMs,
         updatesLatency: true
@@ -172,8 +176,10 @@ extension HarnessMonitorStore {
         return
       }
 
-      lastError = error.localizedDescription
-      isExtensionsLoading = false
+      withUISyncBatch {
+        lastError = error.localizedDescription
+        isExtensionsLoading = false
+      }
 
       if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
         applySelectedSessionSnapshot(
@@ -197,7 +203,9 @@ extension HarnessMonitorStore {
           showingCachedData: true
         )
       } else {
-        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+        withUISyncBatch {
+          isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+        }
       }
     }
   }
@@ -206,8 +214,11 @@ extension HarnessMonitorStore {
     projects: [ProjectSummary],
     sessions: [SessionSummary]
   ) {
-    let didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
-    isShowingCachedData = false
+    var didChange = false
+    withUISyncBatch {
+      didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
+      isShowingCachedData = false
+    }
     if didChange {
       scheduleCacheWrite { service in
         let insertedCount = await service.cacheSessionList(sessions, projects: projects)
@@ -246,11 +257,13 @@ extension HarnessMonitorStore {
       return
     }
 
-    selectedSession = detail
-    self.timeline = timeline
-    applySessionSummaryUpdate(detail.session)
-    isShowingCachedData = showingCachedData
-    synchronizeActionActor()
+    withUISyncBatch {
+      selectedSession = detail
+      self.timeline = timeline
+      applySessionSummaryUpdate(detail.session)
+      isShowingCachedData = showingCachedData
+      synchronizeActionActor()
+    }
     if cancelPendingTimelineRefresh {
       cancelSessionPushFallback(for: sessionID)
     }
@@ -275,7 +288,9 @@ extension HarnessMonitorStore {
         extensionsPending: payload.extensionsPending == true
       )
       if payload.extensionsPending != true {
-        isExtensionsLoading = false
+        withUISyncBatch {
+          isExtensionsLoading = false
+        }
       }
       guard sessionID == selectedSessionID else {
         applySessionSummaryUpdate(detail.session)
@@ -326,7 +341,9 @@ extension HarnessMonitorStore {
         extensionsPending: payload.extensionsPending == true
       )
       if payload.extensionsPending != true {
-        isExtensionsLoading = false
+        withUISyncBatch {
+          isExtensionsLoading = false
+        }
       }
       let timeline = payload.timeline ?? self.timeline
       applySelectedSessionSnapshot(
@@ -362,9 +379,11 @@ extension HarnessMonitorStore {
     }
 
     let merged = detail.merging(extensions: extensions)
-    selectedSession = merged
-    isExtensionsLoading = false
-    pendingExtensions = nil
+    withUISyncBatch {
+      selectedSession = merged
+      isExtensionsLoading = false
+      pendingExtensions = nil
+    }
 
     let currentTimeline = timeline
     scheduleCacheWrite { service in
@@ -533,7 +552,9 @@ extension HarnessMonitorStore {
         guard selectedSessionID == sessionID else {
           return
         }
-        timeline = measuredTimeline.value
+        withUISyncBatch {
+          timeline = measuredTimeline.value
+        }
         if let selectedSession {
           scheduleCacheWrite { service in
             let insertedCount = await service.cacheSessionDetail(selectedSession, timeline: measuredTimeline.value)
@@ -541,7 +562,9 @@ extension HarnessMonitorStore {
           }
         }
       } catch {
-        lastError = error.localizedDescription
+        withUISyncBatch {
+          lastError = error.localizedDescription
+        }
       }
     }
   }
