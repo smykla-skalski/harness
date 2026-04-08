@@ -118,6 +118,45 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 - Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
 - Default filter: `RUST_LOG=harness=info`
 
+## Performance measurement (Harness Monitor macOS app)
+
+Two-layer system for performance regression detection and diagnostic attribution.
+
+**Layer 1: XCTest perf tests** (`Tests/HarnessMonitorUITests/HarnessMonitorPerfTests.swift`) - CI regression gates using native XCTest metrics:
+
+- `XCTHitchMetric(application:)` - direct hitch measurement
+- `XCTOSSignpostMetric(subsystem: "io.harnessmonitor", category: "perf", name:)` - scenario-scoped frame data
+- `XCTApplicationLaunchMetric(waitUntilResponsive:)` - launch time
+- `XCTMemoryMetric(application:)` - memory for backdrop/background/offline scenarios only
+
+The perf driver (`HarnessMonitorPerfDriver` in `HarnessMonitorAppSceneSupport.swift`) uses `OSSignposter.beginAnimationInterval` / `endInterval` to mark scenario boundaries for the signpost metric.
+
+Targeted run (single scenario):
+
+```bash
+xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' \
+  -scheme 'HarnessMonitor' -destination 'platform=macOS' \
+  -derivedDataPath tmp/xcode-derived \
+  test -only-testing:HarnessMonitorUITests/HarnessMonitorPerfTests/testLaunchDashboardHitchRate
+```
+
+**Layer 2: Instruments xctrace pipeline** (`Scripts/`) - periodic deep-dive attribution for data no public API exposes (SwiftUI body evaluations, update groups, causes, allocation call trees):
+
+```bash
+# Full baseline capture
+apps/harness-monitor-macos/Scripts/run-instruments-audit.sh --label baseline
+
+# Compare against baseline
+apps/harness-monitor-macos/Scripts/run-instruments-audit.sh \
+  --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
+
+# Parser regression tests
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'
+```
+
+Artifacts land in `tmp/perf/harness-monitor-instruments/runs/`. Each run produces `manifest.json`, `summary.json`, `summary.csv`, per-scenario metrics, and optional comparison reports.
+
 ## SwiftUI rules (Harness Monitor macOS app)
 
 Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review passes:
@@ -148,6 +187,7 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
 | [swiftui-idle-cpu.md](.claude/rules/swiftui-idle-cpu.md) | `apps/harness-monitor-macos/Sources/**` | No repeatForever on idle views, cached formatters, no periodic animations |
 | [xcuitest-speed.md](.claude/rules/xcuitest-speed.md) | `apps/harness-monitor-macos/Tests/**` | Animation suppression, .firstMatch, coordinate taps, single-launch tests, scroll patterns |
+| [perf-instrumentation.md](.claude/rules/perf-instrumentation.md) | `apps/harness-monitor-macos/**` | Signpost subsystem/category, scenario checklist, perf test env vars, KEEP_ANIMATIONS |
 
 Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines) and `tmp/investigations/xcuitest-speed/`. Consult for rationale or edge cases.
 
