@@ -7,17 +7,8 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
   func testSendSignalSheetPresentsAndDismissesWithEscape() throws {
     let app = launch(mode: "preview")
 
-    // Navigate to cockpit with agents visible.
     tapPreviewSession(in: app)
-
-    let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
-    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.uiTimeout))
-
-    // Right-click agent card to open context menu, then tap "Send Signal".
-    agentCard.rightClick()
-    let signalMenuItem = app.menuItems["Send Signal"].firstMatch
-    XCTAssertTrue(signalMenuItem.waitForExistence(timeout: Self.uiTimeout))
-    signalMenuItem.tap()
+    openSendSignalSheet(in: app)
 
     // Verify sheet appeared.
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
@@ -51,14 +42,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     tapPreviewSession(in: app)
-
-    let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
-    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.uiTimeout))
-
-    agentCard.rightClick()
-    let signalMenuItem = app.menuItems["Send Signal"].firstMatch
-    XCTAssertTrue(signalMenuItem.waitForExistence(timeout: Self.uiTimeout))
-    signalMenuItem.tap()
+    openSendSignalSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
     XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.uiTimeout))
@@ -78,14 +62,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     tapPreviewSession(in: app)
-
-    let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
-    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.uiTimeout))
-
-    agentCard.rightClick()
-    let signalMenuItem = app.menuItems["Send Signal"].firstMatch
-    XCTAssertTrue(signalMenuItem.waitForExistence(timeout: Self.uiTimeout))
-    signalMenuItem.tap()
+    openSendSignalSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
     XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.uiTimeout))
@@ -97,7 +74,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     // Type into message field.
     let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
     XCTAssertTrue(messageField.waitForExistence(timeout: 2))
-    messageField.tap()
+    tapViaCoordinate(in: app, element: messageField)
     messageField.typeText("Review the latest changes")
 
     // Verify submit button exists and is accessible.
@@ -117,6 +94,35 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
 }
 
 private extension HarnessMonitorSheetUITests {
+  /// Scroll the cockpit to reveal agent cards and right-click the leader
+  /// agent card to open the "Send Signal" context menu item.
+  func openSendSignalSheet(in app: XCUIApplication) {
+    let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
+    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.uiTimeout))
+
+    // Agent cards live inside HarnessMonitorAdaptiveGridLayout and may be
+    // below the fold. Scroll the content area down to bring them into view.
+    let contentFrame = frameElement(in: app, identifier: Accessibility.contentRootFrame)
+    if contentFrame.exists {
+      dragUp(in: app, element: contentFrame, distanceRatio: 3.0)
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
+    }
+
+    // Right-click via coordinate since custom layouts report isHittable=false.
+    guard let coordinate = centerCoordinate(in: app, for: agentCard) else {
+      XCTFail("Cannot resolve coordinate for agent card")
+      return
+    }
+    coordinate.rightClick()
+
+    let signalMenuItem = app.menuItems["Send Signal"].firstMatch
+    XCTAssertTrue(
+      signalMenuItem.waitForExistence(timeout: Self.uiTimeout),
+      "Send Signal menu item should appear"
+    )
+    signalMenuItem.tap()
+  }
+
   func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
     if element.isHittable {
       element.tap()
