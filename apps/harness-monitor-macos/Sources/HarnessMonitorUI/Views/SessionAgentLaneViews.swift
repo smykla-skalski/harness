@@ -3,6 +3,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionAgentListSection: View {
+  let store: HarnessMonitorStore
   let agents: [AgentRegistration]
   let inspectAgent: (String) -> Void
 
@@ -20,7 +21,7 @@ struct SessionAgentListSection: View {
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(agents) { agent in
-            SessionAgentSummaryCard(agent: agent, inspectAgent: inspectAgent)
+            SessionAgentSummaryCard(store: store, agent: agent, inspectAgent: inspectAgent)
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -31,6 +32,7 @@ struct SessionAgentListSection: View {
 }
 
 struct SessionAgentSummaryCard: View {
+  let store: HarnessMonitorStore
   let agent: AgentRegistration
   let inspectAgent: (String) -> Void
   @Environment(\.harnessDateTimeConfiguration)
@@ -144,6 +146,13 @@ struct SessionAgentSummaryCard: View {
       Button { inspectAgent(agent.agentId) } label: {
         Label("Inspect", systemImage: "info.circle")
       }
+      Button { store.presentSendSignalSheet(agentID: agent.agentId) } label: {
+        Label("Send Signal", systemImage: "paperplane")
+      }
+      .disabled(store.isSessionReadOnly)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.sessionAgentSignalTrigger(agent.agentId)
+      )
       Divider()
       Button {
         HarnessMonitorClipboard.copy(agent.agentId)
@@ -181,7 +190,11 @@ struct SessionAgentSummaryCard: View {
 }
 
 #Preview("Agent summary") {
-  SessionAgentSummaryCard(agent: PreviewFixtures.agents[1], inspectAgent: { _ in })
-    .padding()
-    .frame(width: 320)
+  SessionAgentSummaryCard(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
+    agent: PreviewFixtures.agents[1],
+    inspectAgent: { _ in }
+  )
+  .padding()
+  .frame(width: 320)
 }

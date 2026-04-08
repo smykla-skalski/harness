@@ -110,6 +110,12 @@ enum HarnessMonitorAccessibility {
   static let actionToast = "harness.action-toast"
   static let connectionCard = "harness.preferences.connection-card"
   static let cornerOverlay = "harness.corner-overlay"
+  static let sendSignalSheet = "harness.sheet.send-signal"
+  static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
+  static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
+  static let sendSignalSheetActionHintField = "harness.sheet.send-signal.action-hint"
+  static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
+  static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
   static let preferencesDatabaseStatistics = "harness.preferences.database.statistics"
   static let preferencesDatabaseOperations = "harness.preferences.database.operations"
   static let preferencesDatabaseHealth = "harness.preferences.database.health"
@@ -144,6 +150,10 @@ enum HarnessMonitorAccessibility {
 
   static func sessionAgentCard(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID))"
+  }
+
+  static func sessionAgentSignalTrigger(_ agentID: String) -> String {
+    "harness.session.agent.\(slug(agentID)).signal-trigger"
   }
 
   static func sessionSignalCard(_ signalID: String) -> String {

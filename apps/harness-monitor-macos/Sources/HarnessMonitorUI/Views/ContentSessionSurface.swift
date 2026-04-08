@@ -38,6 +38,7 @@ struct SessionContentContainer: View {
           .transition(.opacity)
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
+          store: store,
           detail: cockpitDetail,
           timeline: activeTimeline,
           isSessionReadOnly: store.isSessionReadOnly,
