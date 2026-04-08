@@ -8,6 +8,9 @@
 # macOS
 .DS_Store
 
+# Python
+__pycache__/
+
 # AI tool config dirs
 .claude/settings.local.json
 .claude/worktrees/
