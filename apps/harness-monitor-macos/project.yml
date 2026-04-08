@@ -220,14 +220,3 @@ schemes:
       targets:
         - name: HarnessMonitorKitTests
         - name: HarnessMonitorUITests
-  HarnessMonitorUIPreviews:
-    build:
-      config: Preview
-      targets:
-        HarnessMonitorUI: all
-    run:
-      config: Preview
-    test:
-      config: Preview
-    analyze:
-      config: Preview
