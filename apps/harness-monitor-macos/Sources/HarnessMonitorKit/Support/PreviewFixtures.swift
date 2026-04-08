@@ -166,6 +166,47 @@ public enum PreviewFixtures {
     )
   ]
 
+  public static let signalRegressionSecondarySummary = SessionSummary(
+    projectId: summary.projectId,
+    projectName: summary.projectName,
+    projectDir: summary.projectDir,
+    contextRoot: summary.contextRoot,
+    sessionId: "sess-harness-secondary",
+    title: "Signal retention verification",
+    context: "Switch between sessions and make sure existing signal history survives each reload.",
+    status: .active,
+    createdAt: "2026-03-28T14:09:00Z",
+    updatedAt: "2026-03-28T14:19:00Z",
+    lastActivityAt: "2026-03-28T14:19:00Z",
+    leaderId: summary.leaderId,
+    observeId: "observe-sess-harness-secondary",
+    pendingLeaderTransfer: nil,
+    metrics: SessionMetrics(
+      agentCount: 2,
+      activeAgentCount: 2,
+      openTaskCount: 1,
+      inProgressTaskCount: 1,
+      blockedTaskCount: 0,
+      completedTaskCount: 2
+    ),
+  )
+
+  public static let signalRegressionSessions = [
+    summary,
+    signalRegressionSecondarySummary,
+  ]
+
+  public static let signalRegressionProjects = [
+    ProjectSummary(
+      projectId: summary.projectId,
+      name: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      activeSessionCount: signalRegressionSessions.filter { $0.status == .active }.count,
+      totalSessionCount: signalRegressionSessions.count
+    )
+  ]
+
   public static let overflowSessions: [SessionSummary] = {
     let titles = [
       "Sidebar live updates",
@@ -255,4 +296,81 @@ public enum PreviewFixtures {
       )
     }
   }()
+
+  static func sessionDetail(
+    session: SessionSummary,
+    agents: [AgentRegistration] = agents,
+    tasks: [WorkItem] = tasks,
+    signals: [SessionSignalRecord] = [],
+    observer: ObserverSummary? = nil,
+    agentActivity: [AgentToolActivitySummary] = []
+  ) -> SessionDetail {
+    SessionDetail(
+      session: session,
+      agents: agents,
+      tasks: tasks,
+      signals: signals,
+      observer: observer,
+      agentActivity: agentActivity
+    )
+  }
+
+  public static let singleAgentSummary = SessionSummary(
+    projectId: summary.projectId,
+    projectName: summary.projectName,
+    projectDir: summary.projectDir,
+    contextRoot: summary.contextRoot,
+    sessionId: "sess-harness-solo",
+    title: "Solo agent session",
+    context: "A session with only one agent to test single-agent UI states.",
+    status: .active,
+    createdAt: "2026-03-28T14:05:00Z",
+    updatedAt: "2026-03-28T14:18:00Z",
+    lastActivityAt: "2026-03-28T14:18:00Z",
+    leaderId: "leader-claude",
+    observeId: nil,
+    pendingLeaderTransfer: nil,
+    metrics: SessionMetrics(
+      agentCount: 1,
+      activeAgentCount: 1,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      completedTaskCount: 0
+    )
+  )
+
+  public static let singleAgentDetail = sessionDetail(
+    session: singleAgentSummary,
+    agents: [agents[0]],
+    tasks: []
+  )
+
+  public static let singleAgentSessions = [singleAgentSummary]
+
+  public static let singleAgentProjects = [
+    ProjectSummary(
+      projectId: summary.projectId,
+      name: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      activeSessionCount: 1,
+      totalSessionCount: 1
+    )
+  ]
+
+  public static let signalRegressionPrimaryCoreDetail = sessionDetail(
+    session: summary,
+    signals: [],
+    observer: nil,
+    agentActivity: []
+  )
+
+  public static let signalRegressionSecondaryDetail = sessionDetail(
+    session: signalRegressionSecondarySummary
+  )
+
+  public static let signalRegressionSecondaryCoreDetail = sessionDetail(
+    session: signalRegressionSecondarySummary
+  )
 }

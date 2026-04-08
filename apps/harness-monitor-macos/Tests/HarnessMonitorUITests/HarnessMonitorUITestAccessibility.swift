@@ -35,6 +35,9 @@ enum HarnessMonitorUITestAccessibility {
   static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"
   static let previewSessionRow = "harness.sidebar.session.sess-harness"
   static let previewSessionRowFrame = "harness.sidebar.session.sess-harness.frame"
+  static let signalRegressionSecondarySessionRow = "harness.sidebar.session.sess-harness-secondary"
+  static let previewSignalCard = "harness.session.signal.sig-ui-1"
+  static let singleAgentSessionRow = "harness.sidebar.session.sess-harness-solo"
   static let overflowSessionRow = "harness.sidebar.session.sess-harness-17"
   static let previewSessionTitle =
     "Track all live multi-agent harness sessions from a macOS cockpit"
@@ -85,6 +88,8 @@ enum HarnessMonitorUITestAccessibility {
   static let signalMessageField = "harness.inspector.signal-message"
   static let removeAgentButton = "harness.inspector.remove-agent"
   static let signalSendButton = "harness.inspector.signal-send"
+  static let leaderTransferSection = "harness.inspector.leader-transfer"
+  static let leaderTransferPicker = "harness.inspector.leader-transfer-picker"
   static let observeSummaryButton = "harness.session.observe.summary"
   static let endSessionButton = "harness.session.action.end"
   static let pendingLeaderTransferCard = "harness.session.pending-transfer"
