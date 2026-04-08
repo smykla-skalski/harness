@@ -47,7 +47,7 @@ kube = { version = "3.1.0", features = ["runtime", "ws"] }
 axum = { version = "0.8.7", features = ["json", "ws"] }
 async-stream = "0.3.6"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.39", features = ["bundled"] }
 
 [dev-dependencies]
 assert_cmd = "2.2.0"
