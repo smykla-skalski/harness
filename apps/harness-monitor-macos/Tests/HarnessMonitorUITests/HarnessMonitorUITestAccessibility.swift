@@ -139,6 +139,13 @@ enum HarnessMonitorUITestAccessibility {
   static let installLaunchAgentButton = "harness.preferences.action.install-launch-agent"
   static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
   static let actionToast = "harness.action-toast"
+  static let sendSignalSheet = "harness.sheet.send-signal"
+  static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
+  static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
+  static let sendSignalSheetActionHintField = "harness.sheet.send-signal.action-hint"
+  static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
+  static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
+  static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
 
   static func preferencesBackgroundTile(_ key: String) -> String {
     "harness.preferences.background.\(slug(key))"
