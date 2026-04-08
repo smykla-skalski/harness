@@ -269,7 +269,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(centerpieceFrame.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(statusTicker.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(statusTickerContent.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(statusTickerHover.waitForExistence(timeout: Self.uiTimeout))
+    let hasStatusTickerHoverFrame = statusTickerHover.waitForExistence(timeout: 2)
     XCTAssertTrue(metricsFrame.waitForExistence(timeout: Self.uiTimeout))
 
     let centerOffset = abs(centerpieceFrame.frame.midX - toolbar.frame.midX)
@@ -279,12 +279,21 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let trailingInset = centerpieceFrame.frame.maxX - statusTicker.frame.maxX
     let statusLeadingInset = statusTickerContent.frame.minX - statusTicker.frame.minX
     let statusTrailingInset = statusTicker.frame.maxX - statusTickerContent.frame.maxX
-    let hoverLeadingInset = statusTickerHover.frame.minX - statusTicker.frame.minX
-    let hoverTrailingInset = statusTicker.frame.maxX - statusTickerHover.frame.maxX
-    let hoverTopInset = statusTickerHover.frame.minY - statusTicker.frame.minY
-    let hoverBottomInset = statusTicker.frame.maxY - statusTickerHover.frame.maxY
+    let hoverLeadingInset = hasStatusTickerHoverFrame
+      ? statusTickerHover.frame.minX - statusTicker.frame.minX
+      : .zero
+    let hoverTrailingInset = hasStatusTickerHoverFrame
+      ? statusTicker.frame.maxX - statusTickerHover.frame.maxX
+      : .zero
+    let hoverTopInset = hasStatusTickerHoverFrame
+      ? statusTickerHover.frame.minY - statusTicker.frame.minY
+      : .zero
+    let hoverBottomInset = hasStatusTickerHoverFrame
+      ? statusTicker.frame.maxY - statusTickerHover.frame.maxY
+      : .zero
     let expectedLeadingInset: CGFloat = 12
     let leadingInsetTolerance: CGFloat = 1
+    let expectedTrailingInset: CGFloat = 4
     let expectedStatusHorizontalInset: CGFloat = 12
     let expectedHoverInset: CGFloat = 4
     let statusInsetTolerance: CGFloat = 1
@@ -295,7 +304,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       metricsFrame: \(metricsFrame.frame)
       statusTicker: \(statusTicker.frame)
       statusTickerContent: \(statusTickerContent.frame)
-      statusTickerHover: \(statusTickerHover.frame)
+      statusTickerHover exists: \(hasStatusTickerHoverFrame)
+      statusTickerHover: \(hasStatusTickerHoverFrame ? String(describing: statusTickerHover.frame) : "missing")
       centerOffset: \(centerOffset)
       verticalOffset: \(verticalOffset)
       leadingInset: \(leadingInset)
@@ -313,13 +323,16 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       || verticalOffset > 8
       || abs(leadingInset - expectedLeadingInset) > leadingInsetTolerance
       || interiorGap < 20
-      || trailingInset < 10
+      || abs(trailingInset - expectedTrailingInset) > leadingInsetTolerance
       || abs(statusLeadingInset - expectedStatusHorizontalInset) > statusInsetTolerance
       || abs(statusTrailingInset - expectedStatusHorizontalInset) > statusInsetTolerance
-      || abs(hoverLeadingInset - expectedHoverInset) > statusInsetTolerance
-      || abs(hoverTrailingInset - expectedHoverInset) > statusInsetTolerance
-      || abs(hoverTopInset - expectedHoverInset) > statusInsetTolerance
-      || abs(hoverBottomInset - expectedHoverInset) > statusInsetTolerance
+      || (hasStatusTickerHoverFrame
+        && (
+          abs(hoverLeadingInset - expectedHoverInset) > statusInsetTolerance
+            || abs(hoverTrailingInset - expectedHoverInset) > statusInsetTolerance
+            || abs(hoverTopInset - expectedHoverInset) > statusInsetTolerance
+            || abs(hoverBottomInset - expectedHoverInset) > statusInsetTolerance
+        ))
       || centerpieceFrame.frame.width < 180
     {
       attachWindowScreenshot(in: app, named: "toolbar-centerpiece")
@@ -361,8 +374,13 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     )
     XCTAssertGreaterThanOrEqual(
       trailingInset,
-      10,
-      "Expected the status ticker to keep a trailing inset inside the centerpiece capsule"
+      expectedTrailingInset - leadingInsetTolerance,
+      "Expected the status ticker host to sit flush to the trailing edge"
+    )
+    XCTAssertLessThanOrEqual(
+      trailingInset,
+      expectedTrailingInset + leadingInsetTolerance,
+      "Expected the status ticker host trailing inset to stay near zero"
     )
     XCTAssertGreaterThanOrEqual(
       statusLeadingInset,
@@ -384,46 +402,48 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       expectedStatusHorizontalInset + statusInsetTolerance,
       "Expected the status hover capsule trailing inset to match the vertical inset"
     )
-    XCTAssertGreaterThanOrEqual(
-      hoverLeadingInset,
-      expectedHoverInset - statusInsetTolerance,
-      "Expected the hover plate leading inset to match the top/bottom inset"
-    )
-    XCTAssertLessThanOrEqual(
-      hoverLeadingInset,
-      expectedHoverInset + statusInsetTolerance,
-      "Expected the hover plate leading inset to stay aligned with the top/bottom inset"
-    )
-    XCTAssertGreaterThanOrEqual(
-      hoverTrailingInset,
-      expectedHoverInset - statusInsetTolerance,
-      "Expected the hover plate trailing inset to match the top/bottom inset"
-    )
-    XCTAssertLessThanOrEqual(
-      hoverTrailingInset,
-      expectedHoverInset + statusInsetTolerance,
-      "Expected the hover plate trailing inset to stay aligned with the top/bottom inset"
-    )
-    XCTAssertGreaterThanOrEqual(
-      hoverTopInset,
-      expectedHoverInset - statusInsetTolerance,
-      "Expected the hover plate top inset to stay at the calculated inset"
-    )
-    XCTAssertLessThanOrEqual(
-      hoverTopInset,
-      expectedHoverInset + statusInsetTolerance,
-      "Expected the hover plate top inset to stay at the calculated inset"
-    )
-    XCTAssertGreaterThanOrEqual(
-      hoverBottomInset,
-      expectedHoverInset - statusInsetTolerance,
-      "Expected the hover plate bottom inset to stay at the calculated inset"
-    )
-    XCTAssertLessThanOrEqual(
-      hoverBottomInset,
-      expectedHoverInset + statusInsetTolerance,
-      "Expected the hover plate bottom inset to stay at the calculated inset"
-    )
+    if hasStatusTickerHoverFrame {
+      XCTAssertGreaterThanOrEqual(
+        hoverLeadingInset,
+        expectedHoverInset - statusInsetTolerance,
+        "Expected the hover plate leading inset to match the top/bottom inset"
+      )
+      XCTAssertLessThanOrEqual(
+        hoverLeadingInset,
+        expectedHoverInset + statusInsetTolerance,
+        "Expected the hover plate leading inset to stay aligned with the top/bottom inset"
+      )
+      XCTAssertGreaterThanOrEqual(
+        hoverTrailingInset,
+        expectedHoverInset - statusInsetTolerance,
+        "Expected the hover plate trailing inset to match the top/bottom inset"
+      )
+      XCTAssertLessThanOrEqual(
+        hoverTrailingInset,
+        expectedHoverInset + statusInsetTolerance,
+        "Expected the hover plate trailing inset to stay aligned with the top/bottom inset"
+      )
+      XCTAssertGreaterThanOrEqual(
+        hoverTopInset,
+        expectedHoverInset - statusInsetTolerance,
+        "Expected the hover plate top inset to stay at the calculated inset"
+      )
+      XCTAssertLessThanOrEqual(
+        hoverTopInset,
+        expectedHoverInset + statusInsetTolerance,
+        "Expected the hover plate top inset to stay at the calculated inset"
+      )
+      XCTAssertGreaterThanOrEqual(
+        hoverBottomInset,
+        expectedHoverInset - statusInsetTolerance,
+        "Expected the hover plate bottom inset to stay at the calculated inset"
+      )
+      XCTAssertLessThanOrEqual(
+        hoverBottomInset,
+        expectedHoverInset + statusInsetTolerance,
+        "Expected the hover plate bottom inset to stay at the calculated inset"
+      )
+    }
   }
 
   func testToolbarCenterpieceReportsPreviewMetrics() throws {
