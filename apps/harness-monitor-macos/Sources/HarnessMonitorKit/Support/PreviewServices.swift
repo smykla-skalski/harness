@@ -8,6 +8,9 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     let detail: SessionDetail?
     let timeline: [TimelineEntry]
     let readySessionID: String?
+    let detailsBySessionID: [String: SessionDetail]
+    let coreDetailsBySessionID: [String: SessionDetail]
+    let timelinesBySessionID: [String: [TimelineEntry]]
 
     public static let populated = Self(
       health: HealthResponse(
@@ -23,11 +26,36 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       sessions: [PreviewFixtures.summary],
       detail: PreviewFixtures.detail,
       timeline: PreviewFixtures.timeline,
-      readySessionID: PreviewFixtures.summary.sessionId
+      readySessionID: PreviewFixtures.summary.sessionId,
+      detailsBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
     )
 
     public static let overflow: Self = {
       let sessions = PreviewFixtures.overflowSessions
+      let detailsBySessionID = Dictionary(
+        uniqueKeysWithValues: sessions.map { session in
+          let detail =
+            if session.sessionId == PreviewFixtures.summary.sessionId {
+              PreviewFixtures.detail
+            } else {
+              PreviewFixtures.sessionDetail(session: session)
+            }
+          return (session.sessionId, detail)
+        }
+      )
+      let timelinesBySessionID: [String: [TimelineEntry]] = Dictionary(
+        uniqueKeysWithValues: sessions.map { session in
+          let timeline: [TimelineEntry] =
+            if session.sessionId == PreviewFixtures.summary.sessionId {
+              PreviewFixtures.timeline
+            } else {
+              []
+            }
+          return (session.sessionId, timeline)
+        }
+      )
       return Self(
         health: HealthResponse(
           status: "ok",
@@ -51,9 +79,65 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
         sessions: sessions,
         detail: PreviewFixtures.detail,
         timeline: PreviewFixtures.timeline,
-        readySessionID: PreviewFixtures.summary.sessionId
+        readySessionID: PreviewFixtures.summary.sessionId,
+        detailsBySessionID: detailsBySessionID,
+        coreDetailsBySessionID: [:],
+        timelinesBySessionID: timelinesBySessionID
       )
     }()
+
+    public static let signalRegression = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: PreviewFixtures.signalRegressionSessions.count
+      ),
+      projects: PreviewFixtures.signalRegressionProjects,
+      sessions: PreviewFixtures.signalRegressionSessions,
+      detail: PreviewFixtures.detail,
+      timeline: PreviewFixtures.timeline,
+      readySessionID: PreviewFixtures.summary.sessionId,
+      detailsBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.detail,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId:
+          PreviewFixtures.signalRegressionSecondaryDetail,
+      ],
+      coreDetailsBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.signalRegressionPrimaryCoreDetail,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId:
+          PreviewFixtures.signalRegressionSecondaryCoreDetail,
+      ],
+      timelinesBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.timeline,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId: [],
+      ]
+    )
+
+    public static let singleAgent = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: PreviewFixtures.singleAgentProjects,
+      sessions: PreviewFixtures.singleAgentSessions,
+      detail: PreviewFixtures.singleAgentDetail,
+      timeline: [],
+      readySessionID: PreviewFixtures.singleAgentSummary.sessionId,
+      detailsBySessionID: [
+        PreviewFixtures.singleAgentSummary.sessionId: PreviewFixtures.singleAgentDetail,
+      ],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [:]
+    )
 
     public static let empty = Self(
       health: HealthResponse(
@@ -69,8 +153,27 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       sessions: [],
       detail: nil,
       timeline: [],
-      readySessionID: nil
+      readySessionID: nil,
+      detailsBySessionID: [:],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [:]
     )
+
+    func detail(for sessionID: String, scope: String?) -> SessionDetail? {
+      if scope == "core", let coreDetail = coreDetailsBySessionID[sessionID] {
+        return coreDetail
+      }
+
+      if let scopedDetail = detailsBySessionID[sessionID] {
+        return scopedDetail
+      }
+
+      return detail
+    }
+
+    func timeline(for sessionID: String) -> [TimelineEntry] {
+      timelinesBySessionID[sessionID] ?? timeline
+    }
   }
 
   private let fixtures: Fixtures
@@ -146,15 +249,15 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     fixtures.sessions
   }
 
-  public func sessionDetail(id _: String, scope _: String?) async throws -> SessionDetail {
-    guard let detail = fixtures.detail else {
+  public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    guard let detail = fixtures.detail(for: id, scope: scope) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "No preview session detail available.")
     }
     return detail
   }
 
-  public func timeline(sessionID _: String) async throws -> [TimelineEntry] {
-    fixtures.timeline
+  public func timeline(sessionID: String) async throws -> [TimelineEntry] {
+    fixtures.timeline(for: sessionID)
   }
 
   public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
@@ -266,6 +369,8 @@ public actor PreviewDaemonController: DaemonControlling {
   public enum Mode: Sendable {
     case populated
     case overflow
+    case signalRegression
+    case singleAgent
     case empty
   }
 
@@ -280,6 +385,10 @@ public actor PreviewDaemonController: DaemonControlling {
         PreviewHarnessClient.Fixtures.populated
       case .overflow:
         PreviewHarnessClient.Fixtures.overflow
+      case .signalRegression:
+        PreviewHarnessClient.Fixtures.signalRegression
+      case .singleAgent:
+        PreviewHarnessClient.Fixtures.singleAgent
       case .empty:
         PreviewHarnessClient.Fixtures.empty
       }

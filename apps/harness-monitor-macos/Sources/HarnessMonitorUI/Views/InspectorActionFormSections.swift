@@ -259,6 +259,10 @@ struct InspectorLeaderTransferSection: View {
   let isSessionActionInFlight: Bool
   let submitTransferLeader: () -> Void
 
+  private var isSingleAgent: Bool {
+    detail.agents.count <= 1
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       HarnessMonitorActionHeader(
@@ -274,10 +278,21 @@ struct InspectorLeaderTransferSection: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       Picker("New Leader", selection: $transferLeaderID) {
-        ForEach(detail.agents) { agent in
+        if let leader = detail.agents.first(where: { $0.agentId == detail.session.leaderId }) {
+          Text("\(leader.name) (current leader)")
+            .foregroundStyle(.tertiary)
+            .tag(leader.agentId)
+        }
+        ForEach(detail.agents.filter { $0.agentId != detail.session.leaderId }) { agent in
           Text(agent.name).tag(agent.agentId)
         }
       }
+      .onChange(of: transferLeaderID) { previous, current in
+        if current == detail.session.leaderId, previous != detail.session.leaderId {
+          transferLeaderID = previous
+        }
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferPicker)
       .harnessNativeFormControl()
       TextField("Reason", text: $transferReason, axis: .vertical)
         .harnessNativeFormControl()
@@ -295,6 +310,9 @@ struct InspectorLeaderTransferSection: View {
             ? "Select a different agent to transfer leadership to" : ""
         )
     }
-    .disabled(isSessionReadOnly || isSessionActionInFlight)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferSection)
+    .disabled(isSingleAgent || isSessionReadOnly || isSessionActionInFlight)
+    .opacity(isSingleAgent ? 0.4 : 1)
+    .help(isSingleAgent ? "At least two agents are needed to transfer leadership" : "")
   }
 }

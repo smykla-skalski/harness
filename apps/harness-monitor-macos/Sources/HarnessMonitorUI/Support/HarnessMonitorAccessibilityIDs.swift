@@ -64,6 +64,8 @@ enum HarnessMonitorAccessibility {
   static let signalMessageField = "harness.inspector.signal-message"
   static let removeAgentButton = "harness.inspector.remove-agent"
   static let signalSendButton = "harness.inspector.signal-send"
+  static let leaderTransferSection = "harness.inspector.leader-transfer"
+  static let leaderTransferPicker = "harness.inspector.leader-transfer-picker"
   static let preferencesRoot = "harness.preferences.root"
   static let preferencesState = "harness.preferences.state"
   static let preferencesPanel = "harness.preferences.panel"
@@ -142,6 +144,10 @@ enum HarnessMonitorAccessibility {
 
   static func sessionAgentCard(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID))"
+  }
+
+  static func sessionSignalCard(_ signalID: String) -> String {
+    "harness.session.signal.\(slug(signalID))"
   }
 
   static func preferencesMetricCard(_ key: String) -> String {

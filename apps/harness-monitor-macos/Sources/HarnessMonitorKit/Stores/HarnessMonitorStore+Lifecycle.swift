@@ -127,15 +127,15 @@ extension HarnessMonitorStore {
       completeSessionLoad(requestID)
     }
 
-    let usesDeferredExtensions = client is WebSocketTransport
-    isExtensionsLoading = usesDeferredExtensions
+    // Direct session selection must hydrate a full snapshot immediately.
+    // Deferred extension pushes remain useful for live updates, but they are
+    // not reliable enough to be the only source of signals on initial open or
+    // when reselecting an existing session.
+    isExtensionsLoading = false
 
     do {
       async let detailResponse = Self.measureOperation {
-        try await client.sessionDetail(
-          id: sessionID,
-          scope: usesDeferredExtensions ? "core" : nil
-        )
+        try await client.sessionDetail(id: sessionID, scope: nil)
       }
       async let timelineResponse = Self.measureOperation {
         try await client.timeline(sessionID: sessionID)
@@ -150,9 +150,6 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
 
       var detail = measuredDetail.value
-      if !usesDeferredExtensions {
-        isExtensionsLoading = false
-      }
       if let buffered = pendingExtensions, buffered.sessionId == sessionID {
         detail = detail.merging(extensions: buffered)
         pendingExtensions = nil

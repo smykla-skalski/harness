@@ -6,6 +6,8 @@ enum HarnessMonitorAppStoreFactory {
   private enum PreviewFixtureSet: String {
     case standard
     case overflow
+    case signalRegression = "signal-regression"
+    case singleAgent = "single-agent"
 
     init(environment: HarnessMonitorEnvironment) {
       let rawValue = environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]?
@@ -73,6 +75,10 @@ enum HarnessMonitorAppStoreFactory {
           PreviewDaemonController()
         case .overflow:
           PreviewDaemonController(mode: .overflow)
+        case .signalRegression:
+          PreviewDaemonController(mode: .signalRegression)
+        case .singleAgent:
+          PreviewDaemonController(mode: .singleAgent)
         }
     case .empty:
       controller = PreviewDaemonController(mode: .empty)

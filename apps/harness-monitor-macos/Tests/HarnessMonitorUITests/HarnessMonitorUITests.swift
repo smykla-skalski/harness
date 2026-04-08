@@ -108,6 +108,51 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(signals.exists)
   }
 
+  func testExistingSignalsRemainVisibleAfterSwitchingSessions() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_FIXTURE_SET": "signal-regression"]
+    )
+
+    let primarySession = previewSessionTrigger(in: app)
+    let secondarySession = sessionTrigger(
+      in: app,
+      identifier: Accessibility.signalRegressionSecondarySessionRow
+    )
+    let primarySignal = button(in: app, identifier: Accessibility.previewSignalCard)
+    let noSignalsState = app.staticTexts["No signals"]
+    let signalInspector = element(in: app, identifier: Accessibility.signalInspectorCard)
+
+    XCTAssertTrue(primarySession.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(secondarySession.waitForExistence(timeout: Self.uiTimeout))
+
+    if !primarySignal.waitForExistence(timeout: 1.5) {
+      tapPreviewSession(in: app)
+    }
+
+    XCTAssertTrue(
+      primarySignal.waitForExistence(timeout: Self.uiTimeout),
+      "Existing session signals should be visible when the cockpit opens"
+    )
+    tapButton(in: app, identifier: Accessibility.previewSignalCard)
+    XCTAssertTrue(
+      signalInspector.waitForExistence(timeout: Self.uiTimeout),
+      "Selecting a signal row should open the signal inspector"
+    )
+
+    tapSession(in: app, identifier: Accessibility.signalRegressionSecondarySessionRow)
+    XCTAssertTrue(
+      noSignalsState.waitForExistence(timeout: Self.uiTimeout),
+      "A different session without signals should replace the previous signal list"
+    )
+
+    tapPreviewSession(in: app)
+    XCTAssertTrue(
+      primarySignal.waitForExistence(timeout: Self.uiTimeout),
+      "Existing signals should still be visible after switching away and back"
+    )
+  }
+
   func testToolbarSurvivesSidebarToggle() throws {
     let app = launch(mode: "preview")
 
@@ -314,6 +359,51 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       attachWindowScreenshot(in: app, named: "sidebar-search-not-hittable")
     }
     XCTAssertTrue(noMatches.exists)
+  }
+
+  func testLeaderTransferSectionShowsPickerWithCurrentLeaderDimmed() throws {
+    let app = launch(mode: "preview")
+
+    tapPreviewSession(in: app)
+    tapButton(in: app, identifier: Accessibility.workerAgentCard)
+
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+
+    let transferSection = element(in: app, identifier: Accessibility.leaderTransferSection)
+    let transferButton = button(in: app, title: "Transfer Leadership")
+
+    for _ in 0..<8 where !transferButton.exists {
+      dragUp(in: app, element: inspectorRoot, distanceRatio: 0.25)
+    }
+
+    XCTAssertTrue(transferSection.exists, "Leader transfer section should be visible")
+    XCTAssertTrue(transferButton.exists, "Transfer button should be visible")
+    XCTAssertTrue(
+      app.staticTexts["Leader Transfer"].exists,
+      "Section header should read Leader Transfer"
+    )
+  }
+
+  func testLeaderTransferSectionIsDisabledForSingleAgentSession() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_FIXTURE_SET": "single-agent"]
+    )
+
+    tapSession(in: app, identifier: Accessibility.singleAgentSessionRow)
+
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+
+    let transferSection = element(in: app, identifier: Accessibility.leaderTransferSection)
+
+    for _ in 0..<8 where !transferSection.exists {
+      dragUp(in: app, element: inspectorRoot, distanceRatio: 0.25)
+    }
+
+    XCTAssertTrue(transferSection.exists, "Leader transfer section should be in the tree")
+    XCTAssertFalse(transferSection.isEnabled, "Section should be disabled with only one agent")
   }
 
   func testActionToastAppearsAndAutoDismisses() throws {

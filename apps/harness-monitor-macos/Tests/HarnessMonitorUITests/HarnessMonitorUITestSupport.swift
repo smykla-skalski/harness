@@ -50,7 +50,11 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapPreviewSession(in app: XCUIApplication) {
-    let sessionRow = previewSessionTrigger(in: app)
+    tapSession(in: app, identifier: HarnessMonitorUITestAccessibility.previewSessionRow)
+  }
+
+  func tapSession(in app: XCUIApplication, identifier: String) {
+    let sessionRow = sessionTrigger(in: app, identifier: identifier)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     if sessionRow.isHittable {
       sessionRow.tap()
@@ -60,7 +64,7 @@ extension HarnessMonitorUITestCase {
       coordinate.tap()
       return
     }
-    XCTFail("Failed to tap preview session row")
+    XCTFail("Failed to tap session row \(identifier)")
   }
 
   func mainWindow(in app: XCUIApplication) -> XCUIElement {
