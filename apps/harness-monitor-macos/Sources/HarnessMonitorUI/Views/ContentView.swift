@@ -198,6 +198,7 @@ public struct ContentView: View {
       presentationDelay: showLlama ? nil : .milliseconds(400)
     )
     .modifier(HarnessMonitorConfirmationDialogModifier(store: store))
+    .modifier(HarnessMonitorSheetModifier(store: store))
     .modifier(
       ContentAnnouncementsModifier(
         connectionState: store.connectionState,

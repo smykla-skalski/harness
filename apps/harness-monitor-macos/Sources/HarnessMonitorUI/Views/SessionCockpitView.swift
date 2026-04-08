@@ -2,6 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionCockpitView: View {
+  let store: HarnessMonitorStore
   let detail: SessionDetail
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
@@ -44,7 +45,7 @@ struct SessionCockpitView: View {
             companionAgentCount: detail.agents.count,
             inspectTask: inspectTask
           )
-          SessionAgentListSection(agents: detail.agents, inspectAgent: inspectAgent)
+          SessionAgentListSection(store: store, agents: detail.agents, inspectAgent: inspectAgent)
         }
         SessionCockpitSignalsSection(
           signals: detail.signals,
@@ -61,6 +62,7 @@ struct SessionCockpitView: View {
 
 #Preview("Cockpit") {
   SessionCockpitView(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     isSessionReadOnly: false,
