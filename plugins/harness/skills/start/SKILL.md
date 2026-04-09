@@ -1,7 +1,7 @@
 ---
 name: session:start
 description: Start a new multi-agent orchestration session. You become the leader - you plan, delegate, and coordinate. You never execute tasks yourself.
-argument-hint: '--title "name" "goal description" [--session-id ID]'
+argument-hint: '--context "goal" [--session-id ID]'
 allowed-tools: Agent, Bash, Glob, Grep, Read
 user-invocable: true
 ---
@@ -30,8 +30,7 @@ Parse from `$ARGUMENTS`:
 
 | Argument | Default | Purpose |
 | --- | --- | --- |
-| `--title` | required | Short human-readable session name |
-| `<context>` | required | Human-readable goal (positional argument) |
+| `--context` | required | Human-readable goal for the session |
 | `--session-id` | auto-generated | Explicit session ID |
 
 ## Workflow
@@ -39,7 +38,7 @@ Parse from `$ARGUMENTS`:
 ### 1. Start the session
 
 ```bash
-harness session start --title "<short name>" "<goal from arguments>"
+harness session start --context "<goal from arguments>"
 ```
 
 Note the session ID and your agent ID from the output.
