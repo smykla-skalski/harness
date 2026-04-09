@@ -15,6 +15,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     [String: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation] = [:]
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
+  var isShutDown = false
 
   static let reconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
@@ -46,6 +47,9 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   }
 
   public func connect() async throws {
+    guard !isShutDown else {
+      throw WebSocketTransportError.connectionClosed
+    }
     let wsURL = wsEndpoint()
     HarnessMonitorLogger.websocket.info(
       "WebSocket connecting to \(wsURL.absoluteString, privacy: .public)")
@@ -69,6 +73,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   }
 
   public func shutdown() async {
+    isShutDown = true
     disconnect()
     session.invalidateAndCancel()
   }
