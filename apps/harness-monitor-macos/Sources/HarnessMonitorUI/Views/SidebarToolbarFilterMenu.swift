@@ -10,7 +10,7 @@ struct SidebarToolbarFilterMenu: View {
 
   var body: some View {
     Menu {
-      Menu("Status") {
+      Section("Status") {
         ForEach(HarnessMonitorStore.SessionFilter.allCases) { filter in
           filterButton(
             title: filter.title,
@@ -22,7 +22,7 @@ struct SidebarToolbarFilterMenu: View {
         }
       }
 
-      Menu("Focus") {
+      Section("Focus") {
         ForEach(SessionFocusFilter.allCases) { filter in
           filterButton(
             title: filter.title,
@@ -34,7 +34,7 @@ struct SidebarToolbarFilterMenu: View {
         }
       }
 
-      Menu("Sort") {
+      Section("Sort") {
         ForEach(SessionSortOrder.allCases) { order in
           filterButton(
             title: order.title,
@@ -46,16 +46,16 @@ struct SidebarToolbarFilterMenu: View {
         }
       }
 
-      Divider()
-
-      Button("Clear Filters") {
-        store.searchText = ""
-        store.sessionFilter = .all
-        store.sessionFocusFilter = .all
-        store.sessionSortOrder = .recentActivity
+      Section {
+        Button("Clear Filters") {
+          store.searchText = ""
+          store.sessionFilter = .all
+          store.sessionFocusFilter = .all
+          store.sessionSortOrder = .recentActivity
+        }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
+        .disabled(!hasActiveFilters)
       }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
-      .disabled(!hasActiveFilters)
     } label: {
       Label(
         "Filters",
