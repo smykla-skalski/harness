@@ -10,7 +10,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
-use crate::workspace::{harness_data_root, project_context_dir, resolve_git_checkout_identity};
+use crate::workspace::{
+    canonical_checkout_root, harness_data_root, project_context_dir, resolve_git_checkout_identity,
+};
 use fs_err as fs;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -486,6 +488,62 @@ fn fallback_project(context_root: &Path) -> DiscoveredProject {
         checkout_id: project_id,
         checkout_name: "Unknown".to_string(),
         context_root: context_root.to_path_buf(),
+        is_worktree: false,
+        worktree_name: None,
+    }
+}
+
+#[must_use]
+pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject {
+    let checkout_root = canonical_checkout_root(project_dir);
+    let context_root = project_context_dir(&checkout_root);
+    let checkout_id = project_context_dir_name(&context_root).unwrap_or_default();
+
+    if let Some(identity) = resolve_git_checkout_identity(&checkout_root) {
+        let project_id = project_context_dir_name(&project_context_dir(&identity.repository_root))
+            .unwrap_or_default();
+        let name = identity.repository_root.file_name().map_or_else(
+            || project_id.clone(),
+            |name| name.to_string_lossy().to_string(),
+        );
+        let is_worktree = identity.is_worktree();
+        let worktree_name = identity.worktree_name().map(ToString::to_string);
+        let checkout_name = if is_worktree {
+            worktree_name.clone().unwrap_or_else(|| {
+                identity
+                    .checkout_root
+                    .file_name()
+                    .map_or_else(String::new, |name| name.to_string_lossy().to_string())
+            })
+        } else {
+            "Repository".to_string()
+        };
+
+        return DiscoveredProject {
+            project_id,
+            name,
+            project_dir: Some(identity.checkout_root),
+            repository_root: Some(identity.repository_root),
+            checkout_id,
+            checkout_name,
+            context_root,
+            is_worktree,
+            worktree_name,
+        };
+    }
+
+    let name = checkout_root.file_name().map_or_else(
+        || checkout_id.clone(),
+        |name| name.to_string_lossy().to_string(),
+    );
+    DiscoveredProject {
+        project_id: checkout_id.clone(),
+        name,
+        project_dir: Some(checkout_root.clone()),
+        repository_root: Some(checkout_root),
+        checkout_id,
+        checkout_name: "Directory".to_string(),
+        context_root,
         is_worktree: false,
         worktree_name: None,
     }

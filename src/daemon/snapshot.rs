@@ -448,6 +448,10 @@ fn record_tool_event(
 ///
 /// # Errors
 /// Returns [`CliError`] on filesystem read failures.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "signal snapshot assembly merges pending, acknowledged, and ack-result lanes in one pass"
+)]
 pub fn load_signals_for(
     project: &DiscoveredProject,
     state: &SessionState,

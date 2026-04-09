@@ -9,7 +9,9 @@ use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::{SessionLogEntry, SessionState, SessionTransition, TaskSource};
-use crate::session::{observe as session_observe, service as session_service};
+use crate::session::{
+    observe as session_observe, service as session_service, storage as session_storage,
+};
 use crate::workspace::utc_now;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -1027,7 +1029,7 @@ pub fn start_session_direct(
     );
 
     if let Some(db) = db {
-        let project_id = db.ensure_project_for_dir(&request.project_dir)?;
+        let project_id = ensure_project_registered(db, project_dir)?;
         db.create_session_record(&project_id, &state)?;
         let leader_id = state.leader_id.as_deref().unwrap_or("");
         db.append_log_entry(&build_log_entry(
@@ -1049,6 +1051,16 @@ pub fn start_session_direct(
         Some(runtime_name),
         Some(&session_id),
     )
+}
+
+fn ensure_project_registered(
+    db: &super::db::DaemonDb,
+    project_dir: &Path,
+) -> Result<String, CliError> {
+    session_storage::record_project_origin(project_dir)?;
+    let project = index::discovered_project_for_checkout(project_dir);
+    db.sync_project(&project)?;
+    Ok(project.project_id)
 }
 
 /// Join an existing session, writing directly to `SQLite` when a DB is available.
@@ -1874,22 +1886,10 @@ mod tests {
         crate::session::types::SessionState,
     ) {
         use crate::session::service::build_new_session;
-        use crate::workspace::project_context_dir;
 
         let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
 
-        let context_root = project_context_dir(project);
-        let project_record = super::index::DiscoveredProject {
-            project_id: format!("project-{}", hex_digest(project)),
-            name: "test".into(),
-            project_dir: Some(project.to_path_buf()),
-            repository_root: Some(project.to_path_buf()),
-            checkout_id: "checkout-test".into(),
-            checkout_name: "test".into(),
-            context_root,
-            is_worktree: false,
-            worktree_name: None,
-        };
+        let project_record = index::discovered_project_for_checkout(project);
         db.sync_project(&project_record).expect("sync project");
 
         let state = build_new_session(
@@ -1903,13 +1903,6 @@ mod tests {
         db.sync_session(&project_record.project_id, &state)
             .expect("sync session");
         (db, state)
-    }
-
-    fn hex_digest(path: &Path) -> String {
-        use std::hash::{DefaultHasher, Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-        path.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
     }
 
     #[test]
@@ -2015,18 +2008,7 @@ mod tests {
 
     fn setup_db_with_project(project: &Path) -> crate::daemon::db::DaemonDb {
         let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open db");
-        let context_root = project_context_dir(project);
-        let project_record = index::DiscoveredProject {
-            project_id: format!("project-{}", hex_digest(project)),
-            name: "test".into(),
-            project_dir: Some(project.to_path_buf()),
-            repository_root: Some(project.to_path_buf()),
-            checkout_id: "checkout-test".into(),
-            checkout_name: "test".into(),
-            context_root,
-            is_worktree: false,
-            worktree_name: None,
-        };
+        let project_record = index::discovered_project_for_checkout(project);
         db.sync_project(&project_record).expect("sync project");
         db
     }
@@ -2059,6 +2041,48 @@ mod tests {
                 .expect("load")
                 .expect("present");
             assert_eq!(db_state.context, "db-direct start");
+        });
+    }
+
+    #[test]
+    fn start_session_db_direct_registers_fresh_project_for_discovery() {
+        with_temp_project(|project| {
+            use crate::daemon::protocol::SessionStartRequest;
+
+            let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open db");
+            let canonical_project = project.canonicalize().expect("canonicalize project");
+
+            let state = start_session_direct(
+                &SessionStartRequest {
+                    title: "fresh-project start session".into(),
+                    context: "fresh-project start".into(),
+                    runtime: "claude".into(),
+                    session_id: Some("daemon-start-fresh".into()),
+                    project_dir: canonical_project.to_string_lossy().into_owned(),
+                },
+                Some(&db),
+            )
+            .expect("start session via db for fresh project");
+
+            let project_id = db
+                .ensure_project_for_dir(&canonical_project.to_string_lossy())
+                .expect("project registered in db");
+            assert_eq!(
+                db.project_id_for_session(&state.session_id)
+                    .expect("lookup session project id")
+                    .as_deref(),
+                Some(project_id.as_str())
+            );
+
+            let context_root = project_context_dir(project);
+            assert!(context_root.join("project-origin.json").is_file());
+
+            let discovered = index::discover_projects().expect("discover projects");
+            assert_eq!(discovered.len(), 1);
+            assert_eq!(
+                discovered[0].project_dir.as_deref(),
+                Some(canonical_project.as_path())
+            );
         });
     }
 
