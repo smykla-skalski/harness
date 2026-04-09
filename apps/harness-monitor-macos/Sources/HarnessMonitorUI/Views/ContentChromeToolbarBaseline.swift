@@ -52,13 +52,15 @@ private struct ToolbarBaselineOverlayModifier: ViewModifier {
         sidebarMaxX = quantized
       }
       .overlay(alignment: .topLeading) {
-        if sidebarMaxX > 0 {
-          ToolbarBaselineDivider()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, sidebarMaxX)
+        Group {
+          if sidebarMaxX > 0 {
+            ToolbarBaselineDivider()
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(.leading, sidebarMaxX)
+          }
         }
+        .allowsHitTesting(false)
       }
-      .allowsHitTesting(false)
   }
 }
 
