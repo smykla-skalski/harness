@@ -180,6 +180,32 @@ extension PreviewFixtures {
     ),
   ]
 
+  public static let pagedTimeline: [TimelineEntry] = (0..<14).map { index in
+    let eventNumber = 14 - index
+    let minute = 18 - (index / 6)
+    let second = 54 - (index * 3)
+    let taskID = index.isMultiple(of: 3) ? "task-ui" : nil
+    let kind = index.isMultiple(of: 2) ? "task_checkpoint" : "tool_result"
+
+    return TimelineEntry(
+      entryId: "paged-timeline-\(eventNumber)",
+      recordedAt: String(
+        format: "2026-03-28T14:%02d:%02dZ",
+        minute,
+        max(second, 0)
+      ),
+      kind: kind,
+      sessionId: summary.sessionId,
+      agentId: index.isMultiple(of: 2) ? "worker-codex" : "leader-claude",
+      taskId: taskID,
+      summary: "Paged timeline event \(String(format: "%02d", eventNumber))",
+      payload: .object([
+        "event_number": .number(Double(eventNumber)),
+        "page_seed": .string("paged-timeline"),
+      ])
+    )
+  }
+
   public static let projects = [
     ProjectSummary(
       projectId: summary.projectId,
