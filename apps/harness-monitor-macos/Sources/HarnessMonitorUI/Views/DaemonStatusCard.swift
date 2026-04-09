@@ -2,13 +2,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct DaemonStatusCard: View {
+  let store: HarnessMonitorStore
   let connectionState: HarnessMonitorStore.ConnectionState
   let isBusy: Bool
   let isRefreshing: Bool
   let isLaunchAgentInstalled: Bool
-  let startDaemon: HarnessMonitorAsyncActionButton.Action
-  let stopDaemon: HarnessMonitorAsyncActionButton.Action
-  let installLaunchAgent: HarnessMonitorAsyncActionButton.Action
 
   private var isLoading: Bool {
     isBusy || isRefreshing || connectionState == .connecting
@@ -17,20 +15,19 @@ struct DaemonStatusCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       DaemonCardHeader(
+        store: store,
         connectionLabel: connectionLabel,
         isLoading: isLoading,
         isDaemonOnline: isDaemonOnline,
         isLaunchAgentInstalled: isLaunchAgentInstalled,
-        startDaemon: startDaemon,
-        stopDaemon: stopDaemon,
         statusTitle: statusTitle,
         statusColor: statusColor
       )
 
       DaemonActionButtons(
+        store: store,
         isLaunchAgentInstalled: isLaunchAgentInstalled,
-        isLoading: isLoading,
-        installLaunchAgent: installLaunchAgent
+        isLoading: isLoading
       )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,13 +178,11 @@ private func daemonStatusCardPreview(
   isLaunchAgentInstalled: Bool
 ) -> some View {
   DaemonStatusCard(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .empty),
     connectionState: connectionState,
     isBusy: isBusy,
     isRefreshing: isRefreshing,
-    isLaunchAgentInstalled: isLaunchAgentInstalled,
-    startDaemon: {},
-    stopDaemon: {},
-    installLaunchAgent: {}
+    isLaunchAgentInstalled: isLaunchAgentInstalled
   )
   .padding(20)
   .frame(width: 360)

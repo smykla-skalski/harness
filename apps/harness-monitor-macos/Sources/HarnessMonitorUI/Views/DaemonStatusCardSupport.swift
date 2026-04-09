@@ -6,12 +6,11 @@ private final class DaemonLaunchdIconBundleToken {}
 private let daemonLaunchdIconBundle = Bundle(for: DaemonLaunchdIconBundleToken.self)
 
 struct DaemonCardHeader: View {
+  let store: HarnessMonitorStore
   let connectionLabel: String
   let isLoading: Bool
   let isDaemonOnline: Bool
   let isLaunchAgentInstalled: Bool
-  let startDaemon: HarnessMonitorAsyncActionButton.Action
-  let stopDaemon: HarnessMonitorAsyncActionButton.Action
   let statusTitle: String
   let statusColor: Color
 
@@ -49,10 +48,9 @@ struct DaemonCardHeader: View {
 
         DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarStartDaemonButtonFrame) {
           DaemonStateToggleControl(
+            store: store,
             isLoading: isLoading,
             isDaemonOnline: isDaemonOnline,
-            startDaemon: startDaemon,
-            stopDaemon: stopDaemon,
             statusTitle: statusTitle,
             statusColor: statusColor
           )
@@ -63,9 +61,9 @@ struct DaemonCardHeader: View {
 }
 
 struct DaemonActionButtons: View {
+  let store: HarnessMonitorStore
   let isLaunchAgentInstalled: Bool
   let isLoading: Bool
-  let installLaunchAgent: HarnessMonitorAsyncActionButton.Action
 
   var body: some View {
     Group {
@@ -81,9 +79,10 @@ struct DaemonActionButtons: View {
               variant: .bordered,
               isLoading: isLoading,
               accessibilityIdentifier: HarnessMonitorAccessibility.sidebarInstallLaunchAgentButton,
-              fillsWidth: false,
-              action: installLaunchAgent
-            )
+              fillsWidth: false
+            ) {
+              await store.installLaunchAgent()
+            }
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,10 +92,9 @@ struct DaemonActionButtons: View {
 }
 
 private struct DaemonStateToggleControl: View {
+  let store: HarnessMonitorStore
   let isLoading: Bool
   let isDaemonOnline: Bool
-  let startDaemon: HarnessMonitorAsyncActionButton.Action
-  let stopDaemon: HarnessMonitorAsyncActionButton.Action
   let statusTitle: String
   let statusColor: Color
   @State private var isHovered = false
@@ -112,9 +110,9 @@ private struct DaemonStateToggleControl: View {
       guard !isLoading else { return }
       Task {
         if isDaemonOnline {
-          await stopDaemon()
+          await store.stopDaemon()
         } else {
-          await startDaemon()
+          await store.startDaemon()
         }
       }
     } label: {

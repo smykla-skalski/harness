@@ -287,21 +287,20 @@ struct ContentAnnouncementsModifier: ViewModifier {
 }
 
 struct ContentNavigationToolbar: ToolbarContent {
+  let store: HarnessMonitorStore
   let canNavigateBack: Bool
   let canNavigateForward: Bool
-  let navigateBack: () -> Void
-  let navigateForward: () -> Void
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
-      Button(action: navigateBack) {
+      Button { Task { await store.navigateBack() } } label: {
         Label("Back", systemImage: "chevron.backward")
       }
       .disabled(!canNavigateBack)
       .help("Go back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.navigateBackButton)
 
-      Button(action: navigateForward) {
+      Button { Task { await store.navigateForward() } } label: {
         Label("Forward", systemImage: "chevron.forward")
       }
       .disabled(!canNavigateForward)
