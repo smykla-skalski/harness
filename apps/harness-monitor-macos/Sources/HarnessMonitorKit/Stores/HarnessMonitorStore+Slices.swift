@@ -7,10 +7,11 @@ extension HarnessMonitorStore {
     public let checkoutId: String
     public let title: String
     public let isWorktree: Bool
-    public let sessionIDs: [String]
+    public let sessions: [SessionSummary]
 
     public var id: String { checkoutId }
-    public var sessionCount: Int { sessionIDs.count }
+    public var sessionIDs: [String] { sessions.map(\.sessionId) }
+    public var sessionCount: Int { sessions.count }
   }
 
   public struct SessionGroup: Identifiable, Equatable {
@@ -439,10 +440,6 @@ extension HarnessMonitorStore {
   }
 
   public struct SessionProjectionState: Equatable {
-    public var searchText = ""
-    public var sessionFilter: SessionFilter = .all
-    public var sessionFocusFilter: SessionFocusFilter = .all
-    public var sessionSortOrder: SessionSortOrder = .recentActivity
     public var groupedSessions: [SessionGroup] = []
     public var filteredSessionCount = 0
     public var totalSessionCount = 0
@@ -450,20 +447,12 @@ extension HarnessMonitorStore {
     public var emptyState: SidebarEmptyState = .noSessions
 
     public init(
-      searchText: String = "",
-      sessionFilter: SessionFilter = .all,
-      sessionFocusFilter: SessionFocusFilter = .all,
-      sessionSortOrder: SessionSortOrder = .recentActivity,
       groupedSessions: [SessionGroup] = [],
       filteredSessionCount: Int = 0,
       totalSessionCount: Int = 0,
       visibleSessionIDs: [String] = [],
       emptyState: SidebarEmptyState = .noSessions
     ) {
-      self.searchText = searchText
-      self.sessionFilter = sessionFilter
-      self.sessionFocusFilter = sessionFocusFilter
-      self.sessionSortOrder = sessionSortOrder
       self.groupedSessions = groupedSessions
       self.filteredSessionCount = filteredSessionCount
       self.totalSessionCount = totalSessionCount
@@ -477,10 +466,6 @@ extension HarnessMonitorStore {
   public final class SessionProjectionSlice {
     public internal(set) var state = SessionProjectionState()
 
-    public var searchText: String { state.searchText }
-    public var sessionFilter: SessionFilter { state.sessionFilter }
-    public var sessionFocusFilter: SessionFocusFilter { state.sessionFocusFilter }
-    public var sessionSortOrder: SessionSortOrder { state.sessionSortOrder }
     public var groupedSessions: [SessionGroup] { state.groupedSessions }
     public var filteredSessionCount: Int { state.filteredSessionCount }
     public var totalSessionCount: Int { state.totalSessionCount }

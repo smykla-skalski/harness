@@ -371,6 +371,27 @@ struct HarnessMonitorStoreSelectionTests {
     #expect(filterInvalidated == false)
   }
 
+  @Test("Content shell state ignores inspector selection churn")
+  func contentShellStateIgnoresInspectorSelectionChurn() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.contentUI.windowTitle,
+          store.contentUI.toolbarMetrics,
+          store.contentUI.connectionState
+        )
+      },
+      after: {
+        store.inspect(agentID: PreviewFixtures.agents[1].agentId)
+      }
+    )
+
+    #expect(didChange == false)
+  }
+
   @Test("Content UI selection state tracks session selection changes")
   func contentUISelectionStateTracksSessionSelectionChanges() async {
     let store = await makeBootstrappedStore()

@@ -190,11 +190,6 @@ public struct ContentView: View {
     .onChange(of: columnVisibility) { _, _ in
       suppressLayoutGeometry()
     }
-    .onChange(of: store.selection.inspectorSelection) { _, newValue in
-      if newValue != .none, !showInspector {
-        showInspector = true
-      }
-    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay {
@@ -249,9 +244,10 @@ public struct ContentView: View {
   private var sidebarColumn: some View {
     SidebarView(
       store: store,
-      catalog: store.sessionIndex.catalog,
+      controls: store.sessionIndex.controls,
       projection: store.sessionIndex.projection,
-      sidebarUI: store.sidebarUI
+      sidebarUI: store.sidebarUI,
+      sidebarVisible: columnVisibility != .detailOnly
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
     .toolbarBaselineFrame(.sidebar)
@@ -386,6 +382,11 @@ private struct ContentDetailColumn: View {
         contentUI: contentUI,
         showInspector: $showInspector
       )
+    }
+    .onChange(of: selection.inspectorSelection) { _, newValue in
+      if newValue != .none, !showInspector {
+        showInspector = true
+      }
     }
   }
 
