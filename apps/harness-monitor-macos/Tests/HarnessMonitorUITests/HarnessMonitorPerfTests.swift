@@ -68,6 +68,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(sessionInspectorCard.exists)
+    assertAuditBuildState(in: launched, scenario: "launch-dashboard")
 
     launched.terminate()
   }
@@ -87,8 +88,17 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     )
 
     XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.uiTimeout))
+    assertAuditBuildState(in: launched, scenario: "select-session-cockpit")
 
     launched.terminate()
+  }
+
+  func testRefreshAndSearchScenarioState() {
+    assertSearchHeavyScenarioState("refresh-and-search")
+  }
+
+  func testSidebarOverflowSearchScenarioState() {
+    assertSearchHeavyScenarioState("sidebar-overflow-search")
   }
 
   // MARK: - Private
@@ -133,7 +143,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     app.launchEnvironment = [
       "HARNESS_MONITOR_UI_TESTS": "1",
       "HARNESS_MONITOR_KEEP_ANIMATIONS": "1",
+      "HARNESS_MONITOR_LAUNCH_MODE": "preview",
       "HARNESS_MONITOR_PERF_SCENARIO": scenario,
+      "HARNESS_MONITOR_PREVIEW_SCENARIO": expectedPreviewScenario(for: scenario),
     ]
     app.launch()
     return app
@@ -167,6 +179,90 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       12
     default:
       12
+    }
+  }
+
+  private func assertSearchHeavyScenarioState(_ scenario: String) {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: scenario)
+    let sidebarRoot = element(in: launched, identifier: Accessibility.sidebarRoot)
+    let filterState = element(in: launched, identifier: Accessibility.sidebarFilterState)
+    let sessionRow = sessionTrigger(in: launched, identifier: Accessibility.previewSessionRow)
+    let noMatches = launched.staticTexts["No sessions match"]
+
+    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
+
+    waitForScenarioCompletion(
+      app: launched,
+      scenario: scenario
+    )
+
+    XCTAssertTrue(filterState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(noMatches.exists)
+    XCTAssertTrue(filterState.label.contains("search="))
+    XCTAssertTrue(filterState.label.contains("visible="))
+    assertAuditBuildState(in: launched, scenario: scenario)
+
+    launched.terminate()
+  }
+
+  private func assertAuditBuildState(in app: XCUIApplication, scenario: String) {
+    let auditBuildState = element(in: app, identifier: Accessibility.auditBuildState)
+
+    XCTAssertTrue(auditBuildState.waitForExistence(timeout: Self.actionTimeout))
+    let auditText = auditBuildStateText(auditBuildState)
+
+    XCTAssertTrue(
+      auditText.contains("launchMode=preview"),
+      "Audit marker missing preview launch mode. label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+    )
+    XCTAssertTrue(
+      auditText.contains("perfScenario=\(scenario)"),
+      "Audit marker missing perf scenario \(scenario). label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+    )
+    XCTAssertTrue(
+      auditText.contains(
+        "previewScenario=\(expectedPreviewScenario(for: scenario))"
+      ),
+      "Audit marker missing preview scenario \(expectedPreviewScenario(for: scenario)). label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+    )
+    XCTAssertFalse(
+      auditText.contains("buildCommit=unknown"),
+      "Audit marker missing embedded build commit. label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+    )
+    XCTAssertFalse(
+      auditText.contains("buildDirty=unknown"),
+      "Audit marker missing embedded build dirty state. label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+    )
+  }
+
+  private func auditBuildStateText(_ element: XCUIElement) -> String {
+    if !element.label.isEmpty {
+      return element.label
+    }
+
+    if let value = element.value as? String, !value.isEmpty {
+      return value
+    }
+
+    return element.debugDescription
+  }
+
+  private func expectedPreviewScenario(for scenario: String) -> String {
+    switch scenario {
+    case "launch-dashboard", "select-session-cockpit":
+      "dashboard-landing"
+    case "refresh-and-search", "sidebar-overflow-search":
+      "overflow"
+    case "timeline-burst":
+      "cockpit"
+    case "offline-cached-open":
+      "offline-cached"
+    case "settings-backdrop-cycle", "settings-background-cycle":
+      "dashboard"
+    default:
+      "dashboard"
     }
   }
 }
