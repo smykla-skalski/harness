@@ -194,6 +194,58 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(refreshButton.exists)
   }
 
+  func testSidebarFilterMenuHidesWhenSidebarIsCollapsed() throws {
+    let app = launch(mode: "preview")
+
+    let sidebarToggle = sidebarToggleButton(in: app)
+    let sidebarShellQuery = app.otherElements
+      .matching(identifier: Accessibility.sidebarShellFrame)
+    let sidebarShell = sidebarShellQuery.firstMatch
+
+    XCTAssertTrue(sidebarToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      button(in: app, identifier: Accessibility.sidebarFilterMenu)
+        .waitForExistence(timeout: Self.actionTimeout)
+    )
+    XCTAssertTrue(sidebarShell.waitForExistence(timeout: Self.actionTimeout))
+    let initialSidebarWidth = sidebarShell.frame.width
+    XCTAssertGreaterThan(initialSidebarWidth, 200)
+
+    sidebarToggle.tap()
+
+    XCTAssertTrue(
+      waitUntil {
+        guard let collapsedSidebar = sidebarShellQuery.allElementsBoundByIndex.first else {
+          return true
+        }
+        return collapsedSidebar.frame.width < max(120, initialSidebarWidth * 0.5)
+      }
+    )
+    XCTAssertTrue(
+      waitUntil {
+        !self.button(in: app, identifier: Accessibility.sidebarFilterMenu).exists
+      },
+      "Sidebar-only filter controls should leave the toolbar when the sidebar is collapsed"
+    )
+
+    sidebarToggle.tap()
+
+    XCTAssertTrue(
+      waitUntil {
+        guard let restoredSidebar = sidebarShellQuery.allElementsBoundByIndex.first else {
+          return false
+        }
+        return restoredSidebar.frame.width > (initialSidebarWidth * 0.75)
+      }
+    )
+    XCTAssertTrue(
+      waitUntil {
+        self.button(in: app, identifier: Accessibility.sidebarFilterMenu).isHittable
+      },
+      "Sidebar filter controls should return when the sidebar is visible again"
+    )
+  }
+
   func testSessionActionsExposeActorPickerAndRemoveAgentFlow() throws {
     let app = launch(mode: "preview")
 
