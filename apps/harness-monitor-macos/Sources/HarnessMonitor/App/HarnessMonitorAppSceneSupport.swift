@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorUI
+import OSLog
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
