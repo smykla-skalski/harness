@@ -286,10 +286,10 @@ public struct ContentView: View {
       return
     }
     guard !isLayoutAnimating,
-          showInspector,
-          width >= HarnessMonitorInspectorLayout.minWidth,
-          width <= HarnessMonitorInspectorLayout.maxWidth,
-          abs(width - inspectorColumnWidth) > 1
+      showInspector,
+      width >= HarnessMonitorInspectorLayout.minWidth,
+      width <= HarnessMonitorInspectorLayout.maxWidth,
+      abs(width - inspectorColumnWidth) > 1
     else {
       return
     }
@@ -333,15 +333,22 @@ public struct ContentView: View {
 private struct ContentCornerOverlayModifier: ViewModifier {
   @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
   let cornerAnimationContent: () -> AnyView
+  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
+  private var cornerAnimationEnabled = false
+
+  private var isPresented: Bool {
+    cornerAnimationEnabled
+      || shellUI.isSelectionLoading
+      || shellUI.isExtensionsLoading
+      || shellUI.isRefreshing
+      || shellUI.connectionState == .connecting
+  }
 
   func body(content: Content) -> some View {
     content
       .modifier(
         HarnessCornerOverlayModifier(
-          isPresented: shellUI.isSelectionLoading
-            || shellUI.isExtensionsLoading
-            || shellUI.isRefreshing
-            || shellUI.connectionState == .connecting,
+          isPresented: isPresented,
           configuration: .init(
             width: HarnessCornerAnimationDescriptor.dancingLlama.width,
             height: HarnessCornerAnimationDescriptor.dancingLlama.height,
@@ -350,7 +357,7 @@ private struct ContentCornerOverlayModifier: ViewModifier {
             contentPadding: 0,
             appliesGlass: false,
             accessibilityLabel: HarnessCornerAnimationDescriptor.dancingLlama.accessibilityLabel,
-            presentationDelay: .milliseconds(400)
+            presentationDelay: cornerAnimationEnabled ? nil : .milliseconds(400)
           )
         ) {
           cornerAnimationContent()
@@ -389,7 +396,7 @@ private struct ContentDetailColumn: View {
       proxy.size.width
     } action: { width in
       guard !isLayoutAnimating,
-            abs(width - detailColumnWidth) >= 1
+        abs(width - detailColumnWidth) >= 1
       else {
         return
       }
@@ -445,13 +452,15 @@ struct InspectorToolbarActions: ToolbarContent {
       RefreshToolbarButton(isRefreshing: toolbarUI.isRefreshing) {
         Task { await store.refresh() }
       }
-        .help("Refresh sessions")
+      .help("Refresh sessions")
     }
 
     ToolbarSpacer(.fixed, placement: .primaryAction)
 
     ToolbarItem(placement: .primaryAction) {
-      Button { showInspector.toggle() } label: {
+      Button {
+        showInspector.toggle()
+      } label: {
         Label(
           showInspector ? "Hide Inspector" : "Show Inspector",
           systemImage: "sidebar.trailing"
