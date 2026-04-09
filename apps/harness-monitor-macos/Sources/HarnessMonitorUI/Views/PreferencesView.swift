@@ -3,15 +3,18 @@ import SwiftUI
 
 public struct PreferencesView: View {
   let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: PreferencesSection
 
   public init(
     store: HarnessMonitorStore,
+    notifications: HarnessMonitorUserNotificationController,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<PreferencesSection>
   ) {
     self.store = store
+    self.notifications = notifications
     _themeMode = themeMode
     _selectedSection = selectedSection
   }
@@ -32,6 +35,8 @@ public struct PreferencesView: View {
           PreferencesGeneralSection(store: store)
         case .appearance:
           PreferencesAppearanceSection(themeMode: $themeMode)
+        case .notifications:
+          PreferencesNotificationsSection(notifications: notifications)
         case .connection:
           PreferencesConnectionSection(
             connectionState: store.connectionState,

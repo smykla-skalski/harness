@@ -45,6 +45,7 @@ targets:
     dependencies:
       - sdk: SwiftData.framework
       - sdk: IOKit.framework
+      - sdk: UserNotifications.framework
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
