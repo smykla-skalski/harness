@@ -359,7 +359,7 @@ private struct SessionTimelinePaginationFooter: View {
 }
 
 private enum SessionTimelinePagination {
-  static let pageSize = 6
+  static let pageSize = 15
   private static let maxVisiblePageButtons = 5
 
   static func clampedPage(_ page: Int, itemCount: Int) -> Int {

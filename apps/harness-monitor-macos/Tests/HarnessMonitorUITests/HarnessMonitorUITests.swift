@@ -132,8 +132,8 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(previousButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(nextButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
-      app.staticTexts["Paged timeline event 14"].waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(app.staticTexts["Paged timeline event 08"].exists)
+      app.staticTexts["Paged timeline event 32"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(app.staticTexts["Paged timeline event 17"].exists)
     XCTAssertFalse(previousButton.isEnabled)
     XCTAssertTrue(nextButton.isEnabled)
     XCTAssertEqual(pageStatus.label, "Page 1 of 3")
@@ -146,8 +146,8 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       }
     )
     XCTAssertTrue(
-      app.staticTexts["Paged timeline event 08"].waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(app.staticTexts["Paged timeline event 14"].exists)
+      app.staticTexts["Paged timeline event 17"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(app.staticTexts["Paged timeline event 32"].exists)
     XCTAssertTrue(previousButton.isEnabled)
     XCTAssertTrue(nextButton.isEnabled)
 
@@ -184,8 +184,8 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       }
     )
     XCTAssertTrue(
-      app.staticTexts["Paged timeline event 14"].waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(app.staticTexts["Paged timeline event 08"].exists)
+      app.staticTexts["Paged timeline event 32"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(app.staticTexts["Paged timeline event 17"].exists)
   }
 
   func testExistingSignalsRemainVisibleAfterSwitchingSessions() throws {
