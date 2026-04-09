@@ -26,12 +26,20 @@ AUDIT_COMMIT_ENV_KEY="HARNESS_MONITOR_AUDIT_GIT_COMMIT"
 AUDIT_DIRTY_ENV_KEY="HARNESS_MONITOR_AUDIT_GIT_DIRTY"
 AUDIT_RUN_ID_ENV_KEY="HARNESS_MONITOR_AUDIT_RUN_ID"
 AUDIT_LABEL_ENV_KEY="HARNESS_MONITOR_AUDIT_LABEL"
+AUDIT_WORKSPACE_FINGERPRINT_ENV_KEY="HARNESS_MONITOR_AUDIT_WORKSPACE_FINGERPRINT"
+AUDIT_BUILD_STARTED_AT_UTC_ENV_KEY="HARNESS_MONITOR_AUDIT_BUILD_STARTED_AT_UTC"
 BUILD_COMMIT_KEY="HarnessMonitorBuildGitCommit"
 BUILD_DIRTY_KEY="HarnessMonitorBuildGitDirty"
+BUILD_WORKSPACE_FINGERPRINT_KEY="HarnessMonitorBuildWorkspaceFingerprint"
+BUILD_STARTED_AT_UTC_KEY="HarnessMonitorBuildStartedAtUTC"
 BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
 AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
 AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
+STAGED_HOST_APP_PATH=""
+STAGED_HOST_BINARY_PATH=""
+STAGED_HOST_BUNDLE_ID=""
+STAGED_HOST_LAUNCHER_PATH=""
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -121,6 +129,17 @@ duration_for() {
 }
 
 build_release_targets() {
+  purge_release_products
+
+  xcodebuild \
+    -project "$PROJECT_PATH" \
+    -scheme "$SHIPPING_SCHEME" \
+    -configuration Release \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    clean \
+    CODE_SIGNING_ALLOWED=NO \
+    -quiet
+
   xcodebuild \
     -project "$PROJECT_PATH" \
     -scheme "$HOST_SCHEME" \
@@ -138,6 +157,8 @@ build_release_targets() {
     build \
     "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
     "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
+    "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT=$workspace_fingerprint" \
+    "HARNESS_MONITOR_BUILD_STARTED_AT_UTC=$build_started_at_utc" \
     CODE_SIGNING_ALLOWED=NO \
     -quiet
 
@@ -149,8 +170,18 @@ build_release_targets() {
     build \
     "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
     "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
+    "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT=$workspace_fingerprint" \
+    "HARNESS_MONITOR_BUILD_STARTED_AT_UTC=$build_started_at_utc" \
     CODE_SIGNING_ALLOWED=NO \
     -quiet
+}
+
+purge_release_products() {
+  /bin/rm -rf \
+    "$HOST_APP_PATH" \
+    "$HOST_APP_PATH.dSYM" \
+    "$SHIPPING_APP_PATH" \
+    "$SHIPPING_APP_PATH.dSYM"
 }
 
 cleanup_host_processes() {
@@ -169,6 +200,88 @@ cleanup_host_processes() {
       kill -9 "$pid" 2>/dev/null || true
     fi
   done <<<"$pids"
+}
+
+strip_app_attrs() {
+  local target_path="$1"
+  if [[ -e "$target_path" ]]; then
+    /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+    /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+  fi
+}
+
+stage_launch_host() {
+  local stage_root="$run_dir/launch-host"
+  local staged_bundle_name="Harness Monitor UI Testing.app"
+  local staged_bundle_id_suffix
+  local launcher_source_path
+  staged_bundle_id_suffix="$(printf '%s' "$run_id" | tr -cd '[:alnum:]')"
+
+  STAGED_HOST_APP_PATH="$stage_root/$staged_bundle_name"
+  STAGED_HOST_BINARY_PATH="$STAGED_HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
+  STAGED_HOST_BUNDLE_ID="${HOST_BUNDLE_ID}.audit.${staged_bundle_id_suffix}"
+  STAGED_HOST_LAUNCHER_PATH="$stage_root/launch-staged-host"
+  launcher_source_path="$stage_root/launch-staged-host.c"
+
+  rm -rf "$stage_root"
+  mkdir -p "$stage_root"
+  /usr/bin/ditto "$HOST_APP_PATH" "$STAGED_HOST_APP_PATH"
+  strip_app_attrs "$STAGED_HOST_APP_PATH"
+
+  /usr/libexec/PlistBuddy \
+    -c "Set :CFBundleIdentifier $STAGED_HOST_BUNDLE_ID" \
+    "$STAGED_HOST_APP_PATH/Contents/Info.plist"
+
+  cat >"$launcher_source_path" <<EOF
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[]) {
+  const char *target = "$STAGED_HOST_BINARY_PATH";
+  char **child_argv = calloc((size_t)argc + 1U, sizeof(char *));
+  if (child_argv == NULL) {
+    perror("calloc");
+    return 127;
+  }
+
+  child_argv[0] = (char *)target;
+  for (int index = 1; index < argc; index++) {
+    child_argv[index] = argv[index];
+  }
+  child_argv[argc] = NULL;
+
+  execv(target, child_argv);
+  perror("execv");
+  free(child_argv);
+  return errno == 0 ? 127 : errno;
+}
+EOF
+
+  /usr/bin/clang \
+    -Os \
+    -Wall \
+    -Wextra \
+    -Werror \
+    -o "$STAGED_HOST_LAUNCHER_PATH" \
+    "$launcher_source_path"
+}
+
+trace_launched_process_path() {
+  local toc_path="$1"
+  python3 - "$toc_path" <<'PY'
+from __future__ import annotations
+
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+for process in root.findall(".//processes/process"):
+    if process.get("pid") != "0":
+        print(process.get("path", "").strip())
+        break
+PY
 }
 
 write_lock_info() {
@@ -310,6 +423,50 @@ print(digest.hexdigest())
 PY
 }
 
+workspace_tree_fingerprint() {
+  python3 - "$APP_ROOT" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+include_paths = [
+    root / "HarnessMonitor.entitlements",
+    root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
+    root / "Sources" / "HarnessMonitor",
+    root / "Sources" / "HarnessMonitorKit",
+    root / "Sources" / "HarnessMonitorUI",
+]
+digest = hashlib.sha256()
+
+for include_path in include_paths:
+    if not include_path.exists():
+        continue
+
+    if include_path.is_file():
+        file_paths = [include_path]
+    else:
+        file_paths = sorted(
+            candidate
+            for candidate in include_path.rglob("*")
+            if candidate.is_file()
+        )
+
+    for file_path in file_paths:
+        relative_path = file_path.relative_to(root).as_posix()
+        digest.update(relative_path.encode("utf-8"))
+        digest.update(b"\0")
+        with file_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        digest.update(b"\0")
+
+print(digest.hexdigest())
+PY
+}
+
 label=""
 compare_to=""
 scenario_selection="all"
@@ -384,8 +541,12 @@ git_dirty="false"
 if [[ -n "$(git status --short)" ]]; then
   git_dirty="true"
 fi
+workspace_fingerprint="$(workspace_tree_fingerprint)"
+build_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 audit_commit_env="$AUDIT_COMMIT_ENV_KEY=$git_commit"
 audit_dirty_env="$AUDIT_DIRTY_ENV_KEY=$git_dirty"
+audit_workspace_fingerprint_env="$AUDIT_WORKSPACE_FINGERPRINT_ENV_KEY=$workspace_fingerprint"
+audit_build_started_at_utc_env="$AUDIT_BUILD_STARTED_AT_UTC_ENV_KEY=$build_started_at_utc"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 label_slug="${label//[^A-Za-z0-9._-]/-}"
@@ -418,8 +579,12 @@ host_info_plist="$HOST_APP_PATH/Contents/Info.plist"
 shipping_info_plist="$SHIPPING_APP_PATH/Contents/Info.plist"
 host_embedded_commit="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_COMMIT_KEY")"
 host_embedded_dirty="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_DIRTY_KEY")"
+host_embedded_workspace_fingerprint="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_WORKSPACE_FINGERPRINT_KEY")"
+host_embedded_started_at_utc="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_STARTED_AT_UTC_KEY")"
 shipping_embedded_commit="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_COMMIT_KEY")"
 shipping_embedded_dirty="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_DIRTY_KEY")"
+shipping_embedded_workspace_fingerprint="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_WORKSPACE_FINGERPRINT_KEY")"
+shipping_embedded_started_at_utc="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_STARTED_AT_UTC_KEY")"
 
 host_binary_sha256="$(binary_sha256 "$HOST_BINARY_PATH")"
 shipping_binary_sha256="$(binary_sha256 "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
@@ -428,24 +593,24 @@ shipping_bundle_sha256="$(bundle_sha256 "$SHIPPING_APP_PATH")"
 host_binary_mtime_utc="$(binary_mtime_utc "$HOST_BINARY_PATH")"
 shipping_binary_mtime_utc="$(binary_mtime_utc "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
 
-if [[ "$host_embedded_commit" != "$git_commit" || "$host_embedded_dirty" != "$git_dirty" ]]; then
+if [[ "$host_embedded_commit" != "$git_commit" || "$host_embedded_dirty" != "$git_dirty" || "$host_embedded_workspace_fingerprint" != "$workspace_fingerprint" ]]; then
   if [[ "$SKIP_BUILD" == "1" ]]; then
-    printf 'Host build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
-      "$git_commit" "$git_dirty" "$host_embedded_commit" "$host_embedded_dirty" >&2
+    printf 'Host build provenance mismatch: expected commit=%s dirty=%s fingerprint=%s but bundle reports commit=%s dirty=%s fingerprint=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
+      "$git_commit" "$git_dirty" "$workspace_fingerprint" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" >&2
   else
-    printf 'Host build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
-      "$git_commit" "$git_dirty" "$host_embedded_commit" "$host_embedded_dirty" >&2
+    printf 'Host build provenance mismatch: expected commit=%s dirty=%s fingerprint=%s but bundle reports commit=%s dirty=%s fingerprint=%s\n' \
+      "$git_commit" "$git_dirty" "$workspace_fingerprint" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" >&2
     exit 1
   fi
 fi
 
-if [[ "$shipping_embedded_commit" != "$git_commit" || "$shipping_embedded_dirty" != "$git_dirty" ]]; then
+if [[ "$shipping_embedded_commit" != "$git_commit" || "$shipping_embedded_dirty" != "$git_dirty" || "$shipping_embedded_workspace_fingerprint" != "$workspace_fingerprint" ]]; then
   if [[ "$SKIP_BUILD" == "1" ]]; then
-    printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
-      "$git_commit" "$git_dirty" "$shipping_embedded_commit" "$shipping_embedded_dirty" >&2
+    printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s fingerprint=%s but bundle reports commit=%s dirty=%s fingerprint=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
+      "$git_commit" "$git_dirty" "$workspace_fingerprint" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" >&2
   else
-    printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
-      "$git_commit" "$git_dirty" "$shipping_embedded_commit" "$shipping_embedded_dirty" >&2
+    printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s fingerprint=%s but bundle reports commit=%s dirty=%s fingerprint=%s\n' \
+      "$git_commit" "$git_dirty" "$workspace_fingerprint" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" >&2
     exit 1
   fi
 fi
@@ -454,7 +619,25 @@ printf 'Using host binary: %s\n' "$HOST_BINARY_PATH"
 printf 'Host SHA256: %s\n' "$host_binary_sha256"
 printf 'Host bundle SHA256: %s\n' "$host_bundle_sha256"
 printf 'Host mtime (UTC): %s\n' "$host_binary_mtime_utc"
+printf 'Workspace fingerprint: %s\n' "$workspace_fingerprint"
+printf 'Build started at (UTC): %s\n' "$build_started_at_utc"
 printf 'Audit commit stamp: %s dirty=%s\n' "$git_commit" "$git_dirty"
+
+stage_launch_host
+
+if [[ ! -x "$STAGED_HOST_BINARY_PATH" ]]; then
+  printf 'Expected staged UI-test host binary not found at %s\n' "$STAGED_HOST_BINARY_PATH" >&2
+  exit 1
+fi
+
+if [[ ! -x "$STAGED_HOST_LAUNCHER_PATH" ]]; then
+  printf 'Expected staged host launcher not found at %s\n' "$STAGED_HOST_LAUNCHER_PATH" >&2
+  exit 1
+fi
+
+printf 'Using staged host app: %s\n' "$STAGED_HOST_APP_PATH"
+printf 'Using staged host launcher: %s\n' "$STAGED_HOST_LAUNCHER_PATH"
+printf 'Staged host bundle id: %s\n' "$STAGED_HOST_BUNDLE_ID"
 
 capture_records_file="$run_dir/captures.tsv"
 : >"$capture_records_file"
@@ -471,6 +654,7 @@ record_capture() {
   mkdir -p "$template_dir"
   local trace_path="$template_dir/${scenario}.trace"
   local toc_path="$template_dir/${scenario}.toc.xml"
+  local launched_process_path
 
   printf 'Recording %s / %s (%ss)...\n' "$template" "$scenario" "$duration_seconds"
   set +e
@@ -487,11 +671,13 @@ record_capture() {
     --env "$audit_dirty_env" \
     --env "$audit_run_id_env" \
     --env "$audit_label_env" \
+    --env "$audit_workspace_fingerprint_env" \
+    --env "$audit_build_started_at_utc_env" \
     --env "HARNESS_MONITOR_PERF_SCENARIO=$scenario" \
     --env "HARNESS_MONITOR_PREVIEW_SCENARIO=$preview_scenario" \
     --env "$WINDOW_WIDTH_ENV" \
     --env "$WINDOW_HEIGHT_ENV" \
-    --launch -- "$HOST_BINARY_PATH" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO"
+    --launch -- "$STAGED_HOST_LAUNCHER_PATH" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO"
   local record_status=$?
   set -e
 
@@ -501,6 +687,7 @@ record_capture() {
   fi
 
   TMPDIR="$xctrace_tmp_root/" xcrun xctrace export --input "$trace_path" --toc >"$toc_path"
+  launched_process_path="$(trace_launched_process_path "$toc_path")"
   local end_reason
   end_reason="$(
     python3 - "$toc_path" <<'PY'
@@ -520,16 +707,22 @@ PY
     exit "$record_status"
   fi
 
+  if [[ "$launched_process_path" != "$STAGED_HOST_LAUNCHER_PATH" && "$launched_process_path" != "$STAGED_HOST_APP_PATH" && "$launched_process_path" != "$STAGED_HOST_BINARY_PATH" ]]; then
+    printf 'xctrace launched unexpected app for %s / %s: expected %s, %s, or %s but trace recorded %s\n' \
+      "$template" \
+      "$scenario" \
+      "$STAGED_HOST_LAUNCHER_PATH" \
+      "$STAGED_HOST_APP_PATH" \
+      "$STAGED_HOST_BINARY_PATH" \
+      "${launched_process_path:-<missing>}" >&2
+    exit 1
+  fi
+
   cleanup_host_processes
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$scenario" \
-    "$template" \
-    "$duration_seconds" \
-    "${trace_path#"$run_dir"/}" \
-    "$record_status" \
-    "$end_reason" \
-    "$preview_scenario" >>"$capture_records_file"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$scenario" "$template" "$duration_seconds" "${trace_path#"$run_dir"/}" \
+    "$record_status" "$end_reason" "$preview_scenario" "$launched_process_path" >>"$capture_records_file"
 }
 
 for scenario in "${selected_scenarios[@]}"; do
@@ -549,7 +742,7 @@ macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
+python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_LAUNCHER_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -563,6 +756,8 @@ from pathlib import Path
     timestamp,
     git_commit,
     git_dirty,
+    workspace_fingerprint,
+    build_started_at_utc,
     xcode_version,
     xctrace_version,
     macos_version,
@@ -574,13 +769,21 @@ from pathlib import Path
     shipping_app_path,
     host_app_path,
     host_bundle_id,
+    staged_host_app_path,
+    staged_host_binary_path,
+    staged_host_launcher_path,
+    staged_host_bundle_id,
     host_embedded_commit,
     host_embedded_dirty,
+    host_embedded_workspace_fingerprint,
+    host_embedded_started_at_utc,
     host_binary_sha256,
     host_bundle_sha256,
     host_binary_mtime_utc,
     shipping_embedded_commit,
     shipping_embedded_dirty,
+    shipping_embedded_workspace_fingerprint,
+    shipping_embedded_started_at_utc,
     shipping_binary_sha256,
     shipping_bundle_sha256,
     shipping_binary_mtime_utc,
@@ -596,6 +799,8 @@ from pathlib import Path
     audit_dirty_env,
     audit_run_id_env,
     audit_label_env,
+    audit_workspace_fingerprint_env,
+    audit_build_started_at_utc_env,
     launch_arg_one,
     launch_arg_two,
     *selected_scenarios,
@@ -615,6 +820,8 @@ environment_pairs = [
         audit_dirty_env,
         audit_run_id_env,
         audit_label_env,
+        audit_workspace_fingerprint_env,
+        audit_build_started_at_utc_env,
     ]
 ]
 default_environment = {key: value for key, value in environment_pairs}
@@ -622,7 +829,16 @@ captures = []
 for line in Path(capture_records_path).read_text(encoding="utf-8").splitlines():
     if not line.strip():
         continue
-    scenario, template, duration_seconds, trace_relpath, exit_status, end_reason, preview_scenario = line.split("\t")
+    (
+        scenario,
+        template,
+        duration_seconds,
+        trace_relpath,
+        exit_status,
+        end_reason,
+        preview_scenario,
+        launched_process_path,
+    ) = line.split("\t")
     captures.append(
         {
             "scenario": scenario,
@@ -632,6 +848,7 @@ for line in Path(capture_records_path).read_text(encoding="utf-8").splitlines():
             "exit_status": int(exit_status),
             "end_reason": end_reason,
             "preview_scenario": preview_scenario,
+            "launched_process_path": launched_process_path,
             "environment": {
                 **default_environment,
                 "HARNESS_MONITOR_PREVIEW_SCENARIO": preview_scenario,
@@ -648,6 +865,8 @@ manifest = {
     "git": {
         "commit": git_commit,
         "dirty": git_dirty == "true",
+        "workspace_fingerprint": workspace_fingerprint,
+        "build_started_at_utc": build_started_at_utc,
     },
     "system": {
         "xcode_version": xcode_version,
@@ -663,11 +882,17 @@ manifest = {
         "shipping_app_path": shipping_app_path,
         "host_app_path": host_app_path,
         "host_bundle_id": host_bundle_id,
+        "staged_host_app_path": staged_host_app_path,
+        "staged_host_binary_path": staged_host_binary_path,
+        "staged_host_launcher_path": staged_host_launcher_path,
+        "staged_host_bundle_id": staged_host_bundle_id,
     },
     "build_provenance": {
         "host": {
             "embedded_commit": host_embedded_commit,
             "embedded_dirty": host_embedded_dirty,
+            "embedded_workspace_fingerprint": host_embedded_workspace_fingerprint,
+            "embedded_started_at_utc": host_embedded_started_at_utc,
             "binary_sha256": host_binary_sha256,
             "bundle_sha256": host_bundle_sha256,
             "binary_mtime_utc": host_binary_mtime_utc,
@@ -675,6 +900,8 @@ manifest = {
         "shipping": {
             "embedded_commit": shipping_embedded_commit,
             "embedded_dirty": shipping_embedded_dirty,
+            "embedded_workspace_fingerprint": shipping_embedded_workspace_fingerprint,
+            "embedded_started_at_utc": shipping_embedded_started_at_utc,
             "binary_sha256": shipping_binary_sha256,
             "bundle_sha256": shipping_bundle_sha256,
             "binary_mtime_utc": shipping_binary_mtime_utc,
