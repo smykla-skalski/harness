@@ -10,17 +10,18 @@ struct SessionCockpitSignalsSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      Text("Signals")
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
-      if signals.isEmpty && !isExtensionsLoading {
-        ContentUnavailableView {
-          Label("No signals", systemImage: "antenna.radiowaves.left.and.right")
-        } description: {
-          Text("Signals appear when agents send or receive commands.")
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
+        Text("Signals")
+          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+          .opacity(signals.isEmpty && !isExtensionsLoading ? 0.55 : 1)
+        Spacer(minLength: 0)
+        if signals.isEmpty && !isExtensionsLoading {
+          Text("No signals yet")
+            .scaledFont(.system(.body, design: .rounded))
+            .foregroundStyle(.tertiary)
+            .opacity(0.75)
         }
-        .foregroundStyle(.tertiary)
-        .frame(maxWidth: .infinity)
       }
       LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         ForEach(signals) { signal in
