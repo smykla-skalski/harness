@@ -48,7 +48,7 @@ struct HarnessMonitorStoreTests {
 
     #expect(store.groupedSessions.map(\.project.projectId) == [PreviewFixtures.summary.projectId])
     #expect(
-      store.groupedSessions.first?.sessions.map(\.sessionId) == [PreviewFixtures.summary.sessionId]
+      store.groupedSessions.first?.sessionIDs == [PreviewFixtures.summary.sessionId]
     )
   }
 
@@ -108,7 +108,7 @@ struct HarnessMonitorStoreTests {
     store.sessionFocusFilter = .blocked
     #expect(store.sessionFocusFilter == .blocked)
     #expect(store.searchText.isEmpty)
-    #expect(store.groupedSessions.flatMap(\.sessions).map(\.sessionId) == ["sess-blocked"])
+    #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-blocked"])
   }
 
   @Test("Search matches across tokens and reset filters restores defaults")
@@ -147,14 +147,14 @@ struct HarnessMonitorStoreTests {
     store.searchText = "harness leader-alpha"
     store.sessionFilter = .all
 
-    #expect(store.groupedSessions.flatMap(\.sessions).map(\.sessionId) == ["sess-a"])
+    #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-a"])
 
     store.resetFilters()
 
     #expect(store.searchText.isEmpty)
-    #expect(store.sessionFilter == .active)
+    #expect(store.sessionFilter == .all)
     #expect(store.sessionFocusFilter == .all)
-    #expect(store.groupedSessions.flatMap(\.sessions).map(\.sessionId) == ["sess-a"])
+    #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-a", "sess-b"])
   }
 
   @Test("Installing the launch agent refreshes daemon diagnostics")

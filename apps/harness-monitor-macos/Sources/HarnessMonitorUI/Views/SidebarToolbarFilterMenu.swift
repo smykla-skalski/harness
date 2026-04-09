@@ -2,14 +2,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SidebarToolbarFilterMenu: View {
+  let store: HarnessMonitorStore
   let sessionFilter: HarnessMonitorStore.SessionFilter
   let sessionFocusFilter: SessionFocusFilter
   let sessionSortOrder: SessionSortOrder
   let hasActiveFilters: Bool
-  let setSessionFilter: (HarnessMonitorStore.SessionFilter) -> Void
-  let setSessionFocusFilter: (SessionFocusFilter) -> Void
-  let setSessionSortOrder: (SessionSortOrder) -> Void
-  let clearFilters: () -> Void
 
   var body: some View {
     Menu {
@@ -20,7 +17,7 @@ struct SidebarToolbarFilterMenu: View {
             isSelected: sessionFilter == filter,
             identifier: HarnessMonitorAccessibility.sessionFilterButton(filter.rawValue)
           ) {
-            setSessionFilter(filter)
+            store.sessionFilter = filter
           }
         }
       }
@@ -32,7 +29,7 @@ struct SidebarToolbarFilterMenu: View {
             isSelected: sessionFocusFilter == filter,
             identifier: HarnessMonitorAccessibility.sidebarFocusChip(filter.rawValue)
           ) {
-            setSessionFocusFilter(filter)
+            store.sessionFocusFilter = filter
           }
         }
       }
@@ -44,16 +41,21 @@ struct SidebarToolbarFilterMenu: View {
             isSelected: sessionSortOrder == order,
             identifier: HarnessMonitorAccessibility.sidebarSortSegment(order.rawValue)
           ) {
-            setSessionSortOrder(order)
+            store.sessionSortOrder = order
           }
         }
       }
 
       Divider()
 
-      Button("Clear Filters", action: clearFilters)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
-        .disabled(!hasActiveFilters)
+      Button("Clear Filters") {
+        store.searchText = ""
+        store.sessionFilter = .all
+        store.sessionFocusFilter = .all
+        store.sessionSortOrder = .recentActivity
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
+      .disabled(!hasActiveFilters)
     } label: {
       Label(
         "Filters",

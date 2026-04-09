@@ -127,14 +127,11 @@ struct SidebarView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         SidebarToolbarFilterMenu(
+          store: store,
           sessionFilter: projection.sessionFilter,
           sessionFocusFilter: projection.sessionFocusFilter,
           sessionSortOrder: projection.sessionSortOrder,
-          hasActiveFilters: hasActiveSidebarFilters,
-          setSessionFilter: setSessionFilter,
-          setSessionFocusFilter: setSessionFocusFilter,
-          setSessionSortOrder: setSessionSortOrder,
-          clearFilters: clearSidebarFilters
+          hasActiveFilters: hasActiveSidebarFilters
         )
       }
     }
@@ -196,13 +193,11 @@ struct SidebarView: View {
   private var sidebarHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       DaemonStatusCard(
+        store: store,
         connectionState: sidebarUI.connectionState,
         isBusy: sidebarUI.isBusy,
         isRefreshing: sidebarUI.isRefreshing,
-        isLaunchAgentInstalled: sidebarUI.isLaunchAgentInstalled,
-        startDaemon: startDaemon,
-        stopDaemon: stopDaemon,
-        installLaunchAgent: installLaunchAgent
+        isLaunchAgentInstalled: sidebarUI.isLaunchAgentInstalled
       )
 
       if !recentSearchQueries.isEmpty {
@@ -297,37 +292,6 @@ struct SidebarView: View {
     if collapsedCheckoutKeysStorage != encoded {
       collapsedCheckoutKeysStorage = encoded
     }
-  }
-
-  private func startDaemon() async {
-    await store.startDaemon()
-  }
-
-  private func stopDaemon() async {
-    await store.stopDaemon()
-  }
-
-  private func installLaunchAgent() async {
-    await store.installLaunchAgent()
-  }
-
-  private func setSessionFilter(_ filter: HarnessMonitorStore.SessionFilter) {
-    store.sessionFilter = filter
-  }
-
-  private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
-    store.sessionFocusFilter = filter
-  }
-
-  private func setSessionSortOrder(_ order: SessionSortOrder) {
-    store.sessionSortOrder = order
-  }
-
-  private func clearSidebarFilters() {
-    store.searchText = ""
-    store.sessionFilter = .active
-    store.sessionFocusFilter = .all
-    store.sessionSortOrder = .recentActivity
   }
 
   private func applyRecentSearch(_ query: String) {
