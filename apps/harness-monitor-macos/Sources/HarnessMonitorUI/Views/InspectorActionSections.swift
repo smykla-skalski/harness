@@ -12,7 +12,7 @@ struct InspectorActionSections: View {
         isSessionActionInFlight: context.isSessionActionInFlight,
         lastAction: context.lastAction,
         lastError: context.lastError,
-        availableActionActors: context.availableActionActors,
+        actionActorOptions: context.actionActorOptions,
         actionActorID: Binding(
           get: { context.selectedActionActorID },
           set: { store.selectedActionActorID = $0 }
