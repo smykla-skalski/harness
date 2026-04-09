@@ -3,6 +3,7 @@ import SwiftUI
 public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case general
   case appearance
+  case notifications
   case connection
   case database
   case diagnostics
@@ -13,6 +14,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .general: "General"
     case .appearance: "Appearance"
+    case .notifications: "Notifications"
     case .connection: "Connection"
     case .database: "Database"
     case .diagnostics: "Diagnostics"
@@ -23,6 +25,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .general: "gearshape"
     case .appearance: "paintbrush"
+    case .notifications: "bell.badge"
     case .connection: "bolt.horizontal.circle"
     case .database: "cylinder.split.1x2"
     case .diagnostics: "stethoscope"
