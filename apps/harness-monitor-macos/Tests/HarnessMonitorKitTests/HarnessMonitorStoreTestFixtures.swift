@@ -92,6 +92,42 @@ func makeTimelineEntries(
   ]
 }
 
+func makeUpdatedSession(
+  _ base: SessionSummary,
+  context: String,
+  updatedAt: String,
+  agentCount: Int
+) -> SessionSummary {
+  SessionSummary(
+    projectId: base.projectId,
+    projectName: base.projectName,
+    projectDir: base.projectDir,
+    contextRoot: base.contextRoot,
+    checkoutId: base.checkoutId,
+    checkoutRoot: base.checkoutRoot,
+    isWorktree: base.isWorktree,
+    worktreeName: base.worktreeName,
+    sessionId: base.sessionId,
+    title: base.title,
+    context: context,
+    status: base.status,
+    createdAt: base.createdAt,
+    updatedAt: updatedAt,
+    lastActivityAt: updatedAt,
+    leaderId: base.leaderId,
+    observeId: base.observeId,
+    pendingLeaderTransfer: base.pendingLeaderTransfer,
+    metrics: SessionMetrics(
+      agentCount: agentCount,
+      activeAgentCount: agentCount,
+      openTaskCount: base.metrics.openTaskCount,
+      inProgressTaskCount: base.metrics.inProgressTaskCount,
+      blockedTaskCount: base.metrics.blockedTaskCount,
+      completedTaskCount: base.metrics.completedTaskCount
+    )
+  )
+}
+
 func makeSession(_ fixture: SessionFixture) -> SessionSummary {
   SessionSummary(
     projectId: fixture.projectId,
