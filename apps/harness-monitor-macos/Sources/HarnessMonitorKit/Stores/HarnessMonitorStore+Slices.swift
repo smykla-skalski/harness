@@ -1,0 +1,415 @@
+import Foundation
+import Observation
+import SwiftData
+
+extension HarnessMonitorStore {
+  public struct CheckoutGroup: Identifiable, Equatable {
+    public let checkoutId: String
+    public let title: String
+    public let isWorktree: Bool
+    public let sessions: [SessionSummary]
+
+    public var id: String { checkoutId }
+  }
+
+  public struct SessionGroup: Identifiable, Equatable {
+    public let project: ProjectSummary
+    public let checkoutGroups: [CheckoutGroup]
+
+    public var sessions: [SessionSummary] {
+      checkoutGroups.flatMap(\.sessions)
+    }
+
+    public var id: String { project.id }
+  }
+
+  public enum StatusMessageTone: Equatable {
+    case secondary
+    case info
+    case success
+    case caution
+  }
+
+  public struct StatusMessageState: Equatable, Identifiable {
+    public let id: String
+    public let text: String
+    public let systemImage: String?
+    public let tone: StatusMessageTone
+
+    public init(
+      id: String,
+      text: String,
+      systemImage: String? = nil,
+      tone: StatusMessageTone = .secondary
+    ) {
+      self.id = id
+      self.text = text
+      self.systemImage = systemImage
+      self.tone = tone
+    }
+  }
+
+  public enum DaemonIndicatorState: Equatable {
+    case offline
+    case launchdConnected
+    case manualConnected
+  }
+
+  public struct ToolbarMetricsState: Equatable {
+    public var projectCount = 0
+    public var worktreeCount = 0
+    public var sessionCount = 0
+    public var openWorkCount = 0
+    public var blockedCount = 0
+
+    public init(
+      projectCount: Int = 0,
+      worktreeCount: Int = 0,
+      sessionCount: Int = 0,
+      openWorkCount: Int = 0,
+      blockedCount: Int = 0
+    ) {
+      self.projectCount = projectCount
+      self.worktreeCount = worktreeCount
+      self.sessionCount = sessionCount
+      self.openWorkCount = openWorkCount
+      self.blockedCount = blockedCount
+    }
+  }
+
+  public enum SidebarEmptyState: Equatable {
+    case noSessions
+    case noMatches
+    case sessionsAvailable
+  }
+
+  public struct SidebarFilterSummaryState: Equatable {
+    public var activeFilterSummary: String
+    public var isFiltered: Bool
+
+    public init(
+      activeFilterSummary: String = "0 indexed",
+      isFiltered: Bool = false
+    ) {
+      self.activeFilterSummary = activeFilterSummary
+      self.isFiltered = isFiltered
+    }
+  }
+
+  public struct InspectorTaskSelectionState: Equatable {
+    public let task: WorkItem
+    public let notesSessionID: String?
+    public let isPersistenceAvailable: Bool
+
+    public init(
+      task: WorkItem,
+      notesSessionID: String?,
+      isPersistenceAvailable: Bool
+    ) {
+      self.task = task
+      self.notesSessionID = notesSessionID
+      self.isPersistenceAvailable = isPersistenceAvailable
+    }
+  }
+
+  public struct InspectorAgentSelectionState: Equatable {
+    public let agent: AgentRegistration
+    public let activity: AgentToolActivitySummary?
+
+    public init(
+      agent: AgentRegistration,
+      activity: AgentToolActivitySummary?
+    ) {
+      self.agent = agent
+      self.activity = activity
+    }
+  }
+
+  public enum InspectorPrimaryContentState: Equatable {
+    case empty
+    case loading(SessionSummary)
+    case session(SessionDetail)
+    case task(InspectorTaskSelectionState)
+    case agent(InspectorAgentSelectionState)
+    case signal(SessionSignalRecord)
+    case observer(ObserverSummary)
+
+    public var identity: String {
+      switch self {
+      case .empty:
+        return "empty"
+      case .loading(let summary):
+        return "loading:\(summary.sessionId)"
+      case .session(let detail):
+        return "session:\(detail.session.sessionId)"
+      case .task(let selection):
+        return "task:\(selection.task.taskId)"
+      case .agent(let selection):
+        return "agent:\(selection.agent.agentId)"
+      case .signal(let signal):
+        return "signal:\(signal.signal.signalId)"
+      case .observer(let observer):
+        return "observer:\(observer.observeId)"
+      }
+    }
+
+    public var observer: ObserverSummary? {
+      guard case .observer(let observer) = self else {
+        return nil
+      }
+      return observer
+    }
+
+    public init(
+      selectedSession: SessionDetail?,
+      selectedSessionSummary: SessionSummary?,
+      inspectorSelection: HarnessMonitorStore.InspectorSelection,
+      isPersistenceAvailable: Bool
+    ) {
+      guard let selectedSession else {
+        if let selectedSessionSummary {
+          self = .loading(selectedSessionSummary)
+        } else {
+          self = .empty
+        }
+        return
+      }
+
+      self = Self.resolveSelection(
+        selectedSession: selectedSession,
+        inspectorSelection: inspectorSelection,
+        isPersistenceAvailable: isPersistenceAvailable
+      )
+    }
+
+    private static func resolveSelection(
+      selectedSession: SessionDetail,
+      inspectorSelection: HarnessMonitorStore.InspectorSelection,
+      isPersistenceAvailable: Bool
+    ) -> Self {
+      switch inspectorSelection {
+      case .none:
+        return .session(selectedSession)
+      case .task(let taskID):
+        guard let task = selectedSession.tasks.first(where: { $0.taskId == taskID }) else {
+          return .session(selectedSession)
+        }
+        return .task(
+          InspectorTaskSelectionState(
+            task: task,
+            notesSessionID: selectedSession.session.sessionId,
+            isPersistenceAvailable: isPersistenceAvailable
+          )
+        )
+      case .agent(let agentID):
+        guard let agent = selectedSession.agents.first(where: { $0.agentId == agentID }) else {
+          return .session(selectedSession)
+        }
+        return .agent(
+          InspectorAgentSelectionState(
+            agent: agent,
+            activity: selectedSession.agentActivity.first(where: { $0.agentId == agent.agentId })
+          )
+        )
+      case .signal(let signalID):
+        guard
+          let signal = selectedSession.signals.first(where: { $0.signal.signalId == signalID })
+        else {
+          return .session(selectedSession)
+        }
+        return .signal(signal)
+      case .observer:
+        if let observer = selectedSession.observer {
+          return .observer(observer)
+        }
+        return .session(selectedSession)
+      }
+    }
+  }
+
+  public struct InspectorActionContext: Equatable {
+    public let detail: SessionDetail
+    public let selectedTask: WorkItem?
+    public let selectedAgent: AgentRegistration?
+    public let selectedObserver: ObserverSummary?
+    public let isPersistenceAvailable: Bool
+    public let availableActionActors: [AgentRegistration]
+    public let selectedActionActorID: String
+    public let isSessionReadOnly: Bool
+    public let isSessionActionInFlight: Bool
+    public let lastAction: String
+    public let lastError: String?
+
+    public init(
+      detail: SessionDetail,
+      selectedTask: WorkItem?,
+      selectedAgent: AgentRegistration?,
+      selectedObserver: ObserverSummary?,
+      isPersistenceAvailable: Bool,
+      availableActionActors: [AgentRegistration],
+      selectedActionActorID: String,
+      isSessionReadOnly: Bool,
+      isSessionActionInFlight: Bool,
+      lastAction: String,
+      lastError: String?
+    ) {
+      self.detail = detail
+      self.selectedTask = selectedTask
+      self.selectedAgent = selectedAgent
+      self.selectedObserver = selectedObserver
+      self.isPersistenceAvailable = isPersistenceAvailable
+      self.availableActionActors = availableActionActors
+      self.selectedActionActorID = selectedActionActorID
+      self.isSessionReadOnly = isSessionReadOnly
+      self.isSessionActionInFlight = isSessionActionInFlight
+      self.lastAction = lastAction
+      self.lastError = lastError
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class ConnectionSlice {
+    public enum Change {
+      case shellState
+      case metrics
+    }
+
+    @ObservationIgnored public var onChanged: ((Change) -> Void)?
+    public var connectionState: ConnectionState = .idle {
+      didSet { onChanged?(.shellState) }
+    }
+    public var daemonStatus: DaemonStatusReport? {
+      didSet { onChanged?(.shellState) }
+    }
+    public var diagnostics: DaemonDiagnosticsReport?
+    public var health: HealthResponse?
+    public var isRefreshing = false {
+      didSet { onChanged?(.shellState) }
+    }
+    public var isDiagnosticsRefreshInFlight = false
+    public var isDaemonActionInFlight = false {
+      didSet { onChanged?(.shellState) }
+    }
+    public var activeTransport: TransportKind = .httpSSE
+    public var connectionMetrics: ConnectionMetrics = .initial {
+      didSet { onChanged?(.metrics) }
+    }
+    public var connectionEvents: [ConnectionEvent] = []
+    public var subscribedSessionIDs: Set<String> = []
+    public var daemonLogLevel: String?
+    public var isShowingCachedData = false {
+      didSet { onChanged?(.shellState) }
+    }
+    public var persistedSessionCount = 0 {
+      didSet { onChanged?(.shellState) }
+    }
+    public var lastPersistedSnapshotAt: Date? {
+      didSet { onChanged?(.shellState) }
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class SelectionSlice {
+    public enum Change {
+      case selectedSessionID
+      case selectedSession
+      case timeline
+      case inspectorSelection
+      case actionActorID
+      case selectionLoading
+      case extensionsLoading
+      case sessionAction
+    }
+
+    @ObservationIgnored public var onChanged: ((Change) -> Void)?
+    public var selectedSessionID: String? {
+      didSet { onChanged?(.selectedSessionID) }
+    }
+    public var selectedSession: SessionDetail? {
+      didSet { onChanged?(.selectedSession) }
+    }
+    public var timeline: [TimelineEntry] = [] {
+      didSet { onChanged?(.timeline) }
+    }
+    public var inspectorSelection: InspectorSelection = .none {
+      didSet { onChanged?(.inspectorSelection) }
+    }
+    public var actionActorID: String? {
+      didSet { onChanged?(.actionActorID) }
+    }
+    public var isSelectionLoading = false {
+      didSet { onChanged?(.selectionLoading) }
+    }
+    public var isExtensionsLoading = false {
+      didSet { onChanged?(.extensionsLoading) }
+    }
+    public var isSessionActionInFlight = false {
+      didSet { onChanged?(.sessionAction) }
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class UserDataSlice {
+    @ObservationIgnored public var onChanged: (() -> Void)?
+    public var bookmarkedSessionIds: Set<String> = [] {
+      didSet { onChanged?() }
+    }
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentUISlice {
+    public var selectedSessionID: String?
+    public var selectedDetail: SessionDetail?
+    public var selectedSessionSummary: SessionSummary?
+    public var timeline: [TimelineEntry] = []
+    public var windowTitle = "Dashboard"
+    public var persistenceError: String?
+    public var sessionDataAvailability: SessionDataAvailability = .live
+    public var sessionStatus: SessionStatus?
+    public var toolbarMetrics = HarnessMonitorStore.ToolbarMetricsState()
+    public var statusMessages: [HarnessMonitorStore.StatusMessageState] = []
+    public var daemonIndicator: HarnessMonitorStore.DaemonIndicatorState = .offline
+    public var isLaunchAgentInstalled = false
+    public var isBusy = false
+    public var canNavigateBack = false
+    public var canNavigateForward = false
+    public var connectionState: ConnectionState = .idle
+    public var isSessionReadOnly = true
+    public var isSessionActionInFlight = false
+    public var isRefreshing = false
+    public var isSelectionLoading = false
+    public var isExtensionsLoading = false
+    public var lastAction = ""
+    public var pendingConfirmation: PendingConfirmation?
+    public var presentedSheet: PresentedSheet?
+    public var sleepPreventionEnabled = false
+  }
+
+  @MainActor
+  @Observable
+  public final class SidebarUISlice {
+    public var connectionState: ConnectionState = .idle
+    public var isBusy = false
+    public var isRefreshing = false
+    public var isLaunchAgentInstalled = false
+    public var connectionMetrics: ConnectionMetrics = .initial
+    public var selectedSessionID: String?
+    public var isPersistenceAvailable = false
+    public var bookmarkedSessionIds: Set<String> = []
+    public var emptyState: HarnessMonitorStore.SidebarEmptyState = .noSessions
+    public var filterSummary = HarnessMonitorStore.SidebarFilterSummaryState()
+  }
+
+  @MainActor
+  @Observable
+  public final class InspectorUISlice {
+    public var primaryContent: HarnessMonitorStore.InspectorPrimaryContentState = .empty
+    public var actionContext: HarnessMonitorStore.InspectorActionContext?
+  }
+}

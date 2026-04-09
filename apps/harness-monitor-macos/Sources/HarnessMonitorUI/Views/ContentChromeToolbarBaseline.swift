@@ -1,0 +1,85 @@
+import HarnessMonitorKit
+import SwiftUI
+
+enum ToolbarBaselineRegion: Hashable {
+  case sidebar
+}
+
+private enum ToolbarBaselineCoordinateSpace {
+  static let name = "harness.toolbar-baseline"
+}
+
+private struct ToolbarBaselineFramePreferenceKey: PreferenceKey {
+  static let defaultValue: [ToolbarBaselineRegion: CGRect] = [:]
+
+  static func reduce(
+    value: inout [ToolbarBaselineRegion: CGRect],
+    nextValue: () -> [ToolbarBaselineRegion: CGRect]
+  ) {
+    value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+  }
+}
+
+private struct ToolbarBaselineFrameModifier: ViewModifier {
+  let region: ToolbarBaselineRegion
+
+  func body(content: Content) -> some View {
+    content.background {
+      GeometryReader { proxy in
+        Color.clear.preference(
+          key: ToolbarBaselineFramePreferenceKey.self,
+          value: [
+            region: proxy.frame(in: .named(ToolbarBaselineCoordinateSpace.name))
+          ]
+        )
+      }
+    }
+  }
+}
+
+private struct ToolbarBaselineOverlayModifier: ViewModifier {
+  @State private var sidebarMaxX: CGFloat = 0
+
+  func body(content: Content) -> some View {
+    content
+      .coordinateSpace(name: ToolbarBaselineCoordinateSpace.name)
+      .onPreferenceChange(ToolbarBaselineFramePreferenceKey.self) { frames in
+        let raw = max(frames[.sidebar]?.maxX ?? 0, 0)
+        let quantized = (raw / 4).rounded() * 4
+        guard abs(quantized - sidebarMaxX) >= 4 else {
+          return
+        }
+        sidebarMaxX = quantized
+      }
+      .overlay(alignment: .topLeading) {
+        GeometryReader { proxy in
+          let dividerWidth = max(proxy.size.width - sidebarMaxX, 0)
+
+          if dividerWidth > 0 {
+            ToolbarBaselineDivider()
+              .frame(width: dividerWidth, alignment: .leading)
+              .offset(x: sidebarMaxX)
+          }
+        }
+        .allowsHitTesting(false)
+      }
+  }
+}
+
+private struct ToolbarBaselineDivider: View {
+  var body: some View {
+    Divider()
+      .frame(height: 1)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarBaselineDivider)
+  }
+}
+
+extension View {
+  func toolbarBaselineFrame(_ region: ToolbarBaselineRegion) -> some View {
+    modifier(ToolbarBaselineFrameModifier(region: region))
+  }
+
+  func toolbarBaselineOverlay() -> some View {
+    modifier(ToolbarBaselineOverlayModifier())
+  }
+}
