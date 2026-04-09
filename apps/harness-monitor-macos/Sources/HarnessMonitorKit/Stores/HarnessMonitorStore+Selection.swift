@@ -216,18 +216,30 @@ extension HarnessMonitorStore {
   }
 
   func synchronizeActionActor() {
+    let agents = selectedSession?.agents ?? []
     let available = availableActionActors
-    if available.contains(where: { $0.agentId == actionActorID }) {
+    if agents.contains(where: { $0.agentId == actionActorID }) {
       return
     }
-    actionActorID = selectedSession?.session.leaderId ?? available.first?.agentId
+    if let leaderID = selectedSession?.session.leaderId,
+      agents.contains(where: { $0.agentId == leaderID })
+    {
+      actionActorID = leaderID
+    } else {
+      actionActorID = available.first?.agentId
+    }
   }
 
   func resolvedActionActor() -> String? {
-    if let actionActorID, !actionActorID.isEmpty {
+    let agents = selectedSession?.agents ?? []
+    if let actionActorID, !actionActorID.isEmpty,
+      agents.contains(where: { $0.agentId == actionActorID })
+    {
       return actionActorID
     }
-    if let leaderID = selectedSession?.session.leaderId, !leaderID.isEmpty {
+    if let leaderID = selectedSession?.session.leaderId, !leaderID.isEmpty,
+      agents.contains(where: { $0.agentId == leaderID })
+    {
       return leaderID
     }
     return availableActionActors.first?.agentId
