@@ -75,6 +75,7 @@ extension SidebarView {
       session: session,
       isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId)
     )
+    .equatable()
 
     let baseRow =
       row
