@@ -168,9 +168,7 @@ public final class HarnessMonitorStore {
     do {
       let client = try await daemonController.bootstrapClient()
       await connect(using: client)
-      daemonStatus = try? await daemonController.daemonStatus()
     } catch {
-      daemonStatus = try? await daemonController.daemonStatus()
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
     }
@@ -184,7 +182,6 @@ public final class HarnessMonitorStore {
       let client = try await daemonController.startDaemonClient()
       try? await Task.sleep(for: .milliseconds(300))
       await connect(using: client)
-      daemonStatus = try? await daemonController.daemonStatus()
     } catch {
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
@@ -279,8 +276,8 @@ public final class HarnessMonitorStore {
       }
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
+      daemonStatus = DaemonStatusReport(diagnosticsReport: measuredDiagnostics.value)
       recordRequestSuccess()
-      daemonStatus = try? await daemonController.daemonStatus()
     } catch {
       lastError = error.localizedDescription
     }
@@ -292,10 +289,6 @@ public final class HarnessMonitorStore {
       return
     }
     await refresh(using: client, preserveSelection: true)
-    Task { @MainActor [weak self] in
-      guard let self else { return }
-      self.daemonStatus = try? await self.daemonController.daemonStatus()
-    }
   }
 
   public func configureUITestBehavior(lastActionDismissDelay: Duration) {
