@@ -45,7 +45,7 @@ extension WebSocketTransport {
 
   @discardableResult
   func send(method: String, params: JSONValue? = nil) async throws -> JSONValue {
-    guard let webSocketTask else {
+    guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
     let id = UUID().uuidString
@@ -95,6 +95,8 @@ extension WebSocketTransport {
           ]
           attempt += 1
           try? await Task.sleep(for: delay)
+          if Task.isCancelled { return }
+          if await self.isShutDown { return }
           try? await self.reconnectInternal()
         }
       }
@@ -102,6 +104,9 @@ extension WebSocketTransport {
   }
 
   func reconnectInternal() async throws {
+    guard !isShutDown else {
+      throw WebSocketTransportError.connectionClosed
+    }
     HarnessMonitorLogger.websocket.info("WebSocket reconnecting")
     heartbeatTask?.cancel()
     cancelWebSocketTaskIfNeeded(closeCode: .goingAway)
