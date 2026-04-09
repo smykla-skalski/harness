@@ -92,28 +92,28 @@ public struct ContentView: View {
           detailColumnWidth = width
         }
       )
+      .inspector(isPresented: $showInspector) {
+        InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+          .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+          } action: { width in
+            guard showInspector,
+                  width >= HarnessMonitorInspectorLayout.minWidth,
+                  width <= HarnessMonitorInspectorLayout.maxWidth,
+                  abs(width - inspectorColumnWidth) > 1
+            else {
+              return
+            }
+            inspectorColumnWidth = width
+          }
+          .inspectorColumnWidth(
+            min: HarnessMonitorInspectorLayout.minWidth,
+            ideal: inspectorColumnWidth,
+            max: HarnessMonitorInspectorLayout.maxWidth
+          )
+      }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .inspector(isPresented: $showInspector) {
-      InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
-        .onGeometryChange(for: CGFloat.self) { proxy in
-          proxy.size.width
-        } action: { width in
-          guard showInspector,
-                width >= HarnessMonitorInspectorLayout.minWidth,
-                width <= HarnessMonitorInspectorLayout.maxWidth,
-                abs(width - inspectorColumnWidth) > 1
-          else {
-            return
-          }
-          inspectorColumnWidth = width
-        }
-        .inspectorColumnWidth(
-          min: HarnessMonitorInspectorLayout.minWidth,
-          ideal: inspectorColumnWidth,
-          max: HarnessMonitorInspectorLayout.maxWidth
-        )
-    }
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .navigationTitle(windowTitle)
