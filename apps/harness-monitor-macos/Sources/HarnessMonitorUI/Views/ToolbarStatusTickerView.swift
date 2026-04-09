@@ -60,6 +60,27 @@ enum ToolbarTickerDirection {
   }
 }
 
+struct ToolbarStatusTickerCapsule: View {
+  let messages: [ToolbarStatusMessage]
+  private static let contentHorizontalInset: CGFloat = 12
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Spacer(minLength: 0)
+      ToolbarStatusTickerView(messages: messages, direction: .up)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
+    .padding(.horizontal, Self.contentHorizontalInset)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityTestProbe(
+      HarnessMonitorAccessibility.toolbarStatusTicker,
+      label: messages.first?.text ?? "No status"
+    )
+  }
+}
+
 struct ToolbarStatusTickerView: View {
   let messages: [ToolbarStatusMessage]
   var direction: ToolbarTickerDirection = .up
@@ -99,7 +120,6 @@ struct ToolbarStatusTickerView: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(currentMessage?.text ?? "No status")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
   }
 
   private func tickerLabel(_ message: ToolbarStatusMessage) -> some View {

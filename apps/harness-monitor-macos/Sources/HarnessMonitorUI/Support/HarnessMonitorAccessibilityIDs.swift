@@ -93,7 +93,6 @@ enum HarnessMonitorAccessibility {
   static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   static let toolbarStatusTickerFrame = "harness.toolbar.status-ticker.frame"
   static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"
-  static let toolbarStatusTickerHoverFrame = "harness.toolbar.status-ticker.hover.frame"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
