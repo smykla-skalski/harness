@@ -20,7 +20,7 @@ public struct ContentView: View {
   @State private var showInspector = false
   @State private var showLlama = false
   @State private var detailColumnWidth: CGFloat = 980
-  @State private var isInspectorAnimating = false
+  @State private var isLayoutAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var windowTitle: String {
@@ -49,11 +49,14 @@ public struct ContentView: View {
 
     let info = Bundle.main.infoDictionary ?? [:]
     let environment = ProcessInfo.processInfo.environment
+    let provenance = bundleBuildProvenance()
     let commit =
       environment["HARNESS_MONITOR_AUDIT_GIT_COMMIT"]
+      ?? provenance["HarnessMonitorBuildGitCommit"]
       ?? stringValue(in: info, key: "HarnessMonitorBuildGitCommit", fallback: "unknown")
     let dirty =
       environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"]
+      ?? provenance["HarnessMonitorBuildGitDirty"]
       ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown")
     let launchMode = environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live"
     let perfScenario = environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none"
@@ -122,58 +125,9 @@ public struct ContentView: View {
 
   private var baseContent: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
-      SidebarView(
-        store: store,
-        catalog: store.sessionIndex.catalog,
-        projection: store.sessionIndex.projection,
-        sidebarUI: store.sidebarUI
-      )
-      .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
-      .toolbarBaselineFrame(.sidebar)
+      sidebarColumn
     } detail: {
-      ContentDetailColumn(
-        store: store,
-        selection: store.selection,
-        contentUI: contentUI,
-        showInspector: $showInspector,
-        toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
-        detailWidthChanged: { width in
-          guard !isInspectorAnimating,
-                abs(width - detailColumnWidth) >= 1
-          else {
-            return
-          }
-          detailColumnWidth = width
-        }
-      )
-      .inspector(isPresented: $showInspector) {
-        InspectorColumnView(
-          store: store,
-          inspectorUI: store.inspectorUI
-        )
-          .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-          } action: { width in
-            guard hasCapturedInitialInspectorWidth else {
-              hasCapturedInitialInspectorWidth = true
-              return
-            }
-            guard !isInspectorAnimating,
-                  showInspector,
-                  width >= HarnessMonitorInspectorLayout.minWidth,
-                  width <= HarnessMonitorInspectorLayout.maxWidth,
-                  abs(width - inspectorColumnWidth) > 1
-            else {
-              return
-            }
-            inspectorColumnWidth = width
-          }
-          .inspectorColumnWidth(
-            min: HarnessMonitorInspectorLayout.minWidth,
-            ideal: inspectorColumnWidth,
-            max: HarnessMonitorInspectorLayout.maxWidth
-          )
-      }
+      detailColumn
     }
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
@@ -181,17 +135,16 @@ public struct ContentView: View {
     .navigationTitle(windowTitle)
     .toolbar {
       ContentNavigationToolbarItems(
-        contentUI: contentUI,
-        navigateBack: navigateBack,
-        navigateForward: navigateForward
+        store: store,
+        contentUI: contentUI
       )
       ContentCenterpieceToolbarItems(
+        store: store,
         contentUI: contentUI,
         displayMode: toolbarCenterpieceDisplayMode,
         availableDetailWidth: toolbarDetailWidth,
         showsLlamaToggle: showsCornerAnimation,
-        showLlama: $showLlama,
-        toggleSleepPrevention: toggleSleepPrevention
+        showLlama: $showLlama
       )
     }
     .task {
@@ -232,10 +185,14 @@ public struct ContentView: View {
       if persistedShowInspector != newValue {
         persistedShowInspector = newValue
       }
-      isInspectorAnimating = true
-      Task {
-        try? await Task.sleep(for: .milliseconds(400))
-        isInspectorAnimating = false
+      suppressLayoutGeometry()
+    }
+    .onChange(of: columnVisibility) { _, _ in
+      suppressLayoutGeometry()
+    }
+    .onChange(of: store.selection.inspectorSelection) { _, newValue in
+      if newValue != .none, !showInspector {
+        showInspector = true
       }
     }
     .accessibilityElement(children: .contain)
@@ -289,12 +246,71 @@ public struct ContentView: View {
     )
   }
 
-  func navigateBack() {
-    Task { await store.navigateBack() }
+  private var sidebarColumn: some View {
+    SidebarView(
+      store: store,
+      catalog: store.sessionIndex.catalog,
+      projection: store.sessionIndex.projection,
+      sidebarUI: store.sidebarUI
+    )
+    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
+    .toolbarBaselineFrame(.sidebar)
   }
 
-  func navigateForward() {
-    Task { await store.navigateForward() }
+  private var detailColumn: some View {
+    ContentDetailColumn(
+      store: store,
+      selection: store.selection,
+      contentUI: contentUI,
+      showInspector: $showInspector,
+      toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
+      isLayoutAnimating: isLayoutAnimating,
+      detailColumnWidth: $detailColumnWidth
+    )
+    .inspector(isPresented: $showInspector) {
+      inspectorColumn
+    }
+  }
+
+  private var inspectorColumn: some View {
+    InspectorColumnView(
+      store: store,
+      inspectorUI: store.inspectorUI
+    )
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      updateInspectorWidth(width)
+    }
+    .inspectorColumnWidth(
+      min: HarnessMonitorInspectorLayout.minWidth,
+      ideal: inspectorColumnWidth,
+      max: HarnessMonitorInspectorLayout.maxWidth
+    )
+  }
+
+  private func suppressLayoutGeometry() {
+    isLayoutAnimating = true
+    Task {
+      try? await Task.sleep(for: .milliseconds(400))
+      isLayoutAnimating = false
+    }
+  }
+
+  private func updateInspectorWidth(_ width: CGFloat) {
+    guard hasCapturedInitialInspectorWidth else {
+      hasCapturedInitialInspectorWidth = true
+      return
+    }
+    guard !isLayoutAnimating,
+          showInspector,
+          width >= HarnessMonitorInspectorLayout.minWidth,
+          width <= HarnessMonitorInspectorLayout.maxWidth,
+          abs(width - inspectorColumnWidth) > 1
+    else {
+      return
+    }
+    inspectorColumnWidth = width
   }
 
   private func stringValue(
@@ -310,8 +326,24 @@ public struct ContentView: View {
     return trimmed.isEmpty ? fallback : trimmed
   }
 
-  func toggleSleepPrevention() {
-    store.sleepPreventionEnabled.toggle()
+  private func bundleBuildProvenance() -> [String: String] {
+    guard
+      let url = Bundle.main.url(
+        forResource: "HarnessMonitorBuildProvenance",
+        withExtension: "plist"
+      ),
+      let dictionary = NSDictionary(contentsOf: url) as? [String: Any]
+    else {
+      return [:]
+    }
+
+    return dictionary.compactMapValues { value in
+      guard let stringValue = value as? String else {
+        return nil
+      }
+      let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmed.isEmpty ? nil : trimmed
+    }
   }
 }
 
@@ -321,7 +353,8 @@ private struct ContentDetailColumn: View {
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Binding var showInspector: Bool
   let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  let detailWidthChanged: (CGFloat) -> Void
+  let isLayoutAnimating: Bool
+  @Binding var detailColumnWidth: CGFloat
 
   var body: some View {
     ZStack {
@@ -340,7 +373,12 @@ private struct ContentDetailColumn: View {
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { width in
-      detailWidthChanged(width)
+      guard !isLayoutAnimating,
+            abs(width - detailColumnWidth) >= 1
+      else {
+        return
+      }
+      detailColumnWidth = width
     }
     .toolbar {
       ContentPrimaryToolbarItems(
