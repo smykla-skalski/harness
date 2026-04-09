@@ -23,7 +23,10 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
 
     XCTAssertFalse(
       toolbarDivider.waitForExistence(timeout: Self.actionTimeout),
-      "Expected the main window to rely on native Liquid Glass toolbar chrome instead of a custom baseline divider"
+      """
+      Expected the main window to rely on native Liquid Glass toolbar chrome \
+      instead of a custom baseline divider
+      """
     )
   }
 

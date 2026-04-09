@@ -40,7 +40,10 @@ private struct ToolbarBaselineOverlayModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .coordinateSpace(name: ToolbarBaselineCoordinateSpace.name)
-      .overlayPreferenceValue(ToolbarBaselineFramePreferenceKey.self, alignment: .topLeading) { frames in
+      .overlayPreferenceValue(
+        ToolbarBaselineFramePreferenceKey.self,
+        alignment: .topLeading
+      ) { frames in
         ToolbarBaselineOverlay(frames: frames)
       }
   }
