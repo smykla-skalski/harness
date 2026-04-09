@@ -310,13 +310,15 @@ struct SidebarView: View {
     from previousAnchor: SidebarSelectionAnchor,
     to currentAnchor: SidebarSelectionAnchor
   ) {
-    let selectionChanged = previousAnchor.sessionID != currentAnchor.sessionID
     let selectionMoved =
       previousAnchor.sessionID != nil
       && previousAnchor.sessionID == currentAnchor.sessionID
       && previousAnchor.visibleIndex != currentAnchor.visibleIndex
+    let selectionWasCleared =
+      previousAnchor.sessionID != nil
+      && currentAnchor.sessionID == nil
 
-    guard selectionChanged || selectionMoved else {
+    guard selectionMoved || selectionWasCleared else {
       return
     }
 
