@@ -138,10 +138,10 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(pageSizePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
       app.staticTexts["Paged timeline event 32"].waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(app.staticTexts["Paged timeline event 17"].exists)
+    XCTAssertFalse(app.staticTexts["Paged timeline event 22"].exists)
     XCTAssertFalse(previousButton.isEnabled)
     XCTAssertTrue(nextButton.isEnabled)
-    XCTAssertEqual(pageStatus.label, "Page 1 of 3")
+    XCTAssertEqual(pageStatus.label, "Page 1 of 4")
 
     selectMenuOption(
       in: app,
@@ -225,12 +225,12 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         self.element(in: app, identifier: Accessibility.sessionTimelinePaginationStatus).label
-          == "Page 1 of 3"
+          == "Page 1 of 4"
       }
     )
     XCTAssertTrue(
       app.staticTexts["Paged timeline event 32"].waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(app.staticTexts["Paged timeline event 17"].exists)
+    XCTAssertFalse(app.staticTexts["Paged timeline event 22"].exists)
   }
 
   func testExistingSignalsRemainVisibleAfterSwitchingSessions() throws {

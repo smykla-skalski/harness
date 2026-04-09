@@ -428,7 +428,7 @@ private enum SessionTimelinePageSize: Int, CaseIterable, Identifiable {
   case thirty = 30
   case fifty = 50
 
-  static let defaultSize: Self = .fifteen
+  static let defaultSize: Self = .ten
 
   var id: Int { rawValue }
   var label: String { "\(rawValue)" }
