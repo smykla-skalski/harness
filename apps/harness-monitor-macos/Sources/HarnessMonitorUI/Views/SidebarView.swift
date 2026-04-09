@@ -139,9 +139,6 @@ struct SidebarView: View {
           sessionSortOrder: controls.sessionSortOrder,
           hasActiveFilters: hasActiveSidebarFilters
         )
-        .opacity(sidebarVisible ? 1 : 0)
-        .allowsHitTesting(sidebarVisible)
-        .accessibilityHidden(!sidebarVisible)
       }
     }
     .onSubmit(of: .search) {
