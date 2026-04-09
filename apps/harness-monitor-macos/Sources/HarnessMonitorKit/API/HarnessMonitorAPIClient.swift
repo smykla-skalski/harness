@@ -160,6 +160,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await get("/v1/sessions/\(sessionID)/timeline")
   }
 
+  public func shutdown() async {
+    session.invalidateAndCancel()
+  }
+
   public func globalStream() async -> DaemonPushEventStream {
     stream("/v1/stream")
   }
