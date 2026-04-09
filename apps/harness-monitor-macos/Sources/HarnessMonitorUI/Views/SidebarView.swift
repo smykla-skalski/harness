@@ -1,125 +1,164 @@
 import HarnessMonitorKit
 import Observation
+import SwiftData
 import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessMonitorStore
   let sessionIndex: HarnessMonitorStore.SessionIndexSlice
-  let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  @Bindable var searchController: SidebarSearchController
+  @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
+  private var recentSearches: [RecentSearch]
+  @State private var sidebarSelectedSessionID: String?
+  @State private var draftSidebarSearchText = ""
+  @State private var isSidebarSearchPresented = false
+
+  @SceneStorage("sidebar.collapsed-project-ids")
+  var collapsedProjectIDsStorage = ""
+  @SceneStorage("sidebar.collapsed-checkout-keys")
+  var collapsedCheckoutKeysStorage = ""
+
+  init(
+    store: HarnessMonitorStore,
+    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    searchController: SidebarSearchController
+  ) {
+    self.store = store
+    self.sessionIndex = sessionIndex
+    self.searchController = searchController
+    _sidebarSelectedSessionID = State(initialValue: store.selectedSessionID)
+    _draftSidebarSearchText = State(initialValue: store.searchText)
+  }
+
+  var sidebarRowInsets: EdgeInsets {
+    EdgeInsets(
+      top: HarnessMonitorTheme.spacingXS,
+      leading: HarnessMonitorTheme.sectionSpacing,
+      bottom: HarnessMonitorTheme.spacingXS,
+      trailing: HarnessMonitorTheme.sectionSpacing
+    )
+  }
+
+  var collapsedProjectIDs: Set<String> {
+    storageSet(from: collapsedProjectIDsStorage)
+  }
+
+  var collapsedCheckoutKeys: Set<String> {
+    storageSet(from: collapsedCheckoutKeysStorage)
+  }
+
+  private var recentSearchQueries: [String] {
+    guard store.isPersistenceAvailable else {
+      return []
+    }
+    return Array(recentSearches.prefix(5).map(\.query))
+  }
+
+  private var hasActiveSidebarFilters: Bool {
+    !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || store.sessionFilter != .active
+      || store.sessionFocusFilter != .all
+      || store.sessionSortOrder != .recentActivity
+  }
+
+  private var sidebarFilterStateValue: String {
+    [
+      "status=\(store.sessionFilter.rawValue)",
+      "focus=\(store.sessionFocusFilter.rawValue)",
+      "sort=\(store.sessionSortOrder.rawValue)",
+      "visible=\(store.filteredSessionCount)",
+      "total=\(store.sessions.count)",
+      "search=\(store.searchText)",
+    ].joined(separator: ", ")
+  }
 
   var body: some View {
-    ScrollView {
-      SidebarSessionListSection(
-        store: store,
-        sessionIndex: sessionIndex,
-        sidebarUI: sidebarUI
-      )
-      .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+    List(selection: $sidebarSelectedSessionID) {
+      sidebarContent
     }
+    .listStyle(.sidebar)
+    .environment(\.defaultMinListRowHeight, 1)
     .scrollEdgeEffectStyle(.soft, for: .top)
+    .searchable(
+      text: $draftSidebarSearchText,
+      isPresented: $isSidebarSearchPresented,
+      placement: .sidebar,
+      prompt: "Search sessions, projects, leaders"
+    )
     .safeAreaInset(edge: .top, spacing: 0) {
-      SidebarHeaderSection(
-        store: store,
-        sessionIndex: sessionIndex,
-        sidebarUI: sidebarUI
-      )
+      sidebarHeader
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      SidebarFooterSection(sidebarUI: sidebarUI)
+      SidebarFooterAccessory(metrics: store.connectionMetrics)
+    }
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        SidebarToolbarFilterMenu(
+          sessionFilter: store.sessionFilter,
+          sessionFocusFilter: store.sessionFocusFilter,
+          sessionSortOrder: store.sessionSortOrder,
+          hasActiveFilters: hasActiveSidebarFilters,
+          setSessionFilter: setSessionFilter,
+          setSessionFocusFilter: setSessionFocusFilter,
+          setSessionSortOrder: setSessionSortOrder,
+          clearFilters: clearSidebarFilters
+        )
+      }
+    }
+    .onAppear {
+      sidebarSelectedSessionID = store.selectedSessionID
+      draftSidebarSearchText = store.searchText
+    }
+    .task(id: draftSidebarSearchText) {
+      let nextValue = draftSidebarSearchText
+      try? await Task.sleep(for: .milliseconds(300))
+      guard !Task.isCancelled else { return }
+      if store.searchText != nextValue {
+        store.searchText = nextValue
+      }
+    }
+    .onChange(of: store.searchText) { _, newValue in
+      if draftSidebarSearchText != newValue {
+        draftSidebarSearchText = newValue
+      }
+    }
+    .onChange(of: sidebarSelectedSessionID) { _, newValue in
+      guard store.selectedSessionID != newValue else {
+        return
+      }
+      store.selectSessionFromList(newValue)
+    }
+    .onChange(of: store.selectedSessionID) { _, newValue in
+      guard sidebarSelectedSessionID != newValue else {
+        return
+      }
+      sidebarSelectedSessionID = newValue
+    }
+    .onChange(of: searchController.focusRequestToken) { _, _ in
+      focusSidebarSearch()
+    }
+    .onSubmit(of: .search) {
+      if store.isPersistenceAvailable {
+        _ = store.recordSearch(draftSidebarSearchText)
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessMonitorTheme.ink)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
-  }
-}
-
-private struct SidebarHeaderSection: View {
-  let store: HarnessMonitorStore
-  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
-  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
-
-  init(
-    store: HarnessMonitorStore,
-    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
-    sidebarUI: HarnessMonitorStore.SidebarUISlice
-  ) {
-    self.store = store
-    self.sessionIndex = sessionIndex
-    self.sidebarUI = sidebarUI
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      DaemonStatusCard(
-        connectionState: sidebarUI.connectionState,
-        isBusy: sidebarUI.isBusy,
-        isRefreshing: sidebarUI.isRefreshing,
-        isLaunchAgentInstalled: sidebarUI.isLaunchAgentInstalled,
-        startDaemon: startDaemon,
-        stopDaemon: stopDaemon,
-        installLaunchAgent: installLaunchAgent
-      )
-      SidebarFilterContainer(
-        store: store,
-        sessionIndex: sessionIndex,
-        sidebarUI: sidebarUI
-      )
-    }
-    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
-    .padding(.top, HarnessMonitorTheme.spacingXL)
-    .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
-  }
-
-  private func startDaemon() async {
-    await store.startDaemon()
-  }
-
-  private func stopDaemon() async {
-    await store.stopDaemon()
-  }
-
-  private func installLaunchAgent() async {
-    await store.installLaunchAgent()
-  }
-}
-
-private struct SidebarFooterSection: View {
-  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
-
-  init(sidebarUI: HarnessMonitorStore.SidebarUISlice) {
-    self.sidebarUI = sidebarUI
-  }
-
-  var body: some View {
-    SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
-  }
-}
-
-private struct SidebarSessionListSection: View {
-  let store: HarnessMonitorStore
-  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
-  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
-
-  init(
-    store: HarnessMonitorStore,
-    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
-    sidebarUI: HarnessMonitorStore.SidebarUISlice
-  ) {
-    self.store = store
-    self.sessionIndex = sessionIndex
-    self.sidebarUI = sidebarUI
-  }
-
-  var body: some View {
-    LazyVStack(alignment: .leading, spacing: 0) {
-      sessionSections
+    .overlay {
+      if HarnessMonitorUITestEnvironment.isEnabled {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.sidebarFilterState,
+          text: sidebarFilterStateValue
+        )
+      }
     }
   }
 
-  @ViewBuilder private var sessionSections: some View {
-    switch sidebarUI.emptyState {
+  @ViewBuilder private var sidebarContent: some View {
+    switch emptyState {
     case .noSessions:
       SidebarEmptyState(
         title: "No sessions indexed yet",
@@ -134,228 +173,163 @@ private struct SidebarSessionListSection: View {
       )
     case .sessionsAvailable:
       if let firstGroup = sessionIndex.groupedSessions.first {
-        Group {
-          sessionProjectRow(for: firstGroup)
-
-          ForEach(firstGroup.checkoutGroups) { checkoutGroup in
-            sessionCheckoutRow(for: checkoutGroup)
-            ForEach(checkoutGroup.sessions) { session in
-              sessionRow(session)
-            }
-          }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-        .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
+        projectSection(for: firstGroup)
+          .accessibilityElement(children: .contain)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
 
         ForEach(Array(sessionIndex.groupedSessions.dropFirst())) { group in
-          Group {
-            sessionProjectRow(for: group)
-              .padding(.top, HarnessMonitorTheme.sectionSpacing)
-
-            ForEach(group.checkoutGroups) { checkoutGroup in
-              sessionCheckoutRow(for: checkoutGroup)
-              ForEach(checkoutGroup.sessions) { session in
-                sessionRow(session)
-              }
-            }
-          }
+          projectSection(for: group)
         }
       }
     }
   }
 
-  private func sessionProjectRow(for group: HarnessMonitorStore.SessionGroup) -> some View {
-    HStack {
-      Text(group.project.name)
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        .foregroundStyle(HarnessMonitorTheme.ink)
-        .accessibilityAddTraits(.isHeader)
-      Spacer()
-      Text("\(group.sessions.count)")
-        .scaledFont(.caption.monospacedDigit())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+  private var sidebarHeader: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      DaemonStatusCard(
+        connectionState: store.connectionState,
+        isBusy: store.isBusy,
+        isRefreshing: store.isRefreshing,
+        isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
+        startDaemon: startDaemon,
+        stopDaemon: stopDaemon,
+        installLaunchAgent: installLaunchAgent
+      )
+
+      if !recentSearchQueries.isEmpty {
+        sidebarRecentSearches
+      }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.projectHeader(group.project.projectId)
-    )
-    .accessibilityFrameMarker(
-      HarnessMonitorAccessibility.projectHeaderFrame(group.project.projectId)
+    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+    .padding(.top, HarnessMonitorTheme.spacingXL)
+    .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+  }
+
+  func storageSet(from rawValue: String) -> Set<String> {
+    Set(
+      rawValue
+        .split(separator: "\n")
+        .map(String.init)
+        .filter { !$0.isEmpty }
     )
   }
 
-  private func sessionCheckoutRow(
-    for group: HarnessMonitorStore.CheckoutGroup
-  ) -> some View {
-    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-      Image(systemName: group.isWorktree ? "square.3.layers.3d.down.right" : "folder")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(group.title)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Spacer()
-      Text("\(group.sessions.count)")
-        .scaledFont(.caption2.monospacedDigit())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-    .padding(.top, HarnessMonitorTheme.itemSpacing)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.worktreeHeader(group.checkoutId)
-    )
-  }
-
-  @ViewBuilder
-  private func sessionRow(_ session: SessionSummary) -> some View {
-    let isSelected = sidebarUI.selectedSessionID == session.sessionId
-    let baseRow = sessionBaseRow(session, isSelected: isSelected)
-
-    if sidebarUI.isPersistenceAvailable {
-      baseRow
-        .accessibilityAction(named: "Toggle Bookmark") {
-          store.toggleBookmark(
-            sessionId: session.sessionId,
-            projectId: session.projectId
-          )
-        }
-        .contextMenu {
-          Button {
-            store.toggleBookmark(
-              sessionId: session.sessionId,
-              projectId: session.projectId
-            )
-          } label: {
-            if sidebarUI.bookmarkedSessionIds.contains(session.sessionId) {
-              Label("Remove Bookmark", systemImage: "bookmark.slash")
-            } else {
-              Label("Bookmark", systemImage: "bookmark")
-            }
-          }
-          Divider()
-          Button {
-            HarnessMonitorClipboard.copy(session.title)
-          } label: {
-            Label("Copy Title", systemImage: "doc.on.doc")
-          }
-          .disabled(session.title.isEmpty)
-          Button {
-            HarnessMonitorClipboard.copy(session.sessionId)
-          } label: {
-            Label("Copy Session ID", systemImage: "doc.on.doc")
-          }
-        }
+  func updateStorageSet(
+    _ storage: inout String,
+    entry: String,
+    include: Bool
+  ) {
+    var values = storageSet(from: storage)
+    if include {
+      values.insert(entry)
     } else {
-      baseRow
+      values.remove(entry)
+    }
+    storage = values.sorted().joined(separator: "\n")
+  }
+
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func stopDaemon() async {
+    await store.stopDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+
+  private func setSessionFilter(_ filter: HarnessMonitorStore.SessionFilter) {
+    store.sessionFilter = filter
+  }
+
+  private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
+    store.sessionFocusFilter = filter
+  }
+
+  private func setSessionSortOrder(_ order: SessionSortOrder) {
+    store.sessionSortOrder = order
+  }
+
+  private func clearSidebarFilters() {
+    draftSidebarSearchText = ""
+    store.resetFilters()
+    store.sessionSortOrder = .recentActivity
+  }
+
+  private func applyRecentSearch(_ query: String) {
+    draftSidebarSearchText = query
+    store.searchText = query
+    focusSidebarSearch()
+    if store.isPersistenceAvailable {
+      _ = store.recordSearch(query)
     }
   }
 
-  private func sessionBaseRow(
-    _ session: SessionSummary,
-    isSelected: Bool
-  ) -> some View {
-    let sessionCard = SidebarSessionCardSurface(
-      session: session,
-      isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId),
-      isSelected: isSelected
-    )
+  @ViewBuilder private var sidebarRecentSearches: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack {
+        Text("Recent Searches")
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
 
-    return ZStack(alignment: .leading) {
-      Button {
-        Task { await store.selectSession(session.sessionId) }
-      } label: {
-        sessionCard
+        Spacer()
+
+        if store.isPersistenceAvailable {
+          Button("Clear") {
+            _ = store.clearSearchHistory()
+          }
+          .harnessDismissButtonStyle()
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearSearchHistoryButton)
+        }
       }
-      .harnessSidebarRowButtonStyle(
-        cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-        tint: HarnessMonitorTheme.accent
-      )
-      .accessibilityLabel(
-        sessionAccessibilityLabel(for: session)
-      )
-      .accessibilityValue(
-        sessionAccessibilityValue(
-          for: session,
-          selectedSessionID: sidebarUI.selectedSessionID
-        )
-      )
-      .accessibilityElement(children: .combine)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.sessionRow(session.sessionId)
-      )
 
-      if HarnessMonitorUITestEnvironment.isEnabled {
-        sessionCard
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .opacity(0.001)
-          .allowsHitTesting(false)
-          .accessibilityElement(children: .ignore)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRowFrame(session.sessionId))
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          ForEach(recentSearchQueries, id: \.self) { query in
+            Button {
+              applyRecentSearch(query)
+            } label: {
+              Text(query)
+                .lineLimit(1)
+                .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+                .padding(.vertical, HarnessMonitorTheme.spacingXS)
+            }
+            .harnessAccessoryButtonStyle()
+          }
+        }
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
   }
-}
 
-private struct SidebarEmptyState: View {
-  let title: String
-  let systemImage: String
-  let message: String
-
-  var body: some View {
-    VStack {
-      ContentUnavailableView {
-        Label(title, systemImage: systemImage)
-      } description: {
-        Text(message)
-      }
+  private var emptyState: SidebarEmptyStateKind {
+    if store.sessions.isEmpty {
+      return .noSessions
     }
-    .frame(maxWidth: .infinity)
-    .padding(HarnessMonitorTheme.sectionSpacing)
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarEmptyState)
+    if sessionIndex.groupedSessions.isEmpty {
+      return .noMatches
+    }
+    return .sessionsAvailable
   }
-}
 
-private struct SidebarSessionCardSurface: View {
-  let session: SessionSummary
-  let isBookmarked: Bool
-  let isSelected: Bool
-  @State private var isHovered = false
-
-  var body: some View {
-    SidebarSessionRow(
-      session: session,
-      isBookmarked: isBookmarked,
-      isSelected: isSelected,
-      isHovered: isHovered
-    )
-    .padding(HarnessMonitorTheme.cardPadding)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      if isSelected {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-          .fill(HarnessMonitorTheme.accent.opacity(0.16))
+  private func focusSidebarSearch() {
+    guard !isSidebarSearchPresented else {
+      isSidebarSearchPresented = false
+      Task { @MainActor in
+        isSidebarSearchPresented = true
       }
+      return
     }
-    .overlay {
-      if isSelected {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-          .strokeBorder(HarnessMonitorTheme.accent.opacity(0.24), lineWidth: 1)
-      }
-    }
-    .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous))
-    .onHover { isHovered = $0 }
-    .animation(.snappy(duration: 0.2), value: isSelected)
+    isSidebarSearchPresented = true
   }
 }
 
-// TODO: Restore when TableViewListCore_Mac2 preview crash is fixed (macOS 26 SwiftUI bug)
-// #Preview("Sidebar overflow") {
-//   SidebarView(store: HarnessMonitorPreviewStoreFactory.makeStore(for: .sidebarOverflow))
-//     .frame(width: 380, height: 900)
-//     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-// }
+private enum SidebarEmptyStateKind {
+  case noSessions
+  case noMatches
+  case sessionsAvailable
+}

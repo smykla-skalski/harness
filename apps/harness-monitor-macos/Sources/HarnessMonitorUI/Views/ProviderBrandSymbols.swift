@@ -267,7 +267,7 @@ private struct ProviderBrandSymbolPreviewCard: View {
     .padding(20)
     .background {
       RoundedRectangle(cornerRadius: 24, style: .continuous)
-        .fill(.regularMaterial)
+        .fill(Color.primary.opacity(0.08))
     }
   }
 }

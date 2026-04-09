@@ -23,16 +23,9 @@ extension HarnessMonitorStore {
     severity: TaskSeverity,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Create task",
       using: client,
@@ -57,16 +50,9 @@ extension HarnessMonitorStore {
     agentID: String,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Assign task",
       using: client,
@@ -88,16 +74,9 @@ extension HarnessMonitorStore {
     note: String? = nil,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Update task",
       using: client,
@@ -119,16 +98,9 @@ extension HarnessMonitorStore {
     progress: Int,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Save checkpoint",
       using: client,
@@ -153,16 +125,9 @@ extension HarnessMonitorStore {
     role: SessionRole,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Change role",
       using: client,
@@ -182,16 +147,9 @@ extension HarnessMonitorStore {
     agentID: String,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Remove agent",
       using: client,
@@ -212,16 +170,9 @@ extension HarnessMonitorStore {
     reason: String? = nil,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Transfer leader",
       using: client,
@@ -241,16 +192,9 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func observeSelectedSession(actor: String = "harness-app") async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Observe session",
       using: client,
@@ -266,16 +210,9 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func endSelectedSession(actor: String = "harness-app") async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "End session",
       using: client,
@@ -297,16 +234,9 @@ extension HarnessMonitorStore {
     actionHint: String?,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else {
-      return false
-    }
-    guard let client, let sessionID = selectedSessionID else {
-      return false
-    }
-    guard let actor = actionActor(for: actor) else {
-      return false
-    }
-
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Send signal",
       using: client,

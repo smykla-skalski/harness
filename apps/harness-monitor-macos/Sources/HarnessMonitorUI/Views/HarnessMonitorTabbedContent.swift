@@ -20,7 +20,8 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
   @ViewBuilder let content: (Tab) -> Content
 
   @Namespace private var tabNamespace
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
   init(
     title: String,
@@ -50,7 +51,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
         if alignment == .trailing {
           Spacer(minLength: 0)
         }
-        ForEach(Array(Tab.allCases) as! [Tab]) { tab in
+        ForEach(Array(Tab.allCases)) { tab in
           let isSelected = !tabsDisabled && selection == tab
           Button {
             withAnimation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.15)) {
@@ -79,7 +80,7 @@ struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, 
               }
               .contentShape(Rectangle())
           }
-          .buttonStyle(.plain)
+          .harnessDismissButtonStyle()
           .disabled(tabsDisabled)
           .accessibilityLabel(tabTitle(tab))
           .accessibilityAddTraits(isSelected ? [.isSelected] : [])

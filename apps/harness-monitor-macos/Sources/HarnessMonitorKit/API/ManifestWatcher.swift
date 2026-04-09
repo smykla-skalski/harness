@@ -81,7 +81,11 @@ final class ManifestWatcher: @unchecked Sendable {
     let oldEndpoint = lastEndpoint
     lastEndpoint = manifest.endpoint
     HarnessMonitorLogger.lifecycle.info(
-      "ManifestWatcher: endpoint changed from \(oldEndpoint, privacy: .public) to \(manifest.endpoint, privacy: .public)"
+      """
+      ManifestWatcher: endpoint changed \
+      from \(oldEndpoint, privacy: .public) \
+      to \(manifest.endpoint, privacy: .public)
+      """
     )
     onChange()
   }

@@ -369,4 +369,3 @@ public actor BackgroundThumbnailCache {
     return date.timeIntervalSince1970
   }
 }
-

@@ -573,14 +573,12 @@ public final class HarnessMonitorStore {
     connectionState = .connecting
     lastError = nil
 
-    async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
-
     do {
       let client = try await daemonController.bootstrapClient()
       await connect(using: client)
-      daemonStatus = await daemonStatusResponse
+      daemonStatus = try? await daemonController.daemonStatus()
     } catch {
-      daemonStatus = await daemonStatusResponse
+      daemonStatus = try? await daemonController.daemonStatus()
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
     }
@@ -592,10 +590,9 @@ public final class HarnessMonitorStore {
 
     do {
       let client = try await daemonController.startDaemonClient()
-      async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
       try? await Task.sleep(for: .milliseconds(300))
       await connect(using: client)
-      daemonStatus = await daemonStatusResponse
+      daemonStatus = try? await daemonController.daemonStatus()
     } catch {
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
@@ -685,15 +682,13 @@ public final class HarnessMonitorStore {
     }
 
     do {
-      async let diagnosticsResponse = Self.measureOperation {
+      let measuredDiagnostics = try await Self.measureOperation {
         try await client.diagnostics()
       }
-      async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
-      let measuredDiagnostics = try await diagnosticsResponse
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
       recordRequestSuccess()
-      daemonStatus = await daemonStatusResponse
+      daemonStatus = try? await daemonController.daemonStatus()
     } catch {
       lastError = error.localizedDescription
     }
@@ -709,6 +704,10 @@ public final class HarnessMonitorStore {
       guard let self else { return }
       self.daemonStatus = try? await self.daemonController.daemonStatus()
     }
+  }
+
+  public func configureUITestBehavior(lastActionDismissDelay: Duration) {
+    self.lastActionDismissDelay = lastActionDismissDelay
   }
 
   public func showLastAction(_ action: String) {

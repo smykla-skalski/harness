@@ -6,14 +6,14 @@ public enum HarnessMonitorSchemaV1: VersionedSchema {
 
   public static var models: [any PersistentModel.Type] {
     [
-      HarnessMonitorSchemaV1.CachedProject.self,
-      HarnessMonitorSchemaV1.CachedSession.self,
-      HarnessMonitorSchemaV1.CachedAgent.self,
-      HarnessMonitorSchemaV1.CachedWorkItem.self,
-      HarnessMonitorSchemaV1.CachedSignalRecord.self,
-      HarnessMonitorSchemaV1.CachedTimelineEntry.self,
-      HarnessMonitorSchemaV1.CachedObserver.self,
-      HarnessMonitorSchemaV1.CachedAgentActivity.self,
+      Self.CachedProject.self,
+      Self.CachedSession.self,
+      Self.CachedAgent.self,
+      Self.CachedWorkItem.self,
+      Self.CachedSignalRecord.self,
+      Self.CachedTimelineEntry.self,
+      Self.CachedObserver.self,
+      Self.CachedAgentActivity.self,
       SessionBookmark.self,
       UserNote.self,
       RecentSearch.self,
@@ -27,14 +27,14 @@ public enum HarnessMonitorSchemaV2: VersionedSchema {
 
   public static var models: [any PersistentModel.Type] {
     [
-      HarnessMonitorSchemaV2.CachedProject.self,
-      HarnessMonitorSchemaV2.CachedSession.self,
-      HarnessMonitorSchemaV2.CachedAgent.self,
-      HarnessMonitorSchemaV2.CachedWorkItem.self,
-      HarnessMonitorSchemaV2.CachedSignalRecord.self,
-      HarnessMonitorSchemaV2.CachedTimelineEntry.self,
-      HarnessMonitorSchemaV2.CachedObserver.self,
-      HarnessMonitorSchemaV2.CachedAgentActivity.self,
+      Self.CachedProject.self,
+      Self.CachedSession.self,
+      Self.CachedAgent.self,
+      Self.CachedWorkItem.self,
+      Self.CachedSignalRecord.self,
+      Self.CachedTimelineEntry.self,
+      Self.CachedObserver.self,
+      Self.CachedAgentActivity.self,
       SessionBookmark.self,
       UserNote.self,
       RecentSearch.self,
@@ -47,20 +47,20 @@ public enum HarnessMonitorSchemaV3: VersionedSchema {
   public static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
 
   public static var versionString: String {
-    let v = versionIdentifier
-    return "\(v.major).\(v.minor).\(v.patch)"
+    let version = versionIdentifier
+    return "\(version.major).\(version.minor).\(version.patch)"
   }
 
   public static var models: [any PersistentModel.Type] {
     [
-      HarnessMonitorSchemaV3.CachedProject.self,
-      HarnessMonitorSchemaV3.CachedSession.self,
-      HarnessMonitorSchemaV3.CachedAgent.self,
-      HarnessMonitorSchemaV3.CachedWorkItem.self,
-      HarnessMonitorSchemaV3.CachedSignalRecord.self,
-      HarnessMonitorSchemaV3.CachedTimelineEntry.self,
-      HarnessMonitorSchemaV3.CachedObserver.self,
-      HarnessMonitorSchemaV3.CachedAgentActivity.self,
+      Self.CachedProject.self,
+      Self.CachedSession.self,
+      Self.CachedAgent.self,
+      Self.CachedWorkItem.self,
+      Self.CachedSignalRecord.self,
+      Self.CachedTimelineEntry.self,
+      Self.CachedObserver.self,
+      Self.CachedAgentActivity.self,
       SessionBookmark.self,
       UserNote.self,
       RecentSearch.self,

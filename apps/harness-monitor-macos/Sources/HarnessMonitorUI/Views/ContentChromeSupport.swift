@@ -73,8 +73,7 @@ struct ContentDetailChrome<Content: View>: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
-  @ViewBuilder
-  private var contentWithTopChrome: some View {
+  @ViewBuilder private var contentWithTopChrome: some View {
     if showsTopChrome {
       content
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -123,9 +122,7 @@ struct SessionStatusBanner: View {
   let status: SessionStatus
   let isStale: Bool
 
-  private var color: Color {
-    isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
-  }
+  private var color: Color { isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status) }
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -164,23 +161,6 @@ private struct SessionStatusBannerSurfaceModifier: ViewModifier {
       Color(nsColor: .windowBackgroundColor)
         .overlay(tint.opacity(tintOpacity))
     }
-  }
-}
-
-private struct DetailBannerDividerModifier: ViewModifier {
-  func body(content: Content) -> some View {
-    content.overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.9))
-        .frame(height: 1)
-        .accessibilityHidden(true)
-    }
-  }
-}
-
-private extension View {
-  func detailBannerDivider() -> some View {
-    modifier(DetailBannerDividerModifier())
   }
 }
 
@@ -227,11 +207,12 @@ private struct ToolbarBaselineOverlayModifier: ViewModifier {
     content
       .coordinateSpace(name: ToolbarBaselineCoordinateSpace.name)
       .onPreferenceChange(ToolbarBaselineFramePreferenceKey.self) { frames in
-        let nextSidebarMaxX = max(frames[.sidebar]?.maxX ?? 0, 0)
-        guard abs(nextSidebarMaxX - sidebarMaxX) >= 1 else {
+        let raw = max(frames[.sidebar]?.maxX ?? 0, 0)
+        let quantized = (raw / 4).rounded() * 4
+        guard abs(quantized - sidebarMaxX) >= 4 else {
           return
         }
-        sidebarMaxX = nextSidebarMaxX.rounded(.towardZero)
+        sidebarMaxX = quantized
       }
       .overlay(alignment: .topLeading) {
         GeometryReader { proxy in

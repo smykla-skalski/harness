@@ -20,7 +20,11 @@ struct SidebarSessionRow: View {
         Text(session.displayTitle)
           .scaledFont(.system(.body, design: .rounded, weight: .semibold))
           .italic(session.title.isEmpty)
-          .foregroundStyle(session.title.isEmpty ? selectedSecondaryTextStyle : (isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink))
+          .foregroundStyle(
+            session.title.isEmpty
+              ? selectedSecondaryTextStyle
+              : (isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
+          )
           .lineLimit(1)
           .truncationMode(.tail)
         Spacer(minLength: 12)
@@ -46,7 +50,11 @@ struct SidebarSessionRow: View {
         Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
           .scaledFont(.caption.weight(.medium))
           .lineLimit(1)
-          .foregroundStyle(isSelected || isHovered ? selectedSecondaryTextStyle : HarnessMonitorTheme.ink.opacity(0.35))
+          .foregroundStyle(
+            isSelected || isHovered
+              ? selectedSecondaryTextStyle
+              : HarnessMonitorTheme.ink.opacity(0.35)
+          )
       }
       .frame(maxWidth: .infinity)
       .animation(.easeInOut(duration: 0.15), value: isHovered)
@@ -60,7 +68,11 @@ struct SidebarSessionRow: View {
     Text(value)
       .scaledFont(.caption.weight(.medium))
       .lineLimit(1)
-      .foregroundStyle(isSelected || isHovered ? selectedSecondaryTextStyle : HarnessMonitorTheme.ink.opacity(0.35))
+      .foregroundStyle(
+        isSelected || isHovered
+          ? selectedSecondaryTextStyle
+          : HarnessMonitorTheme.ink.opacity(0.35)
+      )
   }
 
   private var selectedSecondaryTextStyle: Color {

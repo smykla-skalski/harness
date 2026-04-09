@@ -18,23 +18,7 @@ public actor SessionCacheService {
     let timeline: [TimelineEntry]
   }
 
-  public struct CacheCounts: Sendable {
-    public let sessions: Int
-    public let projects: Int
-    public let agents: Int
-    public let tasks: Int
-    public let signals: Int
-    public let timeline: Int
-    public let observers: Int
-    public let activities: Int
-
-    public static let zero = CacheCounts(
-      sessions: 0, projects: 0, agents: 0, tasks: 0,
-      signals: 0, timeline: 0, observers: 0, activities: 0
-    )
-  }
-
-  private func makeContext() -> ModelContext {
+  func makeContext() -> ModelContext {
     let context = ModelContext(modelContainer)
     context.autosaveEnabled = false
     return context
@@ -117,11 +101,7 @@ public actor SessionCacheService {
     let descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { summaryIds.contains($0.sessionId) }
     )
-    guard
-      let cached = try? context.fetch(descriptor)
-    else {
-      return summaries
-    }
+    guard let cached = try? context.fetch(descriptor) else { return summaries }
 
     var snapshotState: [String: (updatedAt: String?, hasTimeline: Bool)] = [:]
     for session in cached {
@@ -148,9 +128,7 @@ public actor SessionCacheService {
     let context = makeContext()
     let projectMap = buildProjectMap(context: context)
     let sessionMap = buildSessionMap(context: context)
-
     var insertedSessionCount = 0
-
     for project in projects {
       if let existing = projectMap[project.projectId] {
         existing.update(from: project)
@@ -158,7 +136,6 @@ public actor SessionCacheService {
         context.insert(project.toCachedProject())
       }
     }
-
     for session in sessions {
       if let existing = sessionMap[session.sessionId] {
         existing.update(from: session)
@@ -167,7 +144,6 @@ public actor SessionCacheService {
         insertedSessionCount += 1
       }
     }
-
     try? context.save()
     return insertedSessionCount
   }
@@ -223,16 +199,12 @@ public actor SessionCacheService {
   // MARK: - Private helpers
 
   private func buildProjectMap(context: ModelContext) -> [String: CachedProject] {
-    guard let projects = try? context.fetch(FetchDescriptor<CachedProject>()) else {
-      return [:]
-    }
+    guard let projects = try? context.fetch(FetchDescriptor<CachedProject>()) else { return [:] }
     return Dictionary(uniqueKeysWithValues: projects.map { ($0.projectId, $0) })
   }
 
   private func buildSessionMap(context: ModelContext) -> [String: CachedSession] {
-    guard let sessions = try? context.fetch(FetchDescriptor<CachedSession>()) else {
-      return [:]
-    }
+    guard let sessions = try? context.fetch(FetchDescriptor<CachedSession>()) else { return [:] }
     return Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
   }
 
@@ -257,7 +229,6 @@ public actor SessionCacheService {
       predicate: #Predicate { $0.projectId == project.projectId }
     )
     descriptor.fetchLimit = 1
-
     if let existing = try? context.fetch(descriptor).first {
       existing.update(from: project)
     } else {
@@ -271,7 +242,6 @@ public actor SessionCacheService {
       existing.update(from: summary)
       return false
     }
-
     context.insert(summary.toCachedSession())
     return true
   }
@@ -406,37 +376,4 @@ public actor SessionCacheService {
     }
   }
 
-  // MARK: - Database management
-
-  func recordCounts() -> CacheCounts {
-    let context = makeContext()
-    return CacheCounts(
-      sessions: (try? context.fetchCount(FetchDescriptor<CachedSession>())) ?? 0,
-      projects: (try? context.fetchCount(FetchDescriptor<CachedProject>())) ?? 0,
-      agents: (try? context.fetchCount(FetchDescriptor<CachedAgent>())) ?? 0,
-      tasks: (try? context.fetchCount(FetchDescriptor<CachedWorkItem>())) ?? 0,
-      signals: (try? context.fetchCount(FetchDescriptor<CachedSignalRecord>())) ?? 0,
-      timeline: (try? context.fetchCount(FetchDescriptor<CachedTimelineEntry>())) ?? 0,
-      observers: (try? context.fetchCount(FetchDescriptor<CachedObserver>())) ?? 0,
-      activities: (try? context.fetchCount(FetchDescriptor<CachedAgentActivity>())) ?? 0
-    )
-  }
-
-  func deleteAllCacheData() -> Bool {
-    let context = makeContext()
-    do {
-      let sessions = try context.fetch(FetchDescriptor<CachedSession>())
-      for session in sessions {
-        context.delete(session)
-      }
-      let projects = try context.fetch(FetchDescriptor<CachedProject>())
-      for project in projects {
-        context.delete(project)
-      }
-      try context.save()
-      return true
-    } catch {
-      return false
-    }
-  }
 }

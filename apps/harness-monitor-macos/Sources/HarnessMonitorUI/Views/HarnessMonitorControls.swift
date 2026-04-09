@@ -52,9 +52,12 @@ private struct HarnessMonitorAccessoryButtonStyle: ViewModifier {
 }
 
 private struct HarnessMonitorFlatActionButtonStyle: ButtonStyle {
-  @ScaledMetric(relativeTo: .caption) private var cornerRadius = 9.0
-  @ScaledMetric(relativeTo: .caption) private var horizontalPadding = 10.0
-  @ScaledMetric(relativeTo: .caption) private var verticalPadding = 4.0
+  @ScaledMetric(relativeTo: .caption)
+  private var cornerRadius = 9.0
+  @ScaledMetric(relativeTo: .caption)
+  private var horizontalPadding = 10.0
+  @ScaledMetric(relativeTo: .caption)
+  private var verticalPadding = 4.0
 
   let tint: Color
   @Environment(\.isEnabled)

@@ -29,15 +29,13 @@ public struct DatabaseStatistics: Sendable {
     ByteCountFormatter.string(fromByteCount: Int64(daemonDatabaseSizeBytes), countStyle: .file)
   }
 
-  @MainActor
-  private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+  @MainActor private static let relativeDateFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
     return formatter
   }()
 
-  @MainActor
-  public var lastCachedFormatted: String {
+  @MainActor public var lastCachedFormatted: String {
     guard let lastCachedAt else { return "Never" }
     return Self.relativeDateFormatter.localizedString(for: lastCachedAt, relativeTo: .now)
   }
@@ -184,8 +182,7 @@ extension HarnessMonitorStore {
     var total: Int64 = 0
     for path in paths {
       if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-        let size = attrs[.size] as? Int64
-      {
+        let size = attrs[.size] as? Int64 {
         total += size
       }
     }

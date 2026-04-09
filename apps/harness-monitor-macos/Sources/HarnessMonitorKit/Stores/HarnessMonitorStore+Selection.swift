@@ -49,13 +49,8 @@ extension HarnessMonitorStore {
 
   // MARK: - Navigation history
 
-  public var canNavigateBack: Bool {
-    !navigationBackStack.isEmpty
-  }
-
-  public var canNavigateForward: Bool {
-    !navigationForwardStack.isEmpty
-  }
+  public var canNavigateBack: Bool { !navigationBackStack.isEmpty }
+  public var canNavigateForward: Bool { !navigationForwardStack.isEmpty }
 
   public func navigateBack() async {
     guard !navigationBackStack.isEmpty else { return }
@@ -136,6 +131,16 @@ extension HarnessMonitorStore {
   }
 
   public func selectSession(_ sessionID: String?) async {
+    selectSessionFromList(sessionID)
+
+    guard let selectionTask else {
+      return
+    }
+
+    await selectionTask.value
+  }
+
+  public func selectSessionFromList(_ sessionID: String?) {
     selectionTask?.cancel()
     primeSessionSelection(sessionID)
 
@@ -145,12 +150,10 @@ extension HarnessMonitorStore {
       return
     }
 
-    let task = Task { @MainActor [weak self] in
+    selectionTask = Task { @MainActor [weak self] in
       guard let self else { return }
       await self.performSessionSelection(sessionID: sessionID)
     }
-    selectionTask = task
-    await task.value
   }
 
   private func performSessionSelection(sessionID: String) async {
@@ -174,21 +177,10 @@ extension HarnessMonitorStore {
     startSessionStream(using: client, sessionID: sessionID)
   }
 
-  public func inspect(taskID: String) {
-    inspectorSelection = .task(taskID)
-  }
-
-  public func inspect(agentID: String) {
-    inspectorSelection = .agent(agentID)
-  }
-
-  public func inspect(signalID: String) {
-    inspectorSelection = .signal(signalID)
-  }
-
-  public func inspectObserver() {
-    inspectorSelection = .observer
-  }
+  public func inspect(taskID: String) { inspectorSelection = .task(taskID) }
+  public func inspect(agentID: String) { inspectorSelection = .agent(agentID) }
+  public func inspect(signalID: String) { inspectorSelection = .signal(signalID) }
+  public func inspectObserver() { inspectorSelection = .observer }
 
   public var selectedSessionBookmarkTitle: String {
     guard isPersistenceAvailable else { return "Bookmarks Unavailable" }
@@ -368,47 +360,50 @@ extension HarnessMonitorStore {
       guard !hydrationQueue.isEmpty else { return }
 
       for summary in hydrationQueue {
-        guard !Task.isCancelled else {
+        guard !Task.isCancelled, self.connectionState == .online else {
           return
         }
-        guard self.connectionState == .online else {
-          return
-        }
-
-        do {
-          async let detailResponse = Self.measureOperation {
-            try await client.sessionDetail(id: summary.sessionId)
-          }
-          async let timelineResponse = Self.measureOperation {
-            try await client.timeline(sessionID: summary.sessionId)
-          }
-          let measuredDetail = try await detailResponse
-          let measuredTimeline = try await timelineResponse
-          self.recordRequestSuccess()
-          self.recordRequestSuccess()
-          await self.cacheSessionDetail(
-            measuredDetail.value,
-            timeline: measuredTimeline.value,
-            markViewed: false
-          )
-          if self.selectedSessionID == summary.sessionId && (self.selectedSession == nil || self.isShowingCachedData) {
-            self.applySelectedSessionSnapshot(
-              sessionID: summary.sessionId,
-              detail: measuredDetail.value,
-              timeline: measuredTimeline.value,
-              showingCachedData: false
-            )
-          }
-        } catch {
-          guard !Task.isCancelled else {
-            return
-          }
-          self.appendConnectionEvent(
-            kind: .error,
-            detail: "Persisted snapshot refresh failed for \(summary.sessionId)"
-          )
-        }
+        await self.hydratePersistedSnapshot(summary: summary, using: client)
       }
+    }
+  }
+
+  private func hydratePersistedSnapshot(
+    summary: SessionSummary,
+    using client: any HarnessMonitorClientProtocol
+  ) async {
+    do {
+      let measuredDetail = try await Self.measureOperation {
+        try await client.sessionDetail(id: summary.sessionId)
+      }
+      let measuredTimeline = try await Self.measureOperation {
+        try await client.timeline(sessionID: summary.sessionId)
+      }
+      recordRequestSuccess()
+      recordRequestSuccess()
+      await cacheSessionDetail(
+        measuredDetail.value,
+        timeline: measuredTimeline.value,
+        markViewed: false
+      )
+      let isSelected = selectedSessionID == summary.sessionId
+      let needsUpdate = selectedSession == nil || isShowingCachedData
+      if isSelected && needsUpdate {
+        applySelectedSessionSnapshot(
+          sessionID: summary.sessionId,
+          detail: measuredDetail.value,
+          timeline: measuredTimeline.value,
+          showingCachedData: false
+        )
+      }
+    } catch {
+      guard !Task.isCancelled else {
+        return
+      }
+      appendConnectionEvent(
+        kind: .error,
+        detail: "Persisted snapshot refresh failed for \(summary.sessionId)"
+      )
     }
   }
 

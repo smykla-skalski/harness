@@ -45,7 +45,9 @@ struct PreferencesAppearanceSection: View {
         Text("Appearance")
       } footer: {
         Text(
-          "Theme mode and text size apply to every Harness Monitor window. Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off."
+          "Theme mode and text size apply to every Harness Monitor window."
+            + " Backdrop controls where the softened background image renders,"
+            + " and choosing an image turns on the window backdrop if it is currently off."
         )
       }
 
@@ -197,8 +199,7 @@ struct PreferencesGeneralSection: View {
 
         if dateTimeConfiguration.showsCustomTimeZoneField {
           Picker("Custom zone", selection: $customTimeZoneIdentifier) {
-            ForEach(HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers, id: \.self) {
-              identifier in
+            ForEach(HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers, id: \.self) { identifier in
               Text(identifier).tag(identifier)
             }
           }

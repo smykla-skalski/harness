@@ -19,7 +19,10 @@ enum HarnessMonitorAccessibility {
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
   static let sidebarFiltersCard = "harness.sidebar.filters"
   static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
-  static let sidebarFiltersToggle = "harness.sidebar.filters.toggle"
+  static let sidebarFilterMenu = "harness.toolbar.sidebar-filters"
+  static let sidebarFilterState = "harness.sidebar.filter.state"
+  static let sidebarFiltersToggle = sidebarFilterMenu
+  static let sidebarSearchField = "harness.sidebar.search"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let sidebarClearSearchHistoryButton = "harness.sidebar.search.clear-history"
   static let sessionFilterGroup = "harness.sidebar.filter-group"
@@ -139,6 +142,10 @@ enum HarnessMonitorAccessibility {
 
   static func worktreeHeader(_ checkoutID: String) -> String {
     "harness.sidebar.worktree-header.\(slug(checkoutID))"
+  }
+
+  static func worktreeHeaderFrame(_ checkoutID: String) -> String {
+    "\(worktreeHeader(checkoutID)).frame"
   }
 
   static func sessionFilterButton(_ filter: String) -> String {
