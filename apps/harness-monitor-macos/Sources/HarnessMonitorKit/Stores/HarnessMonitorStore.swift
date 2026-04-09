@@ -13,8 +13,8 @@ public final class HarnessMonitorStore {
   }
 
   public enum SessionFilter: String, CaseIterable, Identifiable {
-    case active
     case all
+    case active
     case ended
 
     public var id: String { rawValue }

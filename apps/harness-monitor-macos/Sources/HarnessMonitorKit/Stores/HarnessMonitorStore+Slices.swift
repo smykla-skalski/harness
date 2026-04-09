@@ -431,7 +431,7 @@ extension HarnessMonitorStore {
   @Observable
   public final class SessionControlsSlice {
     public var searchText = ""
-    public var sessionFilter: SessionFilter = .active
+    public var sessionFilter: SessionFilter = .all
     public var sessionFocusFilter: SessionFocusFilter = .all
     public var sessionSortOrder: SessionSortOrder = .recentActivity
 
@@ -440,7 +440,7 @@ extension HarnessMonitorStore {
 
   public struct SessionProjectionState: Equatable {
     public var searchText = ""
-    public var sessionFilter: SessionFilter = .active
+    public var sessionFilter: SessionFilter = .all
     public var sessionFocusFilter: SessionFocusFilter = .all
     public var sessionSortOrder: SessionSortOrder = .recentActivity
     public var groupedSessions: [SessionGroup] = []
@@ -451,7 +451,7 @@ extension HarnessMonitorStore {
 
     public init(
       searchText: String = "",
-      sessionFilter: SessionFilter = .active,
+      sessionFilter: SessionFilter = .all,
       sessionFocusFilter: SessionFocusFilter = .all,
       sessionSortOrder: SessionSortOrder = .recentActivity,
       groupedSessions: [SessionGroup] = [],
