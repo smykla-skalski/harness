@@ -163,7 +163,7 @@ Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review
 
 - `.claude/rules/swiftui-state-management.md` - @Bindable vs let, @State privacy, no closure properties, owned state over @Binding+closure combos, @Binding only for mutation
 - `.claude/rules/swiftui-view-structure.md` - structs over free functions, stable ForEach identity, no identity-breaking modifier branches, @ViewBuilder usage, no wrapper containers, accessibility probe patterns, dead code
-- `.claude/rules/swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping
+- `.claude/rules/swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping, no geometry feedback loops, no multi-slice computed properties in body
 - `.claude/rules/swiftui-startup-focus.md` - persisted startup state, FocusedValue churn, restoration seeding, inspector/search presentation safety
 - `.claude/rules/swiftui-button-styling.md` - no .plain, ButtonStyle over ViewModifier, no redundant .contentShape, native glass styles
 - `.claude/rules/swiftui-idle-cpu.md` - no repeatForever on always-visible views, cached formatters, no gratuitous periodic animations
@@ -185,7 +185,7 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [ux-platform-ios.md](.claude/rules/ux-platform-ios.md) | `apps/*-ios/**/*.swift` | Tab bar, safe areas, gestures, navigation bar, permissions |
 | [swiftui-state-management.md](.claude/rules/swiftui-state-management.md) | `apps/harness-monitor-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
 | [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-monitor-macos/Sources/**` | View composition, ForEach identity, modifier branches |
-| [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
+| [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping, geometry feedback loops, multi-slice body reads |
 | [swiftui-startup-focus.md](.claude/rules/swiftui-startup-focus.md) | `apps/harness-monitor-macos/Sources/**` | Persisted startup presentation, FocusedValue churn, restoration and geometry writeback safety |
 | [swiftui-idle-cpu.md](.claude/rules/swiftui-idle-cpu.md) | `apps/harness-monitor-macos/Sources/**` | No repeatForever on idle views, cached formatters, no periodic animations |
 | [xcuitest-speed.md](.claude/rules/xcuitest-speed.md) | `apps/harness-monitor-macos/Tests/**` | Animation suppression, .firstMatch, coordinate taps, single-launch tests, scroll patterns |
