@@ -7,17 +7,18 @@ extension HarnessMonitorStore {
     public let checkoutId: String
     public let title: String
     public let isWorktree: Bool
-    public let sessions: [SessionSummary]
+    public let sessionIDs: [String]
 
     public var id: String { checkoutId }
+    public var sessionCount: Int { sessionIDs.count }
   }
 
   public struct SessionGroup: Identifiable, Equatable {
     public let project: ProjectSummary
     public let checkoutGroups: [CheckoutGroup]
 
-    public var sessions: [SessionSummary] {
-      checkoutGroups.flatMap(\.sessions)
+    public var sessionIDs: [String] {
+      checkoutGroups.flatMap(\.sessionIDs)
     }
 
     public var id: String { project.id }
@@ -81,19 +82,6 @@ extension HarnessMonitorStore {
     case noSessions
     case noMatches
     case sessionsAvailable
-  }
-
-  public struct SidebarFilterSummaryState: Equatable {
-    public var activeFilterSummary: String
-    public var isFiltered: Bool
-
-    public init(
-      activeFilterSummary: String = "0 indexed",
-      isFiltered: Bool = false
-    ) {
-      self.activeFilterSummary = activeFilterSummary
-      self.isFiltered = isFiltered
-    }
   }
 
   public struct InspectorTaskSelectionState: Equatable {
@@ -423,6 +411,87 @@ extension HarnessMonitorStore {
 
   @MainActor
   @Observable
+  public final class SessionCatalogSlice {
+    public internal(set) var projects: [ProjectSummary] = []
+    public internal(set) var sessions: [SessionSummary] = []
+    public internal(set) var sessionSummariesByID: [String: SessionSummary] = [:]
+    public internal(set) var totalSessionCount = 0
+    public internal(set) var totalOpenWorkCount = 0
+    public internal(set) var totalBlockedCount = 0
+    public internal(set) var recentSessions: [SessionSummary] = []
+
+    public init() {}
+
+    public func sessionSummary(for sessionID: String) -> SessionSummary? {
+      sessionSummariesByID[sessionID]
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class SessionControlsSlice {
+    public var searchText = ""
+    public var sessionFilter: SessionFilter = .active
+    public var sessionFocusFilter: SessionFocusFilter = .all
+    public var sessionSortOrder: SessionSortOrder = .recentActivity
+
+    public init() {}
+  }
+
+  public struct SessionProjectionState: Equatable {
+    public var searchText = ""
+    public var sessionFilter: SessionFilter = .active
+    public var sessionFocusFilter: SessionFocusFilter = .all
+    public var sessionSortOrder: SessionSortOrder = .recentActivity
+    public var groupedSessions: [SessionGroup] = []
+    public var filteredSessionCount = 0
+    public var totalSessionCount = 0
+    public var visibleSessionIDs: [String] = []
+    public var emptyState: SidebarEmptyState = .noSessions
+
+    public init(
+      searchText: String = "",
+      sessionFilter: SessionFilter = .active,
+      sessionFocusFilter: SessionFocusFilter = .all,
+      sessionSortOrder: SessionSortOrder = .recentActivity,
+      groupedSessions: [SessionGroup] = [],
+      filteredSessionCount: Int = 0,
+      totalSessionCount: Int = 0,
+      visibleSessionIDs: [String] = [],
+      emptyState: SidebarEmptyState = .noSessions
+    ) {
+      self.searchText = searchText
+      self.sessionFilter = sessionFilter
+      self.sessionFocusFilter = sessionFocusFilter
+      self.sessionSortOrder = sessionSortOrder
+      self.groupedSessions = groupedSessions
+      self.filteredSessionCount = filteredSessionCount
+      self.totalSessionCount = totalSessionCount
+      self.visibleSessionIDs = visibleSessionIDs
+      self.emptyState = emptyState
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class SessionProjectionSlice {
+    public internal(set) var state = SessionProjectionState()
+
+    public var searchText: String { state.searchText }
+    public var sessionFilter: SessionFilter { state.sessionFilter }
+    public var sessionFocusFilter: SessionFocusFilter { state.sessionFocusFilter }
+    public var sessionSortOrder: SessionSortOrder { state.sessionSortOrder }
+    public var groupedSessions: [SessionGroup] { state.groupedSessions }
+    public var filteredSessionCount: Int { state.filteredSessionCount }
+    public var totalSessionCount: Int { state.totalSessionCount }
+    public var visibleSessionIDs: [String] { state.visibleSessionIDs }
+    public var emptyState: SidebarEmptyState { state.emptyState }
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
   public final class ContentUISlice {
     public var selectedSessionID: String?
     public var selectedSessionSummary: SessionSummary?
@@ -460,8 +529,6 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
-    public var emptyState: HarnessMonitorStore.SidebarEmptyState = .noSessions
-    public var filterSummary = HarnessMonitorStore.SidebarFilterSummaryState()
   }
 
   @MainActor
@@ -473,5 +540,7 @@ extension HarnessMonitorStore {
     public var isSessionActionInFlight = false
     public var lastAction = ""
     public var lastError: String?
+    public var primaryContent: InspectorPrimaryContentState = .empty
+    public var actionContext: InspectorActionContext?
   }
 }

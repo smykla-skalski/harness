@@ -10,12 +10,6 @@ struct SessionCockpitView: View {
   let isSelectionLoading: Bool
   let isExtensionsLoading: Bool
   let lastAction: String
-  let observeSelectedSession: () -> Void
-  let requestEndSessionConfirmation: () -> Void
-  let inspectTask: (String) -> Void
-  let inspectAgent: (String) -> Void
-  let inspectSignal: (String) -> Void
-  let inspectObserver: () -> Void
 
   var body: some View {
     HarnessMonitorColumnScrollView(verticalPadding: HarnessMonitorTheme.spacingXL) {
@@ -26,31 +20,31 @@ struct SessionCockpitView: View {
           isSessionActionInFlight: isSessionActionInFlight,
           isSelectionLoading: isSelectionLoading,
           isExtensionsLoading: isExtensionsLoading,
-          observeSelectedSession: observeSelectedSession,
-          requestEndSessionConfirmation: requestEndSessionConfirmation,
-          inspectObserver: inspectObserver
+          observeSelectedSession: { Task { await store.observeSelectedSession() } },
+          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+          inspectObserver: store.inspectObserver
         )
         SessionMetricGrid(metrics: detail.session.metrics)
         SessionActionDock(
           detail: detail,
           isSessionActionInFlight: isSessionActionInFlight,
           lastAction: lastAction,
-          inspectTask: inspectTask,
-          inspectAgent: inspectAgent,
-          inspectObserver: inspectObserver
+          inspectTask: store.inspect(taskID:),
+          inspectAgent: store.inspect(agentID:),
+          inspectObserver: store.inspectObserver
         )
         HarnessMonitorAdaptiveGridLayout(minimumColumnWidth: 340, maximumColumns: 2, spacing: 16) {
           SessionTaskListSection(
             tasks: detail.tasks,
             companionAgentCount: detail.agents.count,
-            inspectTask: inspectTask
+            inspectTask: store.inspect(taskID:)
           )
-          SessionAgentListSection(store: store, agents: detail.agents, inspectAgent: inspectAgent)
+          SessionAgentListSection(store: store, agents: detail.agents, inspectAgent: store.inspect(agentID:))
         }
         SessionCockpitSignalsSection(
           signals: detail.signals,
           isExtensionsLoading: isExtensionsLoading,
-          inspectSignal: inspectSignal
+          inspectSignal: store.inspect(signalID:)
         )
         SessionCockpitTimelineSection(timeline: timeline)
       }
@@ -69,12 +63,6 @@ struct SessionCockpitView: View {
     isSessionActionInFlight: false,
     isSelectionLoading: false,
     isExtensionsLoading: false,
-    lastAction: "Observe action queued",
-    observeSelectedSession: {},
-    requestEndSessionConfirmation: {},
-    inspectTask: { _ in },
-    inspectAgent: { _ in },
-    inspectSignal: { _ in },
-    inspectObserver: {}
+    lastAction: "Observe action queued"
   )
 }

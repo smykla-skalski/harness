@@ -131,29 +131,15 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
 }
 
 struct ContentPrimaryToolbarItems: ToolbarContent {
+  let store: HarnessMonitorStore
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Binding var showInspector: Bool
-  let openPreferences: () -> Void
-  let refresh: () -> Void
-
-  init(
-    contentUI: HarnessMonitorStore.ContentUISlice,
-    showInspector: Binding<Bool>,
-    openPreferences: @escaping () -> Void,
-    refresh: @escaping () -> Void
-  ) {
-    self.contentUI = contentUI
-    self._showInspector = showInspector
-    self.openPreferences = openPreferences
-    self.refresh = refresh
-  }
 
   var body: some ToolbarContent {
     InspectorToolbarActions(
+      store: store,
       contentUI: contentUI,
-      showInspector: $showInspector,
-      openPreferences: openPreferences,
-      refresh: refresh
+      showInspector: $showInspector
     )
   }
 }

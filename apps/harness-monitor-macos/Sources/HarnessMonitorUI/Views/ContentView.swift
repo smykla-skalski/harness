@@ -7,8 +7,6 @@ public struct ContentView: View {
   let showsCornerAnimation: Bool
   let cornerAnimationContent: (() -> AnyView)?
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
-  @Environment(\.openWindow)
-  private var openWindow
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage("showInspector")
   private var persistedShowInspector = true
@@ -22,6 +20,7 @@ public struct ContentView: View {
   @State private var showInspector = false
   @State private var showLlama = false
   @State private var detailColumnWidth: CGFloat = 980
+  @State private var isInspectorAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var windowTitle: String {
@@ -40,6 +39,32 @@ public struct ContentView: View {
     [
       "toolbarTitle=native-window",
       "windowTitle=\(windowTitle)",
+    ].joined(separator: ", ")
+  }
+
+  private var auditBuildAccessibilityValue: String? {
+    guard HarnessMonitorUITestEnvironment.isEnabled else {
+      return nil
+    }
+
+    let info = Bundle.main.infoDictionary ?? [:]
+    let environment = ProcessInfo.processInfo.environment
+    let commit =
+      environment["HARNESS_MONITOR_AUDIT_GIT_COMMIT"]
+      ?? stringValue(in: info, key: "HarnessMonitorBuildGitCommit", fallback: "unknown")
+    let dirty =
+      environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"]
+      ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown")
+    let launchMode = environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live"
+    let perfScenario = environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none"
+    let previewScenario = environment["HARNESS_MONITOR_PREVIEW_SCENARIO"] ?? "default"
+
+    return [
+      "buildCommit=\(commit)",
+      "buildDirty=\(dirty)",
+      "launchMode=\(launchMode)",
+      "perfScenario=\(perfScenario)",
+      "previewScenario=\(previewScenario)",
     ].joined(separator: ", ")
   }
 
@@ -99,7 +124,8 @@ public struct ContentView: View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(
         store: store,
-        sessionIndex: store.sessionIndex,
+        catalog: store.sessionIndex.catalog,
+        projection: store.sessionIndex.projection,
         sidebarUI: store.sidebarUI
       )
       .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
@@ -111,10 +137,10 @@ public struct ContentView: View {
         contentUI: contentUI,
         showInspector: $showInspector,
         toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
-        openPreferences: openPreferences,
-        refresh: refresh,
         detailWidthChanged: { width in
-          guard abs(width - detailColumnWidth) >= 1 else {
+          guard !isInspectorAnimating,
+                abs(width - detailColumnWidth) >= 1
+          else {
             return
           }
           detailColumnWidth = width
@@ -123,8 +149,6 @@ public struct ContentView: View {
       .inspector(isPresented: $showInspector) {
         InspectorColumnView(
           store: store,
-          contentUI: store.contentUI,
-          selection: store.selection,
           inspectorUI: store.inspectorUI
         )
           .onGeometryChange(for: CGFloat.self) { proxy in
@@ -134,7 +158,8 @@ public struct ContentView: View {
               hasCapturedInitialInspectorWidth = true
               return
             }
-            guard showInspector,
+            guard !isInspectorAnimating,
+                  showInspector,
                   width >= HarnessMonitorInspectorLayout.minWidth,
                   width <= HarnessMonitorInspectorLayout.maxWidth,
                   abs(width - inspectorColumnWidth) > 1
@@ -207,6 +232,11 @@ public struct ContentView: View {
       if persistedShowInspector != newValue {
         persistedShowInspector = newValue
       }
+      isInspectorAnimating = true
+      Task {
+        try? await Task.sleep(for: .milliseconds(400))
+        isInspectorAnimating = false
+      }
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
@@ -220,6 +250,12 @@ public struct ContentView: View {
           identifier: HarnessMonitorAccessibility.toolbarChromeState,
           text: toolbarChromeAccessibilityValue
         )
+        if let auditBuildAccessibilityValue {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.auditBuildState,
+            text: auditBuildAccessibilityValue
+          )
+        }
         ContentToolbarAccessibilityMarker(contentUI: contentUI)
         AccessibilityTextMarker(
           identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
@@ -253,10 +289,6 @@ public struct ContentView: View {
     )
   }
 
-  private func openPreferences() {
-    openWindow(id: HarnessMonitorWindowID.preferences)
-  }
-
   func navigateBack() {
     Task { await store.navigateBack() }
   }
@@ -265,8 +297,17 @@ public struct ContentView: View {
     Task { await store.navigateForward() }
   }
 
-  func refresh() {
-    Task { await store.refresh() }
+  private func stringValue(
+    in infoDictionary: [String: Any],
+    key: String,
+    fallback: String
+  ) -> String {
+    guard let value = infoDictionary[key] as? String else {
+      return fallback
+    }
+
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? fallback : trimmed
   }
 
   func toggleSleepPrevention() {
@@ -280,29 +321,7 @@ private struct ContentDetailColumn: View {
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Binding var showInspector: Bool
   let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  let openPreferences: () -> Void
-  let refresh: () -> Void
   let detailWidthChanged: (CGFloat) -> Void
-
-  init(
-    store: HarnessMonitorStore,
-    selection: HarnessMonitorStore.SelectionSlice,
-    contentUI: HarnessMonitorStore.ContentUISlice,
-    showInspector: Binding<Bool>,
-    toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration,
-    openPreferences: @escaping () -> Void,
-    refresh: @escaping () -> Void,
-    detailWidthChanged: @escaping (CGFloat) -> Void
-  ) {
-    self.store = store
-    self.selection = selection
-    self.contentUI = contentUI
-    self._showInspector = showInspector
-    self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
-    self.openPreferences = openPreferences
-    self.refresh = refresh
-    self.detailWidthChanged = detailWidthChanged
-  }
 
   var body: some View {
     ZStack {
@@ -325,10 +344,9 @@ private struct ContentDetailColumn: View {
     }
     .toolbar {
       ContentPrimaryToolbarItems(
+        store: store,
         contentUI: contentUI,
-        showInspector: $showInspector,
-        openPreferences: openPreferences,
-        refresh: refresh
+        showInspector: $showInspector
       )
     }
   }
@@ -360,29 +378,20 @@ private struct ContentDetailColumn: View {
 }
 
 struct InspectorToolbarActions: ToolbarContent {
+  let store: HarnessMonitorStore
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Binding var showInspector: Bool
-  let openPreferences: () -> Void
-  let refresh: () -> Void
-
-  init(
-    contentUI: HarnessMonitorStore.ContentUISlice,
-    showInspector: Binding<Bool>,
-    openPreferences: @escaping () -> Void,
-    refresh: @escaping () -> Void
-  ) {
-    self.contentUI = contentUI
-    self._showInspector = showInspector
-    self.openPreferences = openPreferences
-    self.refresh = refresh
-  }
+  @Environment(\.openWindow)
+  private var openWindow
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
-      RefreshToolbarButton(isRefreshing: contentUI.isRefreshing, refresh: refresh)
+      RefreshToolbarButton(isRefreshing: contentUI.isRefreshing) {
+        Task { await store.refresh() }
+      }
         .help("Refresh sessions")
 
-      Button(action: openPreferences) {
+      Button { openWindow(id: HarnessMonitorWindowID.preferences) } label: {
         Label("Settings", systemImage: "gearshape")
       }
       .help("Open settings")

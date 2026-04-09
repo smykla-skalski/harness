@@ -45,7 +45,7 @@ struct SessionContentContainer: View {
       case .dashboard:
         SessionsBoardView(
           store: store,
-          sessionIndex: store.sessionIndex,
+          sessionCatalog: store.sessionIndex.catalog,
           contentUI: store.contentUI
         )
           .transition(.opacity)
@@ -58,13 +58,7 @@ struct SessionContentContainer: View {
           isSessionActionInFlight: state.isSessionActionInFlight,
           isSelectionLoading: state.isSelectionLoading,
           isExtensionsLoading: state.isExtensionsLoading,
-          lastAction: state.lastAction,
-          observeSelectedSession: observeSelectedSession,
-          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-          inspectTask: store.inspect(taskID:),
-          inspectAgent: store.inspect(agentID:),
-          inspectSignal: store.inspect(signalID:),
-          inspectObserver: store.inspectObserver
+          lastAction: state.lastAction
         )
         .id(cockpitDetail.session.sessionId)
         .transition(.opacity)
@@ -85,11 +79,6 @@ struct SessionContentContainer: View {
     }
   }
 
-  private func observeSelectedSession() {
-    Task {
-      await store.observeSelectedSession()
-    }
-  }
 }
 
 private enum SessionContentMode {

@@ -52,7 +52,7 @@ extension HarnessMonitorStore {
       case .data:
         self?.scheduleUISync([.content])
       case .projection:
-        self?.scheduleUISync([.sidebar])
+        break
       }
     }
   }
@@ -162,8 +162,6 @@ extension HarnessMonitorStore {
     assign(selection.selectedSessionID, to: \.selectedSessionID, on: sidebarUI)
     assign(isPersistenceAvailable, to: \.isPersistenceAvailable, on: sidebarUI)
     assign(userData.bookmarkedSessionIds, to: \.bookmarkedSessionIds, on: sidebarUI)
-    assign(resolveSidebarEmptyState(), to: \.emptyState, on: sidebarUI)
-    assign(resolveSidebarFilterSummary(), to: \.filterSummary, on: sidebarUI)
   }
 
   private func syncInspectorUI() {
@@ -173,6 +171,26 @@ extension HarnessMonitorStore {
     assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: inspectorUI)
     assign(lastAction, to: \.lastAction, on: inspectorUI)
     assign(lastError, to: \.lastError, on: inspectorUI)
+
+    let resolvedPrimaryContent = InspectorPrimaryContentState(
+      selectedSession: selection.matchedSelectedSession,
+      selectedSessionSummary: contentUI.selectedSessionSummary,
+      inspectorSelection: selection.inspectorSelection,
+      isPersistenceAvailable: isPersistenceAvailable
+    )
+    assign(resolvedPrimaryContent, to: \.primaryContent, on: inspectorUI)
+
+    let resolvedActionContext = InspectorActionContext(
+      detail: selection.matchedSelectedSession,
+      inspectorSelection: selection.inspectorSelection,
+      isPersistenceAvailable: isPersistenceAvailable,
+      selectedActionActorID: resolvedActionActor() ?? "",
+      isSessionReadOnly: isSessionReadOnly,
+      isSessionActionInFlight: isSessionActionInFlight,
+      lastAction: lastAction,
+      lastError: lastError
+    )
+    assign(resolvedActionContext, to: \.actionContext, on: inspectorUI)
   }
 
   private func resolveStatusMessages(
@@ -242,79 +260,6 @@ extension HarnessMonitorStore {
     return .manualConnected
   }
 
-  private func resolveSidebarEmptyState() -> SidebarEmptyState {
-    if sessionIndex.sessions.isEmpty {
-      return .noSessions
-    }
-    if sessionIndex.groupedSessions.isEmpty {
-      return .noMatches
-    }
-    return .sessionsAvailable
-  }
-
-  private func resolveSidebarFilterSummary() -> SidebarFilterSummaryState {
-    let isFiltered =
-      !sessionIndex.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || sessionIndex.sessionFilter != .active
-      || sessionIndex.sessionFocusFilter != .all
-
-    if isFiltered {
-      return SidebarFilterSummaryState(
-        activeFilterSummary:
-          "\(sessionIndex.filteredSessionCount) visible of \(sessionIndex.sessions.count)",
-        isFiltered: true
-      )
-    }
-
-    return SidebarFilterSummaryState(
-      activeFilterSummary: "\(sessionIndex.sessions.count) indexed",
-      isFiltered: false
-    )
-  }
-
-  private func resolveInspectorActionContext(
-    detail: SessionDetail?
-  ) -> HarnessMonitorStore.InspectorActionContext? {
-    guard let detail else {
-      return nil
-    }
-
-    let selectedTask: WorkItem?
-    if case .task(let taskID) = selection.inspectorSelection {
-      selectedTask = detail.tasks.first(where: { $0.taskId == taskID })
-    } else {
-      selectedTask = nil
-    }
-
-    let selectedAgent: AgentRegistration?
-    if case .agent(let agentID) = selection.inspectorSelection {
-      selectedAgent = detail.agents.first(where: { $0.agentId == agentID })
-    } else {
-      selectedAgent = nil
-    }
-
-    let selectedObserver: ObserverSummary?
-    if case .observer = selection.inspectorSelection {
-      selectedObserver = detail.observer
-    } else {
-      selectedObserver = nil
-    }
-
-    return HarnessMonitorStore.InspectorActionContext(
-      detail: detail,
-      selectedTask: selectedTask,
-      selectedAgent: selectedAgent,
-      selectedObserver: selectedObserver,
-      isPersistenceAvailable: isPersistenceAvailable,
-      availableActionActors: detail.agents.filter { $0.status == .active },
-      selectedActionActorID: resolvedActionActor() ?? "",
-      isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
-      lastAction: lastAction,
-      lastError: lastError
-    )
-  }
-
   func assign<Root: AnyObject, Value: Equatable>(
     _ value: Value,
     to keyPath: ReferenceWritableKeyPath<Root, Value>,
@@ -327,26 +272,3 @@ extension HarnessMonitorStore {
   }
 }
 
-extension HarnessMonitorStore {
-  public var inspectorPrimaryContent: HarnessMonitorStore.InspectorPrimaryContentState {
-    HarnessMonitorStore.InspectorPrimaryContentState(
-      selectedSession: selection.matchedSelectedSession,
-      selectedSessionSummary: contentUI.selectedSessionSummary,
-      inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: inspectorUI.isPersistenceAvailable
-    )
-  }
-
-  public var inspectorActionContext: HarnessMonitorStore.InspectorActionContext? {
-    HarnessMonitorStore.InspectorActionContext(
-      detail: selection.matchedSelectedSession,
-      inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: inspectorUI.isPersistenceAvailable,
-      selectedActionActorID: inspectorUI.selectedActionActorID,
-      isSessionReadOnly: inspectorUI.isSessionReadOnly,
-      isSessionActionInFlight: inspectorUI.isSessionActionInFlight,
-      lastAction: inspectorUI.lastAction,
-      lastError: inspectorUI.lastError
-    )
-  }
-}
