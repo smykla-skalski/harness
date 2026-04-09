@@ -148,7 +148,6 @@ extension HarnessMonitorStore {
     public let projection: SessionProjectionSlice
 
     @ObservationIgnored private var suppressRefresh = false
-    @ObservationIgnored private var sessionSummariesByID: [String: SessionSummary] = [:]
     @ObservationIgnored private var sessionRecordsByID: [String: SessionRecord] = [:]
     @ObservationIgnored private var sessionIndicesByID: [String: Int] = [:]
     @ObservationIgnored private var projectCatalogs: [ProjectCatalog] = []
@@ -260,7 +259,6 @@ extension HarnessMonitorStore {
           rebuildProjection(change: .data)
         case .summaryOnly:
           patchCatalog(existingSummary: existing, updatedSummary: summary)
-          patchVisibleProjection(summary)
           onChanged?(.data)
         }
         return true
@@ -279,7 +277,7 @@ extension HarnessMonitorStore {
       guard let sessionID else {
         return nil
       }
-      return sessionSummariesByID[sessionID]
+      return catalog.sessionSummary(for: sessionID)
     }
 
     private func refreshCatalogIfNeeded(
@@ -350,7 +348,7 @@ extension HarnessMonitorStore {
       catalog.totalSessionCount = catalog.sessions.count
       catalog.totalOpenWorkCount = catalog.sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
       catalog.totalBlockedCount = catalog.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
-      sessionSummariesByID = Dictionary(
+      catalog.sessionSummariesByID = Dictionary(
         uniqueKeysWithValues: catalog.sessions.map { ($0.sessionId, $0) }
       )
 
@@ -370,7 +368,7 @@ extension HarnessMonitorStore {
       existingSummary: SessionSummary,
       updatedSummary: SessionSummary
     ) {
-      sessionSummariesByID[updatedSummary.sessionId] = updatedSummary
+      catalog.sessionSummariesByID[updatedSummary.sessionId] = updatedSummary
       sessionRecordsByID[updatedSummary.sessionId] = SessionRecord(summary: updatedSummary)
       catalog.totalOpenWorkCount += updatedSummary.metrics.openTaskCount
         - existingSummary.metrics.openTaskCount
@@ -381,54 +379,6 @@ extension HarnessMonitorStore {
       } else {
         catalog.recentSessions = replacingSession(updatedSummary, in: catalog.recentSessions)
       }
-    }
-
-    private func patchVisibleProjection(_ updatedSummary: SessionSummary) {
-      let currentState = projection.state
-      guard currentState.visibleSessionIDs.contains(updatedSummary.sessionId) else {
-        return
-      }
-
-      let updatedGroups = currentState.groupedSessions.map { group in
-        guard group.project.projectId == updatedSummary.projectId else {
-          return group
-        }
-
-        let updatedCheckoutGroups = group.checkoutGroups.map { checkout in
-          guard checkout.checkoutId == updatedSummary.checkoutId else {
-            return checkout
-          }
-
-          let updatedSessions = replacingSession(updatedSummary, in: checkout.sessions)
-          guard updatedSessions != checkout.sessions else {
-            return checkout
-          }
-
-          return HarnessMonitorStore.CheckoutGroup(
-            checkoutId: checkout.checkoutId,
-            title: checkout.title,
-            isWorktree: checkout.isWorktree,
-            sessions: updatedSessions
-          )
-        }
-
-        guard updatedCheckoutGroups != group.checkoutGroups else {
-          return group
-        }
-
-        return SessionGroup(
-          project: group.project,
-          checkoutGroups: updatedCheckoutGroups
-        )
-      }
-
-      guard updatedGroups != currentState.groupedSessions else {
-        return
-      }
-
-      var nextState = currentState
-      nextState.groupedSessions = updatedGroups
-      projection.state = nextState
     }
 
     private func buildProjectCatalogs() -> [ProjectCatalog] {
@@ -485,32 +435,28 @@ extension HarnessMonitorStore {
       debugProjectionRebuildCount += 1
       queryTokens = Self.normalizedQueryTokens(for: controls.searchText)
 
-      let visibleRecords = catalog.sessions.compactMap { summary -> SessionRecord? in
+      let visibleSessionIDs = catalog.sessions.compactMap { summary -> String? in
         guard let record = sessionRecordsByID[summary.sessionId], matchesCurrentFilters(record) else {
           return nil
         }
-        return record
+        return summary.sessionId
       }
-
-      let visibleSessionIDs = visibleRecords.map(\.summary.sessionId)
-      let visibleRecordsByID = Dictionary(uniqueKeysWithValues: visibleRecords.map {
-        ($0.summary.sessionId, $0)
-      })
+      let visibleSessionIDSet = Set(visibleSessionIDs)
 
       let groupedSessions = projectCatalogs.compactMap { projectCatalog -> SessionGroup? in
         let checkoutGroups = projectCatalog.checkouts.compactMap { checkout -> HarnessMonitorStore
           .CheckoutGroup? in
-          let checkoutSessions = checkout
+          let checkoutSessionIDs = checkout
             .orderedSessionIDs(for: controls.sessionSortOrder)
-            .compactMap { visibleRecordsByID[$0]?.summary }
-          guard !checkoutSessions.isEmpty else {
+            .filter { visibleSessionIDSet.contains($0) }
+          guard !checkoutSessionIDs.isEmpty else {
             return nil
           }
           return HarnessMonitorStore.CheckoutGroup(
             checkoutId: checkout.checkoutId,
             title: checkout.title,
             isWorktree: checkout.isWorktree,
-            sessions: checkoutSessions
+            sessionIDs: checkoutSessionIDs
           )
         }
         guard !checkoutGroups.isEmpty else {
@@ -518,6 +464,7 @@ extension HarnessMonitorStore {
         }
         return SessionGroup(project: projectCatalog.project, checkoutGroups: checkoutGroups)
       }
+      let orderedVisibleSessionIDs = groupedSessions.flatMap(\.sessionIDs)
       let emptyState: SidebarEmptyState
       if catalog.totalSessionCount == 0 {
         emptyState = .noSessions
@@ -533,9 +480,9 @@ extension HarnessMonitorStore {
         sessionFocusFilter: controls.sessionFocusFilter,
         sessionSortOrder: controls.sessionSortOrder,
         groupedSessions: groupedSessions,
-        filteredSessionCount: visibleSessionIDs.count,
+        filteredSessionCount: orderedVisibleSessionIDs.count,
         totalSessionCount: catalog.totalSessionCount,
-        visibleSessionIDs: visibleSessionIDs,
+        visibleSessionIDs: orderedVisibleSessionIDs,
         emptyState: emptyState
       )
 
@@ -762,7 +709,7 @@ extension HarnessMonitorStore {
 
   public func resetFilters() {
     searchText = ""
-    sessionFilter = .active
+    sessionFilter = .all
     sessionFocusFilter = .all
   }
 }

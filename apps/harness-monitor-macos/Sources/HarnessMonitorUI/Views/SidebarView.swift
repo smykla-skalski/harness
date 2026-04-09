@@ -5,6 +5,7 @@ import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessMonitorStore
+  @Bindable var catalog: HarnessMonitorStore.SessionCatalogSlice
   @Bindable var projection: HarnessMonitorStore.SessionProjectionSlice
   @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
@@ -20,10 +21,12 @@ struct SidebarView: View {
 
   init(
     store: HarnessMonitorStore,
+    catalog: HarnessMonitorStore.SessionCatalogSlice,
     projection: HarnessMonitorStore.SessionProjectionSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice
   ) {
     self.store = store
+    self.catalog = catalog
     self.projection = projection
     self.sidebarUI = sidebarUI
   }
@@ -86,7 +89,7 @@ struct SidebarView: View {
 
   private var hasActiveSidebarFilters: Bool {
     !projection.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || projection.sessionFilter != .active
+      || projection.sessionFilter != .all
       || projection.sessionFocusFilter != .all
       || projection.sessionSortOrder != .recentActivity
   }
