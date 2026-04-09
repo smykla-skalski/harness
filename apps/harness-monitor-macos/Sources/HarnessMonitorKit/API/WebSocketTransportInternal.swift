@@ -2,14 +2,16 @@ import Foundation
 
 // MARK: - Internal transport mechanics
 
+private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
+private typealias IntPingContinuation = CheckedContinuation<Int, Error>
+
 extension WebSocketTransport {
   func sendPing() async throws {
     guard let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
     let task = webSocketTask
-    try await withCheckedThrowingContinuation {
-      (continuation: CheckedContinuation<Void, any Error>) in
+    try await withCheckedThrowingContinuation { (continuation: VoidPingContinuation) in
       task.sendPing { error in
         if let error {
           continuation.resume(throwing: error)
@@ -26,8 +28,7 @@ extension WebSocketTransport {
     }
     let task = webSocketTask
     let startedAt = ContinuousClock.now
-    return try await withCheckedThrowingContinuation {
-      (continuation: CheckedContinuation<Int, any Error>) in
+    return try await withCheckedThrowingContinuation { (continuation: IntPingContinuation) in
       task.sendPing { error in
         let duration = startedAt.duration(to: ContinuousClock.now)
         let ms =
