@@ -99,6 +99,7 @@ struct SessionCockpitTimelineSection: View {
   private var reduceMotion
   @State private var currentPage = 0
   @State private var pageSize = SessionTimelinePageSize.defaultSize
+  @State private var separatorMidY: CGFloat?
 
   private var currentEntries: [TimelineEntry] {
     SessionTimelinePagination.currentEntries(
@@ -151,50 +152,56 @@ struct SessionCockpitTimelineSection: View {
         }
         .frame(maxWidth: .infinity)
       } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-          SessionTimelinePageSummary(
-            rangeText: pageRangeText,
-            pageSize: $pageSize
-          )
+        ZStack {
+          SessionTimelineCardBackground(separatorMidY: showsPagination ? separatorMidY : nil)
 
-          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-            ForEach(currentEntries) { entry in
-              SessionCockpitTimelineEntryRow(
-                entry: entry,
-                dateTimeConfiguration: dateTimeConfiguration
-              )
-            }
-          }
-          .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
-          .frame(maxWidth: .infinity, alignment: .leading)
-
-          if showsPagination {
-            Divider()
-              .overlay(HarnessMonitorTheme.controlBorder.opacity(0.55))
-
-            SessionTimelinePaginationFooter(
-              currentPage: resolvedCurrentPage,
-              pageCount: pageCount,
-              pageStatusText: pageStatusText,
-              visiblePages: SessionTimelinePagination.visiblePages(
-                currentPage: resolvedCurrentPage,
-                pageCount: pageCount
-              ),
-              goToPreviousPage: { changePage(to: currentPage - 1) },
-              goToNextPage: { changePage(to: currentPage + 1) },
-              goToPage: changePage(to:)
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+            SessionTimelinePageSummary(
+              rangeText: pageRangeText,
+              pageSize: $pageSize
             )
-            .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
-          }
-        }
-        .padding(HarnessMonitorTheme.spacingLG)
-        .background {
-          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-            .fill(.primary.opacity(0.035))
-            .overlay {
-              RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-                .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+
+            LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+              ForEach(currentEntries) { entry in
+                SessionCockpitTimelineEntryRow(
+                  entry: entry,
+                  dateTimeConfiguration: dateTimeConfiguration
+                )
+              }
             }
+            .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if showsPagination {
+              SessionTimelineCutoutSpacer()
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                  proxy.frame(in: .named(SessionTimelineCardCoordinateSpace.name)).midY
+                } action: { newMidY in
+                  separatorMidY = newMidY
+                }
+
+              SessionTimelinePaginationFooter(
+                currentPage: resolvedCurrentPage,
+                pageCount: pageCount,
+                pageStatusText: pageStatusText,
+                visiblePages: SessionTimelinePagination.visiblePages(
+                  currentPage: resolvedCurrentPage,
+                  pageCount: pageCount
+                ),
+                goToPreviousPage: { changePage(to: currentPage - 1) },
+                goToNextPage: { changePage(to: currentPage + 1) },
+                goToPage: changePage(to:)
+              )
+              .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
+            }
+          }
+          .padding(HarnessMonitorTheme.spacingLG)
+        }
+        .coordinateSpace(name: SessionTimelineCardCoordinateSpace.name)
+        .clipShape(.rect(cornerRadius: HarnessMonitorTheme.cornerRadiusLG))
+        .overlay {
+          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+            .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: sessionID) { _, _ in
@@ -246,29 +253,96 @@ struct SessionCockpitTimelineSection: View {
   }
 }
 
+private enum SessionTimelineCardCoordinateSpace {
+  static let name = "session-timeline-card"
+}
+
+private struct SessionTimelineCardBackground: View {
+  let separatorMidY: CGFloat?
+
+  private var cutoutHeight: CGFloat {
+    HarnessMonitorTheme.itemSpacing / 2
+  }
+
+  private var cutoutCornerRadius: CGFloat {
+    min(cutoutHeight / 2, HarnessMonitorTheme.cornerRadiusSM)
+  }
+
+  private var cutoutHorizontalInset: CGFloat {
+    HarnessMonitorTheme.spacingLG
+  }
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+      .fill(.primary.opacity(0.035))
+      .overlay(alignment: .topLeading) {
+        if let separatorMidY {
+          RoundedRectangle(cornerRadius: cutoutCornerRadius, style: .continuous)
+            .fill(.black)
+            .frame(maxWidth: .infinity)
+            .frame(height: cutoutHeight)
+            .padding(.horizontal, cutoutHorizontalInset)
+            .offset(y: separatorMidY - (cutoutHeight / 2))
+            .blendMode(.destinationOut)
+        }
+      }
+      .compositingGroup()
+      .accessibilityHidden(true)
+  }
+}
+
+private struct SessionTimelineCutoutSpacer: View {
+  private var cutoutHeight: CGFloat {
+    HarnessMonitorTheme.itemSpacing / 2
+  }
+
+  var body: some View {
+    Color.clear
+      .frame(maxWidth: .infinity)
+      .frame(height: cutoutHeight)
+      .accessibilityHidden(true)
+  }
+}
+
+private struct SessionTimelineEntryMarker: View {
+  @ScaledMetric(relativeTo: .body)
+  private var markerHeight = 18.0
+  @ScaledMetric(relativeTo: .body)
+  private var markerWidth = 6.0
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: markerWidth / 2, style: .continuous)
+      .fill(HarnessMonitorTheme.accent.opacity(0.45))
+      .frame(width: markerWidth, height: markerHeight)
+      .accessibilityHidden(true)
+  }
+}
+
 private struct SessionCockpitTimelineEntryRow: View {
   let entry: TimelineEntry
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-      RoundedRectangle(cornerRadius: 999)
-        .fill(HarnessMonitorTheme.accent.opacity(0.35))
-        .frame(width: 8, height: 8)
-        .accessibilityHidden(true)
+      SessionTimelineEntryMarker()
+      Text(formatTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
       Text(entry.summary)
         .scaledFont(.system(.body, design: .rounded, weight: .semibold))
         .lineLimit(1)
-      Spacer()
-      Text(
-        "\(entry.kind) • "
-          + "\(formatTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))"
-      )
-      .scaledFont(.caption.monospaced())
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .lineLimit(1)
+        .truncationMode(.tail)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(1)
+      Text(entry.kind)
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
     }
-    .frame(maxWidth: .infinity, alignment: .center)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .padding(HarnessMonitorTheme.cardPadding)
     .background {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)

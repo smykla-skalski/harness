@@ -33,14 +33,14 @@ struct SessionTimelinePageSummary: View {
   var body: some View {
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
-        SessionTimelinePageSizePicker(pageSize: $pageSize)
-        Spacer(minLength: 0)
         rangeTextLabel
+        Spacer(minLength: 0)
+        SessionTimelinePageSizePicker(pageSize: $pageSize)
       }
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        SessionTimelinePageSizePicker(pageSize: $pageSize)
         rangeTextLabel
+        SessionTimelinePageSizePicker(pageSize: $pageSize)
       }
     }
   }
@@ -65,6 +65,13 @@ struct SessionTimelinePaginationFooter: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+      Text(pageStatusText)
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(controlTint)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePaginationStatus)
+
+      Spacer(minLength: 0)
+
       Button(action: goToPreviousPage) {
         Label("Previous", systemImage: "chevron.left")
       }
@@ -123,26 +130,19 @@ struct SessionTimelinePaginationFooter: View {
       )
       .disabled(currentPage >= pageCount - 1)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePaginationNext)
-
-      Spacer(minLength: 0)
-
-      Text(pageStatusText)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(controlTint)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePaginationStatus)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
-private enum SessionTimelinePaginationButtonProminence {
+private enum TimelinePageProminence {
   case regular
   case selected
 }
 
 private struct SessionTimelinePaginationButtonStyle: ButtonStyle {
   let tint: Color
-  let prominence: SessionTimelinePaginationButtonProminence
+  let prominence: TimelinePageProminence
 
   @ScaledMetric(relativeTo: .caption)
   private var cornerRadius = 10.0
@@ -152,12 +152,6 @@ private struct SessionTimelinePaginationButtonStyle: ButtonStyle {
   private var verticalPadding = 5.0
   @Environment(\.isEnabled)
   private var isEnabled
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-
-  private var lineWidth: CGFloat {
-    colorSchemeContrast == .increased ? 1.5 : 1
-  }
 
   func makeBody(configuration: Configuration) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -169,14 +163,9 @@ private struct SessionTimelinePaginationButtonStyle: ButtonStyle {
       .background {
         shape.fill(tint.opacity(fillOpacity(isPressed: configuration.isPressed)))
       }
-      .overlay {
-        shape.strokeBorder(
-          tint.opacity(strokeOpacity(isPressed: configuration.isPressed)),
-          lineWidth: lineWidth
-        )
-      }
       .contentShape(shape)
       .scaleEffect(configuration.isPressed && isEnabled ? 0.98 : 1)
+      .shadow(color: shadowColor(isPressed: configuration.isPressed), radius: 10, y: 1)
       .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
   }
 
@@ -193,29 +182,23 @@ private struct SessionTimelinePaginationButtonStyle: ButtonStyle {
     switch prominence {
     case .regular:
       if isEnabled {
-        return isPressed ? 0.44 : 0.32
+        return isPressed ? 0.52 : 0.4
       }
-      return 0.22
+      return 0.26
     case .selected:
       if isEnabled {
-        return isPressed ? 0.96 : 0.88
+        return isPressed ? 0.98 : 0.9
       }
-      return 0.68
+      return 0.7
     }
   }
 
-  private func strokeOpacity(isPressed: Bool) -> Double {
+  private func shadowColor(isPressed: Bool) -> Color {
     switch prominence {
     case .regular:
-      if isEnabled {
-        return isPressed ? 0.82 : 0.68
-      }
-      return 0.46
+      return .black.opacity(isEnabled ? (isPressed ? 0.08 : 0.05) : 0.02)
     case .selected:
-      if isEnabled {
-        return isPressed ? 1 : 0.84
-      }
-      return 0.56
+      return .black.opacity(isEnabled ? (isPressed ? 0.12 : 0.08) : 0.03)
     }
   }
 }
@@ -302,5 +285,63 @@ enum SessionTimelinePagination {
     }
 
     return Array(startPage...endPage)
+  }
+}
+
+#Preview("Timeline Summary - Wide") {
+  @Previewable @State var pageSize = SessionTimelinePageSize.ten
+
+  SessionTimelinePreviewSurface {
+    SessionTimelinePageSummary(
+      rangeText: "Showing 21-30 of 87",
+      pageSize: $pageSize
+    )
+  }
+  .frame(width: 620)
+}
+
+#Preview("Timeline Summary - Compact") {
+  @Previewable @State var pageSize = SessionTimelinePageSize.fifteen
+
+  SessionTimelinePreviewSurface {
+    SessionTimelinePageSummary(
+      rangeText: "Showing 31-45 of 87",
+      pageSize: $pageSize
+    )
+  }
+  .frame(width: 240)
+}
+
+#Preview("Timeline Pagination Footer") {
+  SessionTimelinePreviewSurface {
+    SessionTimelinePaginationFooter(
+      currentPage: 5,
+      pageCount: 12,
+      pageStatusText: "Page 6 of 12",
+      visiblePages: SessionTimelinePagination.visiblePages(
+        currentPage: 5,
+        pageCount: 12
+      ),
+      goToPreviousPage: {},
+      goToNextPage: {},
+      goToPage: { _ in }
+    )
+  }
+  .frame(width: 820)
+}
+
+private struct SessionTimelinePreviewSurface<Content: View>: View {
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    content
+      .padding(HarnessMonitorTheme.spacingLG)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+          .fill(.primary.opacity(0.035))
+      }
+      .padding()
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
