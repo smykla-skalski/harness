@@ -7,6 +7,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let handledSignals = [SIGTERM, SIGINT, SIGHUP]
   private let hidesDockIconForPerfRuns =
     ProcessInfo.processInfo.environment["HARNESS_MONITOR_PERF_HIDE_DOCK_ICON"] == "1"
+  private let launchMode = HarnessMonitorLaunchMode(
+    environment: ProcessInfo.processInfo.environment
+  )
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
   private var store: HarnessMonitorStore?
@@ -51,7 +54,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminateAfterLastWindowClosed(
     _ sender: NSApplication
   ) -> Bool {
-    true
+    launchMode == .live
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

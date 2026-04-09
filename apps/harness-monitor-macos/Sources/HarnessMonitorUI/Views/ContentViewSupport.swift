@@ -139,6 +139,7 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
   let displayMode: ToolbarCenterpieceDisplayMode
   let availableDetailWidth: CGFloat
+  let showsLlamaToggle: Bool
   @Binding var showLlama: Bool
   let toggleSleepPrevention: () -> Void
 
@@ -166,14 +167,16 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
 
-      Button { showLlama.toggle() } label: {
-        Label(
-          showLlama ? "Hide Llama" : "Show Llama",
-          systemImage: showLlama ? "hare.fill" : "hare"
-        )
+      if showsLlamaToggle {
+        Button { showLlama.toggle() } label: {
+          Label(
+            showLlama ? "Hide Llama" : "Show Llama",
+            systemImage: showLlama ? "hare.fill" : "hare"
+          )
+        }
+        .tint(showLlama ? .purple : nil)
+        .help(showLlama ? "Hide dancing llama" : "Show dancing llama")
       }
-      .tint(showLlama ? .purple : nil)
-      .help(showLlama ? "Hide dancing llama" : "Show dancing llama")
     }
     .sharedBackgroundVisibility(.hidden)
   }

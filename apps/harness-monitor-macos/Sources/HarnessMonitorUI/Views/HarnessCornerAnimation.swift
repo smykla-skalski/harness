@@ -1,4 +1,3 @@
-import Lottie
 import SwiftUI
 
 struct HarnessCornerAnimationDescriptor: Equatable {
@@ -19,19 +18,4 @@ struct HarnessCornerAnimationDescriptor: Equatable {
     speed: 1,
     accessibilityLabel: "Dancing llama"
   )
-}
-
-struct HarnessCornerAnimation: View {
-  let descriptor: HarnessCornerAnimationDescriptor
-
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
-
-  var body: some View {
-    LottieView(animation: .named(descriptor.assetName, bundle: HarnessMonitorUIAssets.bundle))
-      .playing(loopMode: reduceMotion ? .playOnce : .loop)
-      .animationSpeed(reduceMotion ? 0 : descriptor.speed)
-      .frame(width: descriptor.width, height: descriptor.height)
-      .accessibilityHidden(true)
-  }
 }

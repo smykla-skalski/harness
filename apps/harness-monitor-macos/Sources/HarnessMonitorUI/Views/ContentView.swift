@@ -4,6 +4,8 @@ import SwiftUI
 
 public struct ContentView: View {
   let store: HarnessMonitorStore
+  let showsCornerAnimation: Bool
+  let cornerAnimationContent: (() -> AnyView)?
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Environment(\.openWindow)
   private var openWindow
@@ -53,12 +55,47 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(detailAvailableWidth)
   }
 
-  public init(store: HarnessMonitorStore) {
+  public init(
+    store: HarnessMonitorStore,
+    showsCornerAnimation: Bool = false,
+    cornerAnimationContent: (() -> AnyView)? = nil
+  ) {
     self.store = store
+    self.showsCornerAnimation = showsCornerAnimation
+    self.cornerAnimationContent = cornerAnimationContent
     self.contentUI = store.contentUI
   }
 
   public var body: some View {
+    if let cornerAnimationContent {
+      baseContent
+        .modifier(
+          HarnessCornerOverlayModifier(
+            isPresented: showLlama
+              || contentUI.isSelectionLoading
+              || contentUI.isExtensionsLoading
+              || contentUI.isRefreshing
+              || contentUI.connectionState == .connecting,
+            configuration: .init(
+              width: HarnessCornerAnimationDescriptor.dancingLlama.width,
+              height: HarnessCornerAnimationDescriptor.dancingLlama.height,
+              trailingPadding: HarnessCornerAnimationDescriptor.dancingLlama.trailingPadding,
+              bottomPadding: HarnessCornerAnimationDescriptor.dancingLlama.bottomPadding,
+              contentPadding: 0,
+              appliesGlass: false,
+              accessibilityLabel: HarnessCornerAnimationDescriptor.dancingLlama.accessibilityLabel,
+              presentationDelay: showLlama ? nil : .milliseconds(400)
+            )
+          ) {
+            cornerAnimationContent()
+          }
+        )
+    } else {
+      baseContent
+    }
+  }
+
+  private var baseContent: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(
         store: store,
@@ -121,6 +158,7 @@ public struct ContentView: View {
         store: store,
         displayMode: toolbarCenterpieceDisplayMode,
         availableDetailWidth: toolbarDetailWidth,
+        showsLlamaToggle: showsCornerAnimation,
         showLlama: $showLlama,
         toggleSleepPrevention: toggleSleepPrevention
       )
@@ -189,15 +227,6 @@ public struct ContentView: View {
       )
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .harnessCornerAnimation(
-      .dancingLlama,
-      isPresented: showLlama
-        || contentUI.isSelectionLoading
-        || contentUI.isExtensionsLoading
-        || contentUI.isRefreshing
-        || contentUI.connectionState == .connecting,
-      presentationDelay: showLlama ? nil : .milliseconds(400)
-    )
     .modifier(
       HarnessMonitorConfirmationDialogModifier(
         store: store,
