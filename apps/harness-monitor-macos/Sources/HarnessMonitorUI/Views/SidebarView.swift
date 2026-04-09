@@ -19,6 +19,10 @@ struct SidebarView: View {
   @State private var collapsedProjectIDsState: Set<String> = []
   @State private var collapsedCheckoutKeysState: Set<String> = []
   @State private var hasHydratedCollapsedState = false
+  @State private var sidebarWidth: CGFloat = 260
+  @State private var sidebarVisibilityPhase = 1.0
+  private static let filterToolbarFadeHiddenWidth: CGFloat = 96
+  private static let filterToolbarFadeVisibleWidth: CGFloat = 220
 
   init(
     store: HarnessMonitorStore,
@@ -108,6 +112,17 @@ struct SidebarView: View {
     ].joined(separator: ", ")
   }
 
+  // The sidebar search field already moves with the split view. Keep the
+  // filter menu in that same toolbar lane and drive it from both the live
+  // width and the split-view visibility state so it follows the motion but
+  // still clears reliably once the sidebar finishes collapsing.
+  private var filterToolbarVisibilityProgress: Double {
+    let hiddenWidth = Self.filterToolbarFadeHiddenWidth
+    let visibleWidth = Self.filterToolbarFadeVisibleWidth
+    let widthProgress = Double(max(0, min(1, (sidebarWidth - hiddenWidth) / (visibleWidth - hiddenWidth))))
+    return min(widthProgress, sidebarVisibilityPhase)
+  }
+
   var body: some View {
     List(selection: sidebarSelection) {
       sidebarContent
@@ -131,7 +146,7 @@ struct SidebarView: View {
       SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
     }
     .toolbar {
-      if sidebarVisible {
+      if filterToolbarVisibilityProgress > 0.02 {
         ToolbarItem(placement: .primaryAction) {
           SidebarToolbarFilterMenu(
             store: store,
@@ -140,6 +155,15 @@ struct SidebarView: View {
             sessionSortOrder: controls.sessionSortOrder,
             hasActiveFilters: hasActiveSidebarFilters
           )
+          .opacity(filterToolbarVisibilityProgress)
+          .scaleEffect(
+            x: 0.94 + (0.06 * filterToolbarVisibilityProgress),
+            y: 0.94 + (0.06 * filterToolbarVisibilityProgress),
+            anchor: .trailing
+          )
+          .allowsHitTesting(filterToolbarVisibilityProgress > 0.85)
+          .accessibilityHidden(filterToolbarVisibilityProgress < 0.15)
+          .animation(.easeInOut(duration: 0.12), value: filterToolbarVisibilityProgress)
         }
       }
     }
@@ -148,7 +172,17 @@ struct SidebarView: View {
         _ = store.recordSearch(controls.searchText)
       }
     }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      updateSidebarWidth(width)
+    }
     .onAppear(perform: hydrateCollapsedStateIfNeeded)
+    .onChange(of: sidebarVisible, initial: true) { _, isVisible in
+      withAnimation(.easeInOut(duration: 0.18)) {
+        sidebarVisibilityPhase = isVisible ? 1 : 0
+      }
+    }
     .onChange(of: collapsedProjectIDsStorage) { _, newValue in
       syncCollapsedProjects(from: newValue)
     }
@@ -240,6 +274,13 @@ struct SidebarView: View {
     collapsedProjectIDsState = decodedStorageSet(from: collapsedProjectIDsStorage)
     collapsedCheckoutKeysState = decodedStorageSet(from: collapsedCheckoutKeysStorage)
     hasHydratedCollapsedState = true
+  }
+
+  func updateSidebarWidth(_ width: CGFloat) {
+    guard abs(width - sidebarWidth) >= 0.5 else {
+      return
+    }
+    sidebarWidth = max(width, 0)
   }
 
   func syncCollapsedProjects(from rawValue: String) {
