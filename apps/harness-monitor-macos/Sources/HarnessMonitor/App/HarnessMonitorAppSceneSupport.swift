@@ -4,6 +4,13 @@ import OSLog
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
+  private enum PerfScenarioStatus: String {
+    case idle
+    case bootstrapping
+    case running
+    case completed
+  }
+
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   @Binding var themeMode: HarnessMonitorThemeMode
@@ -18,6 +25,7 @@ struct HarnessMonitorWindowRootView: View {
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
   @State private var hasRunPerfScenario = false
+  @State private var perfScenarioStatus: PerfScenarioStatus = .idle
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var backdropMode: HarnessMonitorBackdropMode {
@@ -26,6 +34,13 @@ struct HarnessMonitorWindowRootView: View {
 
   private var backgroundImage: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  }
+
+  private var perfScenarioStateText: String? {
+    guard let perfScenario else {
+      return nil
+    }
+    return "scenario=\(perfScenario.rawValue), status=\(perfScenarioStatus.rawValue)"
   }
 
   var body: some View {
@@ -37,6 +52,14 @@ struct HarnessMonitorWindowRootView: View {
         } : nil
     )
     .writingToolsBehavior(.disabled)
+    .overlay {
+      if let perfScenarioStateText {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.perfScenarioState,
+          text: perfScenarioStateText
+        )
+      }
+    }
     .frame(minWidth: 900, minHeight: 600)
     .modifier(
       OptionalInstantFocusRingModifier(
@@ -67,19 +90,24 @@ struct HarnessMonitorWindowRootView: View {
       }
       hasRunPerfScenario = true
       if perfScenario.includesBootstrapInMeasurement {
+        perfScenarioStatus = .running
         await HarnessMonitorPerfDriver.run(
           scenario: perfScenario,
           store: store,
           openWindow: openWindow
         )
+        perfScenarioStatus = .completed
         return
       }
+      perfScenarioStatus = .bootstrapping
       await store.bootstrapIfNeeded()
+      perfScenarioStatus = .running
       await HarnessMonitorPerfDriver.run(
         scenario: perfScenario,
         store: store,
         openWindow: openWindow
       )
+      perfScenarioStatus = .completed
     }
   }
 }
@@ -146,6 +174,9 @@ private enum HarnessMonitorPerfDriver {
   private static let shortDelay: Duration = envMilliseconds(
     "HARNESS_MONITOR_PERF_SHORT_DELAY_MS", fallback: 180
   )
+  private static let settleDelay: Duration = envMilliseconds(
+    "HARNESS_MONITOR_PERF_SETTLE_DELAY_MS", fallback: 900
+  )
 
   private static func envMilliseconds(_ key: String, fallback: Int) -> Duration {
     guard let raw = ProcessInfo.processInfo.environment[key],
@@ -202,8 +233,8 @@ private enum HarnessMonitorPerfDriver {
     signposter.endInterval(signpostName, state)
   }
 
-  private static func settle(_ delay: Duration = .milliseconds(900)) async {
-    try? await Task.sleep(for: delay)
+  private static func settle(_ delay: Duration? = nil) async {
+    try? await Task.sleep(for: delay ?? settleDelay)
   }
 
   private static func runSearchPasses(

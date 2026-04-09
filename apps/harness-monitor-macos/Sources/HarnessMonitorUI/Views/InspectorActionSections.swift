@@ -31,14 +31,20 @@ struct InspectorActionSections: View {
       }
 
       if let selectedAgent = context.selectedAgent {
+        let roleConsoleIdentity = [
+          "agent",
+          context.detail.session.sessionId,
+          selectedAgent.agentId,
+          selectedAgent.role.rawValue,
+          context.detail.session.leaderId ?? "-",
+        ].joined(separator: ":")
+
         InspectorRoleMutationConsole(
           store: store,
           selectedAgent: selectedAgent,
           leaderID: context.detail.session.leaderId
         )
-        .id(
-          "agent:\(context.detail.session.sessionId):\(selectedAgent.agentId):\(selectedAgent.role.rawValue):\(context.detail.session.leaderId ?? "-")"
-        )
+        .id(roleConsoleIdentity)
       }
 
       InspectorLeaderTransferConsole(

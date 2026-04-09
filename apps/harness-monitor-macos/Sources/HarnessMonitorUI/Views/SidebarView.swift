@@ -2,23 +2,11 @@ import HarnessMonitorKit
 import SwiftData
 import SwiftUI
 
-private struct SidebarSelectionAnchor: Equatable {
-  let sessionID: String?
-  let visibleIndex: Int?
-
-  init(
-    selectedSessionID: String?,
-    visibleSessionIDs: [String]
-  ) {
-    sessionID = selectedSessionID
-    visibleIndex = selectedSessionID.flatMap { visibleSessionIDs.firstIndex(of: $0) }
-  }
-}
-
 struct SidebarView: View {
   let store: HarnessMonitorStore
   let controls: HarnessMonitorStore.SessionControlsSlice
   let projection: HarnessMonitorStore.SessionProjectionSlice
+  let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
@@ -33,7 +21,6 @@ struct SidebarView: View {
   @State private var hasHydratedCollapsedState = false
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
-  @State private var selectionRepairToken = 0
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
 
@@ -41,23 +28,16 @@ struct SidebarView: View {
     store: HarnessMonitorStore,
     controls: HarnessMonitorStore.SessionControlsSlice,
     projection: HarnessMonitorStore.SessionProjectionSlice,
+    searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice,
     sidebarVisible: Bool
   ) {
     self.store = store
     self.controls = controls
     self.projection = projection
+    self.searchResults = searchResults
     self.sidebarUI = sidebarUI
     self.sidebarVisible = sidebarVisible
-  }
-
-  var sidebarRowInsets: EdgeInsets {
-    EdgeInsets(
-      top: HarnessMonitorTheme.spacingSM,
-      leading: HarnessMonitorTheme.sectionSpacing,
-      bottom: HarnessMonitorTheme.spacingSM,
-      trailing: HarnessMonitorTheme.sectionSpacing
-    )
   }
 
   var collapsedProjectIDs: Set<String> {
@@ -123,17 +103,10 @@ struct SidebarView: View {
       "status=\(controls.sessionFilter.rawValue)",
       "focus=\(controls.sessionFocusFilter.rawValue)",
       "sort=\(controls.sessionSortOrder.rawValue)",
-      "visible=\(projection.filteredSessionCount)",
-      "total=\(projection.totalSessionCount)",
+      "visible=\(searchResults.filteredSessionCount)",
+      "total=\(searchResults.totalSessionCount)",
       "search=\(controls.searchText)",
     ].joined(separator: ", ")
-  }
-
-  private var selectionAnchor: SidebarSelectionAnchor {
-    SidebarSelectionAnchor(
-      selectedSessionID: sidebarUI.selectedSessionID,
-      visibleSessionIDs: store.visibleSessionIDs
-    )
   }
 
   // The sidebar search field already moves with the split view. Keep the
@@ -152,13 +125,7 @@ struct SidebarView: View {
     List(selection: sidebarSelection) {
       sidebarContent
     }
-    .id(selectionRepairToken)
-    .transaction {
-      $0.animation = nil
-      $0.disablesAnimations = true
-    }
     .listStyle(.sidebar)
-    .environment(\.defaultMinListRowHeight, 1)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .searchable(
       text: sidebarSearchText,
@@ -203,9 +170,6 @@ struct SidebarView: View {
     } action: { width in
       updateSidebarWidth(width)
     }
-    .onChange(of: selectionAnchor) { oldValue, newValue in
-      repairSidebarListSelection(from: oldValue, to: newValue)
-    }
     .onAppear(perform: hydrateCollapsedStateIfNeeded)
     .onChange(of: sidebarVisible, initial: true) { _, isVisible in
       withAnimation(.easeInOut(duration: 0.18)) {
@@ -219,7 +183,6 @@ struct SidebarView: View {
       syncCollapsedCheckouts(from: newValue)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .foregroundStyle(HarnessMonitorTheme.ink)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
@@ -234,7 +197,7 @@ struct SidebarView: View {
   }
 
   @ViewBuilder private var sidebarContent: some View {
-    switch projection.emptyState {
+    switch searchResults.emptyState {
     case .noSessions:
       SidebarEmptyState(
         title: "No sessions indexed yet",
@@ -267,17 +230,22 @@ struct SidebarView: View {
   }
 
   @ViewBuilder private var flatSearchResults: some View {
-    ForEach(projection.visibleSessions, id: \.sessionId) { session in
+    ForEach(searchResults.visibleSessions, id: \.sessionId) { session in
       sessionRow(session)
     }
   }
 
   @ViewBuilder private var sidebarHeader: some View {
     if !recentSearchQueries.isEmpty {
-      sidebarRecentSearches
-        .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
-        .padding(.top, HarnessMonitorTheme.spacingXL)
-        .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+      SidebarRecentSearchesView(
+        queries: recentSearchQueries,
+        isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+        applyQuery: applyRecentSearch,
+        clearHistory: { _ = store.clearSearchHistory() }
+      )
+      .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+      .padding(.top, HarnessMonitorTheme.spacingXL)
+      .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
     }
   }
 
@@ -311,29 +279,6 @@ struct SidebarView: View {
       return
     }
     sidebarWidth = max(width, 0)
-  }
-
-  private func repairSidebarListSelection(
-    from previousAnchor: SidebarSelectionAnchor,
-    to currentAnchor: SidebarSelectionAnchor
-  ) {
-    let selectionMovedWithinVisibleRows =
-      previousAnchor.sessionID != nil
-      && previousAnchor.sessionID == currentAnchor.sessionID
-      && previousAnchor.visibleIndex != currentAnchor.visibleIndex
-    let selectionWasCleared =
-      previousAnchor.sessionID != nil
-      && currentAnchor.sessionID == nil
-
-    guard selectionMovedWithinVisibleRows || selectionWasCleared else {
-      return
-    }
-
-    // macOS's native sidebar list can cling to the old row position when
-    // reconnects insert or remove sessions around the active selection.
-    // Rebuilding the list only for that anchor change keeps the highlight
-    // aligned with the selection binding without resetting every live update.
-    selectionRepairToken &+= 1
   }
 
   func syncCollapsedProjects(from rawValue: String) {
@@ -402,43 +347,4 @@ struct SidebarView: View {
       _ = store.recordSearch(query)
     }
   }
-
-  @ViewBuilder private var sidebarRecentSearches: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      HStack {
-        Text("Recent Searches")
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-
-        Spacer()
-
-        if sidebarUI.isPersistenceAvailable {
-          Button("Clear") {
-            _ = store.clearSearchHistory()
-          }
-          .harnessDismissButtonStyle()
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearSearchHistoryButton)
-        }
-      }
-
-      ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          ForEach(recentSearchQueries, id: \.self) { query in
-            Button {
-              applyRecentSearch(query)
-            } label: {
-              Text(query)
-                .lineLimit(1)
-                .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-                .padding(.vertical, HarnessMonitorTheme.spacingXS)
-            }
-            .harnessAccessoryButtonStyle()
-          }
-        }
-      }
-    }
-  }
-
 }

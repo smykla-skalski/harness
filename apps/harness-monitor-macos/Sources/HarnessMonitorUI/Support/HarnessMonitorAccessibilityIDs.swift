@@ -1,9 +1,11 @@
 import SwiftUI
 
-enum HarnessMonitorAccessibility {
+public enum HarnessMonitorAccessibility {
   static let appChromeRoot = "harness.app.chrome"
   static let appChromeState = "harness.app.chrome.state"
   static let auditBuildState = "harness.audit.build.state"
+  static let auditBuildBadge = "harness.audit.build.badge"
+  public static let perfScenarioState = "harness.perf.scenario.state"
   static let toolbarChromeState = "harness.toolbar.chrome.state"
   static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   static let persistenceBanner = "harness.persistence.banner"

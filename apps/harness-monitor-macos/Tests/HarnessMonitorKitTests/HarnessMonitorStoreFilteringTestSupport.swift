@@ -1,5 +1,6 @@
 @testable import HarnessMonitorKit
 
+@MainActor
 enum HarnessMonitorStoreFilteringTestSupport {
   static func storeWithFocusFixtures() -> HarnessMonitorStore {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
