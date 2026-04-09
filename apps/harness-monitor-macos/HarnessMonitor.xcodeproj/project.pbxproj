@@ -147,6 +147,7 @@
 		AB0AD2C6BAE63D17E2F22129 /* ContentChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34A6D3A87043E44A1419E8 /* ContentChromeSupport.swift */; };
 		ABF1815C358F938D7B10A954 /* UserModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF83058E83D56832DD84366 /* UserModels.swift */; };
 		AF56300AD89D3A4AA9C2071F /* ServerSentEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E7C6AD7FC7DC6B8F574285 /* ServerSentEventsTests.swift */; };
+		B112BC9721AA6983EF6CD536 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6DFA230C28165C5AF0365371 /* Lottie */; };
 		B18C8D2F94F3B5C655EC4752 /* SessionTaskLaneViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707394EEA2DA5DE9174191BB /* SessionTaskLaneViews.swift */; };
 		B425188E03C5813D17D943BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7C50373172AFC22A0DD94523 /* Assets.xcassets */; };
 		B4CBFA1EA1295191ED29CD90 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BCBC5959481D5B05E95B487 /* PreviewFixtures.swift */; };
@@ -532,6 +533,7 @@
 			files = (
 				EEA8D258B68C26898FCD25FA /* HarnessMonitorKit.framework in Frameworks */,
 				9A933416F8657CB7E9D2A9C6 /* HarnessMonitorUI.framework in Frameworks */,
+				B112BC9721AA6983EF6CD536 /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -932,6 +934,7 @@
 			);
 			name = HarnessMonitorUITestHost;
 			packageProductDependencies = (
+				6DFA230C28165C5AF0365371 /* Lottie */,
 			);
 			productName = HarnessMonitorUITestHost;
 			productReference = 06785C940F1CF2DB6A8464A6 /* HarnessMonitorUITestHost.app */;
@@ -1147,7 +1150,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
+			shellScript = "if [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nwrite_build_provenance() {\n  local resources_dir=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n  local provenance_path=\"$resources_dir/HarnessMonitorBuildProvenance.plist\"\n\n  /bin/mkdir -p \"$resources_dir\"\n  /bin/cat > \"$provenance_path\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>HarnessMonitorBuildGitCommit</key>\n  <string>${HARNESS_MONITOR_BUILD_GIT_COMMIT:-unknown}</string>\n  <key>HarnessMonitorBuildGitDirty</key>\n  <string>${HARNESS_MONITOR_BUILD_GIT_DIRTY:-unknown}</string>\n</dict>\n</plist>\nEOF\n}\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nwrite_build_provenance\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
 		};
 		8D380C1A18375B364AD27E7F /* Clear Gatekeeper Metadata */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1185,7 +1188,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
+			shellScript = "if [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nwrite_build_provenance() {\n  local resources_dir=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n  local provenance_path=\"$resources_dir/HarnessMonitorBuildProvenance.plist\"\n\n  /bin/mkdir -p \"$resources_dir\"\n  /bin/cat > \"$provenance_path\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>HarnessMonitorBuildGitCommit</key>\n  <string>${HARNESS_MONITOR_BUILD_GIT_COMMIT:-unknown}</string>\n  <key>HarnessMonitorBuildGitDirty</key>\n  <string>${HARNESS_MONITOR_BUILD_GIT_DIRTY:-unknown}</string>\n</dict>\n</plist>\nEOF\n}\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nwrite_build_provenance\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1538,6 +1541,8 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HARNESS_MONITOR_APP_BUNDLE_ID = io.harnessmonitor.app;
+				HARNESS_MONITOR_BUILD_GIT_COMMIT = "local-dev";
+				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -1659,6 +1664,8 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HARNESS_MONITOR_APP_BUNDLE_ID = io.harnessmonitor.app;
+				HARNESS_MONITOR_BUILD_GIT_COMMIT = "local-dev";
+				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -1685,6 +1692,8 @@
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor";
+				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
+				INFOPLIST_KEY_HarnessMonitorBuildGitDirty = "$(HARNESS_MONITOR_BUILD_GIT_DIRTY)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1735,6 +1744,8 @@
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor UI Testing";
+				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
+				INFOPLIST_KEY_HarnessMonitorBuildGitDirty = "$(HARNESS_MONITOR_BUILD_GIT_DIRTY)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1775,6 +1786,8 @@
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor";
+				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
+				INFOPLIST_KEY_HarnessMonitorBuildGitDirty = "$(HARNESS_MONITOR_BUILD_GIT_DIRTY)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1797,6 +1810,8 @@
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor UI Testing";
+				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
+				INFOPLIST_KEY_HarnessMonitorBuildGitDirty = "$(HARNESS_MONITOR_BUILD_GIT_DIRTY)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1837,6 +1852,8 @@
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor";
+				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
+				INFOPLIST_KEY_HarnessMonitorBuildGitDirty = "$(HARNESS_MONITOR_BUILD_GIT_DIRTY)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1859,6 +1876,8 @@
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor UI Testing";
+				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
+				INFOPLIST_KEY_HarnessMonitorBuildGitDirty = "$(HARNESS_MONITOR_BUILD_GIT_DIRTY)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1978,6 +1997,8 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HARNESS_MONITOR_APP_BUNDLE_ID = io.harnessmonitor.app;
+				HARNESS_MONITOR_BUILD_GIT_COMMIT = "local-dev";
+				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -2183,6 +2204,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		6DFA230C28165C5AF0365371 /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CFA266FE0315A53597F98D13 /* XCRemoteSwiftPackageReference "lottie-ios" */;
+			productName = Lottie;
+		};
 		7361ACFA674EF5EFC9CF3EEE /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CFA266FE0315A53597F98D13 /* XCRemoteSwiftPackageReference "lottie-ios" */;

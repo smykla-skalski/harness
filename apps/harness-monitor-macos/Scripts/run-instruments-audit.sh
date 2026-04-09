@@ -14,6 +14,7 @@ HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Test
 HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
 SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
 UI_TESTS_ENV="HARNESS_MONITOR_UI_TESTS=1"
+UI_ACCESSIBILITY_MARKERS_ENV="HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS=0"
 KEEP_ANIMATIONS_ENV="HARNESS_MONITOR_KEEP_ANIMATIONS=1"
 LAUNCH_MODE_ENV="HARNESS_MONITOR_LAUNCH_MODE=preview"
 WINDOW_WIDTH_ENV="HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH=1640"
@@ -21,6 +22,11 @@ WINDOW_HEIGHT_ENV="HARNESS_MONITOR_UI_MAIN_WINDOW_HEIGHT=980"
 HIDE_DOCK_ENV="HARNESS_MONITOR_PERF_HIDE_DOCK_ICON=1"
 PERSISTENCE_ARG_ONE="-ApplePersistenceIgnoreState"
 PERSISTENCE_ARG_TWO="YES"
+AUDIT_COMMIT_ENV_KEY="HARNESS_MONITOR_AUDIT_GIT_COMMIT"
+AUDIT_DIRTY_ENV_KEY="HARNESS_MONITOR_AUDIT_GIT_DIRTY"
+BUILD_COMMIT_KEY="HarnessMonitorBuildGitCommit"
+BUILD_DIRTY_KEY="HarnessMonitorBuildGitDirty"
+BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -112,10 +118,21 @@ duration_for() {
 build_release_targets() {
   xcodebuild \
     -project "$PROJECT_PATH" \
+    -scheme "$HOST_SCHEME" \
+    -configuration Release \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    clean \
+    CODE_SIGNING_ALLOWED=NO \
+    -quiet
+
+  xcodebuild \
+    -project "$PROJECT_PATH" \
     -scheme "$SHIPPING_SCHEME" \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     build \
+    "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
+    "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
     CODE_SIGNING_ALLOWED=NO \
     -quiet
 
@@ -125,6 +142,8 @@ build_release_targets() {
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     build \
+    "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
+    "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
     CODE_SIGNING_ALLOWED=NO \
     -quiet
 }
@@ -142,6 +161,57 @@ cleanup_host_processes() {
       kill -9 "$pid" 2>/dev/null || true
     fi
   done <<<"$pids"
+}
+
+plist_value() {
+  local plist_path="$1"
+  local key="$2"
+
+  /usr/libexec/PlistBuddy -c "Print :$key" "$plist_path" 2>/dev/null || true
+}
+
+bundle_provenance_value() {
+  local bundle_path="$1"
+  local key="$2"
+  local provenance_path="$bundle_path/Contents/Resources/$BUILD_PROVENANCE_RESOURCE"
+
+  if [[ -f "$provenance_path" ]]; then
+    plist_value "$provenance_path" "$key"
+  else
+    printf '%s' ""
+  fi
+}
+
+binary_sha256() {
+  shasum -a 256 "$1" | awk '{print $1}'
+}
+
+binary_mtime_utc() {
+  TZ=UTC /usr/bin/stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%SZ' "$1"
+}
+
+bundle_sha256() {
+  python3 - "$1" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+digest = hashlib.sha256()
+
+for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+    relative_path = path.relative_to(root).as_posix()
+    digest.update(relative_path.encode("utf-8"))
+    digest.update(b"\0")
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    digest.update(b"\0")
+
+print(digest.hexdigest())
+PY
 }
 
 label=""
@@ -213,6 +283,14 @@ if [[ ${#selected_scenarios[@]} -eq 0 ]]; then
   exit 1
 fi
 
+git_commit="$(git rev-parse HEAD)"
+git_dirty="false"
+if [[ -n "$(git status --short)" ]]; then
+  git_dirty="true"
+fi
+audit_commit_env="$AUDIT_COMMIT_ENV_KEY=$git_commit"
+audit_dirty_env="$AUDIT_DIRTY_ENV_KEY=$git_dirty"
+
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 label_slug="${label//[^A-Za-z0-9._-]/-}"
 run_dir="$RUNS_ROOT/${timestamp}-${label_slug}"
@@ -222,12 +300,45 @@ mkdir -p "$traces_root"
 mkdir -p "$xctrace_tmp_root"
 
 printf 'Building Release targets for Instruments...\n'
+cleanup_host_processes
 build_release_targets
 
 if [[ ! -x "$HOST_BINARY_PATH" ]]; then
   printf 'Expected UI-test host binary not found at %s\n' "$HOST_BINARY_PATH" >&2
   exit 1
 fi
+
+host_info_plist="$HOST_APP_PATH/Contents/Info.plist"
+shipping_info_plist="$SHIPPING_APP_PATH/Contents/Info.plist"
+host_embedded_commit="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_COMMIT_KEY")"
+host_embedded_dirty="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_DIRTY_KEY")"
+shipping_embedded_commit="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_COMMIT_KEY")"
+shipping_embedded_dirty="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_DIRTY_KEY")"
+
+host_binary_sha256="$(binary_sha256 "$HOST_BINARY_PATH")"
+shipping_binary_sha256="$(binary_sha256 "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
+host_bundle_sha256="$(bundle_sha256 "$HOST_APP_PATH")"
+shipping_bundle_sha256="$(bundle_sha256 "$SHIPPING_APP_PATH")"
+host_binary_mtime_utc="$(binary_mtime_utc "$HOST_BINARY_PATH")"
+shipping_binary_mtime_utc="$(binary_mtime_utc "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
+
+if [[ "$host_embedded_commit" != "$git_commit" || "$host_embedded_dirty" != "$git_dirty" ]]; then
+  printf 'Host build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
+    "$git_commit" "$git_dirty" "$host_embedded_commit" "$host_embedded_dirty" >&2
+  exit 1
+fi
+
+if [[ "$shipping_embedded_commit" != "$git_commit" || "$shipping_embedded_dirty" != "$git_dirty" ]]; then
+  printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
+    "$git_commit" "$git_dirty" "$shipping_embedded_commit" "$shipping_embedded_dirty" >&2
+  exit 1
+fi
+
+printf 'Using host binary: %s\n' "$HOST_BINARY_PATH"
+printf 'Host SHA256: %s\n' "$host_binary_sha256"
+printf 'Host bundle SHA256: %s\n' "$host_bundle_sha256"
+printf 'Host mtime (UTC): %s\n' "$host_binary_mtime_utc"
+printf 'Audit commit stamp: %s dirty=%s\n' "$git_commit" "$git_dirty"
 
 capture_records_file="$run_dir/captures.tsv"
 : >"$capture_records_file"
@@ -251,10 +362,13 @@ record_capture() {
     --template "$template" \
     --time-limit "${duration_seconds}s" \
     --output "$trace_path" \
-    --env "$UI_TESTS_ENV" \
-    --env "$KEEP_ANIMATIONS_ENV" \
+      --env "$UI_TESTS_ENV" \
+      --env "$UI_ACCESSIBILITY_MARKERS_ENV" \
+      --env "$KEEP_ANIMATIONS_ENV" \
     --env "$LAUNCH_MODE_ENV" \
     --env "$HIDE_DOCK_ENV" \
+    --env "$audit_commit_env" \
+    --env "$audit_dirty_env" \
     --env "HARNESS_MONITOR_PERF_SCENARIO=$scenario" \
     --env "HARNESS_MONITOR_PREVIEW_SCENARIO=$preview_scenario" \
     --env "$WINDOW_WIDTH_ENV" \
@@ -311,18 +425,13 @@ done
 
 cleanup_host_processes
 
-git_commit="$(git rev-parse HEAD)"
-git_dirty="false"
-if [[ -n "$(git status --short)" ]]; then
-  git_dirty="true"
-fi
 xcode_version="$(xcodebuild -version | tr '\n' ';' | sed 's/;*$//')"
 xctrace_version="$(xcrun xctrace version | tr '\n' ';' | sed 's/;*$//')"
 macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$timestamp" "$git_commit" "$git_dirty" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$capture_records_file" "$UI_TESTS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
+python3 - "$run_dir/manifest.json" "$label" "$timestamp" "$git_commit" "$git_dirty" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -346,13 +455,26 @@ from pathlib import Path
     shipping_app_path,
     host_app_path,
     host_bundle_id,
+    host_embedded_commit,
+    host_embedded_dirty,
+    host_binary_sha256,
+    host_bundle_sha256,
+    host_binary_mtime_utc,
+    shipping_embedded_commit,
+    shipping_embedded_dirty,
+    shipping_binary_sha256,
+    shipping_bundle_sha256,
+    shipping_binary_mtime_utc,
     capture_records_path,
     ui_tests_env,
+    ui_accessibility_markers_env,
     keep_animations_env,
     launch_mode_env,
     window_width_env,
     window_height_env,
     hide_dock_env,
+    audit_commit_env,
+    audit_dirty_env,
     launch_arg_one,
     launch_arg_two,
     *selected_scenarios,
@@ -362,11 +484,14 @@ environment_pairs = [
     item.split("=", 1)
     for item in [
         ui_tests_env,
+        ui_accessibility_markers_env,
         keep_animations_env,
         launch_mode_env,
         window_width_env,
         window_height_env,
         hide_dock_env,
+        audit_commit_env,
+        audit_dirty_env,
     ]
 ]
 default_environment = {key: value for key, value in environment_pairs}
@@ -414,6 +539,22 @@ manifest = {
         "shipping_app_path": shipping_app_path,
         "host_app_path": host_app_path,
         "host_bundle_id": host_bundle_id,
+    },
+    "build_provenance": {
+        "host": {
+            "embedded_commit": host_embedded_commit,
+            "embedded_dirty": host_embedded_dirty,
+            "binary_sha256": host_binary_sha256,
+            "bundle_sha256": host_bundle_sha256,
+            "binary_mtime_utc": host_binary_mtime_utc,
+        },
+        "shipping": {
+            "embedded_commit": shipping_embedded_commit,
+            "embedded_dirty": shipping_embedded_dirty,
+            "binary_sha256": shipping_binary_sha256,
+            "bundle_sha256": shipping_bundle_sha256,
+            "binary_mtime_utc": shipping_binary_mtime_utc,
+        },
     },
     "templates": {
         "swiftui": ["launch-dashboard", "select-session-cockpit", "refresh-and-search", "sidebar-overflow-search", "timeline-burst", "offline-cached-open"],

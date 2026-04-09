@@ -24,6 +24,8 @@ settings:
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     SWIFT_VERSION: "6.2"
     HARNESS_MONITOR_APP_BUNDLE_ID: io.harnessmonitor.app
+    HARNESS_MONITOR_BUILD_GIT_COMMIT: local-dev
+    HARNESS_MONITOR_BUILD_GIT_DIRTY: false
   configs:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
@@ -97,6 +99,25 @@ targets:
             exit 0
           fi
 
+          write_build_provenance() {
+            local resources_dir="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+            local provenance_path="$resources_dir/HarnessMonitorBuildProvenance.plist"
+
+            /bin/mkdir -p "$resources_dir"
+            /bin/cat > "$provenance_path" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>HarnessMonitorBuildGitCommit</key>
+            <string>${HARNESS_MONITOR_BUILD_GIT_COMMIT:-unknown}</string>
+            <key>HarnessMonitorBuildGitDirty</key>
+            <string>${HARNESS_MONITOR_BUILD_GIT_DIRTY:-unknown}</string>
+          </dict>
+          </plist>
+          EOF
+          }
+
           strip_attrs() {
             local target_path="$1"
             if [ -e "$target_path" ]; then
@@ -105,6 +126,7 @@ targets:
             fi
           }
 
+          write_build_provenance
           strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
     settings:
       base:
@@ -113,6 +135,8 @@ targets:
         DEVELOPMENT_TEAM: Q498EB36N4
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
         INFOPLIST_KEY_CFBundleName: Harness Monitor
+        INFOPLIST_KEY_HarnessMonitorBuildGitCommit: $(HARNESS_MONITOR_BUILD_GIT_COMMIT)
+        INFOPLIST_KEY_HarnessMonitorBuildGitDirty: $(HARNESS_MONITOR_BUILD_GIT_DIRTY)
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         PRODUCT_BUNDLE_IDENTIFIER: $(HARNESS_MONITOR_APP_BUNDLE_ID)
         PRODUCT_NAME: Harness Monitor
@@ -125,6 +149,7 @@ targets:
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
+      - package: Lottie
     entitlements:
       path: HarnessMonitor.entitlements
       properties:
@@ -139,6 +164,25 @@ targets:
             exit 0
           fi
 
+          write_build_provenance() {
+            local resources_dir="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+            local provenance_path="$resources_dir/HarnessMonitorBuildProvenance.plist"
+
+            /bin/mkdir -p "$resources_dir"
+            /bin/cat > "$provenance_path" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>HarnessMonitorBuildGitCommit</key>
+            <string>${HARNESS_MONITOR_BUILD_GIT_COMMIT:-unknown}</string>
+            <key>HarnessMonitorBuildGitDirty</key>
+            <string>${HARNESS_MONITOR_BUILD_GIT_DIRTY:-unknown}</string>
+          </dict>
+          </plist>
+          EOF
+          }
+
           strip_attrs() {
             local target_path="$1"
             if [ -e "$target_path" ]; then
@@ -147,6 +191,7 @@ targets:
             fi
           }
 
+          write_build_provenance
           strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
     settings:
       base:
@@ -155,6 +200,8 @@ targets:
         DEVELOPMENT_TEAM: Q498EB36N4
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor UI Testing
         INFOPLIST_KEY_CFBundleName: Harness Monitor UI Testing
+        INFOPLIST_KEY_HarnessMonitorBuildGitCommit: $(HARNESS_MONITOR_BUILD_GIT_COMMIT)
+        INFOPLIST_KEY_HarnessMonitorBuildGitDirty: $(HARNESS_MONITOR_BUILD_GIT_DIRTY)
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.app.ui-testing
         PRODUCT_NAME: Harness Monitor UI Testing
