@@ -6,6 +6,7 @@ import SwiftData
 struct HarnessMonitorAppConfiguration {
   let container: ModelContainer?
   let store: HarnessMonitorStore
+  let launchMode: HarnessMonitorLaunchMode
   let initialThemeMode: HarnessMonitorThemeMode
   let isUITesting: Bool
   let mainWindowDefaultSize: CGSize
@@ -23,6 +24,7 @@ struct HarnessMonitorAppConfiguration {
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
       HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
+      HarnessMonitorCornerAnimationDefaults.enabledKey: false,
       "harnessMonitor.board.onboardingDismissed": false,
       "showInspector": true,
       "inspectorColumnWidth": 420.0,
@@ -91,6 +93,7 @@ struct HarnessMonitorAppConfiguration {
     return Self(
       container: persistenceSetup.container,
       store: store,
+      launchMode: launchMode,
       initialThemeMode: initialThemeMode,
       isUITesting: isUITesting,
       mainWindowDefaultSize: HarnessMonitorUITestWindowDefaults.mainWindowSize(

@@ -9,6 +9,10 @@ public enum HarnessMonitorBackdropDefaults {
   public static let modeKey = "harnessBackdropMode"
 }
 
+public enum HarnessMonitorCornerAnimationDefaults {
+  public static let enabledKey = "harnessCornerAnimationEnabled"
+}
+
 public enum HarnessMonitorBackgroundDefaults {
   public static let imageKey = "harnessBackgroundImage"
   public static let recentKey = "harnessRecentBackgrounds"

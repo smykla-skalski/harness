@@ -37,7 +37,7 @@ extension HarnessMonitorStore {
   }
 }
 
-private extension HarnessMonitorStore.ContentUISlice {
+private extension HarnessMonitorStore.ContentToolbarSlice {
   var toolbarCenterpieceModel: ToolbarCenterpieceModel {
     var metrics: [ToolbarCenterpieceMetric] = [
       .init(kind: .projects, value: toolbarMetrics.projectCount),
@@ -70,59 +70,46 @@ private extension HarnessMonitorStore.ContentUISlice {
 
 struct ContentNavigationToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var toolbarUI: HarnessMonitorStore.ContentToolbarSlice
 
   var body: some ToolbarContent {
     ContentNavigationToolbar(
       store: store,
-      canNavigateBack: contentUI.canNavigateBack,
-      canNavigateForward: contentUI.canNavigateForward
+      canNavigateBack: toolbarUI.canNavigateBack,
+      canNavigateForward: toolbarUI.canNavigateForward
     )
   }
 }
 
 struct ContentCenterpieceToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var toolbarUI: HarnessMonitorStore.ContentToolbarSlice
   let displayMode: ToolbarCenterpieceDisplayMode
   let availableDetailWidth: CGFloat
-  let showsLlamaToggle: Bool
-  @Binding var showLlama: Bool
 
   var body: some ToolbarContent {
     ContentCenterpieceToolbar(
-      model: contentUI.toolbarCenterpieceModel,
+      model: toolbarUI.toolbarCenterpieceModel,
       displayMode: displayMode,
       availableDetailWidth: availableDetailWidth,
-      statusMessages: contentUI.toolbarStatusMessages,
-      daemonIndicator: contentUI.toolbarDaemonIndicator
+      statusMessages: toolbarUI.toolbarStatusMessages,
+      daemonIndicator: toolbarUI.toolbarDaemonIndicator
     )
 
     ToolbarItemGroup(placement: .principal) {
       Button { store.sleepPreventionEnabled.toggle() } label: {
         Label(
-          contentUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: contentUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+          toolbarUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
+          systemImage: toolbarUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
         )
       }
-      .tint(contentUI.sleepPreventionEnabled ? .orange : nil)
+      .tint(toolbarUI.sleepPreventionEnabled ? .orange : nil)
       .help(
-        contentUI.sleepPreventionEnabled
+        toolbarUI.sleepPreventionEnabled
           ? "Preventing sleep - click to disable"
           : "Allow sleep - click to prevent"
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
-
-      if showsLlamaToggle {
-        Button { showLlama.toggle() } label: {
-          Label(
-            showLlama ? "Hide Llama" : "Show Llama",
-            systemImage: showLlama ? "hare.fill" : "hare"
-          )
-        }
-        .tint(showLlama ? .purple : nil)
-        .help(showLlama ? "Hide dancing llama" : "Show dancing llama")
-      }
     }
     .sharedBackgroundVisibility(.hidden)
   }
@@ -130,25 +117,25 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
 
 struct ContentPrimaryToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var toolbarUI: HarnessMonitorStore.ContentToolbarSlice
   @Binding var showInspector: Bool
 
   var body: some ToolbarContent {
     InspectorToolbarActions(
       store: store,
-      contentUI: contentUI,
+      toolbarUI: toolbarUI,
       showInspector: $showInspector
     )
   }
 }
 
 struct ContentToolbarAccessibilityMarker: View {
-  let contentUI: HarnessMonitorStore.ContentUISlice
+  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
 
   var body: some View {
     AccessibilityTextMarker(
       identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
-      text: contentUI.toolbarCenterpieceModel.accessibilityValue
+      text: toolbarUI.toolbarCenterpieceModel.accessibilityValue
     )
   }
 }

@@ -9,6 +9,8 @@ struct PreferencesAppearanceSection: View {
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
+  private var cornerAnimationEnabled = false
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
 
   private var selectedBackground: HarnessMonitorBackgroundSelection {
@@ -41,6 +43,10 @@ struct PreferencesAppearanceSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
+
+        Toggle("Corner animation", isOn: $cornerAnimationEnabled)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier("harness.preferences.appearance.cornerAnimation")
       } header: {
         Text("Appearance")
       } footer: {
@@ -48,6 +54,7 @@ struct PreferencesAppearanceSection: View {
           "Theme mode and text size apply to every Harness Monitor window."
             + " Backdrop controls where the softened background image renders,"
             + " and choosing an image turns on the window backdrop if it is currently off."
+            + " Corner animation shows a dancing llama during activity."
         )
       }
 

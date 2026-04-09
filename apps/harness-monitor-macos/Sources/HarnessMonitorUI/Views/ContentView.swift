@@ -6,7 +6,11 @@ public struct ContentView: View {
   let store: HarnessMonitorStore
   let showsCornerAnimation: Bool
   let cornerAnimationContent: (() -> AnyView)?
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var contentShell: HarnessMonitorStore.ContentShellSlice
+  @Bindable var contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+  @Bindable var contentChrome: HarnessMonitorStore.ContentChromeSlice
+  @Bindable var contentSession: HarnessMonitorStore.ContentSessionSlice
+  @Bindable var contentDashboard: HarnessMonitorStore.ContentDashboardSlice
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage("showInspector")
   private var persistedShowInspector = true
@@ -18,13 +22,12 @@ public struct ContentView: View {
   @State private var hasAppliedInitialInspectorVisibility = false
   @State private var hasCapturedInitialInspectorWidth = false
   @State private var showInspector = false
-  @State private var showLlama = false
   @State private var detailColumnWidth: CGFloat = 980
   @State private var isLayoutAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var windowTitle: String {
-    contentUI.windowTitle
+    contentShell.windowTitle
   }
 
   private var appChromeAccessibilityValue: String {
@@ -91,32 +94,21 @@ public struct ContentView: View {
     self.store = store
     self.showsCornerAnimation = showsCornerAnimation
     self.cornerAnimationContent = cornerAnimationContent
-    self.contentUI = store.contentUI
+    self.contentShell = store.contentUI.shell
+    self.contentToolbar = store.contentUI.toolbar
+    self.contentChrome = store.contentUI.chrome
+    self.contentSession = store.contentUI.session
+    self.contentDashboard = store.contentUI.dashboard
   }
 
   public var body: some View {
     if let cornerAnimationContent {
       baseContent
         .modifier(
-          HarnessCornerOverlayModifier(
-            isPresented: showLlama
-              || contentUI.isSelectionLoading
-              || contentUI.isExtensionsLoading
-              || contentUI.isRefreshing
-              || contentUI.connectionState == .connecting,
-            configuration: .init(
-              width: HarnessCornerAnimationDescriptor.dancingLlama.width,
-              height: HarnessCornerAnimationDescriptor.dancingLlama.height,
-              trailingPadding: HarnessCornerAnimationDescriptor.dancingLlama.trailingPadding,
-              bottomPadding: HarnessCornerAnimationDescriptor.dancingLlama.bottomPadding,
-              contentPadding: 0,
-              appliesGlass: false,
-              accessibilityLabel: HarnessCornerAnimationDescriptor.dancingLlama.accessibilityLabel,
-              presentationDelay: showLlama ? nil : .milliseconds(400)
-            )
-          ) {
-            cornerAnimationContent()
-          }
+          ContentCornerOverlayModifier(
+            shellUI: contentShell,
+            cornerAnimationContent: cornerAnimationContent
+          )
         )
     } else {
       baseContent
@@ -136,15 +128,13 @@ public struct ContentView: View {
     .toolbar {
       ContentNavigationToolbarItems(
         store: store,
-        contentUI: contentUI
+        toolbarUI: contentToolbar
       )
       ContentCenterpieceToolbarItems(
         store: store,
-        contentUI: contentUI,
+        toolbarUI: contentToolbar,
         displayMode: toolbarCenterpieceDisplayMode,
-        availableDetailWidth: toolbarDetailWidth,
-        showsLlamaToggle: showsCornerAnimation,
-        showLlama: $showLlama
+        availableDetailWidth: toolbarDetailWidth
       )
     }
     .task {
@@ -159,13 +149,13 @@ public struct ContentView: View {
       guard !hasSeededSceneRestoration else {
         return
       }
-      guard contentUI.selectedSessionID == nil, let newID else {
+      guard contentShell.selectedSessionID == nil, let newID else {
         return
       }
       hasSeededSceneRestoration = true
       store.primeSessionSelection(newID)
     }
-    .onChange(of: contentUI.selectedSessionID) { _, newID in
+    .onChange(of: contentShell.selectedSessionID) { _, newID in
       if restoredSessionID != newID {
         restoredSessionID = newID
       }
@@ -208,7 +198,7 @@ public struct ContentView: View {
             text: auditBuildAccessibilityValue
           )
         }
-        ContentToolbarAccessibilityMarker(contentUI: contentUI)
+        ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
         AccessibilityTextMarker(
           identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
           text: toolbarCenterpieceDisplayMode.rawValue
@@ -224,20 +214,17 @@ public struct ContentView: View {
     .modifier(
       HarnessMonitorConfirmationDialogModifier(
         store: store,
-        pendingConfirmation: contentUI.pendingConfirmation
+        shellUI: contentShell
       )
     )
     .modifier(
       HarnessMonitorSheetModifier(
         store: store,
-        presentedSheet: contentUI.presentedSheet
+        shellUI: contentShell
       )
     )
     .modifier(
-      ContentAnnouncementsModifier(
-        connectionState: contentUI.connectionState,
-        lastAction: contentUI.lastAction
-      )
+      ContentAnnouncementsModifier(shellUI: contentShell)
     )
   }
 
@@ -257,7 +244,10 @@ public struct ContentView: View {
     ContentDetailColumn(
       store: store,
       selection: store.selection,
-      contentUI: contentUI,
+      contentChrome: contentChrome,
+      contentSession: contentSession,
+      contentToolbar: contentToolbar,
+      dashboardUI: contentDashboard,
       showInspector: $showInspector,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       isLayoutAnimating: isLayoutAnimating,
@@ -343,10 +333,42 @@ public struct ContentView: View {
   }
 }
 
+private struct ContentCornerOverlayModifier: ViewModifier {
+  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
+  let cornerAnimationContent: () -> AnyView
+
+  func body(content: Content) -> some View {
+    content
+      .modifier(
+        HarnessCornerOverlayModifier(
+          isPresented: shellUI.isSelectionLoading
+            || shellUI.isExtensionsLoading
+            || shellUI.isRefreshing
+            || shellUI.connectionState == .connecting,
+          configuration: .init(
+            width: HarnessCornerAnimationDescriptor.dancingLlama.width,
+            height: HarnessCornerAnimationDescriptor.dancingLlama.height,
+            trailingPadding: HarnessCornerAnimationDescriptor.dancingLlama.trailingPadding,
+            bottomPadding: HarnessCornerAnimationDescriptor.dancingLlama.bottomPadding,
+            contentPadding: 0,
+            appliesGlass: false,
+            accessibilityLabel: HarnessCornerAnimationDescriptor.dancingLlama.accessibilityLabel,
+            presentationDelay: .milliseconds(400)
+          )
+        ) {
+          cornerAnimationContent()
+        }
+      )
+  }
+}
+
 private struct ContentDetailColumn: View {
   let store: HarnessMonitorStore
   @Bindable var selection: HarnessMonitorStore.SelectionSlice
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var contentChrome: HarnessMonitorStore.ContentChromeSlice
+  @Bindable var contentSession: HarnessMonitorStore.ContentSessionSlice
+  @Bindable var contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+  @Bindable var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @Binding var showInspector: Bool
   let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   let isLayoutAnimating: Bool
@@ -358,9 +380,9 @@ private struct ContentDetailColumn: View {
         sessionContent
       } else {
         ContentDetailChrome(
-          persistenceError: contentUI.persistenceError,
-          sessionDataAvailability: contentUI.sessionDataAvailability,
-          sessionStatus: contentUI.sessionStatus
+          persistenceError: contentChrome.persistenceError,
+          sessionDataAvailability: contentChrome.sessionDataAvailability,
+          sessionStatus: contentChrome.sessionStatus
         ) {
           sessionContent
         }
@@ -379,7 +401,7 @@ private struct ContentDetailColumn: View {
     .toolbar {
       ContentPrimaryToolbarItems(
         store: store,
-        contentUI: contentUI,
+        toolbarUI: contentToolbar,
         showInspector: $showInspector
       )
     }
@@ -393,15 +415,16 @@ private struct ContentDetailColumn: View {
   private var sessionContent: some View {
     SessionContentContainer(
       store: store,
+      dashboardUI: dashboardUI,
       state: SessionContentState(
         detail: selection.matchedSelectedSession,
-        summary: contentUI.selectedSessionSummary,
+        summary: contentSession.selectedSessionSummary,
         timeline: selection.timeline,
-        isSessionReadOnly: contentUI.isSessionReadOnly,
-        isSessionActionInFlight: contentUI.isSessionActionInFlight,
-        isSelectionLoading: contentUI.isSelectionLoading,
-        isExtensionsLoading: contentUI.isExtensionsLoading,
-        lastAction: contentUI.lastAction
+        isSessionReadOnly: contentSession.isSessionReadOnly,
+        isSessionActionInFlight: contentSession.isSessionActionInFlight,
+        isSelectionLoading: contentSession.isSelectionLoading,
+        isExtensionsLoading: contentSession.isExtensionsLoading,
+        lastAction: contentSession.lastAction
       )
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -418,23 +441,14 @@ private struct ContentDetailColumn: View {
 
 struct InspectorToolbarActions: ToolbarContent {
   let store: HarnessMonitorStore
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var toolbarUI: HarnessMonitorStore.ContentToolbarSlice
   @Binding var showInspector: Bool
-  @Environment(\.openWindow)
-  private var openWindow
-
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
-      RefreshToolbarButton(isRefreshing: contentUI.isRefreshing) {
+      RefreshToolbarButton(isRefreshing: toolbarUI.isRefreshing) {
         Task { await store.refresh() }
       }
         .help("Refresh sessions")
-
-      Button { openWindow(id: HarnessMonitorWindowID.preferences) } label: {
-        Label("Settings", systemImage: "gearshape")
-      }
-      .help("Open settings")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.daemonPreferencesButton)
     }
 
     ToolbarSpacer(.fixed, placement: .primaryAction)
