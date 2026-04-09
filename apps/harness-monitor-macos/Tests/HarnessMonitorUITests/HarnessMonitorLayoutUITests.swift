@@ -7,7 +7,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
   func testPreviewRecentSessionsCardFillsColumn() throws {
     let app = launch(mode: "preview")
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
-    let recentSessionsCard = frameElement(in: app, identifier: Accessibility.recentSessionsCardFrame)
+    let recentSessionsCard = frameElement(
+      in: app, identifier: Accessibility.recentSessionsCardFrame)
 
     XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.actionTimeout))
@@ -24,7 +25,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "empty")
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
     let onboardingCard = frameElement(in: app, identifier: Accessibility.onboardingCardFrame)
-    let recentSessionsCard = frameElement(in: app, identifier: Accessibility.recentSessionsCardFrame)
+    let recentSessionsCard = frameElement(
+      in: app, identifier: Accessibility.recentSessionsCardFrame)
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
 
@@ -81,17 +83,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testSidebarLaunchdIconRendersWhenInstalled() throws {
-    let app = launch(mode: "preview")
-    let daemonCard = element(in: app, identifier: Accessibility.daemonCard)
-    let launchdIcon = element(in: app, identifier: Accessibility.sidebarLaunchdStatusIcon)
-
-    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(launchdIcon.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertGreaterThan(launchdIcon.frame.width, 4)
-    XCTAssertGreaterThan(launchdIcon.frame.height, 4)
-  }
-
   func testOfflineCachedScenarioKeepsSessionsReadableButActionsDisabled() throws {
     let app = launch(
       mode: "preview",
@@ -99,7 +90,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
     let window = mainWindow(in: app)
     let persistedBanner = element(in: app, identifier: Accessibility.persistedDataBanner)
-    let persistedBannerFrame = frameElement(in: app, identifier: Accessibility.persistedDataBannerFrame)
+    let persistedBannerFrame = frameElement(
+      in: app, identifier: Accessibility.persistedDataBannerFrame)
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
@@ -297,7 +289,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
     let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
-    let hideInspectorButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
+    let hideInspectorButton = toolbarButton(
+      in: app, identifier: Accessibility.inspectorToggleButton)
 
     XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
@@ -373,7 +366,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     }
 
     let reconnect = frameElement(in: app, identifier: "\(Accessibility.reconnectButton).frame")
-    let refresh = frameElement(in: app, identifier: "\(Accessibility.refreshDiagnosticsButton).frame")
+    let refresh = frameElement(
+      in: app, identifier: "\(Accessibility.refreshDiagnosticsButton).frame")
     let start = frameElement(in: app, identifier: "\(Accessibility.startDaemonButton).frame")
     let install = frameElement(
       in: app,

@@ -166,14 +166,6 @@ extension HarnessMonitorStore {
   }
 
   private func syncSidebarUI() {
-    assign(connectionState, to: \.connectionState, on: sidebarUI)
-    assign(isBusy, to: \.isBusy, on: sidebarUI)
-    assign(isRefreshing, to: \.isRefreshing, on: sidebarUI)
-    assign(
-      daemonStatus?.launchAgent.installed == true,
-      to: \.isLaunchAgentInstalled,
-      on: sidebarUI
-    )
     assign(connectionMetrics, to: \.connectionMetrics, on: sidebarUI)
     assign(selection.selectedSessionID, to: \.selectedSessionID, on: sidebarUI)
     assign(isPersistenceAvailable, to: \.isPersistenceAvailable, on: sidebarUI)

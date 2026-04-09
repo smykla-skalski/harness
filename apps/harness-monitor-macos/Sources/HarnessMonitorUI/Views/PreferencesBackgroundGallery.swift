@@ -29,7 +29,8 @@ struct PreferencesBackgroundGallery: View {
   }
 
   private var recentItems: [HarnessMonitorBackgroundSelection] {
-    let stored = recentStorageValues.isEmpty
+    let stored =
+      recentStorageValues.isEmpty
       ? []
       : recentStorageValues.split(separator: "|").map(String.init)
     var items = [selectedBackground]
@@ -130,14 +131,16 @@ struct PreferencesBackgroundGallery: View {
 
   private func select(_ background: HarnessMonitorBackgroundSelection) {
     selection = background.storageValue
-    if HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none {
+    let currentBackdropMode = HarnessMonitorBackdropMode(rawValue: backdropModeRawValue)
+    if currentBackdropMode == HarnessMonitorBackdropMode.none {
       backdropModeRawValue = HarnessMonitorBackdropMode.window.rawValue
     }
     updateRecents(with: background)
   }
 
   private func updateRecents(with background: HarnessMonitorBackgroundSelection) {
-    var stored = recentStorageValues.isEmpty
+    var stored =
+      recentStorageValues.isEmpty
       ? []
       : recentStorageValues.split(separator: "|").map(String.init)
     stored.removeAll { $0 == background.storageValue }
