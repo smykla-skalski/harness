@@ -278,7 +278,7 @@ extension HarnessMonitorStore {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     guard let data = FileManager.default.contents(atPath: manifestURL.path),
-          let manifest = try? decoder.decode(DaemonManifest.self, from: data)
+      let manifest = try? decoder.decode(DaemonManifest.self, from: data)
     else {
       return
     }

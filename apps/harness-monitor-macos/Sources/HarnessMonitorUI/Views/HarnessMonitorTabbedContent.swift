@@ -10,7 +10,10 @@ enum HarnessMonitorTabbedContentAlignment {
   case trailing
 }
 
-struct HarnessMonitorTabbedContent<Tab: Hashable & CaseIterable & Identifiable, Content: View>: View {
+struct HarnessMonitorTabbedContent<
+  Tab: Hashable & CaseIterable & Identifiable,
+  Content: View
+>: View {
   let title: String
   @Binding var selection: Tab
   let tabTitle: (Tab) -> String

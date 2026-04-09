@@ -107,6 +107,7 @@ enum HarnessMonitorAccessibility {
   static let reconnectionProgress = "harness.sidebar.reconnection-progress"
   static let actionToast = "harness.action-toast"
   static let sessionTimelinePagination = "harness.session.timeline.pagination"
+  static let sessionTimelinePageSizePicker = "harness.session.timeline.pagination.page-size"
   static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
   static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
   static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"

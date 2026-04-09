@@ -13,7 +13,8 @@ struct SessionsBoardOnboardingCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      SessionsBoardOnboardingHeader(isLaunchAgentInstalled: isLaunchAgentInstalled, dismiss: dismiss)
+      SessionsBoardOnboardingHeader(
+        isLaunchAgentInstalled: isLaunchAgentInstalled, dismiss: dismiss)
       SessionsBoardOnboardingStepsGrid(
         connectionState: connectionState,
         isLaunchAgentInstalled: isLaunchAgentInstalled,
@@ -182,7 +183,9 @@ private struct SessionsBoardOnboardingStepCard<Action: View>: View {
         Text(isReady ? "Ready" : "Pending")
           .scaledFont(.caption.bold())
           .harnessPillPadding()
-          .background(isReady ? HarnessMonitorTheme.success : HarnessMonitorTheme.caution, in: Capsule())
+          .background(
+            isReady ? HarnessMonitorTheme.success : HarnessMonitorTheme.caution, in: Capsule()
+          )
           .foregroundStyle(HarnessMonitorTheme.onContrast)
       }
       Text(detail)

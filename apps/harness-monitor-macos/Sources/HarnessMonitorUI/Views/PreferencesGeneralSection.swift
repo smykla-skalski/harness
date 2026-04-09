@@ -6,7 +6,8 @@ struct PreferencesAppearanceSection: View {
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
-  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
+    .storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
@@ -126,7 +127,8 @@ struct PreferencesGeneralSection: View {
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
-  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
+  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
+    .defaultCustomTimeZoneIdentifier
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   private var effectiveHealth: HealthResponse? {
@@ -155,7 +157,8 @@ struct PreferencesGeneralSection: View {
   }
 
   private var databaseSize: String {
-    let bytes = store.diagnostics?.workspace.databaseSizeBytes
+    let bytes =
+      store.diagnostics?.workspace.databaseSizeBytes
       ?? store.daemonStatus?.diagnostics.databaseSizeBytes ?? 0
     return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
   }
@@ -206,12 +209,15 @@ struct PreferencesGeneralSection: View {
 
         if dateTimeConfiguration.showsCustomTimeZoneField {
           Picker("Custom zone", selection: $customTimeZoneIdentifier) {
-            ForEach(HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers, id: \.self) { identifier in
+            ForEach(
+              HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers,
+              id: \.self
+            ) { identifier in
               Text(identifier).tag(identifier)
             }
           }
-            .harnessNativeFormControl()
-            .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesCustomTimeZonePicker)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesCustomTimeZonePicker)
         }
 
         LabeledContent("Resolved Zone", value: dateTimeConfiguration.effectiveTimeZoneDisplayName)

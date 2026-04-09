@@ -151,16 +151,17 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
       XCTAssertTrue(
         waitUntil(timeout: Self.actionTimeout) {
-          preferencesState.label == self.preferencesStateLabel(
-            mode: expectedMode.rawValue,
-            section: "appearance",
-            backdrop: "none",
-            background: "auroraVeil",
-            textSize: "Default",
-            controlSize: "small",
-            timeZoneMode: "local",
-            timeZone: "local"
-          )
+          preferencesState.label
+            == self.preferencesStateLabel(
+              mode: expectedMode.rawValue,
+              section: "appearance",
+              backdrop: "none",
+              background: "auroraVeil",
+              textSize: "Default",
+              controlSize: "small",
+              timeZoneMode: "local",
+              timeZone: "local"
+            )
         },
         "Preferences state did not settle after selecting \(expectedMode.title); got '\(preferencesState.label)'"
       )
@@ -259,16 +260,17 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
       XCTAssertTrue(
         waitUntil(timeout: Self.actionTimeout) {
-          preferencesState.label == self.preferencesStateLabel(
-            mode: "auto",
-            section: "appearance",
-            backdrop: "window",
-            background: background,
-            textSize: "Default",
-            controlSize: "small",
-            timeZoneMode: "local",
-            timeZone: "local"
-          )
+          preferencesState.label
+            == self.preferencesStateLabel(
+              mode: "auto",
+              section: "appearance",
+              backdrop: "window",
+              background: background,
+              textSize: "Default",
+              controlSize: "small",
+              timeZoneMode: "local",
+              timeZone: "local"
+            )
         },
         "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
       )
@@ -320,16 +322,17 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        preferencesState.label == self.preferencesStateLabel(
-          mode: "auto",
-          section: "appearance",
-          backdrop: "window",
-          background: background,
-          textSize: "Default",
-          controlSize: "small",
-          timeZoneMode: "local",
-          timeZone: "local"
-        )
+        preferencesState.label
+          == self.preferencesStateLabel(
+            mode: "auto",
+            section: "appearance",
+            backdrop: "window",
+            background: background,
+            textSize: "Default",
+            controlSize: "small",
+            timeZoneMode: "local",
+            timeZone: "local"
+          )
       },
       "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
     )
@@ -369,8 +372,8 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
 }
 
-private extension HarnessMonitorSettingsUITests {
-  func assertAppearanceSettingsContract(
+extension HarnessMonitorSettingsUITests {
+  fileprivate func assertAppearanceSettingsContract(
     expectedMode: String,
     textSizeOverride: String? = nil,
     expectedTextSize: String = "Default",
@@ -443,7 +446,7 @@ private extension HarnessMonitorSettingsUITests {
     )
   }
 
-  func assertGeneralSettingsContract(
+  fileprivate func assertGeneralSettingsContract(
     expectedMode: String,
     timeZoneModeOverride: String? = nil,
     customTimeZoneOverride: String? = nil,
@@ -523,7 +526,7 @@ private extension HarnessMonitorSettingsUITests {
     )
   }
 
-  func preferencesStateLabel(
+  fileprivate func preferencesStateLabel(
     mode: String,
     section: String,
     backdrop: String,
@@ -546,7 +549,7 @@ private extension HarnessMonitorSettingsUITests {
     ].joined(separator: ", ")
   }
 
-  func selectAppearanceSection(in app: XCUIApplication) {
+  fileprivate func selectAppearanceSection(in app: XCUIApplication) {
     selectPreferencesSection(
       in: app,
       identifier: Accessibility.preferencesAppearanceSection,
@@ -554,7 +557,7 @@ private extension HarnessMonitorSettingsUITests {
     )
   }
 
-  func selectGeneralSection(in app: XCUIApplication) {
+  fileprivate func selectGeneralSection(in app: XCUIApplication) {
     selectPreferencesSection(
       in: app,
       identifier: Accessibility.preferencesGeneralSection,
@@ -562,7 +565,7 @@ private extension HarnessMonitorSettingsUITests {
     )
   }
 
-  func selectPreferencesSection(
+  fileprivate func selectPreferencesSection(
     in app: XCUIApplication,
     identifier: String,
     expectedTitle: String
@@ -597,7 +600,7 @@ private extension HarnessMonitorSettingsUITests {
     )
   }
 
-  func selectFirstExistingBackground(
+  fileprivate func selectFirstExistingBackground(
     in app: XCUIApplication,
     candidates: [String]
   ) throws -> String {
@@ -629,7 +632,7 @@ private extension HarnessMonitorSettingsUITests {
     throw XCTSkip("No expected macOS wallpaper tiles were available on this machine.")
   }
 
-  func closeSettings(in app: XCUIApplication, preferencesRoot: XCUIElement) {
+  fileprivate func closeSettings(in app: XCUIApplication, preferencesRoot: XCUIElement) {
     if !preferencesRoot.exists {
       return
     }
@@ -644,13 +647,13 @@ private extension HarnessMonitorSettingsUITests {
     XCTAssertTrue(mainWindow(in: app).waitForExistence(timeout: Self.actionTimeout))
   }
 
-  func preferencesRootCount(in app: XCUIApplication) -> Int {
+  fileprivate func preferencesRootCount(in app: XCUIApplication) -> Int {
     app.descendants(matching: .any)
       .matching(identifier: Accessibility.preferencesRoot)
       .count
   }
 
-  func preferencesMetricValue(in element: XCUIElement, label: String) -> XCUIElement {
+  fileprivate func preferencesMetricValue(in element: XCUIElement, label: String) -> XCUIElement {
     element.descendants(matching: .staticText)
       .matching(NSPredicate(format: "label == %@", label))
       .firstMatch

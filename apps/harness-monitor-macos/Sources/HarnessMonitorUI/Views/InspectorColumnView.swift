@@ -112,7 +112,8 @@ private struct InspectorPrimaryLoadingState: View {
       Text(summary.displayTitle)
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         .italic(summary.title.isEmpty)
-        .foregroundStyle(summary.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
+        .foregroundStyle(
+          summary.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
       Text("Loading live task, agent, and signal detail for the selected session.")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -133,8 +134,8 @@ private struct InspectorPrimaryLoadingState: View {
     store: store,
     inspectorUI: store.inspectorUI
   )
-    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-    .frame(width: 420, height: 860)
+  .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+  .frame(width: 420, height: 860)
 }
 
 #Preview("Inspector - Task") {
@@ -144,8 +145,8 @@ private struct InspectorPrimaryLoadingState: View {
     store: store,
     inspectorUI: store.inspectorUI
   )
-    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-    .frame(width: 420, height: 860)
+  .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+  .frame(width: 420, height: 860)
 }
 
 #Preview("Inspector - Agent") {
@@ -155,8 +156,8 @@ private struct InspectorPrimaryLoadingState: View {
     store: store,
     inspectorUI: store.inspectorUI
   )
-    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-    .frame(width: 420, height: 860)
+  .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+  .frame(width: 420, height: 860)
 }
 
 #Preview("Inspector - Observer") {
@@ -166,8 +167,8 @@ private struct InspectorPrimaryLoadingState: View {
     store: store,
     inspectorUI: store.inspectorUI
   )
-    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-    .frame(width: 420, height: 860)
+  .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+  .frame(width: 420, height: 860)
 }
 
 #Preview("Inspector - Empty") {
@@ -180,8 +181,8 @@ private struct InspectorPrimaryLoadingState: View {
     store: store,
     inspectorUI: store.inspectorUI
   )
-    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-    .frame(width: 420, height: 860)
+  .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+  .frame(width: 420, height: 860)
 }
 
 @MainActor

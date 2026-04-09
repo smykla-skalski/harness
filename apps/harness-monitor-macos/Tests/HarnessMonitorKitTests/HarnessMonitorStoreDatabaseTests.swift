@@ -45,26 +45,28 @@ struct HarnessMonitorStoreDatabaseTests {
   func gatherStatisticsPopulated() async {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 2, activeSessionCount: 2)
-    let sessionA = makeSession(.init(
-      sessionId: "sess-db-a",
-      context: "Stats A",
-      status: .active,
-      leaderId: "leader-a",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 2
-    ))
-    let sessionB = makeSession(.init(
-      sessionId: "sess-db-b",
-      context: "Stats B",
-      status: .active,
-      leaderId: "leader-b",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 2
-    ))
+    let sessionA = makeSession(
+      .init(
+        sessionId: "sess-db-a",
+        context: "Stats A",
+        status: .active,
+        leaderId: "leader-a",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
+    let sessionB = makeSession(
+      .init(
+        sessionId: "sess-db-b",
+        context: "Stats B",
+        status: .active,
+        leaderId: "leader-b",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
 
     let detailA = makeSessionDetail(
       summary: sessionA,
@@ -123,16 +125,17 @@ struct HarnessMonitorStoreDatabaseTests {
   func clearSessionCachePreservesUserData() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-clear-cache",
-      context: "Clear cache test",
-      status: .active,
-      leaderId: "leader-clear",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 2
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-clear-cache",
+        context: "Clear cache test",
+        status: .active,
+        leaderId: "leader-clear",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
     let detail = makeSessionDetail(
       summary: session,
       workerID: "worker-clear",
@@ -182,15 +185,16 @@ struct HarnessMonitorStoreDatabaseTests {
   func clearAllUserDataPreservesCache() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-clear-user",
-      context: "Clear user test",
-      status: .active,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-clear-user",
+        context: "Clear user test",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     await store.cacheSessionList([session], projects: [project])
     store.toggleBookmark(sessionId: "sess-clear-user", projectId: "project-a")
@@ -235,16 +239,17 @@ struct HarnessMonitorStoreDatabaseTests {
   func clearAllDatabaseDataRemovesEverything() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-clear-all",
-      context: "Clear all test",
-      status: .active,
-      leaderId: "leader-all",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 2
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-clear-all",
+        context: "Clear all test",
+        status: .active,
+        leaderId: "leader-all",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
     let detail = makeSessionDetail(
       summary: session,
       workerID: "worker-all",

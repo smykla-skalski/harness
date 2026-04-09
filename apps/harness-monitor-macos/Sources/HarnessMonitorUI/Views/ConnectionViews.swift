@@ -202,7 +202,7 @@ struct ConnectionToolbarBadge: View {
         innerSize: 6,
         activeColor: statusTint
       )
-        .accessibilityHidden(true)
+      .accessibilityHidden(true)
       if showsConnectionDetails {
         Text(transportLabel)
           .scaledFont(Self.badgeFont)
@@ -279,16 +279,16 @@ struct SparklineView: View {
 
         ZStack {
           series.areaPath(in: geometry)
-          .fill(
-            LinearGradient(
-              colors: [tint.opacity(0.15), .clear],
-              startPoint: .top,
-              endPoint: .bottom
+            .fill(
+              LinearGradient(
+                colors: [tint.opacity(0.15), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+              )
             )
-          )
 
           series.linePath(in: geometry)
-          .stroke(tint, lineWidth: 1.5)
+            .stroke(tint, lineWidth: 1.5)
         }
       }
     }

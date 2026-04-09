@@ -209,7 +209,8 @@ struct HarnessMonitorSessionModelsTests {
     let detail = try decoder.decode(SessionDetail.self, from: Data(json.utf8))
 
     #expect(detail.signals.count == 1)
-    #expect(detail.signals[0].signal.payload.message == "live payload without extra optional fields")
+    #expect(
+      detail.signals[0].signal.payload.message == "live payload without extra optional fields")
     #expect(detail.signals[0].signal.payload.actionHint == nil)
     #expect(detail.signals[0].signal.payload.relatedFiles.isEmpty)
     #expect(detail.signals[0].signal.payload.metadata == .object([:]))

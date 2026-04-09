@@ -10,8 +10,8 @@ struct HarnessMonitorStoreNavigationTests {
   // MARK: - Direct selectSession path (proves store logic)
 
   @Test("Selecting session from dashboard pushes nil to back stack")
-  func selectFromDashboard() async {
-    let store = await makeNavigationStore()
+  func selectFromDashboard() async throws {
+    let store = try await makeNavigationStore()
 
     await store.selectSession("sess-a")
     #expect(store.navigationBackStack.count == 1)
@@ -19,8 +19,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("Selecting two sessions populates the back stack")
-  func selectTwoSessions() async {
-    let store = await makeNavigationStore()
+  func selectTwoSessions() async throws {
+    let store = try await makeNavigationStore()
 
     await store.selectSession("sess-a")
     await store.selectSession("sess-b")
@@ -29,8 +29,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("Navigate back restores previous session and populates forward stack")
-  func navigateBack() async {
-    let store = await makeNavigationStore()
+  func navigateBack() async throws {
+    let store = try await makeNavigationStore()
 
     await store.selectSession("sess-a")
     await store.selectSession("sess-b")
@@ -42,8 +42,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("Navigate back to dashboard clears selection")
-  func navigateBackToDashboard() async {
-    let store = await makeNavigationStore()
+  func navigateBackToDashboard() async throws {
+    let store = try await makeNavigationStore()
 
     await store.selectSession("sess-a")
     await store.navigateBack()
@@ -54,8 +54,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("Navigate forward after back restores forward session")
-  func navigateForward() async {
-    let store = await makeNavigationStore()
+  func navigateForward() async throws {
+    let store = try await makeNavigationStore()
 
     await store.selectSession("sess-a")
     await store.selectSession("sess-b")
@@ -68,8 +68,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("New selection after back clears forward stack")
-  func newSelectionClearsForward() async {
-    let store = await makeNavigationStore()
+  func newSelectionClearsForward() async throws {
+    let store = try await makeNavigationStore()
 
     await store.selectSession("sess-a")
     await store.selectSession("sess-b")
@@ -82,8 +82,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("Sidebar flow: primeSessionSelection then selectSession records history")
-  func sidebarPrimeThenSelect() async {
-    let store = await makeNavigationStore()
+  func sidebarPrimeThenSelect() async throws {
+    let store = try await makeNavigationStore()
 
     store.primeSessionSelection("sess-a")
     await store.selectSession("sess-a")
@@ -100,8 +100,8 @@ struct HarnessMonitorStoreNavigationTests {
   }
 
   @Test("Observable tracking: back stack mutation is observable")
-  func backStackMutationIsObservable() async {
-    let store = await makeNavigationStore()
+  func backStackMutationIsObservable() async throws {
+    let store = try await makeNavigationStore()
 
     await confirmation("back stack change observed") { confirm in
       withObservationTracking {
@@ -118,7 +118,7 @@ struct HarnessMonitorStoreNavigationTests {
 
   // MARK: - Fixtures
 
-  private func makeNavigationStore() async -> HarnessMonitorStore {
+  private func makeNavigationStore() async throws -> HarnessMonitorStore {
     let summaries = ["sess-a", "sess-b", "sess-c"].map { id in
       makeSession(
         SessionFixture(
@@ -134,14 +134,17 @@ struct HarnessMonitorStoreNavigationTests {
     }
     let details = Dictionary(
       uniqueKeysWithValues: summaries.map { summary in
-        (summary.sessionId, makeSessionDetail(
-          summary: summary,
-          workerID: "worker-\(summary.sessionId)",
-          workerName: "Worker \(summary.sessionId)"
-        ))
+        (
+          summary.sessionId,
+          makeSessionDetail(
+            summary: summary,
+            workerID: "worker-\(summary.sessionId)",
+            workerName: "Worker \(summary.sessionId)"
+          )
+        )
       }
     )
-    let client = RecordingHarnessClient(detail: details.values.first!)
+    let client = RecordingHarnessClient(detail: try #require(details.values.first))
     client.configureSessions(summaries: summaries, detailsByID: details)
     return await makeBootstrappedStore(client: client)
   }

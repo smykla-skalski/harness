@@ -158,7 +158,8 @@ extension HarnessMonitorStore {
       )
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
-          let insertedCount = await service.cacheSessionDetail(detail, timeline: measuredTimeline.value)
+          let insertedCount = await service.cacheSessionDetail(
+            detail, timeline: measuredTimeline.value)
           self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
         }
       }
@@ -270,8 +271,8 @@ extension HarnessMonitorStore {
     extensionsPending: Bool
   ) -> SessionDetail {
     guard extensionsPending,
-          sessionID == selectedSessionID,
-          let selectedSession
+      sessionID == selectedSessionID,
+      let selectedSession
     else {
       return detail
     }
@@ -288,7 +289,7 @@ extension HarnessMonitorStore {
 
   func applySessionExtensions(_ extensions: SessionExtensionsPayload) {
     guard let sessionID = selectedSessionID,
-          sessionID == extensions.sessionId
+      sessionID == extensions.sessionId
     else {
       return
     }

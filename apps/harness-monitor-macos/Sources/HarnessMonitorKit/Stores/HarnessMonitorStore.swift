@@ -101,6 +101,7 @@ public final class HarnessMonitorStore {
   var lastActionDismissDelay: Duration = .seconds(4)
 
   let daemonController: any DaemonControlling
+  let fileViewer: any FileViewerActivating
   public let modelContext: ModelContext?
   let cacheService: SessionCacheService?
   var client: (any HarnessMonitorClientProtocol)?
@@ -128,6 +129,7 @@ public final class HarnessMonitorStore {
 
   public init(
     daemonController: any DaemonControlling,
+    fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) {
@@ -139,6 +141,7 @@ public final class HarnessMonitorStore {
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.daemonController = daemonController
+    self.fileViewer = fileViewer
     self.modelContext = modelContainer?.mainContext
     if let modelContainer {
       self.cacheService = SessionCacheService(modelContainer: modelContainer)

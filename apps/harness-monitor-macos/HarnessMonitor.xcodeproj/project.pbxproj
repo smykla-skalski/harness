@@ -81,6 +81,7 @@
 		5855C61DB10F5059045F49F9 /* InspectorSupportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36D7AEC6128DC640EEEE20F9 /* InspectorSupportViews.swift */; };
 		5967698F2A3531B750EE4643 /* SessionCockpitHeaderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21BFEECFD49DFD5F98CB1D5F /* SessionCockpitHeaderCard.swift */; };
 		5AE09ED8CD281C107F3AB6A7 /* HarnessCornerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE066EEE1A610EC1B6C081E /* HarnessCornerOverlay.swift */; };
+		5C0A6CC0C62524982DB3ACC7 /* HarnessMonitorStoreFileViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73588D1E1D663117A275C727 /* HarnessMonitorStoreFileViewerTests.swift */; };
 		5E4753F6502FAA1A8FE7B334 /* HarnessMonitorActionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B82544B8D7FEC165A767D27 /* HarnessMonitorActionTestSupport.swift */; };
 		5E7FEDEFC89A8BDD761D5B34 /* RecordingHarnessClient+Base.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B66A1CA3B1BD4163C03A3E /* RecordingHarnessClient+Base.swift */; };
 		5E85F24F1EE33893D050B641 /* HarnessMonitorSignalModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6549F9E8DB8A516B84A5C19 /* HarnessMonitorSignalModels.swift */; };
@@ -407,6 +408,7 @@
 		70B66A1CA3B1BD4163C03A3E /* RecordingHarnessClient+Base.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingHarnessClient+Base.swift"; sourceTree = "<group>"; };
 		70EDD380EDACF9010F427743 /* HarnessMonitorWindowIDs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorWindowIDs.swift; sourceTree = "<group>"; };
 		7245EA277463F0D7F3626366 /* InspectorColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorColumnView.swift; sourceTree = "<group>"; };
+		73588D1E1D663117A275C727 /* HarnessMonitorStoreFileViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreFileViewerTests.swift; sourceTree = "<group>"; };
 		7C50373172AFC22A0DD94523 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7D97578BFF8057D6E37550F3 /* PreviewDaemonController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewDaemonController.swift; sourceTree = "<group>"; };
 		7F59C999ECAD7F2E0886BD04 /* HarnessMonitorTaskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTaskModels.swift; sourceTree = "<group>"; };
@@ -699,6 +701,7 @@
 				9A1005E2B090A946F7F6E373 /* HarnessMonitorStoreConfirmationTests.swift */,
 				10DF564102122118B0A5356D /* HarnessMonitorStoreConnectionMetricsTests.swift */,
 				008D1CDC1AF4DB7304D2B662 /* HarnessMonitorStoreDatabaseTests.swift */,
+				73588D1E1D663117A275C727 /* HarnessMonitorStoreFileViewerTests.swift */,
 				FD53406F2271A7D1F5DF0702 /* HarnessMonitorStoreFilteringTests.swift */,
 				D957D8A69D7EF7185EE431CF /* HarnessMonitorStoreInspectorTests.swift */,
 				4D5AFBEAD4CBA367AD3CBE97 /* HarnessMonitorStoreLifecycleTests.swift */,
@@ -1220,6 +1223,7 @@
 				3C64C889D2868179B2014B07 /* HarnessMonitorStoreConfirmationTests.swift in Sources */,
 				4D66844A07A0974B6BD0BF53 /* HarnessMonitorStoreConnectionMetricsTests.swift in Sources */,
 				2AF10F90C078BBCA77093D3C /* HarnessMonitorStoreDatabaseTests.swift in Sources */,
+				5C0A6CC0C62524982DB3ACC7 /* HarnessMonitorStoreFileViewerTests.swift in Sources */,
 				F387EBB66692910AF51247C1 /* HarnessMonitorStoreFilteringTests.swift in Sources */,
 				7C7E982CB93E2560A42BE5F6 /* HarnessMonitorStoreInspectorTests.swift in Sources */,
 				4227089AD301E35FA8C85D6B /* HarnessMonitorStoreLifecycleTests.swift in Sources */,

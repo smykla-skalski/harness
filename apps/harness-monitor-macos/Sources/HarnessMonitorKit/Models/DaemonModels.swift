@@ -75,7 +75,8 @@ public struct DaemonDiagnostics: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let daemonRoot = try container.decode(String.self, forKey: .daemonRoot)
-    let defaultDatabasePath = URL(fileURLWithPath: daemonRoot).appendingPathComponent("harness.db").path
+    let defaultDatabasePath = URL(fileURLWithPath: daemonRoot).appendingPathComponent("harness.db")
+      .path
 
     self.init(
       daemonRoot: daemonRoot,
@@ -240,8 +241,8 @@ public struct DaemonStatusReport: Codable, Equatable, Sendable {
   }
 }
 
-public extension DaemonStatusReport {
-  init(
+extension DaemonStatusReport {
+  public init(
     diagnosticsReport: DaemonDiagnosticsReport,
     fallbackProjectCount: Int? = nil,
     fallbackWorktreeCount: Int? = nil,

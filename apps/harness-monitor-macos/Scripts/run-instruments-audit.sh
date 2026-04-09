@@ -24,9 +24,14 @@ PERSISTENCE_ARG_ONE="-ApplePersistenceIgnoreState"
 PERSISTENCE_ARG_TWO="YES"
 AUDIT_COMMIT_ENV_KEY="HARNESS_MONITOR_AUDIT_GIT_COMMIT"
 AUDIT_DIRTY_ENV_KEY="HARNESS_MONITOR_AUDIT_GIT_DIRTY"
+AUDIT_RUN_ID_ENV_KEY="HARNESS_MONITOR_AUDIT_RUN_ID"
+AUDIT_LABEL_ENV_KEY="HARNESS_MONITOR_AUDIT_LABEL"
 BUILD_COMMIT_KEY="HarnessMonitorBuildGitCommit"
 BUILD_DIRTY_KEY="HarnessMonitorBuildGitDirty"
 BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
+AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
+AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
+SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -151,7 +156,10 @@ build_release_targets() {
 cleanup_host_processes() {
   local host_pattern='Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing'
   local pids
-  pids="$(pgrep -f "$host_pattern" || true)"
+  pids="$(
+    ps -Ao pid=,command= \
+      | awk -v pattern="$host_pattern" '$0 ~ pattern { print $1 }'
+  )"
   if [[ -z "$pids" ]]; then
     return
   fi
@@ -161,6 +169,94 @@ cleanup_host_processes() {
       kill -9 "$pid" 2>/dev/null || true
     fi
   done <<<"$pids"
+}
+
+write_lock_info() {
+  local run_id="$1"
+  local run_label="$2"
+  local started_at_utc="$3"
+  local run_dir="$4"
+
+  mkdir -p "$AUDIT_LOCK_DIR"
+  printf '%s\t%s\t%s\t%s\t%s\n' \
+    "$$" \
+    "$run_id" \
+    "$run_label" \
+    "$started_at_utc" \
+    "$run_dir" >"$AUDIT_LOCK_INFO_PATH"
+}
+
+release_audit_lock() {
+  if [[ -f "$AUDIT_LOCK_INFO_PATH" ]]; then
+    local owner_pid
+    owner_pid="$(cut -f1 "$AUDIT_LOCK_INFO_PATH" 2>/dev/null || true)"
+    if [[ "$owner_pid" == "$$" ]]; then
+      rm -f "$AUDIT_LOCK_INFO_PATH"
+    fi
+  fi
+
+  rmdir "$AUDIT_LOCK_DIR" 2>/dev/null || true
+}
+
+acquire_audit_lock() {
+  local run_id="$1"
+  local run_label="$2"
+  local started_at_utc="$3"
+  local run_dir="$4"
+
+  mkdir -p "$RUNS_ROOT"
+  local active_audit_processes active_pid active_ppid active_command
+  active_audit_processes="$(
+    ps -Ao pid=,ppid=,command= \
+      | awk '
+        /run-instruments-audit[.]sh/ {
+          pid = $1
+          ppid = $2
+          $1 = ""
+          $2 = ""
+          sub(/^  */, "")
+          printf "%s\t%s\t%s\n", pid, ppid, $0
+        }
+      '
+  )"
+  while IFS=$'\t' read -r active_pid active_ppid active_command; do
+    if [[ -z "$active_pid" ]]; then
+      continue
+    fi
+    if [[ "$active_command" == *"harness hook --agent codex suite:run audit-turn"* ]]; then
+      continue
+    fi
+    if [[ "$active_pid" != "$$" && "$active_pid" != "$PPID" && "$active_ppid" != "$$" ]]; then
+      printf 'Another audit script process is already active (pid=%s command=%s). Wait for it to finish before starting %s.\n' \
+        "$active_pid" \
+        "$active_command" \
+        "$run_id" >&2
+      exit 1
+    fi
+  done <<<"$active_audit_processes"
+
+  if mkdir "$AUDIT_LOCK_DIR" 2>/dev/null; then
+    write_lock_info "$run_id" "$run_label" "$started_at_utc" "$run_dir"
+    return
+  fi
+
+  if [[ -f "$AUDIT_LOCK_INFO_PATH" ]]; then
+    local owner_pid owner_run_id owner_label owner_started_at owner_run_dir
+    IFS=$'\t' read -r owner_pid owner_run_id owner_label owner_started_at owner_run_dir <"$AUDIT_LOCK_INFO_PATH" || true
+    if [[ -n "${owner_pid:-}" ]] && kill -0 "$owner_pid" 2>/dev/null; then
+      printf 'Another audit run is already active (pid=%s run_id=%s label=%s started_at=%s run_dir=%s).\n' \
+        "$owner_pid" \
+        "${owner_run_id:-unknown}" \
+        "${owner_label:-unknown}" \
+        "${owner_started_at:-unknown}" \
+        "${owner_run_dir:-unknown}" >&2
+      exit 1
+    fi
+  fi
+
+  rm -rf "$AUDIT_LOCK_DIR"
+  mkdir "$AUDIT_LOCK_DIR"
+  write_lock_info "$run_id" "$run_label" "$started_at_utc" "$run_dir"
 }
 
 plist_value() {
@@ -293,15 +389,25 @@ audit_dirty_env="$AUDIT_DIRTY_ENV_KEY=$git_dirty"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 label_slug="${label//[^A-Za-z0-9._-]/-}"
+run_id="${timestamp}-${label_slug}"
 run_dir="$RUNS_ROOT/${timestamp}-${label_slug}"
 traces_root="$run_dir/traces"
 xctrace_tmp_root="$run_dir/xctrace-tmp"
+acquire_audit_lock "$run_id" "$label" "$timestamp" "$run_dir"
+trap 'release_audit_lock' EXIT INT TERM
 mkdir -p "$traces_root"
 mkdir -p "$xctrace_tmp_root"
 
+audit_run_id_env="$AUDIT_RUN_ID_ENV_KEY=$run_id"
+audit_label_env="$AUDIT_LABEL_ENV_KEY=$label"
+
 printf 'Building Release targets for Instruments...\n'
 cleanup_host_processes
-build_release_targets
+if [[ "$SKIP_BUILD" == "1" ]]; then
+  printf 'Skipping Release build step because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n'
+else
+  build_release_targets
+fi
 
 if [[ ! -x "$HOST_BINARY_PATH" ]]; then
   printf 'Expected UI-test host binary not found at %s\n' "$HOST_BINARY_PATH" >&2
@@ -323,15 +429,25 @@ host_binary_mtime_utc="$(binary_mtime_utc "$HOST_BINARY_PATH")"
 shipping_binary_mtime_utc="$(binary_mtime_utc "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
 
 if [[ "$host_embedded_commit" != "$git_commit" || "$host_embedded_dirty" != "$git_dirty" ]]; then
-  printf 'Host build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
-    "$git_commit" "$git_dirty" "$host_embedded_commit" "$host_embedded_dirty" >&2
-  exit 1
+  if [[ "$SKIP_BUILD" == "1" ]]; then
+    printf 'Host build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
+      "$git_commit" "$git_dirty" "$host_embedded_commit" "$host_embedded_dirty" >&2
+  else
+    printf 'Host build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
+      "$git_commit" "$git_dirty" "$host_embedded_commit" "$host_embedded_dirty" >&2
+    exit 1
+  fi
 fi
 
 if [[ "$shipping_embedded_commit" != "$git_commit" || "$shipping_embedded_dirty" != "$git_dirty" ]]; then
-  printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
-    "$git_commit" "$git_dirty" "$shipping_embedded_commit" "$shipping_embedded_dirty" >&2
-  exit 1
+  if [[ "$SKIP_BUILD" == "1" ]]; then
+    printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
+      "$git_commit" "$git_dirty" "$shipping_embedded_commit" "$shipping_embedded_dirty" >&2
+  else
+    printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s but bundle reports commit=%s dirty=%s\n' \
+      "$git_commit" "$git_dirty" "$shipping_embedded_commit" "$shipping_embedded_dirty" >&2
+    exit 1
+  fi
 fi
 
 printf 'Using host binary: %s\n' "$HOST_BINARY_PATH"
@@ -369,6 +485,8 @@ record_capture() {
     --env "$HIDE_DOCK_ENV" \
     --env "$audit_commit_env" \
     --env "$audit_dirty_env" \
+    --env "$audit_run_id_env" \
+    --env "$audit_label_env" \
     --env "HARNESS_MONITOR_PERF_SCENARIO=$scenario" \
     --env "HARNESS_MONITOR_PREVIEW_SCENARIO=$preview_scenario" \
     --env "$WINDOW_WIDTH_ENV" \
@@ -431,7 +549,7 @@ macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$timestamp" "$git_commit" "$git_dirty" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
+python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -441,6 +559,7 @@ from pathlib import Path
 (
     manifest_path,
     label,
+    run_id,
     timestamp,
     git_commit,
     git_dirty,
@@ -475,6 +594,8 @@ from pathlib import Path
     hide_dock_env,
     audit_commit_env,
     audit_dirty_env,
+    audit_run_id_env,
+    audit_label_env,
     launch_arg_one,
     launch_arg_two,
     *selected_scenarios,
@@ -492,6 +613,8 @@ environment_pairs = [
         hide_dock_env,
         audit_commit_env,
         audit_dirty_env,
+        audit_run_id_env,
+        audit_label_env,
     ]
 ]
 default_environment = {key: value for key, value in environment_pairs}
@@ -520,6 +643,7 @@ for line in Path(capture_records_path).read_text(encoding="utf-8").splitlines():
 
 manifest = {
     "label": label,
+    "run_id": run_id,
     "created_at_utc": timestamp,
     "git": {
         "commit": git_commit,

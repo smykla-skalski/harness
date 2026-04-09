@@ -17,9 +17,11 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func toggleBookmark(sessionId: String, projectId: String) -> Bool {
-    guard let modelContext = unavailablePersistenceContext(
-      for: "Bookmark changes could not be saved."
-    ) else {
+    guard
+      let modelContext = unavailablePersistenceContext(
+        for: "Bookmark changes could not be saved."
+      )
+    else {
       return false
     }
 
@@ -90,9 +92,11 @@ extension HarnessMonitorStore {
     targetId: String,
     sessionId: String
   ) -> Bool {
-    guard let modelContext = unavailablePersistenceContext(
-      for: "Note changes could not be saved."
-    ) else {
+    guard
+      let modelContext = unavailablePersistenceContext(
+        for: "Note changes could not be saved."
+      )
+    else {
       return false
     }
 
@@ -119,9 +123,11 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func deleteNote(_ note: UserNote) -> Bool {
-    guard let modelContext = unavailablePersistenceContext(
-      for: "Note changes could not be saved."
-    ) else {
+    guard
+      let modelContext = unavailablePersistenceContext(
+        for: "Note changes could not be saved."
+      )
+    else {
       return false
     }
 
@@ -145,9 +151,11 @@ extension HarnessMonitorStore {
   public func recordSearch(_ query: String) -> Bool {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return false }
-    guard let modelContext = unavailablePersistenceContext(
-      for: "Search history could not be updated."
-    ) else {
+    guard
+      let modelContext = unavailablePersistenceContext(
+        for: "Search history could not be updated."
+      )
+    else {
       return false
     }
 
@@ -179,9 +187,11 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func clearSearchHistory() -> Bool {
-    guard let modelContext = unavailablePersistenceContext(
-      for: "Search history could not be cleared."
-    ) else {
+    guard
+      let modelContext = unavailablePersistenceContext(
+        for: "Search history could not be cleared."
+      )
+    else {
       return false
     }
 
@@ -310,10 +320,12 @@ extension HarnessMonitorStore {
     for action: String
   ) -> ModelContext? {
     guard let modelContext, persistenceError == nil else {
-      lastError = persistenceError ?? persistenceFailureMessage(
-        action: action,
-        underlyingError: nil
-      )
+      lastError =
+        persistenceError
+        ?? persistenceFailureMessage(
+          action: action,
+          underlyingError: nil
+        )
       return nil
     }
     return modelContext

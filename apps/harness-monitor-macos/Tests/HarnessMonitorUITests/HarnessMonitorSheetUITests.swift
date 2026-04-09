@@ -93,10 +93,10 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
   }
 }
 
-private extension HarnessMonitorSheetUITests {
+extension HarnessMonitorSheetUITests {
   /// Scroll the cockpit to reveal agent cards and right-click the leader
   /// agent card to open the "Send Signal" context menu item.
-  func openSendSignalSheet(in app: XCUIApplication) {
+  fileprivate func openSendSignalSheet(in app: XCUIApplication) {
     let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
     XCTAssertTrue(agentCard.waitForExistence(timeout: Self.actionTimeout))
 
@@ -123,7 +123,7 @@ private extension HarnessMonitorSheetUITests {
     signalMenuItem.tap()
   }
 
-  func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
+  fileprivate func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
     if element.isHittable {
       element.tap()
       return

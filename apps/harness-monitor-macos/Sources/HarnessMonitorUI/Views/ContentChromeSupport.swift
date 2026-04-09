@@ -4,14 +4,14 @@ import SwiftUI
 
 struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   let store: HarnessMonitorStore
-  let pendingConfirmation: HarnessMonitorStore.PendingConfirmation?
+  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
 
   func body(content: Content) -> some View {
     content
       .confirmationDialog(
         title,
         isPresented: Binding(
-          get: { pendingConfirmation != nil },
+          get: { shellUI.pendingConfirmation != nil },
           set: { isPresented in
             if !isPresented {
               store.cancelConfirmation()
@@ -20,7 +20,7 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
         ),
         titleVisibility: .visible
       ) {
-        switch pendingConfirmation {
+        switch shellUI.pendingConfirmation {
         case .endSession(_, let actorID):
           Button("End Session Now", role: .destructive) {
             Task { await store.endSelectedSession(actor: actorID) }
@@ -43,7 +43,7 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   }
 
   private var title: String {
-    switch pendingConfirmation {
+    switch shellUI.pendingConfirmation {
     case .endSession: "End Session?"
     case .removeAgent: "Remove Agent?"
     case nil: ""
@@ -51,7 +51,7 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   }
 
   private var message: String {
-    switch pendingConfirmation {
+    switch shellUI.pendingConfirmation {
     case .endSession(let sessionID, let actorID):
       "This ends \(sessionID) using \(actorID). Active task work must already be closed."
     case .removeAgent(_, let agentID, let actorID):
@@ -122,7 +122,9 @@ struct SessionStatusBanner: View {
   let status: SessionStatus
   let isStale: Bool
 
-  private var color: Color { isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status) }
+  private var color: Color {
+    isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
+  }
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -257,16 +259,15 @@ struct PersistenceUnavailableBanner: View {
 }
 
 struct ContentAnnouncementsModifier: ViewModifier {
-  let connectionState: HarnessMonitorStore.ConnectionState
-  let lastAction: String
+  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
 
   func body(content: Content) -> some View {
     content
-      .onChange(of: connectionState) { _, newState in
+      .onChange(of: shellUI.connectionState) { _, newState in
         guard let message = message(for: newState) else { return }
         AccessibilityNotification.Announcement(message).post()
       }
-      .onChange(of: lastAction) { _, action in
+      .onChange(of: shellUI.lastAction) { _, action in
         guard !action.isEmpty else { return }
         AccessibilityNotification.Announcement(action).post()
       }
@@ -293,14 +294,18 @@ struct ContentNavigationToolbar: ToolbarContent {
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
-      Button { Task { await store.navigateBack() } } label: {
+      Button {
+        Task { await store.navigateBack() }
+      } label: {
         Label("Back", systemImage: "chevron.backward")
       }
       .disabled(!canNavigateBack)
       .help("Go back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.navigateBackButton)
 
-      Button { Task { await store.navigateForward() } } label: {
+      Button {
+        Task { await store.navigateForward() }
+      } label: {
         Label("Forward", systemImage: "chevron.forward")
       }
       .disabled(!canNavigateForward)
@@ -328,8 +333,8 @@ struct RefreshToolbarButton: View {
             reduceMotion
               ? nil
               : isSpinning
-              ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-              : .easeOut(duration: 0.4),
+                ? .linear(duration: 0.9).repeatForever(autoreverses: false)
+                : .easeOut(duration: 0.4),
             value: isSpinning
           )
       }
