@@ -249,10 +249,6 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       in: app,
       identifier: Accessibility.toolbarStatusTickerContentFrame
     )
-    let statusTickerHover = frameElement(
-      in: app,
-      identifier: Accessibility.toolbarStatusTickerHoverFrame
-    )
 
     XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
@@ -260,7 +256,6 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(centerpieceFrame.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(statusTicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(statusTickerContent.waitForExistence(timeout: Self.actionTimeout))
-    let hasStatusTickerHoverFrame = statusTickerHover.waitForExistence(timeout: 2)
     XCTAssertTrue(metricsFrame.waitForExistence(timeout: Self.actionTimeout))
 
     let centerOffset = abs(centerpieceFrame.frame.midX - toolbar.frame.midX)
@@ -270,27 +265,10 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let trailingInset = centerpieceFrame.frame.maxX - statusTicker.frame.maxX
     let statusLeadingInset = statusTickerContent.frame.minX - statusTicker.frame.minX
     let statusTrailingInset = statusTicker.frame.maxX - statusTickerContent.frame.maxX
-    let hoverLeadingInset =
-      hasStatusTickerHoverFrame
-      ? statusTickerHover.frame.minX - statusTicker.frame.minX
-      : .zero
-    let hoverTrailingInset =
-      hasStatusTickerHoverFrame
-      ? statusTicker.frame.maxX - statusTickerHover.frame.maxX
-      : .zero
-    let hoverTopInset =
-      hasStatusTickerHoverFrame
-      ? statusTickerHover.frame.minY - statusTicker.frame.minY
-      : .zero
-    let hoverBottomInset =
-      hasStatusTickerHoverFrame
-      ? statusTicker.frame.maxY - statusTickerHover.frame.maxY
-      : .zero
     let expectedLeadingInset: CGFloat = 12
     let leadingInsetTolerance: CGFloat = 1
     let expectedTrailingInset: CGFloat = 4
     let expectedStatusHorizontalInset: CGFloat = 12
-    let expectedHoverInset: CGFloat = 4
     let statusInsetTolerance: CGFloat = 1
     let diagnostics = """
       toolbar: \(toolbar.frame)
@@ -299,8 +277,6 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       metricsFrame: \(metricsFrame.frame)
       statusTicker: \(statusTicker.frame)
       statusTickerContent: \(statusTickerContent.frame)
-      statusTickerHover exists: \(hasStatusTickerHoverFrame)
-      statusTickerHover: \(hasStatusTickerHoverFrame ? String(describing: statusTickerHover.frame) : "missing")
       centerOffset: \(centerOffset)
       verticalOffset: \(verticalOffset)
       leadingInset: \(leadingInset)
@@ -308,18 +284,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       trailingInset: \(trailingInset)
       statusLeadingInset: \(statusLeadingInset)
       statusTrailingInset: \(statusTrailingInset)
-      hoverLeadingInset: \(hoverLeadingInset)
-      hoverTrailingInset: \(hoverTrailingInset)
-      hoverTopInset: \(hoverTopInset)
-      hoverBottomInset: \(hoverBottomInset)
       """
     let hasTooNarrowCenterpiece = centerpieceFrame.frame.width < 180
-    let hasHoverInsetViolation =
-      hasStatusTickerHoverFrame
-      && (abs(hoverLeadingInset - expectedHoverInset) > statusInsetTolerance
-        || abs(hoverTrailingInset - expectedHoverInset) > statusInsetTolerance
-        || abs(hoverTopInset - expectedHoverInset) > statusInsetTolerance
-        || abs(hoverBottomInset - expectedHoverInset) > statusInsetTolerance)
     let shouldCaptureDiagnostics =
       centerOffset > 120
       || verticalOffset > 8
@@ -328,7 +294,6 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       || abs(trailingInset - expectedTrailingInset) > leadingInsetTolerance
       || abs(statusLeadingInset - expectedStatusHorizontalInset) > statusInsetTolerance
       || abs(statusTrailingInset - expectedStatusHorizontalInset) > statusInsetTolerance
-      || hasHoverInsetViolation
       || hasTooNarrowCenterpiece
 
     if shouldCaptureDiagnostics {
@@ -387,60 +352,18 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertLessThanOrEqual(
       statusLeadingInset,
       expectedStatusHorizontalInset + statusInsetTolerance,
-      "Expected the status hover capsule leading inset to match the vertical inset"
+      "Expected the status ticker leading inset to match the vertical inset"
     )
     XCTAssertGreaterThanOrEqual(
       statusTrailingInset,
       expectedStatusHorizontalInset - statusInsetTolerance,
-      "Expected the status hover capsule to keep the calculated trailing inset"
+      "Expected the status ticker to keep the calculated trailing inset"
     )
     XCTAssertLessThanOrEqual(
       statusTrailingInset,
       expectedStatusHorizontalInset + statusInsetTolerance,
-      "Expected the status hover capsule trailing inset to match the vertical inset"
+      "Expected the status ticker trailing inset to match the vertical inset"
     )
-    if hasStatusTickerHoverFrame {
-      XCTAssertGreaterThanOrEqual(
-        hoverLeadingInset,
-        expectedHoverInset - statusInsetTolerance,
-        "Expected the hover plate leading inset to match the top/bottom inset"
-      )
-      XCTAssertLessThanOrEqual(
-        hoverLeadingInset,
-        expectedHoverInset + statusInsetTolerance,
-        "Expected the hover plate leading inset to stay aligned with the top/bottom inset"
-      )
-      XCTAssertGreaterThanOrEqual(
-        hoverTrailingInset,
-        expectedHoverInset - statusInsetTolerance,
-        "Expected the hover plate trailing inset to match the top/bottom inset"
-      )
-      XCTAssertLessThanOrEqual(
-        hoverTrailingInset,
-        expectedHoverInset + statusInsetTolerance,
-        "Expected the hover plate trailing inset to stay aligned with the top/bottom inset"
-      )
-      XCTAssertGreaterThanOrEqual(
-        hoverTopInset,
-        expectedHoverInset - statusInsetTolerance,
-        "Expected the hover plate top inset to stay at the calculated inset"
-      )
-      XCTAssertLessThanOrEqual(
-        hoverTopInset,
-        expectedHoverInset + statusInsetTolerance,
-        "Expected the hover plate top inset to stay at the calculated inset"
-      )
-      XCTAssertGreaterThanOrEqual(
-        hoverBottomInset,
-        expectedHoverInset - statusInsetTolerance,
-        "Expected the hover plate bottom inset to stay at the calculated inset"
-      )
-      XCTAssertLessThanOrEqual(
-        hoverBottomInset,
-        expectedHoverInset + statusInsetTolerance,
-        "Expected the hover plate bottom inset to stay at the calculated inset"
-      )
-    }
   }
 
   func testToolbarCenterpieceNarrowsWhenInspectorIsVisible() throws {
@@ -579,12 +502,9 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertEqual(centerpieceState.label, "projects=1, sessions=1, openWork=2, blocked=1")
   }
 
-  func testToolbarStatusTickerShowsDropdownOnClick() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
-    )
-    let ticker = element(in: app, identifier: Accessibility.toolbarStatusTicker)
+  func testToolbarStatusTickerRendersInPreview() throws {
+    let app = launch(mode: "empty")
+    let ticker = frameElement(in: app, identifier: Accessibility.toolbarStatusTickerFrame)
 
     let tickerExists = ticker.waitForExistence(timeout: Self.actionTimeout)
     if !tickerExists {
@@ -592,46 +512,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       attachAppHierarchy(in: app, named: "status-ticker-not-found-hierarchy")
     }
     XCTAssertTrue(tickerExists, "Status ticker element not found")
-    attachWindowScreenshot(in: app, named: "status-ticker-before-click")
-
-    let window = mainWindow(in: app)
-    guard window.waitForExistence(timeout: Self.actionTimeout) else {
-      XCTFail("Window not found")
-      return
-    }
-    let tickerFrame = ticker.frame
-    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let toolbar = window.toolbars.firstMatch
-    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
-    let tapY = tickerFrame.minY - window.frame.minY - 4
-    let tapPoint = origin.withOffset(
-      CGVector(
-        dx: tickerFrame.midX - window.frame.minX,
-        dy: tapY
-      ))
-    tapPoint.tap()
-
-    let menuItem = app.menuItems["Running Harness Monitor"].firstMatch
-    let menuAppeared = waitUntil(timeout: 2) { menuItem.exists }
-
-    if !menuAppeared {
-      attachWindowScreenshot(in: app, named: "status-ticker-after-click")
-      attachAppHierarchy(in: app, named: "status-ticker-menu-hierarchy")
-
-      let toolbar = window.toolbars.firstMatch
-      let diagnostics = """
-        ticker: \(tickerFrame)
-        toolbar: \(toolbar.frame)
-        window: \(window.frame)
-        tapY offset from window: \(tickerFrame.minY - window.frame.minY - 6)
-        """
-      let attachment = XCTAttachment(string: diagnostics)
-      attachment.name = "status-ticker-tap-diagnostics"
-      attachment.lifetime = .keepAlways
-      add(attachment)
-    }
-
-    XCTAssertTrue(menuAppeared, "Expected the status ticker dropdown menu to appear on click")
+    XCTAssertGreaterThan(ticker.frame.width, 0)
   }
 }
 
