@@ -4,7 +4,6 @@ import SwiftUI
 
 public struct ContentView: View {
   let store: HarnessMonitorStore
-  let showsCornerAnimation: Bool
   let cornerAnimationContent: (() -> AnyView)?
   @Bindable var contentShell: HarnessMonitorStore.ContentShellSlice
   @Bindable var contentToolbar: HarnessMonitorStore.ContentToolbarSlice
@@ -88,11 +87,9 @@ public struct ContentView: View {
 
   public init(
     store: HarnessMonitorStore,
-    showsCornerAnimation: Bool = false,
     cornerAnimationContent: (() -> AnyView)? = nil
   ) {
     self.store = store
-    self.showsCornerAnimation = showsCornerAnimation
     self.cornerAnimationContent = cornerAnimationContent
     self.contentShell = store.contentUI.shell
     self.contentToolbar = store.contentUI.toolbar
