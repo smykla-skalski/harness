@@ -101,6 +101,10 @@ struct SidebarView: View {
       || controls.sessionSortOrder != .recentActivity
   }
 
+  private var usesFlatSearchResults: Bool {
+    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
   private var sidebarFilterStateValue: String {
     [
       "status=\(controls.sessionFilter.rawValue)",
@@ -119,7 +123,8 @@ struct SidebarView: View {
   private var filterToolbarVisibilityProgress: Double {
     let hiddenWidth = Self.filterToolbarFadeHiddenWidth
     let visibleWidth = Self.filterToolbarFadeVisibleWidth
-    let widthProgress = Double(max(0, min(1, (sidebarWidth - hiddenWidth) / (visibleWidth - hiddenWidth))))
+    let widthProgress = Double(
+      max(0, min(1, (sidebarWidth - hiddenWidth) / (visibleWidth - hiddenWidth))))
     return min(widthProgress, sidebarVisibilityPhase)
   }
 
@@ -219,7 +224,12 @@ struct SidebarView: View {
         message: "Try a broader search or clear filters."
       )
     case .sessionsAvailable:
-      if let firstGroup = projection.groupedSessions.first {
+      if usesFlatSearchResults {
+        flatSearchResults
+          .accessibilityElement(children: .contain)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
+      } else if let firstGroup = projection.groupedSessions.first {
         projectSection(for: firstGroup)
           .accessibilityElement(children: .contain)
           .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
@@ -232,23 +242,19 @@ struct SidebarView: View {
     }
   }
 
-  private var sidebarHeader: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      DaemonStatusCard(
-        store: store,
-        connectionState: sidebarUI.connectionState,
-        isBusy: sidebarUI.isBusy,
-        isRefreshing: sidebarUI.isRefreshing,
-        isLaunchAgentInstalled: sidebarUI.isLaunchAgentInstalled
-      )
-
-      if !recentSearchQueries.isEmpty {
-        sidebarRecentSearches
-      }
+  @ViewBuilder private var flatSearchResults: some View {
+    ForEach(projection.visibleSessions, id: \.sessionId) { session in
+      sessionRow(session)
     }
-    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
-    .padding(.top, HarnessMonitorTheme.spacingXL)
-    .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+  }
+
+  @ViewBuilder private var sidebarHeader: some View {
+    if !recentSearchQueries.isEmpty {
+      sidebarRecentSearches
+        .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+        .padding(.top, HarnessMonitorTheme.spacingXL)
+        .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+    }
   }
 
   func decodedStorageSet(from rawValue: String) -> Set<String> {
