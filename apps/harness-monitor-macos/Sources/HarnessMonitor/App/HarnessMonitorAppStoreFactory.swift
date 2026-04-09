@@ -3,20 +3,6 @@ import SwiftData
 
 @MainActor
 enum HarnessMonitorAppStoreFactory {
-  private enum PreviewFixtureSet: String {
-    case standard
-    case overflow
-    case signalRegression = "signal-regression"
-    case singleAgent = "single-agent"
-
-    init(environment: HarnessMonitorEnvironment) {
-      let rawValue = environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]?
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .lowercased()
-      self = Self(rawValue: rawValue ?? "") ?? .standard
-    }
-  }
-
   private enum PreviewScenarioOverride: String {
     case dashboardLanding = "dashboard-landing"
     case dashboard
@@ -72,17 +58,9 @@ enum HarnessMonitorAppStoreFactory {
     case .live:
       controller = DaemonController(environment: environment)
     case .preview:
-      controller =
-        switch PreviewFixtureSet(environment: environment) {
-        case .standard:
-          PreviewDaemonController()
-        case .overflow:
-          PreviewDaemonController(mode: .overflow)
-        case .signalRegression:
-          PreviewDaemonController(mode: .signalRegression)
-        case .singleAgent:
-          PreviewDaemonController(mode: .singleAgent)
-        }
+      controller = PreviewDaemonController(
+        previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]
+      )
     case .empty:
       controller = PreviewDaemonController(mode: .empty)
     }

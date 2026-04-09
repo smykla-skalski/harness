@@ -5,6 +5,7 @@ public actor PreviewDaemonController: DaemonControlling {
     case dashboardLanding
     case populated
     case overflow
+    case pagedTimeline
     case signalRegression
     case singleAgent
     case empty
@@ -23,6 +24,8 @@ public actor PreviewDaemonController: DaemonControlling {
         PreviewHarnessClient.Fixtures.populated
       case .overflow:
         PreviewHarnessClient.Fixtures.overflow
+      case .pagedTimeline:
+        PreviewHarnessClient.Fixtures.pagedTimeline
       case .signalRegression:
         PreviewHarnessClient.Fixtures.signalRegression
       case .singleAgent:
@@ -34,6 +37,26 @@ public actor PreviewDaemonController: DaemonControlling {
     self.fixtures = fixtures
     self.isDaemonRunning = mode != .empty
     self.isLaunchAgentInstalled = mode != .empty
+  }
+
+  public init(previewFixtureSetRawValue rawValue: String?) {
+    let normalizedValue = rawValue?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    let mode =
+      switch normalizedValue {
+      case "overflow":
+        Mode.overflow
+      case "paged-timeline":
+        Mode.pagedTimeline
+      case "signal-regression":
+        Mode.signalRegression
+      case "single-agent":
+        Mode.singleAgent
+      default:
+        Mode.populated
+      }
+    self.init(mode: mode)
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -122,6 +145,7 @@ public actor PreviewDaemonController: DaemonControlling {
   }
 }
 
-private extension PreviewDaemonController {
-  static let launchAgentPath = "/Users/example/Library/LaunchAgents/io.harness.daemon.plist"
+extension PreviewDaemonController {
+  fileprivate static let launchAgentPath =
+    "/Users/example/Library/LaunchAgents/io.harness.daemon.plist"
 }
