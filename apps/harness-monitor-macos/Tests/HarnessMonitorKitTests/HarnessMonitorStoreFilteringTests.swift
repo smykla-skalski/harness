@@ -54,11 +54,11 @@ struct HarnessMonitorStoreFilteringTests {
   }
 
   private func filteredIDs(from store: HarnessMonitorStore) -> [String] {
-    store.groupedSessions.flatMap(\.sessions).map(\.sessionId).sorted()
+    store.visibleSessionIDs.sorted()
   }
 
   private func orderedVisibleIDs(from store: HarnessMonitorStore) -> [String] {
-    store.groupedSessions.flatMap(\.sessions).map(\.sessionId)
+    store.visibleSessionIDs
   }
 
   @Test("Focus filter .all shows all active sessions")
@@ -538,7 +538,8 @@ struct HarnessMonitorStoreFilteringTests {
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
     #expect(store.sessionIndex.sessionSummary(for: session.sessionId) == updated)
-    #expect(store.groupedSessions.first?.sessions.first == updated)
+    #expect(store.groupedSessions.first?.sessionIDs.first == updated.sessionId)
+    #expect(store.sessionIndex.catalog.sessionSummary(for: session.sessionId) == updated)
     #expect(store.recentSessions.first == updated)
   }
 

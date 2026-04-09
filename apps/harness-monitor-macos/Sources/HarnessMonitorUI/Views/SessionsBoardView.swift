@@ -3,18 +3,18 @@ import SwiftUI
 
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
-  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @AppStorage("harnessMonitor.board.onboardingDismissed")
   private var isOnboardingDismissed = false
 
   init(
     store: HarnessMonitorStore,
-    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    sessionCatalog: HarnessMonitorStore.SessionCatalogSlice,
     contentUI: HarnessMonitorStore.ContentUISlice
   ) {
     self.store = store
-    self.sessionIndex = sessionIndex
+    self.sessionCatalog = sessionCatalog
     self.contentUI = contentUI
   }
 
@@ -29,7 +29,7 @@ struct SessionsBoardView: View {
           SessionsBoardOnboardingCard(
             connectionState: contentUI.connectionState,
             isLaunchAgentInstalled: contentUI.isLaunchAgentInstalled,
-            hasSessions: !sessionIndex.sessions.isEmpty,
+            hasSessions: !sessionCatalog.recentSessions.isEmpty,
             isLoading: isLoading,
             startDaemon: startDaemon,
             installLaunchAgent: installLaunchAgent,
@@ -38,7 +38,7 @@ struct SessionsBoardView: View {
           )
         }
         SessionsBoardRecentSessionsSection(
-          sessions: sessionIndex.sessions,
+          sessions: sessionCatalog.recentSessions,
           selectSession: selectSession
         )
       }
@@ -69,13 +69,21 @@ struct SessionsBoardView: View {
 #Preview("Sessions Board - Dashboard") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
 
-  SessionsBoardView(store: store, sessionIndex: store.sessionIndex, contentUI: store.contentUI)
+  SessionsBoardView(
+    store: store,
+    sessionCatalog: store.sessionIndex.catalog,
+    contentUI: store.contentUI
+  )
     .frame(width: 980, height: 720)
 }
 
 #Preview("Sessions Board - Empty") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
 
-  SessionsBoardView(store: store, sessionIndex: store.sessionIndex, contentUI: store.contentUI)
+  SessionsBoardView(
+    store: store,
+    sessionCatalog: store.sessionIndex.catalog,
+    contentUI: store.contentUI
+  )
     .frame(width: 980, height: 720)
 }

@@ -43,7 +43,7 @@ extension SidebarView {
     projectID: String
   ) -> some View {
     DisclosureGroup(isExpanded: checkoutExpansionBinding(for: group, projectID: projectID)) {
-      ForEach(group.sessions) { session in
+      ForEach(group.sessions, id: \.sessionId) { session in
         sessionRow(session)
       }
     } label: {
@@ -67,7 +67,7 @@ extension SidebarView {
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Spacer()
-      Text("\(group.sessions.count)")
+      Text("\(group.sessionCount)")
         .scaledFont(.caption2.monospacedDigit())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -104,6 +104,9 @@ extension SidebarView {
 
     if sidebarUI.isPersistenceAvailable {
       baseRow
+        .accessibilityFrameMarker(
+          HarnessMonitorAccessibility.sessionRowFrame(session.sessionId)
+        )
         .accessibilityAction(named: "Toggle Bookmark") {
           store.toggleBookmark(
             sessionId: session.sessionId,
@@ -136,30 +139,11 @@ extension SidebarView {
             Label("Copy Session ID", systemImage: "doc.on.doc")
           }
         }
-        .overlay(alignment: .leading) {
-          if HarnessMonitorUITestEnvironment.isEnabled {
-            row
-              .opacity(0.001)
-              .allowsHitTesting(false)
-              .accessibilityElement(children: .ignore)
-              .accessibilityIdentifier(
-                HarnessMonitorAccessibility.sessionRowFrame(session.sessionId)
-              )
-          }
-        }
     } else {
       baseRow
-        .overlay(alignment: .leading) {
-          if HarnessMonitorUITestEnvironment.isEnabled {
-            row
-              .opacity(0.001)
-              .allowsHitTesting(false)
-              .accessibilityElement(children: .ignore)
-              .accessibilityIdentifier(
-                HarnessMonitorAccessibility.sessionRowFrame(session.sessionId)
-              )
-          }
-        }
+        .accessibilityFrameMarker(
+          HarnessMonitorAccessibility.sessionRowFrame(session.sessionId)
+        )
     }
   }
 
