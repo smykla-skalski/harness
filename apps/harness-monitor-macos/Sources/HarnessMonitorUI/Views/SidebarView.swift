@@ -131,14 +131,16 @@ struct SidebarView: View {
       SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
     }
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        SidebarToolbarFilterMenu(
-          store: store,
-          sessionFilter: controls.sessionFilter,
-          sessionFocusFilter: controls.sessionFocusFilter,
-          sessionSortOrder: controls.sessionSortOrder,
-          hasActiveFilters: hasActiveSidebarFilters
-        )
+      if sidebarVisible {
+        ToolbarItem(placement: .primaryAction) {
+          SidebarToolbarFilterMenu(
+            store: store,
+            sessionFilter: controls.sessionFilter,
+            sessionFocusFilter: controls.sessionFocusFilter,
+            sessionSortOrder: controls.sessionSortOrder,
+            hasActiveFilters: hasActiveSidebarFilters
+          )
+        }
       }
     }
     .onSubmit(of: .search) {
