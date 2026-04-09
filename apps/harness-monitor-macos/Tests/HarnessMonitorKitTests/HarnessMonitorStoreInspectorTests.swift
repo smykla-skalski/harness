@@ -90,6 +90,83 @@ struct HarnessMonitorStoreInspectorTests {
     #expect(actors.isEmpty == false)
   }
 
+  @Test("Inspector action context keeps the selected leader available when disconnected")
+  func actionContextKeepsDisconnectedLeaderAvailable() async {
+    let leaderID = "leader-disconnected"
+    let workerID = "worker-connected"
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-disconnected-leader",
+        context: "Disconnected leader fallback",
+        status: .active,
+        leaderId: leaderID,
+        observeId: "observe-disconnected-leader",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let capabilities = PreviewFixtures.agents[0].runtimeCapabilities
+    let detail = SessionDetail(
+      session: summary,
+      agents: [
+        AgentRegistration(
+          agentId: leaderID,
+          name: "Disconnected Leader",
+          runtime: "claude",
+          role: .leader,
+          capabilities: ["general"],
+          joinedAt: summary.createdAt,
+          updatedAt: summary.updatedAt,
+          status: .disconnected,
+          agentSessionId: "\(leaderID)-session",
+          lastActivityAt: summary.lastActivityAt,
+          currentTaskId: nil,
+          runtimeCapabilities: capabilities
+        ),
+        AgentRegistration(
+          agentId: workerID,
+          name: "Connected Worker",
+          runtime: "codex",
+          role: .worker,
+          capabilities: ["general"],
+          joinedAt: summary.createdAt,
+          updatedAt: summary.updatedAt,
+          status: .active,
+          agentSessionId: "\(workerID)-session",
+          lastActivityAt: summary.lastActivityAt,
+          currentTaskId: nil,
+          runtimeCapabilities: capabilities
+        ),
+      ],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      detail: detail
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+
+    guard let actionContext = store.inspectorUI.actionContext else {
+      Issue.record("Expected inspector action context for the selected session")
+      return
+    }
+
+    #expect(actionContext.selectedActionActorID == leaderID)
+    #expect(actionContext.actionActorOptions.contains { $0.agentId == workerID })
+    #expect(
+      actionContext.actionActorOptions.contains { actor in
+        actor.agentId == leaderID && actor.status == .disconnected
+      })
+  }
+
   @Test("Inspector primary content ignores filter churn when selection is unchanged")
   func inspectorPrimaryContentIgnoresFilterChurn() async {
     let store = await makeBootstrappedStore()

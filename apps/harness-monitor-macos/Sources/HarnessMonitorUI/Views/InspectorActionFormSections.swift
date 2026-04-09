@@ -6,7 +6,7 @@ struct InspectorActionStatusBanner: View {
   let isSessionActionInFlight: Bool
   let lastAction: String
   let lastError: String?
-  let availableActionActors: [AgentRegistration]
+  let actionActorOptions: [AgentRegistration]
   @Binding var actionActorID: String
 
   var body: some View {
@@ -32,10 +32,10 @@ struct InspectorActionStatusBanner: View {
         .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(3)
-      if !availableActionActors.isEmpty {
+      if !actionActorOptions.isEmpty {
         Picker("Act As", selection: $actionActorID) {
-          ForEach(availableActionActors) { agent in
-            Text(agent.name).tag(agent.agentId)
+          ForEach(actionActorOptions) { agent in
+            Text(actionActorTitle(for: agent)).tag(agent.agentId)
           }
         }
         .pickerStyle(.menu)
@@ -65,6 +65,13 @@ struct InspectorActionStatusBanner: View {
       Task creation, reassignments, checkpoints, and leadership changes flow through
       the daemon.
       """
+  }
+
+  private func actionActorTitle(for agent: AgentRegistration) -> String {
+    guard agent.status != .active else {
+      return agent.name
+    }
+    return "\(agent.name) (\(agent.status.title.lowercased()))"
   }
 }
 
@@ -228,15 +235,21 @@ struct InspectorRoleActionsSection: View {
       )
       Text(agent.name)
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      Picker("Role", selection: $role) {
-        ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
-          Text(role.title).tag(role)
+      if agent.agentId == leaderID {
+        Text("Transfer leadership before changing the leader's role.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      } else {
+        Picker("Role", selection: $role) {
+          ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
+            Text(role.title).tag(role)
+          }
         }
+        .harnessNativeFormControl()
+        Button("Change Role", action: changeSelectedRole)
+          .harnessActionButtonStyle(variant: .prominent, tint: nil)
+          .disabled(isSessionActionInFlight || isSessionReadOnly)
       }
-      .harnessNativeFormControl()
-      Button("Change Role", action: changeSelectedRole)
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(isSessionActionInFlight || isSessionReadOnly)
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
@@ -277,23 +290,29 @@ struct InspectorLeaderTransferSection: View {
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      Picker("New Leader", selection: $transferLeaderID) {
-        if let leader = detail.agents.first(where: { $0.agentId == detail.session.leaderId }) {
-          Text("\(leader.name) (current leader)")
-            .foregroundStyle(.tertiary)
-            .tag(leader.agentId)
+      if detail.agents.isEmpty {
+        Text("Agent availability is still loading for this session.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      } else {
+        Picker("New Leader", selection: $transferLeaderID) {
+          if let leader = detail.agents.first(where: { $0.agentId == detail.session.leaderId }) {
+            Text("\(leader.name) (current leader)")
+              .foregroundStyle(.tertiary)
+              .tag(leader.agentId)
+          }
+          ForEach(detail.agents.filter { $0.agentId != detail.session.leaderId }) { agent in
+            Text(agent.name).tag(agent.agentId)
+          }
         }
-        ForEach(detail.agents.filter { $0.agentId != detail.session.leaderId }) { agent in
-          Text(agent.name).tag(agent.agentId)
+        .onChange(of: transferLeaderID) { previous, current in
+          if current == detail.session.leaderId, previous != detail.session.leaderId {
+            transferLeaderID = previous
+          }
         }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferPicker)
+        .harnessNativeFormControl()
       }
-      .onChange(of: transferLeaderID) { previous, current in
-        if current == detail.session.leaderId, previous != detail.session.leaderId {
-          transferLeaderID = previous
-        }
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferPicker)
-      .harnessNativeFormControl()
       TextField("Reason", text: $transferReason, axis: .vertical)
         .harnessNativeFormControl()
         .lineLimit(3, reservesSpace: true)

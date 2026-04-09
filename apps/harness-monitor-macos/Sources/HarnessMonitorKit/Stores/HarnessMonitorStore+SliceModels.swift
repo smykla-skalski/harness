@@ -220,7 +220,7 @@ extension HarnessMonitorStore {
     public let selectedAgent: AgentRegistration?
     public let selectedObserver: ObserverSummary?
     public let isPersistenceAvailable: Bool
-    public let availableActionActors: [AgentRegistration]
+    public let actionActorOptions: [AgentRegistration]
     public let selectedActionActorID: String
     public let isSessionReadOnly: Bool
     public let isSessionActionInFlight: Bool
@@ -233,7 +233,7 @@ extension HarnessMonitorStore {
       selectedAgent: AgentRegistration?,
       selectedObserver: ObserverSummary?,
       isPersistenceAvailable: Bool,
-      availableActionActors: [AgentRegistration],
+      actionActorOptions: [AgentRegistration],
       selectedActionActorID: String,
       isSessionReadOnly: Bool,
       isSessionActionInFlight: Bool,
@@ -245,7 +245,7 @@ extension HarnessMonitorStore {
       self.selectedAgent = selectedAgent
       self.selectedObserver = selectedObserver
       self.isPersistenceAvailable = isPersistenceAvailable
-      self.availableActionActors = availableActionActors
+      self.actionActorOptions = actionActorOptions
       self.selectedActionActorID = selectedActionActorID
       self.isSessionReadOnly = isSessionReadOnly
       self.isSessionActionInFlight = isSessionActionInFlight
@@ -294,13 +294,41 @@ extension HarnessMonitorStore {
         selectedAgent: selectedAgent,
         selectedObserver: selectedObserver,
         isPersistenceAvailable: isPersistenceAvailable,
-        availableActionActors: detail.agents.filter { $0.status == .active },
+        actionActorOptions: Self.actionActorOptions(
+          for: detail,
+          selectedActionActorID: selectedActionActorID
+        ),
         selectedActionActorID: selectedActionActorID,
         isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight,
         lastAction: lastAction,
         lastError: lastError
       )
+    }
+
+    private static func actionActorOptions(
+      for detail: SessionDetail,
+      selectedActionActorID: String
+    ) -> [AgentRegistration] {
+      var seenAgentIDs = Set<String>()
+      var options: [AgentRegistration] = []
+
+      func append(_ agent: AgentRegistration?) {
+        guard let agent else {
+          return
+        }
+        guard seenAgentIDs.insert(agent.agentId).inserted else {
+          return
+        }
+        options.append(agent)
+      }
+
+      for agent in detail.agents where agent.status == .active {
+        append(agent)
+      }
+      append(detail.agents.first { $0.agentId == selectedActionActorID })
+      append(detail.agents.first { $0.agentId == detail.session.leaderId })
+      return options
     }
   }
 
