@@ -7,13 +7,9 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
   func testDatabaseSectionStatisticsButtonsAndConfirmations() throws {
     let app = launch(mode: "preview")
 
-    // Open preferences.
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-
+    openSettings(in: app)
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
 
     // Click "Database" in the sidebar. Sidebar items may appear as buttons,
     // cells, or radio buttons depending on the macOS version.
@@ -24,7 +20,7 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     // Verify Database section loaded.
     let title = element(in: app, identifier: Accessibility.preferencesTitle)
     XCTAssertTrue(
-      waitUntil(timeout: 3) { title.exists && title.label == "Database" },
+      waitUntil(timeout: 2) { title.exists && title.label == "Database" },
       "Title should be 'Database' but got '\(title.label)'"
     )
 
@@ -34,7 +30,7 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
 
     // -- Verify Statistics section (visible at the top) --
     let statisticsHeader = app.staticTexts["Statistics"]
-    XCTAssertTrue(statisticsHeader.waitForExistence(timeout: 5))
+    XCTAssertTrue(statisticsHeader.waitForExistence(timeout: 2))
 
     // -- Scroll to reveal Operations buttons --
     dragUp(in: app, element: statisticsHeader, distanceRatio: 3.0)
@@ -45,7 +41,7 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     let clearAllButton = app.buttons["Clear All Data"].firstMatch
     let revealButton = app.buttons["Reveal in Finder"].firstMatch
 
-    XCTAssertTrue(clearCacheButton.waitForExistence(timeout: 3), "Clear Session Cache not found")
+    XCTAssertTrue(clearCacheButton.waitForExistence(timeout: 2), "Clear Session Cache not found")
     XCTAssertTrue(clearUserDataButton.exists, "Clear User Data not found")
     XCTAssertTrue(clearAllButton.exists, "Clear All Data not found")
     XCTAssertTrue(revealButton.exists, "Reveal in Finder not found")

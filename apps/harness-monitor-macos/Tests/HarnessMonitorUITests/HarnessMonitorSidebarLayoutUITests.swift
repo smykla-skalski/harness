@@ -10,9 +10,9 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
 
     let toolbarOffset = sidebarContent.frame.minY - window.frame.minY
     XCTAssertGreaterThan(toolbarOffset, 40)
@@ -21,68 +21,53 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(daemonCard.frame.minY - sidebarContent.frame.minY, 28)
   }
 
-  func testToolbarBaselineDividerStartsAtSidebarBoundary() throws {
+  func testMainWindowUsesNativeToolbarChromeWithoutCustomBaselineDivider() throws {
     let app = launch(mode: "preview")
-    let window = mainWindow(in: app)
-    let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let toolbarDivider = frameElement(in: app, identifier: Accessibility.toolbarBaselineDivider)
-    let toolbar = window.toolbars.firstMatch
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(toolbarDivider.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
-
-    XCTAssertEqual(toolbarDivider.frame.minX, sidebarContent.frame.maxX, accuracy: 6)
-    XCTAssertEqual(toolbarDivider.frame.maxX, window.frame.maxX, accuracy: 6)
-
-    let dividerTopOffset = toolbarDivider.frame.minY - window.frame.minY
-    let toolbarBottomOffset = toolbar.frame.maxY - window.frame.minY
-
-    XCTAssertGreaterThanOrEqual(dividerTopOffset, toolbarBottomOffset - 4)
-    XCTAssertLessThanOrEqual(dividerTopOffset, toolbarBottomOffset + 12)
+    XCTAssertFalse(
+      toolbarDivider.waitForExistence(timeout: Self.actionTimeout),
+      "Expected the main window to rely on native Liquid Glass toolbar chrome instead of a custom baseline divider"
+    )
   }
 
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
-    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
+    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
     let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
 
-    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.actionTimeout))
 
-    XCTAssertEqual(projectHeader.frame.minX, filtersCard.frame.minX)
-    XCTAssertEqual(projectHeader.frame.maxX, filtersCard.frame.maxX)
+    XCTAssertEqual(projectHeader.frame.minX, daemonCard.frame.minX, accuracy: 2)
+    XCTAssertEqual(projectHeader.frame.maxX, daemonCard.frame.maxX, accuracy: 2)
 
-    let headerSpacing = projectHeader.frame.minY - filtersCard.frame.maxY
+    let headerSpacing = projectHeader.frame.minY - daemonCard.frame.maxY
     XCTAssertGreaterThanOrEqual(headerSpacing, 0)
     XCTAssertLessThanOrEqual(headerSpacing, 32)
   }
 
-  func testSidebarSessionCardMatchesFiltersCardWidth() throws {
+  func testSidebarSessionCardMatchesDaemonCardWidth() throws {
     let app = launch(mode: "preview")
-    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
+    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
     let sessionCard = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
 
-    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(sessionCard.frame.minX, filtersCard.frame.minX)
-    XCTAssertEqual(sessionCard.frame.maxX, filtersCard.frame.maxX)
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertEqual(sessionCard.frame.minX, daemonCard.frame.minX, accuracy: 2)
+    XCTAssertEqual(sessionCard.frame.maxX, daemonCard.frame.maxX, accuracy: 2)
   }
 
-  func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
+  func testToolbarSearchAndFilterControlsAreVisible() throws {
     let app = launch(mode: "preview")
-    let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
-    let filtersCard = app.staticTexts["Search & Filters"]
-    let searchField = element(in: app, identifier: Accessibility.sidebarSearchField)
-    let clearButton = element(in: app, identifier: Accessibility.sidebarClearFiltersButton)
+    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
+    let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
+    let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
 
-    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertFalse(clearButton.exists)
-    XCTAssertTrue(sidebarRoot.exists)
-    XCTAssertTrue(filtersCard.exists)
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterState.label.contains("status=active"))
   }
 
   func testSidebarScrollMovesSessionRowsWhenContentOverflows() throws {
@@ -94,9 +79,9 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionList.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionList.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     let initialMinY = sessionRow.frame.minY
 
     for _ in 0..<8 {
@@ -113,51 +98,27 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testFocusFilterSelectionTogglesAccessibilityState() throws {
+  func testToolbarFilterMenuAppliesStatusAndResetFlow() throws {
     let app = launch(mode: "preview")
-    let blockedSegment = button(in: app, identifier: Accessibility.blockedChip)
-    XCTAssertTrue(blockedSegment.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.blockedChip)
-    XCTAssertTrue(
-      app.staticTexts["1 visible of 1"].waitForExistence(timeout: Self.uiTimeout)
-    )
-    XCTAssertTrue(
-      element(in: app, identifier: Accessibility.sidebarClearFiltersButton).waitForExistence(
-        timeout: Self.uiTimeout
-      )
-    )
-  }
-
-  func testStatusFilterSelectionTogglesAccessibilityState() throws {
-    let app = launch(mode: "preview")
-    let endedSegment = element(in: app, identifier: Accessibility.endedFilterButton)
-
-    XCTAssertTrue(endedSegment.waitForExistence(timeout: Self.uiTimeout))
-
-    tapButton(in: app, title: "Ended")
-
-    XCTAssertTrue(
-      frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame).waitForExistence(
-        timeout: Self.uiTimeout
-      )
-    )
-    XCTAssertTrue(
-      element(in: app, identifier: Accessibility.sidebarClearFiltersButton).waitForExistence(
-        timeout: Self.uiTimeout
-      )
-    )
-  }
-
-  func testSidebarEmptyStateStartsDirectlyBelowFiltersCard() throws {
-    let app = launch(mode: "preview")
-    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
+    let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
+    let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
     let emptyState = frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame)
-    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.idleChip)
-    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.uiTimeout))
+    let sessionRow = previewSessionTrigger(in: app)
 
-    let emptyStateSpacing = emptyState.frame.minY - filtersCard.frame.maxY
-    XCTAssertGreaterThanOrEqual(emptyStateSpacing, 0)
-    XCTAssertLessThan(emptyStateSpacing, 32)
+    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
+
+    tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
+    tapButton(in: app, title: "Status")
+    tapButton(in: app, title: "Ended")
+    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterState.label.contains("status=ended"))
+
+    tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
+    tapButton(in: app, identifier: Accessibility.sidebarClearFiltersButton)
+
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterState.label.contains("status=active"))
+    XCTAssertTrue(filterState.label.contains("sort=recentActivity"))
   }
 }

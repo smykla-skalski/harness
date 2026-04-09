@@ -18,9 +18,9 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
     let title = element(in: app, identifier: Accessibility.preferencesTitle)
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
 
     let settingsWindow = window(in: app, containing: preferencesPanel)
     let generalSection = sidebarSectionElement(
@@ -31,7 +31,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     let appearanceSection = element(in: app, identifier: Accessibility.preferencesAppearanceSection)
 
     XCTAssertTrue(generalSection.exists)
-    XCTAssertTrue(appearanceSection.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(appearanceSection.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(title.exists)
     XCTAssertEqual(title.label, "General")
     XCTAssertEqual(
@@ -55,12 +55,12 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     app.typeKey(",", modifierFlags: .command)
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(preferencesRootCount(in: app), 1)
 
     app.typeKey(",", modifierFlags: .command)
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(preferencesRootCount(in: app), 1)
   }
 
@@ -74,14 +74,14 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     let removeButton = element(in: app, identifier: Accessibility.removeLaunchAgentButton)
     let launchdCard = element(in: app, identifier: Accessibility.preferencesLaunchdCard)
-    if !removeButton.waitForExistence(timeout: Self.uiTimeout) {
+    if !removeButton.waitForExistence(timeout: Self.actionTimeout) {
       attachAppHierarchy(in: app, named: "remove-launch-agent-hierarchy")
     }
 
     XCTAssertTrue(removeButton.exists)
-    XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         (launchdCard.value as? String)?.contains("Running") == true
       },
       "Launchd card value should contain 'Running' but got '\(launchdCard.value ?? "nil")'"
@@ -94,11 +94,11 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       title: "Remove Launch Agent Now"
     )
     XCTAssertTrue(
-      confirmButton.waitForExistence(timeout: Self.uiTimeout)
+      confirmButton.waitForExistence(timeout: Self.actionTimeout)
     )
     confirmButton.tap()
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         (launchdCard.value as? String)?.contains("Manual") == true
       }
     )
@@ -130,8 +130,8 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
     selectAppearanceSection(in: app)
 
     let expectedModes: [(title: String, rawValue: String)] = [
@@ -150,7 +150,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       )
 
       XCTAssertTrue(
-        waitUntil(timeout: Self.uiTimeout) {
+        waitUntil(timeout: Self.actionTimeout) {
           preferencesState.label == self.preferencesStateLabel(
             mode: expectedMode.rawValue,
             section: "appearance",
@@ -169,11 +169,11 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     closeSettings(in: app, preferencesRoot: preferencesRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       sessionRow.value as? String,
       "selected, interactive=button, selectionChrome=translucent"
@@ -194,9 +194,9 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
     selectAppearanceSection(in: app)
-    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.actionTimeout))
 
     for option in ["Window", "Content", "None", "Window", "None"] {
       selectMenuOption(
@@ -206,7 +206,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       )
 
       XCTAssertTrue(
-        waitUntil(timeout: Self.uiTimeout) {
+        waitUntil(timeout: Self.actionTimeout) {
           let currentBackdropPicker = self.element(
             in: app,
             identifier: Accessibility.preferencesBackdropModePicker
@@ -220,11 +220,11 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     closeSettings(in: app, preferencesRoot: preferencesRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       sessionRow.value as? String,
       "selected, interactive=button, selectionChrome=translucent"
@@ -249,16 +249,16 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
     selectAppearanceSection(in: app)
-    XCTAssertTrue(gallery.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(gallery.waitForExistence(timeout: Self.actionTimeout))
 
     for background in ["blueMarble", "gangesDelta", "auroraVeil"] {
       tapElement(in: app, identifier: Accessibility.preferencesBackgroundTile(background))
 
       XCTAssertTrue(
-        waitUntil(timeout: Self.uiTimeout) {
+        waitUntil(timeout: Self.actionTimeout) {
           preferencesState.label == self.preferencesStateLabel(
             mode: "auto",
             section: "appearance",
@@ -277,11 +277,11 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     closeSettings(in: app, preferencesRoot: preferencesRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       sessionRow.value as? String,
       "selected, interactive=button, selectionChrome=translucent"
@@ -305,8 +305,8 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
     selectAppearanceSection(in: app)
 
     let background = try selectFirstExistingBackground(
@@ -319,7 +319,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     )
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         preferencesState.label == self.preferencesStateLabel(
           mode: "auto",
           section: "appearance",
@@ -337,11 +337,11 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     closeSettings(in: app, preferencesRoot: preferencesRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       sessionRow.value as? String,
       "selected, interactive=button, selectionChrome=translucent"
@@ -394,14 +394,14 @@ private extension HarnessMonitorSettingsUITests {
     let modePicker = element(in: app, identifier: Accessibility.preferencesThemeModePicker)
     let textSizePicker = element(in: app, identifier: Accessibility.preferencesTextSizePicker)
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.actionTimeout))
 
     selectAppearanceSection(in: app)
 
-    XCTAssertTrue(modePicker.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(textSizePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(modePicker.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(textSizePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       preferencesState.label,
       preferencesStateLabel(
@@ -427,12 +427,12 @@ private extension HarnessMonitorSettingsUITests {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(sessionRow.value as? String, "interactive=button")
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       observeSummaryButton.value as? String,
       "interactive=button, chrome=content-card"
@@ -474,13 +474,13 @@ private extension HarnessMonitorSettingsUITests {
       identifier: Accessibility.preferencesCustomTimeZonePicker
     )
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.actionTimeout))
 
     selectGeneralSection(in: app)
 
-    XCTAssertTrue(timeZonePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(timeZonePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       preferencesState.label,
       preferencesStateLabel(
@@ -507,12 +507,12 @@ private extension HarnessMonitorSettingsUITests {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(sessionRow.value as? String, "interactive=button")
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       observeSummaryButton.value as? String,
       "interactive=button, chrome=content-card"
@@ -580,7 +580,7 @@ private extension HarnessMonitorSettingsUITests {
       within: settingsWindow
     )
 
-    XCTAssertTrue(section.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(section.waitForExistence(timeout: Self.actionTimeout))
     if section.isHittable {
       section.tap()
     } else if let coordinate = centerCoordinate(in: app, for: section) {
@@ -590,7 +590,7 @@ private extension HarnessMonitorSettingsUITests {
     }
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         title.exists && title.label == expectedTitle
       },
       "Preferences title did not switch to \(expectedTitle); got '\(title.label)'"
@@ -605,7 +605,7 @@ private extension HarnessMonitorSettingsUITests {
     let preferencesWindow = window(in: app, containing: preferencesRoot)
     let nativeTab = app.buttons.matching(NSPredicate(format: "label == %@", "Native")).firstMatch
 
-    XCTAssertTrue(nativeTab.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(nativeTab.waitForExistence(timeout: Self.actionTimeout))
 
     for _ in 0..<4 where !nativeTab.isHittable {
       dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
@@ -629,19 +629,6 @@ private extension HarnessMonitorSettingsUITests {
     throw XCTSkip("No expected macOS wallpaper tiles were available on this machine.")
   }
 
-  func openSettings(in app: XCUIApplication) {
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    if preferencesRoot.exists {
-      return
-    }
-
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-  }
-
   func closeSettings(in app: XCUIApplication, preferencesRoot: XCUIElement) {
     if !preferencesRoot.exists {
       return
@@ -650,11 +637,11 @@ private extension HarnessMonitorSettingsUITests {
     app.typeKey("w", modifierFlags: .command)
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         !preferencesRoot.exists
       }
     )
-    XCTAssertTrue(mainWindow(in: app).waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(mainWindow(in: app).waitForExistence(timeout: Self.actionTimeout))
   }
 
   func preferencesRootCount(in app: XCUIApplication) -> Int {

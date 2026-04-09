@@ -9,8 +9,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
     let recentSessionsCard = frameElement(in: app, identifier: Accessibility.recentSessionsCardFrame)
 
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.actionTimeout))
 
     assertFillsColumn(
       child: recentSessionsCard,
@@ -28,11 +28,11 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
 
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(onboardingCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(onboardingCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
 
     assertFillsColumn(
       child: onboardingCard,
@@ -67,9 +67,9 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       NSPredicate(format: "identifier BEGINSWITH %@", "harness.board.metric.")
     )
 
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       centerpieceState.label,
       "projects=1, worktrees=0, sessions=1, openWork=2, blocked=1"
@@ -86,8 +86,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let daemonCard = element(in: app, identifier: Accessibility.daemonCard)
     let launchdIcon = element(in: app, identifier: Accessibility.sidebarLaunchdStatusIcon)
 
-    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(launchdIcon.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(launchdIcon.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertGreaterThan(launchdIcon.frame.width, 4)
     XCTAssertGreaterThan(launchdIcon.frame.height, 4)
   }
@@ -113,17 +113,17 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
     let createTaskButton = button(in: app, title: "Create Task")
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(persistedBanner.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(persistedBannerFrame.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(createTaskButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(persistedBanner.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(persistedBannerFrame.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(createTaskButton.waitForExistence(timeout: Self.actionTimeout))
 
     XCTAssertTrue(persistedBanner.label.contains("Daemon is off"))
     XCTAssertTrue(persistedBanner.label.contains("may be stale"))
@@ -135,7 +135,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     tapElement(in: app, identifier: Accessibility.sidebarSearchField)
     app.typeText("offline cockpit\n")
-    XCTAssertTrue(clearFiltersButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(clearFiltersButton.waitForExistence(timeout: Self.actionTimeout))
     tapElement(in: app, identifier: Accessibility.sidebarClearFiltersButton)
 
     let recentSearchChip = button(in: app, title: "offline cockpit")
@@ -143,11 +143,11 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       in: app,
       identifier: Accessibility.sidebarClearSearchHistoryButton
     )
-    XCTAssertTrue(recentSearchChip.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(clearSearchHistoryButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(recentSearchChip.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(clearSearchHistoryButton.waitForExistence(timeout: Self.actionTimeout))
     tapElement(in: app, identifier: Accessibility.sidebarClearSearchHistoryButton)
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         !recentSearchChip.exists && !clearSearchHistoryButton.exists
       }
     )
@@ -156,18 +156,18 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
     let noteField = editableField(in: app, identifier: Accessibility.taskNoteField)
     let addNoteButton = element(in: app, identifier: Accessibility.taskNoteAddButton)
-    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(noteField.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(addNoteButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(noteField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(addNoteButton.waitForExistence(timeout: Self.actionTimeout))
 
     tapElement(in: app, identifier: Accessibility.taskNoteField)
     app.typeText("Offline note")
     tapElement(in: app, identifier: Accessibility.taskNoteAddButton)
-    XCTAssertTrue(app.staticTexts["Offline note"].waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(app.staticTexts["Offline note"].waitForExistence(timeout: Self.actionTimeout))
 
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
     let signalSendButton = element(in: app, identifier: Accessibility.signalSendButton)
-    XCTAssertTrue(signalSendButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(signalSendButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertFalse(signalSendButton.isEnabled)
   }
 
@@ -177,12 +177,12 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let sessionInspectorCard = element(in: app, identifier: Accessibility.sessionInspectorCard)
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     tapPreviewSession(in: app)
 
-    XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.actionTimeout))
     assertFillsColumn(
       child: sessionInspectorCard,
       in: inspectorRoot,
@@ -196,14 +196,14 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
     let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
-    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.actionTimeout))
     assertFillsColumn(
       child: taskInspector,
       in: inspectorRoot,
@@ -214,7 +214,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
 
     let agentInspector = element(in: app, identifier: Accessibility.agentInspectorCard)
-    XCTAssertTrue(agentInspector.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(agentInspector.waitForExistence(timeout: Self.actionTimeout))
     assertFillsColumn(
       child: agentInspector,
       in: inspectorRoot,
@@ -225,7 +225,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     tapButton(in: app, identifier: Accessibility.observeSummaryButton)
 
     let observerInspector = element(in: app, identifier: Accessibility.observerInspectorCard)
-    XCTAssertTrue(observerInspector.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observerInspector.waitForExistence(timeout: Self.actionTimeout))
     assertFillsColumn(
       child: observerInspector,
       in: inspectorRoot,
@@ -241,9 +241,9 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
 
     let cardOffset = inspectorEmptyState.frame.minY - window.frame.minY
     XCTAssertGreaterThan(cardOffset, 40, "Inspector content overlaps toolbar")
@@ -255,8 +255,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let window = mainWindow(in: app)
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
 
     let initialWidth = inspectorRoot.frame.width
     let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
@@ -267,7 +267,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     start.press(forDuration: 0.01, thenDragTo: end)
 
-    let widenedInspector = waitUntil(timeout: Self.uiTimeout) {
+    let widenedInspector = waitUntil(timeout: Self.actionTimeout) {
       inspectorRoot.frame.width >= initialWidth + 80
     }
 
@@ -297,16 +297,14 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
     let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
     let hideInspectorButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
 
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.actionTimeout))
 
-    for control in [refreshButton, preferencesButton, hideInspectorButton] {
+    for control in [refreshButton, hideInspectorButton] {
       XCTAssertGreaterThanOrEqual(control.frame.minX, inspectorRoot.frame.minX - 6)
       XCTAssertLessThanOrEqual(control.frame.maxX, inspectorRoot.frame.maxX + 6)
       XCTAssertLessThan(control.frame.maxY, inspectorEmptyState.frame.minY)
@@ -317,7 +315,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     tapPreviewSession(in: app)
 
     let taskUI = element(in: app, identifier: Accessibility.taskUICard)
@@ -325,10 +323,10 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let leaderCard = element(in: app, identifier: Accessibility.leaderAgentCard)
     let workerCard = element(in: app, identifier: Accessibility.workerAgentCard)
 
-    XCTAssertTrue(taskUI.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(taskRouting.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(leaderCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(workerCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(taskUI.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(taskRouting.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(leaderCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(workerCard.waitForExistence(timeout: Self.actionTimeout))
 
     assertEqualHeights([taskUI, taskRouting], tolerance: 10)
     assertEqualHeights([leaderCard, workerCard], tolerance: 10)
@@ -340,12 +338,9 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
 
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-
+    openSettings(in: app)
     let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
-    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.actionTimeout))
 
     let endpointCard = element(in: app, identifier: Accessibility.preferencesEndpointCard)
     let versionCard = element(in: app, identifier: Accessibility.preferencesVersionCard)
@@ -353,13 +348,13 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let databaseSizeCard = element(in: app, identifier: Accessibility.preferencesDatabaseSizeCard)
     let liveSessionsCard = element(in: app, identifier: Accessibility.preferencesLiveSessionsCard)
 
-    XCTAssertTrue(endpointCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(versionCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(databaseSizeCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(liveSessionsCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(endpointCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(versionCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(databaseSizeCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(liveSessionsCard.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         (launchdCard.value as? String)?.contains("Running") == true
       }
     )
@@ -389,11 +384,11 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       identifier: "\(Accessibility.removeLaunchAgentButton).frame"
     )
 
-    XCTAssertTrue(reconnect.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(refresh.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(start.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(install.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(remove.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(reconnect.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(refresh.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(start.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(install.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(remove.waitForExistence(timeout: Self.actionTimeout))
 
     assertEqualHeights([reconnect, refresh, start, install, remove], tolerance: 10)
     XCTAssertLessThan(start.frame.height, 62)
@@ -403,18 +398,15 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
   func testPreferencesSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launch(mode: "preview")
 
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-
+    openSettings(in: app)
     let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
 
-    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.actionTimeout))
 
     let settingsWindow = window(in: app, containing: preferencesPanel)
     XCTAssertTrue(settingsWindow.exists)
     let settingsToolbar = settingsWindow.toolbars.firstMatch
-    XCTAssertTrue(settingsToolbar.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(settingsToolbar.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertGreaterThan(
       settingsToolbar.buttons.count,
       0,
@@ -427,7 +419,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       title: "General",
       within: settingsWindow
     )
-    XCTAssertTrue(generalSection.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(generalSection.waitForExistence(timeout: Self.actionTimeout))
     let toolbarLeadingInset = leadingToolbarButton.frame.minX - settingsWindow.frame.minX
     let rowTopInset = generalSection.frame.minY - settingsWindow.frame.minY
 
@@ -463,11 +455,11 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       identifier: Accessibility.onboardingRefreshButtonFrame
     )
 
-    XCTAssertTrue(sidebarStart.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sidebarInstall.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(boardStart.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(boardInstall.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(boardRefresh.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarStart.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarInstall.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(boardStart.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(boardInstall.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(boardRefresh.waitForExistence(timeout: Self.actionTimeout))
 
     assertEqualHeights([boardStart, boardInstall, boardRefresh], tolerance: 10)
     XCTAssertLessThan(sidebarStart.frame.height, 40)

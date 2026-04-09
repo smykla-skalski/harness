@@ -3,7 +3,7 @@ import XCTest
 extension HarnessMonitorUITestCase {
   func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
     let control = popUpButton(in: app, identifier: controlIdentifier)
-    XCTAssertTrue(control.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(control.waitForExistence(timeout: Self.actionTimeout))
 
     app.activate()
     if control.isHittable {
@@ -18,7 +18,7 @@ extension HarnessMonitorUITestCase {
     let menuItem = app.descendants(matching: .menuItem).matching(
       NSPredicate(format: "label == %@ OR title == %@", optionTitle, optionTitle)
     ).firstMatch
-    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.actionTimeout))
     menuItem.tap()
   }
 
@@ -32,7 +32,7 @@ extension HarnessMonitorUITestCase {
 
   func dismissConfirmationDialog(in app: XCUIApplication) {
     let cancelButton = confirmationDialogButton(in: app, title: "Cancel")
-    XCTAssertTrue(cancelButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(cancelButton.waitForExistence(timeout: Self.actionTimeout))
     cancelButton.tap()
   }
 
