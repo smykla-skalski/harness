@@ -12,7 +12,10 @@ struct SessionCockpitView: View {
   let lastAction: String
 
   var body: some View {
-    HarnessMonitorColumnScrollView(verticalPadding: HarnessMonitorTheme.spacingXL) {
+    HarnessMonitorColumnScrollView(
+      verticalPadding: HarnessMonitorTheme.spacingXL,
+      constrainContentWidth: true
+    ) {
       VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(
           detail: detail,
