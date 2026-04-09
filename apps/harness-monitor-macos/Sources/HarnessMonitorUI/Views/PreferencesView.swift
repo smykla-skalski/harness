@@ -33,7 +33,14 @@ public struct PreferencesView: View {
         case .appearance:
           PreferencesAppearanceSection(themeMode: $themeMode)
         case .connection:
-          PreferencesConnectionSection(store: store)
+          PreferencesConnectionSection(
+            connectionState: store.connectionState,
+            isDiagnosticsRefreshInFlight: store.isDiagnosticsRefreshInFlight,
+            metrics: store.connectionMetrics,
+            events: store.connectionEvents,
+            reconnect: { await store.reconnect() },
+            refreshDiagnostics: { await store.refreshDiagnostics() }
+          )
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:

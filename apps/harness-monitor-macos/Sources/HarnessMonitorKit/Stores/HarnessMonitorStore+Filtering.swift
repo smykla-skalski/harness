@@ -87,68 +87,192 @@ extension HarnessMonitorStore {
       case projection
     }
 
+    private enum SummaryChangeImpact {
+      case catalog
+      case projection
+      case summaryOnly
+    }
+
+    private struct SessionRecord {
+      let summary: SessionSummary
+      let normalizedSearchCorpus: String
+      let normalizedName: String
+
+      init(summary: SessionSummary) {
+        self.summary = summary
+        normalizedSearchCorpus = SessionIndexSlice.normalizedSearchCorpus(for: summary)
+        normalizedName = summary.displayTitle.sessionSearchNormalized
+      }
+
+      var statusSortKey: Int { summary.status.sortKey }
+      var recentActivitySortKey: String { summary.updatedAt }
+    }
+
+    private struct CheckoutCatalog {
+      let checkoutId: String
+      let title: String
+      let isWorktree: Bool
+      let recentActivitySessionIDs: [String]
+      let nameSessionIDs: [String]
+      let statusSessionIDs: [String]
+
+      func orderedSessionIDs(
+        for sortOrder: SessionSortOrder
+      ) -> [String] {
+        switch sortOrder {
+        case .recentActivity:
+          recentActivitySessionIDs
+        case .name:
+          nameSessionIDs
+        case .status:
+          statusSessionIDs
+        }
+      }
+    }
+
+    private struct CheckoutAccumulator {
+      let checkoutId: String
+      let title: String
+      let isWorktree: Bool
+      var sessionIDs: [String]
+    }
+
+    private struct ProjectCatalog {
+      let project: ProjectSummary
+      let checkouts: [CheckoutCatalog]
+    }
+
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
-    public var projects: [ProjectSummary] = [] {
-      didSet { refreshDerivedStateIfNeeded(oldValue != projects, change: .data) }
-    }
-    public var sessions: [SessionSummary] = [] {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessions, change: .data) }
-    }
-    public var searchText = "" {
-      didSet { refreshDerivedStateIfNeeded(oldValue != searchText, change: .projection) }
-    }
-    public var sessionFilter: SessionFilter = .active {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFilter, change: .projection) }
-    }
-    public var sessionFocusFilter: SessionFocusFilter = .all {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFocusFilter, change: .projection) }
-    }
-    public var sessionSortOrder: SessionSortOrder = .recentActivity {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionSortOrder, change: .projection) }
-    }
-    public private(set) var groupedSessions: [SessionGroup] = []
-    public private(set) var filteredSessionCount = 0
-    public private(set) var totalOpenWorkCount = 0
-    public private(set) var totalBlockedCount = 0
-    public private(set) var sessionSummariesByID: [String: SessionSummary] = [:]
+    public let catalog: SessionCatalogSlice
+    public let controls: SessionControlsSlice
+    public let projection: SessionProjectionSlice
 
-    private var suppressDerivedStateRefresh = false
+    @ObservationIgnored private var suppressRefresh = false
+    @ObservationIgnored private var sessionSummariesByID: [String: SessionSummary] = [:]
+    @ObservationIgnored private var sessionRecordsByID: [String: SessionRecord] = [:]
+    @ObservationIgnored private var sessionIndicesByID: [String: Int] = [:]
+    @ObservationIgnored private var projectCatalogs: [ProjectCatalog] = []
+    @ObservationIgnored private var queryTokens: [String] = []
+    @ObservationIgnored private(set) var debugCatalogRebuildCount = 0
+    @ObservationIgnored private(set) var debugProjectionRebuildCount = 0
 
-    public init() {}
+    public var projects: [ProjectSummary] {
+      get { catalog.projects }
+      set { refreshCatalogIfNeeded(newValue != catalog.projects, projects: newValue, sessions: catalog.sessions) }
+    }
+
+    public var sessions: [SessionSummary] {
+      get { catalog.sessions }
+      set { refreshCatalogIfNeeded(newValue != catalog.sessions, projects: catalog.projects, sessions: newValue) }
+    }
+
+    public var searchText: String {
+      get { controls.searchText }
+      set { updateSearchText(newValue) }
+    }
+
+    public var sessionFilter: SessionFilter {
+      get { controls.sessionFilter }
+      set { updateSessionFilter(newValue) }
+    }
+
+    public var sessionFocusFilter: SessionFocusFilter {
+      get { controls.sessionFocusFilter }
+      set { updateSessionFocusFilter(newValue) }
+    }
+
+    public var sessionSortOrder: SessionSortOrder {
+      get { controls.sessionSortOrder }
+      set { updateSessionSortOrder(newValue) }
+    }
+
+    public var groupedSessions: [SessionGroup] {
+      projection.groupedSessions
+    }
+
+    public var filteredSessionCount: Int {
+      projection.filteredSessionCount
+    }
+
+    public var totalSessionCount: Int {
+      catalog.totalSessionCount
+    }
+
+    public var totalOpenWorkCount: Int {
+      catalog.totalOpenWorkCount
+    }
+
+    public var totalBlockedCount: Int {
+      catalog.totalBlockedCount
+    }
+
+    public var visibleSessionIDs: [String] {
+      projection.visibleSessionIDs
+    }
+
+    public var recentSessions: [SessionSummary] {
+      catalog.recentSessions
+    }
+
+    public init() {
+      self.catalog = SessionCatalogSlice()
+      self.controls = SessionControlsSlice()
+      self.projection = SessionProjectionSlice()
+      rebuildProjection(change: .projection)
+    }
 
     @discardableResult
     public func replaceSnapshot(
       projects: [ProjectSummary],
       sessions: [SessionSummary]
     ) -> Bool {
-      guard self.projects != projects || self.sessions != sessions else {
+      guard catalog.projects != projects || catalog.sessions != sessions else {
         return false
       }
 
-      suppressDerivedStateRefresh = true
-      self.projects = projects
-      self.sessions = sessions
-      suppressDerivedStateRefresh = false
-      rebuildDerivedState(change: .data)
+      suppressRefresh = true
+      catalog.projects = projects
+      catalog.sessions = sessions
+      suppressRefresh = false
+      rebuildCatalogAndProjection()
       return true
     }
 
     @discardableResult
     public func applySessionSummary(_ summary: SessionSummary) -> Bool {
-      if let index = sessions.firstIndex(where: { $0.sessionId == summary.sessionId }) {
-        guard sessions[index] != summary else {
+      if let index = sessionIndicesByID[summary.sessionId] {
+        let existing = catalog.sessions[index]
+        guard existing != summary else {
           return false
         }
-        var updated = sessions
+
+        var updated = catalog.sessions
         updated[index] = summary
-        sessions = updated
-        return true
-      } else {
-        var updated = sessions
-        updated.append(summary)
-        sessions = updated
+        suppressRefresh = true
+        catalog.sessions = updated
+        suppressRefresh = false
+
+        switch summaryChangeImpact(from: existing, to: summary) {
+        case .catalog:
+          rebuildCatalogAndProjection()
+        case .projection:
+          patchCatalog(existingSummary: existing, updatedSummary: summary)
+          rebuildProjection(change: .data)
+        case .summaryOnly:
+          patchCatalog(existingSummary: existing, updatedSummary: summary)
+          patchVisibleProjection(summary)
+          onChanged?(.data)
+        }
         return true
       }
+
+      var updated = catalog.sessions
+      updated.append(summary)
+      suppressRefresh = true
+      catalog.sessions = updated
+      suppressRefresh = false
+      rebuildCatalogAndProjection()
+      return true
     }
 
     public func sessionSummary(for sessionID: String?) -> SessionSummary? {
@@ -158,37 +282,193 @@ extension HarnessMonitorStore {
       return sessionSummariesByID[sessionID]
     }
 
-    private func refreshDerivedStateIfNeeded(
+    private func refreshCatalogIfNeeded(
       _ changed: Bool,
-      change: Change
+      projects: [ProjectSummary],
+      sessions: [SessionSummary]
     ) {
-      guard changed, !suppressDerivedStateRefresh else {
+      guard changed, !suppressRefresh else {
         return
       }
-      rebuildDerivedState(change: change)
+
+      suppressRefresh = true
+      catalog.projects = projects
+      catalog.sessions = sessions
+      suppressRefresh = false
+      rebuildCatalogAndProjection()
     }
 
-    private func rebuildDerivedState(change: Change) {
-      totalOpenWorkCount = sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
-      totalBlockedCount = sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
-      sessionSummariesByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
+    private func updateSearchText(_ newValue: String) {
+      guard controls.searchText != newValue else {
+        return
+      }
+      let didChangeQuery =
+        Self.normalizedQueryTokens(for: controls.searchText)
+        != Self.normalizedQueryTokens(for: newValue)
+      controls.searchText = newValue
+      refreshProjectionIfNeeded(didChangeQuery)
+    }
 
-      let filteredSessions = sessions.filter(matchesCurrentFilters)
-      filteredSessionCount = filteredSessions.count
-      let sessionsByProject = Dictionary(grouping: filteredSessions, by: \.projectId)
+    private func updateSessionFilter(_ newValue: SessionFilter) {
+      guard controls.sessionFilter != newValue else {
+        return
+      }
+      controls.sessionFilter = newValue
+      refreshProjectionIfNeeded(true)
+    }
 
-      groupedSessions = projects.compactMap { project in
-        guard let sessions = sessionsByProject[project.projectId], !sessions.isEmpty else {
-          return nil
+    private func updateSessionFocusFilter(_ newValue: SessionFocusFilter) {
+      guard controls.sessionFocusFilter != newValue else {
+        return
+      }
+      controls.sessionFocusFilter = newValue
+      refreshProjectionIfNeeded(true)
+    }
+
+    private func updateSessionSortOrder(_ newValue: SessionSortOrder) {
+      guard controls.sessionSortOrder != newValue else {
+        return
+      }
+      controls.sessionSortOrder = newValue
+      refreshProjectionIfNeeded(true)
+    }
+
+    private func refreshProjectionIfNeeded(_ changed: Bool) {
+      guard changed, !suppressRefresh else {
+        return
+      }
+      rebuildProjection(change: .projection)
+    }
+
+    private func rebuildCatalogAndProjection() {
+      rebuildCatalog()
+      rebuildProjection(change: .data)
+    }
+
+    private func rebuildCatalog() {
+      debugCatalogRebuildCount += 1
+      catalog.totalSessionCount = catalog.sessions.count
+      catalog.totalOpenWorkCount = catalog.sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
+      catalog.totalBlockedCount = catalog.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
+      sessionSummariesByID = Dictionary(
+        uniqueKeysWithValues: catalog.sessions.map { ($0.sessionId, $0) }
+      )
+
+      sessionIndicesByID.removeAll(keepingCapacity: true)
+      sessionRecordsByID.removeAll(keepingCapacity: true)
+
+      for (index, summary) in catalog.sessions.enumerated() {
+        sessionIndicesByID[summary.sessionId] = index
+        sessionRecordsByID[summary.sessionId] = SessionRecord(summary: summary)
+      }
+
+      projectCatalogs = buildProjectCatalogs()
+      catalog.recentSessions = sortRecentSessions(catalog.sessions)
+    }
+
+    private func patchCatalog(
+      existingSummary: SessionSummary,
+      updatedSummary: SessionSummary
+    ) {
+      sessionSummariesByID[updatedSummary.sessionId] = updatedSummary
+      sessionRecordsByID[updatedSummary.sessionId] = SessionRecord(summary: updatedSummary)
+      catalog.totalOpenWorkCount += updatedSummary.metrics.openTaskCount
+        - existingSummary.metrics.openTaskCount
+      catalog.totalBlockedCount += updatedSummary.metrics.blockedTaskCount
+        - existingSummary.metrics.blockedTaskCount
+      if existingSummary.updatedAt != updatedSummary.updatedAt {
+        catalog.recentSessions = sortRecentSessions(catalog.sessions)
+      } else {
+        catalog.recentSessions = replacingSession(updatedSummary, in: catalog.recentSessions)
+      }
+    }
+
+    private func patchVisibleProjection(_ updatedSummary: SessionSummary) {
+      let currentState = projection.state
+      guard currentState.visibleSessionIDs.contains(updatedSummary.sessionId) else {
+        return
+      }
+
+      let updatedGroups = currentState.groupedSessions.map { group in
+        guard group.project.projectId == updatedSummary.projectId else {
+          return group
         }
-        let sessionsByCheckout = Dictionary(grouping: sessions, by: \.checkoutId)
-        let checkoutGroups = sessionsByCheckout
-          .map { checkoutID, checkoutSessions in
-            HarnessMonitorStore.CheckoutGroup(
-              checkoutId: checkoutID,
-              title: checkoutSessions.first?.checkoutDisplayName ?? "Repository",
-              isWorktree: checkoutSessions.first?.isWorktree ?? false,
-              sessions: checkoutSessions.sorted(by: sessionSortOrder.compare)
+
+        let updatedCheckoutGroups = group.checkoutGroups.map { checkout in
+          guard checkout.checkoutId == updatedSummary.checkoutId else {
+            return checkout
+          }
+
+          let updatedSessions = replacingSession(updatedSummary, in: checkout.sessions)
+          guard updatedSessions != checkout.sessions else {
+            return checkout
+          }
+
+          return HarnessMonitorStore.CheckoutGroup(
+            checkoutId: checkout.checkoutId,
+            title: checkout.title,
+            isWorktree: checkout.isWorktree,
+            sessions: updatedSessions
+          )
+        }
+
+        guard updatedCheckoutGroups != group.checkoutGroups else {
+          return group
+        }
+
+        return SessionGroup(
+          project: group.project,
+          checkoutGroups: updatedCheckoutGroups
+        )
+      }
+
+      guard updatedGroups != currentState.groupedSessions else {
+        return
+      }
+
+      var nextState = currentState
+      nextState.groupedSessions = updatedGroups
+      projection.state = nextState
+    }
+
+    private func buildProjectCatalogs() -> [ProjectCatalog] {
+      var checkoutsByProject: [String: [String: CheckoutAccumulator]] = [:]
+
+      for summary in catalog.sessions {
+        let checkout = CheckoutAccumulator(
+          checkoutId: summary.checkoutId,
+          title: summary.checkoutDisplayName,
+          isWorktree: summary.isWorktree,
+          sessionIDs: [summary.sessionId]
+        )
+
+        if var existing = checkoutsByProject[summary.projectId]?[summary.checkoutId] {
+          existing.sessionIDs.append(summary.sessionId)
+          checkoutsByProject[summary.projectId]?[summary.checkoutId] = existing
+        } else {
+          checkoutsByProject[summary.projectId, default: [:]][summary.checkoutId] = checkout
+        }
+      }
+
+      return catalog.projects.map { project in
+        let checkouts = (checkoutsByProject[project.projectId] ?? [:]).values
+          .map { checkout in
+            CheckoutCatalog(
+              checkoutId: checkout.checkoutId,
+              title: checkout.title,
+              isWorktree: checkout.isWorktree,
+              recentActivitySessionIDs: sortedSessionIDs(
+                checkout.sessionIDs,
+                using: .recentActivity
+              ),
+              nameSessionIDs: sortedSessionIDs(
+                checkout.sessionIDs,
+                using: .name
+              ),
+              statusSessionIDs: sortedSessionIDs(
+                checkout.sessionIDs,
+                using: .status
+              )
             )
           }
           .sorted { lhs, rhs in
@@ -197,28 +477,176 @@ extension HarnessMonitorStore {
             }
             return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
           }
-        return SessionGroup(
-          project: project,
-          checkoutGroups: checkoutGroups
-        )
+        return ProjectCatalog(project: project, checkouts: checkouts)
+      }
+    }
+
+    private func rebuildProjection(change: Change) {
+      debugProjectionRebuildCount += 1
+      queryTokens = Self.normalizedQueryTokens(for: controls.searchText)
+
+      let visibleRecords = catalog.sessions.compactMap { summary -> SessionRecord? in
+        guard let record = sessionRecordsByID[summary.sessionId], matchesCurrentFilters(record) else {
+          return nil
+        }
+        return record
+      }
+
+      let visibleSessionIDs = visibleRecords.map(\.summary.sessionId)
+      let visibleRecordsByID = Dictionary(uniqueKeysWithValues: visibleRecords.map {
+        ($0.summary.sessionId, $0)
+      })
+
+      let groupedSessions = projectCatalogs.compactMap { projectCatalog -> SessionGroup? in
+        let checkoutGroups = projectCatalog.checkouts.compactMap { checkout -> HarnessMonitorStore
+          .CheckoutGroup? in
+          let checkoutSessions = checkout
+            .orderedSessionIDs(for: controls.sessionSortOrder)
+            .compactMap { visibleRecordsByID[$0]?.summary }
+          guard !checkoutSessions.isEmpty else {
+            return nil
+          }
+          return HarnessMonitorStore.CheckoutGroup(
+            checkoutId: checkout.checkoutId,
+            title: checkout.title,
+            isWorktree: checkout.isWorktree,
+            sessions: checkoutSessions
+          )
+        }
+        guard !checkoutGroups.isEmpty else {
+          return nil
+        }
+        return SessionGroup(project: projectCatalog.project, checkoutGroups: checkoutGroups)
+      }
+      let emptyState: SidebarEmptyState
+      if catalog.totalSessionCount == 0 {
+        emptyState = .noSessions
+      } else if groupedSessions.isEmpty {
+        emptyState = .noMatches
+      } else {
+        emptyState = .sessionsAvailable
+      }
+
+      let nextState = SessionProjectionState(
+        searchText: controls.searchText,
+        sessionFilter: controls.sessionFilter,
+        sessionFocusFilter: controls.sessionFocusFilter,
+        sessionSortOrder: controls.sessionSortOrder,
+        groupedSessions: groupedSessions,
+        filteredSessionCount: visibleSessionIDs.count,
+        totalSessionCount: catalog.totalSessionCount,
+        visibleSessionIDs: visibleSessionIDs,
+        emptyState: emptyState
+      )
+
+      if projection.state != nextState {
+        projection.state = nextState
       }
 
       onChanged?(change)
     }
 
-    private func matchesCurrentFilters(_ summary: SessionSummary) -> Bool {
-      sessionFilter.includes(summary.status)
-        && sessionFocusFilter.includes(summary)
-        && searchMatches(summary)
+    private func sortedSessionIDs(
+      _ sessionIDs: [String],
+      using sortOrder: SessionSortOrder
+    ) -> [String] {
+      sessionIDs.sorted { lhsID, rhsID in
+        guard let lhs = sessionRecordsByID[lhsID],
+          let rhs = sessionRecordsByID[rhsID]
+        else {
+          return lhsID < rhsID
+        }
+
+        switch sortOrder {
+        case .recentActivity:
+          if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
+            return lhs.recentActivitySortKey > rhs.recentActivitySortKey
+          }
+        case .name:
+          let nameComparison = lhs.normalizedName.localizedStandardCompare(rhs.normalizedName)
+          if nameComparison != .orderedSame {
+            return nameComparison == .orderedAscending
+          }
+        case .status:
+          if lhs.statusSortKey != rhs.statusSortKey {
+            return lhs.statusSortKey < rhs.statusSortKey
+          }
+          if lhs.recentActivitySortKey != rhs.recentActivitySortKey {
+            return lhs.recentActivitySortKey > rhs.recentActivitySortKey
+          }
+        }
+
+        return lhs.summary.sessionId < rhs.summary.sessionId
+      }
     }
 
-    private func searchMatches(_ summary: SessionSummary) -> Bool {
-      let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !needle.isEmpty else {
+    private func sortRecentSessions(_ sessions: [SessionSummary]) -> [SessionSummary] {
+      sessions.sorted { lhs, rhs in
+        if lhs.updatedAt != rhs.updatedAt {
+          return lhs.updatedAt > rhs.updatedAt
+        }
+        return lhs.sessionId < rhs.sessionId
+      }
+    }
+
+    private func replacingSession(
+      _ updatedSummary: SessionSummary,
+      in sessions: [SessionSummary]
+    ) -> [SessionSummary] {
+      sessions.map { session in
+        session.sessionId == updatedSummary.sessionId ? updatedSummary : session
+      }
+    }
+
+    private func matchesCurrentFilters(_ record: SessionRecord) -> Bool {
+      controls.sessionFilter.includes(record.summary.status)
+        && controls.sessionFocusFilter.includes(record.summary)
+        && searchMatches(record)
+    }
+
+    private func searchMatches(_ record: SessionRecord) -> Bool {
+      guard !queryTokens.isEmpty else {
         return true
       }
+      return queryTokens.allSatisfy(record.normalizedSearchCorpus.contains)
+    }
 
-      let haystack = [
+    private func requiresCatalogRebuild(
+      from existing: SessionSummary,
+      to updated: SessionSummary
+    ) -> Bool {
+      existing.projectId != updated.projectId
+        || existing.checkoutId != updated.checkoutId
+        || existing.isWorktree != updated.isWorktree
+        || existing.worktreeName != updated.worktreeName
+        || existing.checkoutRoot != updated.checkoutRoot
+    }
+
+    private func summaryChangeImpact(
+      from existing: SessionSummary,
+      to updated: SessionSummary
+    ) -> SummaryChangeImpact {
+      if requiresCatalogRebuild(from: existing, to: updated) {
+        return .catalog
+      }
+
+      let existingRecord = SessionRecord(summary: existing)
+      let updatedRecord = SessionRecord(summary: updated)
+      let affectsProjection =
+        existingRecord.normalizedSearchCorpus != updatedRecord.normalizedSearchCorpus
+        || existingRecord.normalizedName != updatedRecord.normalizedName
+        || existingRecord.statusSortKey != updatedRecord.statusSortKey
+        || existingRecord.recentActivitySortKey != updatedRecord.recentActivitySortKey
+        || existing.metrics.activeAgentCount != updated.metrics.activeAgentCount
+        || existing.metrics.openTaskCount != updated.metrics.openTaskCount
+        || existing.metrics.inProgressTaskCount != updated.metrics.inProgressTaskCount
+        || existing.metrics.blockedTaskCount != updated.metrics.blockedTaskCount
+
+      return affectsProjection ? .projection : .summaryOnly
+    }
+
+    nonisolated private static func normalizedSearchCorpus(for summary: SessionSummary) -> String {
+      [
         summary.projectName,
         summary.projectId,
         summary.checkoutId,
@@ -232,11 +660,13 @@ extension HarnessMonitorStore {
         summary.leaderId ?? "",
         summary.observeId ?? "",
         summary.status.rawValue,
-      ].joined(separator: " ")
+      ]
+      .joined(separator: " ")
+      .sessionSearchNormalized
+    }
 
-      return needle
-        .split(whereSeparator: \.isWhitespace)
-        .allSatisfy { haystack.localizedStandardContains($0) }
+    nonisolated private static func normalizedQueryTokens(for rawValue: String) -> [String] {
+      rawValue.sessionSearchTokens
     }
   }
 }
@@ -278,6 +708,18 @@ extension HarnessMonitorStore {
 
   public var filteredSessionCount: Int {
     sessionIndex.filteredSessionCount
+  }
+
+  public var totalSessionCount: Int {
+    sessionIndex.totalSessionCount
+  }
+
+  public var visibleSessionIDs: [String] {
+    sessionIndex.visibleSessionIDs
+  }
+
+  public var recentSessions: [SessionSummary] {
+    sessionIndex.recentSessions
   }
 
   public var totalOpenWorkCount: Int {
@@ -322,5 +764,20 @@ extension HarnessMonitorStore {
     searchText = ""
     sessionFilter = .active
     sessionFocusFilter = .all
+  }
+}
+
+private extension String {
+  var sessionSearchNormalized: String {
+    folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+      .lowercased()
+      .split(whereSeparator: \.isWhitespace)
+      .joined(separator: " ")
+  }
+
+  var sessionSearchTokens: [String] {
+    sessionSearchNormalized
+      .split(separator: " ")
+      .map(String.init)
   }
 }

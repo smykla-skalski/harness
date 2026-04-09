@@ -9,6 +9,11 @@ private enum InspectorChromeMetrics {
   static let contentSpacing: CGFloat = 16
 }
 
+private enum InspectorPrimaryResetKey: Hashable {
+  case task(taskID: String, notesSessionID: String?)
+  case agent(agentID: String)
+}
+
 struct InspectorColumnView: View {
   let store: HarnessMonitorStore
   let contentUI: HarnessMonitorStore.ContentUISlice
@@ -57,8 +62,6 @@ struct InspectorColumnView: View {
     ) {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
         inspectorPrimaryContent
-          .id(primaryContent.identity)
-          .transition(.opacity.animation(.easeOut(duration: 0.08)))
 
         if let actionContext {
           InspectorActionSections(
@@ -82,8 +85,10 @@ struct InspectorColumnView: View {
       InspectorPrimaryEmptyState()
     case .loading(let summary):
       InspectorPrimaryLoadingState(summary: summary)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .session(let detail):
       SessionInspectorSummaryCard(detail: detail)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .task(let selection):
       TaskInspectorCard(
         store: store,
@@ -91,16 +96,27 @@ struct InspectorColumnView: View {
         notesSessionID: selection.notesSessionID,
         isPersistenceAvailable: selection.isPersistenceAvailable
       )
+      .id(
+        InspectorPrimaryResetKey.task(
+          taskID: selection.task.taskId,
+          notesSessionID: selection.notesSessionID
+        )
+      )
+      .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .agent(let selection):
       AgentInspectorCard(
         store: store,
         agent: selection.agent,
         activity: selection.activity
       )
+      .id(InspectorPrimaryResetKey.agent(agentID: selection.agent.agentId))
+      .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .signal(let signal):
       SignalInspectorCard(signal: signal)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .observer(let observer):
       ObserverInspectorCard(observer: observer)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     }
   }
 }

@@ -2,7 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct PreferencesConnectionSection: View {
-  let store: HarnessMonitorStore
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let isDiagnosticsRefreshInFlight: Bool
+  let metrics: ConnectionMetrics
+  let events: [ConnectionEvent]
+  let reconnect: @MainActor @Sendable () async -> Void
+  let refreshDiagnostics: @MainActor @Sendable () async -> Void
 
   var body: some View {
     Form {
@@ -16,28 +21,28 @@ struct PreferencesConnectionSection: View {
               title: "Reconnect",
               tint: nil,
               variant: .prominent,
-              isLoading: store.connectionState == .connecting,
+              isLoading: connectionState == .connecting,
               accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
                 "Connection Reconnect"
               ),
-              action: { await store.reconnect() }
+              action: reconnect
             )
             HarnessMonitorAsyncActionButton(
               title: "Refresh Diagnostics",
               tint: .secondary,
               variant: .bordered,
-              isLoading: store.isDiagnosticsRefreshInFlight,
+              isLoading: isDiagnosticsRefreshInFlight,
               accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
                 "Connection Refresh Diagnostics"
               ),
-              action: { await store.refreshDiagnostics() }
+              action: refreshDiagnostics
             )
           }
         }
       }
       PreferencesConnectionMetrics(
-        metrics: store.connectionMetrics,
-        events: store.connectionEvents
+        metrics: metrics,
+        events: events
       )
     }
     .preferencesDetailFormStyle()
@@ -45,8 +50,15 @@ struct PreferencesConnectionSection: View {
 }
 
 #Preview("Preferences Connection Section") {
+  let store = PreferencesPreviewSupport.makeStore()
+
   PreferencesConnectionSection(
-    store: PreferencesPreviewSupport.makeStore()
+    connectionState: store.connectionState,
+    isDiagnosticsRefreshInFlight: store.isDiagnosticsRefreshInFlight,
+    metrics: store.connectionMetrics,
+    events: store.connectionEvents,
+    reconnect: { await store.reconnect() },
+    refreshDiagnostics: { await store.refreshDiagnostics() }
   )
   .frame(width: 720)
 }
