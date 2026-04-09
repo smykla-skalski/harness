@@ -180,8 +180,8 @@ extension PreviewFixtures {
     ),
   ]
 
-  public static let pagedTimeline: [TimelineEntry] = (0..<14).map { index in
-    let eventNumber = 14 - index
+  public static let pagedTimeline: [TimelineEntry] = (0..<32).map { index in
+    let eventNumber = 32 - index
     let minute = 18 - (index / 6)
     let second = 54 - (index * 3)
     let taskID = index.isMultiple(of: 3) ? "task-ui" : nil
