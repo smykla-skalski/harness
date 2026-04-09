@@ -3,6 +3,11 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
+private struct FocusRingCornerProbe {
+  let name: String
+  let point: CGPoint
+}
+
 @MainActor
 final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
 
@@ -191,32 +196,40 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
     // For a rounded rect with radius ~12pt, these should NOT be
     // blue because the rounded corner curves away from the corner.
     let cornerOffset: CGFloat = 2
-    let corners: [(String, CGFloat, CGFloat)] = [
-      (
-        "top-left",
-        rowFrame.minX - windowOrigin.x - cornerOffset,
-        rowFrame.minY - windowOrigin.y - cornerOffset
+    let corners: [FocusRingCornerProbe] = [
+      FocusRingCornerProbe(
+        name: "top-left",
+        point: CGPoint(
+          x: rowFrame.minX - windowOrigin.x - cornerOffset,
+          y: rowFrame.minY - windowOrigin.y - cornerOffset
+        )
       ),
-      (
-        "top-right",
-        rowFrame.maxX - windowOrigin.x + cornerOffset,
-        rowFrame.minY - windowOrigin.y - cornerOffset
+      FocusRingCornerProbe(
+        name: "top-right",
+        point: CGPoint(
+          x: rowFrame.maxX - windowOrigin.x + cornerOffset,
+          y: rowFrame.minY - windowOrigin.y - cornerOffset
+        )
       ),
-      (
-        "bottom-left",
-        rowFrame.minX - windowOrigin.x - cornerOffset,
-        rowFrame.maxY - windowOrigin.y + cornerOffset
+      FocusRingCornerProbe(
+        name: "bottom-left",
+        point: CGPoint(
+          x: rowFrame.minX - windowOrigin.x - cornerOffset,
+          y: rowFrame.maxY - windowOrigin.y + cornerOffset
+        )
       ),
-      (
-        "bottom-right",
-        rowFrame.maxX - windowOrigin.x + cornerOffset,
-        rowFrame.maxY - windowOrigin.y + cornerOffset
+      FocusRingCornerProbe(
+        name: "bottom-right",
+        point: CGPoint(
+          x: rowFrame.maxX - windowOrigin.x + cornerOffset,
+          y: rowFrame.maxY - windowOrigin.y + cornerOffset
+        )
       ),
     ]
 
-    for (name, x, y) in corners {
-      let pixelX = Int(x * scale)
-      let pixelY = Int(y * scale)
+    for corner in corners {
+      let pixelX = Int(corner.point.x * scale)
+      let pixelY = Int(corner.point.y * scale)
 
       guard pixelX > 0, pixelY > 0,
         pixelX < cgImage.width, pixelY < cgImage.height
@@ -228,7 +241,7 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
       XCTAssertFalse(
         isFocusRingBlue,
         "Focus ring is rectangular: blue focus ring pixel found at "
-          + "\(name) corner (r=\(String(format: "%.2f", color.red)), "
+          + "\(corner.name) corner (r=\(String(format: "%.2f", color.red)), "
           + "g=\(String(format: "%.2f", color.green)), "
           + "b=\(String(format: "%.2f", color.blue)))"
       )
