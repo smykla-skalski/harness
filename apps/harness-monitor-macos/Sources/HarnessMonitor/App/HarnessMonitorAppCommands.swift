@@ -5,11 +5,10 @@ import SwiftUI
 struct HarnessMonitorAppCommands: Commands {
   @Environment(\.openWindow)
   private var openWindow
-  @FocusedValue(\.commandsDisplayState)
-  private var displayState
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
+  let displayState: CommandsDisplayState
   let searchController: SidebarSearchController
   let textSizeIndex: Int
   let increaseTextSize: () -> Void
@@ -80,47 +79,47 @@ struct HarnessMonitorAppCommands: Commands {
         Task { await store.navigateBack() }
       }
       .keyboardShortcut("[", modifiers: [.command])
-      .disabled(displayState?.canNavigateBack != true)
+      .disabled(!displayState.canNavigateBack)
 
       Button("Forward") {
         Task { await store.navigateForward() }
       }
       .keyboardShortcut("]", modifiers: [.command])
-      .disabled(displayState?.canNavigateForward != true)
+      .disabled(!displayState.canNavigateForward)
 
       Divider()
 
       Button("Observe Selected Session", action: observeSelectedSession)
         .keyboardShortcut("o", modifiers: [.command, .shift])
-        .disabled(displayState?.hasSelectedSession != true || displayState?.isSessionReadOnly == true)
+        .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
 
       Button("End Selected Session", action: endSelectedSession)
         .keyboardShortcut("e", modifiers: [.command, .shift])
-        .disabled(displayState?.hasSelectedSession != true || displayState?.isSessionReadOnly == true)
+        .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
 
       Divider()
 
-      Button(displayState?.bookmarkTitle ?? "Bookmark") {
+      Button(displayState.bookmarkTitle) {
         store.toggleSelectedSessionBookmark()
       }
       .keyboardShortcut("b", modifiers: [.command, .shift])
-      .disabled(displayState?.hasSelectedSession != true || displayState?.isPersistenceAvailable != true)
+      .disabled(!displayState.hasSelectedSession || !displayState.isPersistenceAvailable)
 
       Button("Copy Selection ID") {
         store.copySelectedItemID()
       }
       .keyboardShortcut("c", modifiers: [.command, .shift])
-      .disabled(displayState?.hasSelectedSession != true)
+      .disabled(!displayState.hasSelectedSession)
 
       Divider()
 
       Button("Inspect Session Overview", action: inspectSessionOverview)
         .keyboardShortcut("1", modifiers: [.command, .option])
-        .disabled(displayState?.hasSelectedSession != true)
+        .disabled(!displayState.hasSelectedSession)
 
       Button("Inspect Observer", action: inspectObserver)
         .keyboardShortcut("2", modifiers: [.command, .option])
-        .disabled(displayState?.hasObserver != true)
+        .disabled(!displayState.hasObserver)
 
       Divider()
 

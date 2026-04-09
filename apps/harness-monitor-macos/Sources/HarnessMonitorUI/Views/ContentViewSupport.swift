@@ -2,12 +2,6 @@ import HarnessMonitorKit
 import Observation
 import SwiftUI
 
-// MARK: - Focused value for Commands
-
-/// Window-scoped display state published to scene-level Commands via
-/// `.focusedSceneValue()`. Commands reads this through `@FocusedValue`
-/// instead of observing the store directly, so Commands and toolbar
-/// content don't both push FocusedValue updates in the same frame.
 public struct CommandsDisplayState: Equatable {
   public let canNavigateBack: Bool
   public let canNavigateForward: Bool
@@ -16,17 +10,6 @@ public struct CommandsDisplayState: Equatable {
   public let bookmarkTitle: String
   public let isPersistenceAvailable: Bool
   public let hasObserver: Bool
-}
-
-private struct CommandsDisplayStateKey: FocusedValueKey {
-  typealias Value = CommandsDisplayState
-}
-
-public extension FocusedValues {
-  var commandsDisplayState: CommandsDisplayState? {
-    get { self[CommandsDisplayStateKey.self] }
-    set { self[CommandsDisplayStateKey.self] = newValue }
-  }
 }
 
 enum HarnessMonitorInspectorLayout {
@@ -38,6 +21,21 @@ enum HarnessMonitorInspectorLayout {
 // MARK: - Toolbar store extensions
 
 extension HarnessMonitorStore {
+  // Keep Commands state as plain data. The scene-level FocusedValue bridge
+  // emitted duplicate update faults during startup when the window toolbar
+  // and command menu refreshed in the same frame.
+  public var commandsDisplayState: CommandsDisplayState {
+    CommandsDisplayState(
+      canNavigateBack: canNavigateBack,
+      canNavigateForward: canNavigateForward,
+      hasSelectedSession: selectedSessionID != nil,
+      isSessionReadOnly: isSessionReadOnly,
+      bookmarkTitle: selectedSessionBookmarkTitle,
+      isPersistenceAvailable: isPersistenceAvailable,
+      hasObserver: selectedSession?.observer != nil
+    )
+  }
+
   var toolbarCenterpieceModel: ToolbarCenterpieceModel {
     ToolbarCenterpieceModel(
       workspaceName: "Harness Monitor",
@@ -120,29 +118,116 @@ extension HarnessMonitorStore {
   }
 }
 
-// MARK: - Commands display state publisher
+// MARK: - Sidebar search controller
 
-/// Publishes Commands display state as a focused scene value from an
-/// isolated background view. Keeping this separate from ContentView
-/// prevents `.focusedSceneValue()` and `.toolbar()` from both writing
-/// to the FocusedValue pipeline in the same body evaluation. This view
-/// only re-evaluates when the specific store properties it reads change,
-/// not when toolbar-related properties (metrics, status messages) change.
-struct CommandsDisplayStatePublisher: View {
+@MainActor
+@Observable
+public final class SidebarSearchController {
+  public var focusRequestToken = 0
+
+  public init() {}
+
+  public func requestFocus() {
+    focusRequestToken &+= 1
+  }
+}
+
+// MARK: - Content toolbar items
+
+struct ContentNavigationToolbarItems: ToolbarContent {
+  let store: HarnessMonitorStore
+  let navigateBack: () -> Void
+  let navigateForward: () -> Void
+
+  var body: some ToolbarContent {
+    ContentNavigationToolbar(
+      canNavigateBack: store.canNavigateBack,
+      canNavigateForward: store.canNavigateForward,
+      navigateBack: navigateBack,
+      navigateForward: navigateForward
+    )
+  }
+}
+
+struct ContentCenterpieceToolbarItems: ToolbarContent {
+  let store: HarnessMonitorStore
+  let displayMode: ToolbarCenterpieceDisplayMode
+  let availableDetailWidth: CGFloat
+  @Binding var showLlama: Bool
+  let toggleSleepPrevention: () -> Void
+
+  var body: some ToolbarContent {
+    ContentCenterpieceToolbar(
+      model: store.toolbarCenterpieceModel,
+      displayMode: displayMode,
+      availableDetailWidth: availableDetailWidth,
+      statusMessages: store.toolbarStatusMessages,
+      daemonIndicator: store.toolbarDaemonIndicator
+    )
+
+    ToolbarItemGroup(placement: .principal) {
+      Button(action: toggleSleepPrevention) {
+        Label(
+          store.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
+          systemImage: store.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+        )
+      }
+      .tint(store.sleepPreventionEnabled ? .orange : nil)
+      .help(
+        store.sleepPreventionEnabled
+          ? "Preventing sleep - click to disable"
+          : "Allow sleep - click to prevent"
+      )
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
+
+      Button { showLlama.toggle() } label: {
+        Label(
+          showLlama ? "Hide Llama" : "Show Llama",
+          systemImage: showLlama ? "hare.fill" : "hare"
+        )
+      }
+      .tint(showLlama ? .purple : nil)
+      .help(showLlama ? "Hide dancing llama" : "Show dancing llama")
+    }
+    .sharedBackgroundVisibility(.hidden)
+  }
+}
+
+struct ContentPrimaryToolbarItems: ToolbarContent {
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Binding var showInspector: Bool
+  let openPreferences: () -> Void
+  let refresh: () -> Void
+
+  init(
+    contentUI: HarnessMonitorStore.ContentUISlice,
+    showInspector: Binding<Bool>,
+    openPreferences: @escaping () -> Void,
+    refresh: @escaping () -> Void
+  ) {
+    self.contentUI = contentUI
+    self._showInspector = showInspector
+    self.openPreferences = openPreferences
+    self.refresh = refresh
+  }
+
+  var body: some ToolbarContent {
+    InspectorToolbarActions(
+      contentUI: contentUI,
+      showInspector: $showInspector,
+      openPreferences: openPreferences,
+      refresh: refresh
+    )
+  }
+}
+
+struct ContentToolbarAccessibilityMarker: View {
   let store: HarnessMonitorStore
 
   var body: some View {
-    Color.clear
-      .focusedSceneValue(\.commandsDisplayState, CommandsDisplayState(
-        canNavigateBack: store.canNavigateBack,
-        canNavigateForward: store.canNavigateForward,
-        hasSelectedSession: store.selectedSessionID != nil,
-        isSessionReadOnly: store.isSessionReadOnly,
-        bookmarkTitle: store.selectedSessionBookmarkTitle,
-        isPersistenceAvailable: store.isPersistenceAvailable,
-        hasObserver: store.selectedSession?.observer != nil
-      ))
-      .allowsHitTesting(false)
-      .accessibilityHidden(true)
+    AccessibilityTextMarker(
+      identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
+      text: store.toolbarCenterpieceModel.accessibilityValue
+    )
   }
 }

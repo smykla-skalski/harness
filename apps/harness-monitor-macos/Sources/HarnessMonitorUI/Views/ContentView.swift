@@ -2,18 +2,6 @@ import HarnessMonitorKit
 import Observation
 import SwiftUI
 
-@MainActor
-@Observable
-public final class SidebarSearchController {
-  public var focusRequestToken = 0
-
-  public init() {}
-
-  public func requestFocus() {
-    focusRequestToken &+= 1
-  }
-}
-
 public struct ContentView: View {
   let store: HarnessMonitorStore
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
@@ -117,7 +105,6 @@ public struct ContentView: View {
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .navigationTitle(windowTitle)
-    .background { CommandsDisplayStatePublisher(store: store) }
     .toolbar {
       ContentNavigationToolbarItems(
         store: store,
@@ -297,93 +284,6 @@ private struct ContentDetailColumn: View {
   }
 }
 
-private struct ContentNavigationToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
-  let navigateBack: () -> Void
-  let navigateForward: () -> Void
-
-  var body: some ToolbarContent {
-    ContentNavigationToolbar(
-      canNavigateBack: store.canNavigateBack,
-      canNavigateForward: store.canNavigateForward,
-      navigateBack: navigateBack,
-      navigateForward: navigateForward
-    )
-  }
-}
-
-private struct ContentCenterpieceToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
-  let displayMode: ToolbarCenterpieceDisplayMode
-  let availableDetailWidth: CGFloat
-  @Binding var showLlama: Bool
-  let toggleSleepPrevention: () -> Void
-
-  var body: some ToolbarContent {
-    ContentCenterpieceToolbar(
-      model: store.toolbarCenterpieceModel,
-      displayMode: displayMode,
-      availableDetailWidth: availableDetailWidth,
-      statusMessages: store.toolbarStatusMessages,
-      daemonIndicator: store.toolbarDaemonIndicator
-    )
-
-    ToolbarItemGroup(placement: .principal) {
-      Button(action: toggleSleepPrevention) {
-        Label(
-          store.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: store.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
-        )
-      }
-      .tint(store.sleepPreventionEnabled ? .orange : nil)
-      .help(
-        store.sleepPreventionEnabled
-          ? "Preventing sleep - click to disable"
-          : "Allow sleep - click to prevent"
-      )
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
-
-      Button { showLlama.toggle() } label: {
-        Label(
-          showLlama ? "Hide Llama" : "Show Llama",
-          systemImage: showLlama ? "hare.fill" : "hare"
-        )
-      }
-      .tint(showLlama ? .purple : nil)
-      .help(showLlama ? "Hide dancing llama" : "Show dancing llama")
-    }
-    .sharedBackgroundVisibility(.hidden)
-  }
-}
-
-private struct ContentPrimaryToolbarItems: ToolbarContent {
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
-  @Binding var showInspector: Bool
-  let openPreferences: () -> Void
-  let refresh: () -> Void
-
-  init(
-    contentUI: HarnessMonitorStore.ContentUISlice,
-    showInspector: Binding<Bool>,
-    openPreferences: @escaping () -> Void,
-    refresh: @escaping () -> Void
-  ) {
-    self.contentUI = contentUI
-    self._showInspector = showInspector
-    self.openPreferences = openPreferences
-    self.refresh = refresh
-  }
-
-  var body: some ToolbarContent {
-    InspectorToolbarActions(
-      contentUI: contentUI,
-      showInspector: $showInspector,
-      openPreferences: openPreferences,
-      refresh: refresh
-    )
-  }
-}
-
 struct InspectorToolbarActions: ToolbarContent {
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Binding var showInspector: Bool
@@ -427,16 +327,5 @@ struct InspectorToolbarActions: ToolbarContent {
       .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorToggleButton)
       .help(showInspector ? "Hide inspector" : "Show inspector")
     }
-  }
-}
-
-private struct ContentToolbarAccessibilityMarker: View {
-  let store: HarnessMonitorStore
-
-  var body: some View {
-    AccessibilityTextMarker(
-      identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
-      text: store.toolbarCenterpieceModel.accessibilityValue
-    )
   }
 }

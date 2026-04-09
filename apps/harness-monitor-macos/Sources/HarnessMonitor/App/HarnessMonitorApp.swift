@@ -43,6 +43,7 @@ struct HarnessMonitorApp: App {
     .commands {
       HarnessMonitorAppCommands(
         store: store,
+        displayState: store.commandsDisplayState,
         searchController: searchController,
         textSizeIndex: textSizeIndex,
         increaseTextSize: increaseTextSize,
