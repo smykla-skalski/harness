@@ -2,6 +2,19 @@ import HarnessMonitorKit
 import SwiftData
 import SwiftUI
 
+private struct SidebarSelectionAnchor: Equatable {
+  let sessionID: String?
+  let visibleIndex: Int?
+
+  init(
+    selectedSessionID: String?,
+    visibleSessionIDs: [String]
+  ) {
+    sessionID = selectedSessionID
+    visibleIndex = selectedSessionID.flatMap { visibleSessionIDs.firstIndex(of: $0) }
+  }
+}
+
 struct SidebarView: View {
   let store: HarnessMonitorStore
   let controls: HarnessMonitorStore.SessionControlsSlice
@@ -20,6 +33,7 @@ struct SidebarView: View {
   @State private var hasHydratedCollapsedState = false
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
+  @State private var selectionRepairToken = 0
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
 
@@ -115,6 +129,13 @@ struct SidebarView: View {
     ].joined(separator: ", ")
   }
 
+  private var selectionAnchor: SidebarSelectionAnchor {
+    SidebarSelectionAnchor(
+      selectedSessionID: sidebarUI.selectedSessionID,
+      visibleSessionIDs: store.visibleSessionIDs
+    )
+  }
+
   // The sidebar search field already moves with the split view. Keep the
   // filter menu in that same toolbar lane and drive it from both the live
   // width and the split-view visibility state so it follows the motion but
@@ -131,6 +152,7 @@ struct SidebarView: View {
     List(selection: sidebarSelection) {
       sidebarContent
     }
+    .id(selectionRepairToken)
     .transaction {
       $0.animation = nil
       $0.disablesAnimations = true
@@ -180,6 +202,9 @@ struct SidebarView: View {
       proxy.size.width
     } action: { width in
       updateSidebarWidth(width)
+    }
+    .onChange(of: selectionAnchor) { oldValue, newValue in
+      repairSidebarListSelection(from: oldValue, to: newValue)
     }
     .onAppear(perform: hydrateCollapsedStateIfNeeded)
     .onChange(of: sidebarVisible, initial: true) { _, isVisible in
@@ -286,6 +311,29 @@ struct SidebarView: View {
       return
     }
     sidebarWidth = max(width, 0)
+  }
+
+  private func repairSidebarListSelection(
+    from previousAnchor: SidebarSelectionAnchor,
+    to currentAnchor: SidebarSelectionAnchor
+  ) {
+    let selectionMovedWithinVisibleRows =
+      previousAnchor.sessionID != nil
+      && previousAnchor.sessionID == currentAnchor.sessionID
+      && previousAnchor.visibleIndex != currentAnchor.visibleIndex
+    let selectionWasCleared =
+      previousAnchor.sessionID != nil
+      && currentAnchor.sessionID == nil
+
+    guard selectionMovedWithinVisibleRows || selectionWasCleared else {
+      return
+    }
+
+    // macOS's native sidebar list can cling to the old row position when
+    // reconnects insert or remove sessions around the active selection.
+    // Rebuilding the list only for that anchor change keeps the highlight
+    // aligned with the selection binding without resetting every live update.
+    selectionRepairToken &+= 1
   }
 
   func syncCollapsedProjects(from rawValue: String) {
