@@ -3,12 +3,7 @@ import SwiftUI
 
 enum ContentToolbarLayoutWidth {
   static let minimumWidth: CGFloat = 320
-  static let step: CGFloat = 40
   static let defaultWidth: CGFloat = 1_000
-
-  static func quantize(_ width: CGFloat) -> CGFloat {
-    max((width / step).rounded() * step, minimumWidth)
-  }
 }
 
 public struct ContentView: View {
@@ -53,7 +48,7 @@ public struct ContentView: View {
     ].joined(separator: ", ")
   }
 
-  private var auditBuildAccessibilityValue: String? {
+  private var auditBuildState: AuditBuildDisplayState? {
     guard HarnessMonitorUITestEnvironment.isEnabled else {
       return nil
     }
@@ -61,35 +56,42 @@ public struct ContentView: View {
     let info = Bundle.main.infoDictionary ?? [:]
     let environment = ProcessInfo.processInfo.environment
     let provenance = bundleBuildProvenance()
-    let commit =
-      environment["HARNESS_MONITOR_AUDIT_GIT_COMMIT"]
-      ?? provenance["HarnessMonitorBuildGitCommit"]
-      ?? stringValue(in: info, key: "HarnessMonitorBuildGitCommit", fallback: "unknown")
-    let dirty =
-      environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"]
-      ?? provenance["HarnessMonitorBuildGitDirty"]
-      ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown")
-    let auditRunID = environment["HARNESS_MONITOR_AUDIT_RUN_ID"] ?? "none"
-    let auditLabel = environment["HARNESS_MONITOR_AUDIT_LABEL"] ?? "none"
-    let launchMode = environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live"
-    let perfScenario = environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none"
-    let previewScenario = environment["HARNESS_MONITOR_PREVIEW_SCENARIO"] ?? "default"
 
-    return [
-      "auditRunID=\(auditRunID)",
-      "auditLabel=\(auditLabel)",
-      "buildCommit=\(commit)",
-      "buildDirty=\(dirty)",
-      "launchMode=\(launchMode)",
-      "perfScenario=\(perfScenario)",
-      "previewScenario=\(previewScenario)",
-    ].joined(separator: ", ")
+    return AuditBuildDisplayState(
+      auditRunID: environment["HARNESS_MONITOR_AUDIT_RUN_ID"] ?? "none",
+      auditLabel: environment["HARNESS_MONITOR_AUDIT_LABEL"] ?? "none",
+      launchMode: environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live",
+      perfScenario: environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none",
+      previewScenario: environment["HARNESS_MONITOR_PREVIEW_SCENARIO"] ?? "default",
+      buildCommit: provenance["HarnessMonitorBuildGitCommit"]
+        ?? stringValue(in: info, key: "HarnessMonitorBuildGitCommit", fallback: "unknown"),
+      buildDirty: provenance["HarnessMonitorBuildGitDirty"]
+        ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown"),
+      buildFingerprint: provenance["HarnessMonitorBuildWorkspaceFingerprint"]
+        ?? stringValue(
+          in: info,
+          key: "HarnessMonitorBuildWorkspaceFingerprint",
+          fallback: "unknown"
+        ),
+      buildStartedAtUTC: provenance["HarnessMonitorBuildStartedAtUTC"]
+        ?? stringValue(
+          in: info,
+          key: "HarnessMonitorBuildStartedAtUTC",
+          fallback: "unknown"
+        ),
+      expectedCommit: environment["HARNESS_MONITOR_AUDIT_GIT_COMMIT"],
+      expectedDirty: environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"],
+      expectedFingerprint: environment["HARNESS_MONITOR_AUDIT_WORKSPACE_FINGERPRINT"],
+      expectedBuildStartedAtUTC: environment["HARNESS_MONITOR_AUDIT_BUILD_STARTED_AT_UTC"]
+    )
   }
 
-  // Coalesce split-view settling into stable buckets so toolbar preferences do
-  // not churn on every launch-time and divider pixel delta.
+  private var auditBuildAccessibilityValue: String? {
+    auditBuildState?.accessibilityValue
+  }
+
   private var toolbarLayoutWidth: CGFloat {
-    ContentToolbarLayoutWidth.quantize(detailColumnWidth)
+    max(detailColumnWidth, ContentToolbarLayoutWidth.minimumWidth)
   }
 
   private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
@@ -213,6 +215,13 @@ public struct ContentView: View {
         )
       }
     }
+    .overlay(alignment: .topTrailing) {
+      if let auditBuildState, auditBuildState.showsVisibleBadge {
+        AuditBuildBadge(state: auditBuildState)
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+          .padding(.trailing, HarnessMonitorTheme.spacingLG)
+      }
+    }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
         isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
@@ -241,6 +250,7 @@ public struct ContentView: View {
       store: store,
       controls: store.sessionIndex.controls,
       projection: store.sessionIndex.projection,
+      searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
       sidebarVisible: columnVisibility != .detailOnly
     )

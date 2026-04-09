@@ -15,11 +15,6 @@ extension SidebarView {
     } header: {
       projectHeader(for: group)
     }
-    .transaction {
-      $0.animation = nil
-      $0.disablesAnimations = true
-    }
-    .listRowInsets(sidebarRowInsets)
   }
 
   func projectHeader(
@@ -27,7 +22,6 @@ extension SidebarView {
   ) -> some View {
     Text(group.project.name)
       .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      .foregroundStyle(HarnessMonitorTheme.ink)
       .accessibilityAddTraits(.isHeader)
       .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityIdentifier(
@@ -49,11 +43,6 @@ extension SidebarView {
     } label: {
       checkoutHeader(for: group)
     }
-    .transaction {
-      $0.animation = nil
-      $0.disablesAnimations = true
-    }
-    .listRowInsets(sidebarRowInsets)
   }
 
   func checkoutHeader(
@@ -62,14 +51,14 @@ extension SidebarView {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       Image(systemName: group.isWorktree ? "square.3.layers.3d.down.right" : "folder")
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(.secondary)
       Text(group.title)
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(.secondary)
       Spacer()
       Text("\(group.sessionCount)")
         .scaledFont(.caption2.monospacedDigit())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityIdentifier(
@@ -82,11 +71,9 @@ extension SidebarView {
 
   @ViewBuilder
   func sessionRow(_ session: SessionSummary) -> some View {
-    let isSelected = sidebarUI.selectedSessionID == session.sessionId
     let row = SidebarSessionListLinkRow(
       session: session,
-      isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId),
-      isSelected: isSelected
+      isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId)
     )
     .equatable()
 
@@ -94,14 +81,7 @@ extension SidebarView {
       row
       .tag(session.sessionId as String?)
       .accessibilityLabel(sessionAccessibilityLabel(for: session))
-      .accessibilityValue(
-        sessionAccessibilityValue(
-          for: session,
-          selectedSessionID: sidebarUI.selectedSessionID
-        )
-      )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
-      .listRowInsets(sidebarRowInsets)
 
     if sidebarUI.isPersistenceAvailable {
       baseRow
@@ -155,11 +135,7 @@ extension SidebarView {
     return Binding(
       get: { !collapsedProjectIDs.contains(projectID) },
       set: { isExpanded in
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-          setProjectCollapsed(projectID: projectID, isCollapsed: !isExpanded)
-        }
+        setProjectCollapsed(projectID: projectID, isCollapsed: !isExpanded)
       }
     )
   }
@@ -175,11 +151,7 @@ extension SidebarView {
     return Binding(
       get: { !collapsedCheckoutKeys.contains(checkoutKey) },
       set: { isExpanded in
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-          setCheckoutCollapsed(checkoutKey: checkoutKey, isCollapsed: !isExpanded)
-        }
+        setCheckoutCollapsed(checkoutKey: checkoutKey, isCollapsed: !isExpanded)
       }
     )
   }

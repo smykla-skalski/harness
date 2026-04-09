@@ -281,7 +281,7 @@ struct ToolbarCenterpieceView: View {
   // Leading inset matches the vertical centering gap inside the glass capsule
   // so the first metric token sits at equal distance from the bubble's inner
   // surface on all sides.
-  private static let metricsLeadingInset: CGFloat = 12
+  private static let metricsLeadingInset: CGFloat = 16
   private static let daemonTrailingInset: CGFloat = 8
 
   init(

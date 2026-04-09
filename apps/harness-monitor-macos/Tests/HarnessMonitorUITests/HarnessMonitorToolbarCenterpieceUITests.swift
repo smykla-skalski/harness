@@ -262,7 +262,9 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThan(ticker.frame.width, 0)
   }
 
-  private func toolbarCenterpieceMetrics(in app: XCUIApplication) throws -> ToolbarCenterpieceMetrics {
+  private func toolbarCenterpieceMetrics(
+    in app: XCUIApplication
+  ) throws -> ToolbarCenterpieceMetrics {
     let window = mainWindow(in: app)
     let toolbar = window.toolbars.firstMatch
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
@@ -300,8 +302,8 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
   }
 }
 
-private extension HarnessMonitorToolbarCenterpieceUITests {
-  func outerToolbarFrame(for query: XCUIElementQuery) -> CGRect? {
+extension HarnessMonitorToolbarCenterpieceUITests {
+  fileprivate func outerToolbarFrame(for query: XCUIElementQuery) -> CGRect? {
     query.allElementsBoundByIndex
       .compactMap { element in
         guard element.exists else { return nil }

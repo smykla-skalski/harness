@@ -1,8 +1,9 @@
 import SwiftUI
 
-enum HarnessMonitorUITestEnvironment {
-  static let isEnabled = ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
-  static let accessibilityMarkersEnabled: Bool = {
+public enum HarnessMonitorUITestEnvironment {
+  public static let isEnabled =
+    ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+  public static let accessibilityMarkersEnabled: Bool = {
     guard isEnabled else {
       return false
     }
@@ -37,11 +38,16 @@ private struct AccessibilityProbe: View {
   }
 }
 
-struct AccessibilityTextMarker: View {
+public struct AccessibilityTextMarker: View {
   let identifier: String
   let text: String
 
-  @ViewBuilder var body: some View {
+  public init(identifier: String, text: String) {
+    self.identifier = identifier
+    self.text = text
+  }
+
+  @ViewBuilder public var body: some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       Color.clear
         .allowsHitTesting(false)

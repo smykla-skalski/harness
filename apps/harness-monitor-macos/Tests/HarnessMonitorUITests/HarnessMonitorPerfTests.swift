@@ -146,6 +146,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "HARNESS_MONITOR_LAUNCH_MODE": "preview",
       "HARNESS_MONITOR_PERF_SCENARIO": scenario,
       "HARNESS_MONITOR_PREVIEW_SCENARIO": expectedPreviewScenario(for: scenario),
+      "HARNESS_MONITOR_PERF_STEP_DELAY_MS": "120",
+      "HARNESS_MONITOR_PERF_SHORT_DELAY_MS": "60",
+      "HARNESS_MONITOR_PERF_SETTLE_DELAY_MS": "180",
     ]
     app.launch()
     return app
@@ -157,29 +160,24 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
   ) {
     let window = mainWindow(in: app)
     _ = window.waitForExistence(timeout: Self.actionTimeout)
+    let perfState = element(in: app, identifier: Accessibility.perfScenarioState)
 
-    let timeout = scenarioWaitDuration(scenario)
-    let deadline = Date.now.addingTimeInterval(timeout)
-    while Date.now < deadline {
-      if app.state == .notRunning {
+    XCTAssertTrue(
+      perfState.waitForExistence(timeout: Self.actionTimeout),
+      "Expected perf scenario marker for \(scenario)"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout, pollInterval: 0.05) {
+        if app.state == .notRunning {
+          return false
+        }
+        let stateText = self.markerText(perfState)
         return
-      }
-      RunLoop.current.run(until: Date.now.addingTimeInterval(0.5))
-    }
-  }
-
-  private func scenarioWaitDuration(_ scenario: String) -> TimeInterval {
-    switch scenario {
-    case "launch-dashboard", "offline-cached-open":
-      8
-    case "select-session-cockpit", "sidebar-overflow-search", "timeline-burst":
-      10
-    case "refresh-and-search", "settings-backdrop-cycle",
-      "settings-background-cycle":
-      12
-    default:
-      12
-    }
+          stateText.contains("scenario=\(scenario)")
+          && stateText.contains("status=completed")
+      },
+      "Expected perf scenario \(scenario) to complete within \(Self.actionTimeout)s"
+    )
   }
 
   private func assertSearchHeavyScenarioState(_ scenario: String) {
@@ -211,7 +209,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let auditBuildState = element(in: app, identifier: Accessibility.auditBuildState)
 
     XCTAssertTrue(auditBuildState.waitForExistence(timeout: Self.actionTimeout))
-    let auditText = auditBuildStateText(auditBuildState)
+    let auditText = markerText(auditBuildState)
 
     XCTAssertTrue(
       auditText.contains("launchMode=preview"),
@@ -250,9 +248,16 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       value='\(String(describing: auditBuildState.value))'
       """
     )
+    XCTAssertFalse(
+      auditText.contains("buildFingerprint=unknown"),
+      """
+      Audit marker missing embedded build fingerprint. label='\(auditBuildState.label)' \
+      value='\(String(describing: auditBuildState.value))'
+      """
+    )
   }
 
-  private func auditBuildStateText(_ element: XCUIElement) -> String {
+  private func markerText(_ element: XCUIElement) -> String {
     if !element.label.isEmpty {
       return element.label
     }

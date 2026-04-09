@@ -7,7 +7,9 @@ extension HarnessMonitorUITestCase {
 
   func tapSession(in app: XCUIApplication, identifier: String) {
     let sessionRow = sessionTrigger(in: app, identifier: identifier)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      sessionRow.exists || sessionRow.waitForExistence(timeout: Self.actionTimeout)
+    )
     if sessionRow.isHittable {
       sessionRow.tap()
       return
@@ -42,7 +44,7 @@ extension HarnessMonitorUITestCase {
       app.activate()
 
       let button = button(in: app, identifier: identifier)
-      if button.waitForExistence(timeout: 0.5) {
+      if button.exists || button.waitForExistence(timeout: 0.1) {
         if button.isHittable {
           button.tap()
           return
@@ -67,7 +69,7 @@ extension HarnessMonitorUITestCase {
       app.activate()
 
       let target = button(in: app, title: title)
-      if target.waitForExistence(timeout: 0.5) {
+      if target.exists || target.waitForExistence(timeout: 0.1) {
         if target.isHittable {
           target.tap()
           return
@@ -92,7 +94,7 @@ extension HarnessMonitorUITestCase {
       app.activate()
 
       let target = element(in: app, identifier: identifier)
-      if target.waitForExistence(timeout: 0.5) {
+      if target.exists || target.waitForExistence(timeout: 0.1) {
         if target.isHittable {
           target.tap()
           return

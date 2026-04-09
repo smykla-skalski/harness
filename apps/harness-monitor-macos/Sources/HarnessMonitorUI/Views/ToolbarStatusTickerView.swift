@@ -62,7 +62,7 @@ enum ToolbarTickerDirection {
 
 struct ToolbarStatusTickerCapsule: View {
   let messages: [ToolbarStatusMessage]
-  private static let contentHorizontalInset: CGFloat = 12
+  private static let contentHorizontalInset: CGFloat = 16
 
   var body: some View {
     HStack(spacing: 8) {

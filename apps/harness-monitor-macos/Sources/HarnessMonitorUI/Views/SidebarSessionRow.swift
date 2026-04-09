@@ -4,8 +4,6 @@ import SwiftUI
 struct SidebarSessionRow: View {
   let session: SessionSummary
   let isBookmarked: Bool
-  let isSelected: Bool
-  let isHovered: Bool
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -20,33 +18,25 @@ struct SidebarSessionRow: View {
           Text(session.displayTitle)
             .scaledFont(.system(.body, design: .rounded, weight: .semibold))
             .italic(session.title.isEmpty)
-            .foregroundStyle(
-              session.title.isEmpty
-                ? selectedSecondaryTextStyle
-                : (isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
-            )
+            .foregroundStyle(session.title.isEmpty ? .secondary : .primary)
             .lineLimit(1)
             .truncationMode(.tail)
           Spacer(minLength: 12)
           if isBookmarked {
             Image(systemName: "bookmark.fill")
               .scaledFont(.caption2)
-              .foregroundStyle(
-                isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.accent
-              )
+              .foregroundStyle(.secondary)
               .accessibilityLabel("Bookmarked")
           }
           Text(session.status.title)
             .scaledFont(.caption2.weight(.bold))
-            .foregroundStyle(
-              isSelected ? selectedSecondaryTextStyle : statusColor(for: session.status)
-            )
+            .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
         Text(session.sessionId)
           .scaledFont(.caption.monospaced())
           .truncationMode(.middle)
-          .foregroundStyle(selectedSecondaryTextStyle)
+          .foregroundStyle(.secondary)
         HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
           footerLabel("\(session.metrics.activeAgentCount) active")
           footerLabel("\(session.metrics.inProgressTaskCount) moving")
@@ -54,17 +44,11 @@ struct SidebarSessionRow: View {
           Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
             .scaledFont(.caption.weight(.medium))
             .lineLimit(1)
-            .foregroundStyle(
-              isSelected || isHovered
-                ? selectedSecondaryTextStyle
-                : HarnessMonitorTheme.ink.opacity(0.35)
-            )
+            .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
       }
     }
-    .foregroundStyle(isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
@@ -72,15 +56,7 @@ struct SidebarSessionRow: View {
     Text(value)
       .scaledFont(.caption.weight(.medium))
       .lineLimit(1)
-      .foregroundStyle(
-        isSelected || isHovered
-          ? selectedSecondaryTextStyle
-          : HarnessMonitorTheme.ink.opacity(0.35)
-      )
-  }
-
-  private var selectedSecondaryTextStyle: Color {
-    isSelected ? HarnessMonitorTheme.onContrast.opacity(0.82) : HarnessMonitorTheme.secondaryInk
+      .foregroundStyle(.secondary)
   }
 }
 
@@ -88,27 +64,15 @@ struct SidebarSessionRow: View {
   VStack(spacing: HarnessMonitorTheme.sectionSpacing) {
     SidebarSessionRow(
       session: PreviewFixtures.summary,
-      isBookmarked: true,
-      isSelected: true,
-      isHovered: false
+      isBookmarked: true
     )
     .padding()
-    .background(
-      HarnessMonitorTheme.accent,
-      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG)
-    )
 
     SidebarSessionRow(
       session: PreviewFixtures.overflowSessions[3],
-      isBookmarked: false,
-      isSelected: false,
-      isHovered: false
+      isBookmarked: false
     )
     .padding()
-    .background(
-      HarnessMonitorTheme.ink.opacity(0.08),
-      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG)
-    )
   }
   .padding()
   .frame(width: 360)

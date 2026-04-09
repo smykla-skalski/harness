@@ -2,6 +2,8 @@ enum HarnessMonitorUITestAccessibility {
   static let appChromeRoot = "harness.app.chrome"
   static let appChromeState = "harness.app.chrome.state"
   static let auditBuildState = "harness.audit.build.state"
+  static let auditBuildBadge = "harness.audit.build.badge"
+  static let perfScenarioState = "harness.perf.scenario.state"
   static let toolbarChromeState = "harness.toolbar.chrome.state"
   static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   static let persistenceBanner = "harness.persistence.banner"
@@ -63,6 +65,10 @@ enum HarnessMonitorUITestAccessibility {
   static let onboardingStartButtonFrame = "harness.board.action.start.frame"
   static let onboardingInstallButtonFrame = "harness.board.action.install.frame"
   static let onboardingRefreshButtonFrame = "harness.board.action.refresh.frame"
+  static let sidebarStartButton = onboardingStartButton
+  static let sidebarInstallButton = onboardingInstallButton
+  static let sidebarStartButtonFrame = onboardingStartButtonFrame
+  static let sidebarInstallButtonFrame = onboardingInstallButtonFrame
   static let sessionsBoardRoot = "harness.board.root"
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let recentSessionsCardFrame = "harness.board.recent-sessions-card.frame"
