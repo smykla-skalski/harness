@@ -1,13 +1,12 @@
 import HarnessMonitorKit
-import Observation
 import SwiftData
 import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessMonitorStore
-  @Bindable var controls: HarnessMonitorStore.SessionControlsSlice
-  @Bindable var projection: HarnessMonitorStore.SessionProjectionSlice
-  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let controls: HarnessMonitorStore.SessionControlsSlice
+  let projection: HarnessMonitorStore.SessionProjectionSlice
+  let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]

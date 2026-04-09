@@ -1,10 +1,9 @@
 import HarnessMonitorKit
-import Observation
 import SwiftUI
 
 struct HarnessMonitorSheetModifier: ViewModifier {
   let store: HarnessMonitorStore
-  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
+  let shellUI: HarnessMonitorStore.ContentShellSlice
 
   func body(content: Content) -> some View {
     content

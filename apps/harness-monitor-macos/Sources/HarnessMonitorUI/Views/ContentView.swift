@@ -1,8 +1,7 @@
 import HarnessMonitorKit
-import Observation
 import SwiftUI
 
-private enum ContentToolbarLayoutWidth {
+enum ContentToolbarLayoutWidth {
   static let minimumWidth: CGFloat = 320
   static let step: CGFloat = 40
   static let defaultWidth: CGFloat = 1_000
@@ -15,11 +14,11 @@ private enum ContentToolbarLayoutWidth {
 public struct ContentView: View {
   let store: HarnessMonitorStore
   let cornerAnimationContent: (() -> AnyView)?
-  @Bindable var contentShell: HarnessMonitorStore.ContentShellSlice
-  @Bindable var contentToolbar: HarnessMonitorStore.ContentToolbarSlice
-  @Bindable var contentChrome: HarnessMonitorStore.ContentChromeSlice
-  @Bindable var contentSession: HarnessMonitorStore.ContentSessionSlice
-  @Bindable var contentDashboard: HarnessMonitorStore.ContentDashboardSlice
+  let contentShell: HarnessMonitorStore.ContentShellSlice
+  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+  let contentChrome: HarnessMonitorStore.ContentChromeSlice
+  let contentSession: HarnessMonitorStore.ContentSessionSlice
+  let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage("showInspector")
   private var persistedShowInspector = true
@@ -338,150 +337,6 @@ public struct ContentView: View {
       }
       let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
-    }
-  }
-}
-
-private struct ContentCornerOverlayModifier: ViewModifier {
-  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
-  let cornerAnimationContent: () -> AnyView
-  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
-  private var cornerAnimationEnabled = false
-
-  private var isPresented: Bool {
-    cornerAnimationEnabled
-      || shellUI.isSelectionLoading
-      || shellUI.isExtensionsLoading
-      || shellUI.isRefreshing
-      || shellUI.connectionState == .connecting
-  }
-
-  func body(content: Content) -> some View {
-    content
-      .modifier(
-        HarnessCornerOverlayModifier(
-          isPresented: isPresented,
-          configuration: .init(
-            width: HarnessCornerAnimationDescriptor.dancingLlama.width,
-            height: HarnessCornerAnimationDescriptor.dancingLlama.height,
-            trailingPadding: HarnessCornerAnimationDescriptor.dancingLlama.trailingPadding,
-            bottomPadding: HarnessCornerAnimationDescriptor.dancingLlama.bottomPadding,
-            contentPadding: 0,
-            appliesGlass: false,
-            accessibilityLabel: HarnessCornerAnimationDescriptor.dancingLlama.accessibilityLabel,
-            presentationDelay: cornerAnimationEnabled ? nil : .milliseconds(400)
-          )
-        ) {
-          cornerAnimationContent()
-        }
-      )
-  }
-}
-
-private struct ContentDetailColumn: View {
-  let store: HarnessMonitorStore
-  @Bindable var selection: HarnessMonitorStore.SelectionSlice
-  @Bindable var contentChrome: HarnessMonitorStore.ContentChromeSlice
-  @Bindable var contentSession: HarnessMonitorStore.ContentSessionSlice
-  @Bindable var contentToolbar: HarnessMonitorStore.ContentToolbarSlice
-  @Bindable var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
-  @Binding var showInspector: Bool
-  let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  let isLayoutAnimating: Bool
-  @Binding var detailColumnWidth: CGFloat
-
-  var body: some View {
-    ZStack {
-      if toolbarGlassReproConfiguration.disablesContentDetailChrome {
-        sessionContent
-      } else {
-        ContentDetailChrome(
-          persistenceError: contentChrome.persistenceError,
-          sessionDataAvailability: contentChrome.sessionDataAvailability,
-          sessionStatus: contentChrome.sessionStatus
-        ) {
-          sessionContent
-        }
-      }
-    }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let quantizedWidth = ContentToolbarLayoutWidth.quantize(width)
-      guard !isLayoutAnimating,
-        abs(quantizedWidth - detailColumnWidth) >= 1
-      else {
-        return
-      }
-      detailColumnWidth = quantizedWidth
-    }
-    .toolbar {
-      ContentPrimaryToolbarItems(
-        store: store,
-        toolbarUI: contentToolbar,
-        showInspector: $showInspector
-      )
-    }
-    .onChange(of: selection.inspectorSelection) { _, newValue in
-      if newValue != .none, !showInspector {
-        showInspector = true
-      }
-    }
-  }
-
-  private var sessionContent: some View {
-    SessionContentContainer(
-      store: store,
-      dashboardUI: dashboardUI,
-      state: SessionContentState(
-        detail: selection.matchedSelectedSession,
-        summary: contentSession.selectedSessionSummary,
-        timeline: selection.timeline,
-        isSessionReadOnly: contentSession.isSessionReadOnly,
-        isSessionActionInFlight: contentSession.isSessionActionInFlight,
-        isSelectionLoading: contentSession.isSelectionLoading,
-        isExtensionsLoading: contentSession.isExtensionsLoading,
-        lastAction: contentSession.lastAction
-      )
-    )
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
-    .onKeyPress(.escape) {
-      if selection.matchedSelectedSession != nil {
-        store.inspectorSelection = .none
-        return .handled
-      }
-      return .ignored
-    }
-  }
-}
-
-struct InspectorToolbarActions: ToolbarContent {
-  let store: HarnessMonitorStore
-  @Bindable var toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  @Binding var showInspector: Bool
-  var body: some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
-      RefreshToolbarButton(isRefreshing: toolbarUI.isRefreshing) {
-        Task { await store.refresh() }
-      }
-      .help("Refresh sessions")
-    }
-
-    ToolbarSpacer(.fixed, placement: .primaryAction)
-
-    ToolbarItem(placement: .primaryAction) {
-      Button {
-        showInspector.toggle()
-      } label: {
-        Label(
-          showInspector ? "Hide Inspector" : "Show Inspector",
-          systemImage: "sidebar.trailing"
-        )
-      }
-      .accessibilityLabel(showInspector ? "Hide Inspector" : "Show Inspector")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorToggleButton)
-      .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 }
