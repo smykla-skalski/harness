@@ -94,7 +94,6 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
 
     tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
-    tapButton(in: app, title: "Status")
     tapButton(in: app, title: "Ended")
     XCTAssertTrue(emptyState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(filterState.label.contains("status=ended"))
