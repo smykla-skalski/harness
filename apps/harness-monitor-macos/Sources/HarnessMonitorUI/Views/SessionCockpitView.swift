@@ -34,7 +34,8 @@ struct SessionCockpitView: View {
           lastAction: lastAction,
           inspectTask: store.inspect(taskID:),
           inspectAgent: store.inspect(agentID:),
-          inspectObserver: store.inspectObserver
+          inspectObserver: store.inspectObserver,
+          openCodexFlow: store.presentCodexFlowSheet
         )
         HarnessMonitorAdaptiveGridLayout(minimumColumnWidth: 340, maximumColumns: 2, spacing: 16) {
           SessionTaskListSection(

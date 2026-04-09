@@ -387,9 +387,9 @@ fn dispatch_inner(
             };
             dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
         }
-        "session.subscribe" => handle_session_subscribe(request, connection),
+        "session.subscribe" => handle_session_subscribe(request, state, connection),
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
-        "stream.subscribe" => handle_stream_subscribe(request, connection),
+        "stream.subscribe" => handle_stream_subscribe(request, state, connection),
         "stream.unsubscribe" => handle_stream_unsubscribe(request, connection),
         "task.create" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: TaskCreateRequest = serde_json::from_value(params)?;
@@ -516,6 +516,7 @@ fn schedule_extensions_push(
 
 fn handle_session_subscribe(
     request: &WsRequest,
+    state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
     let Some(session_id) = extract_session_id(&request.params) else {
@@ -524,8 +525,12 @@ fn handle_session_subscribe(
 
     {
         let mut state = connection.lock().expect("connection lock");
-        state.session_subscriptions.insert(session_id);
+        state.session_subscriptions.insert(session_id.clone());
     }
+
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
 
     ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
@@ -548,12 +553,16 @@ fn handle_session_unsubscribe(
 
 fn handle_stream_subscribe(
     request: &WsRequest,
+    state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
     {
         let mut state = connection.lock().expect("connection lock");
         state.global_subscription = true;
     }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    service::broadcast_sessions_updated(&state.sender, db_ref);
     ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
 
@@ -883,9 +892,10 @@ mod tests {
 
     fn test_http_state() -> DaemonHttpState {
         let (sender, _) = broadcast::channel(8);
+        let db = Arc::new(OnceLock::new());
         DaemonHttpState {
             token: "token".into(),
-            sender,
+            sender: sender.clone(),
             manifest: super::super::state::DaemonManifest {
                 version: "18.2.3".into(),
                 pid: 1,
@@ -895,7 +905,10 @@ mod tests {
             },
             daemon_epoch: "epoch".into(),
             replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
-            db: Arc::new(OnceLock::new()),
+            db: db.clone(),
+            codex_controller: crate::daemon::codex_controller::CodexControllerHandle::new(
+                sender, db,
+            ),
         }
     }
 }
