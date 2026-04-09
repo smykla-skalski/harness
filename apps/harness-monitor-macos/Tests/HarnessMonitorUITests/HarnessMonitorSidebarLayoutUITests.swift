@@ -8,17 +8,13 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
     let window = mainWindow(in: app)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
-    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
 
     XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
 
     let toolbarOffset = sidebarContent.frame.minY - window.frame.minY
     XCTAssertGreaterThan(toolbarOffset, 40)
     XCTAssertLessThan(toolbarOffset, 84)
-    XCTAssertGreaterThanOrEqual(daemonCard.frame.minY - sidebarContent.frame.minY, 0)
-    XCTAssertLessThan(daemonCard.frame.minY - sidebarContent.frame.minY, 28)
   }
 
   func testMainWindowUsesNativeToolbarChromeWithoutCustomBaselineDivider() throws {
@@ -33,29 +29,18 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
 
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
-    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
+    let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
-
-    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.actionTimeout))
-
-    XCTAssertEqual(projectHeader.frame.minX, daemonCard.frame.minX, accuracy: 2)
-    XCTAssertEqual(projectHeader.frame.maxX, daemonCard.frame.maxX, accuracy: 2)
-
-    let headerSpacing = projectHeader.frame.minY - daemonCard.frame.maxY
-    XCTAssertGreaterThanOrEqual(headerSpacing, 0)
-    XCTAssertLessThanOrEqual(headerSpacing, 32)
-  }
-
-  func testSidebarSessionCardMatchesDaemonCardWidth() throws {
-    let app = launch(mode: "preview")
-    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
     let sessionCard = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
 
-    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarShell.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertEqual(sessionCard.frame.minX, daemonCard.frame.minX, accuracy: 2)
-    XCTAssertEqual(sessionCard.frame.maxX, daemonCard.frame.maxX, accuracy: 2)
+
+    XCTAssertEqual(projectHeader.frame.minX, sidebarShell.frame.minX, accuracy: 8)
+    XCTAssertEqual(projectHeader.frame.maxX, sidebarShell.frame.maxX, accuracy: 8)
+    XCTAssertEqual(sessionCard.frame.minX, projectHeader.frame.minX, accuracy: 2)
+    XCTAssertEqual(sessionCard.frame.maxX, projectHeader.frame.maxX, accuracy: 2)
   }
 
   func testToolbarSearchAndFilterControlsAreVisible() throws {

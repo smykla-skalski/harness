@@ -559,10 +559,6 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class SidebarUISlice {
-    public var connectionState: ConnectionState = .idle
-    public var isBusy = false
-    public var isRefreshing = false
-    public var isLaunchAgentInstalled = false
     public var connectionMetrics: ConnectionMetrics = .initial
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
