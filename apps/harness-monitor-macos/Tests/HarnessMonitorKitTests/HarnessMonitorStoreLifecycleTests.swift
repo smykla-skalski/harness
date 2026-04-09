@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -5,6 +6,31 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store lifecycle")
 struct HarnessMonitorStoreLifecycleTests {
+  @Test("API client shutdown invalidates the backing URLSession")
+  func apiClientShutdownInvalidatesSession() async {
+    let probe = SessionInvalidationProbe()
+    let session = URLSession(
+      configuration: .ephemeral,
+      delegate: probe,
+      delegateQueue: nil
+    )
+    let client = HarnessMonitorAPIClient(
+      connection: HarnessMonitorConnection(
+        endpoint: URL(string: "http://127.0.0.1:9999")!,
+        token: "token"
+      ),
+      session: session
+    )
+
+    await client.shutdown()
+
+    for _ in 0..<20 where !probe.didInvalidate {
+      try? await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(probe.didInvalidate)
+  }
+
   @Test("bootstrapIfNeeded only bootstraps once")
   func bootstrapIfNeededOnlyBootstrapsOnce() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -511,5 +537,20 @@ struct HarnessMonitorStoreLifecycleTests {
     #expect(store.daemonStatus?.launchAgent.installed == false)
     #expect(store.sessions.isEmpty)
     #expect(store.health?.status == "ok")
+  }
+}
+
+private final class SessionInvalidationProbe: NSObject, URLSessionDelegate, @unchecked Sendable {
+  private let lock = NSLock()
+  private var invalidated = false
+
+  var didInvalidate: Bool {
+    lock.withLock { invalidated }
+  }
+
+  func urlSession(_ session: URLSession, didBecomeInvalidWithError error: (any Error)?) {
+    lock.withLock {
+      invalidated = true
+    }
   }
 }
