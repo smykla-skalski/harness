@@ -30,10 +30,9 @@ struct HarnessMonitorWindowRootView: View {
   var body: some View {
     ContentView(
       store: store,
-      showsCornerAnimation: cornerAnimationEnabled,
-      cornerAnimationContent: {
+      cornerAnimationContent: cornerAnimationEnabled ? {
         AnyView(HarnessMonitorAppLlamaAnimation())
-      }
+      } : nil
     )
       .frame(minWidth: 900, minHeight: 600)
       .modifier(
