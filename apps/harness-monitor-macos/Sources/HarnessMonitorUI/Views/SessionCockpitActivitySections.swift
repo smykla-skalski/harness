@@ -108,31 +108,31 @@ struct SessionCockpitTimelineSection: View {
         .frame(maxWidth: .infinity)
       } else {
         ScrollView {
-          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             ForEach(timeline) { entry in
-              HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
+              HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
                 RoundedRectangle(cornerRadius: 999)
                   .fill(HarnessMonitorTheme.accent.opacity(0.35))
-                  .frame(width: 8)
+                  .frame(width: 8, height: 8)
                   .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                  Text(entry.summary)
-                    .scaledFont(.system(.body, design: .rounded, weight: .semibold))
-                  Text(
-                    "\(entry.kind) • "
-                      + "\(formatTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))"
-                  )
-                    .scaledFont(.caption.monospaced())
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                }
+                Text(entry.summary)
+                  .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+                  .lineLimit(1)
                 Spacer()
-                if let taskID = entry.taskId {
-                  Text(taskID)
-                    .scaledFont(.caption.monospaced())
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                }
+                Text(
+                  "\(entry.kind) • "
+                    + "\(formatTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))"
+                )
+                  .scaledFont(.caption.monospaced())
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                  .lineLimit(1)
               }
-              .frame(maxWidth: .infinity, alignment: .leading)
+              .frame(maxWidth: .infinity, alignment: .center)
+              .padding(HarnessMonitorTheme.cardPadding)
+              .background {
+                RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+                  .fill(.primary.opacity(0.04))
+              }
               .contextMenu {
                 Button {
                   HarnessMonitorClipboard.copy(entry.summary)
