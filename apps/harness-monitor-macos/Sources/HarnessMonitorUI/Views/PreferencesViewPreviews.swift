@@ -28,6 +28,15 @@ import SwiftUI
   )
 }
 
+#Preview("Preferences Window - Notifications") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  preferencesWindowPreview(
+    section: .notifications,
+    themeMode: $themeMode
+  )
+}
+
 #Preview("Preferences Window - Database") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 
@@ -75,6 +84,7 @@ private struct PreferencesWindowPreviewContainer: View {
   let initialSection: PreferencesSection
   let themeMode: Binding<HarnessMonitorThemeMode>
   let store: HarnessMonitorStore
+  let notifications = HarnessMonitorUserNotificationController.preview()
   @State private var selectedSection: PreferencesSection
 
   init(
@@ -91,6 +101,7 @@ private struct PreferencesWindowPreviewContainer: View {
   var body: some View {
     PreferencesView(
       store: store,
+      notifications: notifications,
       themeMode: themeMode,
       selectedSection: $selectedSection
     )

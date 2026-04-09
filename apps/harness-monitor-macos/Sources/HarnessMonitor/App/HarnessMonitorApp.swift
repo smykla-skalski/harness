@@ -11,9 +11,10 @@ struct HarnessMonitorApp: App {
   private let isUITesting: Bool
   private let launchMode: HarnessMonitorLaunchMode
   private let mainWindowDefaultSize: CGSize
+  private let notificationController: HarnessMonitorUserNotificationController
   private let perfScenario: HarnessMonitorPerfScenario?
-  private let preferencesInitialSection: PreferencesSection
   @State private var store: HarnessMonitorStore
+  @State private var preferencesSelectedSection: PreferencesSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -29,9 +30,12 @@ struct HarnessMonitorApp: App {
     isUITesting = configuration.isUITesting
     launchMode = configuration.launchMode
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
+    let notificationController = HarnessMonitorUserNotificationController()
+    notificationController.activate()
+    self.notificationController = notificationController
     perfScenario = configuration.perfScenario
-    preferencesInitialSection = configuration.preferencesInitialSection
     _store = State(initialValue: configuration.store)
+    _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
   }
 
   var body: some Scene {
@@ -62,8 +66,9 @@ struct HarnessMonitorApp: App {
     Window("Preferences", id: HarnessMonitorWindowID.preferences) {
       HarnessMonitorSettingsRootView(
         store: store,
+        notifications: notificationController,
         themeMode: $themeMode,
-        initialSection: preferencesInitialSection
+        selectedSection: $preferencesSelectedSection
       )
     }
     .windowStyle(.titleBar)
@@ -80,7 +85,9 @@ struct HarnessMonitorApp: App {
       HarnessMonitorWindowRootView(
         delegate: delegate,
         store: store,
+        notifications: notificationController,
         themeMode: $themeMode,
+        preferencesSelectedSection: $preferencesSelectedSection,
         perfScenario: perfScenario
       )
       .modelContainer(container)
@@ -88,7 +95,9 @@ struct HarnessMonitorApp: App {
       HarnessMonitorWindowRootView(
         delegate: delegate,
         store: store,
+        notifications: notificationController,
         themeMode: $themeMode,
+        preferencesSelectedSection: $preferencesSelectedSection,
         perfScenario: perfScenario
       )
     }

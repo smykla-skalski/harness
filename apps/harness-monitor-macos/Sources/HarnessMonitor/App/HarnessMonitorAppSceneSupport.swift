@@ -13,7 +13,9 @@ struct HarnessMonitorWindowRootView: View {
 
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
   @Binding var themeMode: HarnessMonitorThemeMode
+  @Binding var preferencesSelectedSection: PreferencesSection
   let perfScenario: HarnessMonitorPerfScenario?
   @Environment(\.openWindow)
   private var openWindow
@@ -26,6 +28,7 @@ struct HarnessMonitorWindowRootView: View {
   private var cornerAnimationEnabled = false
   @State private var hasRunPerfScenario = false
   @State private var perfScenarioStatus: PerfScenarioStatus = .idle
+  @State private var handledSettingsOpenRequestID = 0
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var backdropMode: HarnessMonitorBackdropMode {
@@ -109,13 +112,22 @@ struct HarnessMonitorWindowRootView: View {
       )
       perfScenarioStatus = .completed
     }
+    .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
+      guard requestID != handledSettingsOpenRequestID else {
+        return
+      }
+      handledSettingsOpenRequestID = requestID
+      preferencesSelectedSection = .notifications
+      openWindow(id: HarnessMonitorWindowID.preferences)
+    }
   }
 }
 
 struct HarnessMonitorSettingsRootView: View {
   let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
   @Binding var themeMode: HarnessMonitorThemeMode
-  @State private var selectedSection: PreferencesSection
+  @Binding var selectedSection: PreferencesSection
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -124,12 +136,14 @@ struct HarnessMonitorSettingsRootView: View {
 
   init(
     store: HarnessMonitorStore,
+    notifications: HarnessMonitorUserNotificationController,
     themeMode: Binding<HarnessMonitorThemeMode>,
-    initialSection: PreferencesSection = .general
+    selectedSection: Binding<PreferencesSection>
   ) {
     self.store = store
+    self.notifications = notifications
     _themeMode = themeMode
-    _selectedSection = State(initialValue: initialSection)
+    _selectedSection = selectedSection
   }
 
   private var backdropMode: HarnessMonitorBackdropMode {
@@ -143,6 +157,7 @@ struct HarnessMonitorSettingsRootView: View {
   var body: some View {
     PreferencesView(
       store: store,
+      notifications: notifications,
       themeMode: $themeMode,
       selectedSection: $selectedSection
     )

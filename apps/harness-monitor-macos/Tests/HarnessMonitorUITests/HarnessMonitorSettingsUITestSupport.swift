@@ -259,6 +259,14 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectNotificationsSection(in app: XCUIApplication) {
+    selectPreferencesSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesNotificationsSection,
+      expectedTitle: "Notifications"
+    )
+  }
+
   func selectGeneralSection(in app: XCUIApplication) {
     selectPreferencesSection(
       in: app,
