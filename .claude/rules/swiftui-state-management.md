@@ -19,7 +19,7 @@ Every @State property must be marked private. This prevents passed values from b
 
 ## No closures stored in view structs
 
-Never store closure properties (let onTap: () -> Void, let action: () -> Void) in view structs. Closures prevent SwiftUI from comparing views during diffing, causing unnecessary body re-evaluations.
+Never store closure properties (let onTap: () -> Void, let action: () -> Void) in view structs. Closures prevent SwiftUI from comparing views during diffing, causing unnecessary body re-evaluations. When closures exist at multiple levels (parent -> child -> grandchild), any state change at the top cascades through the entire tree because none of the intermediate views can be skipped.
 
 Instead, pass the store and have the child call methods directly. For HarnessAsyncActionButton, use the StoreAction enum:
 
@@ -39,6 +39,28 @@ HarnessAsyncActionButton(title: "Start Daemon", ...) {
 ```
 
 New store actions require adding a case to `HarnessAsyncActionButton.StoreAction` and a dispatch entry in `performAction()`.
+
+For toolbar items that need environment values like `openWindow`, read `@Environment(\.openWindow)` directly in the toolbar view instead of passing a closure from the parent. This avoids a closure property on the intermediate view and lets SwiftUI compare it.
+
+```swift
+// correct - reads environment directly
+struct InspectorToolbarActions: ToolbarContent {
+  let store: HarnessMonitorStore
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some ToolbarContent {
+    Button { openWindow(id: HarnessMonitorWindowID.preferences) } label: { ... }
+  }
+}
+
+// wrong - closure passed from parent
+struct InspectorToolbarActions: ToolbarContent {
+  let openPreferences: () -> Void
+  var body: some ToolbarContent {
+    Button(action: openPreferences) { ... }
+  }
+}
+```
 
 ## Prefer owned @State over @Binding + closure combos
 
