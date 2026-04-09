@@ -2,6 +2,13 @@ import SwiftUI
 
 enum HarnessMonitorUITestEnvironment {
   static let isEnabled = ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+  static let accessibilityMarkersEnabled: Bool = {
+    guard isEnabled else {
+      return false
+    }
+    let environment = ProcessInfo.processInfo.environment
+    return environment["HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS"] != "0"
+  }()
 }
 
 private struct AccessibilityFrameMarker: View {
@@ -34,12 +41,15 @@ struct AccessibilityTextMarker: View {
   let identifier: String
   let text: String
 
+  @ViewBuilder
   var body: some View {
-    Color.clear
-      .allowsHitTesting(false)
-      .accessibilityElement()
-      .accessibilityLabel(text)
-      .accessibilityIdentifier(identifier)
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+      Color.clear
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel(text)
+        .accessibilityIdentifier(identifier)
+    }
   }
 }
 
@@ -48,7 +58,7 @@ private struct AccessibilityFrameMarkerModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if HarnessMonitorUITestEnvironment.isEnabled {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       content.overlay {
         AccessibilityFrameMarker(identifier: identifier)
       }
@@ -65,7 +75,7 @@ private struct AccessibilityProbeModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if HarnessMonitorUITestEnvironment.isEnabled {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       content.overlay {
         AccessibilityProbe(
           identifier: identifier,
@@ -100,7 +110,7 @@ extension View {
 
   @ViewBuilder
   func harnessUITestValue(_ value: String) -> some View {
-    if HarnessMonitorUITestEnvironment.isEnabled {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       accessibilityValue(value)
     } else {
       self
