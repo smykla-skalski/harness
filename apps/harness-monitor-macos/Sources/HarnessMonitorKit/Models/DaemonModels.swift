@@ -240,6 +240,24 @@ public struct DaemonStatusReport: Codable, Equatable, Sendable {
   }
 }
 
+public extension DaemonStatusReport {
+  init(
+    diagnosticsReport: DaemonDiagnosticsReport,
+    fallbackProjectCount: Int? = nil,
+    fallbackWorktreeCount: Int? = nil,
+    fallbackSessionCount: Int? = nil
+  ) {
+    self.init(
+      manifest: diagnosticsReport.manifest,
+      launchAgent: diagnosticsReport.launchAgent,
+      projectCount: diagnosticsReport.health?.projectCount ?? fallbackProjectCount ?? 0,
+      worktreeCount: diagnosticsReport.health?.worktreeCount ?? fallbackWorktreeCount ?? 0,
+      sessionCount: diagnosticsReport.health?.sessionCount ?? fallbackSessionCount ?? 0,
+      diagnostics: diagnosticsReport.workspace
+    )
+  }
+}
+
 public struct HealthResponse: Codable, Equatable, Sendable {
   public let status: String
   public let version: String

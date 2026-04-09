@@ -67,6 +67,12 @@ extension HarnessMonitorStore {
       withUISyncBatch {
         diagnostics = measuredDiagnostics.value
         health = measuredDiagnostics.value.health
+        daemonStatus = DaemonStatusReport(
+          diagnosticsReport: measuredDiagnostics.value,
+          fallbackProjectCount: measuredProjects.value.count,
+          fallbackWorktreeCount: measuredProjects.value.reduce(0) { $0 + $1.worktrees.count },
+          fallbackSessionCount: measuredSessions.value.count
+        )
         daemonLogLevel = measuredDiagnostics.value.health?.logLevel
       }
       recordRequestSuccess(
