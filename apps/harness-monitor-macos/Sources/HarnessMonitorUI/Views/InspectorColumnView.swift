@@ -1,6 +1,4 @@
 import HarnessMonitorKit
-import Observation
-import SwiftData
 import SwiftUI
 
 private enum InspectorChromeMetrics {
@@ -16,43 +14,7 @@ private enum InspectorPrimaryResetKey: Hashable {
 
 struct InspectorColumnView: View {
   let store: HarnessMonitorStore
-  let contentUI: HarnessMonitorStore.ContentUISlice
-  @Bindable var selection: HarnessMonitorStore.SelectionSlice
   @Bindable var inspectorUI: HarnessMonitorStore.InspectorUISlice
-
-  init(
-    store: HarnessMonitorStore,
-    contentUI: HarnessMonitorStore.ContentUISlice,
-    selection: HarnessMonitorStore.SelectionSlice,
-    inspectorUI: HarnessMonitorStore.InspectorUISlice
-  ) {
-    self.store = store
-    self.contentUI = contentUI
-    self.selection = selection
-    self.inspectorUI = inspectorUI
-  }
-
-  private var primaryContent: HarnessMonitorStore.InspectorPrimaryContentState {
-    HarnessMonitorStore.InspectorPrimaryContentState(
-      selectedSession: selection.matchedSelectedSession,
-      selectedSessionSummary: contentUI.selectedSessionSummary,
-      inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: inspectorUI.isPersistenceAvailable
-    )
-  }
-
-  private var actionContext: HarnessMonitorStore.InspectorActionContext? {
-    HarnessMonitorStore.InspectorActionContext(
-      detail: selection.matchedSelectedSession,
-      inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: inspectorUI.isPersistenceAvailable,
-      selectedActionActorID: inspectorUI.selectedActionActorID,
-      isSessionReadOnly: inspectorUI.isSessionReadOnly,
-      isSessionActionInFlight: inspectorUI.isSessionActionInFlight,
-      lastAction: inspectorUI.lastAction,
-      lastError: inspectorUI.lastError
-    )
-  }
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -63,7 +25,7 @@ struct InspectorColumnView: View {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
         inspectorPrimaryContent
 
-        if let actionContext {
+        if let actionContext = inspectorUI.actionContext {
           InspectorActionSections(
             store: store,
             context: actionContext
@@ -80,7 +42,7 @@ struct InspectorColumnView: View {
   }
 
   @ViewBuilder private var inspectorPrimaryContent: some View {
-    switch primaryContent {
+    switch inspectorUI.primaryContent {
     case .empty:
       InspectorPrimaryEmptyState()
     case .loading(let summary):
@@ -169,8 +131,6 @@ private struct InspectorPrimaryLoadingState: View {
 
   InspectorColumnView(
     store: store,
-    contentUI: store.contentUI,
-    selection: store.selection,
     inspectorUI: store.inspectorUI
   )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
@@ -182,8 +142,6 @@ private struct InspectorPrimaryLoadingState: View {
 
   InspectorColumnView(
     store: store,
-    contentUI: store.contentUI,
-    selection: store.selection,
     inspectorUI: store.inspectorUI
   )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
@@ -195,8 +153,6 @@ private struct InspectorPrimaryLoadingState: View {
 
   InspectorColumnView(
     store: store,
-    contentUI: store.contentUI,
-    selection: store.selection,
     inspectorUI: store.inspectorUI
   )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
@@ -208,8 +164,6 @@ private struct InspectorPrimaryLoadingState: View {
 
   InspectorColumnView(
     store: store,
-    contentUI: store.contentUI,
-    selection: store.selection,
     inspectorUI: store.inspectorUI
   )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
@@ -224,8 +178,6 @@ private struct InspectorPrimaryLoadingState: View {
 
   InspectorColumnView(
     store: store,
-    contentUI: store.contentUI,
-    selection: store.selection,
     inspectorUI: store.inspectorUI
   )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
