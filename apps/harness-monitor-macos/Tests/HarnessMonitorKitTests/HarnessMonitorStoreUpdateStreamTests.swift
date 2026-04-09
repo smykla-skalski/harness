@@ -99,6 +99,88 @@ struct HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("Global session snapshot reloads stale selected detail")
+  func globalSessionSnapshotReloadsStaleSelectedDetail() async {
+    let client = RecordingHarnessClient()
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-selected",
+        context: "Selected cockpit",
+        status: .active,
+        leaderId: "leader-selected",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let updatedSummary = makeUpdatedSession(
+      summary,
+      context: "Selected cockpit updated by external worker",
+      updatedAt: "2026-03-31T12:02:00Z",
+      agentCount: 2
+    )
+    let initialDetail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-before",
+      workerName: "Worker Before"
+    )
+    let updatedDetail = makeSessionDetail(
+      summary: updatedSummary,
+      workerID: "worker-after",
+      workerName: "Worker After"
+    )
+    let refreshedTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-after",
+      summary: "External worker joined"
+    )
+
+    client.configureSessions(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: initialDetail],
+      timelinesBySessionID: [summary.sessionId: PreviewFixtures.timeline]
+    )
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(summary.sessionId)
+    #expect(
+      store.selectedSession?.agents.contains(where: { $0.agentId == "worker-before" }) == true
+    )
+
+    let baselineDetailCalls = client.readCallCount(.sessionDetail(summary.sessionId))
+    client.configureSessions(
+      summaries: [updatedSummary],
+      detailsByID: [summary.sessionId: updatedDetail],
+      timelinesBySessionID: [summary.sessionId: refreshedTimeline]
+    )
+
+    store.applyGlobalPushEvent(
+      .sessionsUpdated(
+        recordedAt: "2026-03-31T12:02:00Z",
+        projects: [makeProject(totalSessionCount: 1, activeSessionCount: 1)],
+        sessions: [updatedSummary]
+      )
+    )
+
+    try? await Task.sleep(for: .milliseconds(80))
+
+    #expect(store.selectedSession?.session.context == updatedSummary.context)
+    #expect(
+      store.selectedSession?.agents.contains(where: { $0.agentId == "worker-after" }) == true
+    )
+    #expect(store.timeline == refreshedTimeline)
+    #expect(
+      client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCalls + 1
+    )
+
+    store.stopAllStreams()
+  }
+
   @Test("Selected session update without timeline refetches timeline separately")
   func selectedSessionUpdateWithoutTimelineRefetchesTimelineSeparately() async {
     let client = RecordingHarnessClient()

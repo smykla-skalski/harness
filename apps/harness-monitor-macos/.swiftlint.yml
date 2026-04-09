@@ -3,12 +3,16 @@ excluded:
   - .build
   - build
   - DerivedData
+  - DerivedData-shell
+  - DerivedData-toolbar
+  - tmp
 reporter: xcode
 strict: true
 lenient: false
 disabled_rules:
   - trailing_comma
   - trailing_whitespace
+  - opening_brace
 opt_in_rules:
   - attributes
   - array_init
@@ -125,6 +129,10 @@ custom_rules:
 file_length:
   warning: 420
   error: 520
+type_name:
+  max_length:
+    warning: 50
+    error: 60
 identifier_name:
   min_length:
     warning: 2

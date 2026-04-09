@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 
 @testable import HarnessMonitorKit
 
@@ -9,84 +8,6 @@ private struct ProjectFixture {
   let contextRoot: String
   var activeSessionCount: Int
   var totalSessionCount: Int
-}
-
-actor RecordingDaemonController: DaemonControlling {
-  private let client: any HarnessMonitorClientProtocol
-  private var launchAgentInstalled: Bool
-  private var lastEventMessage = "daemon ready"
-
-  init(
-    client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
-    launchAgentInstalled: Bool = true
-  ) {
-    self.client = client
-    self.launchAgentInstalled = launchAgentInstalled
-  }
-
-  func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
-    client
-  }
-
-  func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
-    client
-  }
-
-  func stopDaemon() async throws -> String {
-    lastEventMessage = "daemon stopped"
-    return "stopped"
-  }
-
-  func daemonStatus() async throws -> DaemonStatusReport {
-    DaemonStatusReport(
-      manifest: DaemonManifest(
-        version: "14.5.0",
-        pid: 111,
-        endpoint: "http://127.0.0.1:9999",
-        startedAt: "2026-03-28T14:00:00Z",
-        tokenPath: "/tmp/token"
-      ),
-      launchAgent: LaunchAgentStatus(
-        installed: launchAgentInstalled,
-        loaded: launchAgentInstalled,
-        label: "io.harness.daemon",
-        path: "/tmp/io.harness.daemon.plist",
-        domainTarget: "gui/501",
-        serviceTarget: "gui/501/io.harness.daemon",
-        state: launchAgentInstalled ? "running" : nil,
-        pid: launchAgentInstalled ? 4_242 : nil,
-        lastExitStatus: launchAgentInstalled ? 0 : nil
-      ),
-      projectCount: 1,
-      sessionCount: 1,
-      diagnostics: DaemonDiagnostics(
-        daemonRoot: "/tmp/harness/daemon",
-        manifestPath: "/tmp/harness/daemon/manifest.json",
-        authTokenPath: "/tmp/token",
-        authTokenPresent: true,
-        eventsPath: "/tmp/harness/daemon/events.jsonl",
-        databasePath: "/tmp/harness/daemon/harness.db",
-        databaseSizeBytes: 1_740_800,
-        lastEvent: DaemonAuditEvent(
-          recordedAt: "2026-03-28T14:00:00Z",
-          level: "info",
-          message: lastEventMessage
-        )
-      )
-    )
-  }
-
-  func installLaunchAgent() async throws -> String {
-    launchAgentInstalled = true
-    lastEventMessage = "launch agent installed"
-    return "/tmp/io.harness.daemon.plist"
-  }
-
-  func removeLaunchAgent() async throws -> String {
-    launchAgentInstalled = false
-    lastEventMessage = "launch agent removed"
-    return "removed"
-  }
 }
 
 final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable {
@@ -107,10 +28,24 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       severity: TaskSeverity,
       actor: String
     )
+    case interruptCodexRun(runID: String)
     case endSession(sessionID: String, actor: String)
     case observeSession(sessionID: String, actor: String)
     case removeAgent(sessionID: String, agentID: String, actor: String)
+    case resolveCodexApproval(
+      runID: String,
+      approvalID: String,
+      decision: CodexApprovalDecision
+    )
     case sendSignal(sessionID: String, agentID: String, command: String, actor: String)
+    case startCodexRun(
+      sessionID: String,
+      prompt: String,
+      mode: CodexRunMode,
+      actor: String?,
+      resumeThreadID: String?
+    )
+    case steerCodexRun(runID: String, prompt: String)
     case transferLeader(sessionID: String, newLeaderID: String, reason: String?, actor: String)
     case updateTask(
       sessionID: String,
@@ -146,6 +81,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _sessionDetailScopesByID: [String: [String?]] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
+  private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   private var _globalStreamEvents: [DaemonPushEvent] = []
   private var _globalStreamError: (any Error)?
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
@@ -303,6 +239,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     }
   }
 
+  func configureCodexRuns(_ runs: [CodexRunSnapshot], for sessionID: String) {
+    lock.withLock {
+      _codexRunsBySessionID[sessionID] = runs
+    }
+  }
+
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
   func configuredTransportLatencyMs() -> Int? { lock.withLock { _transportLatencyMs } }
   func configuredTransportLatencyError() -> (any Error)? {
@@ -326,6 +268,22 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   }
   func configuredTimelineDelay(for sessionID: String) -> Duration? {
     lock.withLock { _timelineDelays[sessionID] }
+  }
+  func configuredCodexRuns(for sessionID: String) -> [CodexRunSnapshot] {
+    lock.withLock { _codexRunsBySessionID[sessionID] ?? [] }
+  }
+  func configuredCodexRun(id runID: String) -> CodexRunSnapshot? {
+    lock.withLock {
+      _codexRunsBySessionID.values.flatMap(\.self).first { $0.runId == runID }
+    }
+  }
+  func recordCodexRun(_ run: CodexRunSnapshot) {
+    lock.withLock {
+      var runs = _codexRunsBySessionID[run.sessionId] ?? []
+      runs.removeAll { $0.runId == run.runId }
+      runs.insert(run, at: 0)
+      _codexRunsBySessionID[run.sessionId] = runs
+    }
   }
   func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { _globalStreamEvents } }
   func configuredGlobalStreamError() -> (any Error)? { lock.withLock { _globalStreamError } }
