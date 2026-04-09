@@ -9,7 +9,6 @@ struct HarnessMonitorAppCommands: Commands {
   private var showInspector = true
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
-  let searchController: SidebarSearchController
   let textSizeIndex: Int
   let increaseTextSize: () -> Void
   let decreaseTextSize: () -> Void
@@ -51,12 +50,6 @@ struct HarnessMonitorAppCommands: Commands {
       Button("Reset Text Size", action: resetTextSize)
         .keyboardShortcut("0", modifiers: .command)
         .disabled(textSizeIndex == HarnessMonitorTextSize.defaultIndex)
-    }
-    CommandGroup(before: .textEditing) {
-      Button("Find Sessions") {
-        searchController.requestFocus()
-      }
-      .keyboardShortcut("f", modifiers: .command)
     }
     CommandGroup(replacing: .help) {
       Link(

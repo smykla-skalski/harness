@@ -5,13 +5,10 @@ import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessMonitorStore
-  let sessionIndex: HarnessMonitorStore.SessionIndexSlice
-  @Bindable var searchController: SidebarSearchController
+  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
-  @State private var sidebarSelectedSessionID: String?
-  @State private var draftSidebarSearchText = ""
-  @State private var isSidebarSearchPresented = false
 
   @SceneStorage("sidebar.collapsed-project-ids")
   var collapsedProjectIDsStorage = ""
@@ -21,13 +18,11 @@ struct SidebarView: View {
   init(
     store: HarnessMonitorStore,
     sessionIndex: HarnessMonitorStore.SessionIndexSlice,
-    searchController: SidebarSearchController
+    sidebarUI: HarnessMonitorStore.SidebarUISlice
   ) {
     self.store = store
     self.sessionIndex = sessionIndex
-    self.searchController = searchController
-    _sidebarSelectedSessionID = State(initialValue: store.selectedSessionID)
-    _draftSidebarSearchText = State(initialValue: store.searchText)
+    self.sidebarUI = sidebarUI
   }
 
   var sidebarRowInsets: EdgeInsets {
@@ -48,40 +43,63 @@ struct SidebarView: View {
   }
 
   private var recentSearchQueries: [String] {
-    guard store.isPersistenceAvailable else {
+    guard sidebarUI.isPersistenceAvailable else {
       return []
     }
     return Array(recentSearches.prefix(5).map(\.query))
   }
 
+  private var sidebarSelection: Binding<String?> {
+    Binding(
+      get: { sidebarUI.selectedSessionID },
+      set: { newValue in
+        guard sidebarUI.selectedSessionID != newValue else {
+          return
+        }
+        store.selectSessionFromList(newValue)
+      }
+    )
+  }
+
+  private var sidebarSearchText: Binding<String> {
+    Binding(
+      get: { sessionIndex.searchText },
+      set: { newValue in
+        guard sessionIndex.searchText != newValue else {
+          return
+        }
+        sessionIndex.searchText = newValue
+      }
+    )
+  }
+
   private var hasActiveSidebarFilters: Bool {
-    !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || store.sessionFilter != .active
-      || store.sessionFocusFilter != .all
-      || store.sessionSortOrder != .recentActivity
+    !sessionIndex.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || sessionIndex.sessionFilter != .active
+      || sessionIndex.sessionFocusFilter != .all
+      || sessionIndex.sessionSortOrder != .recentActivity
   }
 
   private var sidebarFilterStateValue: String {
     [
-      "status=\(store.sessionFilter.rawValue)",
-      "focus=\(store.sessionFocusFilter.rawValue)",
-      "sort=\(store.sessionSortOrder.rawValue)",
-      "visible=\(store.filteredSessionCount)",
-      "total=\(store.sessions.count)",
-      "search=\(store.searchText)",
+      "status=\(sessionIndex.sessionFilter.rawValue)",
+      "focus=\(sessionIndex.sessionFocusFilter.rawValue)",
+      "sort=\(sessionIndex.sessionSortOrder.rawValue)",
+      "visible=\(sessionIndex.filteredSessionCount)",
+      "total=\(sessionIndex.sessions.count)",
+      "search=\(sessionIndex.searchText)",
     ].joined(separator: ", ")
   }
 
   var body: some View {
-    List(selection: $sidebarSelectedSessionID) {
+    List(selection: sidebarSelection) {
       sidebarContent
     }
     .listStyle(.sidebar)
     .environment(\.defaultMinListRowHeight, 1)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .searchable(
-      text: $draftSidebarSearchText,
-      isPresented: $isSidebarSearchPresented,
+      text: sidebarSearchText,
       placement: .sidebar,
       prompt: "Search sessions, projects, leaders"
     )
@@ -89,14 +107,14 @@ struct SidebarView: View {
       sidebarHeader
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      SidebarFooterAccessory(metrics: store.connectionMetrics)
+      SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
     }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         SidebarToolbarFilterMenu(
-          sessionFilter: store.sessionFilter,
-          sessionFocusFilter: store.sessionFocusFilter,
-          sessionSortOrder: store.sessionSortOrder,
+          sessionFilter: sessionIndex.sessionFilter,
+          sessionFocusFilter: sessionIndex.sessionFocusFilter,
+          sessionSortOrder: sessionIndex.sessionSortOrder,
           hasActiveFilters: hasActiveSidebarFilters,
           setSessionFilter: setSessionFilter,
           setSessionFocusFilter: setSessionFocusFilter,
@@ -105,41 +123,9 @@ struct SidebarView: View {
         )
       }
     }
-    .onAppear {
-      sidebarSelectedSessionID = store.selectedSessionID
-      draftSidebarSearchText = store.searchText
-    }
-    .task(id: draftSidebarSearchText) {
-      let nextValue = draftSidebarSearchText
-      try? await Task.sleep(for: .milliseconds(300))
-      guard !Task.isCancelled else { return }
-      if store.searchText != nextValue {
-        store.searchText = nextValue
-      }
-    }
-    .onChange(of: store.searchText) { _, newValue in
-      if draftSidebarSearchText != newValue {
-        draftSidebarSearchText = newValue
-      }
-    }
-    .onChange(of: sidebarSelectedSessionID) { _, newValue in
-      guard store.selectedSessionID != newValue else {
-        return
-      }
-      store.selectSessionFromList(newValue)
-    }
-    .onChange(of: store.selectedSessionID) { _, newValue in
-      guard sidebarSelectedSessionID != newValue else {
-        return
-      }
-      sidebarSelectedSessionID = newValue
-    }
-    .onChange(of: searchController.focusRequestToken) { _, _ in
-      focusSidebarSearch()
-    }
     .onSubmit(of: .search) {
-      if store.isPersistenceAvailable {
-        _ = store.recordSearch(draftSidebarSearchText)
+      if sidebarUI.isPersistenceAvailable {
+        _ = store.recordSearch(sessionIndex.searchText)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -188,10 +174,10 @@ struct SidebarView: View {
   private var sidebarHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       DaemonStatusCard(
-        connectionState: store.connectionState,
-        isBusy: store.isBusy,
-        isRefreshing: store.isRefreshing,
-        isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
+        connectionState: sidebarUI.connectionState,
+        isBusy: sidebarUI.isBusy,
+        isRefreshing: sidebarUI.isRefreshing,
+        isLaunchAgentInstalled: sidebarUI.isLaunchAgentInstalled,
         startDaemon: startDaemon,
         stopDaemon: stopDaemon,
         installLaunchAgent: installLaunchAgent
@@ -242,28 +228,27 @@ struct SidebarView: View {
   }
 
   private func setSessionFilter(_ filter: HarnessMonitorStore.SessionFilter) {
-    store.sessionFilter = filter
+    sessionIndex.sessionFilter = filter
   }
 
   private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
-    store.sessionFocusFilter = filter
+    sessionIndex.sessionFocusFilter = filter
   }
 
   private func setSessionSortOrder(_ order: SessionSortOrder) {
-    store.sessionSortOrder = order
+    sessionIndex.sessionSortOrder = order
   }
 
   private func clearSidebarFilters() {
-    draftSidebarSearchText = ""
-    store.resetFilters()
-    store.sessionSortOrder = .recentActivity
+    sessionIndex.searchText = ""
+    sessionIndex.sessionFilter = .active
+    sessionIndex.sessionFocusFilter = .all
+    sessionIndex.sessionSortOrder = .recentActivity
   }
 
   private func applyRecentSearch(_ query: String) {
-    draftSidebarSearchText = query
-    store.searchText = query
-    focusSidebarSearch()
-    if store.isPersistenceAvailable {
+    sessionIndex.searchText = query
+    if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
     }
   }
@@ -277,7 +262,7 @@ struct SidebarView: View {
 
         Spacer()
 
-        if store.isPersistenceAvailable {
+        if sidebarUI.isPersistenceAvailable {
           Button("Clear") {
             _ = store.clearSearchHistory()
           }
@@ -306,30 +291,7 @@ struct SidebarView: View {
     }
   }
 
-  private var emptyState: SidebarEmptyStateKind {
-    if store.sessions.isEmpty {
-      return .noSessions
-    }
-    if sessionIndex.groupedSessions.isEmpty {
-      return .noMatches
-    }
-    return .sessionsAvailable
+  private var emptyState: HarnessMonitorStore.SidebarEmptyState {
+    sidebarUI.emptyState
   }
-
-  private func focusSidebarSearch() {
-    guard !isSidebarSearchPresented else {
-      isSidebarSearchPresented = false
-      Task { @MainActor in
-        isSidebarSearchPresented = true
-      }
-      return
-    }
-    isSidebarSearchPresented = true
-  }
-}
-
-private enum SidebarEmptyStateKind {
-  case noSessions
-  case noMatches
-  case sessionsAvailable
 }

@@ -118,20 +118,6 @@ extension HarnessMonitorStore {
   }
 }
 
-// MARK: - Sidebar search controller
-
-@MainActor
-@Observable
-public final class SidebarSearchController {
-  public var focusRequestToken = 0
-
-  public init() {}
-
-  public func requestFocus() {
-    focusRequestToken &+= 1
-  }
-}
-
 // MARK: - Content toolbar items
 
 struct ContentNavigationToolbarItems: ToolbarContent {

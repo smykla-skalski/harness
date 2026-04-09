@@ -13,7 +13,6 @@ struct HarnessMonitorApp: App {
   private let perfScenario: HarnessMonitorPerfScenario?
   private let preferencesInitialSection: PreferencesSection
   @State private var store: HarnessMonitorStore
-  @State private var searchController = SidebarSearchController()
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -44,7 +43,6 @@ struct HarnessMonitorApp: App {
       HarnessMonitorAppCommands(
         store: store,
         displayState: store.commandsDisplayState,
-        searchController: searchController,
         textSizeIndex: textSizeIndex,
         increaseTextSize: increaseTextSize,
         decreaseTextSize: decreaseTextSize,
@@ -76,7 +74,6 @@ struct HarnessMonitorApp: App {
       HarnessMonitorWindowRootView(
         delegate: delegate,
         store: store,
-        searchController: searchController,
         themeMode: $themeMode,
         perfScenario: perfScenario
       )
@@ -85,7 +82,6 @@ struct HarnessMonitorApp: App {
       HarnessMonitorWindowRootView(
         delegate: delegate,
         store: store,
-        searchController: searchController,
         themeMode: $themeMode,
         perfScenario: perfScenario
       )
