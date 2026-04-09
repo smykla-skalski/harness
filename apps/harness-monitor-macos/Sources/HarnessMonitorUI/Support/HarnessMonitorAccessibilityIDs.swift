@@ -91,6 +91,7 @@ enum HarnessMonitorAccessibility {
   static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
   static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
   static let toolbarCenterpieceMetricsFrame = "harness.toolbar.centerpiece.metrics.frame"
+  static let toolbarStartDaemonButton = "harness.toolbar.action.start"
   static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   static let toolbarStatusTickerFrame = "harness.toolbar.status-ticker.frame"
   static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"
@@ -113,6 +114,10 @@ enum HarnessMonitorAccessibility {
   static let activityPulse = "harness.sidebar.activity-pulse"
   static let reconnectionProgress = "harness.sidebar.reconnection-progress"
   static let actionToast = "harness.action-toast"
+  static let sessionTimelinePagination = "harness.session.timeline.pagination"
+  static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
+  static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
+  static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
   static let connectionCard = "harness.preferences.connection-card"
   static let cornerOverlay = "harness.corner-overlay"
   static let sendSignalSheet = "harness.sheet.send-signal"
@@ -167,6 +172,10 @@ enum HarnessMonitorAccessibility {
 
   static func sessionSignalCard(_ signalID: String) -> String {
     "harness.session.signal.\(slug(signalID))"
+  }
+
+  static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
+    "harness.session.timeline.pagination.page.\(pageNumber)"
   }
 
   static func preferencesMetricCard(_ key: String) -> String {
