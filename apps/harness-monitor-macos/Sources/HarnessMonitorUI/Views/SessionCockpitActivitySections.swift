@@ -98,24 +98,34 @@ struct SessionCockpitTimelineSection: View {
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var currentPage = 0
+  @State private var pageSize = SessionTimelinePageSize.defaultSize
 
   private var currentEntries: [TimelineEntry] {
     SessionTimelinePagination.currentEntries(
       in: timeline,
-      currentPage: currentPage
+      currentPage: resolvedCurrentPage,
+      pageSize: pageSize.rawValue
     )
   }
 
   private var pageCount: Int {
-    SessionTimelinePagination.pageCount(for: timeline.count)
+    SessionTimelinePagination.pageCount(for: timeline.count, pageSize: pageSize.rawValue)
+  }
+
+  private var resolvedCurrentPage: Int {
+    SessionTimelinePagination.clampedPage(
+      currentPage,
+      itemCount: timeline.count,
+      pageSize: pageSize.rawValue
+    )
   }
 
   private var pageStatusText: String {
-    "Page \(currentPage + 1) of \(pageCount)"
+    "Page \(resolvedCurrentPage + 1) of \(pageCount)"
   }
 
   private var pageRangeText: String {
-    let lowerBound = (currentPage * SessionTimelinePagination.pageSize) + 1
+    let lowerBound = (resolvedCurrentPage * pageSize.rawValue) + 1
     let upperBound = min(lowerBound + currentEntries.count - 1, timeline.count)
     return "Showing \(lowerBound)-\(upperBound) of \(timeline.count)"
   }
@@ -142,7 +152,10 @@ struct SessionCockpitTimelineSection: View {
         .frame(maxWidth: .infinity)
       } else {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-          SessionTimelinePageSummary(rangeText: pageRangeText)
+          SessionTimelinePageSummary(
+            rangeText: pageRangeText,
+            pageSize: $pageSize
+          )
 
           LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             ForEach(currentEntries) { entry in
@@ -152,7 +165,7 @@ struct SessionCockpitTimelineSection: View {
               )
             }
           }
-          .id(currentPage)
+          .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
           .frame(maxWidth: .infinity, alignment: .leading)
 
           if showsPagination {
@@ -160,11 +173,11 @@ struct SessionCockpitTimelineSection: View {
               .overlay(HarnessMonitorTheme.controlBorder.opacity(0.55))
 
             SessionTimelinePaginationFooter(
-              currentPage: currentPage,
+              currentPage: resolvedCurrentPage,
               pageCount: pageCount,
               pageStatusText: pageStatusText,
               visiblePages: SessionTimelinePagination.visiblePages(
-                currentPage: currentPage,
+                currentPage: resolvedCurrentPage,
                 pageCount: pageCount
               ),
               goToPreviousPage: { changePage(to: currentPage - 1) },
@@ -187,10 +200,21 @@ struct SessionCockpitTimelineSection: View {
         .onChange(of: sessionID) { _, _ in
           currentPage = 0
         }
+        .onChange(of: pageSize) { oldPageSize, newPageSize in
+          setCurrentPage(
+            SessionTimelinePagination.rebasedPage(
+              currentPage,
+              itemCount: timeline.count,
+              oldPageSize: oldPageSize.rawValue,
+              newPageSize: newPageSize.rawValue
+            )
+          )
+        }
         .onChange(of: timeline) { _, newTimeline in
           currentPage = SessionTimelinePagination.clampedPage(
             currentPage,
-            itemCount: newTimeline.count
+            itemCount: newTimeline.count,
+            pageSize: pageSize.rawValue
           )
         }
       }
@@ -199,37 +223,52 @@ struct SessionCockpitTimelineSection: View {
   }
 
   private func changePage(to page: Int) {
-    let clampedPage = SessionTimelinePagination.clampedPage(page, itemCount: timeline.count)
+    let clampedPage = SessionTimelinePagination.clampedPage(
+      page,
+      itemCount: timeline.count,
+      pageSize: pageSize.rawValue
+    )
     guard clampedPage != currentPage else {
       return
     }
 
+    setCurrentPage(clampedPage)
+  }
+
+  private func setCurrentPage(_ page: Int) {
     if let pageChangeAnimation {
       withAnimation(pageChangeAnimation) {
-        currentPage = clampedPage
+        currentPage = page
       }
     } else {
-      currentPage = clampedPage
+      currentPage = page
     }
   }
 }
 
 private struct SessionTimelinePageSummary: View {
   let rangeText: String
+  @Binding var pageSize: SessionTimelinePageSize
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
-      Text("Visible Events")
-        .scaledFont(.caption.weight(.semibold))
-        .tracking(HarnessMonitorTheme.uppercaseTracking)
-        .foregroundStyle(HarnessMonitorTheme.ink)
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+        SessionTimelinePageSizePicker(pageSize: $pageSize)
+        Spacer(minLength: 0)
+        rangeTextLabel
+      }
 
-      Spacer(minLength: 0)
-
-      Text(rangeText)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+        SessionTimelinePageSizePicker(pageSize: $pageSize)
+        rangeTextLabel
+      }
     }
+  }
+
+  private var rangeTextLabel: some View {
+    Text(rangeText)
+      .scaledFont(.caption.monospaced())
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
   }
 }
 
@@ -358,12 +397,48 @@ private struct SessionTimelinePaginationFooter: View {
   }
 }
 
+private struct SessionTimelinePageSizePicker: View {
+  @Binding var pageSize: SessionTimelinePageSize
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+      Text("Per Page")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.ink)
+        .accessibilityHidden(true)
+
+      Picker("Events per page", selection: $pageSize) {
+        ForEach(SessionTimelinePageSize.allCases) { option in
+          Text(option.label).tag(option)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .frame(width: 68)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Events per page")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePageSizePicker)
+    }
+  }
+}
+
+private enum SessionTimelinePageSize: Int, CaseIterable, Identifiable {
+  case ten = 10
+  case fifteen = 15
+  case thirty = 30
+  case fifty = 50
+
+  static let defaultSize: Self = .fifteen
+
+  var id: Int { rawValue }
+  var label: String { "\(rawValue)" }
+}
+
 private enum SessionTimelinePagination {
-  static let pageSize = 15
   private static let maxVisiblePageButtons = 5
 
-  static func clampedPage(_ page: Int, itemCount: Int) -> Int {
-    let resolvedPageCount = pageCount(for: itemCount)
+  static func clampedPage(_ page: Int, itemCount: Int, pageSize: Int) -> Int {
+    let resolvedPageCount = pageCount(for: itemCount, pageSize: pageSize)
     guard resolvedPageCount > 0 else {
       return 0
     }
@@ -373,16 +448,40 @@ private enum SessionTimelinePagination {
 
   static func currentEntries(
     in timeline: [TimelineEntry],
-    currentPage: Int
+    currentPage: Int,
+    pageSize: Int
   ) -> [TimelineEntry] {
-    let clampedCurrentPage = clampedPage(currentPage, itemCount: timeline.count)
+    let clampedCurrentPage = clampedPage(
+      currentPage,
+      itemCount: timeline.count,
+      pageSize: pageSize
+    )
     let startIndex = clampedCurrentPage * pageSize
     let endIndex = min(startIndex + pageSize, timeline.count)
     return Array(timeline[startIndex..<endIndex])
   }
 
-  static func pageCount(for itemCount: Int) -> Int {
+  static func pageCount(for itemCount: Int, pageSize: Int) -> Int {
     max(1, Int(ceil(Double(itemCount) / Double(pageSize))))
+  }
+
+  static func rebasedPage(
+    _ currentPage: Int,
+    itemCount: Int,
+    oldPageSize: Int,
+    newPageSize: Int
+  ) -> Int {
+    guard itemCount > 0 else {
+      return 0
+    }
+
+    let firstVisibleIndex = clampedPage(
+      currentPage,
+      itemCount: itemCount,
+      pageSize: oldPageSize
+    ) * oldPageSize
+    let rebasedPage = firstVisibleIndex / newPageSize
+    return clampedPage(rebasedPage, itemCount: itemCount, pageSize: newPageSize)
   }
 
   static func visiblePages(
