@@ -49,10 +49,12 @@ public final class HarnessMonitorStore {
   }
 
   public enum PresentedSheet: Identifiable, Equatable {
+    case codexFlow
     case sendSignal(agentID: String)
 
     public var id: String {
       switch self {
+      case .codexFlow: "codexFlow"
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       }
     }
@@ -79,6 +81,12 @@ public final class HarnessMonitorStore {
     didSet { scheduleUISync([.content]) }
   }
   public var pendingConfirmation: PendingConfirmation? {
+    didSet { scheduleUISync([.content]) }
+  }
+  public var selectedCodexRuns: [CodexRunSnapshot] = [] {
+    didSet { scheduleUISync([.content]) }
+  }
+  public var selectedCodexRun: CodexRunSnapshot? {
     didSet { scheduleUISync([.content]) }
   }
   public var showConfirmation: Bool {

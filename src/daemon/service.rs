@@ -19,6 +19,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
 
+use super::codex_controller::CodexControllerHandle;
 use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
@@ -117,6 +118,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let daemon_epoch = manifest.started_at.clone();
 
     spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
+    let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone());
 
     let app_state = DaemonHttpState {
         token,
@@ -125,6 +127,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         daemon_epoch,
         replay_buffer,
         db,
+        codex_controller,
     };
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
@@ -1182,6 +1185,38 @@ pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
     }
 }
 
+/// Build the events every global stream subscriber receives immediately.
+///
+/// This closes the subscription gap between the monitor's last explicit
+/// refresh and the moment the daemon marks the stream as subscribed.
+#[must_use]
+pub fn global_stream_initial_events(db: Option<&super::db::DaemonDb>) -> Vec<StreamEvent> {
+    let mut events = vec![ready_event(None)];
+    if let Ok(event) = sessions_updated_event(db) {
+        events.push(event);
+    }
+    events
+}
+
+/// Build the events every per-session stream subscriber receives immediately.
+///
+/// This gives reconnecting clients a fresh selected-session snapshot even when
+/// the mutation broadcast happened before the stream subscription became live.
+#[must_use]
+pub fn session_stream_initial_events(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Vec<StreamEvent> {
+    let mut events = vec![ready_event(Some(session_id))];
+    if let Ok(event) = session_updated_core_event(session_id, db) {
+        events.push(event);
+    }
+    if let Ok(event) = session_extensions_event(session_id, db) {
+        events.push(event);
+    }
+    events
+}
+
 /// Build a `sessions_updated` stream event with current project and session lists.
 ///
 /// # Errors
@@ -1701,6 +1736,71 @@ mod tests {
             assert_eq!(payload.projects.len(), 1);
             assert_eq!(payload.sessions.len(), 1);
             assert_eq!(payload.sessions[0].session_id, state.session_id);
+        });
+    }
+
+    #[test]
+    fn global_stream_initial_events_include_current_session_index() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon stream initial index payload",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-stream-initial-index"),
+            )
+            .expect("start session");
+
+            let events = global_stream_initial_events(None);
+            let snapshot = events
+                .iter()
+                .find(|event| event.event == "sessions_updated")
+                .expect("sessions_updated event");
+            let payload: SessionsUpdatedPayload =
+                serde_json::from_value(snapshot.payload.clone()).expect("deserialize payload");
+
+            assert_eq!(events[0].event, "ready");
+            assert!(events[0].session_id.is_none());
+            assert!(
+                payload
+                    .sessions
+                    .iter()
+                    .any(|session| { session.session_id == state.session_id })
+            );
+        });
+    }
+
+    #[test]
+    fn session_stream_initial_events_include_current_session_snapshot() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon stream initial session payload",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-stream-initial-session"),
+            )
+            .expect("start session");
+
+            let events = session_stream_initial_events(&state.session_id, None);
+            let update = events
+                .iter()
+                .find(|event| event.event == "session_updated")
+                .expect("session_updated event");
+            let payload: SessionUpdatedPayload =
+                serde_json::from_value(update.payload.clone()).expect("deserialize payload");
+
+            assert_eq!(events[0].event, "ready");
+            assert_eq!(
+                events[0].session_id.as_deref(),
+                Some(state.session_id.as_str())
+            );
+            assert_eq!(
+                update.session_id.as_deref(),
+                Some(state.session_id.as_str())
+            );
+            assert_eq!(payload.detail.session.session_id, state.session_id);
+            assert!(payload.extensions_pending);
         });
     }
 

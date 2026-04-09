@@ -66,11 +66,14 @@ struct HarnessMonitorStoreSheetTests {
 
   @Test("PresentedSheet id is stable and unique per case")
   func presentedSheetIdIsStable() {
+    let codexSheet = HarnessMonitorStore.PresentedSheet.codexFlow
     let sheet1 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")
     let sheet2 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-b")
 
+    #expect(codexSheet.id == "codexFlow")
     #expect(sheet1.id == "sendSignal:agent-a")
     #expect(sheet2.id == "sendSignal:agent-b")
+    #expect(codexSheet.id != sheet1.id)
     #expect(sheet1.id != sheet2.id)
   }
 }

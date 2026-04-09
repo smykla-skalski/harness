@@ -1,12 +1,14 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::io::{Error as IoError, ErrorKind};
 use std::path::{Path, PathBuf};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, types::Type};
 
 use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::index::DiscoveredProject;
+use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
@@ -27,7 +29,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-const SCHEMA_VERSION: &str = "3";
+const SCHEMA_VERSION: &str = "4";
 
 impl DaemonDb {
     /// Open (or create) the daemon database at the given path with WAL mode
@@ -96,9 +98,19 @@ impl DaemonDb {
                          UPDATE schema_meta SET value = '2' WHERE key = 'version';",
                     )
                     .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
-                migrate_v2_to_v3(&self.conn)?
+                let reclaimed = migrate_v2_to_v3(&self.conn)?;
+                migrate_v3_to_v4(&self.conn)?;
+                reclaimed
             }
-            "2" => migrate_v2_to_v3(&self.conn)?,
+            "2" => {
+                let reclaimed = migrate_v2_to_v3(&self.conn)?;
+                migrate_v3_to_v4(&self.conn)?;
+                reclaimed
+            }
+            "3" => {
+                migrate_v3_to_v4(&self.conn)?;
+                false
+            }
             _ => false,
         };
 
@@ -1378,6 +1390,173 @@ impl DaemonDb {
             Err(error) => Err(db_error(format!("ensure_project_for_dir: {error}"))),
         }
     }
+
+    /// Persist a Codex controller run snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on serialization or SQL failures.
+    pub fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
+        let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
+            .map_err(|error| db_error(format!("serialize codex approvals: {error}")))?;
+        self.conn
+            .execute(
+                "INSERT INTO codex_runs (
+                    run_id, session_id, project_dir, thread_id, turn_id, mode,
+                    status, prompt, latest_summary, final_message, error,
+                    pending_approvals_json, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    session_id = excluded.session_id,
+                    project_dir = excluded.project_dir,
+                    thread_id = excluded.thread_id,
+                    turn_id = excluded.turn_id,
+                    mode = excluded.mode,
+                    status = excluded.status,
+                    prompt = excluded.prompt,
+                    latest_summary = excluded.latest_summary,
+                    final_message = excluded.final_message,
+                    error = excluded.error,
+                    pending_approvals_json = excluded.pending_approvals_json,
+                    updated_at = excluded.updated_at",
+                rusqlite::params![
+                    snapshot.run_id,
+                    snapshot.session_id,
+                    snapshot.project_dir,
+                    snapshot.thread_id,
+                    snapshot.turn_id,
+                    codex_mode_as_str(snapshot.mode),
+                    codex_status_as_str(snapshot.status),
+                    snapshot.prompt,
+                    snapshot.latest_summary,
+                    snapshot.final_message,
+                    snapshot.error,
+                    pending_approvals_json,
+                    snapshot.created_at,
+                    snapshot.updated_at,
+                ],
+            )
+            .map_err(|error| db_error(format!("save codex run: {error}")))?;
+        Ok(())
+    }
+
+    /// Load one Codex controller run snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT run_id, session_id, project_dir, thread_id, turn_id, mode,
+                status, prompt, latest_summary, final_message, error,
+                pending_approvals_json, created_at, updated_at
+             FROM codex_runs
+             WHERE run_id = ?1",
+            [run_id],
+            codex_run_from_row,
+        );
+        match result {
+            Ok(snapshot) => Ok(Some(snapshot)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("load codex run: {error}"))),
+        }
+    }
+
+    /// List Codex controller runs for a session, newest first.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub fn list_codex_runs(&self, session_id: &str) -> Result<Vec<CodexRunSnapshot>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT run_id, session_id, project_dir, thread_id, turn_id, mode,
+                    status, prompt, latest_summary, final_message, error,
+                    pending_approvals_json, created_at, updated_at
+                 FROM codex_runs
+                 WHERE session_id = ?1
+                 ORDER BY updated_at DESC",
+            )
+            .map_err(|error| db_error(format!("prepare codex run list: {error}")))?;
+        let rows = statement
+            .query_map([session_id], codex_run_from_row)
+            .map_err(|error| db_error(format!("query codex run list: {error}")))?;
+
+        let mut snapshots = Vec::new();
+        for row in rows {
+            snapshots.push(row.map_err(|error| db_error(format!("read codex run row: {error}")))?);
+        }
+        Ok(snapshots)
+    }
+}
+
+fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
+    let mode_raw: String = row.get(5)?;
+    let status_raw: String = row.get(6)?;
+    let pending_approvals_json: String = row.get(11)?;
+    Ok(CodexRunSnapshot {
+        run_id: row.get(0)?,
+        session_id: row.get(1)?,
+        project_dir: row.get(2)?,
+        thread_id: row.get(3)?,
+        turn_id: row.get(4)?,
+        mode: codex_mode_from_str(&mode_raw).map_err(parse_error_to_sql)?,
+        status: codex_status_from_str(&status_raw).map_err(parse_error_to_sql)?,
+        prompt: row.get(7)?,
+        latest_summary: row.get(8)?,
+        final_message: row.get(9)?,
+        error: row.get(10)?,
+        pending_approvals: serde_json::from_str(&pending_approvals_json)
+            .map_err(|error| parse_error_to_sql(format!("parse codex approvals: {error}")))?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
+fn parse_error_to_sql(error: String) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(
+        0,
+        Type::Text,
+        Box::new(IoError::new(ErrorKind::InvalidData, error)),
+    )
+}
+
+fn codex_mode_as_str(mode: CodexRunMode) -> &'static str {
+    match mode {
+        CodexRunMode::Report => "report",
+        CodexRunMode::WorkspaceWrite => "workspace_write",
+        CodexRunMode::Approval => "approval",
+    }
+}
+
+fn codex_mode_from_str(value: &str) -> Result<CodexRunMode, String> {
+    match value {
+        "report" => Ok(CodexRunMode::Report),
+        "workspace_write" => Ok(CodexRunMode::WorkspaceWrite),
+        "approval" => Ok(CodexRunMode::Approval),
+        _ => Err(format!("unknown codex run mode '{value}'")),
+    }
+}
+
+fn codex_status_as_str(status: CodexRunStatus) -> &'static str {
+    match status {
+        CodexRunStatus::Queued => "queued",
+        CodexRunStatus::Running => "running",
+        CodexRunStatus::WaitingApproval => "waiting_approval",
+        CodexRunStatus::Completed => "completed",
+        CodexRunStatus::Failed => "failed",
+        CodexRunStatus::Cancelled => "cancelled",
+    }
+}
+
+fn codex_status_from_str(value: &str) -> Result<CodexRunStatus, String> {
+    match value {
+        "queued" => Ok(CodexRunStatus::Queued),
+        "running" => Ok(CodexRunStatus::Running),
+        "waiting_approval" => Ok(CodexRunStatus::WaitingApproval),
+        "completed" => Ok(CodexRunStatus::Completed),
+        "failed" => Ok(CodexRunStatus::Failed),
+        "cancelled" => Ok(CodexRunStatus::Cancelled),
+        _ => Err(format!("unknown codex run status '{value}'")),
+    }
 }
 
 /// Summary of what was imported from file-based storage.
@@ -1548,7 +1727,7 @@ fn migrate_v2_to_v3(conn: &Connection) -> Result<bool, CliError> {
     transaction
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
-            [SCHEMA_VERSION],
+            ["3"],
         )
         .map_err(|error| db_error(format!("bump schema version to v3: {error}")))?;
 
@@ -1557,6 +1736,17 @@ fn migrate_v2_to_v3(conn: &Connection) -> Result<bool, CliError> {
         .map_err(|error| db_error(format!("commit v2 -> v3 migration: {error}")))?;
 
     Ok(removed_conversation_duplicates > 0 || removed_daemon_duplicates > 0)
+}
+
+fn migrate_v3_to_v4(conn: &Connection) -> Result<(), CliError> {
+    conn.execute_batch(CODEX_RUNS_SCHEMA)
+        .map_err(|error| db_error(format!("migrate v3 -> v4 codex runs: {error}")))?;
+    conn.execute(
+        "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
+        [SCHEMA_VERSION],
+    )
+    .map_err(|error| db_error(format!("bump schema version to v4: {error}")))?;
+    Ok(())
 }
 
 fn reclaim_unused_pages(conn: &Connection) -> Result<(), CliError> {
@@ -1790,6 +1980,30 @@ fn replace_tasks(
     Ok(())
 }
 
+const CODEX_RUNS_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS codex_runs (
+    run_id                 TEXT PRIMARY KEY,
+    session_id             TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    project_dir            TEXT NOT NULL,
+    thread_id              TEXT,
+    turn_id                TEXT,
+    mode                   TEXT NOT NULL,
+    status                 TEXT NOT NULL,
+    prompt                 TEXT NOT NULL,
+    latest_summary         TEXT,
+    final_message          TEXT,
+    error                  TEXT,
+    pending_approvals_json TEXT NOT NULL DEFAULT '[]',
+    created_at             TEXT NOT NULL,
+    updated_at             TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_codex_runs_session_updated
+    ON codex_runs(session_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_codex_runs_status
+    ON codex_runs(status);
+";
+
 const CREATE_SCHEMA: &str = "
 -- Schema version tracking
 CREATE TABLE schema_meta (
@@ -1797,7 +2011,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '3');
+INSERT INTO schema_meta (key, value) VALUES ('version', '4');
 
 -- Discovered projects
 CREATE TABLE projects (
@@ -1989,6 +2203,28 @@ CREATE TABLE diagnostics_cache (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
+CREATE TABLE codex_runs (
+    run_id                 TEXT PRIMARY KEY,
+    session_id             TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    project_dir            TEXT NOT NULL,
+    thread_id              TEXT,
+    turn_id                TEXT,
+    mode                   TEXT NOT NULL,
+    status                 TEXT NOT NULL,
+    prompt                 TEXT NOT NULL,
+    latest_summary         TEXT,
+    final_message          TEXT,
+    error                  TEXT,
+    pending_approvals_json TEXT NOT NULL DEFAULT '[]',
+    created_at             TEXT NOT NULL,
+    updated_at             TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE INDEX idx_codex_runs_session_updated
+    ON codex_runs(session_id, updated_at DESC);
+CREATE INDEX idx_codex_runs_status
+    ON codex_runs(status);
+
 INSERT INTO change_tracking (scope, version, updated_at)
 VALUES ('global', 0, datetime('now'));
 ";
@@ -2045,6 +2281,7 @@ mod tests {
             "agent_activity_cache",
             "agents",
             "change_tracking",
+            "codex_runs",
             "conversation_events",
             "daemon_events",
             "diagnostics_cache",
@@ -2062,6 +2299,38 @@ mod tests {
                 "missing table: {table}"
             );
         }
+    }
+
+    #[test]
+    fn codex_runs_round_trip_and_list_newest_first() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let mut older = sample_codex_run("codex-run-1", "2026-04-09T10:00:00Z");
+        older.status = CodexRunStatus::Completed;
+        older.final_message = Some("Done.".into());
+        db.save_codex_run(&older).expect("save older run");
+
+        let newer = sample_codex_run("codex-run-2", "2026-04-09T11:00:00Z");
+        db.save_codex_run(&newer).expect("save newer run");
+
+        let runs = db
+            .list_codex_runs(&state.session_id)
+            .expect("list codex runs");
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].run_id, "codex-run-2");
+        assert_eq!(runs[1].run_id, "codex-run-1");
+
+        let loaded = db
+            .codex_run("codex-run-1")
+            .expect("load codex run")
+            .expect("present");
+        assert_eq!(loaded.status, CodexRunStatus::Completed);
+        assert_eq!(loaded.final_message.as_deref(), Some("Done."));
     }
 
     #[test]
@@ -2179,6 +2448,25 @@ mod tests {
             observe_id: None,
             pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
+        }
+    }
+
+    fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapshot {
+        CodexRunSnapshot {
+            run_id: run_id.into(),
+            session_id: "sess-test-1".into(),
+            project_dir: "/tmp/harness".into(),
+            thread_id: Some("thread-1".into()),
+            turn_id: Some("turn-1".into()),
+            mode: CodexRunMode::Approval,
+            status: CodexRunStatus::Running,
+            prompt: "Investigate the suite.".into(),
+            latest_summary: Some("Working".into()),
+            final_message: None,
+            error: None,
+            pending_approvals: Vec::new(),
+            created_at: "2026-04-09T09:00:00Z".into(),
+            updated_at: updated_at.into(),
         }
     }
 

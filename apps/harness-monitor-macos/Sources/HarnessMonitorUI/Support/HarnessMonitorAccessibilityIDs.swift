@@ -122,6 +122,15 @@ public enum HarnessMonitorAccessibility {
   static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
   static let connectionCard = "harness.preferences.connection-card"
   static let cornerOverlay = "harness.corner-overlay"
+  static let codexFlowButton = "harness.session.codex-flow"
+  static let codexFlowSheet = "harness.sheet.codex-flow"
+  static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
+  static let codexFlowContextField = "harness.sheet.codex-flow.context"
+  static let codexFlowModePicker = "harness.sheet.codex-flow.mode"
+  static let codexFlowCancelButton = "harness.sheet.codex-flow.cancel"
+  static let codexFlowSubmitButton = "harness.sheet.codex-flow.submit"
+  static let codexFlowSteerButton = "harness.sheet.codex-flow.steer"
+  static let codexFlowInterruptButton = "harness.sheet.codex-flow.interrupt"
   static let sendSignalSheet = "harness.sheet.send-signal"
   static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
@@ -174,6 +183,10 @@ public enum HarnessMonitorAccessibility {
 
   static func sessionSignalCard(_ signalID: String) -> String {
     "harness.session.signal.\(slug(signalID))"
+  }
+
+  static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
+    "harness.sheet.codex-flow.approval.\(slug(approvalID)).\(slug(decision))"
   }
 
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
