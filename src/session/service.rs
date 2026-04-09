@@ -1012,6 +1012,13 @@ pub fn resolve_session_project_dir(
     if storage::load_state(local_project_dir, session_id)?.is_some() {
         return Ok(local_project_dir.to_path_buf());
     }
+    if let Some(client) = DaemonClient::try_connect() {
+        let detail = client.get_session_detail(session_id)?;
+        return Ok(detail.session.project_dir.map_or_else(
+            || PathBuf::from(detail.session.context_root),
+            PathBuf::from,
+        ));
+    }
     let resolved = daemon_index::resolve_session(session_id)?;
     Ok(resolved
         .project
