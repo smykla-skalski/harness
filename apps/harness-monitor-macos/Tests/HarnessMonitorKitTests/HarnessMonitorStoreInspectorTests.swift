@@ -167,6 +167,46 @@ struct HarnessMonitorStoreInspectorTests {
       })
   }
 
+  @Test("Inspector action context ignores actor IDs from a previous session")
+  func actionContextIgnoresPreviousSessionActorID() async {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-new-session",
+        context: "New session actor fallback",
+        status: .active,
+        leaderId: "leader-current",
+        observeId: "observe-current",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-current",
+      workerName: "Current Worker"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      detail: detail
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+    store.actionActorID = "leader-previous"
+
+    guard let actionContext = store.inspectorUI.actionContext else {
+      Issue.record("Expected inspector action context for the selected session")
+      return
+    }
+
+    #expect(store.selectedActionActorID == summary.leaderId)
+    #expect(actionContext.selectedActionActorID == summary.leaderId)
+    #expect(actionContext.actionActorOptions.allSatisfy { $0.agentId != "leader-previous" })
+  }
+
   @Test("Inspector primary content ignores filter churn when selection is unchanged")
   func inspectorPrimaryContentIgnoresFilterChurn() async {
     let store = await makeBootstrappedStore()
