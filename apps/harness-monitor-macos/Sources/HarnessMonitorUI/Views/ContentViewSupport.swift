@@ -37,8 +37,8 @@ extension HarnessMonitorStore {
   }
 }
 
-private extension HarnessMonitorStore.ContentToolbarSlice {
-  var toolbarCenterpieceModel: ToolbarCenterpieceModel {
+extension HarnessMonitorStore.ContentToolbarSlice {
+  fileprivate var toolbarCenterpieceModel: ToolbarCenterpieceModel {
     var metrics: [ToolbarCenterpieceMetric] = [
       .init(kind: .projects, value: toolbarMetrics.projectCount),
       .init(kind: .sessions, value: toolbarMetrics.sessionCount),
@@ -57,11 +57,11 @@ private extension HarnessMonitorStore.ContentToolbarSlice {
     )
   }
 
-  var toolbarStatusMessages: [ToolbarStatusMessage] {
+  fileprivate var toolbarStatusMessages: [ToolbarStatusMessage] {
     statusMessages.map(ToolbarStatusMessage.init)
   }
 
-  var toolbarDaemonIndicator: ToolbarDaemonIndicator {
+  fileprivate var toolbarDaemonIndicator: ToolbarDaemonIndicator {
     ToolbarDaemonIndicator(daemonIndicator)
   }
 }
@@ -93,11 +93,16 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
       displayMode: displayMode,
       availableDetailWidth: availableDetailWidth,
       statusMessages: toolbarUI.toolbarStatusMessages,
-      daemonIndicator: toolbarUI.toolbarDaemonIndicator
+      daemonIndicator: toolbarUI.toolbarDaemonIndicator,
+      store: store,
+      connectionState: toolbarUI.connectionState,
+      isBusy: toolbarUI.isBusy
     )
 
     ToolbarItemGroup(placement: .principal) {
-      Button { store.sleepPreventionEnabled.toggle() } label: {
+      Button {
+        store.sleepPreventionEnabled.toggle()
+      } label: {
         Label(
           toolbarUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
           systemImage: toolbarUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"

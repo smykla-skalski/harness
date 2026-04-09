@@ -37,19 +37,28 @@ struct ContentCenterpieceToolbar: ToolbarContent {
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
+  var store: HarnessMonitorStore? = nil
+  var connectionState: HarnessMonitorStore.ConnectionState = .idle
+  var isBusy: Bool = false
 
   init(
     model: ToolbarCenterpieceModel = .preview,
     displayMode: ToolbarCenterpieceDisplayMode = .standard,
     availableDetailWidth: CGFloat = 1_024,
     statusMessages: [ToolbarStatusMessage] = [],
-    daemonIndicator: ToolbarDaemonIndicator = .offline
+    daemonIndicator: ToolbarDaemonIndicator = .offline,
+    store: HarnessMonitorStore? = nil,
+    connectionState: HarnessMonitorStore.ConnectionState = .idle,
+    isBusy: Bool = false
   ) {
     self.model = model
     self.displayMode = displayMode
     self.availableDetailWidth = availableDetailWidth
     self.statusMessages = statusMessages
     self.daemonIndicator = daemonIndicator
+    self.store = store
+    self.connectionState = connectionState
+    self.isBusy = isBusy
   }
 
   var body: some ToolbarContent {
@@ -59,7 +68,10 @@ struct ContentCenterpieceToolbar: ToolbarContent {
         displayMode: displayMode,
         availableDetailWidth: availableDetailWidth,
         statusMessages: statusMessages,
-        daemonIndicator: daemonIndicator
+        daemonIndicator: daemonIndicator,
+        store: store,
+        connectionState: connectionState,
+        isBusy: isBusy
       )
     }
   }
@@ -200,54 +212,59 @@ enum ToolbarCenterpieceDisplayMode: String {
   var showsMetricLabels: Bool { false }
 
   func centerpieceWidth(for detailWidth: CGFloat) -> CGFloat {
-    let ratio: CGFloat = switch self {
-    case .standard:
-      0.44
-    case .compact:
-      0.42
-    case .compressed:
-      0.4
-    }
+    let ratio: CGFloat =
+      switch self {
+      case .standard:
+        0.44
+      case .compact:
+        0.42
+      case .compressed:
+        0.4
+      }
 
-    let minimumWidth: CGFloat = switch self {
-    case .standard:
-      420
-    case .compact:
-      340
-    case .compressed:
-      260
-    }
+    let minimumWidth: CGFloat =
+      switch self {
+      case .standard:
+        420
+      case .compact:
+        340
+      case .compressed:
+        260
+      }
 
-    let maximumWidth: CGFloat = switch self {
-    case .standard:
-      560
-    case .compact:
-      500
-    case .compressed:
-      380
-    }
+    let maximumWidth: CGFloat =
+      switch self {
+      case .standard:
+        560
+      case .compact:
+        500
+      case .compressed:
+        380
+      }
 
     return min(max(detailWidth * ratio, minimumWidth), maximumWidth)
   }
 
   func statusDropdownWidth(for detailWidth: CGFloat) -> CGFloat {
     let centerpieceWidth = centerpieceWidth(for: detailWidth)
-    let minimumWidth: CGFloat = switch self {
-    case .standard:
-      210
-    case .compact:
-      175
-    case .compressed:
-      140
-    }
-    let maximumWidth: CGFloat = switch self {
-    case .standard:
-      260
-    case .compact:
-      220
-    case .compressed:
-      180
-    }
+    let minimumWidth: CGFloat =
+      switch self {
+      case .standard:
+        210
+      case .compact:
+        175
+      case .compressed:
+        140
+      }
+    let maximumWidth: CGFloat =
+      switch self {
+      case .standard:
+        260
+      case .compact:
+        220
+      case .compressed:
+        180
+      }
 
     return min(max(centerpieceWidth * 0.44, minimumWidth), maximumWidth)
   }
@@ -259,25 +276,34 @@ struct ToolbarCenterpieceView: View {
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
+  var store: HarnessMonitorStore? = nil
+  var connectionState: HarnessMonitorStore.ConnectionState = .idle
+  var isBusy: Bool = false
   private static let toolbarHeight: CGFloat = 32
   // Leading inset matches the vertical centering gap inside the glass capsule
   // so the first metric token sits at equal distance from the bubble's inner
   // surface on all sides.
   private static let metricsLeadingInset: CGFloat = 16
-  private static let daemonTrailingInset: CGFloat = 12
+  private static let daemonTrailingInset: CGFloat = 8
 
   init(
     model: ToolbarCenterpieceModel,
     displayMode: ToolbarCenterpieceDisplayMode,
     availableDetailWidth: CGFloat = 1_024,
     statusMessages: [ToolbarStatusMessage] = [],
-    daemonIndicator: ToolbarDaemonIndicator = .offline
+    daemonIndicator: ToolbarDaemonIndicator = .offline,
+    store: HarnessMonitorStore? = nil,
+    connectionState: HarnessMonitorStore.ConnectionState = .idle,
+    isBusy: Bool = false
   ) {
     self.model = model
     self.displayMode = displayMode
     self.availableDetailWidth = availableDetailWidth
     self.statusMessages = statusMessages
     self.daemonIndicator = daemonIndicator
+    self.store = store
+    self.connectionState = connectionState
+    self.isBusy = isBusy
   }
 
   var body: some View {
@@ -300,7 +326,16 @@ struct ToolbarCenterpieceView: View {
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
         }
 
-        ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
+        HStack(spacing: 6) {
+          ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
+          if let store {
+            ToolbarDaemonToggleControl(
+              store: store,
+              connectionState: connectionState,
+              isBusy: isBusy
+            )
+          }
+        }
       }
       .padding(.leading, Self.metricsLeadingInset)
       .padding(.trailing, Self.daemonTrailingInset)
@@ -345,6 +380,157 @@ private struct ToolbarDaemonIndicatorIcon: View {
     .foregroundStyle(indicator.foregroundColor)
     .animation(nil, value: indicator)
     .accessibilityHidden(true)
+  }
+}
+
+private struct ToolbarDaemonToggleControl: View {
+  let store: HarnessMonitorStore
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let isBusy: Bool
+  @State private var isHovered = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+  var body: some View {
+    Button {
+      guard !isLoading else { return }
+      Task {
+        if isDaemonOnline {
+          await store.stopDaemon()
+        } else {
+          await store.startDaemon()
+        }
+      }
+    } label: {
+      ZStack {
+        dotLayer
+        powerLayer
+      }
+      .frame(width: 20, height: 20)
+      .opacity(isLoading ? 0.7 : 1)
+      .contentShape(Circle())
+    }
+    .buttonStyle(ToolbarDaemonPowerToggleButtonStyle(reduceMotion: reduceMotion))
+    .contentShape(Rectangle())
+    .onContinuousHover { phase in
+      let hovered: Bool
+      switch phase {
+      case .active:
+        hovered = true
+      case .ended:
+        hovered = false
+      }
+      guard hovered != isHovered else { return }
+      withAnimation(morphAnimation) {
+        isHovered = hovered
+      }
+    }
+    .help(isDaemonOnline ? "Stop daemon" : "Start daemon")
+    .accessibilityLabel(isDaemonOnline ? "Stop Daemon" : "Start Daemon")
+    .accessibilityValue(statusTitle)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStartDaemonButton)
+  }
+
+  private var isDaemonOnline: Bool {
+    connectionState == .online
+  }
+
+  private var isLoading: Bool {
+    isBusy || connectionState == .connecting
+  }
+
+  private var statusTitle: String {
+    switch connectionState {
+    case .online: "Online"
+    case .connecting: "Connecting"
+    case .idle: "Idle"
+    case .offline: "Offline"
+    }
+  }
+
+  private var statusColor: Color {
+    switch connectionState {
+    case .online: HarnessMonitorTheme.success
+    case .connecting: HarnessMonitorTheme.caution
+    case .idle: HarnessMonitorTheme.accent
+    case .offline: HarnessMonitorTheme.danger
+    }
+  }
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.88 : 0.8
+    }
+    return colorSchemeContrast == .increased ? 0.76 : 0.66
+  }
+
+  private var strokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.92 : 0.72
+  }
+
+  private var dotLayer: some View {
+    Circle()
+      .fill(statusColor.opacity(fillOpacity))
+      .frame(width: 10, height: 10)
+      .background {
+        Circle()
+          .strokeBorder(statusColor.opacity(strokeOpacity), lineWidth: 1)
+      }
+      .opacity(1 - morphProgress)
+      .scaleEffect(1 + (0.7 * morphProgress))
+      .blur(radius: 2 * morphProgress)
+  }
+
+  private var powerLayer: some View {
+    Image(systemName: "power")
+      .font(.system(.body, weight: .semibold))
+      .foregroundStyle(iconColor)
+      .opacity(morphProgress)
+      .scaleEffect(0.25 + (0.75 * morphProgress))
+      .rotationEffect(.degrees(powerRotationDegrees))
+  }
+
+  private var iconColor: Color {
+    if isLoading { return HarnessMonitorTheme.secondaryInk }
+    return isDaemonOnline ? HarnessMonitorTheme.danger : HarnessMonitorTheme.success
+  }
+
+  private var morphAnimation: Animation? {
+    if reduceMotion {
+      return .easeOut(duration: 0.12)
+    }
+    return .interactiveSpring(response: 0.42, dampingFraction: 0.78, blendDuration: 0.18)
+  }
+
+  private var morphProgress: CGFloat {
+    isHovered ? 1 : 0
+  }
+
+  private var powerRotationDegrees: Double {
+    Double(-95 + (95 * morphProgress))
+  }
+}
+
+private struct ToolbarDaemonPowerToggleButtonStyle: ButtonStyle {
+  let reduceMotion: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    let isPressed = configuration.isPressed
+
+    configuration.label
+      .scaleEffect(isPressed ? 0.9 : 1)
+      .offset(y: isPressed ? 0.35 : 0)
+      .brightness(isPressed ? -0.03 : 0)
+      .saturation(isPressed ? 0.96 : 1)
+      .animation(pressAnimation, value: configuration.isPressed)
+  }
+
+  private var pressAnimation: Animation? {
+    if reduceMotion {
+      return .easeOut(duration: 0.08)
+    }
+    return .interactiveSpring(response: 0.18, dampingFraction: 0.45, blendDuration: 0.14)
   }
 }
 
