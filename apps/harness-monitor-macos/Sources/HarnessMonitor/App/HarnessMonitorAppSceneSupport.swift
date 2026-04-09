@@ -26,7 +26,13 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   var body: some View {
-    ContentView(store: store)
+    ContentView(
+      store: store,
+      showsCornerAnimation: true,
+      cornerAnimationContent: {
+        AnyView(HarnessMonitorAppLlamaAnimation())
+      }
+    )
       .frame(minWidth: 900, minHeight: 600)
       .modifier(
         OptionalInstantFocusRingModifier(

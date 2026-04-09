@@ -46,4 +46,10 @@ xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -schem
 
 The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. Lint enforcement lives in the monitor quality-gate scripts and CI instead.
 
-For SwiftUI canvas previews, open `HarnessMonitor.xcodeproj`, select the `HarnessMonitor` scheme, and navigate to any file under `Sources/HarnessMonitorUI/` with a `#Preview` block. Xcode uses the app target as the preview host so all SPM dependencies (Lottie, etc.) are available.
+For SwiftUI canvas previews, open `HarnessMonitor.xcodeproj` and select the shared `HarnessMonitorUIPreviews` scheme. It uses the `Preview` configuration, builds only the UI framework graph, and avoids launching the full `Harness Monitor.app` as the preview host.
+
+Regenerate the project after target or configuration changes:
+
+```bash
+apps/harness-monitor-macos/Scripts/generate-project.sh
+```

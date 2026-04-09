@@ -138,26 +138,4 @@ extension View {
       )
     )
   }
-
-  func harnessCornerAnimation(
-    _ descriptor: HarnessCornerAnimationDescriptor,
-    isPresented: Bool = true,
-    presentationDelay: Duration? = nil
-  ) -> some View {
-    harnessCornerOverlay(
-      isPresented: isPresented,
-      configuration: .init(
-        width: descriptor.width,
-        height: descriptor.height,
-        trailingPadding: descriptor.trailingPadding,
-        bottomPadding: descriptor.bottomPadding,
-        contentPadding: 0,
-        appliesGlass: false,
-        accessibilityLabel: descriptor.accessibilityLabel,
-        presentationDelay: presentationDelay
-      )
-    ) {
-      HarnessCornerAnimation(descriptor: descriptor)
-    }
-  }
 }
