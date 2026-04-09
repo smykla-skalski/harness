@@ -34,17 +34,20 @@ extension ToolbarDaemonIndicator {
 struct ContentCenterpieceToolbar: ToolbarContent {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
+  let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
 
   init(
     model: ToolbarCenterpieceModel = .preview,
     displayMode: ToolbarCenterpieceDisplayMode = .standard,
+    availableDetailWidth: CGFloat = 1_024,
     statusMessages: [ToolbarStatusMessage] = [],
     daemonIndicator: ToolbarDaemonIndicator = .offline
   ) {
     self.model = model
     self.displayMode = displayMode
+    self.availableDetailWidth = availableDetailWidth
     self.statusMessages = statusMessages
     self.daemonIndicator = daemonIndicator
   }
@@ -54,6 +57,7 @@ struct ContentCenterpieceToolbar: ToolbarContent {
       ToolbarCenterpieceView(
         model: model,
         displayMode: displayMode,
+        availableDetailWidth: availableDetailWidth,
         statusMessages: statusMessages,
         daemonIndicator: daemonIndicator
       )
@@ -168,14 +172,14 @@ enum ToolbarCenterpieceDisplayMode: String {
   case compact
   case compressed
 
-  private static let standardWindowThreshold: CGFloat = 1_520
-  private static let compactWindowThreshold: CGFloat = 1_320
+  private static let standardDetailThreshold: CGFloat = 1_050
+  private static let compactDetailThreshold: CGFloat = 820
 
-  static func forWindowWidth(_ windowWidth: CGFloat) -> Self {
-    switch windowWidth {
-    case Self.standardWindowThreshold...:
+  static func forDetailWidth(_ detailWidth: CGFloat) -> Self {
+    switch detailWidth {
+    case Self.standardDetailThreshold...:
       .standard
-    case Self.compactWindowThreshold...:
+    case Self.compactDetailThreshold...:
       .compact
     default:
       .compressed
@@ -194,11 +198,65 @@ enum ToolbarCenterpieceDisplayMode: String {
   }
 
   var showsMetricLabels: Bool { false }
+
+  func centerpieceWidth(for detailWidth: CGFloat) -> CGFloat {
+    let ratio: CGFloat = switch self {
+    case .standard:
+      0.44
+    case .compact:
+      0.42
+    case .compressed:
+      0.4
+    }
+
+    let minimumWidth: CGFloat = switch self {
+    case .standard:
+      420
+    case .compact:
+      340
+    case .compressed:
+      260
+    }
+
+    let maximumWidth: CGFloat = switch self {
+    case .standard:
+      560
+    case .compact:
+      500
+    case .compressed:
+      380
+    }
+
+    return min(max(detailWidth * ratio, minimumWidth), maximumWidth)
+  }
+
+  func statusDropdownWidth(for detailWidth: CGFloat) -> CGFloat {
+    let centerpieceWidth = centerpieceWidth(for: detailWidth)
+    let minimumWidth: CGFloat = switch self {
+    case .standard:
+      210
+    case .compact:
+      175
+    case .compressed:
+      140
+    }
+    let maximumWidth: CGFloat = switch self {
+    case .standard:
+      260
+    case .compact:
+      220
+    case .compressed:
+      180
+    }
+
+    return min(max(centerpieceWidth * 0.44, minimumWidth), maximumWidth)
+  }
 }
 
-private struct ToolbarCenterpieceView: View {
+struct ToolbarCenterpieceView: View {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
+  let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
   private static let toolbarHeight: CGFloat = 32
@@ -206,8 +264,21 @@ private struct ToolbarCenterpieceView: View {
   // so the first metric token sits at equal distance from the bubble's inner
   // surface on all sides.
   private static let metricsLeadingInset: CGFloat = 16
-  private static let centerpieceWidth: CGFloat = 560
-  private static let statusDropdownWidth: CGFloat = 260
+  private static let daemonTrailingInset: CGFloat = 12
+
+  init(
+    model: ToolbarCenterpieceModel,
+    displayMode: ToolbarCenterpieceDisplayMode,
+    availableDetailWidth: CGFloat = 1_024,
+    statusMessages: [ToolbarStatusMessage] = [],
+    daemonIndicator: ToolbarDaemonIndicator = .offline
+  ) {
+    self.model = model
+    self.displayMode = displayMode
+    self.availableDetailWidth = availableDetailWidth
+    self.statusMessages = statusMessages
+    self.daemonIndicator = daemonIndicator
+  }
 
   var body: some View {
     ZStack {
@@ -223,201 +294,27 @@ private struct ToolbarCenterpieceView: View {
 
         if !statusMessages.isEmpty {
           ToolbarStatusDropdown(
-            messages: statusMessages,
-            daemonIndicator: daemonIndicator
+            messages: statusMessages
           )
-          .frame(width: Self.statusDropdownWidth)
+          .frame(width: displayMode.statusDropdownWidth(for: availableDetailWidth))
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
         }
+
+        ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
       }
       .padding(.leading, Self.metricsLeadingInset)
+      .padding(.trailing, Self.daemonTrailingInset)
     }
-    .frame(width: Self.centerpieceWidth, height: Self.toolbarHeight)
+    .frame(
+      width: displayMode.centerpieceWidth(for: availableDetailWidth),
+      height: Self.toolbarHeight
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
     .accessibilityLabel(model.accessibilityLabel)
     .accessibilityValue(model.accessibilityValue)
     .help("Live harness summary")
   }
-}
-
-private struct ToolbarStatusDropdown: View {
-  let messages: [ToolbarStatusMessage]
-  let daemonIndicator: ToolbarDaemonIndicator
-  @State private var isHovered = false
-  @State private var isPressed = false
-  private static let contentHorizontalInset: CGFloat = 16
-
-  private var highlightOpacity: Double {
-    isPressed ? 0.12 : isHovered ? 0.08 : 0
-  }
-
-  var body: some View {
-    HStack(spacing: 8) {
-      Spacer(minLength: 0)
-      ToolbarStatusTickerView(messages: messages, direction: .up)
-        .lineLimit(1)
-        .truncationMode(.tail)
-      ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
-    }
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
-    .padding(.horizontal, Self.contentHorizontalInset)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background {
-      Capsule()
-        .fill(Color.primary.opacity(highlightOpacity))
-        .animation(.easeOut(duration: 0.15), value: isHovered)
-        .animation(.easeOut(duration: 0.1), value: isPressed)
-    }
-    .overlay {
-      ToolbarStatusMenuHitArea(messages: messages, isHovered: $isHovered, isPressed: $isPressed)
-    }
-    .overlay {
-      Color.clear
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerHoverFrame)
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
-    .accessibilityAddTraits(.isButton)
-    .accessibilityHint("Shows status details")
-  }
-}
-
-private struct ToolbarStatusMenuHitArea: NSViewRepresentable {
-  let messages: [ToolbarStatusMessage]
-  @Binding var isHovered: Bool
-  @Binding var isPressed: Bool
-
-  func makeNSView(context: Context) -> ToolbarStatusMenuNSView {
-    let view = ToolbarStatusMenuNSView()
-    view.messages = messages
-    let hoverBinding = $isHovered
-    let pressBinding = $isPressed
-    view.onHoverChanged = { hoverBinding.wrappedValue = $0 }
-    view.onPressChanged = { pressBinding.wrappedValue = $0 }
-    view.setAccessibilityIdentifier(HarnessMonitorAccessibility.toolbarStatusTicker)
-    view.setAccessibilityRole(.popUpButton)
-    view.setAccessibilityLabel("Status messages")
-    return view
-  }
-
-  func sizeThatFits(_ proposal: ProposedViewSize, nsView: ToolbarStatusMenuNSView, context: Context) -> CGSize? {
-    CGSize(
-      width: proposal.width ?? 0,
-      height: proposal.height ?? 0
-    )
-  }
-
-  func updateNSView(_ nsView: ToolbarStatusMenuNSView, context: Context) {
-    nsView.messages = messages
-    let hoverBinding = $isHovered
-    let pressBinding = $isPressed
-    nsView.onHoverChanged = { hoverBinding.wrappedValue = $0 }
-    nsView.onPressChanged = { pressBinding.wrappedValue = $0 }
-  }
-}
-
-final class ToolbarStatusMenuNSView: NSView {
-  var messages: [ToolbarStatusMessage] = []
-  var onHoverChanged: ((Bool) -> Void)?
-  var onPressChanged: ((Bool) -> Void)?
-  private var currentTrackingArea: NSTrackingArea?
-
-  override init(frame frameRect: NSRect) {
-    super.init(frame: frameRect)
-    focusRingType = .exterior
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("Not supported")
-  }
-
-  override var intrinsicContentSize: NSSize {
-    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
-  }
-
-  override var acceptsFirstResponder: Bool { true }
-
-  override func drawFocusRingMask() {
-    let radius = bounds.height / 2
-    NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
-  }
-
-  override var focusRingMaskBounds: NSRect { bounds }
-
-  override func updateTrackingAreas() {
-    if let existing = currentTrackingArea {
-      removeTrackingArea(existing)
-    }
-    let area = NSTrackingArea(
-      rect: bounds,
-      options: [.mouseEnteredAndExited, .activeInActiveApp],
-      owner: self
-    )
-    addTrackingArea(area)
-    currentTrackingArea = area
-    super.updateTrackingAreas()
-  }
-
-  override func mouseEntered(with event: NSEvent) {
-    onHoverChanged?(true)
-    NSCursor.pointingHand.push()
-  }
-
-  override func mouseExited(with event: NSEvent) {
-    onHoverChanged?(false)
-    NSCursor.pop()
-  }
-
-  override func resetCursorRects() {
-    addCursorRect(bounds, cursor: .pointingHand)
-  }
-
-  override func keyDown(with event: NSEvent) {
-    switch event.keyCode {
-    case 36, 49:
-      showStatusMenu()
-    default:
-      super.keyDown(with: event)
-    }
-  }
-
-  override func mouseDown(with event: NSEvent) {
-    onPressChanged?(true)
-    showStatusMenu()
-    onPressChanged?(false)
-  }
-
-  override func accessibilityPerformPress() -> Bool {
-    showStatusMenu()
-    return true
-  }
-
-  func showStatusMenu() {
-    let menu = NSMenu()
-    for message in messages {
-      let item = NSMenuItem(
-        title: message.text,
-        action: #selector(statusItemTapped(_:)),
-        keyEquivalent: ""
-      )
-      item.target = self
-      if let systemImage = message.systemImage {
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        if let image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)?
-          .withSymbolConfiguration(config)
-        {
-          item.image = image
-        }
-      }
-      menu.addItem(item)
-    }
-    let point = NSPoint(x: 0, y: bounds.height)
-    menu.popUp(positioning: nil, at: point, in: self)
-  }
-
-  @objc private func statusItemTapped(_ sender: NSMenuItem) {}
 }
 
 private let centerpieceBundleRef = Bundle(for: ToolbarCenterpieceBundleToken.self)
@@ -495,116 +392,4 @@ private struct ToolbarCenterpieceMetricToken: View {
   private var labelText: String {
     metric.kind.title.uppercased()
   }
-}
-
-#Preview("Centerpiece - In Toolbar") {
-  NavigationSplitView {
-    List { Text("Sidebar") }
-      .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-  } detail: {
-    Text("Detail content")
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-  .toolbar {
-    ContentCenterpieceToolbar(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: [
-          .init(kind: .projects, value: 11),
-          .init(kind: .sessions, value: 1),
-          .init(kind: .openWork, value: 4),
-          .init(kind: .blocked, value: 1),
-        ]
-      ),
-      displayMode: .compact,
-      statusMessages: [
-        .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-        .init(text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
-        .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
-      ]
-    )
-  }
-  .frame(width: 900, height: 400)
-}
-
-#Preview("Centerpiece - All Modes") {
-  let demoMessages: [ToolbarStatusMessage] = [
-    .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-    .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
-  ]
-  VStack(spacing: 24) {
-    ForEach(
-      Array(
-        [
-          ("Standard", ToolbarCenterpieceDisplayMode.standard),
-          ("Compact", ToolbarCenterpieceDisplayMode.compact),
-          ("Compressed", ToolbarCenterpieceDisplayMode.compressed),
-        ].enumerated()
-      ),
-      id: \.offset
-    ) { _, pair in
-      VStack(spacing: 4) {
-        Text(pair.0)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        ToolbarCenterpieceView(
-          model: .preview,
-          displayMode: pair.1,
-          statusMessages: demoMessages
-        )
-        .background(.quaternary, in: Capsule())
-      }
-    }
-  }
-  .padding(24)
-}
-
-#Preview("Centerpiece - Varying Metrics") {
-  VStack(spacing: 16) {
-    ToolbarCenterpieceView(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: [
-          .init(kind: .projects, value: 1),
-          .init(kind: .blocked, value: 0),
-        ]
-      ),
-      displayMode: .compact
-    )
-    .background(.quaternary, in: Capsule())
-
-    ToolbarCenterpieceView(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: [
-          .init(kind: .projects, value: 11),
-          .init(kind: .sessions, value: 1),
-          .init(kind: .openWork, value: 4),
-          .init(kind: .blocked, value: 1),
-        ]
-      ),
-      displayMode: .compact
-    )
-    .background(.quaternary, in: Capsule())
-
-    ToolbarCenterpieceView(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: ToolbarCenterpieceMetricKind.allCases.map {
-          .init(kind: $0, value: 999)
-        }
-      ),
-      displayMode: .compact
-    )
-    .background(.quaternary, in: Capsule())
-  }
-  .padding(24)
 }

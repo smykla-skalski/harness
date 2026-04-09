@@ -5,7 +5,8 @@ struct PreferencesBackgroundGallery: View {
   @Binding var backdropModeRawValue: String
   let selectedBackground: HarnessMonitorBackgroundSelection
   let collection: BackgroundCollection
-  @ScaledMetric(relativeTo: .body) private var previewHeight = 96.0
+  @ScaledMetric(relativeTo: .body)
+  private var previewHeight = 96.0
   @AppStorage(HarnessMonitorBackgroundDefaults.recentKey)
   private var recentStorageValues = ""
 
@@ -199,7 +200,6 @@ private struct PreferencesBackgroundTile: View {
       }
       .contentShape(outerShape)
     }
-    .buttonStyle(.plain)
     .harnessInteractiveCardButtonStyle(
       cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
       tint: isSelected ? HarnessMonitorTheme.accent : nil
@@ -208,7 +208,9 @@ private struct PreferencesBackgroundTile: View {
     .accessibilityLabel(background.label)
     .accessibilityValue(isSelected ? "selected" : background.subtitle)
     .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundTile(background.accessibilityKey))
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesBackgroundTile(background.accessibilityKey)
+    )
     .task(id: background.storageValue) {
       loadedImage = nil
       guard let cgImage = await BackgroundThumbnailCache.shared.thumbnail(for: background) else {
@@ -219,8 +221,7 @@ private struct PreferencesBackgroundTile: View {
     }
   }
 
-  @ViewBuilder
-  private var previewContent: some View {
+  @ViewBuilder private var previewContent: some View {
     if let loadedImage {
       loadedImage
         .resizable()

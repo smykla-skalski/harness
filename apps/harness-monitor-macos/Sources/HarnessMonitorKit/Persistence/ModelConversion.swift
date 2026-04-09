@@ -41,7 +41,7 @@ extension CachedProject {
 
 extension ProjectSummary {
   func toCachedProject() -> CachedProject {
-    return CachedProject(
+    CachedProject(
       projectId: projectId,
       name: name,
       projectDir: projectDir,

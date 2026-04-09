@@ -89,8 +89,7 @@ struct PreferencesDatabaseSection: View {
     }
   }
 
-  @ViewBuilder
-  private var cacheStatisticsRows: some View {
+  @ViewBuilder private var cacheStatisticsRows: some View {
     LabeledContent("Cached Sessions") {
       Text("\(databaseStats?.sessionCount ?? 0)")
         .monospacedDigit()
@@ -135,8 +134,7 @@ struct PreferencesDatabaseSection: View {
     )
   }
 
-  @ViewBuilder
-  private var userDataStatisticsRows: some View {
+  @ViewBuilder private var userDataStatisticsRows: some View {
     LabeledContent("Bookmarks") {
       Text("\(databaseStats?.bookmarkCount ?? 0)")
         .monospacedDigit()
@@ -167,8 +165,7 @@ struct PreferencesDatabaseSection: View {
     )
   }
 
-  @ViewBuilder
-  private var storageStatisticsRows: some View {
+  @ViewBuilder private var storageStatisticsRows: some View {
     LabeledContent("App Cache Size") {
       Text(databaseStats?.appCacheSizeFormatted ?? "--")
     }

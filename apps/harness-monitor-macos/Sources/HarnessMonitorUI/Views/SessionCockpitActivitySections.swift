@@ -80,7 +80,11 @@ struct SessionCockpitSignalsSection: View {
 }
 
 #Preview("Signals") {
-  SessionCockpitSignalsSection(signals: PreviewFixtures.signals, isExtensionsLoading: false, inspectSignal: { _ in })
+  SessionCockpitSignalsSection(
+    signals: PreviewFixtures.signals,
+    isExtensionsLoading: false,
+    inspectSignal: { _ in }
+  )
     .padding()
     .frame(width: 960)
 }

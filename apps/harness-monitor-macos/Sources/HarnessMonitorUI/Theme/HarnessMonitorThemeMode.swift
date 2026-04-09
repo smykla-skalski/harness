@@ -40,8 +40,7 @@ public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendab
 
     if
       let bundledRawValue = rawValue.removingPrefix("bundle:"),
-      let image = HarnessMonitorBackgroundImage(rawValue: bundledRawValue)
-    {
+      let image = HarnessMonitorBackgroundImage(rawValue: bundledRawValue) {
       return .bundled(image)
     }
 

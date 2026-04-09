@@ -62,7 +62,11 @@ private struct DashboardSessionCard: View {
             Text(session.displayTitle)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
               .italic(session.title.isEmpty)
-              .foregroundStyle(session.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
+              .foregroundStyle(
+                session.title.isEmpty
+                  ? HarnessMonitorTheme.tertiaryInk
+                  : HarnessMonitorTheme.ink
+              )
               .multilineTextAlignment(.leading)
             Spacer(minLength: 12)
             Text(session.status.title)
@@ -77,7 +81,11 @@ private struct DashboardSessionCard: View {
             Spacer(minLength: 0)
             Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
               .scaledFont(.caption.weight(.semibold))
-              .foregroundStyle(isHovered ? HarnessMonitorTheme.secondaryInk : HarnessMonitorTheme.ink.opacity(0.35))
+              .foregroundStyle(
+                isHovered
+                  ? HarnessMonitorTheme.secondaryInk
+                  : HarnessMonitorTheme.ink.opacity(0.35)
+              )
               .animation(.easeInOut(duration: 0.15), value: isHovered)
           }
         }

@@ -4,7 +4,11 @@ import SwiftData
 @MainActor
 public enum HarnessMonitorPreviewStoreFactory {
   public static let previewContainer: ModelContainer = {
-    try! HarnessMonitorModelContainer.preview()
+    do {
+      return try HarnessMonitorModelContainer.preview()
+    } catch {
+      fatalError("Preview ModelContainer failed: \(error)")
+    }
   }()
 
   public enum Scenario: Sendable {

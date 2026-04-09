@@ -1,7 +1,9 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV3 {
+// MARK: - V2 Legacy Models (before title field on CachedSession)
+
+extension HarnessMonitorSchemaV2 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -51,7 +53,6 @@ extension HarnessMonitorSchemaV3 {
     var checkoutRoot: String = ""
     var isWorktree: Bool = false
     var worktreeName: String?
-    var title: String = ""
     var context: String
     var statusRaw: String
     var createdAt: String
@@ -92,7 +93,6 @@ extension HarnessMonitorSchemaV3 {
       checkoutRoot: String,
       isWorktree: Bool,
       worktreeName: String?,
-      title: String = "",
       context: String,
       statusRaw: String,
       createdAt: String,
@@ -114,7 +114,6 @@ extension HarnessMonitorSchemaV3 {
       self.checkoutRoot = checkoutRoot
       self.isWorktree = isWorktree
       self.worktreeName = worktreeName
-      self.title = title
       self.context = context
       self.statusRaw = statusRaw
       self.createdAt = createdAt
@@ -374,12 +373,3 @@ extension HarnessMonitorSchemaV3 {
     }
   }
 }
-
-typealias CachedProject = HarnessMonitorSchemaV3.CachedProject
-typealias CachedSession = HarnessMonitorSchemaV3.CachedSession
-typealias CachedAgent = HarnessMonitorSchemaV3.CachedAgent
-typealias CachedWorkItem = HarnessMonitorSchemaV3.CachedWorkItem
-typealias CachedSignalRecord = HarnessMonitorSchemaV3.CachedSignalRecord
-typealias CachedTimelineEntry = HarnessMonitorSchemaV3.CachedTimelineEntry
-typealias CachedObserver = HarnessMonitorSchemaV3.CachedObserver
-typealias CachedAgentActivity = HarnessMonitorSchemaV3.CachedAgentActivity

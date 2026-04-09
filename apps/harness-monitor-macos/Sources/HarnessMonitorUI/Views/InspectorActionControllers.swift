@@ -56,6 +56,24 @@ struct InspectorTaskMutationConsole: View {
   @State private var checkpointSummary = ""
   @State private var checkpointProgress: Double = 50
 
+  init(
+    store: HarnessMonitorStore,
+    selectedTask: WorkItem,
+    tasks: [WorkItem],
+    agents: [AgentRegistration]
+  ) {
+    self.store = store
+    self.selectedTask = selectedTask
+    self.tasks = tasks
+    self.agents = agents
+    _taskID = State(initialValue: selectedTask.taskId)
+    _assigneeID = State(initialValue: Self.defaultAssigneeID(for: selectedTask, agents: agents))
+    _taskStatus = State(initialValue: selectedTask.status)
+    _checkpointProgress = State(
+      initialValue: Double(selectedTask.checkpointSummary?.progress ?? 50)
+    )
+  }
+
   private var stateKey: String {
     [
       selectedTask.taskId,
@@ -100,6 +118,17 @@ struct InspectorTaskMutationConsole: View {
     if let checkpoint = selectedTask.checkpointSummary {
       checkpointProgress = Double(checkpoint.progress)
     }
+  }
+
+  private static func defaultAssigneeID(
+    for selectedTask: WorkItem,
+    agents: [AgentRegistration]
+  ) -> String {
+    if let assignedAgentID = selectedTask.assignedTo,
+      agents.contains(where: { $0.agentId == assignedAgentID }) {
+      return assignedAgentID
+    }
+    return agents.first?.agentId ?? ""
   }
 
   private func submitAssignSelectedTask() {
@@ -202,6 +231,17 @@ struct InspectorLeaderTransferConsole: View {
   @State private var transferLeaderID = ""
   @State private var transferReason = ""
 
+  init(
+    store: HarnessMonitorStore,
+    detail: SessionDetail,
+    actionActorID: String
+  ) {
+    self.store = store
+    self.detail = detail
+    self.actionActorID = actionActorID
+    _transferLeaderID = State(initialValue: Self.defaultTransferLeaderID(for: detail))
+  }
+
   private var stateKey: String {
     [
       detail.session.sessionId,
@@ -247,6 +287,15 @@ struct InspectorLeaderTransferConsole: View {
         detail.agents.first(where: { $0.agentId != detail.session.leaderId })?.agentId
         ?? detail.agents.first?.agentId ?? ""
     }
+  }
+
+  private static func defaultTransferLeaderID(for detail: SessionDetail) -> String {
+    if let pendingLeaderID = detail.session.pendingLeaderTransfer?.newLeaderId,
+      detail.agents.contains(where: { $0.agentId == pendingLeaderID }) {
+      return pendingLeaderID
+    }
+    return detail.agents.first(where: { $0.agentId != detail.session.leaderId })?.agentId
+      ?? detail.agents.first?.agentId ?? ""
   }
 
   private func submitTransferLeader() {

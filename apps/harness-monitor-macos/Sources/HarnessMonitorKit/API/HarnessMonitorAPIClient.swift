@@ -283,14 +283,18 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     let elapsed = start.duration(to: .now)
     let durationMs = elapsed.components.seconds * 1000
       + Int64(elapsed.components.attoseconds / 1_000_000_000_000_000)
+    let method = request.httpMethod ?? "?"
+    let path = request.url?.path ?? "?"
     guard let httpResponse = response as? HTTPURLResponse else {
       HarnessMonitorLogger.api.error(
-        "Invalid response for \(request.httpMethod ?? "?", privacy: .public) \(request.url?.path ?? "?", privacy: .public)")
+        "Invalid response for \(method, privacy: .public) \(path, privacy: .public)"
+      )
       throw HarnessMonitorAPIError.invalidResponse
     }
 
     HarnessMonitorLogger.api.debug(
-      "\(request.httpMethod ?? "?", privacy: .public) \(request.url?.path ?? "?", privacy: .public) -> \(httpResponse.statusCode) (\(durationMs)ms)")
+      "\(method, privacy: .public) \(path, privacy: .public) -> \(httpResponse.statusCode) (\(durationMs)ms)"
+    )
 
     guard (200..<300).contains(httpResponse.statusCode) else {
       throw try decodeError(statusCode: httpResponse.statusCode, data: data)

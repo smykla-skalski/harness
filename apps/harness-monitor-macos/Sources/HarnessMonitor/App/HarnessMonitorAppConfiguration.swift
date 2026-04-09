@@ -16,7 +16,8 @@ struct HarnessMonitorAppConfiguration {
   static func resolve() -> Self {
     UserDefaults.standard.register(defaults: [
       HarnessMonitorBackdropDefaults.modeKey: HarnessMonitorBackdropMode.none.rawValue,
-      HarnessMonitorBackgroundDefaults.imageKey: HarnessMonitorBackgroundSelection.defaultSelection.storageValue,
+      HarnessMonitorBackgroundDefaults.imageKey:
+        HarnessMonitorBackgroundSelection.defaultSelection.storageValue,
       HarnessMonitorTextSize.storageKey: HarnessMonitorTextSize.defaultIndex,
       HarnessMonitorDateTimeConfiguration.timeZoneModeKey:
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
@@ -34,8 +35,9 @@ struct HarnessMonitorAppConfiguration {
     let launchMode = HarnessMonitorLaunchMode(environment: resolvedEnvironment)
     let initialThemeMode =
       isUITesting
-      ? (HarnessMonitorThemeMode(rawValue: resolvedEnvironment.values["HARNESS_MONITOR_THEME_MODE_OVERRIDE"] ?? "")
-        ?? .auto)
+      ? (HarnessMonitorThemeMode(
+        rawValue: resolvedEnvironment.values["HARNESS_MONITOR_THEME_MODE_OVERRIDE"] ?? ""
+      ) ?? .auto)
       : .auto
     let initialTextSizeIndex =
       isUITesting
@@ -57,7 +59,9 @@ struct HarnessMonitorAppConfiguration {
       : .defaultSelection
     let initialShowInspector =
       isUITesting
-      ? uiTestBoolOverride(from: resolvedEnvironment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]) ?? true
+      ? uiTestBoolOverride(
+        from: resolvedEnvironment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]
+      ) ?? true
       : true
     let persistenceSetup = HarnessMonitorPersistenceSetup.resolve(
       environment: resolvedEnvironment,
@@ -71,46 +75,16 @@ struct HarnessMonitorAppConfiguration {
     )
 
     if isUITesting {
-      let uiTestTimeZoneMode =
-        HarnessMonitorDateTimeZoneMode(
-          rawValue: resolvedEnvironment.values[
-            HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey
-          ]
-            ?? ""
-        ) ?? .local
-      let uiTestCustomTimeZone =
-        resolvedEnvironment.values[
-          HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey
-        ]
-        ?? HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
-
-      UserDefaults.standard.set(
-        initialThemeMode.rawValue,
-        forKey: HarnessMonitorThemeDefaults.modeKey
-      )
-      UserDefaults.standard.set(
-        initialTextSizeIndex,
-        forKey: HarnessMonitorTextSize.storageKey
-      )
-      UserDefaults.standard.set(
-        initialBackdropMode.rawValue,
-        forKey: HarnessMonitorBackdropDefaults.modeKey
-      )
-      UserDefaults.standard.set(
-        initialBackgroundImage.storageValue,
-        forKey: HarnessMonitorBackgroundDefaults.imageKey
-      )
-      UserDefaults.standard.set(
-        initialShowInspector,
-        forKey: "showInspector"
-      )
-      UserDefaults.standard.set(
-        uiTestTimeZoneMode.rawValue,
-        forKey: HarnessMonitorDateTimeConfiguration.timeZoneModeKey
-      )
-      UserDefaults.standard.set(
-        uiTestCustomTimeZone,
-        forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
+      store.configureUITestBehavior(lastActionDismissDelay: .seconds(1))
+      applyUITestDefaults(
+        environment: resolvedEnvironment,
+        overrides: UITestOverrides(
+          themeMode: initialThemeMode,
+          textSizeIndex: initialTextSizeIndex,
+          backdropMode: initialBackdropMode,
+          backgroundImage: initialBackgroundImage,
+          showInspector: initialShowInspector
+        )
       )
     }
 
@@ -125,6 +99,62 @@ struct HarnessMonitorAppConfiguration {
       ),
       perfScenario: perfScenario,
       preferencesInitialSection: perfScenario?.initialPreferencesSection ?? .general
+    )
+  }
+
+  private struct UITestOverrides {
+    let themeMode: HarnessMonitorThemeMode
+    let textSizeIndex: Int
+    let backdropMode: HarnessMonitorBackdropMode
+    let backgroundImage: HarnessMonitorBackgroundSelection
+    let showInspector: Bool
+  }
+
+  @MainActor
+  private static func applyUITestDefaults(
+    environment: HarnessMonitorEnvironment,
+    overrides: UITestOverrides
+  ) {
+    let uiTestTimeZoneMode =
+      HarnessMonitorDateTimeZoneMode(
+        rawValue: environment.values[
+          HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey
+        ]
+          ?? ""
+      ) ?? .local
+    let uiTestCustomTimeZone =
+      environment.values[
+        HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey
+      ]
+      ?? HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
+
+    UserDefaults.standard.set(
+      overrides.themeMode.rawValue,
+      forKey: HarnessMonitorThemeDefaults.modeKey
+    )
+    UserDefaults.standard.set(
+      overrides.textSizeIndex,
+      forKey: HarnessMonitorTextSize.storageKey
+    )
+    UserDefaults.standard.set(
+      overrides.backdropMode.rawValue,
+      forKey: HarnessMonitorBackdropDefaults.modeKey
+    )
+    UserDefaults.standard.set(
+      overrides.backgroundImage.storageValue,
+      forKey: HarnessMonitorBackgroundDefaults.imageKey
+    )
+    UserDefaults.standard.set(
+      overrides.showInspector,
+      forKey: "showInspector"
+    )
+    UserDefaults.standard.set(
+      uiTestTimeZoneMode.rawValue,
+      forKey: HarnessMonitorDateTimeConfiguration.timeZoneModeKey
+    )
+    UserDefaults.standard.set(
+      uiTestCustomTimeZone,
+      forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
     )
   }
 
@@ -198,13 +228,11 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   func applyingDefaults(to environment: HarnessMonitorEnvironment) -> HarnessMonitorEnvironment {
     var values = environment.values
     if values[HarnessMonitorLaunchMode.environmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
-      .isEmpty ?? true
-    {
+      .isEmpty ?? true {
       values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue
     }
     if values["HARNESS_MONITOR_PREVIEW_SCENARIO"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-      .isEmpty ?? true
-    {
+      .isEmpty ?? true {
       values["HARNESS_MONITOR_PREVIEW_SCENARIO"] = defaultPreviewScenario
     }
     return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HarnessCornerOverlayConfiguration {
   var width: CGFloat = 280
-  var height: CGFloat? = nil
+  var height: CGFloat?
   var trailingPadding: CGFloat = HarnessMonitorTheme.spacingLG
   var bottomPadding: CGFloat = HarnessMonitorTheme.spacingLG
   var contentPadding: CGFloat = HarnessMonitorTheme.cardPadding

@@ -40,7 +40,9 @@ struct SessionActionDock: View {
               .accessibilityIdentifier(HarnessMonitorAccessibility.actionToast)
               .transition(.opacity)
           }
-          Text("\(detail.tasks.count) \(detail.tasks.count == 1 ? "task" : "tasks") · \(detail.agents.count) \(detail.agents.count == 1 ? "agent" : "agents")")
+          let taskWord = detail.tasks.count == 1 ? "task" : "tasks"
+          let agentWord = detail.agents.count == 1 ? "agent" : "agents"
+          Text("\(detail.tasks.count) \(taskWord) · \(detail.agents.count) \(agentWord)")
             .scaledFont(.caption.monospacedDigit())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }

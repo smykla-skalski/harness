@@ -20,7 +20,11 @@ struct SessionCockpitHeaderCard: View {
           Text(detail.session.displayTitle)
             .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
             .italic(detail.session.title.isEmpty)
-            .foregroundStyle(detail.session.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
+            .foregroundStyle(
+              detail.session.title.isEmpty
+                ? HarnessMonitorTheme.tertiaryInk
+                : HarnessMonitorTheme.ink
+            )
             .lineLimit(2)
           Text(sessionHeaderMetadata(detail.session))
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
