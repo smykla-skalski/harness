@@ -12,7 +12,7 @@ final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let backButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
-    XCTAssertTrue(backButton.waitForExistence(timeout: Self.uiTimeout), "Back button should exist in toolbar")
+    XCTAssertTrue(backButton.waitForExistence(timeout: Self.actionTimeout), "Back button should exist in toolbar")
 
     // Before selecting a session the back button must be disabled.
     XCTAssertFalse(backButton.isEnabled, "Back button should be disabled with no navigation history")
@@ -25,12 +25,12 @@ final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
     XCTAssertTrue(
-      observeButton.waitForExistence(timeout: Self.uiTimeout),
+      observeButton.waitForExistence(timeout: Self.actionTimeout),
       "Session cockpit should load after selecting preview session"
     )
 
     // The back button must now be enabled - the dashboard is in the back stack.
-    let enabled = waitUntil(timeout: Self.uiTimeout) {
+    let enabled = waitUntil(timeout: Self.actionTimeout) {
       backButton.isEnabled
     }
 
@@ -49,19 +49,19 @@ final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
 
     let backButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
     let forwardButton = toolbarButton(in: app, identifier: Accessibility.navigateForwardButton)
-    XCTAssertTrue(backButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(forwardButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(backButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(forwardButton.waitForExistence(timeout: Self.actionTimeout))
 
     // Select the preview session.
     tapPreviewSession(in: app)
     let observeButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
 
     // Wait for back to become enabled.
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { backButton.isEnabled },
+      waitUntil(timeout: Self.actionTimeout) { backButton.isEnabled },
       "Back button should be enabled after session selection"
     )
 
@@ -71,13 +71,13 @@ final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
     // The dashboard should reappear (no session selected -> board shows).
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
     XCTAssertTrue(
-      boardRoot.waitForExistence(timeout: Self.uiTimeout),
+      boardRoot.waitForExistence(timeout: Self.actionTimeout),
       "Dashboard should appear after navigating back"
     )
 
     // Forward should now be enabled, back should be disabled.
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { forwardButton.isEnabled },
+      waitUntil(timeout: Self.actionTimeout) { forwardButton.isEnabled },
       "Forward button should be enabled after going back"
     )
     XCTAssertFalse(backButton.isEnabled, "Back button should be disabled at start of history")

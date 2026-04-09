@@ -13,7 +13,7 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     )
 
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
-    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.actionTimeout))
 
     let stats = luminanceStats(of: centerpiece)
     let screenshot = XCTAttachment(screenshot: centerpiece.screenshot())
@@ -34,7 +34,7 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "empty")
 
     let card = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
-    XCTAssertTrue(card.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(card.waitForExistence(timeout: Self.actionTimeout))
 
     let stats = luminanceStats(of: card)
     let screenshot = XCTAttachment(screenshot: card.screenshot())
@@ -55,9 +55,9 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let badge = element(in: app, identifier: Accessibility.sidebarDaemonStatusBadge)
-    XCTAssertTrue(badge.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(badge.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
+      waitUntil(timeout: Self.actionTimeout) {
         badge.label == "Online"
       },
       "Expected badge label 'Online' but got '\(badge.label)'"
@@ -103,7 +103,7 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "empty")
 
     let emptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
-    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.actionTimeout))
 
     let stats = luminanceStats(of: emptyState)
     let screenshot = XCTAttachment(screenshot: emptyState.screenshot())
@@ -124,11 +124,11 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     tapPreviewSession(in: app)
 
     let taskCard = element(in: app, identifier: Accessibility.taskUICard)
-    XCTAssertTrue(taskCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(taskCard.waitForExistence(timeout: Self.actionTimeout))
 
     let stats = luminanceStats(of: taskCard)
     let screenshot = XCTAttachment(screenshot: taskCard.screenshot())
@@ -154,7 +154,7 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
       identifier: Accessibility.sidebarFiltersCard
     )
     XCTAssertTrue(
-      chip.waitForExistence(timeout: Self.uiTimeout),
+      chip.waitForExistence(timeout: Self.actionTimeout),
       "Ended status segment must exist"
     )
     XCTAssertTrue(filtersCard.exists, "Filters card must exist")
@@ -208,11 +208,11 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     let focusSegment = button(in: app, identifier: Accessibility.blockedChip)
 
     XCTAssertTrue(
-      sortSegment.waitForExistence(timeout: Self.uiTimeout),
+      sortSegment.waitForExistence(timeout: Self.actionTimeout),
       "Name sort segment must exist"
     )
     XCTAssertTrue(
-      focusSegment.waitForExistence(timeout: Self.uiTimeout),
+      focusSegment.waitForExistence(timeout: Self.actionTimeout),
       "Blocked focus segment must exist"
     )
 

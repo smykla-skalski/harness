@@ -105,12 +105,12 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let toolbar = mainWindow(in: app).toolbars.firstMatch
     let anchor = toolbarMeasurementAnchor(in: app)
 
-    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(anchor.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(anchor.waitForExistence(timeout: Self.actionTimeout))
     if additionalEnvironment["HARNESS_MONITOR_DISABLE_CONTENT_DETAIL_CHROME"] != "1" {
       XCTAssertTrue(
         element(in: app, identifier: Accessibility.sessionStatusBanner).waitForExistence(
-          timeout: Self.uiTimeout
+          timeout: Self.actionTimeout
         ),
         "Expected the active-session banner to be visible for the cockpit glass regression"
       )
@@ -121,7 +121,7 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let initial = toolbarGlassStats(in: app, toolbar: toolbar, anchor: anchor)
 
     tapButton(in: app, identifier: Accessibility.inspectorToggleButton)
-    XCTAssertTrue(waitUntil(timeout: Self.uiTimeout) {
+    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
       self.toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton).exists
     })
     Thread.sleep(forTimeInterval: 1.1)
@@ -152,9 +152,9 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let sidebar = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let statusBanner = element(in: app, identifier: Accessibility.sessionStatusBanner)
 
-    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sidebar.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(statusBanner.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebar.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(statusBanner.waitForExistence(timeout: Self.actionTimeout))
 
     Thread.sleep(forTimeInterval: 0.6)
 
@@ -210,7 +210,7 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
   private func ensureInspectorIsVisible(in app: XCUIApplication) {
     let toggleButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
 
-    XCTAssertTrue(waitUntil(timeout: Self.uiTimeout) {
+    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
       toggleButton.exists
     })
 
@@ -219,7 +219,7 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     }
 
     tapButton(in: app, identifier: Accessibility.inspectorToggleButton)
-    XCTAssertTrue(waitUntil(timeout: Self.uiTimeout) {
+    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
       self.element(in: app, identifier: Accessibility.inspectorRoot).exists
     })
   }

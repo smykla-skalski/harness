@@ -5,6 +5,7 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
+  nonisolated static let actionTimeout: TimeInterval = 2
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -13,7 +14,7 @@ class HarnessMonitorUITestCase: XCTestCase {
       switch app.state {
       case .runningForeground, .runningBackground:
         app.terminate()
-        let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
+        let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
         while Date.now < deadline, app.state != .notRunning {
           RunLoop.current.run(until: Date.now.addingTimeInterval(0.1))
         }
@@ -55,7 +56,7 @@ extension HarnessMonitorUITestCase {
 
   func tapSession(in app: XCUIApplication, identifier: String) {
     let sessionRow = sessionTrigger(in: app, identifier: identifier)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     if sessionRow.isHittable {
       sessionRow.tap()
       return
@@ -117,7 +118,7 @@ extension HarnessMonitorUITestCase {
     case .runningForeground, .runningBackground:
       app.terminate()
       XCTAssertTrue(
-        waitUntil(timeout: Self.uiTimeout) {
+        waitUntil(timeout: Self.actionTimeout) {
           app.state == .notRunning
         }
       )
@@ -129,7 +130,7 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
 
     while Date.now < deadline {
       app.activate()
@@ -154,7 +155,7 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapButton(in app: XCUIApplication, title: String) {
-    let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
 
     while Date.now < deadline {
       app.activate()
@@ -179,7 +180,7 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapElement(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
 
     while Date.now < deadline {
       app.activate()
@@ -204,7 +205,15 @@ extension HarnessMonitorUITestCase {
   }
 
   func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    app.descendants(matching: .any)
+    if identifier == HarnessMonitorUITestAccessibility.sidebarSearchField {
+      let windowSearchField = mainWindow(in: app).searchFields.firstMatch
+      if windowSearchField.exists {
+        return windowSearchField
+      }
+      return app.searchFields.firstMatch
+    }
+
+    return app.descendants(matching: .any)
       .matching(identifier: identifier)
       .firstMatch
   }
@@ -212,6 +221,7 @@ extension HarnessMonitorUITestCase {
   func button(in app: XCUIApplication, identifier: String) -> XCUIElement {
     let roles: [XCUIElement.ElementType] = [
       .button,
+      .menuButton,
       .radioButton,
       .cell,
     ]
@@ -315,6 +325,10 @@ extension HarnessMonitorUITestCase {
   }
 
   func editableField(in app: XCUIApplication, identifier: String) -> XCUIElement {
+    if identifier == HarnessMonitorUITestAccessibility.sidebarSearchField {
+      return element(in: app, identifier: identifier)
+    }
+
     let textField = app.textFields.matching(identifier: identifier).firstMatch
     if textField.exists {
       return textField
@@ -340,14 +354,27 @@ extension HarnessMonitorUITestCase {
     let toolbarButtons = mainWindow(in: app).toolbars.buttons.allElementsBoundByIndex
     if let button = toolbarButtons.first(where: { button in
       let identifier = button.identifier
-      return
-        identifier != HarnessMonitorUITestAccessibility.refreshButton
-        && identifier != HarnessMonitorUITestAccessibility.preferencesButton
+      return identifier != HarnessMonitorUITestAccessibility.refreshButton
     }) {
       return button
     }
 
     return toolbarButton(in: app, index: 0)
+  }
+
+  func openSettings(in app: XCUIApplication) {
+    let preferencesRoot = element(in: app, identifier: HarnessMonitorUITestAccessibility.preferencesRoot)
+    if preferencesRoot.exists {
+      return
+    }
+
+    app.activate()
+    app.typeKey(",", modifierFlags: .command)
+
+    XCTAssertTrue(
+      preferencesRoot.waitForExistence(timeout: Self.actionTimeout),
+      "Expected Cmd-, to open the settings window"
+    )
   }
 
   func dragUp(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
@@ -407,7 +434,7 @@ extension HarnessMonitorUITestCase {
   }
 
   func waitUntil(
-    timeout: TimeInterval = 5,
+    timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout,
     pollInterval: TimeInterval = 0.1,
     condition: @escaping () -> Bool
   ) -> Bool {

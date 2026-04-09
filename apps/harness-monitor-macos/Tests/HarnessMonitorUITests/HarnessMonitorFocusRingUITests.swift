@@ -10,7 +10,7 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let searchField = editableField(in: app, identifier: "harness.sidebar.search")
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
 
     if fieldHasFocusRingPixels(searchField, in: app) {
       tapPreviewSession(in: app)
@@ -58,7 +58,7 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
     )
 
     let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
 
     // Tab through controls until the session row gains keyboard focus.
     // The preview mode has a search field and filter controls above

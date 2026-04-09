@@ -13,7 +13,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     // Verify sheet appeared.
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
     XCTAssertTrue(
-      sheetRoot.waitForExistence(timeout: Self.uiTimeout),
+      sheetRoot.waitForExistence(timeout: Self.actionTimeout),
       "Send Signal sheet should appear after context menu tap"
     )
 
@@ -33,7 +33,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
 
     XCTAssertTrue(
-      waitUntil(timeout: 3) { !sheetRoot.exists },
+      waitUntil(timeout: 2) { !sheetRoot.exists },
       "Sheet should dismiss on Escape"
     )
   }
@@ -45,7 +45,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     openSendSignalSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
-    XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.actionTimeout))
 
     // Dismiss via Cancel button.
     let cancelButton = button(in: app, identifier: Accessibility.sendSignalSheetCancelButton)
@@ -53,7 +53,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     tapViaCoordinate(in: app, element: cancelButton)
 
     XCTAssertTrue(
-      waitUntil(timeout: 3) { !sheetRoot.exists },
+      waitUntil(timeout: 2) { !sheetRoot.exists },
       "Sheet should dismiss on Cancel"
     )
   }
@@ -65,7 +65,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     openSendSignalSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
-    XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.actionTimeout))
 
     // Command field should have default value "inject_context".
     let commandField = editableField(in: app, identifier: Accessibility.sendSignalSheetCommandField)
@@ -98,7 +98,7 @@ private extension HarnessMonitorSheetUITests {
   /// agent card to open the "Send Signal" context menu item.
   func openSendSignalSheet(in app: XCUIApplication) {
     let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
-    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.actionTimeout))
 
     // Agent cards live inside HarnessMonitorAdaptiveGridLayout and may be
     // below the fold. Scroll the content area down to bring them into view.
@@ -117,7 +117,7 @@ private extension HarnessMonitorSheetUITests {
 
     let signalMenuItem = app.menuItems["Send Signal"].firstMatch
     XCTAssertTrue(
-      signalMenuItem.waitForExistence(timeout: Self.uiTimeout),
+      signalMenuItem.waitForExistence(timeout: Self.actionTimeout),
       "Send Signal menu item should appear"
     )
     signalMenuItem.tap()

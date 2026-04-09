@@ -13,19 +13,19 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
     )
 
     let startButton = button(in: app, identifier: Accessibility.onboardingStartButton)
-    XCTAssertTrue(startButton.waitForExistence(timeout: Self.uiTimeout), "Start Daemon not found")
+    XCTAssertTrue(startButton.waitForExistence(timeout: Self.actionTimeout), "Start Daemon not found")
 
     let installButton = button(in: app, identifier: Accessibility.onboardingInstallButton)
-    XCTAssertTrue(installButton.waitForExistence(timeout: Self.uiTimeout), "Install Launch Agent not found")
+    XCTAssertTrue(installButton.waitForExistence(timeout: Self.actionTimeout), "Install Launch Agent not found")
 
     let refreshButton = button(in: app, identifier: Accessibility.onboardingRefreshButton)
-    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout), "Refresh Index not found")
+    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.actionTimeout), "Refresh Index not found")
 
     let allFilter = button(in: app, identifier: Accessibility.allFilterButton)
-    XCTAssertTrue(allFilter.waitForExistence(timeout: Self.uiTimeout), "All filter chip not found")
+    XCTAssertTrue(allFilter.waitForExistence(timeout: Self.actionTimeout), "All filter chip not found")
 
     let activeFilter = button(in: app, identifier: Accessibility.activeFilterButton)
-    XCTAssertTrue(activeFilter.waitForExistence(timeout: Self.uiTimeout), "Active filter chip not found")
+    XCTAssertTrue(activeFilter.waitForExistence(timeout: Self.actionTimeout), "Active filter chip not found")
 
     let elements: [(String, XCUIElement)] = [
       ("onboarding-start-daemon", startButton),

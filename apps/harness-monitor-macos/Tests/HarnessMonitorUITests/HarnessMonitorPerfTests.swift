@@ -144,7 +144,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     scenario: String
   ) {
     let window = mainWindow(in: app)
-    _ = window.waitForExistence(timeout: Self.uiTimeout)
+    _ = window.waitForExistence(timeout: Self.actionTimeout)
 
     let timeout = scenarioWaitDuration(scenario)
     let deadline = Date.now.addingTimeInterval(timeout)
