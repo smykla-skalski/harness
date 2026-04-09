@@ -38,7 +38,7 @@ struct PreferencesOverlayMarkers: View {
   }
 
   var body: some View {
-    if HarnessMonitorUITestEnvironment.isEnabled {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       ZStack {
         Color.clear
           .allowsHitTesting(false)
