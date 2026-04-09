@@ -1,104 +1,5 @@
 import Foundation
 
-public typealias DaemonPushEventStream = AsyncThrowingStream<DaemonPushEvent, Error>
-
-public protocol HarnessMonitorClientProtocol: Sendable {
-  func health() async throws -> HealthResponse
-  func transportLatencyMs() async throws -> Int?
-  func shutdown() async
-  func diagnostics() async throws -> DaemonDiagnosticsReport
-  func stopDaemon() async throws -> DaemonControlResponse
-  func projects() async throws -> [ProjectSummary]
-  func sessions() async throws -> [SessionSummary]
-  func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
-  func timeline(sessionID: String) async throws -> [TimelineEntry]
-  func globalStream() async -> DaemonPushEventStream
-  func sessionStream(sessionID: String) async -> DaemonPushEventStream
-  func createTask(sessionID: String, request: TaskCreateRequest) async throws -> SessionDetail
-  func assignTask(
-    sessionID: String,
-    taskID: String,
-    request: TaskAssignRequest
-  ) async throws -> SessionDetail
-  func updateTask(
-    sessionID: String,
-    taskID: String,
-    request: TaskUpdateRequest
-  ) async throws -> SessionDetail
-  func checkpointTask(
-    sessionID: String,
-    taskID: String,
-    request: TaskCheckpointRequest
-  ) async throws -> SessionDetail
-  func changeRole(
-    sessionID: String,
-    agentID: String,
-    request: RoleChangeRequest
-  ) async throws -> SessionDetail
-  func removeAgent(
-    sessionID: String,
-    agentID: String,
-    request: AgentRemoveRequest
-  ) async throws -> SessionDetail
-  func transferLeader(
-    sessionID: String,
-    request: LeaderTransferRequest
-  ) async throws -> SessionDetail
-  func endSession(
-    sessionID: String,
-    request: SessionEndRequest
-  ) async throws -> SessionDetail
-  func sendSignal(
-    sessionID: String,
-    request: SignalSendRequest
-  ) async throws -> SessionDetail
-  func observeSession(
-    sessionID: String,
-    request: ObserveSessionRequest
-  ) async throws -> SessionDetail
-  func logLevel() async throws -> LogLevelResponse
-  func setLogLevel(_ level: String) async throws -> LogLevelResponse
-}
-
-extension HarnessMonitorClientProtocol {
-  public func transportLatencyMs() async throws -> Int? {
-    nil
-  }
-
-  public func shutdown() async {}
-
-  public func sessionDetail(id: String) async throws -> SessionDetail {
-    try await sessionDetail(id: id, scope: nil)
-  }
-}
-
-public struct HarnessMonitorConnection: Equatable, Sendable {
-  public let endpoint: URL
-  public let token: String
-
-  public init(endpoint: URL, token: String) {
-    self.endpoint = endpoint
-    self.token = token
-  }
-}
-
-public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
-  case invalidEndpoint(String)
-  case invalidResponse
-  case server(code: Int, message: String)
-
-  public var errorDescription: String? {
-    switch self {
-    case .invalidEndpoint(let value):
-      "Invalid daemon endpoint: \(value)"
-    case .invalidResponse:
-      "The daemon returned an invalid response."
-    case .server(let code, let message):
-      "Daemon error \(code): \(message)"
-    }
-  }
-}
-
 public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   private static let requestTimeoutInterval: TimeInterval = 15
   private static let resourceTimeoutInterval: TimeInterval = 30
@@ -245,6 +146,40 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: ObserveSessionRequest
   ) async throws -> SessionDetail {
     try await post("/v1/sessions/\(sessionID)/observe", body: request)
+  }
+
+  public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
+    try await get("/v1/sessions/\(sessionID)/codex-runs")
+  }
+
+  public func codexRun(runID: String) async throws -> CodexRunSnapshot {
+    try await get("/v1/codex-runs/\(runID)")
+  }
+
+  public func startCodexRun(
+    sessionID: String,
+    request: CodexRunRequest
+  ) async throws -> CodexRunSnapshot {
+    try await post("/v1/sessions/\(sessionID)/codex-runs", body: request)
+  }
+
+  public func steerCodexRun(
+    runID: String,
+    request: CodexSteerRequest
+  ) async throws -> CodexRunSnapshot {
+    try await post("/v1/codex-runs/\(runID)/steer", body: request)
+  }
+
+  public func interruptCodexRun(runID: String) async throws -> CodexRunSnapshot {
+    try await post("/v1/codex-runs/\(runID)/interrupt", body: EmptyBody())
+  }
+
+  public func resolveCodexApproval(
+    runID: String,
+    approvalID: String,
+    request: CodexApprovalDecisionRequest
+  ) async throws -> CodexRunSnapshot {
+    try await post("/v1/codex-runs/\(runID)/approvals/\(approvalID)", body: request)
   }
 
   public func logLevel() async throws -> LogLevelResponse {
