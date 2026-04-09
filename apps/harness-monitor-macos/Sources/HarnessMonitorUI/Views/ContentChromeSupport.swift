@@ -1,10 +1,9 @@
 import HarnessMonitorKit
-import Observation
 import SwiftUI
 
 struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   let store: HarnessMonitorStore
-  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
+  let shellUI: HarnessMonitorStore.ContentShellSlice
 
   func body(content: Content) -> some View {
     content
@@ -259,7 +258,7 @@ struct PersistenceUnavailableBanner: View {
 }
 
 struct ContentAnnouncementsModifier: ViewModifier {
-  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
+  let shellUI: HarnessMonitorStore.ContentShellSlice
 
   func body(content: Content) -> some View {
     content

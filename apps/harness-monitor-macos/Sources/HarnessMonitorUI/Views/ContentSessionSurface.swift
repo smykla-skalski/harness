@@ -14,7 +14,7 @@ struct SessionContentState: Equatable {
 
 struct SessionContentContainer: View {
   let store: HarnessMonitorStore
-  @Bindable var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let state: SessionContentState
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion

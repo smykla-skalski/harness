@@ -14,7 +14,7 @@ private enum InspectorPrimaryResetKey: Hashable {
 
 struct InspectorColumnView: View {
   let store: HarnessMonitorStore
-  @Bindable var inspectorUI: HarnessMonitorStore.InspectorUISlice
+  let inspectorUI: HarnessMonitorStore.InspectorUISlice
 
   var body: some View {
     HarnessMonitorColumnScrollView(

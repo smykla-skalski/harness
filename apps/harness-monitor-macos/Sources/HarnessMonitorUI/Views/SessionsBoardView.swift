@@ -3,8 +3,8 @@ import SwiftUI
 
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
-  @Bindable var sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
-  @Bindable var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @AppStorage("harnessMonitor.board.onboardingDismissed")
   private var isOnboardingDismissed = false
 

@@ -8,7 +8,8 @@ extension WebSocketTransport {
       throw WebSocketTransportError.connectionClosed
     }
     let task = webSocketTask
-    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Void, any Error>) in
       task.sendPing { error in
         if let error {
           continuation.resume(throwing: error)
