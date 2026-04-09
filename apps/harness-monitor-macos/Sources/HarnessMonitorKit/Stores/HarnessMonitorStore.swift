@@ -122,6 +122,8 @@ public final class HarnessMonitorStore {
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
   private var hasBootstrapped = false
+  private var isReconnecting = false
+  private var reconnectRequestedDuringReconnect = false
   private var lastActionDismissTask: Task<Void, Never>?
   private let sleepAssertion = SleepAssertion()
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
@@ -244,10 +246,33 @@ public final class HarnessMonitorStore {
   }
 
   public func reconnect() async {
-    stopAllStreams()
-    client = nil
-    hasBootstrapped = true
-    await bootstrap()
+    if isReconnecting {
+      reconnectRequestedDuringReconnect = true
+      return
+    }
+    isReconnecting = true
+
+    repeat {
+      reconnectRequestedDuringReconnect = false
+      stopAllStreams()
+      let oldClient = client
+      client = nil
+      if let oldClient {
+        await oldClient.shutdown()
+      }
+      hasBootstrapped = true
+      await bootstrap()
+
+      guard reconnectRequestedDuringReconnect, connectionState != .online else {
+        break
+      }
+      // A manifest change was detected during bootstrap - the attempt above
+      // likely used a stale endpoint. Give the daemon a moment to accept
+      // connections on the new port before retrying.
+      try? await Task.sleep(for: .milliseconds(500))
+    } while true
+
+    isReconnecting = false
   }
 
   public func prepareForTermination() async {

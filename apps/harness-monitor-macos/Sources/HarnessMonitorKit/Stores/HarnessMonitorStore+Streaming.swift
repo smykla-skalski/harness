@@ -285,8 +285,6 @@ extension HarnessMonitorStore {
     let watcher = ManifestWatcher(currentEndpoint: manifest.endpoint) { [weak self] in
       Task { @MainActor [weak self] in
         guard let self else { return }
-        // Skip if already reconnecting or offline (user stopped daemon)
-        guard self.connectionState == .online else { return }
         self.appendConnectionEvent(
           kind: .reconnecting,
           detail: "Daemon manifest changed, re-bootstrapping"
