@@ -107,6 +107,7 @@ public struct ContentView: View {
     } detail: {
       ContentDetailColumn(
         store: store,
+        selection: store.selection,
         contentUI: contentUI,
         showInspector: $showInspector,
         toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
@@ -120,7 +121,12 @@ public struct ContentView: View {
         }
       )
       .inspector(isPresented: $showInspector) {
-        InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+        InspectorColumnView(
+          store: store,
+          contentUI: store.contentUI,
+          selection: store.selection,
+          inspectorUI: store.inspectorUI
+        )
           .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
           } action: { width in
@@ -150,12 +156,12 @@ public struct ContentView: View {
     .navigationTitle(windowTitle)
     .toolbar {
       ContentNavigationToolbarItems(
-        store: store,
+        contentUI: contentUI,
         navigateBack: navigateBack,
         navigateForward: navigateForward
       )
       ContentCenterpieceToolbarItems(
-        store: store,
+        contentUI: contentUI,
         displayMode: toolbarCenterpieceDisplayMode,
         availableDetailWidth: toolbarDetailWidth,
         showsLlamaToggle: showsCornerAnimation,
@@ -214,7 +220,7 @@ public struct ContentView: View {
           identifier: HarnessMonitorAccessibility.toolbarChromeState,
           text: toolbarChromeAccessibilityValue
         )
-        ContentToolbarAccessibilityMarker(store: store)
+        ContentToolbarAccessibilityMarker(contentUI: contentUI)
         AccessibilityTextMarker(
           identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
           text: toolbarCenterpieceDisplayMode.rawValue
@@ -270,6 +276,7 @@ public struct ContentView: View {
 
 private struct ContentDetailColumn: View {
   let store: HarnessMonitorStore
+  @Bindable var selection: HarnessMonitorStore.SelectionSlice
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   @Binding var showInspector: Bool
   let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
@@ -279,6 +286,7 @@ private struct ContentDetailColumn: View {
 
   init(
     store: HarnessMonitorStore,
+    selection: HarnessMonitorStore.SelectionSlice,
     contentUI: HarnessMonitorStore.ContentUISlice,
     showInspector: Binding<Bool>,
     toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration,
@@ -287,6 +295,7 @@ private struct ContentDetailColumn: View {
     detailWidthChanged: @escaping (CGFloat) -> Void
   ) {
     self.store = store
+    self.selection = selection
     self.contentUI = contentUI
     self._showInspector = showInspector
     self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
@@ -328,9 +337,9 @@ private struct ContentDetailColumn: View {
     SessionContentContainer(
       store: store,
       state: SessionContentState(
-        detail: contentUI.selectedDetail,
+        detail: selection.matchedSelectedSession,
         summary: contentUI.selectedSessionSummary,
-        timeline: contentUI.timeline,
+        timeline: selection.timeline,
         isSessionReadOnly: contentUI.isSessionReadOnly,
         isSessionActionInFlight: contentUI.isSessionActionInFlight,
         isSelectionLoading: contentUI.isSelectionLoading,
@@ -341,7 +350,7 @@ private struct ContentDetailColumn: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
-      if store.inspectorUI.actionContext != nil {
+      if selection.matchedSelectedSession != nil {
         store.inspectorSelection = .none
         return .handled
       }

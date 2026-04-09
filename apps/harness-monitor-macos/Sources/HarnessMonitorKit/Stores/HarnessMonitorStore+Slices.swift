@@ -265,6 +265,56 @@ extension HarnessMonitorStore {
       self.lastAction = lastAction
       self.lastError = lastError
     }
+
+    public init?(
+      detail: SessionDetail?,
+      inspectorSelection: HarnessMonitorStore.InspectorSelection,
+      isPersistenceAvailable: Bool,
+      selectedActionActorID: String,
+      isSessionReadOnly: Bool,
+      isSessionActionInFlight: Bool,
+      lastAction: String,
+      lastError: String?
+    ) {
+      guard let detail else {
+        return nil
+      }
+
+      let selectedTask: WorkItem?
+      if case .task(let taskID) = inspectorSelection {
+        selectedTask = detail.tasks.first(where: { $0.taskId == taskID })
+      } else {
+        selectedTask = nil
+      }
+
+      let selectedAgent: AgentRegistration?
+      if case .agent(let agentID) = inspectorSelection {
+        selectedAgent = detail.agents.first(where: { $0.agentId == agentID })
+      } else {
+        selectedAgent = nil
+      }
+
+      let selectedObserver: ObserverSummary?
+      if case .observer = inspectorSelection {
+        selectedObserver = detail.observer
+      } else {
+        selectedObserver = nil
+      }
+
+      self.init(
+        detail: detail,
+        selectedTask: selectedTask,
+        selectedAgent: selectedAgent,
+        selectedObserver: selectedObserver,
+        isPersistenceAvailable: isPersistenceAvailable,
+        availableActionActors: detail.agents.filter { $0.status == .active },
+        selectedActionActorID: selectedActionActorID,
+        isSessionReadOnly: isSessionReadOnly,
+        isSessionActionInFlight: isSessionActionInFlight,
+        lastAction: lastAction,
+        lastError: lastError
+      )
+    }
   }
 
   @MainActor
@@ -348,6 +398,16 @@ extension HarnessMonitorStore {
     public var isSessionActionInFlight = false {
       didSet { onChanged?(.sessionAction) }
     }
+
+    public var matchedSelectedSession: SessionDetail? {
+      guard let selectedSessionID,
+        let selectedSession,
+        selectedSession.session.sessionId == selectedSessionID
+      else {
+        return nil
+      }
+      return selectedSession
+    }
   }
 
   @MainActor
@@ -365,9 +425,7 @@ extension HarnessMonitorStore {
   @Observable
   public final class ContentUISlice {
     public var selectedSessionID: String?
-    public var selectedDetail: SessionDetail?
     public var selectedSessionSummary: SessionSummary?
-    public var timeline: [TimelineEntry] = []
     public var windowTitle = "Dashboard"
     public var persistenceError: String?
     public var sessionDataAvailability: SessionDataAvailability = .live
@@ -409,7 +467,11 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class InspectorUISlice {
-    public var primaryContent: HarnessMonitorStore.InspectorPrimaryContentState = .empty
-    public var actionContext: HarnessMonitorStore.InspectorActionContext?
+    public var isPersistenceAvailable = false
+    public var selectedActionActorID = ""
+    public var isSessionReadOnly = true
+    public var isSessionActionInFlight = false
+    public var lastAction = ""
+    public var lastError: String?
   }
 }

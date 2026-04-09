@@ -11,18 +11,42 @@ private enum InspectorChromeMetrics {
 
 struct InspectorColumnView: View {
   let store: HarnessMonitorStore
+  let contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var selection: HarnessMonitorStore.SelectionSlice
   @Bindable var inspectorUI: HarnessMonitorStore.InspectorUISlice
 
   init(
     store: HarnessMonitorStore,
+    contentUI: HarnessMonitorStore.ContentUISlice,
+    selection: HarnessMonitorStore.SelectionSlice,
     inspectorUI: HarnessMonitorStore.InspectorUISlice
   ) {
     self.store = store
+    self.contentUI = contentUI
+    self.selection = selection
     self.inspectorUI = inspectorUI
   }
 
-  private var selectedObserver: ObserverSummary? {
-    inspectorUI.primaryContent.observer
+  private var primaryContent: HarnessMonitorStore.InspectorPrimaryContentState {
+    HarnessMonitorStore.InspectorPrimaryContentState(
+      selectedSession: selection.matchedSelectedSession,
+      selectedSessionSummary: contentUI.selectedSessionSummary,
+      inspectorSelection: selection.inspectorSelection,
+      isPersistenceAvailable: inspectorUI.isPersistenceAvailable
+    )
+  }
+
+  private var actionContext: HarnessMonitorStore.InspectorActionContext? {
+    HarnessMonitorStore.InspectorActionContext(
+      detail: selection.matchedSelectedSession,
+      inspectorSelection: selection.inspectorSelection,
+      isPersistenceAvailable: inspectorUI.isPersistenceAvailable,
+      selectedActionActorID: inspectorUI.selectedActionActorID,
+      isSessionReadOnly: inspectorUI.isSessionReadOnly,
+      isSessionActionInFlight: inspectorUI.isSessionActionInFlight,
+      lastAction: inspectorUI.lastAction,
+      lastError: inspectorUI.lastError
+    )
   }
 
   var body: some View {
@@ -33,10 +57,10 @@ struct InspectorColumnView: View {
     ) {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
         inspectorPrimaryContent
-          .id(inspectorUI.primaryContent.identity)
+          .id(primaryContent.identity)
           .transition(.opacity.animation(.easeOut(duration: 0.08)))
 
-        if let actionContext = inspectorUI.actionContext {
+        if let actionContext {
           InspectorActionSections(
             store: store,
             context: actionContext
@@ -53,7 +77,7 @@ struct InspectorColumnView: View {
   }
 
   @ViewBuilder private var inspectorPrimaryContent: some View {
-    switch inspectorUI.primaryContent {
+    switch primaryContent {
     case .empty:
       InspectorPrimaryEmptyState()
     case .loading(let summary):
@@ -127,7 +151,12 @@ private struct InspectorPrimaryLoadingState: View {
 #Preview("Inspector - Session") {
   let store = inspectorPreviewStore(selection: .none)
 
-  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+  InspectorColumnView(
+    store: store,
+    contentUI: store.contentUI,
+    selection: store.selection,
+    inspectorUI: store.inspectorUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -135,7 +164,12 @@ private struct InspectorPrimaryLoadingState: View {
 #Preview("Inspector - Task") {
   let store = inspectorPreviewStore(selection: .task(PreviewFixtures.tasks[0].taskId))
 
-  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+  InspectorColumnView(
+    store: store,
+    contentUI: store.contentUI,
+    selection: store.selection,
+    inspectorUI: store.inspectorUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -143,7 +177,12 @@ private struct InspectorPrimaryLoadingState: View {
 #Preview("Inspector - Agent") {
   let store = inspectorPreviewStore(selection: .agent(PreviewFixtures.agents[0].agentId))
 
-  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+  InspectorColumnView(
+    store: store,
+    contentUI: store.contentUI,
+    selection: store.selection,
+    inspectorUI: store.inspectorUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -151,7 +190,12 @@ private struct InspectorPrimaryLoadingState: View {
 #Preview("Inspector - Observer") {
   let store = inspectorPreviewStore(selection: .observer)
 
-  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+  InspectorColumnView(
+    store: store,
+    contentUI: store.contentUI,
+    selection: store.selection,
+    inspectorUI: store.inspectorUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }
@@ -162,7 +206,12 @@ private struct InspectorPrimaryLoadingState: View {
     modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer
   )
 
-  InspectorColumnView(store: store, inspectorUI: store.inspectorUI)
+  InspectorColumnView(
+    store: store,
+    contentUI: store.contentUI,
+    selection: store.selection,
+    inspectorUI: store.inspectorUI
+  )
     .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
     .frame(width: 420, height: 860)
 }

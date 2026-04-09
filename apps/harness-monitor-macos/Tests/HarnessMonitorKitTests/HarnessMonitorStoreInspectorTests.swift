@@ -96,7 +96,7 @@ struct HarnessMonitorStoreInspectorTests {
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
     let didChange = await didInvalidate(
-      { store.inspectorUI.primaryContent },
+      { store.inspectorPrimaryContent },
       after: {
         store.searchText = "preview"
       }
@@ -111,14 +111,14 @@ struct HarnessMonitorStoreInspectorTests {
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
     let didChange = await didInvalidate(
-      { store.inspectorUI.primaryContent },
+      { store.inspectorPrimaryContent },
       after: {
         store.inspect(agentID: PreviewFixtures.agents[1].agentId)
       }
     )
 
     #expect(didChange)
-    switch store.inspectorUI.primaryContent {
+    switch store.inspectorPrimaryContent {
     case .agent(let selection):
       #expect(selection.agent.agentId == PreviewFixtures.agents[1].agentId)
     default:
