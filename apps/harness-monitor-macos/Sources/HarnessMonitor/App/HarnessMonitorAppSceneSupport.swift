@@ -14,6 +14,8 @@ struct HarnessMonitorWindowRootView: View {
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
+  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
+  private var cornerAnimationEnabled = false
   @State private var hasRunPerfScenario = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
@@ -28,7 +30,7 @@ struct HarnessMonitorWindowRootView: View {
   var body: some View {
     ContentView(
       store: store,
-      showsCornerAnimation: true,
+      showsCornerAnimation: cornerAnimationEnabled,
       cornerAnimationContent: {
         AnyView(HarnessMonitorAppLlamaAnimation())
       }
