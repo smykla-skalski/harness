@@ -98,6 +98,96 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(signals.exists)
   }
 
+  func testTimelinePaginationChangesVisibleEntriesAndResetsAfterSessionSwitch() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_FIXTURE_SET": "paged-timeline"]
+    )
+
+    let primarySession = previewSessionTrigger(in: app)
+    let secondarySession = sessionTrigger(
+      in: app,
+      identifier: Accessibility.signalRegressionSecondarySessionRow
+    )
+
+    XCTAssertTrue(primarySession.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(secondarySession.waitForExistence(timeout: Self.actionTimeout))
+
+    tapPreviewSession(in: app)
+
+    let previousButton = button(
+      in: app,
+      identifier: Accessibility.sessionTimelinePaginationPrevious
+    )
+    let nextButton = button(
+      in: app,
+      identifier: Accessibility.sessionTimelinePaginationNext
+    )
+    let pageStatus = element(
+      in: app,
+      identifier: Accessibility.sessionTimelinePaginationStatus
+    )
+
+    XCTAssertTrue(pageStatus.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(previousButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(nextButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      app.staticTexts["Paged timeline event 14"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(app.staticTexts["Paged timeline event 08"].exists)
+    XCTAssertFalse(previousButton.isEnabled)
+    XCTAssertTrue(nextButton.isEnabled)
+    XCTAssertEqual(pageStatus.label, "Page 1 of 3")
+
+    tapButton(in: app, identifier: Accessibility.sessionTimelinePaginationPageButton(2))
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        pageStatus.label == "Page 2 of 3"
+      }
+    )
+    XCTAssertTrue(
+      app.staticTexts["Paged timeline event 08"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(app.staticTexts["Paged timeline event 14"].exists)
+    XCTAssertTrue(previousButton.isEnabled)
+    XCTAssertTrue(nextButton.isEnabled)
+
+    tapButton(in: app, identifier: Accessibility.sessionTimelinePaginationPageButton(3))
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        pageStatus.label == "Page 3 of 3"
+      }
+    )
+    XCTAssertTrue(
+      app.staticTexts["Paged timeline event 02"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(nextButton.isEnabled)
+
+    tapSession(in: app, identifier: Accessibility.signalRegressionSecondarySessionRow)
+
+    XCTAssertTrue(
+      app.staticTexts["worker-codex received a result from Edit"].waitForExistence(
+        timeout: Self.actionTimeout
+      )
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        !self.element(in: app, identifier: Accessibility.sessionTimelinePagination).exists
+      }
+    )
+
+    tapPreviewSession(in: app)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.element(in: app, identifier: Accessibility.sessionTimelinePaginationStatus).label
+          == "Page 1 of 3"
+      }
+    )
+    XCTAssertTrue(
+      app.staticTexts["Paged timeline event 14"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(app.staticTexts["Paged timeline event 08"].exists)
+  }
+
   func testExistingSignalsRemainVisibleAfterSwitchingSessions() throws {
     let app = launch(
       mode: "preview",

@@ -137,6 +137,37 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       ]
     )
 
+    public static let pagedTimeline = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: PreviewFixtures.signalRegressionSessions.count
+      ),
+      projects: PreviewFixtures.signalRegressionProjects,
+      sessions: PreviewFixtures.signalRegressionSessions,
+      detail: PreviewFixtures.detail,
+      timeline: PreviewFixtures.pagedTimeline,
+      readySessionID: PreviewFixtures.summary.sessionId,
+      detailsBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.detail,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId:
+          PreviewFixtures.signalRegressionSecondaryDetail,
+      ],
+      coreDetailsBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.signalRegressionPrimaryCoreDetail,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId:
+          PreviewFixtures.signalRegressionSecondaryCoreDetail,
+      ],
+      timelinesBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.pagedTimeline,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId: PreviewFixtures.timeline,
+      ]
+    )
+
     public static let singleAgent = Self(
       health: HealthResponse(
         status: "ok",
@@ -153,7 +184,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       timeline: [],
       readySessionID: PreviewFixtures.singleAgentSummary.sessionId,
       detailsBySessionID: [
-        PreviewFixtures.singleAgentSummary.sessionId: PreviewFixtures.singleAgentDetail,
+        PreviewFixtures.singleAgentSummary.sessionId: PreviewFixtures.singleAgentDetail
       ],
       coreDetailsBySessionID: [:],
       timelinesBySessionID: [:]
@@ -275,7 +306,10 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
     guard let detail = fixtures.detail(for: id, scope: scope) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "No preview session detail available.")
+      throw HarnessMonitorAPIError.server(
+        code: 404,
+        message: "No preview session detail available."
+      )
     }
     return detail
   }
@@ -293,7 +327,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     }
   }
 
-  public func sessionStream(sessionID _: String) async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func sessionStream(sessionID _: String)
+    async -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { continuation in
       continuation.yield(
         .ready(

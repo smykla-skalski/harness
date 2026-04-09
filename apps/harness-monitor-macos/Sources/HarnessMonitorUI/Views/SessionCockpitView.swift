@@ -39,14 +39,21 @@ struct SessionCockpitView: View {
             companionAgentCount: detail.agents.count,
             inspectTask: store.inspect(taskID:)
           )
-          SessionAgentListSection(store: store, agents: detail.agents, inspectAgent: store.inspect(agentID:))
+          SessionAgentListSection(
+            store: store,
+            agents: detail.agents,
+            inspectAgent: store.inspect(agentID:)
+          )
         }
         SessionCockpitSignalsSection(
           signals: detail.signals,
           isExtensionsLoading: isExtensionsLoading,
           inspectSignal: store.inspect(signalID:)
         )
-        SessionCockpitTimelineSection(timeline: timeline)
+        SessionCockpitTimelineSection(
+          sessionID: detail.session.sessionId,
+          timeline: timeline
+        )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
