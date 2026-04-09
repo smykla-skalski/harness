@@ -82,12 +82,13 @@ extension SidebarView {
 
   @ViewBuilder
   func sessionRow(_ session: SessionSummary) -> some View {
-    let isSelected = store.selectedSessionID == session.sessionId
+    let isSelected = sidebarUI.selectedSessionID == session.sessionId
     let row = SidebarSessionListLinkRow(
       session: session,
-      isBookmarked: store.bookmarkedSessionIds.contains(session.sessionId),
+      isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId),
       isSelected: isSelected
     )
+    .equatable()
 
     let baseRow = row
       .tag(session.sessionId as String?)
@@ -95,13 +96,13 @@ extension SidebarView {
       .accessibilityValue(
         sessionAccessibilityValue(
           for: session,
-          selectedSessionID: store.selectedSessionID
+          selectedSessionID: sidebarUI.selectedSessionID
         )
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
       .listRowInsets(sidebarRowInsets)
 
-    if store.isPersistenceAvailable {
+    if sidebarUI.isPersistenceAvailable {
       baseRow
         .accessibilityAction(named: "Toggle Bookmark") {
           store.toggleBookmark(
@@ -116,7 +117,7 @@ extension SidebarView {
               projectId: session.projectId
             )
           } label: {
-            if store.bookmarkedSessionIds.contains(session.sessionId) {
+            if sidebarUI.bookmarkedSessionIds.contains(session.sessionId) {
               Label("Remove Bookmark", systemImage: "bookmark.slash")
             } else {
               Label("Bookmark", systemImage: "bookmark")
@@ -172,11 +173,7 @@ extension SidebarView {
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-          updateStorageSet(
-            &collapsedProjectIDsStorage,
-            entry: projectID,
-            include: !isExpanded
-          )
+          setProjectCollapsed(projectID: projectID, isCollapsed: !isExpanded)
         }
       }
     )
@@ -196,11 +193,7 @@ extension SidebarView {
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-          updateStorageSet(
-            &collapsedCheckoutKeysStorage,
-            entry: checkoutKey,
-            include: !isExpanded
-          )
+          setCheckoutCollapsed(checkoutKey: checkoutKey, isCollapsed: !isExpanded)
         }
       }
     )

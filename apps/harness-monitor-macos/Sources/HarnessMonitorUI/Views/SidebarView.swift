@@ -5,7 +5,7 @@ import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessMonitorStore
-  @Bindable var sessionIndex: HarnessMonitorStore.SessionIndexSlice
+  @Bindable var projection: HarnessMonitorStore.SessionProjectionSlice
   @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
@@ -14,14 +14,17 @@ struct SidebarView: View {
   var collapsedProjectIDsStorage = ""
   @SceneStorage("sidebar.collapsed-checkout-keys")
   var collapsedCheckoutKeysStorage = ""
+  @State private var collapsedProjectIDsState: Set<String> = []
+  @State private var collapsedCheckoutKeysState: Set<String> = []
+  @State private var hasHydratedCollapsedState = false
 
   init(
     store: HarnessMonitorStore,
-    sessionIndex: HarnessMonitorStore.SessionIndexSlice,
+    projection: HarnessMonitorStore.SessionProjectionSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice
   ) {
     self.store = store
-    self.sessionIndex = sessionIndex
+    self.projection = projection
     self.sidebarUI = sidebarUI
   }
 
@@ -35,11 +38,19 @@ struct SidebarView: View {
   }
 
   var collapsedProjectIDs: Set<String> {
-    storageSet(from: collapsedProjectIDsStorage)
+    if hasHydratedCollapsedState {
+      collapsedProjectIDsState
+    } else {
+      decodedStorageSet(from: collapsedProjectIDsStorage)
+    }
   }
 
   var collapsedCheckoutKeys: Set<String> {
-    storageSet(from: collapsedCheckoutKeysStorage)
+    if hasHydratedCollapsedState {
+      collapsedCheckoutKeysState
+    } else {
+      decodedStorageSet(from: collapsedCheckoutKeysStorage)
+    }
   }
 
   private var recentSearchQueries: [String] {
@@ -63,31 +74,31 @@ struct SidebarView: View {
 
   private var sidebarSearchText: Binding<String> {
     Binding(
-      get: { sessionIndex.searchText },
+      get: { projection.searchText },
       set: { newValue in
-        guard sessionIndex.searchText != newValue else {
+        guard projection.searchText != newValue else {
           return
         }
-        sessionIndex.searchText = newValue
+        store.searchText = newValue
       }
     )
   }
 
   private var hasActiveSidebarFilters: Bool {
-    !sessionIndex.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || sessionIndex.sessionFilter != .active
-      || sessionIndex.sessionFocusFilter != .all
-      || sessionIndex.sessionSortOrder != .recentActivity
+    !projection.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || projection.sessionFilter != .active
+      || projection.sessionFocusFilter != .all
+      || projection.sessionSortOrder != .recentActivity
   }
 
   private var sidebarFilterStateValue: String {
     [
-      "status=\(sessionIndex.sessionFilter.rawValue)",
-      "focus=\(sessionIndex.sessionFocusFilter.rawValue)",
-      "sort=\(sessionIndex.sessionSortOrder.rawValue)",
-      "visible=\(sessionIndex.filteredSessionCount)",
-      "total=\(sessionIndex.sessions.count)",
-      "search=\(sessionIndex.searchText)",
+      "status=\(projection.sessionFilter.rawValue)",
+      "focus=\(projection.sessionFocusFilter.rawValue)",
+      "sort=\(projection.sessionSortOrder.rawValue)",
+      "visible=\(projection.filteredSessionCount)",
+      "total=\(projection.totalSessionCount)",
+      "search=\(projection.searchText)",
     ].joined(separator: ", ")
   }
 
@@ -95,6 +106,7 @@ struct SidebarView: View {
     List(selection: sidebarSelection) {
       sidebarContent
     }
+    .animation(nil, value: projection.state)
     .listStyle(.sidebar)
     .environment(\.defaultMinListRowHeight, 1)
     .scrollEdgeEffectStyle(.soft, for: .top)
@@ -112,9 +124,9 @@ struct SidebarView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         SidebarToolbarFilterMenu(
-          sessionFilter: sessionIndex.sessionFilter,
-          sessionFocusFilter: sessionIndex.sessionFocusFilter,
-          sessionSortOrder: sessionIndex.sessionSortOrder,
+          sessionFilter: projection.sessionFilter,
+          sessionFocusFilter: projection.sessionFocusFilter,
+          sessionSortOrder: projection.sessionSortOrder,
           hasActiveFilters: hasActiveSidebarFilters,
           setSessionFilter: setSessionFilter,
           setSessionFocusFilter: setSessionFocusFilter,
@@ -125,8 +137,15 @@ struct SidebarView: View {
     }
     .onSubmit(of: .search) {
       if sidebarUI.isPersistenceAvailable {
-        _ = store.recordSearch(sessionIndex.searchText)
+        _ = store.recordSearch(projection.searchText)
       }
+    }
+    .onAppear(perform: hydrateCollapsedStateIfNeeded)
+    .onChange(of: collapsedProjectIDsStorage) { _, newValue in
+      syncCollapsedProjects(from: newValue)
+    }
+    .onChange(of: collapsedCheckoutKeysStorage) { _, newValue in
+      syncCollapsedCheckouts(from: newValue)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessMonitorTheme.ink)
@@ -144,7 +163,7 @@ struct SidebarView: View {
   }
 
   @ViewBuilder private var sidebarContent: some View {
-    switch emptyState {
+    switch projection.emptyState {
     case .noSessions:
       SidebarEmptyState(
         title: "No sessions indexed yet",
@@ -158,13 +177,13 @@ struct SidebarView: View {
         message: "Try a broader search or clear filters."
       )
     case .sessionsAvailable:
-      if let firstGroup = sessionIndex.groupedSessions.first {
+      if let firstGroup = projection.groupedSessions.first {
         projectSection(for: firstGroup)
           .accessibilityElement(children: .contain)
           .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
           .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
 
-        ForEach(Array(sessionIndex.groupedSessions.dropFirst())) { group in
+        ForEach(Array(projection.groupedSessions.dropFirst())) { group in
           projectSection(for: group)
         }
       }
@@ -192,7 +211,7 @@ struct SidebarView: View {
     .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
   }
 
-  func storageSet(from rawValue: String) -> Set<String> {
+  func decodedStorageSet(from rawValue: String) -> Set<String> {
     Set(
       rawValue
         .split(separator: "\n")
@@ -201,18 +220,80 @@ struct SidebarView: View {
     )
   }
 
-  func updateStorageSet(
-    _ storage: inout String,
-    entry: String,
-    include: Bool
-  ) {
-    var values = storageSet(from: storage)
-    if include {
-      values.insert(entry)
-    } else {
-      values.remove(entry)
+  func encodedStorageSet(
+    _ values: Set<String>
+  ) -> String {
+    values.sorted().joined(separator: "\n")
+  }
+
+  func hydrateCollapsedStateIfNeeded() {
+    guard !hasHydratedCollapsedState else {
+      return
     }
-    storage = values.sorted().joined(separator: "\n")
+
+    collapsedProjectIDsState = decodedStorageSet(from: collapsedProjectIDsStorage)
+    collapsedCheckoutKeysState = decodedStorageSet(from: collapsedCheckoutKeysStorage)
+    hasHydratedCollapsedState = true
+  }
+
+  func syncCollapsedProjects(from rawValue: String) {
+    guard hasHydratedCollapsedState else {
+      return
+    }
+
+    let decoded = decodedStorageSet(from: rawValue)
+    guard decoded != collapsedProjectIDsState else {
+      return
+    }
+    collapsedProjectIDsState = decoded
+  }
+
+  func syncCollapsedCheckouts(from rawValue: String) {
+    guard hasHydratedCollapsedState else {
+      return
+    }
+
+    let decoded = decodedStorageSet(from: rawValue)
+    guard decoded != collapsedCheckoutKeysState else {
+      return
+    }
+    collapsedCheckoutKeysState = decoded
+  }
+
+  func setProjectCollapsed(
+    projectID: String,
+    isCollapsed: Bool
+  ) {
+    hydrateCollapsedStateIfNeeded()
+
+    if isCollapsed {
+      collapsedProjectIDsState.insert(projectID)
+    } else {
+      collapsedProjectIDsState.remove(projectID)
+    }
+
+    let encoded = encodedStorageSet(collapsedProjectIDsState)
+    if collapsedProjectIDsStorage != encoded {
+      collapsedProjectIDsStorage = encoded
+    }
+  }
+
+  func setCheckoutCollapsed(
+    checkoutKey: String,
+    isCollapsed: Bool
+  ) {
+    hydrateCollapsedStateIfNeeded()
+
+    if isCollapsed {
+      collapsedCheckoutKeysState.insert(checkoutKey)
+    } else {
+      collapsedCheckoutKeysState.remove(checkoutKey)
+    }
+
+    let encoded = encodedStorageSet(collapsedCheckoutKeysState)
+    if collapsedCheckoutKeysStorage != encoded {
+      collapsedCheckoutKeysStorage = encoded
+    }
   }
 
   private func startDaemon() async {
@@ -228,26 +309,26 @@ struct SidebarView: View {
   }
 
   private func setSessionFilter(_ filter: HarnessMonitorStore.SessionFilter) {
-    sessionIndex.sessionFilter = filter
+    store.sessionFilter = filter
   }
 
   private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
-    sessionIndex.sessionFocusFilter = filter
+    store.sessionFocusFilter = filter
   }
 
   private func setSessionSortOrder(_ order: SessionSortOrder) {
-    sessionIndex.sessionSortOrder = order
+    store.sessionSortOrder = order
   }
 
   private func clearSidebarFilters() {
-    sessionIndex.searchText = ""
-    sessionIndex.sessionFilter = .active
-    sessionIndex.sessionFocusFilter = .all
-    sessionIndex.sessionSortOrder = .recentActivity
+    store.searchText = ""
+    store.sessionFilter = .active
+    store.sessionFocusFilter = .all
+    store.sessionSortOrder = .recentActivity
   }
 
   private func applyRecentSearch(_ query: String) {
-    sessionIndex.searchText = query
+    store.searchText = query
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
     }
@@ -291,7 +372,4 @@ struct SidebarView: View {
     }
   }
 
-  private var emptyState: HarnessMonitorStore.SidebarEmptyState {
-    sidebarUI.emptyState
-  }
 }
