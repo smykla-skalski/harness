@@ -5,9 +5,10 @@ import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessMonitorStore
-  @Bindable var catalog: HarnessMonitorStore.SessionCatalogSlice
+  @Bindable var controls: HarnessMonitorStore.SessionControlsSlice
   @Bindable var projection: HarnessMonitorStore.SessionProjectionSlice
   @Bindable var sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let sidebarVisible: Bool
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
 
@@ -21,14 +22,16 @@ struct SidebarView: View {
 
   init(
     store: HarnessMonitorStore,
-    catalog: HarnessMonitorStore.SessionCatalogSlice,
+    controls: HarnessMonitorStore.SessionControlsSlice,
     projection: HarnessMonitorStore.SessionProjectionSlice,
-    sidebarUI: HarnessMonitorStore.SidebarUISlice
+    sidebarUI: HarnessMonitorStore.SidebarUISlice,
+    sidebarVisible: Bool
   ) {
     self.store = store
-    self.catalog = catalog
+    self.controls = controls
     self.projection = projection
     self.sidebarUI = sidebarUI
+    self.sidebarVisible = sidebarVisible
   }
 
   var sidebarRowInsets: EdgeInsets {
@@ -77,9 +80,9 @@ struct SidebarView: View {
 
   private var sidebarSearchText: Binding<String> {
     Binding(
-      get: { projection.searchText },
+      get: { controls.searchText },
       set: { newValue in
-        guard projection.searchText != newValue else {
+        guard controls.searchText != newValue else {
           return
         }
         store.searchText = newValue
@@ -88,20 +91,20 @@ struct SidebarView: View {
   }
 
   private var hasActiveSidebarFilters: Bool {
-    !projection.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || projection.sessionFilter != .all
-      || projection.sessionFocusFilter != .all
-      || projection.sessionSortOrder != .recentActivity
+    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || controls.sessionFilter != .all
+      || controls.sessionFocusFilter != .all
+      || controls.sessionSortOrder != .recentActivity
   }
 
   private var sidebarFilterStateValue: String {
     [
-      "status=\(projection.sessionFilter.rawValue)",
-      "focus=\(projection.sessionFocusFilter.rawValue)",
-      "sort=\(projection.sessionSortOrder.rawValue)",
+      "status=\(controls.sessionFilter.rawValue)",
+      "focus=\(controls.sessionFocusFilter.rawValue)",
+      "sort=\(controls.sessionSortOrder.rawValue)",
       "visible=\(projection.filteredSessionCount)",
       "total=\(projection.totalSessionCount)",
-      "search=\(projection.searchText)",
+      "search=\(controls.searchText)",
     ].joined(separator: ", ")
   }
 
@@ -109,7 +112,10 @@ struct SidebarView: View {
     List(selection: sidebarSelection) {
       sidebarContent
     }
-    .animation(nil, value: projection.state)
+    .transaction {
+      $0.animation = nil
+      $0.disablesAnimations = true
+    }
     .listStyle(.sidebar)
     .environment(\.defaultMinListRowHeight, 1)
     .scrollEdgeEffectStyle(.soft, for: .top)
@@ -128,16 +134,19 @@ struct SidebarView: View {
       ToolbarItem(placement: .primaryAction) {
         SidebarToolbarFilterMenu(
           store: store,
-          sessionFilter: projection.sessionFilter,
-          sessionFocusFilter: projection.sessionFocusFilter,
-          sessionSortOrder: projection.sessionSortOrder,
+          sessionFilter: controls.sessionFilter,
+          sessionFocusFilter: controls.sessionFocusFilter,
+          sessionSortOrder: controls.sessionSortOrder,
           hasActiveFilters: hasActiveSidebarFilters
         )
+        .opacity(sidebarVisible ? 1 : 0)
+        .allowsHitTesting(sidebarVisible)
+        .accessibilityHidden(!sidebarVisible)
       }
     }
     .onSubmit(of: .search) {
       if sidebarUI.isPersistenceAvailable {
-        _ = store.recordSearch(projection.searchText)
+        _ = store.recordSearch(controls.searchText)
       }
     }
     .onAppear(perform: hydrateCollapsedStateIfNeeded)

@@ -449,6 +449,7 @@ extension HarnessMonitorStore {
           let checkoutSessionIDs = checkout
             .orderedSessionIDs(for: controls.sessionSortOrder)
             .filter { visibleSessionIDSet.contains($0) }
+          let checkoutSessions = checkoutSessionIDs.compactMap { sessionRecordsByID[$0]?.summary }
           guard !checkoutSessionIDs.isEmpty else {
             return nil
           }
@@ -456,7 +457,7 @@ extension HarnessMonitorStore {
             checkoutId: checkout.checkoutId,
             title: checkout.title,
             isWorktree: checkout.isWorktree,
-            sessionIDs: checkoutSessionIDs
+            sessions: checkoutSessions
           )
         }
         guard !checkoutGroups.isEmpty else {
@@ -475,10 +476,6 @@ extension HarnessMonitorStore {
       }
 
       let nextState = SessionProjectionState(
-        searchText: controls.searchText,
-        sessionFilter: controls.sessionFilter,
-        sessionFocusFilter: controls.sessionFocusFilter,
-        sessionSortOrder: controls.sessionSortOrder,
         groupedSessions: groupedSessions,
         filteredSessionCount: orderedVisibleSessionIDs.count,
         totalSessionCount: catalog.totalSessionCount,

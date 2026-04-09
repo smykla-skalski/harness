@@ -52,17 +52,13 @@ private struct ToolbarBaselineOverlayModifier: ViewModifier {
         sidebarMaxX = quantized
       }
       .overlay(alignment: .topLeading) {
-        GeometryReader { proxy in
-          let dividerWidth = max(proxy.size.width - sidebarMaxX, 0)
-
-          if dividerWidth > 0 {
-            ToolbarBaselineDivider()
-              .frame(width: dividerWidth, alignment: .leading)
-              .offset(x: sidebarMaxX)
-          }
+        if sidebarMaxX > 0 {
+          ToolbarBaselineDivider()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, sidebarMaxX)
         }
-        .allowsHitTesting(false)
       }
+      .allowsHitTesting(false)
   }
 }
 
