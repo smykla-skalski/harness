@@ -36,6 +36,7 @@ struct HarnessMonitorWindowRootView: View {
           AnyView(HarnessMonitorAppLlamaAnimation())
         } : nil
     )
+    .writingToolsBehavior(.disabled)
     .frame(minWidth: 900, minHeight: 600)
     .modifier(
       OptionalInstantFocusRingModifier(
@@ -117,6 +118,7 @@ struct HarnessMonitorSettingsRootView: View {
       themeMode: $themeMode,
       selectedSection: $selectedSection
     )
+    .writingToolsBehavior(.disabled)
     .frame(minWidth: 680, minHeight: 440)
     .modifier(
       HarnessMonitorWindowBackdropModifier(
