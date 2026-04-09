@@ -18,7 +18,7 @@ enum HarnessMonitorInspectorLayout {
   static let maxWidth: CGFloat = 760
 }
 
-// MARK: - Toolbar store extensions
+// MARK: - Commands state
 
 extension HarnessMonitorStore {
   // Keep Commands state as plain data. The scene-level FocusedValue bridge
@@ -35,100 +35,48 @@ extension HarnessMonitorStore {
       hasObserver: selectedSession?.observer != nil
     )
   }
+}
 
+private extension HarnessMonitorStore.ContentUISlice {
   var toolbarCenterpieceModel: ToolbarCenterpieceModel {
-    ToolbarCenterpieceModel(
+    var metrics: [ToolbarCenterpieceMetric] = [
+      .init(kind: .projects, value: toolbarMetrics.projectCount),
+      .init(kind: .sessions, value: toolbarMetrics.sessionCount),
+      .init(kind: .openWork, value: toolbarMetrics.openWorkCount),
+      .init(kind: .blocked, value: toolbarMetrics.blockedCount),
+    ]
+    if toolbarMetrics.worktreeCount > 0 {
+      metrics.insert(.init(kind: .worktrees, value: toolbarMetrics.worktreeCount), at: 1)
+    }
+
+    return ToolbarCenterpieceModel(
       workspaceName: "Harness Monitor",
       destinationName: "My Mac",
       destinationSystemImage: "laptopcomputer",
-      metrics: [
-        .init(kind: .projects, value: projects.count),
-        .init(
-          kind: .worktrees,
-          value: groupedSessions.reduce(0) { $0 + $1.checkoutGroups.count }
-        ),
-        .init(kind: .sessions, value: sessions.count),
-        .init(kind: .openWork, value: totalOpenWorkCount),
-        .init(kind: .blocked, value: totalBlockedCount),
-      ]
+      metrics: metrics
     )
   }
 
   var toolbarStatusMessages: [ToolbarStatusMessage] {
-    var messages: [ToolbarStatusMessage] = []
-
-    if !lastAction.isEmpty {
-      messages.append(
-        ToolbarStatusMessage(
-          id: "last-action",
-          text: lastAction,
-          systemImage: "checkmark.circle.fill",
-          tint: .green
-        )
-      )
-    }
-
-    switch connectionState {
-    case .connecting:
-      messages.append(
-        ToolbarStatusMessage(
-          id: "connecting",
-          text: "Connecting to daemon",
-          systemImage: "arrow.trianglehead.2.clockwise",
-          tint: .orange
-        )
-      )
-    case .offline(let reason):
-      messages.append(
-        ToolbarStatusMessage(
-          id: "offline",
-          text: isShowingCachedData || persistedSessionCount > 0 || !sessions.isEmpty
-            ? cachedDataStatusMessage
-            : reason,
-          systemImage: "wifi.slash",
-          tint: .secondary
-        )
-      )
-    case .online:
-      if isRefreshing {
-        messages.append(
-          ToolbarStatusMessage(
-            id: "refreshing",
-            text: "Refreshing sessions",
-            systemImage: "arrow.clockwise",
-            tint: .secondary
-          )
-        )
-      }
-    case .idle:
-      break
-    }
-
-    return messages
+    statusMessages.map(ToolbarStatusMessage.init)
   }
 
   var toolbarDaemonIndicator: ToolbarDaemonIndicator {
-    guard connectionState == .online else {
-      return .offline
-    }
-    if daemonStatus?.launchAgent.installed == true {
-      return .launchdConnected
-    }
-    return .manualConnected
+    ToolbarDaemonIndicator(daemonIndicator)
   }
 }
 
 // MARK: - Content toolbar items
 
 struct ContentNavigationToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   let navigateBack: () -> Void
   let navigateForward: () -> Void
 
   var body: some ToolbarContent {
     ContentNavigationToolbar(
-      canNavigateBack: store.canNavigateBack,
-      canNavigateForward: store.canNavigateForward,
+      canNavigateBack: contentUI.canNavigateBack,
+      canNavigateForward: contentUI.canNavigateForward,
       navigateBack: navigateBack,
       navigateForward: navigateForward
     )
@@ -136,7 +84,7 @@ struct ContentNavigationToolbarItems: ToolbarContent {
 }
 
 struct ContentCenterpieceToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
+  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   let displayMode: ToolbarCenterpieceDisplayMode
   let availableDetailWidth: CGFloat
   let showsLlamaToggle: Bool
@@ -145,23 +93,23 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
 
   var body: some ToolbarContent {
     ContentCenterpieceToolbar(
-      model: store.toolbarCenterpieceModel,
+      model: contentUI.toolbarCenterpieceModel,
       displayMode: displayMode,
       availableDetailWidth: availableDetailWidth,
-      statusMessages: store.toolbarStatusMessages,
-      daemonIndicator: store.toolbarDaemonIndicator
+      statusMessages: contentUI.toolbarStatusMessages,
+      daemonIndicator: contentUI.toolbarDaemonIndicator
     )
 
     ToolbarItemGroup(placement: .principal) {
       Button(action: toggleSleepPrevention) {
         Label(
-          store.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: store.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+          contentUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
+          systemImage: contentUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
         )
       }
-      .tint(store.sleepPreventionEnabled ? .orange : nil)
+      .tint(contentUI.sleepPreventionEnabled ? .orange : nil)
       .help(
-        store.sleepPreventionEnabled
+        contentUI.sleepPreventionEnabled
           ? "Preventing sleep - click to disable"
           : "Allow sleep - click to prevent"
       )
@@ -211,12 +159,12 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
 }
 
 struct ContentToolbarAccessibilityMarker: View {
-  let store: HarnessMonitorStore
+  let contentUI: HarnessMonitorStore.ContentUISlice
 
   var body: some View {
     AccessibilityTextMarker(
       identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
-      text: store.toolbarCenterpieceModel.accessibilityValue
+      text: contentUI.toolbarCenterpieceModel.accessibilityValue
     )
   }
 }

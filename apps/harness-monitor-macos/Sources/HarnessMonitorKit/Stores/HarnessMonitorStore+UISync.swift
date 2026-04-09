@@ -50,7 +50,7 @@ extension HarnessMonitorStore {
     sessionIndex.onChanged = { [weak self] change in
       switch change {
       case .data:
-        self?.scheduleUISync([.content, .sidebar, .inspector])
+        self?.scheduleUISync([.content])
       case .projection:
         self?.scheduleUISync([.sidebar])
       }
@@ -95,7 +95,7 @@ extension HarnessMonitorStore {
   }
 
   private func syncContentUI() {
-    let selectedDetail = matchedSelectedDetail()
+    let selectedDetail = selection.matchedSelectedSession
     let selectedSessionSummary = sessionIndex.sessionSummary(
       for: selection.selectedSessionID
     )
@@ -109,9 +109,7 @@ extension HarnessMonitorStore {
     )
 
     assign(selection.selectedSessionID, to: \.selectedSessionID, on: contentUI)
-    assign(selectedDetail, to: \.selectedDetail, on: contentUI)
     assign(selectedSessionSummary, to: \.selectedSessionSummary, on: contentUI)
-    assign(selection.timeline, to: \.timeline, on: contentUI)
     assign(
       selectedDetail != nil || selectedSessionSummary != nil ? "Cockpit" : "Dashboard",
       to: \.windowTitle,
@@ -169,36 +167,12 @@ extension HarnessMonitorStore {
   }
 
   private func syncInspectorUI() {
-    let selectedDetail = matchedSelectedDetail()
-    let selectedSessionSummary = sessionIndex.sessionSummary(
-      for: selection.selectedSessionID
-    )
-
-    assign(
-      HarnessMonitorStore.InspectorPrimaryContentState(
-        selectedSession: selectedDetail,
-        selectedSessionSummary: selectedSessionSummary,
-        inspectorSelection: selection.inspectorSelection,
-        isPersistenceAvailable: isPersistenceAvailable
-      ),
-      to: \.primaryContent,
-      on: inspectorUI
-    )
-    assign(
-      resolveInspectorActionContext(detail: selectedDetail),
-      to: \.actionContext,
-      on: inspectorUI
-    )
-  }
-
-  private func matchedSelectedDetail() -> SessionDetail? {
-    guard let sessionID = selection.selectedSessionID,
-      let detail = selection.selectedSession,
-      detail.session.sessionId == sessionID
-    else {
-      return nil
-    }
-    return detail
+    assign(isPersistenceAvailable, to: \.isPersistenceAvailable, on: inspectorUI)
+    assign(resolvedActionActor() ?? "", to: \.selectedActionActorID, on: inspectorUI)
+    assign(isSessionReadOnly, to: \.isSessionReadOnly, on: inspectorUI)
+    assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: inspectorUI)
+    assign(lastAction, to: \.lastAction, on: inspectorUI)
+    assign(lastError, to: \.lastError, on: inspectorUI)
   }
 
   private func resolveStatusMessages(
@@ -206,67 +180,54 @@ extension HarnessMonitorStore {
   ) -> [StatusMessageState] {
     var messages: [StatusMessageState] = []
 
-    if connectionState == .connecting {
+    if !lastAction.isEmpty {
       messages.append(
         .init(
-          id: "loading.connecting",
-          text: "Connecting to the control plane",
-          systemImage: "network",
-          tone: .caution
-        )
-      )
-    }
-    if isRefreshing {
-      messages.append(
-        .init(
-          id: "loading.refreshing",
-          text: "Refreshing session index",
-          systemImage: "arrow.trianglehead.2.clockwise",
-          tone: .caution
-        )
-      )
-    }
-    if isSelectionLoading {
-      messages.append(
-        .init(
-          id: "loading.session",
-          text: "Loading session detail",
-          systemImage: "doc.text.magnifyingglass",
-          tone: .caution
-        )
-      )
-    }
-    if isExtensionsLoading {
-      messages.append(
-        .init(
-          id: "loading.extensions",
-          text: "Loading observers and signals",
-          systemImage: "antenna.radiowaves.left.and.right",
-          tone: .caution
+          id: "last-action",
+          text: lastAction,
+          systemImage: "checkmark.circle.fill",
+          tone: .success
         )
       )
     }
 
-    messages.append(contentsOf: [
-      .init(
-        id: "status.running",
-        text: "Running Harness Monitor",
-        systemImage: "gearshape.fill",
-        tone: .info
-      ),
-      .init(
-        id: "status.sessions",
-        text: "\(sessionCount) sessions active",
-        systemImage: "antenna.radiowaves.left.and.right",
-        tone: .success
-      ),
-      .init(
-        id: "status.daemon",
-        text: "Daemon connected",
-        systemImage: "checkmark.circle.fill",
-        tone: .success
-      ),
-    ])
+    switch connectionState {
+    case .connecting:
+      messages.append(
+        .init(
+          id: "connecting",
+          text: "Connecting to daemon",
+          systemImage: "arrow.trianglehead.2.clockwise",
+          tone: .caution
+        )
+      )
+    case .offline(let reason):
+      let offlineText =
+        isShowingCachedData || persistedSessionCount > 0 || sessionCount > 0
+        ? cachedDataStatusMessage
+        : reason
+      messages.append(
+        .init(
+          id: "offline",
+          text: offlineText,
+          systemImage: "wifi.slash",
+          tone: .secondary
+        )
+      )
+    case .online:
+      if isRefreshing {
+        messages.append(
+          .init(
+            id: "refreshing",
+            text: "Refreshing sessions",
+            systemImage: "arrow.clockwise",
+            tone: .secondary
+          )
+        )
+      }
+    case .idle:
+      break
+    }
 
     return messages
   }
@@ -363,5 +324,29 @@ extension HarnessMonitorStore {
       return
     }
     root[keyPath: keyPath] = value
+  }
+}
+
+extension HarnessMonitorStore {
+  public var inspectorPrimaryContent: HarnessMonitorStore.InspectorPrimaryContentState {
+    HarnessMonitorStore.InspectorPrimaryContentState(
+      selectedSession: selection.matchedSelectedSession,
+      selectedSessionSummary: contentUI.selectedSessionSummary,
+      inspectorSelection: selection.inspectorSelection,
+      isPersistenceAvailable: inspectorUI.isPersistenceAvailable
+    )
+  }
+
+  public var inspectorActionContext: HarnessMonitorStore.InspectorActionContext? {
+    HarnessMonitorStore.InspectorActionContext(
+      detail: selection.matchedSelectedSession,
+      inspectorSelection: selection.inspectorSelection,
+      isPersistenceAvailable: inspectorUI.isPersistenceAvailable,
+      selectedActionActorID: inspectorUI.selectedActionActorID,
+      isSessionReadOnly: inspectorUI.isSessionReadOnly,
+      isSessionActionInFlight: inspectorUI.isSessionActionInFlight,
+      lastAction: inspectorUI.lastAction,
+      lastError: inspectorUI.lastError
+    )
   }
 }
