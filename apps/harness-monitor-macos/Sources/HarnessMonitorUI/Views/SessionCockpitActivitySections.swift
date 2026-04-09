@@ -99,7 +99,6 @@ struct SessionCockpitTimelineSection: View {
   private var reduceMotion
   @State private var currentPage = 0
   @State private var pageSize = SessionTimelinePageSize.defaultSize
-  @State private var separatorMidY: CGFloat?
 
   private var currentEntries: [TimelineEntry] {
     SessionTimelinePagination.currentEntries(
@@ -152,56 +151,47 @@ struct SessionCockpitTimelineSection: View {
         }
         .frame(maxWidth: .infinity)
       } else {
-        ZStack {
-          SessionTimelineCardBackground(separatorMidY: showsPagination ? separatorMidY : nil)
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+          SessionTimelinePageSummary(
+            rangeText: pageRangeText,
+            pageSize: $pageSize
+          )
 
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-            SessionTimelinePageSummary(
-              rangeText: pageRangeText,
-              pageSize: $pageSize
-            )
-
-            LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-              ForEach(currentEntries) { entry in
-                SessionCockpitTimelineEntryRow(
-                  entry: entry,
-                  dateTimeConfiguration: dateTimeConfiguration
-                )
-              }
-            }
-            .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if showsPagination {
-              SessionTimelineCutoutSpacer()
-                .onGeometryChange(for: CGFloat.self) { proxy in
-                  proxy.frame(in: .named(SessionTimelineCardCoordinateSpace.name)).midY
-                } action: { newMidY in
-                  separatorMidY = newMidY
-                }
-
-              SessionTimelinePaginationFooter(
-                currentPage: resolvedCurrentPage,
-                pageCount: pageCount,
-                pageStatusText: pageStatusText,
-                visiblePages: SessionTimelinePagination.visiblePages(
-                  currentPage: resolvedCurrentPage,
-                  pageCount: pageCount
-                ),
-                goToPreviousPage: { changePage(to: currentPage - 1) },
-                goToNextPage: { changePage(to: currentPage + 1) },
-                goToPage: changePage(to:)
+          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+            ForEach(currentEntries) { entry in
+              SessionCockpitTimelineEntryRow(
+                entry: entry,
+                dateTimeConfiguration: dateTimeConfiguration
               )
-              .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
             }
           }
-          .padding(HarnessMonitorTheme.spacingLG)
+          .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
+          .frame(maxWidth: .infinity, alignment: .leading)
+
+          if showsPagination {
+            SessionTimelinePaginationFooter(
+              currentPage: resolvedCurrentPage,
+              pageCount: pageCount,
+              pageStatusText: pageStatusText,
+              visiblePages: SessionTimelinePagination.visiblePages(
+                currentPage: resolvedCurrentPage,
+                pageCount: pageCount
+              ),
+              goToPreviousPage: { changePage(to: currentPage - 1) },
+              goToNextPage: { changePage(to: currentPage + 1) },
+              goToPage: changePage(to:)
+            )
+            .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
+          }
         }
-        .coordinateSpace(name: SessionTimelineCardCoordinateSpace.name)
-        .clipShape(.rect(cornerRadius: HarnessMonitorTheme.cornerRadiusLG))
-        .overlay {
+        .padding(HarnessMonitorTheme.spacingLG)
+        .background {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-            .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+            .fill(.primary.opacity(0.035))
+            .overlay {
+              RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+                .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: sessionID) { _, _ in
@@ -250,57 +240,6 @@ struct SessionCockpitTimelineSection: View {
     } else {
       currentPage = page
     }
-  }
-}
-
-private enum SessionTimelineCardCoordinateSpace {
-  static let name = "session-timeline-card"
-}
-
-private struct SessionTimelineCardBackground: View {
-  let separatorMidY: CGFloat?
-
-  private var cutoutHeight: CGFloat {
-    HarnessMonitorTheme.itemSpacing / 2
-  }
-
-  private var cutoutCornerRadius: CGFloat {
-    min(cutoutHeight / 2, HarnessMonitorTheme.cornerRadiusSM)
-  }
-
-  private var cutoutHorizontalInset: CGFloat {
-    HarnessMonitorTheme.spacingLG
-  }
-
-  var body: some View {
-    RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-      .fill(.primary.opacity(0.035))
-      .overlay(alignment: .topLeading) {
-        if let separatorMidY {
-          RoundedRectangle(cornerRadius: cutoutCornerRadius, style: .continuous)
-            .fill(.black)
-            .frame(maxWidth: .infinity)
-            .frame(height: cutoutHeight)
-            .padding(.horizontal, cutoutHorizontalInset)
-            .offset(y: separatorMidY - (cutoutHeight / 2))
-            .blendMode(.destinationOut)
-        }
-      }
-      .compositingGroup()
-      .accessibilityHidden(true)
-  }
-}
-
-private struct SessionTimelineCutoutSpacer: View {
-  private var cutoutHeight: CGFloat {
-    HarnessMonitorTheme.itemSpacing / 2
-  }
-
-  var body: some View {
-    Color.clear
-      .frame(maxWidth: .infinity)
-      .frame(height: cutoutHeight)
-      .accessibilityHidden(true)
   }
 }
 
