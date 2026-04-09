@@ -36,9 +36,9 @@ struct SidebarView: View {
 
   var sidebarRowInsets: EdgeInsets {
     EdgeInsets(
-      top: HarnessMonitorTheme.spacingXS,
+      top: HarnessMonitorTheme.spacingSM,
       leading: HarnessMonitorTheme.sectionSpacing,
-      bottom: HarnessMonitorTheme.spacingXS,
+      bottom: HarnessMonitorTheme.spacingSM,
       trailing: HarnessMonitorTheme.sectionSpacing
     )
   }
