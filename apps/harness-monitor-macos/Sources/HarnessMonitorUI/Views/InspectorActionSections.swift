@@ -27,6 +27,7 @@ struct InspectorActionSections: View {
           tasks: context.detail.tasks,
           agents: context.detail.agents
         )
+        .id("task:\(context.detail.session.sessionId):\(selectedTask.taskId)")
       }
 
       if let selectedAgent = context.selectedAgent {
@@ -35,6 +36,9 @@ struct InspectorActionSections: View {
           selectedAgent: selectedAgent,
           leaderID: context.detail.session.leaderId
         )
+        .id(
+          "agent:\(context.detail.session.sessionId):\(selectedAgent.agentId):\(selectedAgent.role.rawValue):\(context.detail.session.leaderId ?? "-")"
+        )
       }
 
       InspectorLeaderTransferConsole(
@@ -42,6 +46,7 @@ struct InspectorActionSections: View {
         detail: context.detail,
         actionActorID: context.selectedActionActorID
       )
+      .id("leader:\(context.detail.session.sessionId):\(context.detail.session.leaderId ?? "-")")
 
       if let selectedObserver = context.selectedObserver {
         InspectorObserverSummarySection(observer: selectedObserver)
