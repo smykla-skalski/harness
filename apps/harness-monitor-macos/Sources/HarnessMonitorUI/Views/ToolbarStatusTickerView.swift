@@ -74,10 +74,6 @@ struct ToolbarStatusTickerCapsule: View {
     .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
     .padding(.horizontal, Self.contentHorizontalInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityTestProbe(
-      HarnessMonitorAccessibility.toolbarStatusTicker,
-      label: messages.first?.text ?? "No status"
-    )
   }
 }
 
