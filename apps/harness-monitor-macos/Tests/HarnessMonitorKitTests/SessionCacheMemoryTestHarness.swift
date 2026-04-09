@@ -2,6 +2,7 @@ import SwiftData
 
 @testable import HarnessMonitorKit
 
+@MainActor
 struct SessionCacheMemoryTestHarness {
   let container: ModelContainer
 

@@ -185,11 +185,13 @@ purge_release_products() {
 }
 
 cleanup_host_processes() {
-  local host_pattern='Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing'
   local pids
   pids="$(
     ps -Ao pid=,command= \
-      | awk -v pattern="$host_pattern" '$0 ~ pattern { print $1 }'
+      | awk '
+        /Harness Monitor UI Testing[.]app\/Contents\/MacOS\/Harness Monitor UI Testing/ { print $1; next }
+        /launch-staged-host([[:space:]]|$)/ { print $1; next }
+      '
   )"
   if [[ -z "$pids" ]]; then
     return
@@ -467,6 +469,26 @@ print(digest.hexdigest())
 PY
 }
 
+assert_audit_source_unchanged() {
+  local checkpoint="$1"
+  local current_git_commit
+  local current_workspace_fingerprint
+
+  current_git_commit="$(git rev-parse HEAD)"
+  current_workspace_fingerprint="$(workspace_tree_fingerprint)"
+  if [[ "$current_git_commit" == "$git_commit" && "$current_workspace_fingerprint" == "$workspace_fingerprint" ]]; then
+    return
+  fi
+
+  printf 'Audit source changed during %s. Built commit=%s fingerprint=%s; current commit=%s fingerprint=%s. Rerun the audit so Instruments measures the current checkout.\n' \
+    "$checkpoint" \
+    "$git_commit" \
+    "$workspace_fingerprint" \
+    "$current_git_commit" \
+    "$current_workspace_fingerprint" >&2
+  exit 1
+}
+
 label=""
 compare_to=""
 scenario_selection="all"
@@ -569,6 +591,7 @@ if [[ "$SKIP_BUILD" == "1" ]]; then
 else
   build_release_targets
 fi
+assert_audit_source_unchanged "Release build"
 
 if [[ ! -x "$HOST_BINARY_PATH" ]]; then
   printf 'Expected UI-test host binary not found at %s\n' "$HOST_BINARY_PATH" >&2
@@ -657,6 +680,7 @@ record_capture() {
   local launched_process_path
 
   printf 'Recording %s / %s (%ss)...\n' "$template" "$scenario" "$duration_seconds"
+  assert_audit_source_unchanged "before recording $template / $scenario"
   set +e
   TMPDIR="$xctrace_tmp_root/" xcrun xctrace record \
     --template "$template" \
@@ -719,6 +743,7 @@ PY
   fi
 
   cleanup_host_processes
+  assert_audit_source_unchanged "after recording $template / $scenario"
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$scenario" "$template" "$duration_seconds" "${trace_path#"$run_dir"/}" \
@@ -735,6 +760,7 @@ for scenario in "${selected_scenarios[@]}"; do
 done
 
 cleanup_host_processes
+assert_audit_source_unchanged "before writing summary"
 
 xcode_version="$(xcodebuild -version | tr '\n' ';' | sed 's/;*$//')"
 xctrace_version="$(xcrun xctrace version | tr '\n' ';' | sed 's/;*$//')"

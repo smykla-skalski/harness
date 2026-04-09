@@ -10,10 +10,3 @@ func sessionAccessibilityLabel(for session: SessionSummary) -> String {
     session.sessionId,
   ].joined(separator: ", ")
 }
-
-func sessionAccessibilityValue(
-  for session: SessionSummary,
-  selectedSessionID: String?
-) -> String {
-  selectedSessionID == session.sessionId ? "selected" : ""
-}
