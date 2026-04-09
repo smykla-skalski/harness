@@ -26,7 +26,8 @@ extension WebSocketTransport {
     }
     let task = webSocketTask
     let startedAt = ContinuousClock.now
-    return try await withCheckedThrowingContinuation { continuation in
+    return try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Int, any Error>) in
       task.sendPing { error in
         let duration = startedAt.duration(to: ContinuousClock.now)
         let ms =
