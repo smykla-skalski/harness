@@ -15,10 +15,11 @@ use tokio::sync::{broadcast, watch};
 use crate::errors::{CliError, CliErrorKind};
 
 use super::protocol::{
-    AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SessionJoinRequest, SessionMutationResponse, SessionStartRequest,
-    SetLogLevelRequest, SignalAckRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
+    AgentRemoveRequest, CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest,
+    LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
+    SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
+    SignalAckRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -32,6 +33,7 @@ pub struct DaemonHttpState {
     pub daemon_epoch: String,
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
     pub db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    pub codex_controller: super::codex_controller::CodexControllerHandle,
 }
 
 /// Serve the daemon's HTTP API.
@@ -93,6 +95,20 @@ pub async fn serve(
         .route(
             "/v1/sessions/{session_id}/observe",
             post(post_observe_session),
+        )
+        .route(
+            "/v1/sessions/{session_id}/codex-runs",
+            get(get_codex_runs).post(post_codex_run),
+        )
+        .route("/v1/codex-runs/{run_id}", get(get_codex_run))
+        .route("/v1/codex-runs/{run_id}/steer", post(post_codex_steer))
+        .route(
+            "/v1/codex-runs/{run_id}/interrupt",
+            post(post_codex_interrupt),
+        )
+        .route(
+            "/v1/codex-runs/{run_id}/approvals/{approval_id}",
+            post(post_codex_approval),
         )
         .with_state(state);
 
@@ -532,14 +548,139 @@ async fn post_observe_session(
     )
 }
 
+async fn get_codex_runs(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        "/v1/sessions/{id}/codex-runs",
+        &request_id,
+        start,
+        state.codex_controller.list_runs(&session_id),
+    )
+}
+
+async fn post_codex_run(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<CodexRunRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/codex-runs",
+        &request_id,
+        start,
+        state.codex_controller.start_run(&session_id, &request),
+    )
+}
+
+async fn get_codex_run(
+    Path(run_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        "/v1/codex-runs/{id}",
+        &request_id,
+        start,
+        state.codex_controller.run(&run_id),
+    )
+}
+
+async fn post_codex_steer(
+    Path(run_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<CodexSteerRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/codex-runs/{id}/steer",
+        &request_id,
+        start,
+        state.codex_controller.steer(&run_id, &request),
+    )
+}
+
+async fn post_codex_interrupt(
+    Path(run_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/codex-runs/{id}/interrupt",
+        &request_id,
+        start,
+        state.codex_controller.interrupt(&run_id),
+    )
+}
+
+async fn post_codex_approval(
+    Path((run_id, approval_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<CodexApprovalDecisionRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/codex-runs/{id}/approvals/{id}",
+        &request_id,
+        start,
+        state
+            .codex_controller
+            .resolve_approval(&run_id, &approval_id, &request),
+    )
+}
+
 async fn stream_global(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, Response> {
     require_auth(&headers, &state).map_err(|response| *response)?;
     let mut receiver = state.sender.subscribe();
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let initial_events = service::global_stream_initial_events(db_guard.as_deref());
+    drop(db_guard);
     let stream = stream! {
-        yield Ok(Event::default().event("ready").json_data(service::ready_event(None)).expect("serialize ready event"));
+        for event in initial_events {
+            let event_name = event.event.clone();
+            yield Ok(Event::default().event(&event_name).json_data(event).expect("serialize stream event"));
+        }
         loop {
             match receiver.recv().await {
                 Ok(event) => {
@@ -561,8 +702,14 @@ async fn stream_session(
 ) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, Response> {
     require_auth(&headers, &state).map_err(|response| *response)?;
     let mut receiver = state.sender.subscribe();
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let initial_events = service::session_stream_initial_events(&session_id, db_guard.as_deref());
+    drop(db_guard);
     let stream = stream! {
-        yield Ok(Event::default().event("ready").json_data(service::ready_event(Some(&session_id))).expect("serialize ready event"));
+        for event in initial_events {
+            let event_name = event.event.clone();
+            yield Ok(Event::default().event(&event_name).json_data(event).expect("serialize stream event"));
+        }
         loop {
             match receiver.recv().await {
                 Ok(event) => {

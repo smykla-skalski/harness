@@ -8,6 +8,7 @@ struct SessionActionDock: View {
   let inspectTask: (String) -> Void
   let inspectAgent: (String) -> Void
   let inspectObserver: () -> Void
+  let openCodexFlow: () -> Void
 
   private var firstTaskID: String? {
     detail.tasks.first?.taskId
@@ -56,19 +57,29 @@ struct SessionActionDock: View {
             title: "Task Flow",
             subtitle: "Create, reassign, checkpoint",
             symbol: "checklist",
-            action: focusFirstTask
+            action: focusFirstTask,
+            accessibilityID: nil
           )
           flowButton(
             title: "People Flow",
             subtitle: "Change roles and leadership",
             symbol: "person.2",
-            action: focusFirstAgent
+            action: focusFirstAgent,
+            accessibilityID: nil
           )
           flowButton(
             title: "Observe Flow",
             subtitle: "Surface and triage issues",
             symbol: "eye",
-            action: focusObserver
+            action: focusObserver,
+            accessibilityID: nil
+          )
+          flowButton(
+            title: "Codex Flow",
+            subtitle: "Ask for a report or patch",
+            symbol: "sparkles",
+            action: openCodexFlow,
+            accessibilityID: HarnessMonitorAccessibility.codexFlowButton
           )
         }
         VStack(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -76,19 +87,29 @@ struct SessionActionDock: View {
             title: "Task Flow",
             subtitle: "Create, reassign, checkpoint",
             symbol: "checklist",
-            action: focusFirstTask
+            action: focusFirstTask,
+            accessibilityID: nil
           )
           flowButton(
             title: "People Flow",
             subtitle: "Change roles and leadership",
             symbol: "person.2",
-            action: focusFirstAgent
+            action: focusFirstAgent,
+            accessibilityID: nil
           )
           flowButton(
             title: "Observe Flow",
             subtitle: "Surface and triage issues",
             symbol: "eye",
-            action: focusObserver
+            action: focusObserver,
+            accessibilityID: nil
+          )
+          flowButton(
+            title: "Codex Flow",
+            subtitle: "Ask for a report or patch",
+            symbol: "sparkles",
+            action: openCodexFlow,
+            accessibilityID: HarnessMonitorAccessibility.codexFlowButton
           )
         }
       }
@@ -99,7 +120,8 @@ struct SessionActionDock: View {
     title: String,
     subtitle: String,
     symbol: String,
-    action: @escaping () -> Void
+    action: @escaping () -> Void,
+    accessibilityID: String?
   ) -> some View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -113,6 +135,7 @@ struct SessionActionDock: View {
       .padding(HarnessMonitorTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
+    .optionalAccessibilityIdentifier(accessibilityID)
   }
 
   private func focusFirstTask() {
@@ -134,6 +157,17 @@ struct SessionActionDock: View {
   }
 }
 
+extension View {
+  @ViewBuilder
+  fileprivate func optionalAccessibilityIdentifier(_ value: String?) -> some View {
+    if let value {
+      accessibilityIdentifier(value)
+    } else {
+      self
+    }
+  }
+}
+
 #Preview("Action flow") {
   SessionActionDock(
     detail: PreviewFixtures.detail,
@@ -141,7 +175,8 @@ struct SessionActionDock: View {
     lastAction: "Observe action queued",
     inspectTask: { _ in },
     inspectAgent: { _ in },
-    inspectObserver: {}
+    inspectObserver: {},
+    openCodexFlow: {}
   )
   .padding()
   .frame(width: 960)

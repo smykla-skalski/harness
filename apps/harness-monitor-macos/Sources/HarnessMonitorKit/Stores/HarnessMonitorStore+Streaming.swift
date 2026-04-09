@@ -179,6 +179,7 @@ extension HarnessMonitorStore {
         projects: payload.projects,
         sessions: payload.sessions
       )
+      refreshSelectedSessionIfSummaryChanged(sessions: payload.sessions)
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
         return
@@ -188,6 +189,10 @@ extension HarnessMonitorStore {
       applySessionExtensions(payload)
     case .logLevelChanged(let response):
       daemonLogLevel = response.level
+    case .codexRunUpdated(let run):
+      applyCodexRun(run)
+    case .codexApprovalRequested(let payload):
+      applyCodexApprovalRequested(payload)
     case .unknown:
       break
     }
@@ -235,10 +240,33 @@ extension HarnessMonitorStore {
     }
   }
 
+  func refreshSelectedSessionIfSummaryChanged(sessions: [SessionSummary]) {
+    guard let client,
+      let selectedSessionID,
+      let updatedSummary = sessions.first(where: { $0.sessionId == selectedSessionID }),
+      selectedSession?.session != updatedSummary
+    else {
+      return
+    }
+
+    let requestID = beginSessionLoad()
+    Task { @MainActor [weak self] in
+      await self?.loadSession(
+        using: client,
+        sessionID: selectedSessionID,
+        requestID: requestID
+      )
+    }
+  }
+
   func applySessionPushEvent(_ event: DaemonPushEvent) {
     switch event.kind {
     case .ready, .sessionsUpdated, .logLevelChanged, .unknown:
       break
+    case .codexRunUpdated(let run):
+      applyCodexRun(run)
+    case .codexApprovalRequested(let payload):
+      applyCodexApprovalRequested(payload)
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
         return
