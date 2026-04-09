@@ -15,7 +15,7 @@ public struct CommandsDisplayState: Equatable {
 enum HarnessMonitorInspectorLayout {
   static let minWidth: CGFloat = 320
   static let idealWidth: CGFloat = 420
-  static let maxWidth: CGFloat = 760
+  static let maxWidth: CGFloat = 480
 }
 
 // MARK: - Commands state
@@ -69,27 +69,25 @@ private extension HarnessMonitorStore.ContentUISlice {
 // MARK: - Content toolbar items
 
 struct ContentNavigationToolbarItems: ToolbarContent {
+  let store: HarnessMonitorStore
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
-  let navigateBack: () -> Void
-  let navigateForward: () -> Void
 
   var body: some ToolbarContent {
     ContentNavigationToolbar(
+      store: store,
       canNavigateBack: contentUI.canNavigateBack,
-      canNavigateForward: contentUI.canNavigateForward,
-      navigateBack: navigateBack,
-      navigateForward: navigateForward
+      canNavigateForward: contentUI.canNavigateForward
     )
   }
 }
 
 struct ContentCenterpieceToolbarItems: ToolbarContent {
+  let store: HarnessMonitorStore
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
   let displayMode: ToolbarCenterpieceDisplayMode
   let availableDetailWidth: CGFloat
   let showsLlamaToggle: Bool
   @Binding var showLlama: Bool
-  let toggleSleepPrevention: () -> Void
 
   var body: some ToolbarContent {
     ContentCenterpieceToolbar(
@@ -101,7 +99,7 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
     )
 
     ToolbarItemGroup(placement: .principal) {
-      Button(action: toggleSleepPrevention) {
+      Button { store.sleepPreventionEnabled.toggle() } label: {
         Label(
           contentUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
           systemImage: contentUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
