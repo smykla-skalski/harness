@@ -210,6 +210,15 @@ extension HarnessMonitorStore {
     projects: [ProjectSummary],
     sessions: [SessionSummary]
   ) {
+    let selectionMissingFromSnapshot =
+      selectedSessionID.map { selectedSessionID in
+        sessions.contains { $0.sessionId == selectedSessionID } == false
+      } ?? false
+    if selectionMissingFromSnapshot {
+      primeSessionSelection(nil)
+      stopSessionStream()
+    }
+
     var didChange = false
     withUISyncBatch {
       didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)

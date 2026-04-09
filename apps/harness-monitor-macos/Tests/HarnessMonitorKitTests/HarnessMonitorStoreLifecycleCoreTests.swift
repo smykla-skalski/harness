@@ -125,6 +125,71 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.selectedSessionID == nil)
   }
 
+  @Test("Replacing the session snapshot clears removed selection across UI slices")
+  func replacingSessionSnapshotClearsRemovedSelectionAcrossUISlices() async {
+    let selectedSummary = makeSession(
+      .init(
+        sessionId: "sess-selected",
+        context: "Selected cockpit",
+        status: .active,
+        leaderId: "leader-selected",
+        observeId: "observe-selected",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let selectedDetail = makeSessionDetail(
+      summary: selectedSummary,
+      workerID: "worker-selected",
+      workerName: "Worker Selected"
+    )
+    let selectedTimeline = makeTimelineEntries(
+      sessionID: selectedSummary.sessionId,
+      agentID: "worker-selected",
+      summary: "Selected timeline"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [selectedSummary],
+      detailsByID: [selectedSummary.sessionId: selectedDetail],
+      timelinesBySessionID: [selectedSummary.sessionId: selectedTimeline],
+      detail: selectedDetail
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(selectedSummary.sessionId)
+    #expect(store.sidebarUI.selectedSessionID == selectedSummary.sessionId)
+    #expect(store.contentUI.shell.selectedSessionID == selectedSummary.sessionId)
+
+    let replacementSummary = makeSession(
+      .init(
+        sessionId: "sess-replacement",
+        context: "Replacement cockpit",
+        status: .active,
+        leaderId: "leader-replacement",
+        observeId: "observe-replacement",
+        openTaskCount: 0,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        activeAgentCount: 1,
+        lastActivityAt: "2026-03-28T14:19:00Z"
+      )
+    )
+
+    store.applySessionIndexSnapshot(
+      projects: [makeProject(totalSessionCount: 1, activeSessionCount: 1)],
+      sessions: [replacementSummary]
+    )
+
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.timeline.isEmpty)
+    #expect(store.subscribedSessionIDs.isEmpty)
+    #expect(store.sidebarUI.selectedSessionID == nil)
+    #expect(store.contentUI.shell.selectedSessionID == nil)
+  }
+
   @Test("Prepare for termination cancels background work and shuts down the client")
   func prepareForTerminationCancelsBackgroundWorkAndShutsDownClient() async {
     let client = RecordingHarnessClient()
