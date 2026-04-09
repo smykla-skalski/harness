@@ -5,16 +5,19 @@ import SwiftUI
 public struct ContentView: View {
   let store: HarnessMonitorStore
   @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
-  let searchController: SidebarSearchController
   @Environment(\.openWindow)
   private var openWindow
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage("showInspector")
-  private var showInspector = true
+  private var persistedShowInspector = true
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
+  @State private var hasSeededSceneRestoration = false
+  @State private var hasAppliedInitialInspectorVisibility = false
+  @State private var hasCapturedInitialInspectorWidth = false
+  @State private var showInspector = false
   @State private var showLlama = false
   @State private var detailColumnWidth: CGFloat = 980
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -50,10 +53,9 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(detailAvailableWidth)
   }
 
-  public init(store: HarnessMonitorStore, searchController: SidebarSearchController) {
+  public init(store: HarnessMonitorStore) {
     self.store = store
     self.contentUI = store.contentUI
-    self.searchController = searchController
   }
 
   public var body: some View {
@@ -61,7 +63,7 @@ public struct ContentView: View {
       SidebarView(
         store: store,
         sessionIndex: store.sessionIndex,
-        searchController: searchController
+        sidebarUI: store.sidebarUI
       )
       .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
       .toolbarBaselineFrame(.sidebar)
@@ -85,6 +87,10 @@ public struct ContentView: View {
           .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
           } action: { width in
+            guard hasCapturedInitialInspectorWidth else {
+              hasCapturedInitialInspectorWidth = true
+              return
+            }
             guard showInspector,
                   width >= HarnessMonitorInspectorLayout.minWidth,
                   width <= HarnessMonitorInspectorLayout.maxWidth,
@@ -119,13 +125,44 @@ public struct ContentView: View {
         toggleSleepPrevention: toggleSleepPrevention
       )
     }
-    .onAppear {
-      if let restoredSessionID, contentUI.selectedSessionID == nil {
-        Task { await store.selectSession(restoredSessionID) }
+    .task {
+      guard !hasAppliedInitialInspectorVisibility else {
+        return
       }
+      hasAppliedInitialInspectorVisibility = true
+      await Task.yield()
+      showInspector = persistedShowInspector
+    }
+    .onChange(of: restoredSessionID, initial: true) { _, newID in
+      guard !hasSeededSceneRestoration else {
+        return
+      }
+      guard contentUI.selectedSessionID == nil, let newID else {
+        return
+      }
+      hasSeededSceneRestoration = true
+      store.primeSessionSelection(newID)
     }
     .onChange(of: contentUI.selectedSessionID) { _, newID in
-      restoredSessionID = newID
+      if restoredSessionID != newID {
+        restoredSessionID = newID
+      }
+      if newID != nil {
+        hasSeededSceneRestoration = true
+      }
+    }
+    .onChange(of: persistedShowInspector) { _, newValue in
+      guard hasAppliedInitialInspectorVisibility else {
+        return
+      }
+      if showInspector != newValue {
+        showInspector = newValue
+      }
+    }
+    .onChange(of: showInspector) { _, newValue in
+      if persistedShowInspector != newValue {
+        persistedShowInspector = newValue
+      }
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)

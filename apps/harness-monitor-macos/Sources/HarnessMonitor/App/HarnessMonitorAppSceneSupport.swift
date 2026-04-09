@@ -6,7 +6,6 @@ import SwiftUI
 struct HarnessMonitorWindowRootView: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
-  let searchController: SidebarSearchController
   @Binding var themeMode: HarnessMonitorThemeMode
   let perfScenario: HarnessMonitorPerfScenario?
   @Environment(\.openWindow)
@@ -27,7 +26,7 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   var body: some View {
-    ContentView(store: store, searchController: searchController)
+    ContentView(store: store)
       .frame(minWidth: 900, minHeight: 600)
       .modifier(
         OptionalInstantFocusRingModifier(

@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SidebarSessionListLinkRow: View {
+struct SidebarSessionListLinkRow: View, Equatable {
   let session: SessionSummary
   let isBookmarked: Bool
   let isSelected: Bool
@@ -21,6 +21,12 @@ struct SidebarSessionListLinkRow: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(Rectangle())
     .onHover { isHovered = $0 }
+  }
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.session == rhs.session
+      && lhs.isBookmarked == rhs.isBookmarked
+      && lhs.isSelected == rhs.isSelected
   }
 }
 
