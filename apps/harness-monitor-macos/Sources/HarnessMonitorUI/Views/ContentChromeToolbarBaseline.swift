@@ -1,4 +1,3 @@
-import HarnessMonitorKit
 import SwiftUI
 
 enum ToolbarBaselineRegion: Hashable {
@@ -38,29 +37,32 @@ private struct ToolbarBaselineFrameModifier: ViewModifier {
 }
 
 private struct ToolbarBaselineOverlayModifier: ViewModifier {
-  @State private var sidebarMaxX: CGFloat = 0
-
   func body(content: Content) -> some View {
     content
       .coordinateSpace(name: ToolbarBaselineCoordinateSpace.name)
-      .onPreferenceChange(ToolbarBaselineFramePreferenceKey.self) { frames in
-        let raw = max(frames[.sidebar]?.maxX ?? 0, 0)
-        let quantized = (raw / 4).rounded() * 4
-        guard abs(quantized - sidebarMaxX) >= 4 else {
-          return
-        }
-        sidebarMaxX = quantized
+      .overlayPreferenceValue(ToolbarBaselineFramePreferenceKey.self, alignment: .topLeading) { frames in
+        ToolbarBaselineOverlay(frames: frames)
       }
-      .overlay(alignment: .topLeading) {
-        Group {
-          if sidebarMaxX > 0 {
-            ToolbarBaselineDivider()
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(.leading, sidebarMaxX)
-          }
-        }
-        .allowsHitTesting(false)
+  }
+}
+
+private struct ToolbarBaselineOverlay: View {
+  let frames: [ToolbarBaselineRegion: CGRect]
+
+  private var sidebarMaxX: CGFloat {
+    let raw = max(frames[.sidebar]?.maxX ?? 0, 0)
+    return (raw / 4).rounded() * 4
+  }
+
+  var body: some View {
+    Group {
+      if sidebarMaxX > 0 {
+        ToolbarBaselineDivider()
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.leading, sidebarMaxX)
       }
+    }
+    .allowsHitTesting(false)
   }
 }
 
