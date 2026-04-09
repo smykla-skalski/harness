@@ -9,6 +9,7 @@ struct HarnessMonitorApp: App {
   @NSApplicationDelegateAdaptor private var delegate: HarnessMonitorAppDelegate
   private let container: ModelContainer?
   private let isUITesting: Bool
+  private let launchMode: HarnessMonitorLaunchMode
   private let mainWindowDefaultSize: CGSize
   private let perfScenario: HarnessMonitorPerfScenario?
   private let preferencesInitialSection: PreferencesSection
@@ -26,6 +27,7 @@ struct HarnessMonitorApp: App {
     let configuration = HarnessMonitorAppConfiguration.resolve()
     container = configuration.container
     isUITesting = configuration.isUITesting
+    launchMode = configuration.launchMode
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
     perfScenario = configuration.perfScenario
     preferencesInitialSection = configuration.preferencesInitialSection
@@ -38,7 +40,7 @@ struct HarnessMonitorApp: App {
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
-    .restorationBehavior(isUITesting ? .disabled : .automatic)
+    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
     .commands {
       HarnessMonitorAppCommands(
         store: store,
@@ -66,7 +68,11 @@ struct HarnessMonitorApp: App {
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
-    .restorationBehavior(isUITesting ? .disabled : .automatic)
+    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+  }
+
+  private var allowsWindowRestoration: Bool {
+    launchMode == .live && !isUITesting
   }
 
   @ViewBuilder private var mainWindowContent: some View {

@@ -42,10 +42,11 @@ public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendab
       return .bundled(image)
     }
 
-    if
-      let bundledRawValue = rawValue.removingPrefix("bundle:"),
-      let image = HarnessMonitorBackgroundImage(rawValue: bundledRawValue) {
-      return .bundled(image)
+    if let bundledRawValue = rawValue.removingPrefix("bundle:") {
+      let image = HarnessMonitorBackgroundImage(rawValue: bundledRawValue)
+      if let image {
+        return .bundled(image)
+      }
     }
 
     if let wallpaper = HarnessMonitorSystemWallpaper.wallpaper(for: rawValue) {
@@ -95,7 +96,8 @@ public struct HarnessMonitorSystemWallpaper: Equatable, Identifiable, Sendable {
   }
 
   private static func loadAvailable() -> [Self] {
-    let desktopPicturesURL = URL(fileURLWithPath: "/System/Library/Desktop Pictures", isDirectory: true)
+    let desktopPicturesURL = URL(
+      fileURLWithPath: "/System/Library/Desktop Pictures", isDirectory: true)
     guard
       let urls = try? FileManager.default.contentsOfDirectory(
         at: desktopPicturesURL,
@@ -174,7 +176,8 @@ public struct HarnessMonitorSystemWallpaper: Equatable, Identifiable, Sendable {
     return Self(
       id: slug(label),
       label: label,
-      subtitle: isDynamic || isSolar ? "Built-in macOS dynamic wallpaper" : "Built-in macOS wallpaper",
+      subtitle: isDynamic || isSolar
+        ? "Built-in macOS dynamic wallpaper" : "Built-in macOS wallpaper",
       imagePath: thumbnailPath
     )
   }
@@ -190,8 +193,8 @@ public struct HarnessMonitorSystemWallpaper: Equatable, Identifiable, Sendable {
   }
 }
 
-private extension String {
-  func removingPrefix(_ prefix: String) -> String? {
+extension String {
+  fileprivate func removingPrefix(_ prefix: String) -> String? {
     guard hasPrefix(prefix) else {
       return nil
     }
@@ -199,7 +202,7 @@ private extension String {
     return String(dropFirst(prefix.count))
   }
 
-  var nonEmpty: String? {
+  fileprivate var nonEmpty: String? {
     isEmpty ? nil : self
   }
 }

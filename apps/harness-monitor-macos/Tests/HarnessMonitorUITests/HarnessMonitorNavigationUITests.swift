@@ -12,10 +12,13 @@ final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let backButton = toolbarButton(in: app, identifier: Accessibility.navigateBackButton)
-    XCTAssertTrue(backButton.waitForExistence(timeout: Self.actionTimeout), "Back button should exist in toolbar")
+    XCTAssertTrue(
+      backButton.waitForExistence(timeout: Self.actionTimeout),
+      "Back button should exist in toolbar")
 
     // Before selecting a session the back button must be disabled.
-    XCTAssertFalse(backButton.isEnabled, "Back button should be disabled with no navigation history")
+    XCTAssertFalse(
+      backButton.isEnabled, "Back button should be disabled with no navigation history")
 
     // Select the preview session from the sidebar.
     tapPreviewSession(in: app)

@@ -24,7 +24,8 @@ import SwiftUI
       displayMode: .compact,
       statusMessages: [
         .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-        .init(text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+        .init(
+          text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
         .init(text: "Daemon connected", systemImage: "checkmark.circle.fill", tint: .green),
       ]
     )

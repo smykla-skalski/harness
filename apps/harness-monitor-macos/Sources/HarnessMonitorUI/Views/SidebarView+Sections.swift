@@ -29,13 +29,13 @@ extension SidebarView {
       .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
       .foregroundStyle(HarnessMonitorTheme.ink)
       .accessibilityAddTraits(.isHeader)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.projectHeader(group.project.projectId)
-    )
-    .accessibilityFrameMarker(
-      HarnessMonitorAccessibility.projectHeaderFrame(group.project.projectId)
-    )
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.projectHeader(group.project.projectId)
+      )
+      .accessibilityFrameMarker(
+        HarnessMonitorAccessibility.projectHeaderFrame(group.project.projectId)
+      )
   }
 
   func checkoutDisclosureRow(
@@ -90,7 +90,8 @@ extension SidebarView {
     )
     .equatable()
 
-    let baseRow = row
+    let baseRow =
+      row
       .tag(session.sessionId as String?)
       .accessibilityLabel(sessionAccessibilityLabel(for: session))
       .accessibilityValue(

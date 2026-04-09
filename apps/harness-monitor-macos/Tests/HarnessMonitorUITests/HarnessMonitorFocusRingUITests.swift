@@ -104,11 +104,13 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
     in app: XCUIApplication
   ) -> Bool {
     let screenshot = field.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else { return false }
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else { return false }
 
     let probes: [(Int, Int)] = [
       (2, max(cgImage.height / 2, 2)),
@@ -136,11 +138,13 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
   ) -> Bool {
     let window = mainWindow(in: app)
     let screenshot = window.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else { return false }
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else { return false }
 
     let scale = CGFloat(cgImage.width) / window.frame.width
     let rowFrame = row.frame
@@ -167,11 +171,13 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
   ) {
     let window = mainWindow(in: app)
     let screenshot = window.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       XCTFail("Could not capture window screenshot")
       return
     }
@@ -235,15 +241,17 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
     let bytesPerRow = image.width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: image.height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: image.width,
-      height: image.height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: image.width,
+        height: image.height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 

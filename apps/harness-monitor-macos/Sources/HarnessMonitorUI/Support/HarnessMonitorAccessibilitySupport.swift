@@ -41,8 +41,7 @@ struct AccessibilityTextMarker: View {
   let identifier: String
   let text: String
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       Color.clear
         .allowsHitTesting(false)

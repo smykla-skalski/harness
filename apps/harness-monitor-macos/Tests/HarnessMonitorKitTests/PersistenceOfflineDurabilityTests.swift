@@ -25,15 +25,17 @@ struct PersistenceOfflineDurabilityTests {
     sessionId: String
   ) throws -> [UserNote] {
     let notes = try previewContainer.mainContext.fetch(FetchDescriptor<UserNote>())
-    return notes
+    return
+      notes
       .filter { $0.targetId == targetId && $0.sessionId == sessionId }
       .sorted { $0.createdAt > $1.createdAt }
   }
 
   private func fetchRecentSearches() throws -> [RecentSearch] {
-    try previewContainer.mainContext.fetch(FetchDescriptor<RecentSearch>(
-      sortBy: [SortDescriptor(\RecentSearch.lastUsedAt, order: .reverse)]
-    ))
+    try previewContainer.mainContext.fetch(
+      FetchDescriptor<RecentSearch>(
+        sortBy: [SortDescriptor(\RecentSearch.lastUsedAt, order: .reverse)]
+      ))
   }
 
   private func makeV1Container(at url: URL) throws -> ModelContainer {
@@ -122,12 +124,13 @@ struct PersistenceOfflineDurabilityTests {
     #expect(store.toggleBookmark(sessionId: "sess-offline", projectId: "proj-1"))
     #expect(store.isBookmarked(sessionId: "sess-offline"))
 
-    #expect(store.addNote(
-      text: "Offline note",
-      targetKind: "task",
-      targetId: "task-offline",
-      sessionId: "sess-offline"
-    ))
+    #expect(
+      store.addNote(
+        text: "Offline note",
+        targetKind: "task",
+        targetId: "task-offline",
+        sessionId: "sess-offline"
+      ))
 
     store.sessionFilter = .ended
     store.sessionFocusFilter = .blocked
@@ -166,8 +169,10 @@ struct PersistenceOfflineDurabilityTests {
         daemonController: RecordingDaemonController(),
         modelContainer: firstContainer
       )
-      await firstStore.cacheSessionList([PreviewFixtures.summary], projects: PreviewFixtures.projects)
-      await firstStore.cacheSessionDetail(PreviewFixtures.detail, timeline: PreviewFixtures.timeline)
+      await firstStore.cacheSessionList(
+        [PreviewFixtures.summary], projects: PreviewFixtures.projects)
+      await firstStore.cacheSessionDetail(
+        PreviewFixtures.detail, timeline: PreviewFixtures.timeline)
     }
 
     let reopenedContainer = try HarnessMonitorModelContainer.live(using: environment)
@@ -210,14 +215,15 @@ struct PersistenceOfflineDurabilityTests {
     )
 
     let storeURL = harnessRoot.appendingPathComponent("harness-cache.store")
-    let metricsData = try JSONEncoder().encode(SessionMetrics(
-      agentCount: 2,
-      activeAgentCount: 1,
-      openTaskCount: 3,
-      inProgressTaskCount: 1,
-      blockedTaskCount: 0,
-      completedTaskCount: 4
-    ))
+    let metricsData = try JSONEncoder().encode(
+      SessionMetrics(
+        agentCount: 2,
+        activeAgentCount: 1,
+        openTaskCount: 3,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        completedTaskCount: 4
+      ))
 
     do {
       let v1Container = try makeV1Container(at: storeURL)

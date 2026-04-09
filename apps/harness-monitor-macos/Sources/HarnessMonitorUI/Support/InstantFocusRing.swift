@@ -17,8 +17,8 @@ public struct InstantFocusRingModifier: ViewModifier {
   }
 }
 
-public extension View {
-  func instantFocusRing() -> some View {
+extension View {
+  public func instantFocusRing() -> some View {
     modifier(InstantFocusRingModifier())
   }
 }

@@ -25,15 +25,17 @@ struct PersistenceIntegrationTests {
     sessionId: String
   ) throws -> [UserNote] {
     let notes = try container.mainContext.fetch(FetchDescriptor<UserNote>())
-    return notes
+    return
+      notes
       .filter { $0.targetId == targetId && $0.sessionId == sessionId }
       .sorted { $0.createdAt > $1.createdAt }
   }
 
   private func fetchRecentSearches() throws -> [RecentSearch] {
-    try container.mainContext.fetch(FetchDescriptor<RecentSearch>(
-      sortBy: [SortDescriptor(\RecentSearch.lastUsedAt, order: .reverse)]
-    ))
+    try container.mainContext.fetch(
+      FetchDescriptor<RecentSearch>(
+        sortBy: [SortDescriptor(\RecentSearch.lastUsedAt, order: .reverse)]
+      ))
   }
 
   private struct LargeSnapshotFixture {
@@ -152,15 +154,16 @@ struct PersistenceIntegrationTests {
   func cacheSessionListWritesThenReads() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-1",
-      context: "Test session",
-      status: .active,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-1",
+        context: "Test session",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     await store.cacheSessionList([session], projects: [project])
 
@@ -175,16 +178,17 @@ struct PersistenceIntegrationTests {
   @Test("cacheSessionDetail stores full detail and timeline")
   func cacheSessionDetailWritesThenReads() async throws {
     let store = makeStore()
-    let session = makeSession(.init(
-      sessionId: "sess-detail",
-      context: "Detail test",
-      status: .active,
-      leaderId: "leader-1",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 2
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-detail",
+        context: "Detail test",
+        status: .active,
+        leaderId: "leader-1",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
 
     let detail = makeSessionDetail(
       summary: session,
@@ -210,15 +214,16 @@ struct PersistenceIntegrationTests {
   @Test("cacheSessionDetail updates existing session in place")
   func cacheSessionDetailUpdatesInPlace() async throws {
     let store = makeStore()
-    let session = makeSession(.init(
-      sessionId: "sess-update",
-      context: "Original",
-      status: .active,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-update",
+        context: "Original",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     let detail = makeSessionDetail(
       summary: session,
@@ -227,15 +232,16 @@ struct PersistenceIntegrationTests {
     )
     await store.cacheSessionDetail(detail, timeline: [])
 
-    let updated = makeSession(.init(
-      sessionId: "sess-update",
-      context: "Updated",
-      status: .active,
-      openTaskCount: 3,
-      inProgressTaskCount: 1,
-      blockedTaskCount: 0,
-      activeAgentCount: 2
-    ))
+    let updated = makeSession(
+      .init(
+        sessionId: "sess-update",
+        context: "Updated",
+        status: .active,
+        openTaskCount: 3,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      ))
     let updatedDetail = makeSessionDetail(
       summary: updated,
       workerID: "w-2",
@@ -257,15 +263,16 @@ struct PersistenceIntegrationTests {
     let store = makeStore()
 
     for index in 0..<55 {
-      let session = makeSession(.init(
-        sessionId: "sess-\(index)",
-        context: "Session \(index)",
-        status: .active,
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 0
-      ))
+      let session = makeSession(
+        .init(
+          sessionId: "sess-\(index)",
+          context: "Session \(index)",
+          status: .active,
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 0
+        ))
       let detail = SessionDetail(
         session: session,
         agents: [],
@@ -291,16 +298,17 @@ struct PersistenceIntegrationTests {
   @Test("Persisted detail stays loadable even when it was hydrated without manual viewing")
   func loadCachedDetailReturnsHydratedSnapshotWithoutManualViewing() async {
     let store = makeStore()
-    let session = makeSession(.init(
-      sessionId: "hydrated-offline",
-      context: "Hydrated offline",
-      status: .active,
-      leaderId: "leader-offline",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "hydrated-offline",
+        context: "Hydrated offline",
+        status: .active,
+        leaderId: "leader-offline",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let detail = makeSessionDetail(
       summary: session,
       workerID: "worker-offline",
@@ -319,16 +327,17 @@ struct PersistenceIntegrationTests {
   func selectingPersistedSessionOfflineRestoresCachedSnapshot() async {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-offline-select",
-      context: "Offline selection",
-      status: .active,
-      leaderId: "leader-offline-select",
-      openTaskCount: 1,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-offline-select",
+        context: "Offline selection",
+        status: .active,
+        leaderId: "leader-offline-select",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let detail = makeSessionDetail(
       summary: session,
       workerID: "worker-select",
@@ -353,20 +362,23 @@ struct PersistenceIntegrationTests {
     #expect(store.sessionDataAvailability != .live)
   }
 
-  @Test("Selecting an offline persisted session with only a cached summary restores a summary-backed cockpit")
+  @Test(
+    "Selecting an offline persisted session with only a cached summary restores a summary-backed cockpit"
+  )
   func selectingPersistedSessionOfflineRestoresSummaryBackedCockpit() async {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-summary-only",
-      context: "Summary only selection",
-      status: .active,
-      leaderId: "leader-summary-only",
-      openTaskCount: 2,
-      inProgressTaskCount: 1,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-summary-only",
+        context: "Summary only selection",
+        status: .active,
+        leaderId: "leader-summary-only",
+        openTaskCount: 2,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     store.applySessionIndexSnapshot(projects: [project], sessions: [session])
     store.connectionState = .offline("daemon down")
@@ -383,16 +395,17 @@ struct PersistenceIntegrationTests {
 
   @Test("Hydration upgrades the selected summary-backed cockpit when live detail arrives")
   func hydrationUpgradesSelectedSummaryBackedCockpit() async throws {
-    let session = makeSession(.init(
-      sessionId: "sess-hydrate-selected",
-      context: "Hydrate selected",
-      status: .active,
-      leaderId: "leader-hydrate-selected",
-      openTaskCount: 1,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-hydrate-selected",
+        context: "Hydrate selected",
+        status: .active,
+        leaderId: "leader-hydrate-selected",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
     let detail = makeSessionDetail(
       summary: session,
@@ -433,16 +446,17 @@ struct PersistenceIntegrationTests {
   func persistedSnapshotNeedsHydrationReflectsSnapshotState() async {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-hydration",
-      context: "Hydration needed",
-      status: .active,
-      leaderId: "leader-hydration",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-hydration",
+        context: "Hydration needed",
+        status: .active,
+        leaderId: "leader-hydration",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let detail = makeSessionDetail(
       summary: session,
       workerID: "worker-hydration",
@@ -649,12 +663,13 @@ struct PersistenceIntegrationTests {
   func userNotesCRUD() throws {
     let store = makeStore()
 
-    #expect(store.addNote(
-      text: "Fix this later",
-      targetKind: "task",
-      targetId: "task-42",
-      sessionId: "sess-1"
-    ))
+    #expect(
+      store.addNote(
+        text: "Fix this later",
+        targetKind: "task",
+        targetId: "task-42",
+        sessionId: "sess-1"
+      ))
 
     let notes = try fetchNotes(targetId: "task-42", sessionId: "sess-1")
     #expect(notes.count == 1)
@@ -670,18 +685,20 @@ struct PersistenceIntegrationTests {
   func userNotesStayScopedToSession() throws {
     let store = makeStore()
 
-    #expect(store.addNote(
-      text: "Session one note",
-      targetKind: "task",
-      targetId: "task-42",
-      sessionId: "sess-1"
-    ))
-    #expect(store.addNote(
-      text: "Session two note",
-      targetKind: "task",
-      targetId: "task-42",
-      sessionId: "sess-2"
-    ))
+    #expect(
+      store.addNote(
+        text: "Session one note",
+        targetKind: "task",
+        targetId: "task-42",
+        sessionId: "sess-1"
+      ))
+    #expect(
+      store.addNote(
+        text: "Session two note",
+        targetKind: "task",
+        targetId: "task-42",
+        sessionId: "sess-2"
+      ))
 
     let sessionOneNotes = try fetchNotes(targetId: "task-42", sessionId: "sess-1")
     let sessionTwoNotes = try fetchNotes(targetId: "task-42", sessionId: "sess-2")
@@ -756,12 +773,13 @@ struct PersistenceIntegrationTests {
     #expect(store.isPersistenceAvailable == false)
     #expect(store.selectedSessionBookmarkTitle == "Bookmarks Unavailable")
     #expect(store.toggleBookmark(sessionId: "sess-bm", projectId: "proj-1") == false)
-    #expect(store.addNote(
-      text: "Should not save",
-      targetKind: "task",
-      targetId: "task-42",
-      sessionId: "sess-1"
-    ) == false)
+    #expect(
+      store.addNote(
+        text: "Should not save",
+        targetKind: "task",
+        targetId: "task-42",
+        sessionId: "sess-1"
+      ) == false)
     #expect(store.recordSearch("cockpit") == false)
     #expect(store.clearSearchHistory() == false)
     #expect(store.isBookmarked(sessionId: "sess-bm") == false)

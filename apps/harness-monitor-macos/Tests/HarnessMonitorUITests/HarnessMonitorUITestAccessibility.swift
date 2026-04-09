@@ -136,6 +136,7 @@ enum HarnessMonitorUITestAccessibility {
   static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
   static let actionToast = "harness.action-toast"
   static let sessionTimelinePagination = "harness.session.timeline.pagination"
+  static let sessionTimelinePageSizePicker = "harness.session.timeline.pagination.page-size"
   static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
   static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
   static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"

@@ -96,7 +96,9 @@ struct SessionAgentSummaryCard: View {
   }
 
   var body: some View {
-    Button { inspectAgent(agent.agentId) } label: {
+    Button {
+      inspectAgent(agent.agentId)
+    } label: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(agent.name)
@@ -143,10 +145,14 @@ struct SessionAgentSummaryCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .contextMenu {
-      Button { inspectAgent(agent.agentId) } label: {
+      Button {
+        inspectAgent(agent.agentId)
+      } label: {
         Label("Inspect", systemImage: "info.circle")
       }
-      Button { store.presentSendSignalSheet(agentID: agent.agentId) } label: {
+      Button {
+        store.presentSendSignalSheet(agentID: agent.agentId)
+      } label: {
         Label("Send Signal", systemImage: "paperplane")
       }
       .disabled(store.isSessionReadOnly)
@@ -161,7 +167,9 @@ struct SessionAgentSummaryCard: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId))
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId)).frame")
+    .accessibilityFrameMarker(
+      "\(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId)).frame"
+    )
     .transition(
       .asymmetric(
         insertion: .scale(scale: 0.95).combined(with: .opacity),

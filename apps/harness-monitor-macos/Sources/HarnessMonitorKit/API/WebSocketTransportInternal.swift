@@ -8,7 +8,7 @@ extension WebSocketTransport {
       throw WebSocketTransportError.connectionClosed
     }
     let task = webSocketTask
-    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+    try await withCheckedThrowingContinuation { continuation in
       task.sendPing { error in
         if let error {
           continuation.resume(throwing: error)
@@ -25,10 +25,11 @@ extension WebSocketTransport {
     }
     let task = webSocketTask
     let startedAt = ContinuousClock.now
-    return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, any Error>) in
+    return try await withCheckedThrowingContinuation { continuation in
       task.sendPing { error in
         let duration = startedAt.duration(to: ContinuousClock.now)
-        let ms = max(0, Int(duration.components.seconds * 1_000))
+        let ms =
+          max(0, Int(duration.components.seconds * 1_000))
           + Int(duration.components.attoseconds / 1_000_000_000_000_000)
         if let error {
           continuation.resume(throwing: error)
@@ -100,7 +101,7 @@ extension WebSocketTransport {
   func reconnectInternal() async throws {
     HarnessMonitorLogger.websocket.info("WebSocket reconnecting")
     heartbeatTask?.cancel()
-    webSocketTask?.cancel(with: .goingAway, reason: nil)
+    cancelWebSocketTaskIfNeeded(closeCode: .goingAway)
     let wsURL = wsEndpoint()
     var request = URLRequest(url: wsURL)
     request.setValue(
@@ -219,6 +220,18 @@ extension WebSocketTransport {
       continuation.finish()
     }
     sessionStreamContinuations.removeAll()
+  }
+
+  func cancelWebSocketTaskIfNeeded(closeCode: URLSessionWebSocketTask.CloseCode) {
+    guard let webSocketTask else {
+      return
+    }
+
+    guard webSocketTask.state == .running, webSocketTask.closeCode == .invalid else {
+      return
+    }
+
+    webSocketTask.cancel(with: closeCode, reason: nil)
   }
 
   nonisolated func wsEndpoint() -> URL {

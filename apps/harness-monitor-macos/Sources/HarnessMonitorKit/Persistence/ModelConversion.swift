@@ -57,7 +57,8 @@ extension ProjectSummary {
 
 extension CachedSession {
   func toSessionSummary() -> SessionSummary {
-    let metrics = (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))
+    let metrics =
+      (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))
       ?? SessionMetrics(
         agentCount: 0,
         activeAgentCount: 0,

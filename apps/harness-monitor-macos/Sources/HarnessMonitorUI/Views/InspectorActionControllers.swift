@@ -108,9 +108,13 @@ struct InspectorTaskMutationConsole: View {
     taskID = selectedTask.taskId
     taskStatus = selectedTask.status
 
-    if let assignedAgentID = selectedTask.assignedTo,
-      agents.contains(where: { $0.agentId == assignedAgentID }) {
-      assigneeID = assignedAgentID
+    if let assignedAgentID = selectedTask.assignedTo {
+      let isAssignedAgentAvailable = agents.contains(where: { $0.agentId == assignedAgentID })
+      if isAssignedAgentAvailable {
+        assigneeID = assignedAgentID
+      } else if !agents.contains(where: { $0.agentId == assigneeID }) {
+        assigneeID = agents.first?.agentId ?? ""
+      }
     } else if !agents.contains(where: { $0.agentId == assigneeID }) {
       assigneeID = agents.first?.agentId ?? ""
     }
@@ -124,9 +128,11 @@ struct InspectorTaskMutationConsole: View {
     for selectedTask: WorkItem,
     agents: [AgentRegistration]
   ) -> String {
-    if let assignedAgentID = selectedTask.assignedTo,
-      agents.contains(where: { $0.agentId == assignedAgentID }) {
-      return assignedAgentID
+    if let assignedAgentID = selectedTask.assignedTo {
+      let isAssignedAgentAvailable = agents.contains(where: { $0.agentId == assignedAgentID })
+      if isAssignedAgentAvailable {
+        return assignedAgentID
+      }
     }
     return agents.first?.agentId ?? ""
   }
@@ -252,8 +258,10 @@ struct InspectorLeaderTransferConsole: View {
   }
 
   private var transferLeaderButtonTitle: String {
-    if detail.session.pendingLeaderTransfer != nil,
-      actionActorID == detail.session.leaderId {
+    let shouldConfirmTransfer =
+      detail.session.pendingLeaderTransfer != nil
+      && actionActorID == detail.session.leaderId
+    if shouldConfirmTransfer {
       return "Confirm Leadership Transfer"
     }
     return "Transfer Leadership"
@@ -276,13 +284,20 @@ struct InspectorLeaderTransferConsole: View {
   }
 
   private func syncDefaults() {
-    if let pendingLeaderID = detail.session.pendingLeaderTransfer?.newLeaderId,
-      detail.agents.contains(where: { $0.agentId == pendingLeaderID }) {
-      transferLeaderID = pendingLeaderID
-      return
+    if let pendingLeaderID = detail.session.pendingLeaderTransfer?.newLeaderId {
+      let isPendingLeaderAvailable = detail.agents.contains {
+        $0.agentId == pendingLeaderID
+      }
+      if isPendingLeaderAvailable {
+        transferLeaderID = pendingLeaderID
+        return
+      }
     }
 
-    if transferLeaderID.isEmpty || !detail.agents.contains(where: { $0.agentId == transferLeaderID }) {
+    let hasCurrentTransferLeader = detail.agents.contains {
+      $0.agentId == transferLeaderID
+    }
+    if transferLeaderID.isEmpty || !hasCurrentTransferLeader {
       transferLeaderID =
         detail.agents.first(where: { $0.agentId != detail.session.leaderId })?.agentId
         ?? detail.agents.first?.agentId ?? ""
@@ -290,9 +305,13 @@ struct InspectorLeaderTransferConsole: View {
   }
 
   private static func defaultTransferLeaderID(for detail: SessionDetail) -> String {
-    if let pendingLeaderID = detail.session.pendingLeaderTransfer?.newLeaderId,
-      detail.agents.contains(where: { $0.agentId == pendingLeaderID }) {
-      return pendingLeaderID
+    if let pendingLeaderID = detail.session.pendingLeaderTransfer?.newLeaderId {
+      let isPendingLeaderAvailable = detail.agents.contains {
+        $0.agentId == pendingLeaderID
+      }
+      if isPendingLeaderAvailable {
+        return pendingLeaderID
+      }
     }
     return detail.agents.first(where: { $0.agentId != detail.session.leaderId })?.agentId
       ?? detail.agents.first?.agentId ?? ""

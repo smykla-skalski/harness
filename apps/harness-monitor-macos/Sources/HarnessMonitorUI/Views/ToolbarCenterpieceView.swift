@@ -37,7 +37,7 @@ struct ContentCenterpieceToolbar: ToolbarContent {
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
-  var store: HarnessMonitorStore? = nil
+  var store: HarnessMonitorStore?
   var connectionState: HarnessMonitorStore.ConnectionState = .idle
   var isBusy: Bool = false
 
@@ -276,7 +276,7 @@ struct ToolbarCenterpieceView: View {
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var daemonIndicator: ToolbarDaemonIndicator = .offline
-  var store: HarnessMonitorStore? = nil
+  var store: HarnessMonitorStore?
   var connectionState: HarnessMonitorStore.ConnectionState = .idle
   var isBusy: Bool = false
   private static let toolbarHeight: CGFloat = 32
@@ -388,9 +388,12 @@ private struct ToolbarDaemonToggleControl: View {
   let connectionState: HarnessMonitorStore.ConnectionState
   let isBusy: Bool
   @State private var isHovered = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
 
   var body: some View {
     Button {

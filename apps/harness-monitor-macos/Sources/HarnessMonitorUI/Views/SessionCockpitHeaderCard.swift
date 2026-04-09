@@ -29,8 +29,10 @@ struct SessionCockpitHeaderCard: View {
           Text(sessionHeaderMetadata(detail.session))
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          if !detail.session.context.isEmpty,
-             detail.session.context != detail.session.displayTitle {
+          let shouldShowContext =
+            !detail.session.context.isEmpty
+            && detail.session.context != detail.session.displayTitle
+          if shouldShowContext {
             Text(detail.session.context)
               .scaledFont(.system(.body, design: .rounded, weight: .medium))
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)

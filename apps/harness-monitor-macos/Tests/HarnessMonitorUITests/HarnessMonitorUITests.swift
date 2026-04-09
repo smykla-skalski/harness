@@ -127,16 +127,61 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       in: app,
       identifier: Accessibility.sessionTimelinePaginationStatus
     )
+    let pageSizePicker = popUpButton(
+      in: app,
+      identifier: Accessibility.sessionTimelinePageSizePicker
+    )
 
     XCTAssertTrue(pageStatus.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(previousButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(nextButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(pageSizePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
       app.staticTexts["Paged timeline event 32"].waitForExistence(timeout: Self.actionTimeout))
     XCTAssertFalse(app.staticTexts["Paged timeline event 17"].exists)
     XCTAssertFalse(previousButton.isEnabled)
     XCTAssertTrue(nextButton.isEnabled)
     XCTAssertEqual(pageStatus.label, "Page 1 of 3")
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.sessionTimelinePageSizePicker,
+      optionTitle: "30"
+    )
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        pageStatus.label == "Page 1 of 2"
+      }
+    )
+    XCTAssertTrue(app.staticTexts["Paged timeline event 32"].exists)
+    XCTAssertFalse(app.staticTexts["Paged timeline event 02"].exists)
+
+    tapButton(in: app, identifier: Accessibility.sessionTimelinePaginationPageButton(2))
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        pageStatus.label == "Page 2 of 2"
+      }
+    )
+    XCTAssertTrue(
+      app.staticTexts["Paged timeline event 02"].waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(nextButton.isEnabled)
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.sessionTimelinePageSizePicker,
+      optionTitle: "15"
+    )
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        pageStatus.label == "Page 3 of 3"
+      }
+    )
+    XCTAssertTrue(app.staticTexts["Paged timeline event 02"].exists)
+    XCTAssertTrue(previousButton.isEnabled)
+    XCTAssertFalse(nextButton.isEnabled)
 
     tapButton(in: app, identifier: Accessibility.sessionTimelinePaginationPageButton(2))
 

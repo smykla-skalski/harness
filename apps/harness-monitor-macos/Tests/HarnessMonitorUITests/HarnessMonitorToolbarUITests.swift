@@ -5,7 +5,8 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
   func testHiddenInspectorUsesSingleToolbarActionSet() throws {
     let app = launch(mode: "empty")
-    let hideInspectorButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
+    let hideInspectorButton = toolbarButton(
+      in: app, identifier: Accessibility.inspectorToggleButton)
 
     XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.actionTimeout))
     hideInspectorButton.tap()
@@ -16,30 +17,29 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let refreshButtons = app.toolbars.buttons.matching(identifier: Accessibility.refreshButton)
 
     func distinctVisibleFrames(for query: XCUIElementQuery) -> Set<String> {
-      Set(query.allElementsBoundByIndex.compactMap { element in
-        guard element.exists else {
-          return nil
-        }
-        let frame = element.frame
-        // macOS toolbars expose an inner icon button inside the outer
-        // toolbar control. We only want the outer control frame when
-        // checking for duplicated visible buttons.
-        guard frame.width >= 40, frame.height >= 40 else {
-          return nil
-        }
-        return
-          "\(Int(frame.minX.rounded())):"
-          + "\(Int(frame.minY.rounded())):"
-          + "\(Int(frame.width.rounded())):"
-          + "\(Int(frame.height.rounded()))"
-      })
+      Set(
+        query.allElementsBoundByIndex.compactMap { element in
+          guard element.exists else {
+            return nil
+          }
+          let frame = element.frame
+          // macOS toolbars expose an inner icon button inside the outer
+          // toolbar control. We only want the outer control frame when
+          // checking for duplicated visible buttons.
+          guard frame.width >= 40, frame.height >= 40 else {
+            return nil
+          }
+          return
+            "\(Int(frame.minX.rounded())):"
+            + "\(Int(frame.minY.rounded())):"
+            + "\(Int(frame.width.rounded())):"
+            + "\(Int(frame.height.rounded()))"
+        })
     }
 
     let hasSingleToolbarSet = waitUntil(timeout: Self.actionTimeout) {
-      (
-        distinctVisibleFrames(for: refreshButtons).count == 1
-          && distinctVisibleFrames(for: showInspectorButtons).count == 1
-      )
+      (distinctVisibleFrames(for: refreshButtons).count == 1
+        && distinctVisibleFrames(for: showInspectorButtons).count == 1)
     }
 
     if !hasSingleToolbarSet {
@@ -242,7 +242,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let toolbar = window.toolbars.firstMatch
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
     let centerpieceFrame = frameElement(in: app, identifier: Accessibility.toolbarCenterpieceFrame)
-    let metricsFrame = frameElement(in: app, identifier: Accessibility.toolbarCenterpieceMetricsFrame)
+    let metricsFrame = frameElement(
+      in: app, identifier: Accessibility.toolbarCenterpieceMetricsFrame)
     let statusTicker = frameElement(in: app, identifier: Accessibility.toolbarStatusTickerFrame)
     let statusTickerContent = frameElement(
       in: app,
@@ -269,16 +270,20 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let trailingInset = centerpieceFrame.frame.maxX - statusTicker.frame.maxX
     let statusLeadingInset = statusTickerContent.frame.minX - statusTicker.frame.minX
     let statusTrailingInset = statusTicker.frame.maxX - statusTickerContent.frame.maxX
-    let hoverLeadingInset = hasStatusTickerHoverFrame
+    let hoverLeadingInset =
+      hasStatusTickerHoverFrame
       ? statusTickerHover.frame.minX - statusTicker.frame.minX
       : .zero
-    let hoverTrailingInset = hasStatusTickerHoverFrame
+    let hoverTrailingInset =
+      hasStatusTickerHoverFrame
       ? statusTicker.frame.maxX - statusTickerHover.frame.maxX
       : .zero
-    let hoverTopInset = hasStatusTickerHoverFrame
+    let hoverTopInset =
+      hasStatusTickerHoverFrame
       ? statusTickerHover.frame.minY - statusTicker.frame.minY
       : .zero
-    let hoverBottomInset = hasStatusTickerHoverFrame
+    let hoverBottomInset =
+      hasStatusTickerHoverFrame
       ? statusTicker.frame.maxY - statusTickerHover.frame.maxY
       : .zero
     let expectedLeadingInset: CGFloat = 12
@@ -308,23 +313,25 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       hoverTopInset: \(hoverTopInset)
       hoverBottomInset: \(hoverBottomInset)
       """
-
-    if centerOffset > 120
+    let hasTooNarrowCenterpiece = centerpieceFrame.frame.width < 180
+    let hasHoverInsetViolation =
+      hasStatusTickerHoverFrame
+      && (abs(hoverLeadingInset - expectedHoverInset) > statusInsetTolerance
+        || abs(hoverTrailingInset - expectedHoverInset) > statusInsetTolerance
+        || abs(hoverTopInset - expectedHoverInset) > statusInsetTolerance
+        || abs(hoverBottomInset - expectedHoverInset) > statusInsetTolerance)
+    let shouldCaptureDiagnostics =
+      centerOffset > 120
       || verticalOffset > 8
       || abs(leadingInset - expectedLeadingInset) > leadingInsetTolerance
       || interiorGap < 20
       || abs(trailingInset - expectedTrailingInset) > leadingInsetTolerance
       || abs(statusLeadingInset - expectedStatusHorizontalInset) > statusInsetTolerance
       || abs(statusTrailingInset - expectedStatusHorizontalInset) > statusInsetTolerance
-      || (hasStatusTickerHoverFrame
-        && (
-          abs(hoverLeadingInset - expectedHoverInset) > statusInsetTolerance
-            || abs(hoverTrailingInset - expectedHoverInset) > statusInsetTolerance
-            || abs(hoverTopInset - expectedHoverInset) > statusInsetTolerance
-            || abs(hoverBottomInset - expectedHoverInset) > statusInsetTolerance
-        ))
-      || centerpieceFrame.frame.width < 180
-    {
+      || hasHoverInsetViolation
+      || hasTooNarrowCenterpiece
+
+    if shouldCaptureDiagnostics {
       attachWindowScreenshot(in: app, named: "toolbar-centerpiece")
       let attachment = XCTAttachment(string: diagnostics)
       attachment.name = "toolbar-centerpiece-diagnostics"
@@ -439,7 +446,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
   func testToolbarCenterpieceNarrowsWhenInspectorIsVisible() throws {
     let app = launch(mode: "empty")
     let centerpieceFrame = frameElement(in: app, identifier: Accessibility.toolbarCenterpieceFrame)
-    let inspectorToggleButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
+    let inspectorToggleButton = toolbarButton(
+      in: app, identifier: Accessibility.inspectorToggleButton)
 
     XCTAssertTrue(centerpieceFrame.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(inspectorToggleButton.waitForExistence(timeout: Self.actionTimeout))
@@ -476,10 +484,12 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
   }
 
   func testToolbarCenterpieceCompactsInsteadOfDisappearingInNarrowWindow() throws {
-    let app = launch(mode: "preview", additionalEnvironment: [
-      "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard",
-      "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1180",
-    ])
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard",
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1180",
+      ])
     let window = mainWindow(in: app)
     let toolbar = window.toolbars.firstMatch
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
@@ -487,7 +497,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let centerpieceMode = element(in: app, identifier: Accessibility.toolbarCenterpieceMode)
     let toolbarChromeState = element(in: app, identifier: Accessibility.toolbarChromeState)
     let backButtons = app.toolbars.buttons.matching(identifier: Accessibility.navigateBackButton)
-    let forwardButtons = app.toolbars.buttons.matching(identifier: Accessibility.navigateForwardButton)
+    let forwardButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.navigateForwardButton)
     let titlePredicate = NSPredicate(format: "label == %@ OR value == %@", "Dashboard", "Dashboard")
     let title = app.staticTexts.matching(titlePredicate).firstMatch
     let titleButtons = app.toolbars.buttons.matching(titlePredicate)
@@ -495,21 +506,24 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
     tapPreviewSession(in: app)
-    let observeButton = app.buttons.matching(identifier: Accessibility.observeSummaryButton).firstMatch
+    let observeButton = app.buttons.matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(backButtons.firstMatch.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
-      self.toolbarButton(in: app, identifier: Accessibility.navigateBackButton).isEnabled
-    }, "Back button should be enabled after selecting a preview session")
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.toolbarButton(in: app, identifier: Accessibility.navigateBackButton).isEnabled
+      }, "Back button should be enabled after selecting a preview session")
     tapButton(in: app, identifier: Accessibility.navigateBackButton)
     XCTAssertTrue(forwardButtons.firstMatch.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
       element(in: app, identifier: Accessibility.sessionsBoardRoot)
         .waitForExistence(timeout: Self.actionTimeout)
     )
-    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
-      self.toolbarButton(in: app, identifier: Accessibility.navigateForwardButton).isEnabled
-    }, "Forward button should be enabled after navigating back to the dashboard")
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.toolbarButton(in: app, identifier: Accessibility.navigateForwardButton).isEnabled
+      }, "Forward button should be enabled after navigating back to the dashboard")
     let didCompact = waitUntil(timeout: Self.actionTimeout) {
       guard title.exists, centerpiece.exists else {
         return false
@@ -532,7 +546,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       attachAppHierarchy(in: app, named: "toolbar-centerpiece-compact-hierarchy")
 
       let centerpieceExists = centerpiece.exists
-      let centerpieceFrameDescription = centerpieceExists ? String(describing: centerpiece.frame) : "missing"
+      let centerpieceFrameDescription =
+        centerpieceExists ? String(describing: centerpiece.frame) : "missing"
       let centerpieceStateLabel = centerpieceState.exists ? centerpieceState.label : "missing"
       let centerpieceModeLabel = centerpieceMode.exists ? centerpieceMode.label : "missing"
       let toolbarChromeLabel = toolbarChromeState.exists ? toolbarChromeState.label : "missing"
@@ -589,10 +604,11 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     let toolbar = window.toolbars.firstMatch
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
     let tapY = tickerFrame.minY - window.frame.minY - 4
-    let tapPoint = origin.withOffset(CGVector(
-      dx: tickerFrame.midX - window.frame.minX,
-      dy: tapY
-    ))
+    let tapPoint = origin.withOffset(
+      CGVector(
+        dx: tickerFrame.midX - window.frame.minX,
+        dy: tapY
+      ))
     tapPoint.tap()
 
     let menuItem = app.menuItems["Running Harness Monitor"].firstMatch
@@ -619,8 +635,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
   }
 }
 
-private extension HarnessMonitorToolbarUITests {
-  func outerToolbarFrame(for query: XCUIElementQuery) -> CGRect? {
+extension HarnessMonitorToolbarUITests {
+  fileprivate func outerToolbarFrame(for query: XCUIElementQuery) -> CGRect? {
     query.allElementsBoundByIndex
       .compactMap { element in
         guard element.exists else { return nil }

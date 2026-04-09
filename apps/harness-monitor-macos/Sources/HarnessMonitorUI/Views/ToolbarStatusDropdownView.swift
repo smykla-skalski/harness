@@ -58,7 +58,11 @@ struct ToolbarStatusMenuHitArea: NSViewRepresentable {
     return view
   }
 
-  func sizeThatFits(_ proposal: ProposedViewSize, nsView: ToolbarStatusMenuNSView, context: Context) -> CGSize? {
+  func sizeThatFits(
+    _ proposal: ProposedViewSize,
+    nsView: ToolbarStatusMenuNSView,
+    context: Context
+  ) -> CGSize? {
     CGSize(
       width: proposal.width ?? 0,
       height: proposal.height ?? 0
@@ -162,8 +166,10 @@ final class ToolbarStatusMenuNSView: NSView {
       item.target = self
       if let systemImage = message.systemImage {
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        if let image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)?
-          .withSymbolConfiguration(config) {
+        let configuredImage =
+          NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)?
+          .withSymbolConfiguration(config)
+        if let image = configuredImage {
           item.image = image
         }
       }
