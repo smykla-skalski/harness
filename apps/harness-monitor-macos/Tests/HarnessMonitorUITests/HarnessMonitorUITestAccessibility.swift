@@ -18,6 +18,7 @@ enum HarnessMonitorUITestAccessibility {
   static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
   static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
   static let toolbarCenterpieceMetricsFrame = "harness.toolbar.centerpiece.metrics.frame"
+  static let toolbarStartDaemonButton = "harness.toolbar.action.start"
   static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   static let toolbarStatusTickerFrame = "harness.toolbar.status-ticker.frame"
   static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"
@@ -142,6 +143,10 @@ enum HarnessMonitorUITestAccessibility {
   static let installLaunchAgentButton = "harness.preferences.action.install-launch-agent"
   static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
   static let actionToast = "harness.action-toast"
+  static let sessionTimelinePagination = "harness.session.timeline.pagination"
+  static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
+  static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
+  static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
   static let sendSignalSheet = "harness.sheet.send-signal"
   static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
@@ -149,6 +154,10 @@ enum HarnessMonitorUITestAccessibility {
   static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
   static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
   static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
+
+  static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
+    "harness.session.timeline.pagination.page.\(pageNumber)"
+  }
 
   static func preferencesBackgroundTile(_ key: String) -> String {
     "harness.preferences.background.\(slug(key))"

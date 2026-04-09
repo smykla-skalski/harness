@@ -99,6 +99,11 @@ extension HarnessMonitorStore {
     let selectedSessionSummary = sessionIndex.sessionSummary(
       for: selection.selectedSessionID
     )
+    let contentShell = contentUI.shell
+    let contentToolbar = contentUI.toolbar
+    let contentChrome = contentUI.chrome
+    let contentSession = contentUI.session
+    let contentDashboard = contentUI.dashboard
     let toolbarMetrics = ToolbarMetricsState(
       projectCount: daemonStatus?.projectCount ?? sessionIndex.projects.count,
       worktreeCount: daemonStatus?.worktreeCount
@@ -108,45 +113,56 @@ extension HarnessMonitorStore {
       blockedCount: sessionIndex.totalBlockedCount
     )
 
-    assign(selection.selectedSessionID, to: \.selectedSessionID, on: contentUI)
-    assign(selectedSessionSummary, to: \.selectedSessionSummary, on: contentUI)
+    assign(selection.selectedSessionID, to: \.selectedSessionID, on: contentShell)
     assign(
       selectedDetail != nil || selectedSessionSummary != nil ? "Cockpit" : "Dashboard",
       to: \.windowTitle,
-      on: contentUI
+      on: contentShell
     )
-    assign(persistenceError, to: \.persistenceError, on: contentUI)
-    assign(sessionDataAvailability, to: \.sessionDataAvailability, on: contentUI)
+    assign(connectionState, to: \.connectionState, on: contentShell)
+    assign(isRefreshing, to: \.isRefreshing, on: contentShell)
+    assign(isSelectionLoading, to: \.isSelectionLoading, on: contentShell)
+    assign(isExtensionsLoading, to: \.isExtensionsLoading, on: contentShell)
+    assign(lastAction, to: \.lastAction, on: contentShell)
+    assign(pendingConfirmation, to: \.pendingConfirmation, on: contentShell)
+    assign(presentedSheet, to: \.presentedSheet, on: contentShell)
+
+    assign(persistenceError, to: \.persistenceError, on: contentChrome)
+    assign(sessionDataAvailability, to: \.sessionDataAvailability, on: contentChrome)
     assign(
       selectedDetail?.session.status ?? selectedSessionSummary?.status,
       to: \.sessionStatus,
-      on: contentUI
+      on: contentChrome
     )
-    assign(toolbarMetrics, to: \.toolbarMetrics, on: contentUI)
+    assign(toolbarMetrics, to: \.toolbarMetrics, on: contentToolbar)
     assign(
       resolveStatusMessages(sessionCount: toolbarMetrics.sessionCount),
       to: \.statusMessages,
-      on: contentUI
+      on: contentToolbar
     )
-    assign(resolveDaemonIndicatorState(), to: \.daemonIndicator, on: contentUI)
+    assign(resolveDaemonIndicatorState(), to: \.daemonIndicator, on: contentToolbar)
+    assign(canNavigateBack, to: \.canNavigateBack, on: contentToolbar)
+    assign(canNavigateForward, to: \.canNavigateForward, on: contentToolbar)
+    assign(isRefreshing, to: \.isRefreshing, on: contentToolbar)
+    assign(sleepPreventionEnabled, to: \.sleepPreventionEnabled, on: contentToolbar)
+    assign(connectionState, to: \.connectionState, on: contentToolbar)
+    assign(isBusy, to: \.isBusy, on: contentToolbar)
+
+    assign(selectedSessionSummary, to: \.selectedSessionSummary, on: contentSession)
+    assign(isSessionReadOnly, to: \.isSessionReadOnly, on: contentSession)
+    assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: contentSession)
+    assign(isSelectionLoading, to: \.isSelectionLoading, on: contentSession)
+    assign(isExtensionsLoading, to: \.isExtensionsLoading, on: contentSession)
+    assign(lastAction, to: \.lastAction, on: contentSession)
+
     assign(
       daemonStatus?.launchAgent.installed == true,
       to: \.isLaunchAgentInstalled,
-      on: contentUI
+      on: contentDashboard
     )
-    assign(isBusy, to: \.isBusy, on: contentUI)
-    assign(canNavigateBack, to: \.canNavigateBack, on: contentUI)
-    assign(canNavigateForward, to: \.canNavigateForward, on: contentUI)
-    assign(connectionState, to: \.connectionState, on: contentUI)
-    assign(isSessionReadOnly, to: \.isSessionReadOnly, on: contentUI)
-    assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: contentUI)
-    assign(isRefreshing, to: \.isRefreshing, on: contentUI)
-    assign(isSelectionLoading, to: \.isSelectionLoading, on: contentUI)
-    assign(isExtensionsLoading, to: \.isExtensionsLoading, on: contentUI)
-    assign(lastAction, to: \.lastAction, on: contentUI)
-    assign(pendingConfirmation, to: \.pendingConfirmation, on: contentUI)
-    assign(presentedSheet, to: \.presentedSheet, on: contentUI)
-    assign(sleepPreventionEnabled, to: \.sleepPreventionEnabled, on: contentUI)
+    assign(isBusy, to: \.isBusy, on: contentDashboard)
+    assign(connectionState, to: \.connectionState, on: contentDashboard)
+    assign(isRefreshing, to: \.isRefreshing, on: contentDashboard)
   }
 
   private func syncSidebarUI() {
@@ -174,7 +190,7 @@ extension HarnessMonitorStore {
 
     let resolvedPrimaryContent = InspectorPrimaryContentState(
       selectedSession: selection.matchedSelectedSession,
-      selectedSessionSummary: contentUI.selectedSessionSummary,
+      selectedSessionSummary: contentUI.session.selectedSessionSummary,
       inspectorSelection: selection.inspectorSelection,
       isPersistenceAvailable: isPersistenceAvailable
     )
@@ -271,4 +287,3 @@ extension HarnessMonitorStore {
     root[keyPath: keyPath] = value
   }
 }
-

@@ -444,6 +444,7 @@ extension HarnessMonitorStore {
     public var filteredSessionCount = 0
     public var totalSessionCount = 0
     public var visibleSessionIDs: [String] = []
+    public var visibleSessions: [SessionSummary] = []
     public var emptyState: SidebarEmptyState = .noSessions
 
     public init(
@@ -451,12 +452,14 @@ extension HarnessMonitorStore {
       filteredSessionCount: Int = 0,
       totalSessionCount: Int = 0,
       visibleSessionIDs: [String] = [],
+      visibleSessions: [SessionSummary] = [],
       emptyState: SidebarEmptyState = .noSessions
     ) {
       self.groupedSessions = groupedSessions
       self.filteredSessionCount = filteredSessionCount
       self.totalSessionCount = totalSessionCount
       self.visibleSessionIDs = visibleSessionIDs
+      self.visibleSessions = visibleSessions
       self.emptyState = emptyState
     }
   }
@@ -470,37 +473,87 @@ extension HarnessMonitorStore {
     public var filteredSessionCount: Int { state.filteredSessionCount }
     public var totalSessionCount: Int { state.totalSessionCount }
     public var visibleSessionIDs: [String] { state.visibleSessionIDs }
+    public var visibleSessions: [SessionSummary] { state.visibleSessions }
     public var emptyState: SidebarEmptyState { state.emptyState }
 
     public init() {}
   }
 
   @MainActor
-  @Observable
   public final class ContentUISlice {
+    public let shell = ContentShellSlice()
+    public let toolbar = ContentToolbarSlice()
+    public let chrome = ContentChromeSlice()
+    public let session = ContentSessionSlice()
+    public let dashboard = ContentDashboardSlice()
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentShellSlice {
     public var selectedSessionID: String?
-    public var selectedSessionSummary: SessionSummary?
     public var windowTitle = "Dashboard"
-    public var persistenceError: String?
-    public var sessionDataAvailability: SessionDataAvailability = .live
-    public var sessionStatus: SessionStatus?
-    public var toolbarMetrics = HarnessMonitorStore.ToolbarMetricsState()
-    public var statusMessages: [HarnessMonitorStore.StatusMessageState] = []
-    public var daemonIndicator: HarnessMonitorStore.DaemonIndicatorState = .offline
-    public var isLaunchAgentInstalled = false
-    public var isBusy = false
-    public var canNavigateBack = false
-    public var canNavigateForward = false
     public var connectionState: ConnectionState = .idle
-    public var isSessionReadOnly = true
-    public var isSessionActionInFlight = false
     public var isRefreshing = false
     public var isSelectionLoading = false
     public var isExtensionsLoading = false
     public var lastAction = ""
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentToolbarSlice {
+    public var toolbarMetrics = HarnessMonitorStore.ToolbarMetricsState()
+    public var statusMessages: [HarnessMonitorStore.StatusMessageState] = []
+    public var daemonIndicator: HarnessMonitorStore.DaemonIndicatorState = .offline
+    public var canNavigateBack = false
+    public var canNavigateForward = false
+    public var isRefreshing = false
     public var sleepPreventionEnabled = false
+    public var connectionState: ConnectionState = .idle
+    public var isBusy = false
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentChromeSlice {
+    public var persistenceError: String?
+    public var sessionDataAvailability: SessionDataAvailability = .live
+    public var sessionStatus: SessionStatus?
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentSessionSlice {
+    public var selectedSessionSummary: SessionSummary?
+    public var isSessionReadOnly = true
+    public var isSessionActionInFlight = false
+    public var isSelectionLoading = false
+    public var isExtensionsLoading = false
+    public var lastAction = ""
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentDashboardSlice {
+    public var connectionState: ConnectionState = .idle
+    public var isBusy = false
+    public var isRefreshing = false
+    public var isLaunchAgentInstalled = false
+
+    public init() {}
   }
 
   @MainActor
