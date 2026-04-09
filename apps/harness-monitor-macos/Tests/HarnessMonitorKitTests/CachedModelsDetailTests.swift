@@ -86,7 +86,7 @@ struct CachedModelsDetailTests {
           occurrenceCount: 1,
           fixSafety: "safe",
           evidenceExcerpt: "unwrap without guard"
-        ),
+        )
       ],
       mutedCodes: ["W003"],
       activeWorkers: nil,
@@ -97,7 +97,7 @@ struct CachedModelsDetailTests {
           toLine: 500,
           newIssues: 3,
           resolved: 1
-        ),
+        )
       ],
       agentSessions: nil
     )

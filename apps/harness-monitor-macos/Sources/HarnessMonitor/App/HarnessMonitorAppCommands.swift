@@ -3,6 +3,13 @@ import HarnessMonitorUI
 import SwiftUI
 
 struct HarnessMonitorAppCommands: Commands {
+  private static var documentationURL: URL {
+    guard let documentationURL = URL(string: "https://github.com/smykla-skalski/harness") else {
+      preconditionFailure("Harness documentation URL must remain valid")
+    }
+    return documentationURL
+  }
+
   @Environment(\.openWindow)
   private var openWindow
   @AppStorage("showInspector")
@@ -54,7 +61,7 @@ struct HarnessMonitorAppCommands: Commands {
     CommandGroup(replacing: .help) {
       Link(
         "Harness Monitor Documentation",
-        destination: URL(string: "https://github.com/smykla-skalski/harness")!
+        destination: Self.documentationURL
       )
     }
     CommandMenu("Harness Monitor") {

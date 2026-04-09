@@ -13,19 +13,24 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
     )
 
     let startButton = button(in: app, identifier: Accessibility.onboardingStartButton)
-    XCTAssertTrue(startButton.waitForExistence(timeout: Self.actionTimeout), "Start Daemon not found")
+    XCTAssertTrue(
+      startButton.waitForExistence(timeout: Self.actionTimeout), "Start Daemon not found")
 
     let installButton = button(in: app, identifier: Accessibility.onboardingInstallButton)
-    XCTAssertTrue(installButton.waitForExistence(timeout: Self.actionTimeout), "Install Launch Agent not found")
+    XCTAssertTrue(
+      installButton.waitForExistence(timeout: Self.actionTimeout), "Install Launch Agent not found")
 
     let refreshButton = button(in: app, identifier: Accessibility.onboardingRefreshButton)
-    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.actionTimeout), "Refresh Index not found")
+    XCTAssertTrue(
+      refreshButton.waitForExistence(timeout: Self.actionTimeout), "Refresh Index not found")
 
     let allFilter = button(in: app, identifier: Accessibility.allFilterButton)
-    XCTAssertTrue(allFilter.waitForExistence(timeout: Self.actionTimeout), "All filter chip not found")
+    XCTAssertTrue(
+      allFilter.waitForExistence(timeout: Self.actionTimeout), "All filter chip not found")
 
     let activeFilter = button(in: app, identifier: Accessibility.activeFilterButton)
-    XCTAssertTrue(activeFilter.waitForExistence(timeout: Self.actionTimeout), "Active filter chip not found")
+    XCTAssertTrue(
+      activeFilter.waitForExistence(timeout: Self.actionTimeout), "Active filter chip not found")
 
     let elements: [(String, XCUIElement)] = [
       ("onboarding-start-daemon", startButton),
@@ -51,9 +56,13 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
 
       print(
         "BUTTON_DATA[\(name)] "
-          + "bg_r=\(String(format: "%.4f", bg.red)) bg_g=\(String(format: "%.4f", bg.green)) bg_b=\(String(format: "%.4f", bg.blue)) "
+          + "bg_r=\(String(format: "%.4f", bg.red)) "
+          + "bg_g=\(String(format: "%.4f", bg.green)) "
+          + "bg_b=\(String(format: "%.4f", bg.blue)) "
           + "bgSpread=\(String(format: "%.4f", bgSpread)) "
-          + "text_r=\(String(format: "%.4f", text.red)) text_g=\(String(format: "%.4f", text.green)) text_b=\(String(format: "%.4f", text.blue)) "
+          + "text_r=\(String(format: "%.4f", text.red)) "
+          + "text_g=\(String(format: "%.4f", text.green)) "
+          + "text_b=\(String(format: "%.4f", text.blue)) "
           + "textSpread=\(String(format: "%.4f", textSpread)) "
           + "img=\(b64)"
       )
@@ -62,14 +71,16 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
     // Regression guard: Refresh Index background must be neutral (no color tint)
     let refreshBg = darkestColor(of: refreshButton)
     XCTAssertLessThan(
-      channelSpread(refreshBg), 0.04,
+      channelSpread(refreshBg),
+      0.04,
       "Refresh button background has a color tint: spread=\(channelSpread(refreshBg))"
     )
 
     // Regression guard: Refresh Index text must be neutral (no accent tint)
     let refreshText = textColor(of: refreshButton)
     XCTAssertLessThan(
-      channelSpread(refreshText), 0.08,
+      channelSpread(refreshText),
+      0.08,
       "Refresh button text has a color tint: spread=\(channelSpread(refreshText))"
     )
   }
@@ -79,11 +90,13 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
   /// on small elements like filter chips where text is a small fraction.
   private func textColor(of element: XCUIElement) -> RGBColor {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -97,15 +110,17 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
     let bytesPerRow = width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -153,11 +168,13 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
   /// excluding text pixels which are brighter.
   private func darkestColor(of element: XCUIElement) -> RGBColor {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -171,15 +188,17 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
     let bytesPerRow = width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -222,11 +241,13 @@ final class HarnessMonitorOnboardingButtonUITests: HarnessMonitorUITestCase {
   }
 
   private func screenshotBase64(_ screenshot: XCUIScreenshot) -> String {
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else { return "" }
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else { return "" }
     let rep = NSBitmapImageRep(cgImage: cgImage)
     guard let data = rep.representation(using: .png, properties: [:]) else { return "" }
     return data.base64EncodedString()

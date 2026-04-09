@@ -1,15 +1,16 @@
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 struct HarnessMonitorSheetModifier: ViewModifier {
   let store: HarnessMonitorStore
-  let presentedSheet: HarnessMonitorStore.PresentedSheet?
+  @Bindable var shellUI: HarnessMonitorStore.ContentShellSlice
 
   func body(content: Content) -> some View {
     content
       .sheet(
         item: Binding(
-          get: { presentedSheet },
+          get: { shellUI.presentedSheet },
           set: { sheet in
             if sheet == nil {
               store.dismissSheet()

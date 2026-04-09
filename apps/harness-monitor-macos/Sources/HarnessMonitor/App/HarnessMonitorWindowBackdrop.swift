@@ -135,9 +135,11 @@ struct HarnessMonitorWindowBackdropView: View {
     .accessibilityHidden(true)
     .task(id: backgroundImage.storageValue) {
       loadedImage = nil
-      guard let cgImage = await BackgroundThumbnailCache.shared.fullImage(
-        for: backgroundImage
-      ) else {
+      guard
+        let cgImage = await BackgroundThumbnailCache.shared.fullImage(
+          for: backgroundImage
+        )
+      else {
         return
       }
       let size = NSSize(width: cgImage.width, height: cgImage.height)

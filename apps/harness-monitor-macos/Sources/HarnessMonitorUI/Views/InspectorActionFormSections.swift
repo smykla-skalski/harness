@@ -29,9 +29,9 @@ struct InspectorActionStatusBanner: View {
       .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
       .animation(.spring(duration: 0.2), value: lastAction.isEmpty)
       Text(statusMessage)
-      .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .lineLimit(3)
+        .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(3)
       if !availableActionActors.isEmpty {
         Picker("Act As", selection: $actionActorID) {
           ForEach(availableActionActors) { agent in
@@ -57,14 +57,14 @@ struct InspectorActionStatusBanner: View {
   private var statusMessage: String {
     if isSessionReadOnly {
       return """
-      The daemon is offline. Persisted session data remains visible, but daemon-backed
-      actions are read-only.
-      """
+        The daemon is offline. Persisted session data remains visible, but daemon-backed
+        actions are read-only.
+        """
     }
     return """
-    Task creation, reassignments, checkpoints, and leadership changes flow through
-    the daemon.
-    """
+      Task creation, reassignments, checkpoints, and leadership changes flow through
+      the daemon.
+      """
   }
 }
 

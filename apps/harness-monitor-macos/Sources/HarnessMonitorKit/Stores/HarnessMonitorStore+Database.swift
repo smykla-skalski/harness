@@ -2,6 +2,20 @@ import AppKit
 import Foundation
 import SwiftData
 
+public protocol FileViewerActivating {
+  @MainActor
+  func reveal(itemsAt urls: [URL])
+}
+
+public struct WorkspaceFileViewer: FileViewerActivating {
+  public init() {}
+
+  @MainActor
+  public func reveal(itemsAt urls: [URL]) {
+    NSWorkspace.shared.activateFileViewerSelecting(urls)
+  }
+}
+
 public struct DatabaseStatistics: Sendable {
   public let sessionCount: Int
   public let projectCount: Int
@@ -116,9 +130,11 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func clearAllUserData() -> Bool {
-    guard let modelContext = unavailablePersistenceContext(
-      for: "User data could not be cleared."
-    ) else {
+    guard
+      let modelContext = unavailablePersistenceContext(
+        for: "User data could not be cleared."
+      )
+    else {
       return false
     }
 
@@ -153,7 +169,7 @@ extension HarnessMonitorStore {
 
   public func revealDatabaseInFinder() {
     let url = HarnessMonitorPaths.harnessRoot()
-    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
+    fileViewer.reveal(itemsAt: [url])
   }
 
   // MARK: - Private helpers
@@ -181,8 +197,8 @@ extension HarnessMonitorStore {
     ]
     var total: Int64 = 0
     for path in paths {
-      if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-        let size = attrs[.size] as? Int64 {
+      let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+      if let size = attrs?[.size] as? Int64 {
         total += size
       }
     }

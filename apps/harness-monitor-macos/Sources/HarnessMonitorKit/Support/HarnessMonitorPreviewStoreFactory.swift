@@ -91,8 +91,8 @@ private struct PreviewPersistenceState {
   )
 }
 
-private extension HarnessMonitorPreviewStoreFactory {
-  static func configuration(for scenario: Scenario) -> PreviewStoreConfiguration {
+extension HarnessMonitorPreviewStoreFactory {
+  fileprivate static func configuration(for scenario: Scenario) -> PreviewStoreConfiguration {
     switch scenario {
     case .dashboardLanding:
       return dashboardLandingConfiguration()
@@ -109,7 +109,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     }
   }
 
-  static func dashboardConfiguration() -> PreviewStoreConfiguration {
+  fileprivate static func dashboardConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.populated
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
@@ -126,7 +126,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func dashboardLandingConfiguration() -> PreviewStoreConfiguration {
+  fileprivate static func dashboardLandingConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.dashboardLanding
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
@@ -143,7 +143,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func cockpitConfiguration() -> PreviewStoreConfiguration {
+  fileprivate static func cockpitConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.populated
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
@@ -160,7 +160,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func offlineCachedConfiguration() -> PreviewStoreConfiguration {
+  fileprivate static func offlineCachedConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.populated
     return offlineConfiguration(
       mode: .empty,
@@ -180,7 +180,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func overflowConfiguration() -> PreviewStoreConfiguration {
+  fileprivate static func overflowConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.overflow
     let metrics = makeConnectionMetrics(latencyMs: 38, messagesPerSecond: 12.4)
     return liveConfiguration(
@@ -200,7 +200,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func emptyConfiguration() -> PreviewStoreConfiguration {
+  fileprivate static func emptyConfiguration() -> PreviewStoreConfiguration {
     offlineConfiguration(
       mode: .empty,
       fixtures: .empty,
@@ -215,7 +215,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func liveConfiguration(
+  fileprivate static func liveConfiguration(
     mode: PreviewDaemonController.Mode,
     fixtures: PreviewHarnessClient.Fixtures,
     metrics: ConnectionMetrics,
@@ -239,7 +239,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func offlineConfiguration(
+  fileprivate static func offlineConfiguration(
     mode: PreviewDaemonController.Mode,
     fixtures: PreviewHarnessClient.Fixtures,
     selection: PreviewSelectionState,
@@ -263,11 +263,13 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static var previewCachedSnapshotDate: Date {
+  fileprivate static var previewCachedSnapshotDate: Date {
     ISO8601DateFormatter().date(from: PreviewFixtures.summary.updatedAt) ?? .distantPast
   }
 
-  static func makeStatusReport(fixtures: PreviewHarnessClient.Fixtures) -> DaemonStatusReport {
+  fileprivate static func makeStatusReport(
+    fixtures: PreviewHarnessClient.Fixtures
+  ) -> DaemonStatusReport {
     let hasSessions = !fixtures.sessions.isEmpty
     return DaemonStatusReport(
       manifest: DaemonManifest(
@@ -308,7 +310,7 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func makeConnectionMetrics(
+  fileprivate static func makeConnectionMetrics(
     latencyMs: Int,
     messagesPerSecond: Double
   ) -> ConnectionMetrics {
@@ -328,7 +330,9 @@ private extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
-  static func makeConnectionEvents(using metrics: ConnectionMetrics) -> [ConnectionEvent] {
+  fileprivate static func makeConnectionEvents(
+    using metrics: ConnectionMetrics
+  ) -> [ConnectionEvent] {
     [
       ConnectionEvent(
         kind: .connected,

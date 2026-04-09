@@ -210,8 +210,8 @@ extension HarnessMonitorStore {
     }
     guard !text.isEmpty else { return }
     #if canImport(AppKit)
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(text, forType: .string)
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(text, forType: .string)
     #endif
   }
 

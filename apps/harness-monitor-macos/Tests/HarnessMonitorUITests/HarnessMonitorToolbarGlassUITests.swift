@@ -121,9 +121,10 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let initial = toolbarGlassStats(in: app, toolbar: toolbar, anchor: anchor)
 
     tapButton(in: app, identifier: Accessibility.inspectorToggleButton)
-    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
-      self.toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton).exists
-    })
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton).exists
+      })
     Thread.sleep(forTimeInterval: 1.1)
 
     let afterClose = toolbarGlassStats(in: app, toolbar: toolbar, anchor: anchor)
@@ -159,7 +160,8 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     Thread.sleep(forTimeInterval: 0.6)
 
     let screenshot = window.screenshot()
-    guard let cgImage = screenshot.image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    guard let cgImage = screenshot.image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    else {
       XCTFail("Could not capture window screenshot")
       return .zero
     }
@@ -210,18 +212,20 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
   private func ensureInspectorIsVisible(in app: XCUIApplication) {
     let toggleButton = toolbarButton(in: app, identifier: Accessibility.inspectorToggleButton)
 
-    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
-      toggleButton.exists
-    })
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        toggleButton.exists
+      })
 
     if element(in: app, identifier: Accessibility.inspectorRoot).exists {
       return
     }
 
     tapButton(in: app, identifier: Accessibility.inspectorToggleButton)
-    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) {
-      self.element(in: app, identifier: Accessibility.inspectorRoot).exists
-    })
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.element(in: app, identifier: Accessibility.inspectorRoot).exists
+      })
   }
 
   private func toolbarGlassStats(
@@ -231,7 +235,8 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
   ) -> ToolbarGlassStats {
     let window = mainWindow(in: app)
     let screenshot = window.screenshot()
-    guard let cgImage = screenshot.image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    guard let cgImage = screenshot.image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    else {
       XCTFail("Could not capture window screenshot")
       return .zero
     }
@@ -242,8 +247,10 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let toolbarFrame = toolbar.frame
     let anchorFrame = anchor.frame
     let isStatusBanner = anchor.identifier == Accessibility.sessionStatusBanner
-    let sampleWidth = isStatusBanner ? min(anchorFrame.width * 0.16, 120) : min(anchorFrame.width * 0.4, 220)
-    let sampleX = isStatusBanner
+    let sampleWidth =
+      isStatusBanner ? min(anchorFrame.width * 0.16, 120) : min(anchorFrame.width * 0.4, 220)
+    let sampleX =
+      isStatusBanner
       ? anchorFrame.minX + 24
       : anchorFrame.midX - (sampleWidth / 2)
 
@@ -270,15 +277,17 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let bytesPerRow = image.width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: image.height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: image.width,
-      height: image.height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: image.width,
+        height: image.height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return .zero
     }
 
@@ -326,15 +335,17 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let bytesPerRow = image.width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: image.height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: image.width,
-      height: image.height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: image.width,
+        height: image.height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return .zero
     }
 

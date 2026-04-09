@@ -2,6 +2,16 @@ import HarnessMonitorKit
 import Observation
 import SwiftUI
 
+private enum ContentToolbarLayoutWidth {
+  static let minimumWidth: CGFloat = 320
+  static let step: CGFloat = 40
+  static let defaultWidth: CGFloat = 1_000
+
+  static func quantize(_ width: CGFloat) -> CGFloat {
+    max((width / step).rounded() * step, minimumWidth)
+  }
+}
+
 public struct ContentView: View {
   let store: HarnessMonitorStore
   let cornerAnimationContent: (() -> AnyView)?
@@ -21,7 +31,7 @@ public struct ContentView: View {
   @State private var hasAppliedInitialInspectorVisibility = false
   @State private var hasCapturedInitialInspectorWidth = false
   @State private var showInspector = false
-  @State private var detailColumnWidth: CGFloat = 980
+  @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var isLayoutAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
@@ -60,11 +70,15 @@ public struct ContentView: View {
       environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"]
       ?? provenance["HarnessMonitorBuildGitDirty"]
       ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown")
+    let auditRunID = environment["HARNESS_MONITOR_AUDIT_RUN_ID"] ?? "none"
+    let auditLabel = environment["HARNESS_MONITOR_AUDIT_LABEL"] ?? "none"
     let launchMode = environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live"
     let perfScenario = environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none"
     let previewScenario = environment["HARNESS_MONITOR_PREVIEW_SCENARIO"] ?? "default"
 
     return [
+      "auditRunID=\(auditRunID)",
+      "auditLabel=\(auditLabel)",
       "buildCommit=\(commit)",
       "buildDirty=\(dirty)",
       "launchMode=\(launchMode)",
@@ -73,16 +87,14 @@ public struct ContentView: View {
     ].joined(separator: ", ")
   }
 
-  private var detailAvailableWidth: CGFloat { max(detailColumnWidth, 320) }
-
-  // Quantize resize-driven updates so the principal toolbar does not recompute
-  // on every pixel delta while the split view divider is dragged.
-  private var toolbarDetailWidth: CGFloat {
-    (detailAvailableWidth / 10).rounded() * 10
+  // Coalesce split-view settling into stable buckets so toolbar preferences do
+  // not churn on every launch-time and divider pixel delta.
+  private var toolbarLayoutWidth: CGFloat {
+    ContentToolbarLayoutWidth.quantize(detailColumnWidth)
   }
 
   private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
-    ToolbarCenterpieceDisplayMode.forDetailWidth(detailAvailableWidth)
+    ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
   }
 
   public init(
@@ -131,7 +143,7 @@ public struct ContentView: View {
         store: store,
         toolbarUI: contentToolbar,
         displayMode: toolbarCenterpieceDisplayMode,
-        availableDetailWidth: toolbarDetailWidth
+        availableDetailWidth: toolbarLayoutWidth
       )
     }
     .task {
@@ -395,12 +407,13 @@ private struct ContentDetailColumn: View {
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { width in
+      let quantizedWidth = ContentToolbarLayoutWidth.quantize(width)
       guard !isLayoutAnimating,
-        abs(width - detailColumnWidth) >= 1
+        abs(quantizedWidth - detailColumnWidth) >= 1
       else {
         return
       }
-      detailColumnWidth = width
+      detailColumnWidth = quantizedWidth
     }
     .toolbar {
       ContentPrimaryToolbarItems(

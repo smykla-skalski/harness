@@ -80,7 +80,8 @@ struct HarnessMonitorLoadingStateView: View {
         .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
     }
     .harnessCellPadding()
-    .modifier(HarnessMonitorStatusPillChromeModifier(chrome: chrome, tint: HarnessMonitorTheme.accent))
+    .modifier(
+      HarnessMonitorStatusPillChromeModifier(chrome: chrome, tint: HarnessMonitorTheme.accent))
   }
 }
 

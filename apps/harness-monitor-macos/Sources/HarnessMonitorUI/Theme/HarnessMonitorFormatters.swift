@@ -188,7 +188,8 @@ private func parsedTimestampDate(from value: String) -> Date? {
     ?? spaceSeparatedFormatter.date(from: value)
 }
 
-private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path(
+  percentEncoded: false)
 
 func abbreviateHomePath(_ path: String) -> String {
   if path.hasPrefix(homeDirectory) {

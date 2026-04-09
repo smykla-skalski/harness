@@ -43,15 +43,17 @@ public enum TransportPreference: Sendable {
 
 public struct DaemonController: DaemonControlling {
   private let environment: HarnessMonitorEnvironment
-  private let sessionFactory: @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
+  private let sessionFactory:
+    @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
   private let transportPreference: TransportPreference
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
     transportPreference: TransportPreference = .auto,
-    sessionFactory: @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
-      HarnessMonitorAPIClient(connection: $0)
-    }
+    sessionFactory:
+      @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
+        HarnessMonitorAPIClient(connection: $0)
+      }
   ) {
     self.environment = environment
     self.transportPreference = transportPreference

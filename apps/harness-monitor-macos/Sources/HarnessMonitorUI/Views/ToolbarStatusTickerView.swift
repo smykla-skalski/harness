@@ -31,8 +31,8 @@ extension ToolbarStatusMessage {
   }
 }
 
-private extension HarnessMonitorStore.StatusMessageTone {
-  var color: Color {
+extension HarnessMonitorStore.StatusMessageTone {
+  fileprivate var color: Color {
     switch self {
     case .secondary:
       .secondary
@@ -115,7 +115,8 @@ struct ToolbarStatusTickerView: View {
     ToolbarStatusTickerView(
       messages: [
         .init(text: "Running Harness Monitor", systemImage: "gearshape.fill", tint: .blue),
-        .init(text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
+        .init(
+          text: "3 sessions active", systemImage: "antenna.radiowaves.left.and.right", tint: .green),
         .init(text: "Build succeeded", systemImage: "checkmark.circle.fill", tint: .green),
         .init(text: "Indexing workspace", systemImage: "magnifyingglass", tint: .orange),
       ],

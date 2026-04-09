@@ -230,12 +230,17 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   func applyingDefaults(to environment: HarnessMonitorEnvironment) -> HarnessMonitorEnvironment {
     var values = environment.values
-    if values[HarnessMonitorLaunchMode.environmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
-      .isEmpty ?? true {
+    if values[HarnessMonitorLaunchMode.environmentKey]?.trimmingCharacters(
+      in: .whitespacesAndNewlines
+    )
+    .isEmpty ?? true {
       values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue
     }
-    if values["HARNESS_MONITOR_PREVIEW_SCENARIO"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-      .isEmpty ?? true {
+    let previewScenarioIsEmpty =
+      values["HARNESS_MONITOR_PREVIEW_SCENARIO"]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .isEmpty ?? true
+    if previewScenarioIsEmpty {
       values["HARNESS_MONITOR_PREVIEW_SCENARIO"] = defaultPreviewScenario
     }
     return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)

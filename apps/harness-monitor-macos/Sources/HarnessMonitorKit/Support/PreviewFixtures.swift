@@ -250,51 +250,53 @@ public enum PreviewFixtures {
       "Review session focus filters with mixed observed and idle fixtures",
     ]
 
-    return [summary] + zip(titles, contexts).enumerated().map { offset, pair in
-      let (title, context) = pair
-      let index = offset + 1
-      let minute = 17 - min(offset, 15)
-      let status: SessionStatus =
-        switch index % 4 {
-        case 0:
-          .ended
-        case 1:
-          .active
-        case 2:
-          .paused
-        default:
-          .active
-        }
-      let activeAgentCount = status == .ended ? 0 : max(0, 3 - (index % 3))
-      let openTaskCount = (index % 4) + (status == .ended ? 0 : 1)
-      let inProgressTaskCount = status == .ended ? 0 : max(1, 3 - (index % 2))
-      let blockedTaskCount = index.isMultiple(of: 3) ? 1 : 0
+    return [summary]
+      + zip(titles, contexts).enumerated().map { offset, pair in
+        let (title, context) = pair
+        let index = offset + 1
+        let minute = 17 - min(offset, 15)
+        let status: SessionStatus =
+          switch index % 4 {
+          case 0:
+            .ended
+          case 1:
+            .active
+          case 2:
+            .paused
+          default:
+            .active
+          }
+        let activeAgentCount = status == .ended ? 0 : max(0, 3 - (index % 3))
+        let openTaskCount = (index % 4) + (status == .ended ? 0 : 1)
+        let inProgressTaskCount = status == .ended ? 0 : max(1, 3 - (index % 2))
+        let blockedTaskCount = index.isMultiple(of: 3) ? 1 : 0
 
-      return SessionSummary(
-        projectId: summary.projectId,
-        projectName: summary.projectName,
-        projectDir: summary.projectDir,
-        contextRoot: summary.contextRoot,
-        sessionId: String(format: "sess-harness-%02d", index),
-        title: title,
-        context: context,
-        status: status,
-        createdAt: "2026-03-28T14:\(String(format: "%02d", max(minute - 1, 0))):00Z",
-        updatedAt: "2026-03-28T14:\(String(format: "%02d", minute)):00Z",
-        lastActivityAt: status == .ended ? nil : "2026-03-28T14:\(String(format: "%02d", minute)):30Z",
-        leaderId: summary.leaderId,
-        observeId: index.isMultiple(of: 2) ? "observe-sess-harness-\(index)" : nil,
-        pendingLeaderTransfer: nil,
-        metrics: SessionMetrics(
-          agentCount: 4,
-          activeAgentCount: activeAgentCount,
-          openTaskCount: openTaskCount,
-          inProgressTaskCount: inProgressTaskCount,
-          blockedTaskCount: blockedTaskCount,
-          completedTaskCount: 2 + index
-        ),
-      )
-    }
+        return SessionSummary(
+          projectId: summary.projectId,
+          projectName: summary.projectName,
+          projectDir: summary.projectDir,
+          contextRoot: summary.contextRoot,
+          sessionId: String(format: "sess-harness-%02d", index),
+          title: title,
+          context: context,
+          status: status,
+          createdAt: "2026-03-28T14:\(String(format: "%02d", max(minute - 1, 0))):00Z",
+          updatedAt: "2026-03-28T14:\(String(format: "%02d", minute)):00Z",
+          lastActivityAt: status == .ended
+            ? nil : "2026-03-28T14:\(String(format: "%02d", minute)):30Z",
+          leaderId: summary.leaderId,
+          observeId: index.isMultiple(of: 2) ? "observe-sess-harness-\(index)" : nil,
+          pendingLeaderTransfer: nil,
+          metrics: SessionMetrics(
+            agentCount: 4,
+            activeAgentCount: activeAgentCount,
+            openTaskCount: openTaskCount,
+            inProgressTaskCount: inProgressTaskCount,
+            blockedTaskCount: blockedTaskCount,
+            completedTaskCount: 2 + index
+          ),
+        )
+      }
   }()
 
   static func sessionDetail(

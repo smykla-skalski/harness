@@ -1,5 +1,7 @@
 import Foundation
 
+public typealias DaemonPushEventStream = AsyncThrowingStream<DaemonPushEvent, Error>
+
 public protocol HarnessMonitorClientProtocol: Sendable {
   func health() async throws -> HealthResponse
   func transportLatencyMs() async throws -> Int?
@@ -10,8 +12,8 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
   func timeline(sessionID: String) async throws -> [TimelineEntry]
-  func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error>
-  func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error>
+  func globalStream() async -> DaemonPushEventStream
+  func sessionStream(sessionID: String) async -> DaemonPushEventStream
   func createTask(sessionID: String, request: TaskCreateRequest) async throws -> SessionDetail
   func assignTask(
     sessionID: String,
@@ -58,14 +60,14 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func setLogLevel(_ level: String) async throws -> LogLevelResponse
 }
 
-public extension HarnessMonitorClientProtocol {
-  func transportLatencyMs() async throws -> Int? {
+extension HarnessMonitorClientProtocol {
+  public func transportLatencyMs() async throws -> Int? {
     nil
   }
 
-  func shutdown() async {}
+  public func shutdown() async {}
 
-  func sessionDetail(id: String) async throws -> SessionDetail {
+  public func sessionDetail(id: String) async throws -> SessionDetail {
     try await sessionDetail(id: id, scope: nil)
   }
 }
@@ -158,11 +160,11 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await get("/v1/sessions/\(sessionID)/timeline")
   }
 
-  public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func globalStream() async -> DaemonPushEventStream {
     stream("/v1/stream")
   }
 
-  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func sessionStream(sessionID: String) async -> DaemonPushEventStream {
     stream("/v1/sessions/\(sessionID)/stream")
   }
 
@@ -281,7 +283,8 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     let start = ContinuousClock.now
     let (data, response) = try await session.data(for: request)
     let elapsed = start.duration(to: .now)
-    let durationMs = elapsed.components.seconds * 1000
+    let durationMs =
+      elapsed.components.seconds * 1000
       + Int64(elapsed.components.attoseconds / 1_000_000_000_000_000)
     let method = request.httpMethod ?? "?"
     let path = request.url?.path ?? "?"
@@ -303,7 +306,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     return try decoder.decode(Response.self, from: data)
   }
 
-  private func stream(_ path: String) -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  private func stream(_ path: String) -> DaemonPushEventStream {
     AsyncThrowingStream { continuation in
       let task = Task {
         do {

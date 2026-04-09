@@ -322,22 +322,36 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
 
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
   func configuredTransportLatencyMs() -> Int? { lock.withLock { _transportLatencyMs } }
-  func configuredTransportLatencyError() -> (any Error)? { lock.withLock { _transportLatencyError } }
+  func configuredTransportLatencyError() -> (any Error)? {
+    lock.withLock { _transportLatencyError }
+  }
   func configuredDiagnosticsDelay() -> Duration? { lock.withLock { _diagnosticsDelay } }
   func configuredMutationDelay() -> Duration? { lock.withLock { _mutationDelay } }
   func configuredProjects() -> [ProjectSummary]? { lock.withLock { _projectSummaries } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { _sessionSummaries } }
-  func configuredSessionDetail(id: String) -> SessionDetail? { lock.withLock { _sessionDetailsByID[id] } }
-  func configuredDetailDelay(for sessionID: String) -> Duration? { lock.withLock { _detailDelays[sessionID] } }
+  func configuredSessionDetail(id: String) -> SessionDetail? {
+    lock.withLock { _sessionDetailsByID[id] }
+  }
+  func configuredDetailDelay(for sessionID: String) -> Duration? {
+    lock.withLock { _detailDelays[sessionID] }
+  }
   func sessionDetailScopes(for sessionID: String) -> [String?] {
     lock.withLock { _sessionDetailScopesByID[sessionID] ?? [] }
   }
-  func configuredTimeline(for sessionID: String) -> [TimelineEntry]? { lock.withLock { _timelinesBySessionID[sessionID] } }
-  func configuredTimelineDelay(for sessionID: String) -> Duration? { lock.withLock { _timelineDelays[sessionID] } }
+  func configuredTimeline(for sessionID: String) -> [TimelineEntry]? {
+    lock.withLock { _timelinesBySessionID[sessionID] }
+  }
+  func configuredTimelineDelay(for sessionID: String) -> Duration? {
+    lock.withLock { _timelineDelays[sessionID] }
+  }
   func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { _globalStreamEvents } }
   func configuredGlobalStreamError() -> (any Error)? { lock.withLock { _globalStreamError } }
-  func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] { lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] } }
-  func configuredSessionStreamError(for sessionID: String) -> (any Error)? { lock.withLock { _sessionStreamErrorsByID[sessionID] } }
+  func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] {
+    lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] }
+  }
+  func configuredSessionStreamError(for sessionID: String) -> (any Error)? {
+    lock.withLock { _sessionStreamErrorsByID[sessionID] }
+  }
   func shutdownCallCount() -> Int { lock.withLock { _shutdownCallCount } }
 
   func recordReadCall(_ call: ReadCall) {
@@ -462,11 +476,11 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
   func sessionDetail(id _: String, scope _: String?) async throws -> SessionDetail { throw error }
   func timeline(sessionID _: String) async throws -> [TimelineEntry] { throw error }
 
-  nonisolated func globalStream() -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  nonisolated func globalStream() -> DaemonPushEventStream {
     AsyncThrowingStream { $0.finish(throwing: self.error) }
   }
 
-  nonisolated func sessionStream(sessionID _: String) -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  nonisolated func sessionStream(sessionID _: String) -> DaemonPushEventStream {
     AsyncThrowingStream { $0.finish(throwing: self.error) }
   }
 

@@ -5,7 +5,8 @@ import SwiftData
 
 extension CachedSignalRecord {
   func toSessionSignalRecord() -> SessionSignalRecord {
-    let signal = (try? Codecs.decoder.decode(Signal.self, from: signalData))
+    let signal =
+      (try? Codecs.decoder.decode(Signal.self, from: signalData))
       ?? Signal(
         signalId: signalId,
         version: 0,
@@ -76,10 +77,11 @@ extension SessionSignalRecord {
 
 extension CachedTimelineEntry {
   func toTimelineEntry() -> TimelineEntry {
-    let payload = (try? Codecs.decoder.decode(
-      JSONValue.self,
-      from: payloadData
-    )) ?? .null
+    let payload =
+      (try? Codecs.decoder.decode(
+        JSONValue.self,
+        from: payloadData
+      )) ?? .null
 
     return TimelineEntry(
       entryId: entryId,
@@ -131,10 +133,11 @@ struct ObserverDetailBlob: Codable {
 
 extension CachedObserver {
   func toObserverSummary() -> ObserverSummary {
-    let detail = (try? Codecs.decoder.decode(
-      ObserverDetailBlob.self,
-      from: detailData
-    )) ?? ObserverDetailBlob()
+    let detail =
+      (try? Codecs.decoder.decode(
+        ObserverDetailBlob.self,
+        from: detailData
+      )) ?? ObserverDetailBlob()
 
     return ObserverSummary(
       observeId: observeId,
@@ -194,10 +197,11 @@ extension ObserverSummary {
 
 extension CachedAgentActivity {
   func toAgentToolActivitySummary() -> AgentToolActivitySummary {
-    let recentTools = (try? Codecs.decoder.decode(
-      [String].self,
-      from: recentToolsData
-    )) ?? []
+    let recentTools =
+      (try? Codecs.decoder.decode(
+        [String].self,
+        from: recentToolsData
+      )) ?? []
 
     return AgentToolActivitySummary(
       agentId: agentId,
@@ -218,9 +222,10 @@ extension CachedAgentActivity {
     toolErrorCount = activity.toolErrorCount
     latestToolName = activity.latestToolName
     latestEventAt = activity.latestEventAt
-    recentToolsData = (try? Codecs.encoder.encode(
-      activity.recentTools
-    )) ?? Data()
+    recentToolsData =
+      (try? Codecs.encoder.encode(
+        activity.recentTools
+      )) ?? Data()
   }
 }
 

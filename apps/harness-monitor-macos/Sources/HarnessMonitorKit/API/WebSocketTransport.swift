@@ -11,9 +11,8 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   var receiveTask: Task<Void, Never>?
   var heartbeatTask: Task<Void, Never>?
   var globalStreamContinuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation?
-  var sessionStreamContinuations: [
-    String: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation
-  ] = [:]
+  var sessionStreamContinuations:
+    [String: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation] = [:]
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
 
@@ -48,7 +47,8 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
 
   public func connect() async throws {
     let wsURL = wsEndpoint()
-    HarnessMonitorLogger.websocket.info("WebSocket connecting to \(wsURL.absoluteString, privacy: .public)")
+    HarnessMonitorLogger.websocket.info(
+      "WebSocket connecting to \(wsURL.absoluteString, privacy: .public)")
     var request = URLRequest(url: wsURL)
     request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
     let task = session.webSocketTask(with: request)
@@ -62,7 +62,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     HarnessMonitorLogger.websocket.info("WebSocket disconnected")
     receiveTask?.cancel()
     heartbeatTask?.cancel()
-    webSocketTask?.cancel(with: .normalClosure, reason: nil)
+    cancelWebSocketTaskIfNeeded(closeCode: .normalClosure)
     webSocketTask = nil
     pending.failAll(error: WebSocketTransportError.connectionClosed)
     terminateAllStreams()
@@ -123,7 +123,7 @@ extension WebSocketTransport {
 extension WebSocketTransport {
   // MARK: - Streams
 
-  public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func globalStream() async -> DaemonPushEventStream {
     let (stream, continuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
     globalStreamContinuation = continuation
     globalSubscriptionActive = true
@@ -158,7 +158,7 @@ extension WebSocketTransport {
     }
   }
 
-  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func sessionStream(sessionID: String) async -> DaemonPushEventStream {
     let (stream, continuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
     sessionStreamContinuations[sessionID] = continuation
     activeSubscriptions.insert(sessionID)

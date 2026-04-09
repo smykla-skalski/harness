@@ -8,11 +8,13 @@ struct PreferencesOverlayMarkers: View {
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
-  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
+    .storageValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
-  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
+  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
+    .defaultCustomTimeZoneIdentifier
 
   private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
     HarnessMonitorDateTimeConfiguration(
@@ -29,8 +31,7 @@ struct PreferencesOverlayMarkers: View {
       "backdrop=\(backdropModeRawValue)",
       "background=\(backgroundSelection.preferencesStateValue)",
       "textSize=\(HarnessMonitorTextSize.label(for: textSizeIndex))",
-      "controlSize=" +
-        "\(HarnessMonitorTextSize.controlSizeLabel(at: textSizeIndex))",
+      "controlSize=" + "\(HarnessMonitorTextSize.controlSizeLabel(at: textSizeIndex))",
       "timeZoneMode=\(dateTimeConfiguration.timeZoneMode.rawValue)",
       "timeZone=\(dateTimeConfiguration.preferencesStateValue)",
       "preferencesChrome=native",

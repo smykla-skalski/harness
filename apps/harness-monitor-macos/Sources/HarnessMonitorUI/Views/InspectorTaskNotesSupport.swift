@@ -78,12 +78,14 @@ struct TaskUserNotesSection: View {
   private func submitNote() {
     let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
-    guard store.addNote(
-      text: text,
-      targetKind: "task",
-      targetId: taskID,
-      sessionId: sessionID
-    ) else {
+    guard
+      store.addNote(
+        text: text,
+        targetKind: "task",
+        targetId: taskID,
+        sessionId: sessionID
+      )
+    else {
       return
     }
 

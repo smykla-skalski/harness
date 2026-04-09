@@ -14,6 +14,7 @@ struct SessionContentState: Equatable {
 
 struct SessionContentContainer: View {
   let store: HarnessMonitorStore
+  @Bindable var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let state: SessionContentState
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
@@ -46,9 +47,9 @@ struct SessionContentContainer: View {
         SessionsBoardView(
           store: store,
           sessionCatalog: store.sessionIndex.catalog,
-          contentUI: store.contentUI
+          dashboardUI: dashboardUI
         )
-          .transition(.opacity)
+        .transition(.opacity)
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
           store: store,
@@ -100,6 +101,7 @@ private enum SessionContentMode {
 
   SessionContentContainer(
     store: store,
+    dashboardUI: store.contentUI.dashboard,
     state: .init(
       detail: nil,
       summary: nil,
@@ -119,6 +121,7 @@ private enum SessionContentMode {
 
   SessionContentContainer(
     store: store,
+    dashboardUI: store.contentUI.dashboard,
     state: .init(
       detail: store.selectedSession,
       summary: store.selectedSessionSummary,

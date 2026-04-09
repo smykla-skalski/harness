@@ -4,22 +4,24 @@ import SwiftUI
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
   @Bindable var sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
-  @Bindable var contentUI: HarnessMonitorStore.ContentUISlice
+  @Bindable var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @AppStorage("harnessMonitor.board.onboardingDismissed")
   private var isOnboardingDismissed = false
 
   init(
     store: HarnessMonitorStore,
     sessionCatalog: HarnessMonitorStore.SessionCatalogSlice,
-    contentUI: HarnessMonitorStore.ContentUISlice
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   ) {
     self.store = store
     self.sessionCatalog = sessionCatalog
-    self.contentUI = contentUI
+    self.dashboardUI = dashboardUI
   }
 
   private var isLoading: Bool {
-    contentUI.isBusy || contentUI.isRefreshing || contentUI.connectionState == .connecting
+    dashboardUI.isBusy
+      || dashboardUI.isRefreshing
+      || dashboardUI.connectionState == .connecting
   }
 
   var body: some View {
@@ -27,8 +29,8 @@ struct SessionsBoardView: View {
       VStack(alignment: .leading, spacing: 24) {
         if !isOnboardingDismissed {
           SessionsBoardOnboardingCard(
-            connectionState: contentUI.connectionState,
-            isLaunchAgentInstalled: contentUI.isLaunchAgentInstalled,
+            connectionState: dashboardUI.connectionState,
+            isLaunchAgentInstalled: dashboardUI.isLaunchAgentInstalled,
             hasSessions: !sessionCatalog.recentSessions.isEmpty,
             isLoading: isLoading,
             startDaemon: startDaemon,
@@ -72,9 +74,9 @@ struct SessionsBoardView: View {
   SessionsBoardView(
     store: store,
     sessionCatalog: store.sessionIndex.catalog,
-    contentUI: store.contentUI
+    dashboardUI: store.contentUI.dashboard
   )
-    .frame(width: 980, height: 720)
+  .frame(width: 980, height: 720)
 }
 
 #Preview("Sessions Board - Empty") {
@@ -83,7 +85,7 @@ struct SessionsBoardView: View {
   SessionsBoardView(
     store: store,
     sessionCatalog: store.sessionIndex.catalog,
-    contentUI: store.contentUI
+    dashboardUI: store.contentUI.dashboard
   )
-    .frame(width: 980, height: 720)
+  .frame(width: 980, height: 720)
 }

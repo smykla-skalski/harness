@@ -9,7 +9,8 @@ struct SessionTaskListSection: View {
   private var emptyStateMinHeight: CGFloat {
     let visibleAgentCards = max(companionAgentCount, 1)
     let cardHeights = CGFloat(visibleAgentCards) * SessionCockpitLayout.laneCardFootprint
-    let interCardSpacing = CGFloat(max(visibleAgentCards - 1, 0)) * HarnessMonitorTheme.sectionSpacing
+    let interCardSpacing =
+      CGFloat(max(visibleAgentCards - 1, 0)) * HarnessMonitorTheme.sectionSpacing
     return cardHeights + interCardSpacing
   }
 
@@ -48,7 +49,9 @@ struct SessionTaskSummaryCard: View {
   let inspectTask: (String) -> Void
 
   var body: some View {
-    Button { inspectTask(task.taskId) } label: {
+    Button {
+      inspectTask(task.taskId)
+    } label: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(task.title)
@@ -87,7 +90,9 @@ struct SessionTaskSummaryCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .contextMenu {
-      Button { inspectTask(task.taskId) } label: {
+      Button {
+        inspectTask(task.taskId)
+      } label: {
         Label("Inspect", systemImage: "info.circle")
       }
       Divider()

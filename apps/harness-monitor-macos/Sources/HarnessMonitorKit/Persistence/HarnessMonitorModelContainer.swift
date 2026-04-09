@@ -20,7 +20,8 @@ public enum HarnessMonitorModelContainer {
 
   public static func preview() throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorSchemaV3.self)
-    let config = ModelConfiguration("HarnessMonitorPreview", schema: schema, isStoredInMemoryOnly: true)
+    let config = ModelConfiguration(
+      "HarnessMonitorPreview", schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [config])
   }
 

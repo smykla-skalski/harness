@@ -32,11 +32,13 @@ extension HarnessMonitorUITestCase {
     region: SampleRegion
   ) -> RegionSample {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return RegionSample(
         averageColor: RGBColor(red: 0, green: 0, blue: 0),
         luminanceStats: LuminanceStats(min: 0, max: 0, mean: 0, stddev: 0, count: 0)
@@ -56,15 +58,17 @@ extension HarnessMonitorUITestCase {
     let bytesPerRow = width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return RegionSample(
         averageColor: RGBColor(red: 0, green: 0, blue: 0),
         luminanceStats: LuminanceStats(min: 0, max: 0, mean: 0, stddev: 0, count: 0)
@@ -117,9 +121,10 @@ extension HarnessMonitorUITestCase {
     let luminanceMin = luminanceSamples.min() ?? 0
     let luminanceMax = luminanceSamples.max() ?? 0
     let meanLuminance = luminanceSamples.reduce(0, +) / Double(luminanceSamples.count)
-    let variance = luminanceSamples.reduce(0) {
-      $0 + ($1 - meanLuminance) * ($1 - meanLuminance)
-    } / Double(luminanceSamples.count - 1)
+    let variance =
+      luminanceSamples.reduce(0) {
+        $0 + ($1 - meanLuminance) * ($1 - meanLuminance)
+      } / Double(luminanceSamples.count - 1)
 
     return RegionSample(
       averageColor: RGBColor(red: meanRed, green: meanGreen, blue: meanBlue),
@@ -139,25 +144,29 @@ extension HarnessMonitorUITestCase {
   /// Reference: https://medium.com/@mallabhyas/how-to-compute-the-average-color-of-an-image-using-cgcontext-in-swift-f774981a224e
   func averageColor(of element: XCUIElement) -> RGBColor {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
     var pixel = [UInt8](repeating: 0, count: 4)
 
-    guard let context = CGContext(
-      data: &pixel,
-      width: 1,
-      height: 1,
-      bitsPerComponent: 8,
-      bytesPerRow: 4,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixel,
+        width: 1,
+        height: 1,
+        bitsPerComponent: 8,
+        bytesPerRow: 4,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -181,11 +190,13 @@ extension HarnessMonitorUITestCase {
   /// by luminance and average their RGB to get the rendered text color.
   func brightestCenterColor(of element: XCUIElement) -> RGBColor {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -199,15 +210,17 @@ extension HarnessMonitorUITestCase {
     let bytesPerRow = width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return RGBColor(red: 0, green: 0, blue: 0)
     }
 
@@ -258,11 +271,13 @@ extension HarnessMonitorUITestCase {
     region: SampleRegion
   ) -> Double {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return 0
     }
 
@@ -274,15 +289,17 @@ extension HarnessMonitorUITestCase {
     let bytesPerRow = width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return 0
     }
 
@@ -322,11 +339,13 @@ extension HarnessMonitorUITestCase {
 
   func luminanceStats(of element: XCUIElement) -> LuminanceStats {
     let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else {
       return LuminanceStats(
         min: 0, max: 0, mean: 0, stddev: 0, count: 0
       )
@@ -344,15 +363,17 @@ extension HarnessMonitorUITestCase {
     let bytesPerRow = width * bytesPerPixel
     var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
 
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else {
       return LuminanceStats(
         min: 0, max: 0, mean: 0, stddev: 0, count: 0
       )
@@ -388,9 +409,10 @@ extension HarnessMonitorUITestCase {
     let sampleMin = samples.min() ?? 0
     let sampleMax = samples.max() ?? 0
     let mean = samples.reduce(0, +) / Double(samples.count)
-    let variance = samples.reduce(0) {
-      $0 + ($1 - mean) * ($1 - mean)
-    } / Double(samples.count - 1)
+    let variance =
+      samples.reduce(0) {
+        $0 + ($1 - mean) * ($1 - mean)
+      } / Double(samples.count - 1)
 
     return LuminanceStats(
       min: sampleMin,

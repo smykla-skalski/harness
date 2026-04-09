@@ -137,7 +137,7 @@ struct CachedModelsTests {
           name: "pre-tool",
           typicalLatencySeconds: 1,
           supportsContextInjection: true
-        ),
+        )
       ]
     )
 
@@ -189,7 +189,7 @@ struct CachedModelsTests {
       updatedAt: "2026-03-28T14:00:00Z",
       createdBy: "agent-leader",
       notes: [
-        TaskNote(timestamp: "2026-03-28T11:00:00Z", agentId: "agent-1", text: "Started work"),
+        TaskNote(timestamp: "2026-03-28T11:00:00Z", agentId: "agent-1", text: "Started work")
       ],
       suggestedFix: "Use GeometryReader",
       source: .observe,

@@ -125,8 +125,8 @@ private struct HarnessMonitorSystemButtonChromeModifier: ViewModifier {
 
   private var effectiveStyle: HarnessMonitorSystemButtonChromeStyle {
     guard !isEnabled,
-          HarnessMonitorControlMetrics.disabledButtonChromeBehavior == .regularize,
-          style == .borderedProminent
+      HarnessMonitorControlMetrics.disabledButtonChromeBehavior == .regularize,
+      style == .borderedProminent
     else { return style }
     return .bordered
   }

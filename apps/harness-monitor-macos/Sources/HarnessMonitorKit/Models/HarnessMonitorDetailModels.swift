@@ -102,9 +102,10 @@ public struct SessionDetail: Codable, Equatable, Sendable {
     tasks = try container.decode([WorkItem].self, forKey: .tasks)
     signals = try container.decodeIfPresent([SessionSignalRecord].self, forKey: .signals) ?? []
     observer = try container.decodeIfPresent(ObserverSummary.self, forKey: .observer)
-    agentActivity = try container.decodeIfPresent(
-      [AgentToolActivitySummary].self, forKey: .agentActivity
-    ) ?? []
+    agentActivity =
+      try container.decodeIfPresent(
+        [AgentToolActivitySummary].self, forKey: .agentActivity
+      ) ?? []
   }
 
   public func merging(extensions: SessionExtensionsPayload) -> Self {

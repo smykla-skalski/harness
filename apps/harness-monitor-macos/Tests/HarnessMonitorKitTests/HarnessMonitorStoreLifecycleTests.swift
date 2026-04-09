@@ -124,28 +124,30 @@ struct HarnessMonitorStoreLifecycleTests {
   @Test("Global session update refreshes a non-selected summary without a full refetch")
   func globalSessionUpdateRefreshesNonSelectedSummaryWithoutRefetch() async {
     let client = RecordingHarnessClient()
-    let primary = makeSession(.init(
-      sessionId: "sess-primary",
-      context: "Primary cockpit",
-      status: .active,
-      leaderId: "leader-primary",
-      observeId: "observe-primary",
-      openTaskCount: 1,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
-    let secondary = makeSession(.init(
-      sessionId: "sess-secondary",
-      context: "Secondary lane",
-      status: .active,
-      leaderId: "leader-secondary",
-      observeId: nil,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 0
-    ))
+    let primary = makeSession(
+      .init(
+        sessionId: "sess-primary",
+        context: "Primary cockpit",
+        status: .active,
+        leaderId: "leader-primary",
+        observeId: "observe-primary",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let secondary = makeSession(
+      .init(
+        sessionId: "sess-secondary",
+        context: "Secondary lane",
+        status: .active,
+        leaderId: "leader-secondary",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 0
+      ))
     let updatedSecondary = SessionSummary(
       projectId: secondary.projectId,
       projectName: secondary.projectName,
@@ -216,17 +218,18 @@ struct HarnessMonitorStoreLifecycleTests {
   @Test("Selected session update without timeline refetches timeline separately")
   func selectedSessionUpdateWithoutTimelineRefetchesTimelineSeparately() async {
     let client = RecordingHarnessClient()
-    let summary = makeSession(.init(
-      sessionId: "sess-selected",
-      context: "Selected cockpit",
-      status: .active,
-      leaderId: "leader-selected",
-      observeId: nil,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-selected",
+        context: "Selected cockpit",
+        status: .active,
+        leaderId: "leader-selected",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let updatedSummary = SessionSummary(
       projectId: summary.projectId,
       projectName: summary.projectName,

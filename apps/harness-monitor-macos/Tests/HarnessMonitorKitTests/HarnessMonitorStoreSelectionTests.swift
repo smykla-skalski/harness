@@ -228,26 +228,31 @@ struct HarnessMonitorStoreSelectionTests {
   @Test("Rapid session clicks cancel previous selection tasks")
   func rapidSessionClicksCancelPreviousSelectionTasks() async throws {
     let summaries = (0..<10).map { index in
-      makeSession(.init(
-        sessionId: "rapid-\(index)",
-        context: "Rapid click \(index)",
-        status: .active,
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 1
-      ))
+      makeSession(
+        .init(
+          sessionId: "rapid-\(index)",
+          context: "Rapid click \(index)",
+          status: .active,
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        ))
     }
-    let detailsByID = Dictionary(uniqueKeysWithValues: summaries.map { summary in
-      (summary.sessionId, SessionDetail(
-        session: summary,
-        agents: [],
-        tasks: [],
-        signals: [],
-        observer: nil,
-        agentActivity: []
-      ))
-    })
+    let detailsByID = Dictionary(
+      uniqueKeysWithValues: summaries.map { summary in
+        (
+          summary.sessionId,
+          SessionDetail(
+            session: summary,
+            agents: [],
+            tasks: [],
+            signals: [],
+            observer: nil,
+            agentActivity: []
+          )
+        )
+      })
     let client = RecordingHarnessClient()
     client.configureSessions(summaries: summaries, detailsByID: detailsByID)
 
@@ -280,15 +285,16 @@ struct HarnessMonitorStoreSelectionTests {
     let store = await makeBootstrappedStore()
 
     for index in 0..<20 {
-      let summary = makeSession(.init(
-        sessionId: "coalesce-\(index)",
-        context: "Coalesce \(index)",
-        status: .active,
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 1
-      ))
+      let summary = makeSession(
+        .init(
+          sessionId: "coalesce-\(index)",
+          context: "Coalesce \(index)",
+          status: .active,
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        ))
       store.applySessionSummaryUpdate(summary)
     }
 
@@ -300,41 +306,55 @@ struct HarnessMonitorStoreSelectionTests {
 
   @Test("Selecting a session does not change sidebar filter state")
   func selectingSessionDoesNotChangeFilterState() async {
-    let summaryA = makeSession(.init(
-      sessionId: "filter-a",
-      context: "Project A session",
-      status: .active,
-      projectId: "proj-a",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
-    let summaryB = makeSession(.init(
-      sessionId: "filter-b",
-      context: "Project B session",
-      status: .ended,
-      projectId: "proj-b",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 0
-    ))
+    let summaryA = makeSession(
+      .init(
+        sessionId: "filter-a",
+        context: "Project A session",
+        status: .active,
+        projectId: "proj-a",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let summaryB = makeSession(
+      .init(
+        sessionId: "filter-b",
+        context: "Project B session",
+        status: .ended,
+        projectId: "proj-b",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 0
+      ))
     let client = configuredSelectionClient(
       summaries: [summaryA, summaryB],
       detailsByID: [
         summaryA.sessionId: SessionDetail(
-          session: summaryA, agents: [], tasks: [], signals: [],
-          observer: nil, agentActivity: []
+          session: summaryA,
+          agents: [],
+          tasks: [],
+          signals: [],
+          observer: nil,
+          agentActivity: []
         ),
         summaryB.sessionId: SessionDetail(
-          session: summaryB, agents: [], tasks: [], signals: [],
-          observer: nil, agentActivity: []
+          session: summaryB,
+          agents: [],
+          tasks: [],
+          signals: [],
+          observer: nil,
+          agentActivity: []
         ),
       ],
       detail: SessionDetail(
-        session: summaryA, agents: [], tasks: [], signals: [],
-        observer: nil, agentActivity: []
+        session: summaryA,
+        agents: [],
+        tasks: [],
+        signals: [],
+        observer: nil,
+        agentActivity: []
       )
     )
     let store = await makeBootstrappedStore(client: client)
@@ -355,7 +375,7 @@ struct HarnessMonitorStoreSelectionTests {
     let store = await makeBootstrappedStore()
 
     let bookmarkInvalidated = await didInvalidate(
-      { store.contentUI.toolbarMetrics },
+      { store.contentUI.toolbar.toolbarMetrics },
       after: {
         store.bookmarkedSessionIds = ["bookmark-content"]
       }
@@ -363,7 +383,7 @@ struct HarnessMonitorStoreSelectionTests {
     #expect(bookmarkInvalidated == false)
 
     let filterInvalidated = await didInvalidate(
-      { store.contentUI.toolbarMetrics },
+      { store.contentUI.toolbar.toolbarMetrics },
       after: {
         store.searchText = "preview"
       }
@@ -379,13 +399,54 @@ struct HarnessMonitorStoreSelectionTests {
     let didChange = await didInvalidate(
       {
         (
-          store.contentUI.windowTitle,
-          store.contentUI.toolbarMetrics,
-          store.contentUI.connectionState
+          store.contentUI.shell.windowTitle,
+          store.contentUI.toolbar.toolbarMetrics,
+          store.contentUI.shell.connectionState
         )
       },
       after: {
         store.inspect(agentID: PreviewFixtures.agents[1].agentId)
+      }
+    )
+
+    #expect(didChange == false)
+  }
+
+  @Test("Content dashboard state ignores session selection churn")
+  func contentDashboardStateIgnoresSessionSelectionChurn() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.contentUI.dashboard.connectionState,
+          store.contentUI.dashboard.isBusy,
+          store.contentUI.dashboard.isRefreshing,
+          store.contentUI.dashboard.isLaunchAgentInstalled
+        )
+      },
+      after: {
+        await store.selectSession(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange == false)
+  }
+
+  @Test("Content toolbar centerpiece ignores session selection churn")
+  func contentToolbarCenterpieceIgnoresSessionSelectionChurn() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.contentUI.toolbar.toolbarMetrics,
+          store.contentUI.toolbar.statusMessages,
+          store.contentUI.toolbar.daemonIndicator
+        )
+      },
+      after: {
+        await store.selectSession(PreviewFixtures.summary.sessionId)
       }
     )
 
@@ -397,14 +458,14 @@ struct HarnessMonitorStoreSelectionTests {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      { store.contentUI.selectedSessionID },
+      { store.contentUI.shell.selectedSessionID },
       after: {
         await store.selectSession(PreviewFixtures.summary.sessionId)
       }
     )
 
     #expect(didChange)
-    #expect(store.contentUI.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
   }
 
   private func configuredSelectionClient(

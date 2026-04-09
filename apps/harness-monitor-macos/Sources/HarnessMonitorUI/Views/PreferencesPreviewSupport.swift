@@ -53,8 +53,8 @@ enum PreferencesPreviewSupport {
 
 }
 
-private extension PreferencesPreviewSupport {
-  static func makeWorkspaceDiagnostics(
+extension PreferencesPreviewSupport {
+  fileprivate static func makeWorkspaceDiagnostics(
     from base: DaemonDiagnostics?,
     events: [DaemonAuditEvent]
   ) -> DaemonDiagnostics {

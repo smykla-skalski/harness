@@ -3,8 +3,10 @@ import SwiftUI
 public struct ToolbarGlassReproConfiguration: Sendable {
   private static let forceInstantFocusRingKey = "HARNESS_MONITOR_FORCE_INSTANT_FOCUS_RING"
   private static let disableContentDetailChromeKey = "HARNESS_MONITOR_DISABLE_CONTENT_DETAIL_CHROME"
-  private static let disableToolbarBaselineOverlayKey = "HARNESS_MONITOR_DISABLE_TOOLBAR_BASELINE_OVERLAY"
-  private static let disablePreferredColorSchemeKey = "HARNESS_MONITOR_DISABLE_PREFERRED_COLOR_SCHEME"
+  private static let disableToolbarBaselineOverlayKey =
+    "HARNESS_MONITOR_DISABLE_TOOLBAR_BASELINE_OVERLAY"
+  private static let disablePreferredColorSchemeKey =
+    "HARNESS_MONITOR_DISABLE_PREFERRED_COLOR_SCHEME"
 
   public static let current = Self()
 

@@ -25,16 +25,17 @@ struct SessionCacheMemoryTests {
   @Test("syncTimeline caps entries at 300 per session")
   func syncTimelineCapsAt300() async throws {
     let store = makeStore()
-    let session = makeSession(.init(
-      sessionId: "sess-cap",
-      context: "Cap test",
-      status: .active,
-      leaderId: "leader-cap",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-cap",
+        context: "Cap test",
+        status: .active,
+        leaderId: "leader-cap",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     let detail = SessionDetail(
       session: session,
@@ -50,7 +51,9 @@ struct SessionCacheMemoryTests {
         entryId: "entry-\(index)",
         recordedAt: String(
           format: "2026-04-01T%02d:%02d:%02dZ",
-          index / 3600, (index / 60) % 60, index % 60
+          index / 3600,
+          (index / 60) % 60,
+          index % 60
         ),
         kind: "task_checkpoint",
         sessionId: "sess-cap",
@@ -79,16 +82,17 @@ struct SessionCacheMemoryTests {
   @Test("syncTimeline trims existing entries beyond cap on update")
   func syncTimelineTrimsOnUpdate() async throws {
     let store = makeStore()
-    let session = makeSession(.init(
-      sessionId: "sess-trim",
-      context: "Trim test",
-      status: .active,
-      leaderId: "leader-trim",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-trim",
+        context: "Trim test",
+        status: .active,
+        leaderId: "leader-trim",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let detail = SessionDetail(
       session: session,
       agents: [],
@@ -142,15 +146,16 @@ struct SessionCacheMemoryTests {
   @Test("syncTimeline keeps all entries when under cap")
   func syncTimelineKeepsAllUnderCap() async throws {
     let store = makeStore()
-    let session = makeSession(.init(
-      sessionId: "sess-small",
-      context: "Small timeline",
-      status: .active,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-small",
+        context: "Small timeline",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
     let detail = SessionDetail(
       session: session,
       agents: [],
@@ -187,16 +192,17 @@ struct SessionCacheMemoryTests {
   func hydrationQueueDetectsDetailViaTimelineEntries() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-detect",
-      context: "Detection test",
-      status: .active,
-      leaderId: "leader-detect",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-detect",
+        context: "Detection test",
+        status: .active,
+        leaderId: "leader-detect",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     await store.cacheSessionList([session], projects: [project])
 
@@ -227,16 +233,17 @@ struct SessionCacheMemoryTests {
   func hydrationQueueDetectsNoTimeline() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
-    let session = makeSession(.init(
-      sessionId: "sess-notimeline",
-      context: "No timeline",
-      status: .active,
-      leaderId: "leader-notimeline",
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      activeAgentCount: 1
-    ))
+    let session = makeSession(
+      .init(
+        sessionId: "sess-notimeline",
+        context: "No timeline",
+        status: .active,
+        leaderId: "leader-notimeline",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
 
     await store.cacheSessionList([session], projects: [project])
     let detail = SessionDetail(
@@ -261,15 +268,16 @@ struct SessionCacheMemoryTests {
     let project = makeProject(totalSessionCount: 3, activeSessionCount: 3)
 
     let sessions = (0..<3).map { index in
-      makeSession(.init(
-        sessionId: "sess-scope-\(index)",
-        context: "Scope \(index)",
-        status: .active,
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 1
-      ))
+      makeSession(
+        .init(
+          sessionId: "sess-scope-\(index)",
+          context: "Scope \(index)",
+          status: .active,
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        ))
     }
 
     await store.cacheSessionList(sessions, projects: [project])
@@ -288,16 +296,17 @@ struct SessionCacheMemoryTests {
     let project = makeProject(totalSessionCount: 20, activeSessionCount: 20)
 
     for index in 0..<20 {
-      let session = makeSession(.init(
-        sessionId: "seq-\(index)",
-        context: "Sequential \(index)",
-        status: .active,
-        leaderId: "leader-seq-\(index)",
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 2
-      ))
+      let session = makeSession(
+        .init(
+          sessionId: "seq-\(index)",
+          context: "Sequential \(index)",
+          status: .active,
+          leaderId: "leader-seq-\(index)",
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 2
+        ))
       let detail = makeSessionDetail(
         summary: session,
         workerID: "worker-seq-\(index)",
@@ -341,16 +350,17 @@ struct SessionCacheMemoryTests {
     let project = makeProject(totalSessionCount: 3, activeSessionCount: 3)
 
     let sessions = (0..<3).map { index in
-      makeSession(.init(
-        sessionId: "sess-recent-\(index)",
-        context: "Recent \(index)",
-        status: .active,
-        leaderId: "leader-recent-\(index)",
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 1
-      ))
+      makeSession(
+        .init(
+          sessionId: "sess-recent-\(index)",
+          context: "Recent \(index)",
+          status: .active,
+          leaderId: "leader-recent-\(index)",
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        ))
     }
 
     await store.cacheSessionList(sessions, projects: [project])

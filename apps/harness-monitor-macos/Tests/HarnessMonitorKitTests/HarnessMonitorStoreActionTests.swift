@@ -200,9 +200,10 @@ struct HarnessMonitorStoreActionTests {
           )
         ]
     )
-    let agentStillPresent = store.selectedSession?.agents.contains(where: {
-      $0.agentId == PreviewFixtures.agents[1].agentId
-    }) ?? true
+    let agentStillPresent =
+      store.selectedSession?.agents.contains(where: {
+        $0.agentId == PreviewFixtures.agents[1].agentId
+      }) ?? true
     #expect(agentStillPresent == false)
     #expect(store.lastAction == "Remove agent")
   }

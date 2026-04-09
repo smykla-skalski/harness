@@ -318,7 +318,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     fixtures.timeline(for: sessionID)
   }
 
-  public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func globalStream() async -> DaemonPushEventStream {
     AsyncThrowingStream { continuation in
       continuation.yield(
         .ready(recordedAt: "2026-03-28T14:00:00Z")
@@ -327,8 +327,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     }
   }
 
-  public func sessionStream(sessionID _: String)
-    async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+  public func sessionStream(sessionID _: String) async -> DaemonPushEventStream {
     AsyncThrowingStream { continuation in
       continuation.yield(
         .ready(

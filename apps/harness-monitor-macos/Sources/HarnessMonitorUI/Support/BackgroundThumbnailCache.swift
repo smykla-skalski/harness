@@ -148,19 +148,21 @@ public actor BackgroundThumbnailCache {
     let url = URL(fileURLWithPath: wallpaper.imagePath)
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary)
+    else {
       return nil
     }
 
     guard CGImageSourceGetStatus(source) == .statusComplete,
-          CGImageSourceGetCount(source) > 0
+      CGImageSourceGetCount(source) > 0
     else {
       return nil
     }
 
     let imageOptions: [CFString: Any] = [kCGImageSourceShouldCacheImmediately: true]
 
-    guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, imageOptions as CFDictionary) else {
+    guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, imageOptions as CFDictionary)
+    else {
       return nil
     }
 
@@ -210,12 +212,13 @@ public actor BackgroundThumbnailCache {
     let url = URL(fileURLWithPath: path)
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary)
+    else {
       return nil
     }
 
     guard CGImageSourceGetStatus(source) == .statusComplete,
-          CGImageSourceGetCount(source) > 0
+      CGImageSourceGetCount(source) > 0
     else {
       log.warning("Invalid image source: \(path)")
       return nil
@@ -234,9 +237,11 @@ public actor BackgroundThumbnailCache {
   private func downsample(cgImage: CGImage) -> CGImage? {
     let data = NSMutableData()
 
-    guard let destination = CGImageDestinationCreateWithData(
-      data as CFMutableData, "public.jpeg" as CFString, 1, nil
-    ) else {
+    guard
+      let destination = CGImageDestinationCreateWithData(
+        data as CFMutableData, "public.jpeg" as CFString, 1, nil
+      )
+    else {
       return nil
     }
 
@@ -248,7 +253,8 @@ public actor BackgroundThumbnailCache {
 
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
-    guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary) else {
+    guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary)
+    else {
       return nil
     }
 
@@ -273,20 +279,22 @@ public actor BackgroundThumbnailCache {
     let metaURL = diskCachePath(key: key, extension: "meta")
 
     guard FileManager.default.fileExists(atPath: jpegURL.path),
-          FileManager.default.fileExists(atPath: metaURL.path)
+      FileManager.default.fileExists(atPath: metaURL.path)
     else {
       return nil
     }
 
-    guard let metaString = try? String(contentsOf: metaURL, encoding: .utf8).trimmingCharacters(
-      in: .whitespacesAndNewlines
-    ) else {
+    guard
+      let metaString = try? String(contentsOf: metaURL, encoding: .utf8).trimmingCharacters(
+        in: .whitespacesAndNewlines
+      )
+    else {
       return nil
     }
 
     if let expectedMtime {
       guard let storedMtime = TimeInterval(metaString),
-            abs(storedMtime - expectedMtime) < 0.001
+        abs(storedMtime - expectedMtime) < 0.001
       else {
         return nil
       }
@@ -298,9 +306,11 @@ public actor BackgroundThumbnailCache {
 
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
-    guard let source = CGImageSourceCreateWithURL(
-      jpegURL as CFURL, sourceOptions as CFDictionary
-    ) else {
+    guard
+      let source = CGImageSourceCreateWithURL(
+        jpegURL as CFURL, sourceOptions as CFDictionary
+      )
+    else {
       return nil
     }
 
@@ -322,9 +332,11 @@ public actor BackgroundThumbnailCache {
     let metaURL = diskCachePath(key: key, extension: "meta")
 
     let rep = NSBitmapImageRep(cgImage: image)
-    guard let jpegData = rep.representation(
-      using: .jpeg, properties: [.compressionFactor: 0.85]
-    ) else {
+    guard
+      let jpegData = rep.representation(
+        using: .jpeg, properties: [.compressionFactor: 0.85]
+      )
+    else {
       return
     }
 

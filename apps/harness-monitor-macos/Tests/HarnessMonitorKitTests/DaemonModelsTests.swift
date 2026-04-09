@@ -109,21 +109,21 @@ struct DaemonModelsTests {
   @Test("Daemon diagnostics decode legacy cache payloads")
   func daemonDiagnosticsDecodeLegacyCachePayloads() throws {
     let json = #"""
-    {
-      "daemon_root": "/Users/example/Library/Application Support/harness/daemon",
-      "manifest_path": "/Users/example/Library/Application Support/harness/daemon/manifest.json",
-      "auth_token_path": "/Users/example/Library/Application Support/harness/daemon/auth-token",
-      "auth_token_present": true,
-      "events_path": "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
-      "cache_root": "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-      "cache_entry_count": 7,
-      "last_event": {
-        "recorded_at": "2026-04-04T06:39:30Z",
-        "level": "info",
-        "message": "daemon listening on http://127.0.0.1:63438"
+      {
+        "daemon_root": "/Users/example/Library/Application Support/harness/daemon",
+        "manifest_path": "/Users/example/Library/Application Support/harness/daemon/manifest.json",
+        "auth_token_path": "/Users/example/Library/Application Support/harness/daemon/auth-token",
+        "auth_token_present": true,
+        "events_path": "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
+        "cache_root": "/Users/example/Library/Application Support/harness/daemon/cache/projects",
+        "cache_entry_count": 7,
+        "last_event": {
+          "recorded_at": "2026-04-04T06:39:30Z",
+          "level": "info",
+          "message": "daemon listening on http://127.0.0.1:63438"
+        }
       }
-    }
-    """#
+      """#
 
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase

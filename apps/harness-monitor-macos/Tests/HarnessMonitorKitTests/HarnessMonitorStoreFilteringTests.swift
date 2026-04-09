@@ -61,6 +61,10 @@ struct HarnessMonitorStoreFilteringTests {
     store.visibleSessionIDs
   }
 
+  private func orderedVisibleSessions(from store: HarnessMonitorStore) -> [String] {
+    store.visibleSessions.map(\.sessionId)
+  }
+
   @Test("Focus filter .all shows all active sessions")
   func focusFilterAll() {
     let store = storeWithFocusFixtures()
@@ -178,6 +182,21 @@ struct HarnessMonitorStoreFilteringTests {
     #expect(store.filteredSessionCount == 1)
   }
 
+  @Test("Visible sessions keep the projected visible order for search-heavy rendering")
+  func visibleSessionsMirrorVisibleSessionIDs() {
+    let store = storeWithStatusFixtures()
+
+    store.sessionSortOrder = .status
+    #expect(orderedVisibleSessions(from: store) == orderedVisibleIDs(from: store))
+
+    store.searchText = "leader"
+    #expect(orderedVisibleSessions(from: store) == orderedVisibleIDs(from: store))
+
+    store.sessionFilter = .ended
+    #expect(orderedVisibleSessions(from: store) == ["ended"])
+    #expect(orderedVisibleSessions(from: store) == orderedVisibleIDs(from: store))
+  }
+
   @Test("Total open work count sums across all sessions")
   func totalOpenWorkCount() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -285,7 +304,7 @@ struct HarnessMonitorStoreFilteringTests {
           blockedTaskCount: 0,
           activeAgentCount: 0
         )
-      ),
+      )
     ]
     #expect(store.selectedSessionSummary == nil)
   }

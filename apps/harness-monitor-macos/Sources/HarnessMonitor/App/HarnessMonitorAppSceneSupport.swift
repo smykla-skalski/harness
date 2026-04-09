@@ -1,6 +1,5 @@
 import HarnessMonitorKit
 import HarnessMonitorUI
-import os
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
@@ -13,7 +12,8 @@ struct HarnessMonitorWindowRootView: View {
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
-  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
+    .storageValue
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
   @State private var hasRunPerfScenario = false
@@ -30,54 +30,55 @@ struct HarnessMonitorWindowRootView: View {
   var body: some View {
     ContentView(
       store: store,
-      cornerAnimationContent: cornerAnimationEnabled ? {
-        AnyView(HarnessMonitorAppLlamaAnimation())
-      } : nil
+      cornerAnimationContent: cornerAnimationEnabled
+        ? {
+          AnyView(HarnessMonitorAppLlamaAnimation())
+        } : nil
     )
-      .frame(minWidth: 900, minHeight: 600)
-      .modifier(
-        OptionalInstantFocusRingModifier(
-          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
-        )
+    .frame(minWidth: 900, minHeight: 600)
+    .modifier(
+      OptionalInstantFocusRingModifier(
+        isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
       )
-      .modifier(
-        HarnessMonitorSceneAppearanceModifier(
-          themeMode: $themeMode,
-          appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
-        )
+    )
+    .modifier(
+      HarnessMonitorSceneAppearanceModifier(
+        themeMode: $themeMode,
+        appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
       )
-      .modifier(
-        HarnessMonitorWindowBackdropModifier(
-          mode: backdropMode,
-          backgroundImage: backgroundImage
-        )
+    )
+    .modifier(
+      HarnessMonitorWindowBackdropModifier(
+        mode: backdropMode,
+        backgroundImage: backgroundImage
       )
-      .modifier(HarnessMonitorUITestAnimationModifier())
-      .task {
-        delegate.bind(store: store)
-        guard let perfScenario else {
-          await store.bootstrapIfNeeded()
-          return
-        }
-        guard !hasRunPerfScenario else {
-          return
-        }
-        hasRunPerfScenario = true
-        if perfScenario.includesBootstrapInMeasurement {
-          await HarnessMonitorPerfDriver.run(
-            scenario: perfScenario,
-            store: store,
-            openWindow: openWindow
-          )
-          return
-        }
+    )
+    .modifier(HarnessMonitorUITestAnimationModifier())
+    .task {
+      delegate.bind(store: store)
+      guard let perfScenario else {
         await store.bootstrapIfNeeded()
+        return
+      }
+      guard !hasRunPerfScenario else {
+        return
+      }
+      hasRunPerfScenario = true
+      if perfScenario.includesBootstrapInMeasurement {
         await HarnessMonitorPerfDriver.run(
           scenario: perfScenario,
           store: store,
           openWindow: openWindow
         )
+        return
       }
+      await store.bootstrapIfNeeded()
+      await HarnessMonitorPerfDriver.run(
+        scenario: perfScenario,
+        store: store,
+        openWindow: openWindow
+      )
+    }
   }
 }
 
@@ -88,7 +89,8 @@ struct HarnessMonitorSettingsRootView: View {
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
-  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection.storageValue
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
+    .storageValue
 
   init(
     store: HarnessMonitorStore,
@@ -144,7 +146,7 @@ private enum HarnessMonitorPerfDriver {
 
   private static func envMilliseconds(_ key: String, fallback: Int) -> Duration {
     guard let raw = ProcessInfo.processInfo.environment[key],
-          let value = Int(raw), value > 0
+      let value = Int(raw), value > 0
     else {
       return .milliseconds(fallback)
     }
@@ -236,9 +238,10 @@ private enum HarnessMonitorPerfDriver {
       forKey: HarnessMonitorBackdropDefaults.modeKey
     )
 
-    let backgrounds = Array(
-      HarnessMonitorBackgroundSelection.bundledLibrary.prefix(6)
-    ) + [HarnessMonitorBackgroundSelection.defaultSelection]
+    let backgrounds =
+      Array(
+        HarnessMonitorBackgroundSelection.bundledLibrary.prefix(6)
+      ) + [HarnessMonitorBackgroundSelection.defaultSelection]
 
     for background in backgrounds {
       UserDefaults.standard.set(
@@ -296,7 +299,8 @@ private struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
-  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
+  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
+    .defaultCustomTimeZoneIdentifier
 
   private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
     HarnessMonitorDateTimeConfiguration(
@@ -344,8 +348,8 @@ private struct OptionalPreferredColorSchemeModifier: ViewModifier {
   }
 }
 
-private extension HarnessMonitorPerfScenario {
-  var includesBootstrapInMeasurement: Bool {
+extension HarnessMonitorPerfScenario {
+  fileprivate var includesBootstrapInMeasurement: Bool {
     switch self {
     case .launchDashboard:
       true
@@ -360,7 +364,7 @@ private extension HarnessMonitorPerfScenario {
     }
   }
 
-  var signpostName: StaticString {
+  fileprivate var signpostName: StaticString {
     switch self {
     case .launchDashboard: "launch-dashboard"
     case .selectSessionCockpit: "select-session-cockpit"
