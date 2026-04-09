@@ -6,6 +6,59 @@ private let timeZoneModeOverrideKey = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"
 private let customTimeZoneOverrideKey = "HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE"
 private let backgroundImageOverrideKey = "HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"
 
+private struct PreferencesStateSnapshot {
+  let mode: String
+  let section: String
+  let backdrop: String
+  let background: String
+  let textSize: String
+  let controlSize: String
+  let timeZoneMode: String
+  let timeZone: String
+
+  static func general(
+    mode: String,
+    backdrop: String = "none",
+    background: String = "auroraVeil",
+    textSize: String = "Default",
+    controlSize: String = "small",
+    timeZoneMode: String = "local",
+    timeZone: String = "local"
+  ) -> Self {
+    Self(
+      mode: mode,
+      section: "general",
+      backdrop: backdrop,
+      background: background,
+      textSize: textSize,
+      controlSize: controlSize,
+      timeZoneMode: timeZoneMode,
+      timeZone: timeZone
+    )
+  }
+
+  static func appearance(
+    mode: String,
+    backdrop: String = "none",
+    background: String = "auroraVeil",
+    textSize: String = "Default",
+    controlSize: String = "small",
+    timeZoneMode: String = "local",
+    timeZone: String = "local"
+  ) -> Self {
+    Self(
+      mode: mode,
+      section: "appearance",
+      backdrop: backdrop,
+      background: background,
+      textSize: textSize,
+      controlSize: controlSize,
+      timeZoneMode: timeZoneMode,
+      timeZone: timeZone
+    )
+  }
+}
+
 @MainActor
 final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
   func testToolbarOpensSettingsWindow() throws {
@@ -36,16 +89,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     XCTAssertEqual(title.label, "General")
     XCTAssertEqual(
       preferencesState.label,
-      preferencesStateLabel(
-        mode: "auto",
-        section: "general",
-        backdrop: "none",
-        background: "auroraVeil",
-        textSize: "Default",
-        controlSize: "small",
-        timeZoneMode: "local",
-        timeZone: "local"
-      )
+      preferencesStateLabel(.general(mode: "auto"))
     )
   }
 
@@ -143,6 +187,9 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     ]
 
     for expectedMode in expectedModes {
+      let expectedState = preferencesStateLabel(
+        .appearance(mode: expectedMode.rawValue)
+      )
       selectMenuOption(
         in: app,
         controlIdentifier: Accessibility.preferencesThemeModePicker,
@@ -151,17 +198,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
       XCTAssertTrue(
         waitUntil(timeout: Self.actionTimeout) {
-          preferencesState.label
-            == self.preferencesStateLabel(
-              mode: expectedMode.rawValue,
-              section: "appearance",
-              backdrop: "none",
-              background: "auroraVeil",
-              textSize: "Default",
-              controlSize: "small",
-              timeZoneMode: "local",
-              timeZone: "local"
-            )
+          preferencesState.label == expectedState
         },
         "Preferences state did not settle after selecting \(expectedMode.title); got '\(preferencesState.label)'"
       )
@@ -256,21 +293,14 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(gallery.waitForExistence(timeout: Self.actionTimeout))
 
     for background in ["blueMarble", "gangesDelta", "auroraVeil"] {
+      let expectedState = preferencesStateLabel(
+        .appearance(mode: "auto", backdrop: "window", background: background)
+      )
       tapElement(in: app, identifier: Accessibility.preferencesBackgroundTile(background))
 
       XCTAssertTrue(
         waitUntil(timeout: Self.actionTimeout) {
-          preferencesState.label
-            == self.preferencesStateLabel(
-              mode: "auto",
-              section: "appearance",
-              backdrop: "window",
-              background: background,
-              textSize: "Default",
-              controlSize: "small",
-              timeZoneMode: "local",
-              timeZone: "local"
-            )
+          preferencesState.label == expectedState
         },
         "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
       )
@@ -322,17 +352,9 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        preferencesState.label
-          == self.preferencesStateLabel(
-            mode: "auto",
-            section: "appearance",
-            backdrop: "window",
-            background: background,
-            textSize: "Default",
-            controlSize: "small",
-            timeZoneMode: "local",
-            timeZone: "local"
-          )
+        preferencesState.label == self.preferencesStateLabel(
+          .appearance(mode: "auto", backdrop: "window", background: background)
+        )
       },
       "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
     )
@@ -408,14 +430,11 @@ extension HarnessMonitorSettingsUITests {
     XCTAssertEqual(
       preferencesState.label,
       preferencesStateLabel(
-        mode: expectedMode,
-        section: "appearance",
-        backdrop: "none",
-        background: "auroraVeil",
-        textSize: expectedTextSize,
-        controlSize: expectedControlSize,
-        timeZoneMode: "local",
-        timeZone: "local"
+        .appearance(
+          mode: expectedMode,
+          textSize: expectedTextSize,
+          controlSize: expectedControlSize
+        )
       )
     )
     XCTAssertEqual(
@@ -487,14 +506,11 @@ extension HarnessMonitorSettingsUITests {
     XCTAssertEqual(
       preferencesState.label,
       preferencesStateLabel(
-        mode: expectedMode,
-        section: "general",
-        backdrop: "none",
-        background: "auroraVeil",
-        textSize: "Default",
-        controlSize: "small",
-        timeZoneMode: expectedTimeZoneMode,
-        timeZone: expectedTimeZone
+        .general(
+          mode: expectedMode,
+          timeZoneMode: expectedTimeZoneMode,
+          timeZone: expectedTimeZone
+        )
       )
     )
     XCTAssertEqual(customTimeZonePicker.exists, expectedTimeZoneMode == "custom")
@@ -526,25 +542,16 @@ extension HarnessMonitorSettingsUITests {
     )
   }
 
-  fileprivate func preferencesStateLabel(
-    mode: String,
-    section: String,
-    backdrop: String,
-    background: String,
-    textSize: String,
-    controlSize: String,
-    timeZoneMode: String,
-    timeZone: String
-  ) -> String {
+  fileprivate func preferencesStateLabel(_ snapshot: PreferencesStateSnapshot) -> String {
     [
-      "mode=\(mode)",
-      "section=\(section)",
-      "backdrop=\(backdrop)",
-      "background=\(background)",
-      "textSize=\(textSize)",
-      "controlSize=\(controlSize)",
-      "timeZoneMode=\(timeZoneMode)",
-      "timeZone=\(timeZone)",
+      "mode=\(snapshot.mode)",
+      "section=\(snapshot.section)",
+      "backdrop=\(snapshot.backdrop)",
+      "background=\(snapshot.background)",
+      "textSize=\(snapshot.textSize)",
+      "controlSize=\(snapshot.controlSize)",
+      "timeZoneMode=\(snapshot.timeZoneMode)",
+      "timeZone=\(snapshot.timeZone)",
       "preferencesChrome=native",
     ].joined(separator: ", ")
   }

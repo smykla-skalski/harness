@@ -11,6 +11,94 @@ struct HarnessMonitorSessionModelsTests {
     return decoder
   }()
 
+  private let signalPayloadDefaultsFixture = """
+    {
+      "session": {
+        "project_id": "project-b72ed763e074d381",
+        "project_name": "harness",
+        "project_dir": "/tmp/project",
+        "context_root": "/tmp/project/context",
+        "checkout_id": "project-b72ed763e074d381",
+        "checkout_root": "/tmp/project",
+        "is_worktree": false,
+        "worktree_name": null,
+        "session_id": "sess-signal",
+        "context": "Signal decode proof",
+        "status": "active",
+        "created_at": "2026-04-03T17:23:26Z",
+        "updated_at": "2026-04-03T17:23:32Z",
+        "last_activity_at": "2026-04-03T17:23:32Z",
+        "leader_id": "claude-leader",
+        "observe_id": null,
+        "pending_leader_transfer": null,
+        "metrics": {
+          "agent_count": 2,
+          "active_agent_count": 2,
+          "open_task_count": 0,
+          "in_progress_task_count": 0,
+          "blocked_task_count": 0,
+          "completed_task_count": 0
+        }
+      },
+      "agents": [
+        {
+          "agent_id": "claude-leader",
+          "name": "claude leader",
+          "runtime": "claude",
+          "role": "leader",
+          "capabilities": [],
+          "joined_at": "2026-04-03T17:23:26Z",
+          "updated_at": "2026-04-03T17:23:26Z",
+          "status": "active",
+          "last_activity_at": "2026-04-03T17:23:26Z",
+          "runtime_capabilities": {
+            "runtime": "claude",
+            "supports_native_transcript": true,
+            "supports_signal_delivery": true,
+            "supports_context_injection": true,
+            "typical_signal_latency_seconds": 5,
+            "hook_points": []
+          }
+        }
+      ],
+      "tasks": [],
+      "signals": [
+        {
+          "runtime": "codex",
+          "agent_id": "codex-worker",
+          "session_id": "sess-signal",
+          "status": "acknowledged",
+          "signal": {
+            "signal_id": "sig-1",
+            "version": 1,
+            "created_at": "2026-04-03T17:24:00Z",
+            "expires_at": "2026-04-03T17:39:00Z",
+            "source_agent": "claude-leader",
+            "command": "inject_context",
+            "priority": "normal",
+            "payload": {
+              "message": "live payload without extra optional fields"
+            },
+            "delivery": {
+              "max_retries": 3,
+              "retry_count": 0,
+              "idempotency_key": "sess-signal:codex-worker:inject_context"
+            }
+          },
+          "acknowledgment": {
+            "signal_id": "sig-1",
+            "acknowledged_at": "2026-04-03T17:24:05Z",
+            "result": "accepted",
+            "agent": "worker-session",
+            "session_id": "sess-signal"
+          }
+        }
+      ],
+      "observer": null,
+      "agent_activity": []
+    }
+    """
+
   @Test("Work item decoding defaults omitted daemon fields")
   func workItemDecodingDefaultsOmittedDaemonFields() throws {
     let json = """
@@ -118,95 +206,10 @@ struct HarnessMonitorSessionModelsTests {
 
   @Test("Session detail decoding defaults omitted signal payload fields")
   func sessionDetailDecodingDefaultsOmittedSignalPayloadFields() throws {
-    let json = """
-      {
-        "session": {
-          "project_id": "project-b72ed763e074d381",
-          "project_name": "harness",
-          "project_dir": "/tmp/project",
-          "context_root": "/tmp/project/context",
-          "checkout_id": "project-b72ed763e074d381",
-          "checkout_root": "/tmp/project",
-          "is_worktree": false,
-          "worktree_name": null,
-          "session_id": "sess-signal",
-          "context": "Signal decode proof",
-          "status": "active",
-          "created_at": "2026-04-03T17:23:26Z",
-          "updated_at": "2026-04-03T17:23:32Z",
-          "last_activity_at": "2026-04-03T17:23:32Z",
-          "leader_id": "claude-leader",
-          "observe_id": null,
-          "pending_leader_transfer": null,
-          "metrics": {
-            "agent_count": 2,
-            "active_agent_count": 2,
-            "open_task_count": 0,
-            "in_progress_task_count": 0,
-            "blocked_task_count": 0,
-            "completed_task_count": 0
-          }
-        },
-        "agents": [
-          {
-            "agent_id": "claude-leader",
-            "name": "claude leader",
-            "runtime": "claude",
-            "role": "leader",
-            "capabilities": [],
-            "joined_at": "2026-04-03T17:23:26Z",
-            "updated_at": "2026-04-03T17:23:26Z",
-            "status": "active",
-            "last_activity_at": "2026-04-03T17:23:26Z",
-            "runtime_capabilities": {
-              "runtime": "claude",
-              "supports_native_transcript": true,
-              "supports_signal_delivery": true,
-              "supports_context_injection": true,
-              "typical_signal_latency_seconds": 5,
-              "hook_points": []
-            }
-          }
-        ],
-        "tasks": [],
-        "signals": [
-          {
-            "runtime": "codex",
-            "agent_id": "codex-worker",
-            "session_id": "sess-signal",
-            "status": "acknowledged",
-            "signal": {
-              "signal_id": "sig-1",
-              "version": 1,
-              "created_at": "2026-04-03T17:24:00Z",
-              "expires_at": "2026-04-03T17:39:00Z",
-              "source_agent": "claude-leader",
-              "command": "inject_context",
-              "priority": "normal",
-              "payload": {
-                "message": "live payload without extra optional fields"
-              },
-              "delivery": {
-                "max_retries": 3,
-                "retry_count": 0,
-                "idempotency_key": "sess-signal:codex-worker:inject_context"
-              }
-            },
-            "acknowledgment": {
-              "signal_id": "sig-1",
-              "acknowledged_at": "2026-04-03T17:24:05Z",
-              "result": "accepted",
-              "agent": "worker-session",
-              "session_id": "sess-signal"
-            }
-          }
-        ],
-        "observer": null,
-        "agent_activity": []
-      }
-      """
-
-    let detail = try decoder.decode(SessionDetail.self, from: Data(json.utf8))
+    let detail = try decoder.decode(
+      SessionDetail.self,
+      from: Data(signalPayloadDefaultsFixture.utf8)
+    )
 
     #expect(detail.signals.count == 1)
     #expect(

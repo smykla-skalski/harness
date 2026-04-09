@@ -21,7 +21,10 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThan(
       measurement.detail.greenDominance,
       measurement.sidebar.greenDominance * 0.6,
-      "Detail toolbar lost too much of the active-banner tint at the split boundary: \(measurement.debugDescription)"
+      """
+      Detail toolbar lost too much of the active-banner tint at the split boundary: \
+      \(measurement.debugDescription)
+      """
     )
   }
 

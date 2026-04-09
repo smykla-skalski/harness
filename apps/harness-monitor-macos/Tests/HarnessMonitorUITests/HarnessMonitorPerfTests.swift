@@ -215,25 +215,40 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       auditText.contains("launchMode=preview"),
-      "Audit marker missing preview launch mode. label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+      """
+      Audit marker missing preview launch mode. label='\(auditBuildState.label)' \
+      value='\(String(describing: auditBuildState.value))'
+      """
     )
     XCTAssertTrue(
       auditText.contains("perfScenario=\(scenario)"),
-      "Audit marker missing perf scenario \(scenario). label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+      """
+      Audit marker missing perf scenario \(scenario). label='\(auditBuildState.label)' \
+      value='\(String(describing: auditBuildState.value))'
+      """
     )
+    let expectedScenario = expectedPreviewScenario(for: scenario)
     XCTAssertTrue(
-      auditText.contains(
-        "previewScenario=\(expectedPreviewScenario(for: scenario))"
-      ),
-      "Audit marker missing preview scenario \(expectedPreviewScenario(for: scenario)). label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+      auditText.contains("previewScenario=\(expectedScenario)"),
+      """
+      Audit marker missing preview scenario \(expectedScenario). \
+      label='\(auditBuildState.label)' \
+      value='\(String(describing: auditBuildState.value))'
+      """
     )
     XCTAssertFalse(
       auditText.contains("buildCommit=unknown"),
-      "Audit marker missing embedded build commit. label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+      """
+      Audit marker missing embedded build commit. label='\(auditBuildState.label)' \
+      value='\(String(describing: auditBuildState.value))'
+      """
     )
     XCTAssertFalse(
       auditText.contains("buildDirty=unknown"),
-      "Audit marker missing embedded build dirty state. label='\(auditBuildState.label)' value='\(String(describing: auditBuildState.value))'"
+      """
+      Audit marker missing embedded build dirty state. label='\(auditBuildState.label)' \
+      value='\(String(describing: auditBuildState.value))'
+      """
     )
   }
 
