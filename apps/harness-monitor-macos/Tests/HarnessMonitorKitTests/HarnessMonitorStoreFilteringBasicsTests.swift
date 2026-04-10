@@ -118,6 +118,25 @@ struct HarnessMonitorStoreFilteringBasicsTests {
     )
   }
 
+  @Test("Search active state follows committed projection rebuilds")
+  func searchActiveStateFollowsProjectionRebuilds() {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+
+    #expect(store.sessionIndex.searchResults.isSearchActive == false)
+
+    store.searchText = "leader"
+    #expect(store.sessionIndex.searchResults.isSearchActive == false)
+
+    store.flushPendingSearchRebuild()
+    #expect(store.sessionIndex.searchResults.isSearchActive == true)
+
+    store.searchText = ""
+    #expect(store.sessionIndex.searchResults.isSearchActive == true)
+
+    store.flushPendingSearchRebuild()
+    #expect(store.sessionIndex.searchResults.isSearchActive == false)
+  }
+
   @Test("Search result observation ignores project-header-only updates")
   func searchResultObservationIgnoresProjectHeaderOnlyUpdates() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
