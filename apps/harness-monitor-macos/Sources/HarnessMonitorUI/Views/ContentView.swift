@@ -26,6 +26,7 @@ public struct ContentView: View {
   @State private var hasCapturedInitialInspectorWidth = false
   @State private var showInspector = false
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
+  @State private var toolbarBaselineLeadingInset: CGFloat = 260
   @State private var isLayoutAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
@@ -96,6 +97,10 @@ public struct ContentView: View {
 
   private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
     ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
+  }
+
+  private var activeToolbarBaselineLeadingInset: CGFloat {
+    columnVisibility == .detailOnly ? 0 : toolbarBaselineLeadingInset
   }
 
   public init(
@@ -224,7 +229,8 @@ public struct ContentView: View {
     }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
-        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
+        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay,
+        leadingInset: activeToolbarBaselineLeadingInset
       )
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -252,10 +258,10 @@ public struct ContentView: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      sidebarVisible: columnVisibility != .detailOnly
+      sidebarVisible: columnVisibility != .detailOnly,
+      onSidebarWidthChange: updateToolbarBaselineLeadingInset
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
-    .toolbarBaselineFrame(.sidebar)
   }
 
   private var detailColumn: some View {
@@ -315,6 +321,14 @@ public struct ContentView: View {
       return
     }
     inspectorColumnWidth = width
+  }
+
+  private func updateToolbarBaselineLeadingInset(_ width: CGFloat) {
+    let nextValue = max((width / 4).rounded() * 4, 0)
+    guard abs(nextValue - toolbarBaselineLeadingInset) >= 1 else {
+      return
+    }
+    toolbarBaselineLeadingInset = nextValue
   }
 
   private func stringValue(
