@@ -190,6 +190,72 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.contentUI.shell.selectedSessionID == nil)
   }
 
+  @Test("Bootstrap with notRegistered agent marks offline and sets installed false")
+  func bootstrapWithNotRegisteredAgentMarksOffline() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: false,
+      registrationState: .notRegistered
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    if case .offline(let reason) = store.connectionState {
+      #expect(reason.contains("not installed"))
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+    #expect(store.daemonStatus?.launchAgent.installed == false)
+  }
+
+  @Test("Bootstrap with requiresApproval marks offline with approval message")
+  func bootstrapWithRequiresApprovalMarksOffline() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .requiresApproval
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    if case .offline(let reason) = store.connectionState {
+      #expect(reason.contains("approval"))
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+  }
+
+  @Test("Bootstrap with enabled state connects via awaitManifestWarmUp")
+  func bootstrapWithEnabledStateConnects() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .enabled
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    #expect(store.connectionState == .online)
+  }
+
+  @Test("Bootstrap surfaces awaitManifestWarmUp failure as offline")
+  func bootstrapSurfacesWarmUpFailureAsOffline() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .enabled,
+      warmUpError: DaemonControlError.daemonDidNotStart
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    if case .offline = store.connectionState {
+      // expected
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+  }
+
   @Test("Prepare for termination cancels background work and shuts down the client")
   func prepareForTerminationCancelsBackgroundWorkAndShutsDownClient() async {
     let client = RecordingHarnessClient()

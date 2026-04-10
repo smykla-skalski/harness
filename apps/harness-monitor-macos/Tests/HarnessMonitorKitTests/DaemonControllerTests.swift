@@ -67,16 +67,86 @@ struct DaemonControllerTests {
     }
     #expect(manager.registerCallCount == 0)
   }
+
+  @Test("registerLaunchAgent returns enabled after registering notRegistered agent")
+  func registerLaunchAgentReturnsEnabledState() async throws {
+    let manager = RecordingLaunchAgentManager(state: .notRegistered)
+    let controller = DaemonController(launchAgentManager: manager)
+
+    let state = try await controller.registerLaunchAgent()
+
+    #expect(state == .enabled)
+    #expect(manager.registerCallCount == 1)
+  }
+
+  @Test("registerLaunchAgent surfaces requiresApproval when SMAppService needs consent")
+  func registerLaunchAgentSurfacesApprovalRequired() async throws {
+    let manager = RecordingLaunchAgentManager(
+      state: .notRegistered,
+      registerResult: .requiresApproval
+    )
+    let controller = DaemonController(launchAgentManager: manager)
+
+    let state = try await controller.registerLaunchAgent()
+
+    #expect(state == .requiresApproval)
+    #expect(manager.registerCallCount == 1)
+  }
+
+  @Test("awaitLaunchAgentState throws daemonDidNotStart when state never matches")
+  func awaitLaunchAgentStateTimesOut() async throws {
+    let manager = RecordingLaunchAgentManager(state: .notRegistered)
+    let controller = DaemonController(launchAgentManager: manager)
+
+    await #expect(throws: DaemonControlError.daemonDidNotStart) {
+      try await controller.awaitLaunchAgentState(
+        .enabled,
+        timeout: .milliseconds(50)
+      )
+    }
+  }
+
+  @Test("awaitLaunchAgentState returns immediately when state already matches")
+  func awaitLaunchAgentStateReturnsWhenReady() async throws {
+    let manager = RecordingLaunchAgentManager(state: .enabled)
+    let controller = DaemonController(launchAgentManager: manager)
+
+    try await controller.awaitLaunchAgentState(
+      .enabled,
+      timeout: .milliseconds(50)
+    )
+  }
+
+  @Test("launchAgentSnapshot mirrors current registration state")
+  func launchAgentSnapshotMirrorsRegistrationState() async throws {
+    let manager = RecordingLaunchAgentManager(state: .enabled)
+    let controller = DaemonController(launchAgentManager: manager)
+
+    let enabledSnapshot = await controller.launchAgentSnapshot()
+    #expect(enabledSnapshot.installed == true)
+    #expect(enabledSnapshot.loaded == true)
+
+    try manager.unregister()
+
+    let offlineSnapshot = await controller.launchAgentSnapshot()
+    #expect(offlineSnapshot.installed == false)
+    #expect(offlineSnapshot.loaded == false)
+  }
 }
 
 private final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {
   private let lock = NSLock()
   private var protectedState: DaemonLaunchAgentRegistrationState
+  private let registerResult: DaemonLaunchAgentRegistrationState
   private var protectedRegisterCallCount = 0
   private var protectedUnregisterCallCount = 0
 
-  init(state: DaemonLaunchAgentRegistrationState) {
+  init(
+    state: DaemonLaunchAgentRegistrationState,
+    registerResult: DaemonLaunchAgentRegistrationState = .enabled
+  ) {
     self.protectedState = state
+    self.registerResult = registerResult
   }
 
   var state: DaemonLaunchAgentRegistrationState {
@@ -98,7 +168,7 @@ private final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unc
   func register() throws {
     lock.withLock {
       protectedRegisterCallCount += 1
-      protectedState = .enabled
+      protectedState = registerResult
     }
   }
 
