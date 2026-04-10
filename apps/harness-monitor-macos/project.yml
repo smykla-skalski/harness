@@ -28,6 +28,7 @@ settings:
     HARNESS_MONITOR_APP_BUNDLE_ID: io.harnessmonitor.app
     HARNESS_MONITOR_BUILD_GIT_COMMIT: local-dev
     HARNESS_MONITOR_BUILD_GIT_DIRTY: false
+    HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT: local-dev
   configs:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
@@ -47,6 +48,7 @@ targets:
     dependencies:
       - sdk: SwiftData.framework
       - sdk: IOKit.framework
+      - sdk: ServiceManagement.framework
       - sdk: UserNotifications.framework
     settings:
       base:
@@ -93,15 +95,35 @@ targets:
     entitlements:
       path: HarnessMonitor.entitlements
       properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - Q498EB36N4.io.harnessmonitor
         com.apple.security.network.client: true
-        com.apple.security.network.server: true
-        com.apple.security.cs.disable-library-validation: true
     postBuildScripts:
+      - name: Bundle Daemon Agent
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
+          - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist
+          - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist
+          - $(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist
+        script: |
+          /bin/bash "$PROJECT_DIR/Scripts/bundle-daemon-agent.sh"
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
         inputFiles:
           - $(PROJECT_DIR)/HarnessMonitor.entitlements
+          - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
           - $(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj
+          - $(PROJECT_DIR)/Resources
+          - $(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh
+          - $(PROJECT_DIR)/Sources/HarnessMonitor
+          - $(PROJECT_DIR)/Sources/HarnessMonitorKit
+          - $(PROJECT_DIR)/Sources/HarnessMonitorUI
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist
         script: |
@@ -134,7 +156,10 @@ targets:
           root = Path(sys.argv[1])
           include_paths = [
               root / "HarnessMonitor.entitlements",
+              root / "HarnessMonitorDaemon.entitlements",
               root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
+              root / "Resources",
+              root / "Scripts" / "bundle-daemon-agent.sh",
               root / "Sources" / "HarnessMonitor",
               root / "Sources" / "HarnessMonitorKit",
               root / "Sources" / "HarnessMonitorUI",
@@ -182,7 +207,11 @@ targets:
 
           build_workspace_fingerprint="${HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT:-}"
           if [ -z "$build_workspace_fingerprint" ]; then
-            build_workspace_fingerprint="$(workspace_tree_fingerprint)"
+            if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" = "YES" ]; then
+              build_workspace_fingerprint="unavailable-user-script-sandbox"
+            else
+              build_workspace_fingerprint="$(workspace_tree_fingerprint)"
+            fi
           fi
 
           build_started_at_utc="${HARNESS_MONITOR_BUILD_STARTED_AT_UTC:-}"
@@ -229,6 +258,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_INCOMING_NETWORK_CONNECTIONS: NO
+        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
         INFOPLIST_KEY_CFBundleName: Harness Monitor
         INFOPLIST_KEY_HarnessMonitorBuildGitCommit: $(HARNESS_MONITOR_BUILD_GIT_COMMIT)
@@ -251,15 +283,35 @@ targets:
     entitlements:
       path: HarnessMonitor.entitlements
       properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - Q498EB36N4.io.harnessmonitor
         com.apple.security.network.client: true
-        com.apple.security.network.server: true
-        com.apple.security.cs.disable-library-validation: true
     postBuildScripts:
+      - name: Bundle Daemon Agent
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
+          - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist
+          - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist
+          - $(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist
+        script: |
+          /bin/bash "$PROJECT_DIR/Scripts/bundle-daemon-agent.sh"
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
         inputFiles:
           - $(PROJECT_DIR)/HarnessMonitor.entitlements
+          - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
           - $(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj
+          - $(PROJECT_DIR)/Resources
+          - $(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh
+          - $(PROJECT_DIR)/Sources/HarnessMonitor
+          - $(PROJECT_DIR)/Sources/HarnessMonitorKit
+          - $(PROJECT_DIR)/Sources/HarnessMonitorUI
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist
         script: |
@@ -292,7 +344,10 @@ targets:
           root = Path(sys.argv[1])
           include_paths = [
               root / "HarnessMonitor.entitlements",
+              root / "HarnessMonitorDaemon.entitlements",
               root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
+              root / "Resources",
+              root / "Scripts" / "bundle-daemon-agent.sh",
               root / "Sources" / "HarnessMonitor",
               root / "Sources" / "HarnessMonitorKit",
               root / "Sources" / "HarnessMonitorUI",
@@ -340,7 +395,11 @@ targets:
 
           build_workspace_fingerprint="${HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT:-}"
           if [ -z "$build_workspace_fingerprint" ]; then
-            build_workspace_fingerprint="$(workspace_tree_fingerprint)"
+            if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" = "YES" ]; then
+              build_workspace_fingerprint="unavailable-user-script-sandbox"
+            else
+              build_workspace_fingerprint="$(workspace_tree_fingerprint)"
+            fi
           fi
 
           build_started_at_utc="${HARNESS_MONITOR_BUILD_STARTED_AT_UTC:-}"
@@ -387,6 +446,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_INCOMING_NETWORK_CONNECTIONS: NO
+        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor UI Testing
         INFOPLIST_KEY_CFBundleName: Harness Monitor UI Testing
         INFOPLIST_KEY_HarnessMonitorBuildGitCommit: $(HARNESS_MONITOR_BUILD_GIT_COMMIT)
