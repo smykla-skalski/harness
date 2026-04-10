@@ -66,6 +66,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
 
     let db_slot = Arc::new(OnceLock::new());
     if let Some(db) = db {
+        let _ = db.cache_startup_diagnostics();
         db_slot
             .set(Arc::new(Mutex::new(db)))
             .expect("seed daemon db");
