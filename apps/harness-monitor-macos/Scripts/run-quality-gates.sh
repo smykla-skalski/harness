@@ -50,3 +50,13 @@ xcodebuild \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   build-for-testing
+
+SANDBOX_VIOLATIONS="$(log show \
+  --predicate 'subsystem == "com.apple.sandbox.reporting" AND composedMessage CONTAINS "io.harnessmonitor"' \
+  --last 10m \
+  --style compact 2>/dev/null || true)"
+
+if [ -n "$SANDBOX_VIOLATIONS" ]; then
+  printf '\n=== Sandbox violations detected ===\n%s\n' "$SANDBOX_VIOLATIONS" >&2
+  exit 1
+fi
