@@ -196,12 +196,16 @@ public struct SessionSignalRecord: Codable, Equatable, Identifiable, Sendable {
 extension SessionSignalRecord {
   public func effectiveStatus(now: Date = .now) -> SessionSignalStatus {
     guard status == .pending else { return status }
-    guard let expires = Self.parseExpiresAt(signal.expiresAt) else { return status }
+    guard let expires = expiresAtDate else { return status }
     return expires < now ? .expired : .pending
   }
 
   public var effectiveStatus: SessionSignalStatus {
     effectiveStatus(now: .now)
+  }
+
+  public var expiresAtDate: Date? {
+    Self.parseExpiresAt(signal.expiresAt)
   }
 
   static func parseExpiresAt(_ value: String) -> Date? {
