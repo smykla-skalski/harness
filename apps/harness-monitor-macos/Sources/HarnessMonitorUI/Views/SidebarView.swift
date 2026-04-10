@@ -12,8 +12,10 @@ struct SidebarView: View {
   let onSidebarWidthChange: (CGFloat) -> Void
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
+  @Environment(\.harnessDateTimeConfiguration)
+  var dateTimeConfiguration
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
 
   @SceneStorage("sidebar.collapsed-project-ids")
   var collapsedProjectIDsStorage = ""
