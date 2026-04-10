@@ -46,6 +46,19 @@ actor FailingDaemonController: DaemonControlling {
     return .enabled
   }
 
+  func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    .enabled
+  }
+
+  func launchAgentSnapshot() async -> LaunchAgentStatus {
+    LaunchAgentStatus(
+      installed: true,
+      loaded: true,
+      label: "io.harness.daemon",
+      path: "/tmp/io.harness.daemon.plist"
+    )
+  }
+
   func awaitLaunchAgentState(
     _ target: DaemonLaunchAgentRegistrationState,
     timeout: Duration
