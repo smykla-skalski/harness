@@ -52,6 +52,7 @@ struct HarnessMonitorMarkdownText: View {
       .textual.blockQuoteStyle(HarnessMonitorMarkdownBlockQuoteStyle())
       .textual.codeBlockStyle(HarnessMonitorMarkdownCodeBlockStyle())
       .textual.unorderedListMarker(HarnessMonitorMarkdownUnorderedListMarker())
+      .textual.orderedListMarker(HarnessMonitorMarkdownOrderedListMarker())
       .textual.overflowMode(.wrap)
   }
 
@@ -167,6 +168,21 @@ private struct HarnessMonitorMarkdownUnorderedListMarker: StructuredText.Unorder
     Image(systemName: "circle.fill")
       .foregroundStyle(HarnessMonitorTheme.accent)
       .textual.fontScale(0.32)
+      .textual.frame(
+        width: .fontScaled(1.35),
+        height: .fontScaled(1.0),
+        alignment: .center
+      )
+  }
+}
+
+private struct HarnessMonitorMarkdownOrderedListMarker: StructuredText.OrderedListMarker {
+  func makeBody(configuration: Configuration) -> some View {
+    Text("\(configuration.ordinal).")
+      .monospacedDigit()
+      .foregroundStyle(HarnessMonitorTheme.accent)
+      .fontWeight(.semibold)
+      .textual.fontScale(0.94)
       .textual.frame(
         width: .fontScaled(1.35),
         height: .fontScaled(1.0),
