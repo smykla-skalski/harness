@@ -173,7 +173,6 @@ extension HarnessMonitorNotificationSettingsSnapshot {
     self.lockScreenSetting = Self.label(for: settings.lockScreenSetting)
     self.alertStyle = Self.label(for: settings.alertStyle)
     self.showPreviews = Self.label(for: settings.showPreviewsSetting)
-    self.criticalAlertSetting = Self.label(for: settings.criticalAlertSetting)
     self.timeSensitiveSetting = Self.label(for: settings.timeSensitiveSetting)
     self.scheduledDeliverySetting = Self.label(for: settings.scheduledDeliverySetting)
     self.directMessagesSetting = Self.label(for: settings.directMessagesSetting)

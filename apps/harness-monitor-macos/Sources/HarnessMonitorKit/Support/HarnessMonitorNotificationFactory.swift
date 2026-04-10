@@ -147,21 +147,6 @@ enum HarnessMonitorNotificationRequestFactory {
       nil
     case .systemDefault:
       .default
-    case .customSample:
-      try await {
-        let soundName = try await assetWriter.sampleSoundName()
-        return UNNotificationSound(named: UNNotificationSoundName(soundName))
-      }()
-    case .criticalDefault:
-      .defaultCriticalSound(withAudioVolume: Float(clampedVolume(draft.criticalVolume)))
-    case .criticalSample:
-      try await {
-        let soundName = try await assetWriter.sampleSoundName()
-        return .criticalSoundNamed(
-          UNNotificationSoundName(soundName),
-          withAudioVolume: Float(clampedVolume(draft.criticalVolume))
-        )
-      }()
     }
   }
 
@@ -213,9 +198,5 @@ enum HarnessMonitorNotificationRequestFactory {
   private static func optionalTrimmed(_ value: String) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
-  }
-
-  private static func clampedVolume(_ value: Double) -> Double {
-    min(1, max(0, value))
   }
 }
