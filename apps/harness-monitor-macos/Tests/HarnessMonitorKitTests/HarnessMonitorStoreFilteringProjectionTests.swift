@@ -50,6 +50,7 @@ struct HarnessMonitorStoreProjectionTests {
       },
       after: {
         store.searchText = "preview"
+        store.flushPendingSearchRebuild()
       }
     )
 
@@ -65,6 +66,7 @@ struct HarnessMonitorStoreProjectionTests {
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
 
     store.searchText = "active"
+    store.flushPendingSearchRebuild()
 
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
@@ -89,6 +91,7 @@ struct HarnessMonitorStoreProjectionTests {
       },
       after: {
         store.searchText = "active"
+        store.flushPendingSearchRebuild()
       }
     )
 
@@ -352,5 +355,65 @@ struct HarnessMonitorStoreProjectionTests {
 
     #expect(store.visibleSessionIDs == ["ended"])
     #expect(store.recentSessions.map(\.sessionId) == ["ended", "paused", "active"])
+  }
+
+  @Test("Rapid search updates coalesce to a single projection rebuild")
+  func rapidSearchUpdatesCoalesceToSingleProjectionRebuild() async {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
+
+    store.searchText = "a"
+    store.searchText = "ac"
+    store.searchText = "act"
+    store.searchText = "acti"
+    store.searchText = "activ"
+    store.searchText = "active"
+
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
+
+    try? await Task.sleep(nanoseconds: 300_000_000)
+
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
+    #expect(store.visibleSessionIDs == ["active"])
+  }
+
+  @Test("Filter change cancels pending search rebuild debounce")
+  func filterChangeCancelsPendingSearchRebuild() async {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
+
+    store.searchText = "active"
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
+
+    store.sessionFilter = .active
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
+
+    try? await Task.sleep(nanoseconds: 300_000_000)
+
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
+  }
+
+  @Test("Flush runs pending search rebuild synchronously")
+  func flushRunsPendingSearchRebuildSynchronously() {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
+
+    store.searchText = "active"
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
+
+    store.flushPendingSearchRebuild()
+
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
+    #expect(store.visibleSessionIDs == ["active"])
+  }
+
+  @Test("Flush is a no-op when no search rebuild is pending")
+  func flushIsNoOpWhenNoPendingSearchRebuild() {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
+
+    store.flushPendingSearchRebuild()
+
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
   }
 }
