@@ -21,6 +21,7 @@ struct HarnessMonitorAppCommands: Commands {
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
+  let focusSidebarSearch: () -> Void
   let startDaemon: () -> Void
   let installLaunchAgent: () -> Void
   let observeSelectedSession: () -> Void
@@ -65,6 +66,9 @@ struct HarnessMonitorAppCommands: Commands {
       )
     }
     CommandMenu("Harness Monitor") {
+      Button("Find in Sessions", action: focusSidebarSearch)
+        .keyboardShortcut("f", modifiers: .command)
+
       Button("Refresh", action: refreshStore)
         .keyboardShortcut("r", modifiers: [.command, .shift])
 

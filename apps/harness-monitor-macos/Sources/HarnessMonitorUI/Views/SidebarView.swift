@@ -9,7 +9,6 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
-  let onSidebarWidthChange: (CGFloat) -> Void
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
   @Environment(\.harnessDateTimeConfiguration)
@@ -26,6 +25,7 @@ struct SidebarView: View {
   @State private var hasHydratedCollapsedState = false
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
+  @FocusState private var isSearchFocused: Bool
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
 
@@ -35,8 +35,7 @@ struct SidebarView: View {
     projection: HarnessMonitorStore.SessionProjectionSlice,
     searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice,
-    sidebarVisible: Bool,
-    onSidebarWidthChange: @escaping (CGFloat) -> Void
+    sidebarVisible: Bool
   ) {
     self.store = store
     self.controls = controls
@@ -44,7 +43,6 @@ struct SidebarView: View {
     self.searchResults = searchResults
     self.sidebarUI = sidebarUI
     self.sidebarVisible = sidebarVisible
-    self.onSidebarWidthChange = onSidebarWidthChange
   }
 
   var collapsedProjectIDs: Set<String> {
@@ -155,6 +153,7 @@ struct SidebarView: View {
       placement: .sidebar,
       prompt: "Search sessions, projects, leaders"
     )
+    .searchFocused($isSearchFocused)
     .safeAreaInset(edge: .top, spacing: 0) {
       sidebarHeader
     }
@@ -199,6 +198,9 @@ struct SidebarView: View {
       withAnimation(.easeInOut(duration: 0.18)) {
         sidebarVisibilityPhase = isVisible ? 1 : 0
       }
+    }
+    .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
+      isSearchFocused = true
     }
     .onChange(of: collapsedProjectIDsStorage) { _, newValue in
       syncCollapsedProjects(from: newValue)
@@ -300,7 +302,6 @@ struct SidebarView: View {
 
   func updateSidebarWidth(_ width: CGFloat) {
     let clampedWidth = max(width, 0)
-    onSidebarWidthChange(clampedWidth)
     guard abs(clampedWidth - sidebarWidth) >= 0.5 else {
       return
     }

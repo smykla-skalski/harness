@@ -236,9 +236,13 @@ public struct ContentView: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      sidebarVisible: columnVisibility != .detailOnly,
-      onSidebarWidthChange: updateToolbarBaselineLeadingInset
+      sidebarVisible: columnVisibility != .detailOnly
     )
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      updateToolbarBaselineLeadingInset(width)
+    }
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }
 
