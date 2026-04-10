@@ -1,5 +1,6 @@
 pub mod client;
 pub mod codex_controller;
+pub mod codex_transport;
 pub mod db;
 pub mod http;
 pub mod index;
