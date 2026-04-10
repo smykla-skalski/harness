@@ -33,7 +33,6 @@ struct PreferencesNotificationsSection: View {
       LabeledContent("Lock Screen", value: notifications.settingsSnapshot.lockScreenSetting)
       LabeledContent("Alert Style", value: notifications.settingsSnapshot.alertStyle)
       LabeledContent("Previews", value: notifications.settingsSnapshot.showPreviews)
-      LabeledContent("Critical Alerts", value: notifications.settingsSnapshot.criticalAlertSetting)
       LabeledContent("Time Sensitive", value: notifications.settingsSnapshot.timeSensitiveSetting)
       LabeledContent("Categories", value: "\(notifications.registeredCategoryCount)")
       LabeledContent("Pending", value: "\(notifications.pendingRequestCount)")
@@ -59,7 +58,7 @@ struct PreferencesNotificationsSection: View {
           ForEach(HarnessMonitorNotificationAuthorizationProfile.allCases) { profile in
             HarnessMonitorAsyncActionButton(
               title: profile.title,
-              tint: profile == .critical ? .red : nil,
+              tint: nil,
               variant: profile == .standard ? .prominent : .bordered,
               isLoading: notifications.isWorking,
               accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
@@ -160,13 +159,6 @@ struct PreferencesNotificationsSection: View {
       .harnessNativeFormControl()
       .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesNotificationsSoundPicker)
 
-      if notifications.draft.soundMode.usesCriticalAlert {
-        LabeledContent("Critical volume") {
-          Slider(value: $notifications.draft.criticalVolume, in: 0...1)
-            .frame(maxWidth: 220)
-        }
-      }
-
       Picker("Interruption", selection: $notifications.draft.interruptionMode) {
         ForEach(HarnessMonitorNotificationInterruptionMode.allCases) { mode in
           Text(mode.title).tag(mode)
@@ -181,10 +173,7 @@ struct PreferencesNotificationsSection: View {
     } header: {
       Text("Native Options")
     } footer: {
-      Text(
-        "Critical alerts require system authorization"
-          + " and may be ignored without entitlement approval."
-      )
+      Text("Time-sensitive delivery remains available when the system allows it.")
     }
   }
 

@@ -5,14 +5,10 @@ import Foundation
 public protocol HarnessMonitorNotificationAssetWriting: Sendable {
   @MainActor
   func sampleImageURL() throws -> URL
-
-  @MainActor
-  func sampleSoundName() throws -> String
 }
 
 public struct HarnessMonitorNotificationAssetWriter: HarnessMonitorNotificationAssetWriting {
   private static let sampleImageName = "harness-monitor-notification-sample.png"
-  private static let sampleSoundName = "HarnessMonitorNotificationSample.wav"
 
   private let environment: HarnessMonitorEnvironment
 
@@ -32,20 +28,6 @@ public struct HarnessMonitorNotificationAssetWriter: HarnessMonitorNotificationA
       try Self.makeSampleImageData().write(to: url, options: .atomic)
     }
     return url
-  }
-
-  public func sampleSoundName() throws -> String {
-    let directory = environment.homeDirectory
-      .appendingPathComponent("Library", isDirectory: true)
-      .appendingPathComponent("Sounds", isDirectory: true)
-    let fileManager = FileManager.default
-    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-
-    let url = directory.appendingPathComponent(Self.sampleSoundName)
-    if !fileManager.fileExists(atPath: url.path) {
-      try Self.makeSampleWaveData().write(to: url, options: .atomic)
-    }
-    return Self.sampleSoundName
   }
 
   private static func makeSampleImageData() throws -> Data {
@@ -105,59 +87,4 @@ public struct HarnessMonitorNotificationAssetWriter: HarnessMonitorNotificationA
     return data
   }
 
-  private static func makeSampleWaveData() -> Data {
-    let sampleRate = 44_100
-    let durationSeconds = 0.45
-    let channelCount = 1
-    let bitsPerSample = 16
-    let byteRate = sampleRate * channelCount * bitsPerSample / 8
-    let blockAlign = channelCount * bitsPerSample / 8
-    let sampleCount = Int(Double(sampleRate) * durationSeconds)
-    let dataByteCount = sampleCount * blockAlign
-
-    var data = Data()
-    data.appendASCII("RIFF")
-    data.appendLittleEndianUInt32(UInt32(36 + dataByteCount))
-    data.appendASCII("WAVE")
-    data.appendASCII("fmt ")
-    data.appendLittleEndianUInt32(16)
-    data.appendLittleEndianUInt16(1)
-    data.appendLittleEndianUInt16(UInt16(channelCount))
-    data.appendLittleEndianUInt32(UInt32(sampleRate))
-    data.appendLittleEndianUInt32(UInt32(byteRate))
-    data.appendLittleEndianUInt16(UInt16(blockAlign))
-    data.appendLittleEndianUInt16(UInt16(bitsPerSample))
-    data.appendASCII("data")
-    data.appendLittleEndianUInt32(UInt32(dataByteCount))
-
-    for sampleIndex in 0..<sampleCount {
-      let progress = Double(sampleIndex) / Double(sampleRate)
-      let envelope = max(0.0, 1.0 - (progress / durationSeconds))
-      let value = sin(2.0 * Double.pi * 880.0 * progress) * 0.36 * envelope
-      data.appendLittleEndianInt16(Int16(value * Double(Int16.max)))
-    }
-
-    return data
-  }
-}
-
-extension Data {
-  fileprivate mutating func appendASCII(_ value: String) {
-    append(contentsOf: value.utf8)
-  }
-
-  fileprivate mutating func appendLittleEndianUInt16(_ value: UInt16) {
-    var littleEndianValue = value.littleEndian
-    Swift.withUnsafeBytes(of: &littleEndianValue) { append(contentsOf: $0) }
-  }
-
-  fileprivate mutating func appendLittleEndianInt16(_ value: Int16) {
-    var littleEndianValue = value.littleEndian
-    Swift.withUnsafeBytes(of: &littleEndianValue) { append(contentsOf: $0) }
-  }
-
-  fileprivate mutating func appendLittleEndianUInt32(_ value: UInt32) {
-    var littleEndianValue = value.littleEndian
-    Swift.withUnsafeBytes(of: &littleEndianValue) { append(contentsOf: $0) }
-  }
 }

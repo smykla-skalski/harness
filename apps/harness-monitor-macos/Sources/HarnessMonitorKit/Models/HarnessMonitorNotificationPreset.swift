@@ -5,7 +5,6 @@ public enum HarnessMonitorNotificationPreset: String, CaseIterable, Identifiable
   case sessionFinished
   case actionRequest
   case richImage
-  case critical
 
   public var id: String { rawValue }
 
@@ -15,7 +14,6 @@ public enum HarnessMonitorNotificationPreset: String, CaseIterable, Identifiable
     case .sessionFinished: "Session Finished"
     case .actionRequest: "Action Request"
     case .richImage: "Rich Image"
-    case .critical: "Critical"
     }
   }
 
@@ -64,25 +62,10 @@ public enum HarnessMonitorNotificationPreset: String, CaseIterable, Identifiable
         targetContentIdentifier: "timeline",
         filterCriteria: "image",
         category: .fullControls,
-        soundMode: .customSample,
+        soundMode: .systemDefault,
         attachmentMode: .sampleImage,
         interruptionMode: .active,
         relevanceScore: 0.8
-      )
-    case .critical:
-      HarnessMonitorNotificationDraft(
-        title: "Critical harness alert",
-        subtitle: "Manual test",
-        body:
-          "This exercises the critical alert content path when system authorization allows it.",
-        threadIdentifier: "critical-alerts",
-        targetContentIdentifier: "critical",
-        filterCriteria: "critical",
-        category: .fullControls,
-        soundMode: .criticalDefault,
-        attachmentMode: .sampleImage,
-        interruptionMode: .critical,
-        relevanceScore: 1
       )
     }
   }
