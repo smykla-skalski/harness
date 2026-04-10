@@ -168,6 +168,7 @@ Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review
 - `.claude/rules/swiftui-startup-focus.md` - persisted startup state, FocusedValue churn, restoration seeding, inspector/search presentation safety
 - `.claude/rules/swiftui-button-styling.md` - no .plain, ButtonStyle over ViewModifier, no redundant .contentShape, native glass styles
 - `.claude/rules/swiftui-idle-cpu.md` - no repeatForever on always-visible views, cached formatters, no gratuitous periodic animations
+- `.claude/rules/swiftui-drag-drop.md` - unconditional draggable, drop rejection must set store.lastError, exhaustive DragSession.Phase, single dragPhase snapshot
 
 These rules auto-activate when editing `apps/harness-monitor-macos/Sources/**/*.swift`.
 
@@ -190,6 +191,7 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping, geometry feedback loops, multi-slice body reads |
 | [swiftui-startup-focus.md](.claude/rules/swiftui-startup-focus.md) | `apps/harness-monitor-macos/Sources/**` | Persisted startup presentation, FocusedValue churn, restoration and geometry writeback safety |
 | [swiftui-idle-cpu.md](.claude/rules/swiftui-idle-cpu.md) | `apps/harness-monitor-macos/Sources/**` | No repeatForever on idle views, cached formatters, no periodic animations |
+| [swiftui-drag-drop.md](.claude/rules/swiftui-drag-drop.md) | `apps/harness-monitor-macos/Sources/**` | Unconditional draggable, drop rejection feedback, exhaustive DragSession.Phase, one dragPhase snapshot, Button+style for click+drag cards |
 | [xcuitest-speed.md](.claude/rules/xcuitest-speed.md) | `apps/harness-monitor-macos/Tests/**` | Animation suppression, .firstMatch, coordinate taps, single-launch tests, scroll patterns |
 | [perf-instrumentation.md](.claude/rules/perf-instrumentation.md) | `apps/harness-monitor-macos/**` | Signpost subsystem/category, scenario checklist, perf test env vars, KEEP_ANIMATIONS |
 
