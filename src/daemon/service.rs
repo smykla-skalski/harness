@@ -21,6 +21,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
 
+use super::codex_bridge;
 use super::codex_controller::CodexControllerHandle;
 use super::codex_transport::{self, CodexTransportKind};
 use super::http::{self, DaemonHttpState};
@@ -182,6 +183,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 
     spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
     let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
+    let _bridge_watcher = codex_bridge::spawn_bridge_endpoint_watcher(config.sandboxed);
 
     let app_state = DaemonHttpState {
         token,
