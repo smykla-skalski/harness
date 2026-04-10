@@ -124,13 +124,22 @@ public struct DaemonController: DaemonControlling {
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
     HarnessMonitorLogger.lifecycle.debug("Bootstrapping daemon client")
+    let connection = try loadConnection()
+    return try await bootstrap(connection: connection)
+  }
+
+  private func loadConnection() throws -> HarnessMonitorConnection {
     let manifest = try loadManifest()
     let token = try loadToken(path: manifest.tokenPath)
-    let connection = HarnessMonitorConnection(
+    return HarnessMonitorConnection(
       endpoint: try endpointURL(from: manifest.endpoint),
       token: token
     )
+  }
 
+  private func bootstrap(
+    connection: HarnessMonitorConnection
+  ) async throws -> any HarnessMonitorClientProtocol {
     let httpClient = sessionFactory(connection)
     _ = try await httpClient.health()
 
@@ -197,16 +206,34 @@ public struct DaemonController: DaemonControlling {
     var lastError: (any Error)?
     while ContinuousClock.now < deadline {
       do {
-        return try await bootstrapClient()
+        let connection = try loadConnection()
+        if await endpointIsListening(connection.endpoint) {
+          return try await bootstrap(connection: connection)
+        }
       } catch {
         lastError = error
-        try await Task.sleep(for: .milliseconds(250))
       }
+      try await Task.sleep(for: .milliseconds(250))
     }
     if let client = try? await bootstrapClient() {
       return client
     }
     throw lastError ?? DaemonControlError.daemonDidNotStart
+  }
+
+  private func endpointIsListening(_ endpoint: URL) async -> Bool {
+    guard let host = endpoint.host, let port = endpoint.port else {
+      return true
+    }
+    let candidate = UInt16(exactly: port) ?? 0
+    guard candidate != 0 else { return true }
+    return await Task.detached(priority: .userInitiated) {
+      DaemonPortProbe.isListening(
+        host: host,
+        port: candidate,
+        timeout: .milliseconds(200)
+      )
+    }.value
   }
 
   public func stopDaemon() async throws -> String {
