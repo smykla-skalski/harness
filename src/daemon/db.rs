@@ -8,6 +8,9 @@ use rusqlite::{Connection, types::Type};
 
 use crate::agents::runtime::event::ConversationEvent;
 use crate::agents::runtime::signal::Signal;
+use crate::daemon::agent_tui::{
+    AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
+};
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::errors::{CliError, CliErrorKind};
@@ -30,7 +33,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-const SCHEMA_VERSION: &str = "4";
+const SCHEMA_VERSION: &str = "5";
 
 impl DaemonDb {
     /// Open (or create) the daemon database at the given path with WAL mode
@@ -101,15 +104,22 @@ impl DaemonDb {
                     .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
                 let reclaimed = migrate_v2_to_v3(&self.conn)?;
                 migrate_v3_to_v4(&self.conn)?;
+                migrate_v4_to_v5(&self.conn)?;
                 reclaimed
             }
             "2" => {
                 let reclaimed = migrate_v2_to_v3(&self.conn)?;
                 migrate_v3_to_v4(&self.conn)?;
+                migrate_v4_to_v5(&self.conn)?;
                 reclaimed
             }
             "3" => {
                 migrate_v3_to_v4(&self.conn)?;
+                migrate_v4_to_v5(&self.conn)?;
+                false
+            }
+            "4" => {
+                migrate_v4_to_v5(&self.conn)?;
                 false
             }
             _ => false,
@@ -1498,6 +1508,110 @@ impl DaemonDb {
         }
         Ok(snapshots)
     }
+
+    /// Persist a managed agent TUI snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on serialization or SQL failures.
+    pub fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+        let argv_json = serde_json::to_string(&snapshot.argv)
+            .map_err(|error| db_error(format!("serialize agent TUI argv: {error}")))?;
+        self.conn
+            .execute(
+                "INSERT INTO agent_tuis (
+                    tui_id, session_id, agent_id, runtime, status, argv_json,
+                    project_dir, rows, cols, cursor_row, cursor_col, screen_text,
+                    transcript_path, exit_code, signal, error, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+                ON CONFLICT(tui_id) DO UPDATE SET
+                    session_id = excluded.session_id,
+                    agent_id = excluded.agent_id,
+                    runtime = excluded.runtime,
+                    status = excluded.status,
+                    argv_json = excluded.argv_json,
+                    project_dir = excluded.project_dir,
+                    rows = excluded.rows,
+                    cols = excluded.cols,
+                    cursor_row = excluded.cursor_row,
+                    cursor_col = excluded.cursor_col,
+                    screen_text = excluded.screen_text,
+                    transcript_path = excluded.transcript_path,
+                    exit_code = excluded.exit_code,
+                    signal = excluded.signal,
+                    error = excluded.error,
+                    updated_at = excluded.updated_at",
+                rusqlite::params![
+                    snapshot.tui_id,
+                    snapshot.session_id,
+                    snapshot.agent_id,
+                    snapshot.runtime,
+                    snapshot.status.as_str(),
+                    argv_json,
+                    snapshot.project_dir,
+                    snapshot.screen.rows,
+                    snapshot.screen.cols,
+                    snapshot.screen.cursor_row,
+                    snapshot.screen.cursor_col,
+                    snapshot.screen.text,
+                    snapshot.transcript_path,
+                    snapshot.exit_code,
+                    snapshot.signal,
+                    snapshot.error,
+                    snapshot.created_at,
+                    snapshot.updated_at,
+                ],
+            )
+            .map_err(|error| db_error(format!("save agent TUI: {error}")))?;
+        Ok(())
+    }
+
+    /// Load one managed agent TUI snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub fn agent_tui(&self, tui_id: &str) -> Result<Option<AgentTuiSnapshot>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
+                project_dir, rows, cols, cursor_row, cursor_col, screen_text,
+                transcript_path, exit_code, signal, error, created_at, updated_at
+             FROM agent_tuis
+             WHERE tui_id = ?1",
+            [tui_id],
+            agent_tui_from_row,
+        );
+        match result {
+            Ok(snapshot) => Ok(Some(snapshot)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("load agent TUI: {error}"))),
+        }
+    }
+
+    /// List managed agent TUI snapshots for a session, newest first.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub fn list_agent_tuis(&self, session_id: &str) -> Result<Vec<AgentTuiSnapshot>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
+                    project_dir, rows, cols, cursor_row, cursor_col, screen_text,
+                    transcript_path, exit_code, signal, error, created_at, updated_at
+                 FROM agent_tuis
+                 WHERE session_id = ?1
+                 ORDER BY updated_at DESC",
+            )
+            .map_err(|error| db_error(format!("prepare agent TUI list: {error}")))?;
+        let rows = statement
+            .query_map([session_id], agent_tui_from_row)
+            .map_err(|error| db_error(format!("query agent TUI list: {error}")))?;
+
+        let mut snapshots = Vec::new();
+        for row in rows {
+            snapshots.push(row.map_err(|error| db_error(format!("read agent TUI row: {error}")))?);
+        }
+        Ok(snapshots)
+    }
 }
 
 fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
@@ -1521,6 +1635,48 @@ fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnaps
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
     })
+}
+
+fn agent_tui_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTuiSnapshot> {
+    let status_raw: String = row.get(4)?;
+    let argv_json: String = row.get(5)?;
+    let rows = row_i64_to_u16(row.get(7)?, "rows")?;
+    let cols = row_i64_to_u16(row.get(8)?, "cols")?;
+    let cursor_row = row_i64_to_u16(row.get(9)?, "cursor_row")?;
+    let cursor_col = row_i64_to_u16(row.get(10)?, "cursor_col")?;
+    let exit_code = row
+        .get::<_, Option<i64>>(13)?
+        .map(|value| u32::try_from(value).map_err(|error| parse_error_to_sql(error.to_string())))
+        .transpose()?;
+    Ok(AgentTuiSnapshot {
+        tui_id: row.get(0)?,
+        session_id: row.get(1)?,
+        agent_id: row.get(2)?,
+        runtime: row.get(3)?,
+        status: AgentTuiStatus::from_str(&status_raw).map_err(parse_error_to_sql)?,
+        argv: serde_json::from_str(&argv_json)
+            .map_err(|error| parse_error_to_sql(format!("parse agent TUI argv: {error}")))?,
+        project_dir: row.get(6)?,
+        size: AgentTuiSize { rows, cols },
+        screen: TerminalScreenSnapshot {
+            rows,
+            cols,
+            cursor_row,
+            cursor_col,
+            text: row.get(11)?,
+        },
+        transcript_path: row.get(12)?,
+        exit_code,
+        signal: row.get(14)?,
+        error: row.get(15)?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+    })
+}
+
+fn row_i64_to_u16(value: i64, column: &str) -> rusqlite::Result<u16> {
+    u16::try_from(value)
+        .map_err(|error| parse_error_to_sql(format!("invalid {column} value {value}: {error}")))
 }
 
 fn parse_error_to_sql(error: String) -> rusqlite::Error {
@@ -1755,9 +1911,20 @@ fn migrate_v3_to_v4(conn: &Connection) -> Result<(), CliError> {
         .map_err(|error| db_error(format!("migrate v3 -> v4 codex runs: {error}")))?;
     conn.execute(
         "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
-        [SCHEMA_VERSION],
+        ["4"],
     )
     .map_err(|error| db_error(format!("bump schema version to v4: {error}")))?;
+    Ok(())
+}
+
+fn migrate_v4_to_v5(conn: &Connection) -> Result<(), CliError> {
+    conn.execute_batch(AGENT_TUIS_SCHEMA)
+        .map_err(|error| db_error(format!("migrate v4 -> v5 agent tuis: {error}")))?;
+    conn.execute(
+        "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
+        [SCHEMA_VERSION],
+    )
+    .map_err(|error| db_error(format!("bump schema version to v5: {error}")))?;
     Ok(())
 }
 
@@ -2082,6 +2249,34 @@ CREATE INDEX IF NOT EXISTS idx_codex_runs_status
     ON codex_runs(status);
 ";
 
+const AGENT_TUIS_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS agent_tuis (
+    tui_id          TEXT PRIMARY KEY,
+    session_id      TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    agent_id        TEXT NOT NULL,
+    runtime         TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    argv_json       TEXT NOT NULL,
+    project_dir     TEXT NOT NULL,
+    rows            INTEGER NOT NULL,
+    cols            INTEGER NOT NULL,
+    cursor_row      INTEGER NOT NULL,
+    cursor_col      INTEGER NOT NULL,
+    screen_text     TEXT NOT NULL,
+    transcript_path TEXT NOT NULL,
+    exit_code       INTEGER,
+    signal          TEXT,
+    error           TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_agent_tuis_session_updated
+    ON agent_tuis(session_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_tuis_status
+    ON agent_tuis(status);
+";
+
 const CREATE_SCHEMA: &str = "
 -- Schema version tracking
 CREATE TABLE schema_meta (
@@ -2089,7 +2284,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '4');
+INSERT INTO schema_meta (key, value) VALUES ('version', '5');
 
 -- Discovered projects
 CREATE TABLE projects (
@@ -2303,6 +2498,32 @@ CREATE INDEX idx_codex_runs_session_updated
 CREATE INDEX idx_codex_runs_status
     ON codex_runs(status);
 
+CREATE TABLE agent_tuis (
+    tui_id          TEXT PRIMARY KEY,
+    session_id      TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    agent_id        TEXT NOT NULL,
+    runtime         TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    argv_json       TEXT NOT NULL,
+    project_dir     TEXT NOT NULL,
+    rows            INTEGER NOT NULL,
+    cols            INTEGER NOT NULL,
+    cursor_row      INTEGER NOT NULL,
+    cursor_col      INTEGER NOT NULL,
+    screen_text     TEXT NOT NULL,
+    transcript_path TEXT NOT NULL,
+    exit_code       INTEGER,
+    signal          TEXT,
+    error           TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE INDEX idx_agent_tuis_session_updated
+    ON agent_tuis(session_id, updated_at DESC);
+CREATE INDEX idx_agent_tuis_status
+    ON agent_tuis(status);
+
 INSERT INTO change_tracking (scope, version, updated_at)
 VALUES ('global', 0, datetime('now'));
 ";
@@ -2357,6 +2578,35 @@ mod tests {
     }
 
     #[test]
+    fn migrates_v4_schema_to_agent_tuis() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let path = tmp.path().join("harness.db");
+        {
+            let conn = Connection::open(&path).expect("open sqlite");
+            conn.execute_batch(
+                "CREATE TABLE schema_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                ) WITHOUT ROWID;
+                INSERT INTO schema_meta (key, value) VALUES ('version', '4');",
+            )
+            .expect("seed v4 schema meta");
+        }
+
+        let db = DaemonDb::open(&path).expect("open migrated db");
+        assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+        let exists: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'agent_tuis'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query agent_tuis table");
+        assert_eq!(exists, 1);
+    }
+
+    #[test]
     fn all_tables_exist() {
         let db = DaemonDb::open_in_memory().expect("open db");
         let tables: Vec<String> = db
@@ -2370,6 +2620,7 @@ mod tests {
 
         let expected = [
             "agent_activity_cache",
+            "agent_tuis",
             "agents",
             "change_tracking",
             "codex_runs",
@@ -2422,6 +2673,36 @@ mod tests {
             .expect("present");
         assert_eq!(loaded.status, CodexRunStatus::Completed);
         assert_eq!(loaded.final_message.as_deref(), Some("Done."));
+    }
+
+    #[test]
+    fn agent_tuis_round_trip_and_list_newest_first() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let mut older = sample_agent_tui("agent-tui-1", "2026-04-09T10:00:00Z");
+        older.status = AgentTuiStatus::Stopped;
+        db.save_agent_tui(&older).expect("save older tui");
+
+        let newer = sample_agent_tui("agent-tui-2", "2026-04-09T11:00:00Z");
+        db.save_agent_tui(&newer).expect("save newer tui");
+
+        let tuis = db.list_agent_tuis(&state.session_id).expect("list tuis");
+        assert_eq!(tuis.len(), 2);
+        assert_eq!(tuis[0].tui_id, "agent-tui-2");
+        assert_eq!(tuis[1].tui_id, "agent-tui-1");
+
+        let loaded = db
+            .agent_tui("agent-tui-1")
+            .expect("load tui")
+            .expect("present");
+        assert_eq!(loaded.status, AgentTuiStatus::Stopped);
+        assert_eq!(loaded.screen.text, "ready");
+        assert_eq!(loaded.argv, vec!["copilot".to_string()]);
     }
 
     #[test]
@@ -2686,6 +2967,35 @@ mod tests {
             final_message: None,
             error: None,
             pending_approvals: Vec::new(),
+            created_at: "2026-04-09T09:00:00Z".into(),
+            updated_at: updated_at.into(),
+        }
+    }
+
+    fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapshot {
+        AgentTuiSnapshot {
+            tui_id: tui_id.into(),
+            session_id: "sess-test-1".into(),
+            agent_id: "claude-leader".into(),
+            runtime: "copilot".into(),
+            status: AgentTuiStatus::Running,
+            argv: vec!["copilot".into()],
+            project_dir: "/tmp/harness".into(),
+            size: AgentTuiSize {
+                rows: 30,
+                cols: 120,
+            },
+            screen: TerminalScreenSnapshot {
+                rows: 30,
+                cols: 120,
+                cursor_row: 1,
+                cursor_col: 6,
+                text: "ready".into(),
+            },
+            transcript_path: "/tmp/harness/output.raw".into(),
+            exit_code: None,
+            signal: None,
+            error: None,
             created_at: "2026-04-09T09:00:00Z".into(),
             updated_at: updated_at.into(),
         }
