@@ -1008,3 +1008,52 @@ pub(super) fn require_auth(
             .into_response(),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{StatusCode, map_json};
+    use crate::errors::CliErrorKind;
+    use axum::body::to_bytes;
+    use serde_json::Value;
+
+    async fn response_body(result: Result<Value, crate::errors::CliError>) -> (StatusCode, Value) {
+        let response = map_json(result);
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), 4096).await.expect("body");
+        let json: Value = serde_json::from_slice(&bytes).expect("json body");
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn map_json_maps_codex_unavailable_to_503() {
+        let error = CliErrorKind::codex_server_unavailable("ws://127.0.0.1:4500").into();
+        let (status, body) = response_body(Err(error)).await;
+
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["error"], "codex-unavailable");
+        assert_eq!(body["endpoint"], "ws://127.0.0.1:4500");
+        assert_eq!(
+            body["hint"],
+            "run: codex app-server --listen ws://127.0.0.1:4500"
+        );
+    }
+
+    #[tokio::test]
+    async fn map_json_maps_sandbox_disabled_to_501() {
+        let error = CliErrorKind::sandbox_feature_disabled("codex.stdio").into();
+        let (status, body) = response_body(Err(error)).await;
+
+        assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(body["error"], "sandbox-disabled");
+        assert_eq!(body["feature"], "codex.stdio");
+    }
+
+    #[tokio::test]
+    async fn map_json_maps_other_errors_to_400() {
+        let error = CliErrorKind::workflow_parse("bad request").into();
+        let (status, body) = response_body(Err(error)).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(body["error"]["code"].as_str().is_some());
+    }
+}
