@@ -197,15 +197,29 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 
 Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines) and `tmp/investigations/xcuitest-speed/`. Consult for rationale or edge cases.
 
-## Sandboxed daemon and codex bridge
+## Daemon modes
 
-Harness Monitor runs its daemon helper under the macOS App Sandbox via `SMAppService`. The launch agent plist sets `HARNESS_SANDBOXED=1`, which gates all subprocess-spawning code paths (launchd management, codex stdio transport, daemon restart).
+Harness Monitor supports two daemon ownership modes. Pick the right one for the work you're doing.
+
+### External daemon (recommended dev workflow)
+
+Launch the app under the `HarnessMonitor (External Daemon)` scheme in Xcode and run `harness daemon dev` in a terminal. The dev daemon runs unsandboxed, writes its manifest into the `Q498EB36N4.io.harnessmonitor` app group container so the sandboxed Monitor app can read it, and spawns codex as its own stdio child - no `harness codex-bridge` process required.
+
+Debugging is `lldb -- harness daemon dev` or `cargo run --bin harness -- daemon dev` in a terminal. The scheme sets `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout so the app can wait for you to start the daemon after launch. Starting the app before the daemon also works: the manifest watcher fires on the first manifest write and auto-reconnects within ~250ms.
+
+If you previously ran `harness codex-bridge`, stop it before using dev mode - the dev daemon would otherwise route codex over the old bridge instead of spawning stdio.
+
+The `HARNESS_MONITOR_EXTERNAL_DAEMON` flag is gated behind `#if DEBUG` in `DaemonOwnership`, so release builds always fall back to managed mode regardless of environment.
+
+### Managed daemon (release and distribution)
+
+Use the default `HarnessMonitor` scheme. This exercises the shipping path: the daemon runs under the macOS App Sandbox via `SMAppService`, and the launch agent plist sets `HARNESS_SANDBOXED=1` and `HARNESS_APP_GROUP_ID=Q498EB36N4.io.harnessmonitor`. Subprocess-spawning code paths (launchd management, codex stdio transport, daemon restart) are gated off in sandboxed mode and surface structured errors.
+
+Run this scheme before cutting a TestFlight / notarized build - it's the only way to validate the release code path end-to-end.
 
 Codex Runs use WebSocket transport when sandboxed. The daemon connects to an externally-managed `codex app-server` on loopback. Users start the bridge with `harness codex-bridge start` in a terminal or install it as a login item with `harness codex-bridge install-launch-agent`. The bridge writes `codex-endpoint.json` to the daemon data root; the daemon watches it and updates the manifest live so the Swift UI reflects bridge status without restart.
 
-When no codex bridge is running, `POST /v1/sessions/{id}/codex-runs` returns 503 with `{"error": "codex-unavailable"}`. The Swift store sets `codexUnavailable = true` and the Codex Flow sheet shows a recovery banner with a copy-to-clipboard command. The flag clears on reconnect (manifest watcher fires when the bridge comes up).
-
-To attach a debugger to the daemon, run `cargo run --bin harness -- daemon serve --host 127.0.0.1 --port 0` in a terminal (unsandboxed). The Monitor app connects to the running daemon via its manifest. This bypasses `SMAppService` and allows debugging codex stdio paths too.
+When no codex bridge is running in managed mode, `POST /v1/sessions/{id}/codex-runs` returns 503 with `{"error": "codex-unavailable"}`. The Swift store sets `codexUnavailable = true` and the Codex Flow sheet shows a recovery banner with a copy-to-clipboard command. The flag clears on reconnect.
 
 Minimum codex version for WebSocket transport: `rust-v0.102.0+`.
 
