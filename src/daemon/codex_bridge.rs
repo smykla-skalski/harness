@@ -301,7 +301,7 @@ pub struct CodexBridgeRemoveLaunchAgentArgs {
 }
 
 /// Serialized snapshot of the bridge's live state for `status` / `stop`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CodexBridgeStatusReport {
     /// `true` when the bridge PID is still alive on the host.
     pub running: bool,
