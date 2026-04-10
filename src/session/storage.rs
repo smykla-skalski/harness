@@ -117,6 +117,7 @@ pub(crate) fn state_repository(
                 Box::new(migrate_v1_to_v2),
                 Box::new(migrate_v2_to_v3),
                 Box::new(migrate_v3_to_v4),
+                Box::new(migrate_v4_to_v5),
             ]),
     )
 }
@@ -436,6 +437,15 @@ fn migrate_v3_to_v4(mut value: Value) -> Result<Value, CliError> {
     Ok(value)
 }
 
+fn migrate_v4_to_v5(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    object.insert("schema_version".to_string(), json!(5));
+    Ok(value)
+}
+
 /// Active session registry: maps session IDs to creation timestamps.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct ActiveRegistry {
@@ -503,6 +513,7 @@ pub(crate) fn record_project_origin(project_dir: &Path) -> Result<(), CliError> 
     let context_root = project_context_dir(project_dir);
     let path = context_root.join(PROJECT_ORIGIN_FILE);
     let identity = resolve_git_checkout_identity(project_dir);
+    let previous = load_project_origin(&context_root);
     let origin = ProjectOriginRecord {
         recorded_from_dir: project_dir.to_string_lossy().to_string(),
         repository_root: identity
@@ -517,6 +528,7 @@ pub(crate) fn record_project_origin(project_dir: &Path) -> Result<(), CliError> 
         worktree_name: identity.and_then(|value| value.worktree_name().map(ToString::to_string)),
         recorded_at: utc_now(),
     };
+    let origin = merge_project_origin(origin, previous.as_ref());
     write_json_pretty(&path, &origin)
 }
 
@@ -525,6 +537,30 @@ pub(crate) fn record_project_origin(project_dir: &Path) -> Result<(), CliError> 
 pub(crate) fn load_project_origin(context_root: &Path) -> Option<ProjectOriginRecord> {
     let path = context_root.join(PROJECT_ORIGIN_FILE);
     read_json_typed::<ProjectOriginRecord>(&path).ok()
+}
+
+fn merge_project_origin(
+    mut origin: ProjectOriginRecord,
+    previous: Option<&ProjectOriginRecord>,
+) -> ProjectOriginRecord {
+    let Some(previous) = previous else {
+        return origin;
+    };
+
+    if origin.repository_root.is_none() {
+        origin.repository_root.clone_from(&previous.repository_root);
+    }
+    if origin.checkout_root.is_none() {
+        origin.checkout_root.clone_from(&previous.checkout_root);
+    }
+    if !origin.is_worktree && previous.is_worktree {
+        origin.is_worktree = true;
+        origin.worktree_name.clone_from(&previous.worktree_name);
+    }
+    if origin.worktree_name.is_none() {
+        origin.worktree_name.clone_from(&previous.worktree_name);
+    }
+    origin
 }
 
 #[cfg(test)]
@@ -679,7 +715,70 @@ mod tests {
     }
 
     #[test]
-    fn load_state_migrates_v3_state_and_persists_v4() {
+    fn migrate_v4_to_v5_stamps_current_schema() {
+        let migrated = migrate_v4_to_v5(json!({
+            "schema_version": 4,
+            "state_version": 2,
+            "session_id": "sess-1",
+            "title": "session title",
+            "context": "session goal",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+            "leader_id": null,
+            "archived_at": null,
+            "last_activity_at": null,
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+                "agent_count": 0,
+                "active_agent_count": 0,
+                "open_task_count": 0,
+                "in_progress_task_count": 0,
+                "blocked_task_count": 0,
+                "completed_task_count": 0
+            }
+        }))
+        .expect("migrate v4");
+
+        assert_eq!(migrated["schema_version"], json!(CURRENT_VERSION));
+        assert_eq!(migrated["title"], json!("session title"));
+    }
+
+    #[test]
+    fn merge_project_origin_preserves_existing_git_identity() {
+        let merged = merge_project_origin(
+            ProjectOriginRecord {
+                recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
+                repository_root: None,
+                checkout_root: None,
+                is_worktree: false,
+                worktree_name: None,
+                recorded_at: "2026-04-10T10:00:00Z".to_string(),
+            },
+            Some(&ProjectOriginRecord {
+                recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
+                repository_root: Some("/repo".to_string()),
+                checkout_root: Some("/repo/.claude/worktrees/feature".to_string()),
+                is_worktree: true,
+                worktree_name: Some("feature".to_string()),
+                recorded_at: "2026-04-10T09:00:00Z".to_string(),
+            }),
+        );
+
+        assert_eq!(merged.repository_root.as_deref(), Some("/repo"));
+        assert_eq!(
+            merged.checkout_root.as_deref(),
+            Some("/repo/.claude/worktrees/feature")
+        );
+        assert!(merged.is_worktree);
+        assert_eq!(merged.worktree_name.as_deref(), Some("feature"));
+    }
+
+    #[test]
+    fn load_state_migrates_v3_state_and_persists_current_schema() {
         let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [

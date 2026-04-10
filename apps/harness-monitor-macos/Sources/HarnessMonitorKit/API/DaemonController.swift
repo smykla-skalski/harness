@@ -267,7 +267,7 @@ public struct DaemonController: DaemonControlling {
   private func startDetachedDaemon(binary: URL) throws -> Process {
     let process = Process()
     process.executableURL = binary
-    process.arguments = ["daemon", "serve", "--host", "127.0.0.1", "--port", "0"]
+    process.arguments = Self.daemonServeArguments
     process.environment = processEnvironment()
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
@@ -302,11 +302,26 @@ public struct DaemonController: DaemonControlling {
   }
 
   private func processEnvironment() -> [String: String] {
-    var values = ProcessInfo.processInfo.environment
+    Self.daemonProcessEnvironment(
+      base: ProcessInfo.processInfo.environment,
+      environment: environment
+    )
+  }
+
+  static var daemonServeArguments: [String] {
+    ["daemon", "serve", "--host", "127.0.0.1", "--port", "0", "--sandboxed"]
+  }
+
+  static func daemonProcessEnvironment(
+    base: [String: String],
+    environment: HarnessMonitorEnvironment
+  ) -> [String: String] {
+    var values = base
     values.merge(environment.values) { _, new in new }
     values[HarnessMonitorAppGroup.environmentKey] =
       values[HarnessMonitorAppGroup.environmentKey]?.nonEmpty
       ?? HarnessMonitorAppGroup.identifier
+    values["HARNESS_SANDBOXED"] = "1"
 
     if values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?.nonEmpty == nil {
       values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey] =

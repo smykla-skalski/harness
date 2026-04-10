@@ -16,5 +16,6 @@ pub(crate) use remote_kubernetes::{
 };
 pub use session::{
     current_run_context_path, current_run_context_path_for_project, data_root, project_context_dir,
-    session_context_dir, session_context_dir_for_project, session_scope_key, suite_root,
+    project_context_id, session_context_dir, session_context_dir_for_project, session_scope_key,
+    suite_root,
 };
