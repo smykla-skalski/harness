@@ -17,6 +17,7 @@ extension UTType {
 }
 
 struct SessionTaskListSection: View {
+  let store: HarnessMonitorStore
   let sessionID: String
   let tasks: [WorkItem]
   let companionAgentCount: Int
@@ -51,6 +52,7 @@ struct SessionTaskListSection: View {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(tasks) { task in
             SessionTaskSummaryCard(
+              store: store,
               sessionID: sessionID,
               task: task,
               inspectTask: inspectTask
@@ -65,6 +67,7 @@ struct SessionTaskListSection: View {
 }
 
 struct SessionTaskSummaryCard: View {
+  let store: HarnessMonitorStore
   let sessionID: String
   let task: WorkItem
   let inspectTask: (String) -> Void
@@ -132,16 +135,24 @@ struct SessionTaskSummaryCard: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
     .animation(.easeOut(duration: 0.10), value: isDragging)
+    .onDisappear {
+      if isDragging {
+        store.contentUI.session.isTaskDragActive = false
+      }
+    }
   }
 
   private func updateDragSession(_ session: DragSession) {
     switch session.phase {
     case .initial, .active:
       dragPhase = session.phase
+      store.contentUI.session.isTaskDragActive = true
     case .ended, .dataTransferCompleted:
       dragPhase = nil
+      store.contentUI.session.isTaskDragActive = false
     @unknown default:
       dragPhase = nil
+      store.contentUI.session.isTaskDragActive = false
     }
   }
 
@@ -186,6 +197,7 @@ struct SessionTaskSummaryCard: View {
 
 #Preview("Task summary") {
   SessionTaskSummaryCard(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     sessionID: PreviewFixtures.summary.sessionId,
     task: PreviewFixtures.tasks[0],
     inspectTask: { _ in }

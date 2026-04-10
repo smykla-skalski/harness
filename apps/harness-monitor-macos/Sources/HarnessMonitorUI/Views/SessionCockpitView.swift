@@ -36,6 +36,7 @@ struct SessionCockpitView: View {
         )
         HarnessMonitorAdaptiveGridLayout(minimumColumnWidth: 340, maximumColumns: 2, spacing: 16) {
           SessionTaskListSection(
+            store: store,
             sessionID: detail.session.sessionId,
             tasks: detail.tasks,
             companionAgentCount: detail.agents.count,

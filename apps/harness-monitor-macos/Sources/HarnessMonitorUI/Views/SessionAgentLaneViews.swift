@@ -206,6 +206,10 @@ struct SessionAgentSummaryCard: View {
       .accessibilityFrameMarker(
         "\(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId)).frame"
       )
+      if showPulseBorder {
+        DropTargetPulseBorder()
+          .transition(.opacity)
+      }
       if let feedback = taskDropFeedback {
         ZStack {
           AgentTaskDropFeedbackOverlay(feedback: feedback)
@@ -223,6 +227,13 @@ struct SessionAgentSummaryCard: View {
       isDropTargeted = targeted
     }
     .animation(.easeInOut(duration: 0.12), value: isDropTargeted)
+    .animation(.easeInOut(duration: 0.2), value: showPulseBorder)
+  }
+
+  private var showPulseBorder: Bool {
+    store.contentUI.session.isTaskDragActive
+      && taskDropAction.feedback.isActionable
+      && !isDropTargeted
   }
 
   private var taskDropFeedback: AgentTaskDropFeedback? {
@@ -305,4 +316,18 @@ private struct RoleTintRGB {
   let red: CGFloat
   let green: CGFloat
   let blue: CGFloat
+}
+
+private struct DropTargetPulseBorder: View {
+  var body: some View {
+    RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+      .stroke(HarnessMonitorTheme.accent, lineWidth: 1.5)
+      .phaseAnimator([0.25, 0.7]) { border, opacity in
+        border.opacity(opacity)
+      } animation: { _ in
+        .easeInOut(duration: 1.1)
+      }
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
 }
