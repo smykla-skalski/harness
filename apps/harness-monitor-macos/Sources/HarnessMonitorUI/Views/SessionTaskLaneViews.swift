@@ -197,10 +197,11 @@ struct SessionTaskSummaryCard: View {
 private struct TaskDraggingOverlay: View {
   var body: some View {
     ZStack {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(.regularMaterial)
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.accent.opacity(0.18))
+      Color.clear
+        .harnessFloatingControlGlass(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          tint: HarnessMonitorTheme.accent
+        )
       Circle()
         .fill(HarnessMonitorTheme.accent.opacity(0.32))
         .frame(width: 112, height: 112)
@@ -230,7 +231,10 @@ private struct TaskDragPreview: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .harnessFloatingControlGlass(
+      cornerRadius: 8,
+      tint: HarnessMonitorTheme.accent
+    )
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(HarnessMonitorTheme.accent.opacity(0.5), lineWidth: 1)
