@@ -996,6 +996,43 @@ pub fn send_signal(
     session_detail(session_id, db)
 }
 
+/// Cancel a pending signal by writing a rejected acknowledgment.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved, the signal is not
+/// pending, or ack persistence fails.
+pub fn cancel_signal(
+    session_id: &str,
+    request: &super::protocol::SignalCancelRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    let project_dir = if let Some(db) = db
+        && let Some(dir) = db.project_dir_for_session(session_id)?
+    {
+        PathBuf::from(dir)
+    } else {
+        let resolved = index::resolve_session(session_id)?;
+        effective_project_dir(&resolved).to_path_buf()
+    };
+
+    session_service::cancel_signal(
+        session_id,
+        &request.agent_id,
+        &request.signal_id,
+        &request.actor,
+        &project_dir,
+    )?;
+
+    if let Some(db) = db {
+        refresh_signal_index_for_db(db, session_id)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+    } else {
+        sync_after_mutation(db, session_id);
+    }
+    session_detail(session_id, db)
+}
+
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 ///
 /// Falls back to file-based session creation when `db` is `None`.
@@ -1956,6 +1993,133 @@ mod tests {
                 detail.signals[0].signal.payload.action_hint.as_deref(),
                 Some("task:signal")
             );
+        });
+    }
+
+    #[test]
+    fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon cancel request",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-cancel"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("daemon-cancel-worker"))], || {
+                    session_service::join_session(
+                        "daemon-cancel",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join worker")
+                });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|agent_id| agent_id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+
+            let sent = send_signal(
+                "daemon-cancel",
+                &SignalSendRequest {
+                    actor: leader_id.clone(),
+                    agent_id: worker_id.clone(),
+                    command: "inject_context".into(),
+                    message: "Investigate the stuck signal lane".into(),
+                    action_hint: Some("task:signal".into()),
+                },
+                None,
+            )
+            .expect("send signal");
+            let signal_id = sent.signals[0].signal.signal_id.clone();
+
+            let detail = cancel_signal(
+                "daemon-cancel",
+                &super::super::protocol::SignalCancelRequest {
+                    actor: leader_id,
+                    agent_id: worker_id.clone(),
+                    signal_id: signal_id.clone(),
+                },
+                None,
+            )
+            .expect("cancel signal");
+
+            assert_eq!(detail.signals.len(), 1);
+            assert_eq!(detail.signals[0].status, SessionSignalStatus::Rejected);
+            assert_eq!(detail.signals[0].signal.signal_id, signal_id);
+            assert_eq!(
+                detail.signals[0]
+                    .acknowledgment
+                    .as_ref()
+                    .map(|ack| ack.result),
+                Some(crate::agents::runtime::signal::AckResult::Rejected)
+            );
+
+            let log_entries =
+                crate::session::storage::load_log_entries(project, "daemon-cancel").expect("log");
+            assert!(log_entries.into_iter().any(|entry| matches!(
+                entry.transition,
+                crate::session::types::SessionTransition::SignalAcknowledged {
+                    signal_id: ref id,
+                    result: crate::agents::runtime::signal::AckResult::Rejected,
+                    ..
+                } if id == &signal_id
+            )));
+        });
+    }
+
+    #[test]
+    fn cancel_signal_errors_when_signal_not_pending() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon cancel missing",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-cancel-missing"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined = temp_env::with_vars(
+                [("CODEX_SESSION_ID", Some("daemon-cancel-missing-worker"))],
+                || {
+                    session_service::join_session(
+                        "daemon-cancel-missing",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join worker")
+                },
+            );
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|agent_id| agent_id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+
+            let result = cancel_signal(
+                "daemon-cancel-missing",
+                &super::super::protocol::SignalCancelRequest {
+                    actor: leader_id,
+                    agent_id: worker_id,
+                    signal_id: "nonexistent-signal".into(),
+                },
+                None,
+            );
+
+            assert!(result.is_err(), "cancel should fail when signal missing");
         });
     }
 

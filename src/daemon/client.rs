@@ -11,8 +11,8 @@ use crate::infra::exec::RUNTIME;
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
-    SignalAckRequest, SignalSendRequest, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskUpdateRequest,
+    SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
 };
 use super::state;
 use crate::session::types::SessionState;
@@ -160,6 +160,14 @@ impl DaemonClient {
     ) -> Result<(), CliError> {
         let _: Value = self.post(&format!("/v1/sessions/{session_id}/signal-ack"), request)?;
         Ok(())
+    }
+
+    pub fn cancel_signal(
+        &self,
+        session_id: &str,
+        request: &SignalCancelRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(&format!("/v1/sessions/{session_id}/signal-cancel"), request)
     }
 
     // --- Read operations ---
