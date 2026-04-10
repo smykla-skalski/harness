@@ -19,7 +19,6 @@ extension UTType {
 struct SessionTaskListSection: View {
   let sessionID: String
   let tasks: [WorkItem]
-  let isSessionReadOnly: Bool
   let companionAgentCount: Int
   let inspectTask: (String) -> Void
 
@@ -54,7 +53,6 @@ struct SessionTaskListSection: View {
             SessionTaskSummaryCard(
               sessionID: sessionID,
               task: task,
-              isDragEnabled: !isSessionReadOnly && task.isDraggableForWorkerDrop,
               inspectTask: inspectTask
             )
           }
@@ -69,10 +67,8 @@ struct SessionTaskListSection: View {
 struct SessionTaskSummaryCard: View {
   let sessionID: String
   let task: WorkItem
-  let isDragEnabled: Bool
   let inspectTask: (String) -> Void
-  @State private var isHovered = false
-  @State private var isDragSessionActive = false
+  @State private var dragPhase: DragSession.Phase?
 
   private var dragPayload: TaskDragPayload {
     TaskDragPayload(
@@ -83,113 +79,69 @@ struct SessionTaskSummaryCard: View {
   }
 
   private var isDragging: Bool {
-    isDragEnabled && isDragSessionActive
+    switch dragPhase {
+    case .initial, .active:
+      true
+    default:
+      false
+    }
   }
 
   var body: some View {
-    ZStack {
+    Button {
+      inspectTask(task.taskId)
+    } label: {
       cardSurface
     }
-      .background {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          .fill(Color.primary.opacity(isDragging || isHovered ? 0.08 : 0.04))
+    .harnessInteractiveCardButtonStyle()
+    .overlay {
+      if isDragging {
+        TaskDraggingOverlay()
+          .transition(.opacity)
       }
-      .overlay {
-        if isDragging {
-          TaskDraggingOverlay()
-            .transition(.opacity)
-        }
-      }
-      .overlay {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          .strokeBorder(
-            isDragging ? HarnessMonitorTheme.accent : Color.clear,
-            lineWidth: isDragging ? 2 : 0
-          )
-      }
-      .opacity(isDragging ? 0.82 : 1)
-      .scaleEffect(isDragging ? 0.985 : 1)
-      .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD))
-      .taskCardDrag(
-        payload: dragPayload,
-        isEnabled: isDragEnabled
-      )
-      .onDragSessionUpdated { session in
-        updateDragSession(session)
-      }
-      .onContinuousHover { phase in
-        withAnimation(.easeOut(duration: 0.15)) {
-          switch phase {
-          case .active:
-            isHovered = true
-          case .ended:
-            isHovered = false
-          }
-        }
-      }
-      .onTapGesture {
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .strokeBorder(
+          isDragging ? HarnessMonitorTheme.accent : Color.clear,
+          lineWidth: isDragging ? 2 : 0
+        )
+    }
+    .opacity(isDragging ? 0.82 : 1)
+    .scaleEffect(isDragging ? 0.985 : 1)
+    .draggable(dragPayload) {
+      TaskDragPreview(taskID: task.taskId)
+    }
+    .onDragSessionUpdated { session in
+      updateDragSession(session)
+    }
+    .contextMenu {
+      Button {
         inspectTask(task.taskId)
+      } label: {
+        Label("Inspect", systemImage: "info.circle")
       }
-      .contextMenu {
-        Button {
-          inspectTask(task.taskId)
-        } label: {
-          Label("Inspect", systemImage: "info.circle")
-        }
-        Divider()
-        Button {
-          HarnessMonitorClipboard.copy(task.taskId)
-        } label: {
-          Label("Copy Task ID", systemImage: "doc.on.doc")
-        }
+      Divider()
+      Button {
+        HarnessMonitorClipboard.copy(task.taskId)
+      } label: {
+        Label("Copy Task ID", systemImage: "doc.on.doc")
       }
-      .accessibilityElement(children: .combine)
-      .accessibilityAddTraits(.isButton)
-      .accessibilityAction {
-        inspectTask(task.taskId)
-      }
-      .accessibilityValue(isDragging ? "Dragging" : "")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
-      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
-      .animation(isDragging ? .easeOut(duration: 0.10) : nil, value: isDragging)
-      .animation(.easeOut(duration: 0.15), value: isHovered)
-      .onChange(of: isDragEnabled) { _, isEnabled in
-        if !isEnabled {
-          resetDragSessionState()
-        }
-      }
-      .onDisappear {
-        resetDragSessionState()
-      }
+    }
+    .accessibilityValue(isDragging ? "Dragging" : "")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
+    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
+    .animation(.easeOut(duration: 0.10), value: isDragging)
   }
 
   private func updateDragSession(_ session: DragSession) {
-    guard isDragEnabled else {
-      resetDragSessionState()
-      return
-    }
     switch session.phase {
     case .initial, .active:
-      guard !isDragSessionActive else {
-        return
-      }
-      withAnimation(.easeOut(duration: 0.10)) {
-        isDragSessionActive = true
-      }
-    default:
-      resetDragSessionState()
-    }
-  }
-
-  private func resetDragSessionState() {
-    guard isDragSessionActive || isHovered else {
-      return
-    }
-    var transaction = Transaction()
-    transaction.disablesAnimations = true
-    withTransaction(transaction) {
-      isDragSessionActive = false
-      isHovered = false
+      dragPhase = session.phase
+    case .ended, .dataTransferCompleted:
+      dragPhase = nil
+    @unknown default:
+      dragPhase = nil
     }
   }
 
@@ -236,27 +188,10 @@ struct SessionTaskSummaryCard: View {
   SessionTaskSummaryCard(
     sessionID: PreviewFixtures.summary.sessionId,
     task: PreviewFixtures.tasks[0],
-    isDragEnabled: true,
     inspectTask: { _ in }
   )
     .padding()
     .frame(width: 320)
-}
-
-private extension View {
-  @ViewBuilder
-  func taskCardDrag(
-    payload: TaskDragPayload,
-    isEnabled: Bool
-  ) -> some View {
-    if isEnabled {
-      draggable(payload) {
-        TaskDragPreview(taskID: payload.taskID)
-      }
-    } else {
-      self
-    }
-  }
 }
 
 private struct TaskDraggingOverlay: View {
@@ -317,10 +252,6 @@ private struct TaskDragGestureIcon: View {
 }
 
 private extension WorkItem {
-  var isDraggableForWorkerDrop: Bool {
-    isLeaderAssignable || isReassignableQueuedTask
-  }
-
   var assignmentStateTitle: String {
     if isQueuedForWorker {
       return queuePolicy == .reassignWhenFree ? "Queued · reassignable" : "Queued"
