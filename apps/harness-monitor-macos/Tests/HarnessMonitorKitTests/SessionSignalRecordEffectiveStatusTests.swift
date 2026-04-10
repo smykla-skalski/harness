@@ -98,6 +98,18 @@ struct SessionSignalRecordEffectiveStatusTests {
     let record = makeRecord(status: .pending, expiresAt: "2000-01-01T00:00:00.123Z")
     #expect(record.effectiveStatus == .expired)
   }
+
+  @Test("expiresAtDate exposes parsed date")
+  func expiresAtDateParses() {
+    let record = makeRecord(status: .pending, expiresAt: "2026-06-01T12:00:00Z")
+    #expect(record.expiresAtDate != nil)
+  }
+
+  @Test("expiresAtDate returns nil on malformed input")
+  func expiresAtDateNilOnMalformed() {
+    let record = makeRecord(status: .pending, expiresAt: "not-a-timestamp")
+    #expect(record.expiresAtDate == nil)
+  }
 }
 
 @Suite("JSONValue structural emptiness")

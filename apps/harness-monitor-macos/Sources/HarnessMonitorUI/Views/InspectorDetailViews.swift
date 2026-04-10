@@ -61,7 +61,19 @@ struct SessionInspectorSummaryCard: View {
 struct SignalInspectorCard: View {
   let signal: SessionSignalRecord
 
+  private static let expiresInStyle: Date.RelativeFormatStyle = .relative(
+    presentation: .numeric,
+    unitsStyle: .wide
+  )
+
   private var effectiveStatus: SessionSignalStatus { signal.effectiveStatus }
+
+  private var pendingExpiresAt: Date? {
+    guard effectiveStatus == .pending, let expires = signal.expiresAtDate, expires > .now else {
+      return nil
+    }
+    return expires
+  }
 
   private var facts: [InspectorFact] {
     [
@@ -81,6 +93,16 @@ struct SignalInspectorCard: View {
       Text(signal.signal.payload.message)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
+      if let expires = pendingExpiresAt {
+        Label {
+          Text("Expires \(expires, format: Self.expiresInStyle)")
+        } icon: {
+          Image(systemName: "clock")
+        }
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityLabel("Expires \(expires, format: Self.expiresInStyle)")
+      }
       if let actionHint = signal.signal.payload.actionHint, !actionHint.isEmpty {
         InspectorSection(title: "Action Hint") {
           Text(actionHint)
