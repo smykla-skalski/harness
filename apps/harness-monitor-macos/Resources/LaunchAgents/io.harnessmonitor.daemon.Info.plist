@@ -4,14 +4,22 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Harness Monitor Daemon</string>
 	<key>CFBundleExecutable</key>
 	<string>harness</string>
 	<key>CFBundleIdentifier</key>
 	<string>io.harnessmonitor.daemon</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Harness Monitor Daemon</string>
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>18.14.2</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>LSBackgroundOnly</key>
 	<true/>
 </dict>
