@@ -96,6 +96,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
   private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
+  private var _codexStartError: (any Error)?
   private var _globalStreamEvents: [DaemonPushEvent] = []
   private var _globalStreamError: (any Error)?
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
@@ -257,6 +258,14 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     lock.withLock {
       _codexRunsBySessionID[sessionID] = runs
     }
+  }
+
+  func configureCodexStartError(_ error: (any Error)?) {
+    lock.withLock { _codexStartError = error }
+  }
+
+  func configuredCodexStartError() -> (any Error)? {
+    lock.withLock { _codexStartError }
   }
 
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
