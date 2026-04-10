@@ -101,6 +101,7 @@ struct HarnessMonitorStoreFilteringBasicsTests {
     )
 
     store.searchText = "leader"
+    store.flushPendingSearchRebuild()
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleSessions(from: store)
         == HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
@@ -121,6 +122,7 @@ struct HarnessMonitorStoreFilteringBasicsTests {
   func searchResultObservationIgnoresProjectHeaderOnlyUpdates() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
     store.searchText = "leader"
+    store.flushPendingSearchRebuild()
 
     let renamedProject = ProjectSummary(
       projectId: "project-a",
