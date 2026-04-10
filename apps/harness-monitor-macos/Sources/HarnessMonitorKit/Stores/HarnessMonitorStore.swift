@@ -135,6 +135,7 @@ public final class HarnessMonitorStore {
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var lastActionDismissDelay: Duration = .seconds(4)
+  var bootstrapWarmUpTimeout: Duration = .seconds(15)
 
   let daemonController: any DaemonControlling
   let fileViewer: any FileViewerActivating
@@ -224,8 +225,9 @@ public final class HarnessMonitorStore {
     defer { isDaemonActionInFlight = false }
 
     do {
-      let client = try await daemonController.startDaemonClient()
-      try? await Task.sleep(for: .milliseconds(300))
+      let client = try await daemonController.awaitManifestWarmUp(
+        timeout: bootstrapWarmUpTimeout
+      )
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)

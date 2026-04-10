@@ -19,7 +19,20 @@ actor RecordingDaemonController: DaemonControlling {
     client
   }
 
-  func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
+  func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    launchAgentInstalled = true
+    lastEventMessage = "launch agent installed"
+    return .enabled
+  }
+
+  func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {}
+
+  func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
     client
   }
 

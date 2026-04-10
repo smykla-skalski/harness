@@ -3,11 +3,18 @@ import ServiceManagement
 
 public protocol DaemonControlling: Sendable {
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol
-  func startDaemonClient() async throws -> any HarnessMonitorClientProtocol
   func stopDaemon() async throws -> String
   func daemonStatus() async throws -> DaemonStatusReport
   func installLaunchAgent() async throws -> String
   func removeLaunchAgent() async throws -> String
+  func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState
+  func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws
+  func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol
 }
 
 public enum DaemonLaunchAgentRegistrationState: Equatable, Sendable {
@@ -151,8 +158,45 @@ public struct DaemonController: DaemonControlling {
     }
   }
 
-  public func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
-    try await waitForHealthyClient()
+  public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    try launchAgentManager.register()
+    return launchAgentManager.registrationState()
+  }
+
+  public func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+      if launchAgentManager.registrationState() == target {
+        return
+      }
+      try await Task.sleep(for: .milliseconds(100))
+    }
+    if launchAgentManager.registrationState() == target {
+      return
+    }
+    throw DaemonControlError.daemonDidNotStart
+  }
+
+  public func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
+    let deadline = ContinuousClock.now + timeout
+    var lastError: (any Error)?
+    while ContinuousClock.now < deadline {
+      do {
+        return try await bootstrapClient()
+      } catch {
+        lastError = error
+        try await Task.sleep(for: .milliseconds(250))
+      }
+    }
+    if let client = try? await bootstrapClient() {
+      return client
+    }
+    throw lastError ?? DaemonControlError.daemonDidNotStart
   }
 
   public func stopDaemon() async throws -> String {
@@ -186,8 +230,7 @@ public struct DaemonController: DaemonControlling {
         "Enable Harness Monitor daemon in System Settings > General > Login Items."
       )
     case .notRegistered, .notFound:
-      try launchAgentManager.register()
-      switch launchAgentManager.registrationState() {
+      switch try await registerLaunchAgent() {
       case .enabled:
         return "launch agent installed"
       case .requiresApproval:
@@ -206,17 +249,6 @@ public struct DaemonController: DaemonControlling {
       try launchAgentManager.unregister()
       return "launch agent removed"
     }
-  }
-
-  private func waitForHealthyClient() async throws -> any HarnessMonitorClientProtocol {
-    let deadline = Date.now.addingTimeInterval(8)
-    while Date.now < deadline {
-      if let client = try? await bootstrapClient() {
-        return client
-      }
-      try await Task.sleep(for: .milliseconds(250))
-    }
-    throw DaemonControlError.daemonDidNotStart
   }
 
   private func loadManifest() throws -> DaemonManifest {
