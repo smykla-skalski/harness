@@ -6,6 +6,7 @@ use serde::Serialize;
 use tempfile::tempdir;
 use tokio::sync::{broadcast, watch};
 
+use harness::daemon::codex_controller::CodexControllerHandle;
 use harness::daemon::db::DaemonDb;
 use harness::daemon::http::{DaemonHttpState, serve};
 use harness::daemon::protocol::StreamEvent;
@@ -70,6 +71,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
             .expect("seed daemon db");
     }
 
+    let codex_controller = CodexControllerHandle::new(sender.clone(), db_slot.clone());
     let state = DaemonHttpState {
         token: token.clone(),
         sender,
@@ -77,6 +79,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         daemon_epoch: harness::workspace::utc_now(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(64))),
         db: db_slot,
+        codex_controller,
     };
 
     tokio::spawn(async move {
