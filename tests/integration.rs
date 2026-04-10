@@ -3,6 +3,7 @@
 
 mod integration {
     mod architecture;
+    mod codex_bridge;
     mod daemon_comparison;
     mod daemon_control;
     mod daemon_perf;
