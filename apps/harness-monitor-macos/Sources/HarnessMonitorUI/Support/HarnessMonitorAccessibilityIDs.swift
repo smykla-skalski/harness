@@ -181,6 +181,10 @@ public enum HarnessMonitorAccessibility {
     "harness.session.agent.\(slug(agentID))"
   }
 
+  static func sessionAgentTaskDropFeedback(_ agentID: String) -> String {
+    "\(sessionAgentCard(agentID)).task-drop-feedback"
+  }
+
   static func sessionAgentSignalTrigger(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID)).signal-trigger"
   }

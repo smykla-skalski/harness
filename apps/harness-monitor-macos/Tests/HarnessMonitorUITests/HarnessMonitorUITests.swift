@@ -98,6 +98,26 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(signals.exists)
   }
 
+  func testTaskDropFeedbackShowsQueuedWorkerAction() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_UI_TASK_DROP_FEEDBACK_AGENT_ID": "worker-codex"]
+    )
+
+    tapPreviewSession(in: app)
+    XCTAssertTrue(
+      element(in: app, identifier: Accessibility.workerAgentCard)
+        .waitForExistence(timeout: Self.actionTimeout)
+    )
+
+    let feedback = element(
+      in: app,
+      identifier: Accessibility.sessionAgentTaskDropFeedback("worker-codex")
+    )
+    XCTAssertTrue(feedback.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertEqual(feedback.label, "Queue for this worker. Drop behind the current task.")
+  }
+
   func testToolbarSurvivesSidebarToggle() throws {
     let app = launch(mode: "preview")
 

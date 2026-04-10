@@ -181,6 +181,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.sidebar.focus-chip.\(slug(filter))"
   }
 
+  static func sessionAgentTaskDropFeedback(_ agentID: String) -> String {
+    "harness.session.agent.\(slug(agentID)).task-drop-feedback"
+  }
+
   private static func slug(_ value: String) -> String {
     let lowercased = value.lowercased()
     return
