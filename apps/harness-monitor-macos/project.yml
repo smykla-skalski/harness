@@ -94,13 +94,6 @@ targets:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
       - package: Lottie
-    entitlements:
-      path: HarnessMonitor.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.application-groups:
-          - Q498EB36N4.io.harnessmonitor
-        com.apple.security.network.client: true
     postBuildScripts:
       - name: Bundle Daemon Agent
         basedOnDependencyAnalysis: false
@@ -282,13 +275,6 @@ targets:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
       - package: Lottie
-    entitlements:
-      path: HarnessMonitor.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.application-groups:
-          - Q498EB36N4.io.harnessmonitor
-        com.apple.security.network.client: true
     postBuildScripts:
       - name: Bundle Daemon Agent
         basedOnDependencyAnalysis: false
