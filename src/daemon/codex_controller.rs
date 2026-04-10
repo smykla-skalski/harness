@@ -1,18 +1,15 @@
 use std::collections::{HashMap, VecDeque};
-use std::env;
-use std::process::Stdio;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use serde::Serialize;
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::codex_transport::{CodexTransport, StdioCodexTransport};
 use super::db::DaemonDb;
 use super::protocol::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexApprovalRequest,
@@ -331,7 +328,8 @@ impl CodexRunWorker {
             Some("Starting codex app-server"),
             None,
         )?;
-        let mut rpc = CodexJsonRpc::spawn()?;
+        let transport: Box<dyn CodexTransport> = Box::new(StdioCodexTransport::spawn()?);
+        let mut rpc = CodexJsonRpc::new(transport);
         self.initialize(&mut rpc).await?;
         self.start_or_resume_thread(&mut rpc).await?;
         self.start_turn(&mut rpc).await?;
@@ -702,59 +700,18 @@ impl CodexRunWorker {
 }
 
 struct CodexJsonRpc {
-    child: Child,
-    stdin: ChildStdin,
-    lines: Lines<BufReader<ChildStdout>>,
+    transport: Box<dyn CodexTransport>,
     pending_messages: VecDeque<Value>,
     next_id: i64,
 }
 
 impl CodexJsonRpc {
-    fn spawn() -> Result<Self, CliError> {
-        let bin = env::var("HARNESS_CODEX_BIN").unwrap_or_else(|_| "codex".to_string());
-        let mut child = Command::new(bin)
-            .arg("app-server")
-            .arg("--listen")
-            .arg("stdio://")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("spawn codex app-server: {error}"))
-            })?;
-
-        if let Some(stderr) = child.stderr.take() {
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(stderr).lines();
-                loop {
-                    match lines.next_line().await {
-                        Ok(Some(line)) => tracing::debug!(line, "codex app-server stderr"),
-                        Ok(None) => break,
-                        Err(error) => {
-                            tracing::warn!(%error, "failed to read codex app-server stderr");
-                            break;
-                        }
-                    }
-                }
-            });
-        }
-
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| CliErrorKind::workflow_io("codex app-server stdin unavailable"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| CliErrorKind::workflow_io("codex app-server stdout unavailable"))?;
-        Ok(Self {
-            child,
-            stdin,
-            lines: BufReader::new(stdout).lines(),
+    fn new(transport: Box<dyn CodexTransport>) -> Self {
+        Self {
+            transport,
             pending_messages: VecDeque::new(),
             next_id: 1,
-        })
+        }
     }
 
     async fn request(&mut self, method: &str, params: Value) -> Result<Value, CliError> {
@@ -804,19 +761,7 @@ impl CodexJsonRpc {
         let encoded = serde_json::to_string(&message).map_err(|error| {
             CliErrorKind::workflow_serialize(format!("codex rpc request: {error}"))
         })?;
-        self.stdin
-            .write_all(encoded.as_bytes())
-            .await
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("write codex app-server stdin: {error}"))
-            })?;
-        self.stdin.write_all(b"\n").await.map_err(|error| {
-            CliErrorKind::workflow_io(format!("write codex app-server newline: {error}"))
-        })?;
-        self.stdin.flush().await.map_err(|error| {
-            CliErrorKind::workflow_io(format!("flush codex app-server stdin: {error}"))
-        })?;
-        Ok(())
+        self.transport.send(encoded).await
     }
 
     async fn next_message(&mut self) -> Result<Option<Value>, CliError> {
@@ -827,21 +772,12 @@ impl CodexJsonRpc {
     }
 
     async fn read_stdout_message(&mut self) -> Result<Option<Value>, CliError> {
-        let Some(line) = self.lines.next_line().await.map_err(|error| {
-            CliErrorKind::workflow_io(format!("read codex app-server stdout: {error}"))
-        })?
-        else {
+        let Some(line) = self.transport.next_frame().await? else {
             return Ok(None);
         };
         serde_json::from_str(&line).map(Some).map_err(|error| {
             CliErrorKind::workflow_parse(format!("parse codex app-server JSON: {error}")).into()
         })
-    }
-}
-
-impl Drop for CodexJsonRpc {
-    fn drop(&mut self) {
-        let _ = self.child.start_kill();
     }
 }
 
