@@ -26,6 +26,25 @@ pub struct DaemonManifest {
     pub endpoint: String,
     pub started_at: String,
     pub token_path: String,
+    /// Whether the daemon is running inside the macOS App Sandbox.
+    ///
+    /// Legacy manifests written before this field existed default to
+    /// `false` so they can be deserialized without migration.
+    #[serde(default)]
+    pub sandboxed: bool,
+    /// Transport name for the codex bridge. Currently `"stdio"` by
+    /// default; WebSocket support is staged behind this field so the
+    /// client can pick a transport without a schema break.
+    #[serde(default = "default_codex_transport")]
+    pub codex_transport: String,
+    /// Optional WebSocket endpoint the codex bridge exposes. `None`
+    /// when the daemon has no bridge or is running stdio-only.
+    #[serde(default)]
+    pub codex_endpoint: Option<String>,
+}
+
+fn default_codex_transport() -> String {
+    "stdio".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -446,6 +465,32 @@ mod tests {
     }
 
     #[test]
+    fn manifest_deserializes_legacy_json_without_sandbox_fields() {
+        let legacy = r#"{
+            "version": "18.14.0",
+            "pid": 101,
+            "endpoint": "http://127.0.0.1:7070",
+            "started_at": "2026-04-01T00:00:00Z",
+            "token_path": "/tmp/legacy-token"
+        }"#;
+        let manifest: DaemonManifest = serde_json::from_str(legacy).expect("legacy deserialize");
+        assert_eq!(manifest.version, "18.14.0");
+        assert_eq!(manifest.pid, 101);
+        assert!(
+            !manifest.sandboxed,
+            "legacy manifests default to unsandboxed"
+        );
+        assert_eq!(
+            manifest.codex_transport, "stdio",
+            "legacy manifests default codex transport to stdio"
+        );
+        assert!(
+            manifest.codex_endpoint.is_none(),
+            "legacy manifests default codex endpoint to None"
+        );
+    }
+
+    #[test]
     fn manifest_round_trip() {
         let tmp = tempdir().expect("tempdir");
         temp_env::with_vars(
@@ -460,6 +505,9 @@ mod tests {
                     endpoint: "http://127.0.0.1:9999".into(),
                     started_at: "2026-03-28T12:00:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    codex_transport: default_codex_transport(),
+                    codex_endpoint: None,
                 };
                 write_manifest(&manifest).expect("write");
                 let loaded = load_manifest().expect("load").expect("manifest");
@@ -485,6 +533,9 @@ mod tests {
                     endpoint: "http://127.0.0.1:9999".into(),
                     started_at: "2026-04-04T07:00:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    codex_transport: default_codex_transport(),
+                    codex_endpoint: None,
                 })
                 .expect("manifest");
 
@@ -512,6 +563,9 @@ mod tests {
                     endpoint: "http://127.0.0.1:7777".into(),
                     started_at: "2026-04-04T07:05:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    codex_transport: default_codex_transport(),
+                    codex_endpoint: None,
                 })
                 .expect("manifest");
 
@@ -542,6 +596,9 @@ mod tests {
                     endpoint: "http://127.0.0.1:9191".into(),
                     started_at: "2026-04-10T07:05:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    codex_transport: default_codex_transport(),
+                    codex_endpoint: None,
                 })
                 .expect("manifest");
 
