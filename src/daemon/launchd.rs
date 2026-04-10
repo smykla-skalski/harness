@@ -82,26 +82,51 @@ pub fn render_launch_agent_plist(binary_path: &Path) -> String {
 
 /// Boot out the user `LaunchAgent` runtime if it is currently loaded.
 ///
+/// When `sandboxed` is `true`, returns a `SandboxFeatureDisabled` error
+/// immediately without touching `launchctl`.
+///
 /// # Errors
-/// Returns `CliError` when `launchctl bootout` fails for a reason other than a
-/// missing service.
-pub fn bootout_launch_agent() -> Result<bool, CliError> {
+/// Returns `CliError` when sandbox mode is on, or when `launchctl bootout`
+/// fails for a reason other than a missing service.
+pub fn bootout_launch_agent(sandboxed: bool) -> Result<bool, CliError> {
+    if sandboxed {
+        return Err(CliError::from(CliErrorKind::sandbox_feature_disabled(
+            "launch-agent-bootout",
+        )));
+    }
     best_effort_bootout(&run_launchctl)
 }
 
 /// Restart the installed user `LaunchAgent` without rewriting the plist.
 ///
+/// When `sandboxed` is `true`, returns a `SandboxFeatureDisabled` error
+/// immediately without touching `launchctl`.
+///
 /// # Errors
-/// Returns `CliError` when the plist is missing or `launchctl` operations fail.
-pub fn restart_launch_agent() -> Result<(), CliError> {
+/// Returns `CliError` when sandbox mode is on, when the plist is missing,
+/// or when `launchctl` operations fail.
+pub fn restart_launch_agent(sandboxed: bool) -> Result<(), CliError> {
+    if sandboxed {
+        return Err(CliError::from(CliErrorKind::sandbox_feature_disabled(
+            "launch-agent-restart",
+        )));
+    }
     restart_launch_agent_with(&run_launchctl)
 }
 
 /// Install the user `LaunchAgent` plist for the harness daemon.
 ///
+/// When `sandboxed` is `true`, returns a `SandboxFeatureDisabled` error
+/// immediately without writing the plist or calling `launchctl`.
+///
 /// # Errors
-/// Returns `CliError` on filesystem failures.
-pub fn install_launch_agent(binary_path: &Path) -> Result<PathBuf, CliError> {
+/// Returns `CliError` when sandbox mode is on, or on filesystem failures.
+pub fn install_launch_agent(sandboxed: bool, binary_path: &Path) -> Result<PathBuf, CliError> {
+    if sandboxed {
+        return Err(CliError::from(CliErrorKind::sandbox_feature_disabled(
+            "launch-agent-install",
+        )));
+    }
     install_launch_agent_with(binary_path, &run_launchctl)
 }
 
@@ -162,9 +187,17 @@ where
 
 /// Remove the user `LaunchAgent` plist if present.
 ///
+/// When `sandboxed` is `true`, returns a `SandboxFeatureDisabled` error
+/// immediately without touching the filesystem or `launchctl`.
+///
 /// # Errors
-/// Returns `CliError` on filesystem failures.
-pub fn remove_launch_agent() -> Result<bool, CliError> {
+/// Returns `CliError` when sandbox mode is on, or on filesystem failures.
+pub fn remove_launch_agent(sandboxed: bool) -> Result<bool, CliError> {
+    if sandboxed {
+        return Err(CliError::from(CliErrorKind::sandbox_feature_disabled(
+            "launch-agent-remove",
+        )));
+    }
     remove_launch_agent_with(&run_launchctl)
 }
 
@@ -779,5 +812,34 @@ mod tests {
                 assert_eq!(status.last_exit_status, Some(0));
             },
         );
+    }
+
+    #[test]
+    fn bootout_launch_agent_refuses_in_sandbox_mode() {
+        let error = bootout_launch_agent(true).expect_err("sandbox mode must refuse bootout");
+        assert_eq!(error.code(), "SANDBOX001");
+        assert!(error.to_string().contains("launch-agent-bootout"));
+    }
+
+    #[test]
+    fn restart_launch_agent_refuses_in_sandbox_mode() {
+        let error = restart_launch_agent(true).expect_err("sandbox mode must refuse restart");
+        assert_eq!(error.code(), "SANDBOX001");
+        assert!(error.to_string().contains("launch-agent-restart"));
+    }
+
+    #[test]
+    fn install_launch_agent_refuses_in_sandbox_mode() {
+        let error = install_launch_agent(true, Path::new("/tmp/harness-bin"))
+            .expect_err("sandbox mode must refuse install");
+        assert_eq!(error.code(), "SANDBOX001");
+        assert!(error.to_string().contains("launch-agent-install"));
+    }
+
+    #[test]
+    fn remove_launch_agent_refuses_in_sandbox_mode() {
+        let error = remove_launch_agent(true).expect_err("sandbox mode must refuse remove");
+        assert_eq!(error.code(), "SANDBOX001");
+        assert!(error.to_string().contains("launch-agent-remove"));
     }
 }
