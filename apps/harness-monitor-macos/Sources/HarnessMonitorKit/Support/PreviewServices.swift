@@ -386,6 +386,13 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     try await sessionDetail(id: "")
   }
 
+  public func cancelSignal(
+    sessionID _: String,
+    request _: SignalCancelRequest
+  ) async throws -> SessionDetail {
+    try await sessionDetail(id: "")
+  }
+
   public func observeSession(
     sessionID _: String,
     request _: ObserveSessionRequest

@@ -50,9 +50,10 @@ struct SessionCockpitView: View {
           )
         }
         SessionCockpitSignalsSection(
+          store: store,
           signals: detail.signals,
           isExtensionsLoading: isExtensionsLoading,
-          inspectSignal: store.inspect(signalID:)
+          isSessionReadOnly: isSessionReadOnly
         )
         SessionCockpitTimelineSection(
           sessionID: detail.session.sessionId,

@@ -131,6 +131,10 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
     sessionID _: String, request _: SignalSendRequest
   ) async throws -> SessionDetail { throw error }
 
+  func cancelSignal(
+    sessionID _: String, request _: SignalCancelRequest
+  ) async throws -> SessionDetail { throw error }
+
   func observeSession(
     sessionID _: String, request _: ObserveSessionRequest
   ) async throws -> SessionDetail { throw error }

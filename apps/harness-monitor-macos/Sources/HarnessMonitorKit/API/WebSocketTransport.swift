@@ -303,6 +303,15 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func cancelSignal(
+    sessionID: String,
+    request: SignalCancelRequest
+  ) async throws -> SessionDetail {
+    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let value = try await send(method: "signal.cancel", params: params)
+    return try decode(value)
+  }
+
   public func observeSession(
     sessionID: String,
     request: ObserveSessionRequest

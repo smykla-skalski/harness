@@ -38,6 +38,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       decision: CodexApprovalDecision
     )
     case sendSignal(sessionID: String, agentID: String, command: String, actor: String)
+    case cancelSignal(sessionID: String, agentID: String, signalID: String, actor: String)
     case startCodexRun(
       sessionID: String,
       prompt: String,
