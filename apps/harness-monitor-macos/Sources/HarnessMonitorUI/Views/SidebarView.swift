@@ -11,6 +11,8 @@ struct SidebarView: View {
   let sidebarVisible: Bool
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
+  @Environment(\.fontScale)
+  private var fontScale
 
   @SceneStorage("sidebar.collapsed-project-ids")
   var collapsedProjectIDsStorage = ""
@@ -61,6 +63,10 @@ struct SidebarView: View {
       return []
     }
     return Array(recentSearches.prefix(5).map(\.query))
+  }
+
+  func scaledSidebarFont(_ font: Font) -> Font {
+    HarnessMonitorTextSize.scaledFont(font, by: fontScale)
   }
 
   private var sidebarSelection: Binding<String?> {
