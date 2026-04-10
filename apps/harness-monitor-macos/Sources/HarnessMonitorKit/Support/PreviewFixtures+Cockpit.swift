@@ -131,6 +131,14 @@ extension PreviewFixtures {
     agentActivity: agentActivity
   )
 
+  public static let taskDropDetail = sessionDetail(
+    session: taskDropSummary,
+    tasks: taskDropTasks,
+    signals: signals,
+    observer: observer,
+    agentActivity: agentActivity
+  )
+
   public static let timeline = [
     TimelineEntry(
       entryId: "codex-worker-codex-tool-result-4",

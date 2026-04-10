@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -75,29 +74,31 @@ struct SessionAgentSummaryCard: View {
   }
 
   private var roleTint: Color {
+    let components = roleTintComponents
+    return Color(red: components.red, green: components.green, blue: components.blue)
+  }
+
+  private var roleTintComponents: (red: CGFloat, green: CGFloat, blue: CGFloat) {
     switch agent.role {
     case .leader:
-      Color(red: 0.35, green: 0.61, blue: 0.96)
+      (red: 0.35, green: 0.61, blue: 0.96)
     case .worker:
-      Color(red: 0.16, green: 0.73, blue: 0.63)
+      (red: 0.16, green: 0.73, blue: 0.63)
     case .observer:
-      Color(red: 0.52, green: 0.56, blue: 0.94)
+      (red: 0.52, green: 0.56, blue: 0.94)
     case .reviewer:
-      Color(red: 0.95, green: 0.50, blue: 0.33)
+      (red: 0.95, green: 0.50, blue: 0.33)
     case .improver:
-      Color(red: 0.78, green: 0.41, blue: 0.84)
+      (red: 0.78, green: 0.41, blue: 0.84)
     }
   }
 
   private var roleForeground: Color {
-    guard let rgbColor = NSColor(roleTint).usingColorSpace(.deviceRGB) else {
-      return HarnessMonitorTheme.onContrast
-    }
-
+    let rgbColor = roleTintComponents
     let luminance = relativeLuminance(
-      red: rgbColor.redComponent,
-      green: rgbColor.greenComponent,
-      blue: rgbColor.blueComponent
+      red: rgbColor.red,
+      green: rgbColor.green,
+      blue: rgbColor.blue
     )
     let contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05)
     let contrastWithDark = (luminance + 0.05) / (0.03 + 0.05)
@@ -107,8 +108,12 @@ struct SessionAgentSummaryCard: View {
       : HarnessMonitorTheme.onContrast
   }
 
-  private var isWorkerDropTarget: Bool {
-    !isSessionReadOnly && agent.status == .active && agent.role == .worker
+  private var taskDropAction: AgentTaskDropAction {
+    AgentTaskDropAction(
+      agent: agent,
+      queuedTaskCount: queuedTasks.count,
+      isSessionReadOnly: isSessionReadOnly
+    )
   }
 
   private var queueSummary: String {
@@ -175,9 +180,6 @@ struct SessionAgentSummaryCard: View {
         .clipped()
       }
       .harnessInteractiveCardButtonStyle()
-      .dropDestination(for: TaskDragPayload.self, action: handleTaskDrop, isTargeted: { targeted in
-        isDropTargeted = targeted
-      })
       .contextMenu {
         Button {
           inspectAgent(agent.agentId)
@@ -216,31 +218,32 @@ struct SessionAgentSummaryCard: View {
         .transition(.opacity.combined(with: .scale(scale: 0.98)))
       }
     }
+    .contentShape(.rect)
+    .dropDestination(for: TaskDragPayload.self, action: handleTaskDrop) { targeted in
+      isDropTargeted = targeted
+    }
     .animation(.easeInOut(duration: 0.12), value: isDropTargeted)
   }
 
   private var taskDropFeedback: AgentTaskDropFeedback? {
-    guard isDropTargeted || UITestTaskDropFeedbackOverride.matches(agent.agentId) else {
+    guard isDropTargeted else {
       return nil
     }
-    return AgentTaskDropFeedback(
-      agent: agent,
-      queuedTaskCount: queuedTasks.count,
-      isSessionReadOnly: isSessionReadOnly
-    )
+    return taskDropAction.feedback
   }
 
   private func handleTaskDrop(_ payloads: [TaskDragPayload], _: CGPoint) -> Bool {
-    guard isWorkerDropTarget else {
-      return false
-    }
-    guard let payload = payloads.first, payload.sessionID == sessionID else {
+    guard let targetAgentID = taskDropAction.targetAgentID,
+      let payload = payloads.first,
+      payload.sessionID == sessionID
+    else {
       return false
     }
     Task {
       await store.dropTask(
         taskID: payload.taskID,
-        target: .agent(agentId: agent.agentId)
+        target: .agent(agentId: targetAgentID),
+        queuePolicy: payload.queuePolicy
       )
     }
     return true
@@ -263,6 +266,49 @@ struct SessionAgentSummaryCard: View {
       return component / 12.92
     }
     return pow((component + 0.055) / 1.055, 2.4)
+  }
+}
+
+private enum AgentTaskDropAction {
+  case start(agentID: String, feedback: AgentTaskDropFeedback)
+  case queue(agentID: String, feedback: AgentTaskDropFeedback)
+  case unavailable(feedback: AgentTaskDropFeedback)
+
+  var feedback: AgentTaskDropFeedback {
+    switch self {
+    case .start(_, let feedback), .queue(_, let feedback), .unavailable(let feedback):
+      feedback
+    }
+  }
+
+  var targetAgentID: String? {
+    switch self {
+    case .start(let agentID, _), .queue(let agentID, _):
+      agentID
+    case .unavailable:
+      nil
+    }
+  }
+
+  init(
+    agent: AgentRegistration,
+    queuedTaskCount: Int,
+    isSessionReadOnly: Bool
+  ) {
+    let feedback = AgentTaskDropFeedback(
+      agent: agent,
+      queuedTaskCount: queuedTaskCount,
+      isSessionReadOnly: isSessionReadOnly
+    )
+    guard feedback.isActionable else {
+      self = .unavailable(feedback: feedback)
+      return
+    }
+    if agent.currentTaskId == nil {
+      self = .start(agentID: agent.agentId, feedback: feedback)
+    } else {
+      self = .queue(agentID: agent.agentId, feedback: feedback)
+    }
   }
 }
 
@@ -400,17 +446,6 @@ private struct AgentTaskDropFeedbackOverlay: View {
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(feedback.title)
     .accessibilityValue(feedback.detail)
-  }
-}
-
-private enum UITestTaskDropFeedbackOverride {
-  private static let targetAgentIDKey = "HARNESS_MONITOR_UI_TASK_DROP_FEEDBACK_AGENT_ID"
-
-  static func matches(_ agentID: String) -> Bool {
-    guard HarnessMonitorUITestEnvironment.isEnabled else {
-      return false
-    }
-    return ProcessInfo.processInfo.environment[targetAgentIDKey] == agentID
   }
 }
 
