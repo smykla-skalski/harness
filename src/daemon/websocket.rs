@@ -18,8 +18,8 @@ use super::http::DaemonHttpState;
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
     SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, WsErrorPayload,
-    WsPushEvent, WsRequest, WsResponse,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, WsErrorPayload, WsPushEvent, WsRequest, WsResponse,
 };
 use super::service;
 
@@ -399,6 +399,19 @@ fn dispatch_inner(
             dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
                 let body: TaskAssignRequest = serde_json::from_value(params)?;
                 service::assign_task(&session_id, &task_id, &body, db).map_err(Into::into)
+            })
+        }
+        "task.drop" => {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
+                let body: TaskDropRequest = serde_json::from_value(params)?;
+                service::drop_task(&session_id, &task_id, &body, db).map_err(Into::into)
+            })
+        }
+        "task.queue_policy" => {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
+                let body: TaskQueuePolicyRequest = serde_json::from_value(params)?;
+                service::update_task_queue_policy(&session_id, &task_id, &body, db)
+                    .map_err(Into::into)
             })
         }
         "task.update" => {

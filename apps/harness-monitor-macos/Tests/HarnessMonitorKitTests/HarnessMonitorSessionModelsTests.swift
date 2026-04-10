@@ -11,6 +11,12 @@ struct HarnessMonitorSessionModelsTests {
     return decoder
   }()
 
+  private let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    return encoder
+  }()
+
   private let signalPayloadDefaultsFixture = """
     {
       "session": {
@@ -120,6 +126,52 @@ struct HarnessMonitorSessionModelsTests {
     #expect(item.assignedTo == nil)
     #expect(item.createdBy == nil)
     #expect(item.checkpointSummary == nil)
+  }
+
+  @Test("Work item decoding accepts queued daemon fields")
+  func workItemDecodingAcceptsQueuedDaemonFields() throws {
+    let json = """
+      {
+        "task_id": "task-queued",
+        "title": "Queued task",
+        "severity": "medium",
+        "status": "open",
+        "assigned_to": "worker-codex",
+        "queue_policy": "reassign_when_free",
+        "queued_at": "2026-04-10T08:00:00Z",
+        "created_at": "2026-04-10T07:58:00Z",
+        "updated_at": "2026-04-10T08:00:00Z"
+      }
+      """
+
+    let item = try decoder.decode(WorkItem.self, from: Data(json.utf8))
+
+    #expect(item.assignedTo == "worker-codex")
+    #expect(item.queuePolicy == .reassignWhenFree)
+    #expect(item.queuedAt == "2026-04-10T08:00:00Z")
+    #expect(item.isQueuedForWorker)
+    #expect(item.isReassignableQueuedTask)
+    #expect(item.assignmentSummary == "Queued for worker-codex")
+  }
+
+  @Test("Task drop request encodes daemon wire values")
+  func taskDropRequestEncodesDaemonWireValues() throws {
+    let request = TaskDropRequest(
+      actor: "leader-claude",
+      target: .agent(agentId: "worker-codex"),
+      queuePolicy: .reassignWhenFree
+    )
+
+    let data = try encoder.encode(request)
+    let object = try #require(
+      JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let target = try #require(object["target"] as? [String: Any])
+
+    #expect(object["actor"] as? String == "leader-claude")
+    #expect(object["queue_policy"] as? String == "reassign_when_free")
+    #expect(target["target_type"] as? String == "agent")
+    #expect(target["agent_id"] as? String == "worker-codex")
   }
 
   @Test("Session detail decoding accepts daemon task payloads with omitted defaults")

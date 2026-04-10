@@ -49,6 +49,63 @@ public struct TaskAssignRequest: Codable, Equatable, Sendable {
   public let agentId: String
 }
 
+public enum TaskDropTarget: Codable, Equatable, Sendable {
+  case agent(agentId: String)
+
+  enum CodingKeys: String, CodingKey {
+    case targetType
+    case agentId
+  }
+
+  enum TargetType: String, Codable {
+    case agent
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let targetType = try container.decode(TargetType.self, forKey: .targetType)
+    switch targetType {
+    case .agent:
+      self = .agent(agentId: try container.decode(String.self, forKey: .agentId))
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .agent(let agentId):
+      try container.encode(TargetType.agent, forKey: .targetType)
+      try container.encode(agentId, forKey: .agentId)
+    }
+  }
+}
+
+public struct TaskDropRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let target: TaskDropTarget
+  public let queuePolicy: TaskQueuePolicy
+
+  public init(
+    actor: String,
+    target: TaskDropTarget,
+    queuePolicy: TaskQueuePolicy = .locked
+  ) {
+    self.actor = actor
+    self.target = target
+    self.queuePolicy = queuePolicy
+  }
+}
+
+public struct TaskQueuePolicyRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let queuePolicy: TaskQueuePolicy
+
+  public init(actor: String, queuePolicy: TaskQueuePolicy) {
+    self.actor = actor
+    self.queuePolicy = queuePolicy
+  }
+}
+
 public struct TaskUpdateRequest: Codable, Equatable, Sendable {
   public let actor: String
   public let status: TaskStatus

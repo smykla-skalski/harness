@@ -12,7 +12,7 @@ use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
     SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
 };
 use super::state;
 use crate::session::types::SessionState;
@@ -117,6 +117,18 @@ impl DaemonClient {
     ) -> Result<SessionDetail, CliError> {
         self.post(
             &format!("/v1/sessions/{session_id}/tasks/{task_id}/assign"),
+            request,
+        )
+    }
+
+    pub fn drop_task(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskDropRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}/drop"),
             request,
         )
     }

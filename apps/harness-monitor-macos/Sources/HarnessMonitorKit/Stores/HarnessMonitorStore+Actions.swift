@@ -68,6 +68,57 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
+  public func dropTask(
+    taskID: String,
+    target: TaskDropTarget,
+    queuePolicy: TaskQueuePolicy = .locked,
+    actor: String = "harness-app"
+  ) async -> Bool {
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
+    return await mutateSelectedSession(
+      actionName: "Drop task",
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        try await client.dropTask(
+          sessionID: sessionID,
+          taskID: taskID,
+          request: TaskDropRequest(
+            actor: actor,
+            target: target,
+            queuePolicy: queuePolicy
+          )
+        )
+      }
+    )
+  }
+
+  @discardableResult
+  public func updateTaskQueuePolicy(
+    taskID: String,
+    queuePolicy: TaskQueuePolicy,
+    actor: String = "harness-app"
+  ) async -> Bool {
+    guard guardSessionActionsAvailable() else { return false }
+    guard let client, let sessionID = selectedSessionID else { return false }
+    guard let actor = actionActor(for: actor) else { return false }
+    return await mutateSelectedSession(
+      actionName: "Update task queue",
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        try await client.updateTaskQueuePolicy(
+          sessionID: sessionID,
+          taskID: taskID,
+          request: TaskQueuePolicyRequest(actor: actor, queuePolicy: queuePolicy)
+        )
+      }
+    )
+  }
+
+  @discardableResult
   public func updateTaskStatus(
     taskID: String,
     status: TaskStatus,

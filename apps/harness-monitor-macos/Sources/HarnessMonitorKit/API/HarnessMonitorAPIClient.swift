@@ -88,6 +88,22 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/assign", body: request)
   }
 
+  public func dropTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDropRequest
+  ) async throws -> SessionDetail {
+    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/drop", body: request)
+  }
+
+  public func updateTaskQueuePolicy(
+    sessionID: String,
+    taskID: String,
+    request: TaskQueuePolicyRequest
+  ) async throws -> SessionDetail {
+    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/queue-policy", body: request)
+  }
+
   public func updateTask(
     sessionID: String,
     taskID: String,

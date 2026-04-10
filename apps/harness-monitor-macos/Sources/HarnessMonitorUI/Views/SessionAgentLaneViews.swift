@@ -4,7 +4,10 @@ import SwiftUI
 
 struct SessionAgentListSection: View {
   let store: HarnessMonitorStore
+  let sessionID: String
   let agents: [AgentRegistration]
+  let tasks: [WorkItem]
+  let isSessionReadOnly: Bool
   let inspectAgent: (String) -> Void
 
   var body: some View {
@@ -21,7 +24,14 @@ struct SessionAgentListSection: View {
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(agents) { agent in
-            SessionAgentSummaryCard(store: store, agent: agent, inspectAgent: inspectAgent)
+            SessionAgentSummaryCard(
+              store: store,
+              sessionID: sessionID,
+              agent: agent,
+              queuedTasks: tasks.queued(for: agent.agentId),
+              isSessionReadOnly: isSessionReadOnly,
+              inspectAgent: inspectAgent
+            )
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -33,10 +43,12 @@ struct SessionAgentListSection: View {
 
 struct SessionAgentSummaryCard: View {
   let store: HarnessMonitorStore
+  let sessionID: String
   let agent: AgentRegistration
+  let queuedTasks: [WorkItem]
+  let isSessionReadOnly: Bool
   let inspectAgent: (String) -> Void
-  @Environment(\.harnessDateTimeConfiguration)
-  private var dateTimeConfiguration
+  @State private var isDropTargeted = false
 
   private var runtimeSymbol: ProviderBrandSymbol? {
     switch agent.runtime.lowercased() {
@@ -95,6 +107,18 @@ struct SessionAgentSummaryCard: View {
       : HarnessMonitorTheme.onContrast
   }
 
+  private var isWorkerDropTarget: Bool {
+    !isSessionReadOnly && agent.status == .active && agent.role == .worker
+  }
+
+  private var queueSummary: String {
+    guard !queuedTasks.isEmpty else {
+      return agent.currentTaskId == nil ? "Ready" : "Working"
+    }
+    let suffix = queuedTasks.count == 1 ? "task" : "tasks"
+    return "\(queuedTasks.count) queued \(suffix)"
+  }
+
   var body: some View {
     Button {
       inspectAgent(agent.agentId)
@@ -116,10 +140,16 @@ struct SessionAgentSummaryCard: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: 0)
+        if let currentTaskId = agent.currentTaskId {
+          Text("Current \(currentTaskId)")
+            .scaledFont(.caption.monospaced())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+        }
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
           badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
-          badge(formatTimestamp(agent.lastActivityAt, configuration: dateTimeConfiguration))
+          badge(queueSummary)
         }
       }
       .frame(
@@ -144,6 +174,16 @@ struct SessionAgentSummaryCard: View {
       .clipped()
     }
     .harnessInteractiveCardButtonStyle()
+    .dropDestination(for: TaskDragPayload.self, action: handleTaskDrop, isTargeted: { targeted in
+      isDropTargeted = targeted && isWorkerDropTarget
+    })
+    .overlay {
+      if isDropTargeted {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .stroke(HarnessMonitorTheme.accent, lineWidth: 2)
+          .allowsHitTesting(false)
+      }
+    }
     .contextMenu {
       Button {
         inspectAgent(agent.agentId)
@@ -177,6 +217,22 @@ struct SessionAgentSummaryCard: View {
       ))
   }
 
+  private func handleTaskDrop(_ payloads: [TaskDragPayload], _: CGPoint) -> Bool {
+    guard isWorkerDropTarget else {
+      return false
+    }
+    guard let payload = payloads.first, payload.sessionID == sessionID else {
+      return false
+    }
+    Task {
+      await store.dropTask(
+        taskID: payload.taskID,
+        target: .agent(agentId: agent.agentId)
+      )
+    }
+    return true
+  }
+
   private func badge(_ value: String) -> some View {
     Text(value)
       .scaledFont(.caption.weight(.semibold))
@@ -200,9 +256,23 @@ struct SessionAgentSummaryCard: View {
 #Preview("Agent summary") {
   SessionAgentSummaryCard(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
+    sessionID: PreviewFixtures.summary.sessionId,
     agent: PreviewFixtures.agents[1],
+    queuedTasks: [],
+    isSessionReadOnly: false,
     inspectAgent: { _ in }
   )
   .padding()
   .frame(width: 320)
+}
+
+private extension [WorkItem] {
+  func queued(for agentID: String) -> [WorkItem] {
+    filter { task in
+      task.assignedTo == agentID && task.isQueuedForWorker
+    }
+    .sorted { lhs, rhs in
+      (lhs.queuedAt ?? lhs.updatedAt, lhs.taskId) < (rhs.queuedAt ?? rhs.updatedAt, rhs.taskId)
+    }
+  }
 }

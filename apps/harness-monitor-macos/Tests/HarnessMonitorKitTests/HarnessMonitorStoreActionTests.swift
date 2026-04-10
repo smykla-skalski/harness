@@ -63,6 +63,67 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.lastAction == "Assign task")
   }
 
+  @Test("Drop task sends target request and refreshes the selected session")
+  func dropTaskSendsRequestAndRefreshesSession() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+
+    await store.dropTask(
+      taskID: PreviewFixtures.tasks[0].taskId,
+      target: .agent(agentId: PreviewFixtures.agents[1].agentId),
+      actor: "leader-claude"
+    )
+
+    #expect(
+      client.recordedCalls()
+        == [
+          .dropTask(
+            sessionID: PreviewFixtures.summary.sessionId,
+            taskID: PreviewFixtures.tasks[0].taskId,
+            target: .agent(agentId: PreviewFixtures.agents[1].agentId),
+            queuePolicy: .locked,
+            actor: "leader-claude"
+          )
+        ]
+    )
+    #expect(
+      store.selectedSession?.tasks.first(where: {
+        $0.taskId == PreviewFixtures.tasks[0].taskId
+      })?.assignedTo == PreviewFixtures.agents[1].agentId
+    )
+    #expect(store.lastAction == "Drop task")
+  }
+
+  @Test("Update task queue policy sends request and refreshes the selected session")
+  func updateTaskQueuePolicySendsRequestAndRefreshesSession() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+
+    await store.updateTaskQueuePolicy(
+      taskID: PreviewFixtures.tasks[0].taskId,
+      queuePolicy: .reassignWhenFree,
+      actor: "leader-claude"
+    )
+
+    #expect(
+      client.recordedCalls()
+        == [
+          .updateTaskQueuePolicy(
+            sessionID: PreviewFixtures.summary.sessionId,
+            taskID: PreviewFixtures.tasks[0].taskId,
+            queuePolicy: .reassignWhenFree,
+            actor: "leader-claude"
+          )
+        ]
+    )
+    #expect(
+      store.selectedSession?.tasks.first(where: {
+        $0.taskId == PreviewFixtures.tasks[0].taskId
+      })?.queuePolicy == .reassignWhenFree
+    )
+    #expect(store.lastAction == "Update task queue")
+  }
+
   @Test("Update task status sends request and refreshes the selected session")
   func updateTaskStatusSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()

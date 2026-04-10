@@ -7,7 +7,7 @@ use crate::agents::runtime::signal::AckResult;
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::types::{
     AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionRole, SessionSignalRecord,
-    SessionState, SessionStatus, TaskSeverity, TaskStatus, WorkItem,
+    SessionState, SessionStatus, TaskQueuePolicy, TaskSeverity, TaskStatus, WorkItem,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -349,6 +349,26 @@ pub struct TaskCreateRequest {
 pub struct TaskAssignRequest {
     pub actor: String,
     pub agent_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDropRequest {
+    pub actor: String,
+    pub target: TaskDropTarget,
+    #[serde(default)]
+    pub queue_policy: TaskQueuePolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "target_type", rename_all = "snake_case")]
+pub enum TaskDropTarget {
+    Agent { agent_id: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskQueuePolicyRequest {
+    pub actor: String,
+    pub queue_policy: TaskQueuePolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

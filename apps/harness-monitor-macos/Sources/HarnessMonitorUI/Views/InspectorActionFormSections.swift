@@ -130,12 +130,14 @@ struct InspectorTaskActionsSection: View {
   @Binding var taskID: String
   @Binding var assigneeID: String
   @Binding var taskStatus: TaskStatus
+  @Binding var queuePolicy: TaskQueuePolicy
   @Binding var statusNote: String
   @Binding var checkpointSummary: String
   @Binding var checkpointProgress: Double
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let assignSelectedTask: () -> Void
+  let updateQueuePolicy: () -> Void
   let updateSelectedTask: () -> Void
   let checkpointSelectedTask: () -> Void
   @FocusState private var focusedField: ActionField?
@@ -169,9 +171,18 @@ struct InspectorTaskActionsSection: View {
         }
       }
       .harnessNativeFormControl()
+      Picker("Queue Policy", selection: $queuePolicy) {
+        ForEach(TaskQueuePolicy.allCases, id: \.self) { policy in
+          Text(policy.title).tag(policy)
+        }
+      }
+      .harnessNativeFormControl()
       HStack {
         Button("Assign", action: assignSelectedTask)
           .harnessActionButtonStyle(variant: .prominent, tint: nil)
+          .disabled(isSessionActionInFlight || isSessionReadOnly)
+        Button("Save Queue Policy", action: updateQueuePolicy)
+          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
           .disabled(isSessionActionInFlight || isSessionReadOnly)
       }
       HStack {

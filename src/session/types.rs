@@ -7,7 +7,7 @@ use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::signal::{AckResult, Signal, SignalAck};
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 4;
+pub const CURRENT_VERSION: u32 = 5;
 
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +184,10 @@ pub struct WorkItem {
     pub status: TaskStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assigned_to: Option<String>,
+    #[serde(default, skip_serializing_if = "TaskQueuePolicy::is_default")]
+    pub queue_policy: TaskQueuePolicy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queued_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -221,6 +225,25 @@ pub enum TaskStatus {
     InReview,
     Done,
     Blocked,
+}
+
+/// Whether a queued task can move to another free worker before its selected
+/// worker becomes available.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ValueEnum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskQueuePolicy {
+    #[default]
+    Locked,
+    ReassignWhenFree,
+}
+
+impl TaskQueuePolicy {
+    #[must_use]
+    pub const fn is_default(&self) -> bool {
+        matches!(self, Self::Locked)
+    }
 }
 
 /// Source that introduced a work item.
@@ -378,6 +401,10 @@ pub enum SessionTransition {
         task_id: String,
         agent_id: String,
     },
+    TaskQueued {
+        task_id: String,
+        agent_id: String,
+    },
     TaskStatusChanged {
         task_id: String,
         from: TaskStatus,
@@ -461,6 +488,8 @@ mod tests {
             severity: TaskSeverity::High,
             status: TaskStatus::Open,
             assigned_to: None,
+            queue_policy: TaskQueuePolicy::Locked,
+            queued_at: None,
             created_at: "2026-03-28T12:00:00Z".into(),
             updated_at: "2026-03-28T12:00:00Z".into(),
             created_by: Some("agent-1".into()),
@@ -519,6 +548,8 @@ mod tests {
                 severity: TaskSeverity::Medium,
                 status: TaskStatus::Open,
                 assigned_to: None,
+                queue_policy: TaskQueuePolicy::Locked,
+                queued_at: None,
                 created_at: "2026-03-28T12:00:00Z".into(),
                 updated_at: "2026-03-28T12:00:00Z".into(),
                 created_by: None,
@@ -539,6 +570,8 @@ mod tests {
                 severity: TaskSeverity::Medium,
                 status: TaskStatus::Done,
                 assigned_to: None,
+                queue_policy: TaskQueuePolicy::Locked,
+                queued_at: None,
                 created_at: "2026-03-28T12:00:00Z".into(),
                 updated_at: "2026-03-28T12:00:00Z".into(),
                 created_by: None,

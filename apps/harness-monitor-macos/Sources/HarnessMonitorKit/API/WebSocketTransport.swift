@@ -224,6 +224,32 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func dropTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDropRequest
+  ) async throws -> SessionDetail {
+    let params = try encodeParams(
+      request,
+      extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
+    )
+    let value = try await send(method: "task.drop", params: params)
+    return try decode(value)
+  }
+
+  public func updateTaskQueuePolicy(
+    sessionID: String,
+    taskID: String,
+    request: TaskQueuePolicyRequest
+  ) async throws -> SessionDetail {
+    let params = try encodeParams(
+      request,
+      extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
+    )
+    let value = try await send(method: "task.queue_policy", params: params)
+    return try decode(value)
+  }
+
   public func updateTask(
     sessionID: String,
     taskID: String,

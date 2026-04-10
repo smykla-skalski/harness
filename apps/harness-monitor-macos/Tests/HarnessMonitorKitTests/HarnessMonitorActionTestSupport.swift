@@ -28,6 +28,13 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       severity: TaskSeverity,
       actor: String
     )
+    case dropTask(
+      sessionID: String,
+      taskID: String,
+      target: TaskDropTarget,
+      queuePolicy: TaskQueuePolicy,
+      actor: String
+    )
     case interruptCodexRun(runID: String)
     case endSession(sessionID: String, actor: String)
     case observeSession(sessionID: String, actor: String)
@@ -48,6 +55,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     )
     case steerCodexRun(runID: String, prompt: String)
     case transferLeader(sessionID: String, newLeaderID: String, reason: String?, actor: String)
+    case updateTaskQueuePolicy(
+      sessionID: String,
+      taskID: String,
+      queuePolicy: TaskQueuePolicy,
+      actor: String
+    )
     case updateTask(
       sessionID: String,
       taskID: String,

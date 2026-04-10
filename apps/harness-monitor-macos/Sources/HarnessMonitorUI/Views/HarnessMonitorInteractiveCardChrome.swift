@@ -24,6 +24,7 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
 private struct InteractiveCardHoverModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color?
+  let extraHoverHint: Bool
   @State private var isHovered = false
 
   func body(content: Content) -> some View {
@@ -32,7 +33,7 @@ private struct InteractiveCardHoverModifier: ViewModifier {
         InteractiveCardButtonStyle(
           cornerRadius: cornerRadius,
           tint: tint,
-          isHovered: isHovered
+          isHovered: isHovered || extraHoverHint
         )
       )
       .onContinuousHover { phase in
@@ -52,12 +53,14 @@ private struct InteractiveCardHoverModifier: ViewModifier {
 extension View {
   func harnessInteractiveCardButtonStyle(
     cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusMD,
-    tint: Color? = nil
+    tint: Color? = nil,
+    extraHoverHint: Bool = false
   ) -> some View {
     modifier(
       InteractiveCardHoverModifier(
         cornerRadius: cornerRadius,
-        tint: tint
+        tint: tint,
+        extraHoverHint: extraHoverHint
       )
     )
   }

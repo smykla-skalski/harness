@@ -484,6 +484,9 @@ fn transition_summary(transition: &SessionTransition) -> (&'static str, Option<S
         SessionTransition::TaskAssigned { task_id, agent_id } => {
             task_assigned_summary(task_id, agent_id)
         }
+        SessionTransition::TaskQueued { task_id, agent_id } => {
+            task_queued_summary(task_id, agent_id)
+        }
         SessionTransition::TaskStatusChanged { task_id, from, to } => {
             task_status_changed_summary(task_id, *from, *to)
         }
@@ -600,6 +603,14 @@ fn task_assigned_summary(task_id: &str, agent_id: &str) -> (&'static str, Option
     )
 }
 
+fn task_queued_summary(task_id: &str, agent_id: &str) -> (&'static str, Option<String>, String) {
+    (
+        "task_queued",
+        Some(task_id.to_string()),
+        format!("{task_id} queued for {agent_id}"),
+    )
+}
+
 fn task_status_changed_summary(
     task_id: &str,
     from: TaskStatus,
@@ -666,7 +677,7 @@ mod tests {
     };
     use crate::session::types::{
         AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole, SessionState,
-        SessionStatus, TaskSeverity, TaskStatus, WorkItem,
+        SessionStatus, TaskQueuePolicy, TaskSeverity, TaskStatus, WorkItem,
     };
 
     fn write_json(path: &std::path::Path, value: &impl serde::Serialize) {
@@ -731,6 +742,8 @@ mod tests {
                 severity: TaskSeverity::High,
                 status: TaskStatus::InProgress,
                 assigned_to: Some("worker-codex".into()),
+                queue_policy: TaskQueuePolicy::Locked,
+                queued_at: None,
                 created_at: "2026-03-28T14:00:00Z".into(),
                 updated_at: "2026-03-28T14:05:00Z".into(),
                 created_by: Some("leader-claude".into()),

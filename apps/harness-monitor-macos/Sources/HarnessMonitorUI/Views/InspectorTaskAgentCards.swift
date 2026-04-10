@@ -11,7 +11,8 @@ struct TaskInspectorCard: View {
     [
       .init(title: "Severity", value: task.severity.title),
       .init(title: "Status", value: task.status.title),
-      .init(title: "Assignee", value: task.assignedTo ?? "Unassigned"),
+      .init(title: "Assignee", value: task.assignmentSummary),
+      .init(title: "Queue Policy", value: task.queuePolicy.title),
       .init(title: "Source", value: task.source.title),
     ]
   }

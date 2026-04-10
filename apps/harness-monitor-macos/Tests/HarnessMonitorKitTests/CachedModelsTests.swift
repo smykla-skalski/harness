@@ -185,6 +185,8 @@ struct CachedModelsTests {
       severity: .high,
       status: .inProgress,
       assignedTo: "agent-1",
+      queuePolicy: .reassignWhenFree,
+      queuedAt: "2026-03-28T10:15:00Z",
       createdAt: "2026-03-28T10:00:00Z",
       updatedAt: "2026-03-28T14:00:00Z",
       createdBy: "agent-leader",

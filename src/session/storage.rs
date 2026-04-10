@@ -531,7 +531,9 @@ pub(crate) fn load_project_origin(context_root: &Path) -> Option<ProjectOriginRe
 mod tests {
     use super::*;
     use crate::agents::runtime::RuntimeCapabilities;
-    use crate::session::types::{AgentStatus, SessionRole, SessionStatus, TaskSource, WorkItem};
+    use crate::session::types::{
+        AgentStatus, SessionRole, SessionStatus, TaskQueuePolicy, TaskSource, WorkItem,
+    };
 
     fn sample_state(session_id: &str) -> SessionState {
         SessionState {
@@ -569,6 +571,8 @@ mod tests {
                     severity: super::super::types::TaskSeverity::Medium,
                     status: super::super::types::TaskStatus::Open,
                     assigned_to: None,
+                    queue_policy: TaskQueuePolicy::Locked,
+                    queued_at: None,
                     created_at: "2026-01-01T00:00:00Z".into(),
                     updated_at: "2026-01-01T00:00:00Z".into(),
                     created_by: None,
