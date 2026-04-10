@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::id as process_id;
+use std::slice;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -810,17 +811,41 @@ pub fn remove_agent(
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-        session_service::apply_remove_agent(&mut state, agent_id, &request.actor, &utc_now())?;
+        let now = utc_now();
+        let project_dir = project_dir_for_db_session(db, session_id)?;
+        let leave_signal = session_service::prepare_remove_agent_leave_signal(
+            &state,
+            agent_id,
+            &request.actor,
+            &now,
+        )?;
+        if let Some(ref signal) = leave_signal {
+            session_service::write_prepared_leave_signals(
+                &project_dir,
+                slice::from_ref(signal),
+                "remove agent",
+            )?;
+        }
+        session_service::apply_remove_agent(&mut state, agent_id, &request.actor, &now)?;
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
+        if let Some(ref signal) = leave_signal {
+            append_leave_signal_logs_to_db(
+                db,
+                session_id,
+                &request.actor,
+                slice::from_ref(signal),
+            )?;
+        }
         db.append_log_entry(&build_log_entry(
             session_id,
             session_service::log_agent_removed(agent_id),
             Some(&request.actor),
             None,
         ))?;
+        refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         return session_detail(session_id, Some(db));
@@ -887,18 +912,25 @@ pub fn end_session(
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-        session_service::apply_end_session(&mut state, &request.actor, &utc_now())?;
+        let now = utc_now();
+        let project_dir = project_dir_for_db_session(db, session_id)?;
+        let leave_signals =
+            session_service::prepare_end_session_leave_signals(&state, &request.actor, &now)?;
+        session_service::write_prepared_leave_signals(&project_dir, &leave_signals, "end session")?;
+        session_service::apply_end_session(&mut state, &request.actor, &now)?;
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
         db.mark_session_inactive(session_id)?;
+        append_leave_signal_logs_to_db(db, session_id, &request.actor, &leave_signals)?;
         db.append_log_entry(&build_log_entry(
             session_id,
             session_service::log_session_ended(),
             Some(&request.actor),
             None,
         ))?;
+        refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         return session_detail(session_id, Some(db));
@@ -923,21 +955,12 @@ pub fn send_signal(
     request: &SignalSendRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    // Resolve project_dir (needed for signal file writes regardless of path).
-    let project_dir = if let Some(db) = db
-        && let Some(dir) = db.project_dir_for_session(session_id)?
-    {
-        PathBuf::from(dir)
-    } else {
-        let resolved = index::resolve_session(session_id)?;
-        effective_project_dir(&resolved).to_path_buf()
-    };
-
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
         // DB-direct: apply state mutation to SQLite, then write signal file.
         let now = utc_now();
+        let project_dir = project_dir_for_db_session(db, session_id)?;
         let (runtime_name, target_agent_session_id) = session_service::apply_send_signal_state(
             &mut state,
             &request.agent_id,
@@ -977,12 +1000,15 @@ pub fn send_signal(
             Some(&request.actor),
             None,
         ))?;
+        refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         return session_detail(session_id, Some(db));
     }
 
     // File-based fallback
+    let resolved = index::resolve_session(session_id)?;
+    let project_dir = effective_project_dir(&resolved).to_path_buf();
     let _ = session_service::send_signal(
         session_id,
         &request.agent_id,
@@ -1460,6 +1486,35 @@ fn sync_after_mutation(db: Option<&super::db::DaemonDb>, session_id: &str) {
     }
 }
 
+fn refresh_signal_index_for_db(db: &super::db::DaemonDb, session_id: &str) -> Result<(), CliError> {
+    let resolved = db
+        .resolve_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    let signals = snapshot::load_signals_for(&resolved.project, &resolved.state)?;
+    db.sync_signal_index(session_id, &signals)
+}
+
+fn append_leave_signal_logs_to_db(
+    db: &super::db::DaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    signals: &[session_service::LeaveSignalRecord],
+) -> Result<(), CliError> {
+    for signal in signals {
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_signal_sent(
+                &signal.signal.signal_id,
+                &signal.agent_id,
+                &signal.signal.command,
+            ),
+            Some(actor_id),
+            None,
+        ))?;
+    }
+    Ok(())
+}
+
 fn append_transfer_logs_to_db(
     db: &super::db::DaemonDb,
     session_id: &str,
@@ -1528,6 +1583,16 @@ fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
 
 fn session_not_found(session_id: &str) -> CliError {
     CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
+}
+
+fn project_dir_for_db_session(
+    db: &super::db::DaemonDb,
+    session_id: &str,
+) -> Result<PathBuf, CliError> {
+    let resolved = db
+        .resolve_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    Ok(effective_project_dir(&resolved).to_path_buf())
 }
 
 fn build_log_entry(
@@ -1620,7 +1685,7 @@ mod tests {
     use crate::hooks::adapters::HookAgent;
     use crate::session::{
         service as session_service,
-        types::{SessionRole, SessionSignalStatus},
+        types::{AgentStatus, SessionRole, SessionSignalStatus, SessionStatus},
     };
     use crate::workspace::project_context_dir;
 
@@ -2169,6 +2234,36 @@ mod tests {
         (db, state)
     }
 
+    fn join_db_codex_worker(
+        db: &crate::daemon::db::DaemonDb,
+        state: &crate::session::types::SessionState,
+        project: &Path,
+        runtime_session_id: &str,
+    ) -> String {
+        use crate::daemon::protocol::SessionJoinRequest;
+
+        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some(runtime_session_id))], || {
+            join_session_direct(
+                &state.session_id,
+                &SessionJoinRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec![],
+                    name: None,
+                    project_dir: project.to_string_lossy().into(),
+                },
+                Some(db),
+            )
+            .expect("join db worker")
+        });
+        joined
+            .agents
+            .keys()
+            .find(|agent_id| agent_id.starts_with("codex-"))
+            .expect("worker id")
+            .clone()
+    }
+
     #[test]
     fn create_task_db_direct_writes_to_sqlite() {
         with_temp_project(|project| {
@@ -2203,20 +2298,119 @@ mod tests {
     fn end_session_db_direct_marks_inactive() {
         with_temp_project(|project| {
             let (db, state) = setup_db_only_session(project);
-            let leader_id = state.leader_id.expect("leader id");
+            let leader_id = state.leader_id.clone().expect("leader id");
+            let worker_id = join_db_codex_worker(&db, &state, project, "db-end-worker");
 
-            let _ = end_session(
+            let detail = end_session(
                 &state.session_id,
                 &SessionEndRequest { actor: leader_id },
                 Some(&db),
             )
             .expect("end session via db");
 
+            assert_eq!(detail.session.status, SessionStatus::Ended);
+            assert_eq!(detail.session.metrics.active_agent_count, 0);
+            assert!(
+                detail
+                    .agents
+                    .iter()
+                    .all(|agent| agent.status == AgentStatus::Disconnected)
+            );
+            assert_eq!(detail.signals.len(), 2);
+            assert!(
+                detail
+                    .signals
+                    .iter()
+                    .any(|signal| signal.agent_id == worker_id)
+            );
+            assert!(
+                detail
+                    .signals
+                    .iter()
+                    .all(|signal| signal.signal.command == "abort")
+            );
+
             let db_state = db
                 .load_session_state(&state.session_id)
                 .expect("load state")
                 .expect("state present");
-            assert_eq!(db_state.status, crate::session::types::SessionStatus::Ended);
+            assert_eq!(db_state.status, SessionStatus::Ended);
+            assert_eq!(
+                db.load_signals(&state.session_id).expect("signals").len(),
+                2
+            );
+        });
+    }
+
+    #[test]
+    fn remove_agent_db_direct_sends_abort_signal() {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let leader_id = state.leader_id.clone().expect("leader id");
+            let worker_id = join_db_codex_worker(&db, &state, project, "db-remove-worker");
+
+            let detail = remove_agent(
+                &state.session_id,
+                &worker_id,
+                &AgentRemoveRequest { actor: leader_id },
+                Some(&db),
+            )
+            .expect("remove via db");
+
+            let worker = detail
+                .agents
+                .iter()
+                .find(|agent| agent.agent_id == worker_id)
+                .expect("worker");
+            assert_eq!(worker.status, AgentStatus::Removed);
+            assert_eq!(detail.signals.len(), 1);
+            assert_eq!(detail.signals[0].agent_id, worker_id);
+            assert_eq!(detail.signals[0].signal.command, "abort");
+            assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
+        });
+    }
+
+    #[test]
+    fn send_signal_db_direct_refreshes_non_empty_signal_index() {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let leader_id = state.leader_id.clone().expect("leader id");
+
+            let first = send_signal(
+                &state.session_id,
+                &SignalSendRequest {
+                    actor: leader_id.clone(),
+                    agent_id: leader_id.clone(),
+                    command: "inject_context".into(),
+                    message: "first signal".into(),
+                    action_hint: None,
+                },
+                Some(&db),
+            )
+            .expect("first signal");
+            assert_eq!(first.signals.len(), 1);
+
+            let second = send_signal(
+                &state.session_id,
+                &SignalSendRequest {
+                    actor: leader_id.clone(),
+                    agent_id: leader_id,
+                    command: "inject_context".into(),
+                    message: "second signal".into(),
+                    action_hint: None,
+                },
+                Some(&db),
+            )
+            .expect("second signal");
+
+            assert_eq!(second.signals.len(), 2);
+            let messages: Vec<_> = second
+                .signals
+                .iter()
+                .map(|signal| signal.signal.payload.message.as_str())
+                .collect();
+            assert!(messages.contains(&"first signal"));
+            assert!(messages.contains(&"second signal"));
         });
     }
 

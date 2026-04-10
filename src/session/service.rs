@@ -1,7 +1,9 @@
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::env;
+use std::fmt;
 use std::path::{Path, PathBuf};
+use std::slice;
 
 use chrono::{Duration, Utc};
 use serde_json::Value;
@@ -30,6 +32,12 @@ use super::types::{
 };
 
 const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
+const LEAVE_SESSION_SIGNAL_COMMAND: &str = "abort";
+const END_SESSION_SIGNAL_MESSAGE: &str =
+    "This harness session has ended. Stop current work and leave the harness session.";
+const REMOVE_AGENT_SIGNAL_MESSAGE: &str = "You have been removed from this harness session. Stop current work and leave the harness session.";
+const END_SESSION_SIGNAL_ACTION_HINT: &str = "harness:session:end";
+const REMOVE_AGENT_SIGNAL_ACTION_HINT: &str = "harness:session:remove-agent";
 
 /// Task-specific fields for `create_task_with_source`.
 pub struct TaskSpec<'a> {
@@ -45,6 +53,14 @@ pub struct TaskSpec<'a> {
 pub struct ResolvedRuntimeSessionAgent {
     pub orchestration_session_id: String,
     pub agent_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LeaveSignalRecord {
+    pub(crate) runtime: String,
+    pub(crate) agent_id: String,
+    pub(crate) signal_session_id: String,
+    pub(crate) signal: Signal,
 }
 
 /// Start a new orchestration session and register the caller as leader.
@@ -197,11 +213,15 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
     }
 
     let now = utc_now();
+    let mut leave_signals = Vec::new();
 
     storage::update_state(project_dir, session_id, |state| {
+        leave_signals = prepare_end_session_leave_signals(state, actor_id, &now)?;
+        write_prepared_leave_signals(project_dir, &leave_signals, "end session")?;
         apply_end_session(state, actor_id, &now)
     })?;
 
+    append_leave_signal_logs(project_dir, session_id, actor_id, &leave_signals)?;
     storage::append_log_entry(
         project_dir,
         session_id,
@@ -280,11 +300,19 @@ pub fn remove_agent(
     }
 
     let now = utc_now();
+    let mut leave_signal = None;
 
     storage::update_state(project_dir, session_id, |state| {
+        leave_signal = prepare_remove_agent_leave_signal(state, agent_id, actor_id, &now)?;
+        if let Some(ref signal) = leave_signal {
+            write_prepared_leave_signals(project_dir, slice::from_ref(signal), "remove agent")?;
+        }
         apply_remove_agent(state, agent_id, actor_id, &now)
     })?;
 
+    if let Some(ref signal) = leave_signal {
+        append_leave_signal_logs(project_dir, session_id, actor_id, slice::from_ref(signal))?;
+    }
     storage::append_log_entry(
         project_dir,
         session_id,
@@ -1165,6 +1193,84 @@ pub(crate) fn apply_join_session(
     Ok(agent_id)
 }
 
+pub(crate) fn prepare_end_session_leave_signals(
+    state: &SessionState,
+    actor_id: &str,
+    now: &str,
+) -> Result<Vec<LeaveSignalRecord>, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::EndSession)?;
+    ensure_session_can_end(state)?;
+
+    state
+        .agents
+        .values()
+        .filter(|agent| agent.status == AgentStatus::Active)
+        .map(|agent| {
+            build_leave_signal_record(
+                state,
+                agent,
+                actor_id,
+                END_SESSION_SIGNAL_MESSAGE,
+                END_SESSION_SIGNAL_ACTION_HINT,
+                now,
+                "end session",
+            )
+        })
+        .collect()
+}
+
+pub(crate) fn prepare_remove_agent_leave_signal(
+    state: &SessionState,
+    agent_id: &str,
+    actor_id: &str,
+    now: &str,
+) -> Result<Option<LeaveSignalRecord>, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::RemoveAgent)?;
+    require_removable_agent(state, agent_id)?;
+
+    let agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    if agent.status != AgentStatus::Active {
+        return Ok(None);
+    }
+
+    build_leave_signal_record(
+        state,
+        agent,
+        actor_id,
+        REMOVE_AGENT_SIGNAL_MESSAGE,
+        REMOVE_AGENT_SIGNAL_ACTION_HINT,
+        now,
+        "remove agent",
+    )
+    .map(Some)
+}
+
+pub(crate) fn write_prepared_leave_signals(
+    project_dir: &Path,
+    signals: &[LeaveSignalRecord],
+    action: &str,
+) -> Result<(), CliError> {
+    for signal in signals {
+        let runtime = runtime::runtime_for_name(&signal.runtime).ok_or_else(|| {
+            leave_signal_delivery_error(
+                action,
+                &signal.agent_id,
+                format!("unknown runtime '{}'", signal.runtime),
+            )
+        })?;
+        runtime
+            .write_signal(project_dir, &signal.signal_session_id, &signal.signal)
+            .map_err(|error| leave_signal_delivery_error(action, &signal.agent_id, error))?;
+    }
+    Ok(())
+}
+
 /// Mark a session as ended. Validates permissions and active-task constraints.
 pub(crate) fn apply_end_session(
     state: &mut SessionState,
@@ -1173,21 +1279,18 @@ pub(crate) fn apply_end_session(
 ) -> Result<(), CliError> {
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::EndSession)?;
-
-    let active_tasks = state.tasks.values().any(|task| {
-        matches!(
-            task.status,
-            TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
-        )
-    });
-    if active_tasks {
-        return Err(CliErrorKind::session_agent_conflict(
-            "cannot end session with in-progress tasks",
-        )
-        .into());
-    }
+    ensure_session_can_end(state)?;
 
     touch_agent(state, actor_id, now);
+    for agent in state.agents.values_mut() {
+        if agent.status == AgentStatus::Active {
+            agent.status = AgentStatus::Disconnected;
+            agent.current_task_id = None;
+            agent.updated_at = now.to_string();
+            agent.last_activity_at = Some(now.to_string());
+        }
+    }
+    state.pending_leader_transfer = None;
     state.status = SessionStatus::Ended;
     state.archived_at = Some(now.to_string());
     refresh_session(state, now);
@@ -1241,12 +1344,7 @@ pub(crate) fn apply_remove_agent(
 ) -> Result<(), CliError> {
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::RemoveAgent)?;
-    if state.leader_id.as_deref() == Some(agent_id) {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "cannot remove current leader '{agent_id}'; transfer leadership first"
-        ))
-        .into());
-    }
+    require_removable_agent(state, agent_id)?;
 
     {
         let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
@@ -1666,6 +1764,28 @@ pub(crate) fn log_signal_acknowledged(
     }
 }
 
+fn append_leave_signal_logs(
+    project_dir: &Path,
+    session_id: &str,
+    actor_id: &str,
+    signals: &[LeaveSignalRecord],
+) -> Result<(), CliError> {
+    for signal in signals {
+        storage::append_log_entry(
+            project_dir,
+            session_id,
+            log_signal_sent(
+                &signal.signal.signal_id,
+                &signal.agent_id,
+                &signal.signal.command,
+            ),
+            Some(actor_id),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Daemon response conversions
 // ---------------------------------------------------------------------------
@@ -1827,6 +1947,37 @@ fn require_active(state: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
+fn ensure_session_can_end(state: &SessionState) -> Result<(), CliError> {
+    let active_tasks = state.tasks.values().any(|task| {
+        matches!(
+            task.status,
+            TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
+        )
+    });
+    if active_tasks {
+        return Err(CliErrorKind::session_agent_conflict(
+            "cannot end session with in-progress tasks",
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn require_removable_agent(state: &SessionState, agent_id: &str) -> Result<(), CliError> {
+    if state.leader_id.as_deref() == Some(agent_id) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "cannot remove current leader '{agent_id}'; transfer leadership first"
+        ))
+        .into());
+    }
+    if !state.agents.contains_key(agent_id) {
+        return Err(
+            CliErrorKind::session_agent_conflict(format!("agent '{agent_id}' not found")).into(),
+        );
+    }
+    Ok(())
+}
+
 fn require_permission(
     state: &SessionState,
     actor_id: &str,
@@ -1854,6 +2005,55 @@ fn require_permission(
         .into());
     }
     Ok(())
+}
+
+fn build_leave_signal_record(
+    state: &SessionState,
+    agent: &AgentRegistration,
+    actor_id: &str,
+    message: &str,
+    action_hint: &str,
+    now: &str,
+    action: &str,
+) -> Result<LeaveSignalRecord, CliError> {
+    if runtime::runtime_for_name(&agent.runtime).is_none() {
+        return Err(leave_signal_delivery_error(
+            action,
+            &agent.agent_id,
+            format!("unknown runtime '{}'", agent.runtime),
+        ));
+    }
+    let signal_session_id = agent
+        .agent_session_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(&state.session_id)
+        .to_string();
+    Ok(LeaveSignalRecord {
+        runtime: agent.runtime.clone(),
+        agent_id: agent.agent_id.clone(),
+        signal_session_id,
+        signal: build_signal(
+            actor_id,
+            LEAVE_SESSION_SIGNAL_COMMAND,
+            message,
+            Some(action_hint),
+            &state.session_id,
+            &agent.agent_id,
+            now,
+        ),
+    })
+}
+
+fn leave_signal_delivery_error(
+    action: &str,
+    agent_id: &str,
+    detail: impl fmt::Display,
+) -> CliError {
+    CliErrorKind::session_agent_conflict(format!(
+        "cannot {action}: leave signal delivery failed for agent '{agent_id}' ({detail}); session was not changed and needs attention before retry"
+    ))
+    .into()
 }
 
 fn build_initial_state(
@@ -2508,6 +2708,174 @@ mod tests {
             let tasks = list_tasks("s4", Some(TaskStatus::Open), project).expect("open");
             assert_eq!(tasks.len(), 1);
             assert!(tasks[0].assigned_to.is_none());
+        });
+    }
+
+    #[test]
+    fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
+        with_temp_project(|project| {
+            let state = start_session("test", "", project, Some("claude"), Some("end-leave"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("end-leave-worker"))], || {
+                    join_session(
+                        "end-leave",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join")
+                });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+
+            end_session("end-leave", &leader_id, project).expect("end");
+
+            let updated = session_status("end-leave", project).expect("status");
+            assert_eq!(updated.status, SessionStatus::Ended);
+            assert_eq!(updated.metrics.active_agent_count, 0);
+            assert!(updated.pending_leader_transfer.is_none());
+            assert!(updated.agents.values().all(|agent| {
+                agent.status == AgentStatus::Disconnected && agent.current_task_id.is_none()
+            }));
+
+            let signals = list_signals("end-leave", None, project).expect("signals");
+            assert_eq!(signals.len(), 2);
+            assert!(signals.iter().all(|record| {
+                record.status == SessionSignalStatus::Pending
+                    && record.signal.command == LEAVE_SESSION_SIGNAL_COMMAND
+                    && record
+                        .signal
+                        .payload
+                        .message
+                        .contains("leave the harness session")
+                    && record.signal.payload.action_hint.as_deref()
+                        == Some(END_SESSION_SIGNAL_ACTION_HINT)
+            }));
+            assert!(signals.iter().any(|record| record.agent_id == leader_id));
+            assert!(signals.iter().any(|record| record.agent_id == worker_id));
+
+            let entries = storage::load_log_entries(project, "end-leave").expect("entries");
+            assert_eq!(
+                entries
+                    .iter()
+                    .filter(|entry| {
+                        matches!(
+                            entry.transition,
+                            SessionTransition::SignalSent { ref command, .. }
+                                if command == LEAVE_SESSION_SIGNAL_COMMAND
+                        )
+                    })
+                    .count(),
+                2
+            );
+            assert!(
+                entries
+                    .iter()
+                    .any(|entry| matches!(entry.transition, SessionTransition::SessionEnded))
+            );
+        });
+    }
+
+    #[test]
+    fn remove_agent_sends_abort_leave_signal_to_removed_agent() {
+        with_temp_project(|project| {
+            let state = start_session("test", "", project, Some("claude"), Some("remove-leave"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("remove-leave-worker"))], || {
+                    join_session(
+                        "remove-leave",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join")
+                });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+
+            remove_agent("remove-leave", &worker_id, &leader_id, project).expect("remove");
+
+            let updated = session_status("remove-leave", project).expect("status");
+            let worker = updated.agents.get(&worker_id).expect("worker");
+            assert_eq!(worker.status, AgentStatus::Removed);
+            assert!(worker.current_task_id.is_none());
+
+            let signals =
+                list_signals("remove-leave", Some(&worker_id), project).expect("worker signals");
+            assert_eq!(signals.len(), 1);
+            assert_eq!(signals[0].status, SessionSignalStatus::Pending);
+            assert_eq!(signals[0].signal.command, LEAVE_SESSION_SIGNAL_COMMAND);
+            assert_eq!(
+                signals[0].signal.payload.action_hint.as_deref(),
+                Some(REMOVE_AGENT_SIGNAL_ACTION_HINT)
+            );
+            assert!(
+                signals[0]
+                    .signal
+                    .payload
+                    .message
+                    .contains("leave the harness session")
+            );
+        });
+    }
+
+    #[test]
+    fn end_session_fails_visibly_when_leave_signal_cannot_be_delivered() {
+        with_temp_project(|project| {
+            let state = start_session("test", "", project, Some("claude"), Some("end-leave-fail"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined = join_session(
+                "end-leave-fail",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+            )
+            .expect("join");
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+            storage::update_state(project, "end-leave-fail", |state| {
+                state.agents.get_mut(&worker_id).expect("worker").runtime = "unknown".into();
+                Ok(())
+            })
+            .expect("mark invalid runtime");
+
+            let error = end_session("end-leave-fail", &leader_id, project).expect_err("end fails");
+
+            assert_eq!(error.code(), "KSRCLI092");
+            let message = error.to_string();
+            assert!(message.contains("leave signal delivery failed"));
+            assert!(message.contains("needs attention"));
+            let updated = session_status("end-leave-fail", project).expect("status");
+            assert_eq!(updated.status, SessionStatus::Active);
+            assert_eq!(updated.metrics.active_agent_count, 2);
+            assert!(
+                list_signals("end-leave-fail", None, project)
+                    .expect("signals")
+                    .is_empty()
+            );
         });
     }
 
