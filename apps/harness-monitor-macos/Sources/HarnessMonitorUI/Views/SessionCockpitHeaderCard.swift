@@ -5,8 +5,6 @@ struct SessionCockpitHeaderCard: View {
   let detail: SessionDetail
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
-  let isSelectionLoading: Bool
-  let isExtensionsLoading: Bool
   let observeSelectedSession: () -> Void
   let requestEndSessionConfirmation: () -> Void
   let inspectObserver: () -> Void
@@ -193,8 +191,6 @@ private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
     detail: PreviewFixtures.detail,
     isSessionReadOnly: false,
     isSessionActionInFlight: false,
-    isSelectionLoading: false,
-    isExtensionsLoading: false,
     observeSelectedSession: {},
     requestEndSessionConfirmation: {},
     inspectObserver: {}

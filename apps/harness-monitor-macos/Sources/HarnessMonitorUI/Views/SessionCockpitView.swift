@@ -7,7 +7,6 @@ struct SessionCockpitView: View {
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
-  let isSelectionLoading: Bool
   let isExtensionsLoading: Bool
   let lastAction: String
 
@@ -21,8 +20,6 @@ struct SessionCockpitView: View {
           detail: detail,
           isSessionReadOnly: isSessionReadOnly,
           isSessionActionInFlight: isSessionActionInFlight,
-          isSelectionLoading: isSelectionLoading,
-          isExtensionsLoading: isExtensionsLoading,
           observeSelectedSession: { Task { await store.observeSelectedSession() } },
           requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
           inspectObserver: store.inspectObserver
@@ -76,7 +73,6 @@ struct SessionCockpitView: View {
     timeline: PreviewFixtures.timeline,
     isSessionReadOnly: false,
     isSessionActionInFlight: false,
-    isSelectionLoading: false,
     isExtensionsLoading: false,
     lastAction: "Observe action queued"
   )
