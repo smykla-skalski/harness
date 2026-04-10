@@ -9,6 +9,7 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
+  let onSidebarWidthChange: (CGFloat) -> Void
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
   @Environment(\.fontScale)
@@ -32,7 +33,8 @@ struct SidebarView: View {
     projection: HarnessMonitorStore.SessionProjectionSlice,
     searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice,
-    sidebarVisible: Bool
+    sidebarVisible: Bool,
+    onSidebarWidthChange: @escaping (CGFloat) -> Void
   ) {
     self.store = store
     self.controls = controls
@@ -40,6 +42,7 @@ struct SidebarView: View {
     self.searchResults = searchResults
     self.sidebarUI = sidebarUI
     self.sidebarVisible = sidebarVisible
+    self.onSidebarWidthChange = onSidebarWidthChange
   }
 
   var collapsedProjectIDs: Set<String> {
@@ -154,7 +157,7 @@ struct SidebarView: View {
       sidebarHeader
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
+      SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
     }
     .toolbar {
       if filterToolbarVisibilityProgress > 0.02 {
@@ -293,10 +296,12 @@ struct SidebarView: View {
   }
 
   func updateSidebarWidth(_ width: CGFloat) {
-    guard abs(width - sidebarWidth) >= 0.5 else {
+    let clampedWidth = max(width, 0)
+    onSidebarWidthChange(clampedWidth)
+    guard abs(clampedWidth - sidebarWidth) >= 0.5 else {
       return
     }
-    sidebarWidth = max(width, 0)
+    sidebarWidth = clampedWidth
   }
 
   func syncCollapsedProjects(from rawValue: String) {
@@ -364,5 +369,13 @@ struct SidebarView: View {
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
     }
+  }
+}
+
+private struct SidebarFooterMetricsBridge: View {
+  let sidebarUI: HarnessMonitorStore.SidebarUISlice
+
+  var body: some View {
+    SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
   }
 }

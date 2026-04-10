@@ -44,16 +44,16 @@ private struct ToolbarBaselineOverlayModifier: ViewModifier {
         ToolbarBaselineFramePreferenceKey.self,
         alignment: .topLeading
       ) { frames in
-        ToolbarBaselineOverlay(frames: frames)
+        ToolbarBaselineOverlay(leadingInset: frames[.sidebar]?.maxX ?? 0)
       }
   }
 }
 
-private struct ToolbarBaselineOverlay: View {
-  let frames: [ToolbarBaselineRegion: CGRect]
+struct ToolbarBaselineOverlay: View {
+  let leadingInset: CGFloat
 
   private var sidebarMaxX: CGFloat {
-    let raw = max(frames[.sidebar]?.maxX ?? 0, 0)
+    let raw = max(leadingInset, 0)
     return (raw / 4).rounded() * 4
   }
 
@@ -84,5 +84,11 @@ extension View {
 
   func toolbarBaselineOverlay() -> some View {
     modifier(ToolbarBaselineOverlayModifier())
+  }
+
+  func toolbarBaselineOverlay(leadingInset: CGFloat) -> some View {
+    overlay(alignment: .topLeading) {
+      ToolbarBaselineOverlay(leadingInset: leadingInset)
+    }
   }
 }

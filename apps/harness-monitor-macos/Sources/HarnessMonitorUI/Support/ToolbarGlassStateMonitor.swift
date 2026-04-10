@@ -25,11 +25,16 @@ public struct ToolbarGlassReproConfiguration: Sendable {
 
 struct OptionalToolbarBaselineOverlayModifier: ViewModifier {
   let isEnabled: Bool
+  var leadingInset: CGFloat? = nil
 
   @ViewBuilder
   func body(content: Content) -> some View {
     if isEnabled {
-      content.toolbarBaselineOverlay()
+      if let leadingInset {
+        content.toolbarBaselineOverlay(leadingInset: leadingInset)
+      } else {
+        content.toolbarBaselineOverlay()
+      }
     } else {
       content
     }

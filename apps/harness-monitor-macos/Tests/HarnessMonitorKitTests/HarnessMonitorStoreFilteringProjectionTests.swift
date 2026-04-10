@@ -70,20 +70,33 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
   }
 
-  @Test("Search projection skips publishing grouped sidebar trees")
-  func searchProjectionSkipsPublishingGroupedSidebarTrees() async {
+  @Test("Search projection skips publishing projection slice changes")
+  func searchProjectionSkipsPublishingProjectionSliceChanges() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
     let initialGroupedSessions = store.sessionIndex.projection.groupedSessions
+    let initialFilteredSessionCount = store.sessionIndex.projection.filteredSessionCount
+    let initialTotalSessionCount = store.sessionIndex.projection.totalSessionCount
+    let initialEmptyState = store.sessionIndex.projection.emptyState
 
-    let groupedProjectionInvalidated = await didInvalidate(
-      { store.sessionIndex.projection.groupedSessions },
+    let projectionInvalidated = await didInvalidate(
+      {
+        (
+          store.sessionIndex.projection.groupedSessions,
+          store.sessionIndex.projection.filteredSessionCount,
+          store.sessionIndex.projection.totalSessionCount,
+          store.sessionIndex.projection.emptyState
+        )
+      },
       after: {
         store.searchText = "active"
       }
     )
 
-    #expect(groupedProjectionInvalidated == false)
+    #expect(projectionInvalidated == false)
     #expect(store.sessionIndex.projection.groupedSessions == initialGroupedSessions)
+    #expect(store.sessionIndex.projection.filteredSessionCount == initialFilteredSessionCount)
+    #expect(store.sessionIndex.projection.totalSessionCount == initialTotalSessionCount)
+    #expect(store.sessionIndex.projection.emptyState == initialEmptyState)
     #expect(store.visibleSessionIDs == ["active"])
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["active"])
   }

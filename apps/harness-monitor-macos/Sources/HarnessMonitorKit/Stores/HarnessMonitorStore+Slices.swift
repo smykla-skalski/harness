@@ -161,21 +161,6 @@ extension HarnessMonitorStore {
       }
     }
 
-    internal func applyMetadata(
-      filteredSessionCount: Int,
-      totalSessionCount: Int,
-      emptyState: SidebarEmptyState
-    ) {
-      if self.filteredSessionCount != filteredSessionCount {
-        self.filteredSessionCount = filteredSessionCount
-      }
-      if self.totalSessionCount != totalSessionCount {
-        self.totalSessionCount = totalSessionCount
-      }
-      if self.emptyState != emptyState {
-        self.emptyState = emptyState
-      }
-    }
   }
 
   @MainActor

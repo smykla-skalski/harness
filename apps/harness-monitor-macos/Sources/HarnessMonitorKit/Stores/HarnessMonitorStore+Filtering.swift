@@ -347,12 +347,6 @@ extension HarnessMonitorStore {
             emptyState: emptyState
           )
         )
-      } else {
-        projection.applyMetadata(
-          filteredSessionCount: orderedVisibleSessionIDs.count,
-          totalSessionCount: catalog.totalSessionCount,
-          emptyState: emptyState
-        )
       }
       let nextSearchResults = SessionSearchResultsState(
         filteredSessionCount: orderedVisibleSessionIDs.count,
