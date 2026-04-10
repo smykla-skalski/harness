@@ -39,9 +39,10 @@ struct SessionCockpitSignalsSection: View {
               }
               Spacer()
               VStack(alignment: .trailing, spacing: HarnessMonitorTheme.itemSpacing) {
-                Text(signal.status.title)
+                let effectiveStatus = signal.effectiveStatus
+                Text(effectiveStatus.title)
                   .scaledFont(.caption.bold())
-                  .foregroundStyle(signalStatusColor(for: signal.status))
+                  .foregroundStyle(signalStatusColor(for: effectiveStatus))
                 Text(formatTimestamp(signal.signal.createdAt, configuration: dateTimeConfiguration))
                   .scaledFont(.caption.monospaced())
                   .foregroundStyle(HarnessMonitorTheme.secondaryInk)
