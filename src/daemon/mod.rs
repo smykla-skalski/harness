@@ -16,6 +16,7 @@
 //! HARNESS_SANDBOXED=1 cargo run --bin harness -- daemon serve --port 0
 //! ```
 
+pub mod agent_tui;
 pub mod client;
 pub mod codex_bridge;
 pub mod codex_controller;
