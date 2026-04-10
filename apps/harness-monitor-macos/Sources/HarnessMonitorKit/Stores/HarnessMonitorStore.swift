@@ -271,6 +271,31 @@ public final class HarnessMonitorStore {
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
+    var registrationState = await daemonController.launchAgentRegistrationState()
+    if registrationState == .notRegistered || registrationState == .notFound {
+      do {
+        registrationState = try await daemonController.registerLaunchAgent()
+      } catch {
+        await applyLaunchAgentOfflineState(reason: error.localizedDescription)
+        return
+      }
+    }
+
+    switch registrationState {
+    case .requiresApproval:
+      await applyLaunchAgentOfflineState(
+        reason: "Launch agent needs approval in System Settings > General > Login Items."
+      )
+      return
+    case .notRegistered, .notFound:
+      await applyLaunchAgentOfflineState(
+        reason: "Launch agent registration did not complete."
+      )
+      return
+    case .enabled:
+      break
+    }
+
     do {
       let client = try await daemonController.awaitManifestWarmUp(
         timeout: bootstrapWarmUpTimeout
