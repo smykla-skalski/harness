@@ -8,6 +8,8 @@ public protocol DaemonControlling: Sendable {
   func installLaunchAgent() async throws -> String
   func removeLaunchAgent() async throws -> String
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState
+  func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState
+  func launchAgentSnapshot() async -> LaunchAgentStatus
   func awaitLaunchAgentState(
     _ target: DaemonLaunchAgentRegistrationState,
     timeout: Duration
@@ -161,6 +163,14 @@ public struct DaemonController: DaemonControlling {
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     try launchAgentManager.register()
     return launchAgentManager.registrationState()
+  }
+
+  public func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    launchAgentManager.registrationState()
+  }
+
+  public func launchAgentSnapshot() async -> LaunchAgentStatus {
+    launchAgentStatus()
   }
 
   public func awaitLaunchAgentState(

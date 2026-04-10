@@ -72,6 +72,24 @@ public actor PreviewDaemonController: DaemonControlling {
     return .enabled
   }
 
+  public func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    isLaunchAgentInstalled ? .enabled : .notRegistered
+  }
+
+  public func launchAgentSnapshot() async -> LaunchAgentStatus {
+    LaunchAgentStatus(
+      installed: isLaunchAgentInstalled,
+      loaded: isDaemonRunning && isLaunchAgentInstalled,
+      label: "io.harness.daemon",
+      path: Self.launchAgentPath,
+      domainTarget: "gui/501",
+      serviceTarget: "gui/501/io.harness.daemon",
+      state: isDaemonRunning && isLaunchAgentInstalled ? "running" : nil,
+      pid: isDaemonRunning && isLaunchAgentInstalled ? fixtures.health.pid : nil,
+      lastExitStatus: isDaemonRunning && isLaunchAgentInstalled ? 0 : nil
+    )
+  }
+
   public func awaitLaunchAgentState(
     _ target: DaemonLaunchAgentRegistrationState,
     timeout: Duration
