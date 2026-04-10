@@ -235,6 +235,7 @@ extension HarnessMonitorStore {
     public let toolbar = ContentToolbarSlice()
     public let chrome = ContentChromeSlice()
     public let session = ContentSessionSlice()
+    public let sessionDetail = ContentSessionDetailSlice()
     public let dashboard = ContentDashboardSlice()
 
     public init() {}
@@ -285,15 +286,22 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class ContentSessionSlice {
-    public var selectedSessionDetail: SessionDetail?
     public var selectedSessionSummary: SessionSummary?
-    public var timeline: [TimelineEntry] = []
     public var isSessionReadOnly = true
     public var isSessionActionInFlight = false
     public var isSelectionLoading = false
     public var isExtensionsLoading = false
     public var lastAction = ""
     public var isTaskDragActive = false
+
+    public init() {}
+  }
+
+  @MainActor
+  @Observable
+  public final class ContentSessionDetailSlice {
+    public var selectedSessionDetail: SessionDetail?
+    public var timeline: [TimelineEntry] = []
 
     public init() {}
   }
