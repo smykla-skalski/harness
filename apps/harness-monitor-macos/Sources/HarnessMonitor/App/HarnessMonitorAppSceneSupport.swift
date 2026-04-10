@@ -3,13 +3,6 @@ import HarnessMonitorUI
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
-  private enum PerfScenarioStatus: String {
-    case idle
-    case bootstrapping
-    case running
-    case completed
-  }
-
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -25,8 +18,6 @@ struct HarnessMonitorWindowRootView: View {
     .storageValue
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
-  @State private var hasRunPerfScenario = false
-  @State private var perfScenarioStatus: PerfScenarioStatus = .idle
   @State private var handledSettingsOpenRequestID = 0
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
@@ -38,13 +29,6 @@ struct HarnessMonitorWindowRootView: View {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
 
-  private var perfScenarioStateText: String? {
-    guard let perfScenario else {
-      return nil
-    }
-    return "scenario=\(perfScenario.rawValue), status=\(perfScenarioStatus.rawValue)"
-  }
-
   var body: some View {
     ContentView(
       store: store,
@@ -54,14 +38,13 @@ struct HarnessMonitorWindowRootView: View {
         } : nil
     )
     .writingToolsBehavior(.disabled)
-    .overlay {
-      if let perfScenarioStateText {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.perfScenarioState,
-          text: perfScenarioStateText
-        )
-      }
-    }
+    .modifier(
+      HarnessMonitorPerfScenarioModifier(
+        delegate: delegate,
+        store: store,
+        perfScenario: perfScenario
+      )
+    )
     .frame(minWidth: 900, minHeight: 600)
     .modifier(
       OptionalInstantFocusRingModifier(
@@ -81,36 +64,6 @@ struct HarnessMonitorWindowRootView: View {
       )
     )
     .modifier(HarnessMonitorUITestAnimationModifier())
-    .task {
-      delegate.bind(store: store)
-      guard let perfScenario else {
-        await store.bootstrapIfNeeded()
-        return
-      }
-      guard !hasRunPerfScenario else {
-        return
-      }
-      hasRunPerfScenario = true
-      if perfScenario.includesBootstrapInMeasurement {
-        perfScenarioStatus = .running
-        await HarnessMonitorPerfDriver.run(
-          scenario: perfScenario,
-          store: store,
-          openWindow: openWindow
-        )
-        perfScenarioStatus = .completed
-        return
-      }
-      perfScenarioStatus = .bootstrapping
-      await store.bootstrapIfNeeded()
-      perfScenarioStatus = .running
-      await HarnessMonitorPerfDriver.run(
-        scenario: perfScenario,
-        store: store,
-        openWindow: openWindow
-      )
-      perfScenarioStatus = .completed
-    }
     .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
       guard requestID != handledSettingsOpenRequestID else {
         return
@@ -119,6 +72,78 @@ struct HarnessMonitorWindowRootView: View {
       preferencesSelectedSection = .notifications
       openWindow(id: HarnessMonitorWindowID.preferences)
     }
+  }
+}
+
+private enum HarnessMonitorPerfScenarioStatus: String {
+  case idle
+  case bootstrapping
+  case running
+  case completed
+}
+
+private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
+  let delegate: HarnessMonitorAppDelegate
+  let store: HarnessMonitorStore
+  let perfScenario: HarnessMonitorPerfScenario?
+  @Environment(\.openWindow)
+  private var openWindow
+  @State private var hasRunPerfScenario = false
+  @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
+
+  private var perfScenarioStateText: String? {
+    guard let perfScenario else {
+      return nil
+    }
+    return "scenario=\(perfScenario.rawValue), status=\(perfScenarioStatus.rawValue)"
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .overlay {
+        if let perfScenarioStateText {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.perfScenarioState,
+            text: perfScenarioStateText
+          )
+        }
+      }
+      .task {
+        await runPerfScenarioIfNeeded()
+      }
+  }
+
+  private func runPerfScenarioIfNeeded() async {
+    delegate.bind(store: store)
+    guard let perfScenario else {
+      await store.bootstrapIfNeeded()
+      return
+    }
+    guard !hasRunPerfScenario else {
+      return
+    }
+    hasRunPerfScenario = true
+
+    if perfScenario.includesBootstrapInMeasurement {
+      perfScenarioStatus = .running
+      await HarnessMonitorPerfDriver.run(
+        scenario: perfScenario,
+        store: store,
+        openWindow: openWindow
+      )
+      perfScenarioStatus = .completed
+      return
+    }
+
+    perfScenarioStatus = .bootstrapping
+    await store.bootstrapIfNeeded()
+    perfScenarioStatus = .running
+    await HarnessMonitorPerfDriver.run(
+      scenario: perfScenario,
+      store: store,
+      openWindow: openWindow
+    )
+    perfScenarioStatus = .completed
   }
 }
 
