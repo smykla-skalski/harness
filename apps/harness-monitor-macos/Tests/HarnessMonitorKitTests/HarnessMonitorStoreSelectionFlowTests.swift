@@ -280,6 +280,62 @@ struct HarnessMonitorStoreSelectionFlowTests {
     #expect(detailCallCount >= 1, "The winning session must have been fetched")
   }
 
+  @Test("Duplicate sidebar selection does not restart the active load")
+  func duplicateSidebarSelectionDoesNotRestartActiveLoad() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "duplicate-selection",
+        context: "Duplicate selection",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = SessionDetail(
+      session: summary,
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      detail: detail
+    )
+    client.configureDetailDelay(.milliseconds(150), for: summary.sessionId)
+    client.configureTimelineDelay(.milliseconds(150), for: summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+
+    store.selectSessionFromList(summary.sessionId)
+    try await Task.sleep(for: .milliseconds(20))
+    store.selectSessionFromList(summary.sessionId)
+    await store.selectionTask?.value
+
+    #expect(store.selectedSessionID == summary.sessionId)
+    #expect(store.selectedSession?.session.sessionId == summary.sessionId)
+    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == 1)
+    #expect(client.readCallCount(.timeline(summary.sessionId)) == 1)
+  }
+
+  @Test("Reselecting the loaded sidebar session clears inspector without reloading")
+  func reselectingLoadedSidebarSessionClearsInspectorWithoutReloading() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    let detailCallCount = client.readCallCount(.sessionDetail(PreviewFixtures.summary.sessionId))
+    let timelineCallCount = client.readCallCount(.timeline(PreviewFixtures.summary.sessionId))
+
+    store.inspect(taskID: "task-ui")
+    store.selectSessionFromList(PreviewFixtures.summary.sessionId)
+
+    #expect(store.inspectorSelection == .none)
+    #expect(client.readCallCount(.sessionDetail(PreviewFixtures.summary.sessionId)) == detailCallCount)
+    #expect(client.readCallCount(.timeline(PreviewFixtures.summary.sessionId)) == timelineCallCount)
+  }
+
   @Test("Cache write coalescing prevents task accumulation")
   func cacheWriteCoalescingPreventsTaskAccumulation() async throws {
     let store = await makeBootstrappedStore()
