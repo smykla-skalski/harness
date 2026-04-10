@@ -141,9 +141,9 @@ private struct SessionCockpitSignalCard: View {
           store: store,
           signal: signal,
           canCancel: canCancel,
-          canResend: canResend
+          canResend: canResend,
+          isHovered: isHovered
         )
-        .opacity(isHovered ? 1 : 0)
         .allowsHitTesting(isHovered)
       }
     }
@@ -156,61 +156,107 @@ private struct SessionCockpitSignalCard: View {
 }
 
 private struct SignalHoverActionStrip: View {
+  static let hiddenScale: CGFloat = 0.2
+  static let bouncingScale: CGFloat = 1
+  // 1.001 forces a @State change when interrupting the bouncy spring mid-flight -
+  // withAnimation only re-triggers if the target value differs, so settling to 1.0
+  // when the state is already 1.0 would be a no-op and the spring would keep running.
+  static let settledScale: CGFloat = 1.001
+
   let store: HarnessMonitorStore
   let signal: SessionSignalRecord
   let canCancel: Bool
   let canResend: Bool
+  let isHovered: Bool
+
+  @State private var displayScale: CGFloat = SignalHoverActionStrip.hiddenScale
+  @State private var isCancelHovering = false
+  @State private var isResendHovering = false
+
+  private var anyIconHovering: Bool {
+    isCancelHovering || isResendHovering
+  }
+
+  private var soloTintColor: Color? {
+    if canCancel && !canResend { return HarnessMonitorTheme.danger }
+    if canResend && !canCancel { return HarnessMonitorTheme.accent }
+    return nil
+  }
+
+  private var overlayColor: Color {
+    soloTintColor ?? .black
+  }
+
+  private var overlayPeakOpacity: Double {
+    soloTintColor == nil ? 0.35 : 0.7
+  }
 
   var body: some View {
     VStack(spacing: HarnessMonitorTheme.itemSpacing) {
       if canCancel {
-        Button {
-          Task {
-            await store.cancelSignal(
-              signalID: signal.signal.signalId,
-              agentID: signal.agentId
-            )
-          }
-        } label: {
-          Image(systemName: "xmark.circle")
-            .symbolRenderingMode(.hierarchical)
-            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-            .foregroundStyle(HarnessMonitorTheme.danger)
-            .frame(width: 28, height: 28)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .help("Cancel pending signal")
-        .accessibilityLabel("Cancel signal")
+        SignalCancelActionButton(
+          store: store,
+          signal: signal,
+          useWhiteTint: soloTintColor != nil,
+          isHovering: $isCancelHovering
+        )
       }
       if canResend {
-        Button {
-          Task { await store.resendSignal(signal) }
-        } label: {
-          Image(systemName: "arrow.clockwise")
-            .symbolRenderingMode(.hierarchical)
-            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-            .foregroundStyle(HarnessMonitorTheme.accent)
-            .frame(width: 28, height: 28)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .help("Resend signal")
-        .accessibilityLabel("Resend signal")
+        SignalResendActionButton(
+          store: store,
+          signal: signal,
+          useWhiteTint: soloTintColor != nil,
+          isHovering: $isResendHovering
+        )
       }
     }
-    .frame(maxHeight: .infinity)
-    .padding(.leading, HarnessMonitorTheme.spacingLG * 4)
-    .padding(.trailing, HarnessMonitorTheme.itemSpacing)
+    .scaleEffect(displayScale, anchor: .center)
+    .onChange(of: isHovered) { _, newValue in
+      if newValue {
+        if anyIconHovering {
+          withAnimation(.easeOut(duration: 0.12)) {
+            displayScale = Self.settledScale
+          }
+        } else {
+          withAnimation(.interpolatingSpring(mass: 1, stiffness: 180, damping: 6)) {
+            displayScale = Self.bouncingScale
+          }
+        }
+      } else {
+        withAnimation(.easeOut(duration: 0.25)) {
+          displayScale = Self.hiddenScale
+        }
+      }
+    }
+    .onChange(of: anyIconHovering) { _, newValue in
+      guard newValue, isHovered else { return }
+      withAnimation(.easeOut(duration: 0.12)) {
+        displayScale = Self.settledScale
+      }
+    }
+    .frame(maxHeight: .infinity, alignment: .top)
+    .padding(.leading, HarnessMonitorTheme.spacingLG * 6)
+    .padding(.trailing, HarnessMonitorTheme.cardPadding)
     .padding(.vertical, HarnessMonitorTheme.cardPadding)
     .background {
       Rectangle()
-        .fill(.regularMaterial)
+        .fill(.thinMaterial)
         .overlay {
           LinearGradient(
             colors: [
-              Color.black.opacity(0),
-              Color.black.opacity(0.45),
+              overlayColor.opacity(0),
+              overlayColor.opacity(overlayPeakOpacity),
+            ],
+            startPoint: .bottomLeading,
+            endPoint: .topTrailing
+          )
+        }
+        .mask {
+          LinearGradient(
+            stops: [
+              .init(color: .clear, location: 0),
+              .init(color: .black.opacity(0.5), location: 0.35),
+              .init(color: .black, location: 0.6),
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -219,12 +265,12 @@ private struct SignalHoverActionStrip: View {
         .mask {
           LinearGradient(
             stops: [
-              .init(color: .clear, location: 0),
-              .init(color: .black.opacity(0.5), location: 0.2),
-              .init(color: .black, location: 0.5),
+              .init(color: .black, location: 0),
+              .init(color: .black.opacity(0.55), location: 0.55),
+              .init(color: .clear, location: 1),
             ],
-            startPoint: .leading,
-            endPoint: .trailing
+            startPoint: .top,
+            endPoint: .bottom
           )
         }
     }
@@ -237,6 +283,75 @@ private struct SignalHoverActionStrip: View {
         style: .continuous
       )
     )
+    .opacity(isHovered ? 1 : 0)
+  }
+}
+
+private struct SignalActionButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.82 : 1)
+      .brightness(configuration.isPressed ? -0.05 : 0)
+      .animation(.spring(response: 0.18, dampingFraction: 0.55), value: configuration.isPressed)
+  }
+}
+
+private struct SignalCancelActionButton: View {
+  let store: HarnessMonitorStore
+  let signal: SessionSignalRecord
+  let useWhiteTint: Bool
+  @Binding var isHovering: Bool
+
+  var body: some View {
+    Button {
+      Task {
+        await store.cancelSignal(
+          signalID: signal.signal.signalId,
+          agentID: signal.agentId
+        )
+      }
+    } label: {
+      Image(systemName: "xmark.circle")
+        .symbolRenderingMode(useWhiteTint ? .monochrome : .hierarchical)
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+        .foregroundStyle(useWhiteTint ? Color.white : HarnessMonitorTheme.danger)
+        .opacity(isHovering ? 1 : (useWhiteTint ? 0.9 : 0.7))
+        .frame(width: 28, height: 28)
+        .contentShape(Rectangle())
+        .scaleEffect(isHovering ? 1.22 : 1)
+        .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isHovering)
+    }
+    .buttonStyle(SignalActionButtonStyle())
+    .help("Cancel pending signal")
+    .accessibilityLabel("Cancel signal")
+    .onHover { isHovering = $0 }
+  }
+}
+
+private struct SignalResendActionButton: View {
+  let store: HarnessMonitorStore
+  let signal: SessionSignalRecord
+  let useWhiteTint: Bool
+  @Binding var isHovering: Bool
+
+  var body: some View {
+    Button {
+      Task { await store.resendSignal(signal) }
+    } label: {
+      Image(systemName: "arrow.clockwise")
+        .symbolRenderingMode(useWhiteTint ? .monochrome : .hierarchical)
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+        .foregroundStyle(useWhiteTint ? Color.white : HarnessMonitorTheme.accent)
+        .opacity(isHovering ? 1 : (useWhiteTint ? 0.9 : 0.7))
+        .frame(width: 28, height: 28)
+        .contentShape(Rectangle())
+        .scaleEffect(isHovering ? 1.22 : 1)
+        .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isHovering)
+    }
+    .buttonStyle(SignalActionButtonStyle())
+    .help("Resend signal")
+    .accessibilityLabel("Resend signal")
+    .onHover { isHovering = $0 }
   }
 }
 
