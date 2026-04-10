@@ -120,6 +120,9 @@ extension HarnessMonitorStore {
     let task = Task { @MainActor [weak self] in
       guard let self else { return }
       await self.performSessionSelection(sessionID: sessionID)
+      if !Task.isCancelled, self.selectedSessionID == sessionID {
+        self.selectionTask = nil
+      }
     }
     selectionTask = task
     await task.value
@@ -178,6 +181,10 @@ extension HarnessMonitorStore {
   }
 
   public func selectSessionFromList(_ sessionID: String?) {
+    guard !shouldIgnoreDuplicateListSelection(for: sessionID) else {
+      return
+    }
+
     selectionTask?.cancel()
     primeSessionSelection(sessionID)
 
@@ -190,7 +197,27 @@ extension HarnessMonitorStore {
     selectionTask = Task { @MainActor [weak self] in
       guard let self else { return }
       await self.performSessionSelection(sessionID: sessionID)
+      if !Task.isCancelled, self.selectedSessionID == sessionID {
+        self.selectionTask = nil
+      }
     }
+  }
+
+  private func shouldIgnoreDuplicateListSelection(for sessionID: String?) -> Bool {
+    guard selectedSessionID == sessionID else {
+      return false
+    }
+    guard let sessionID else {
+      return true
+    }
+    if inspectorSelection != .none, selectedSession?.session.sessionId == sessionID {
+      inspectorSelection = .none
+      return true
+    }
+    if selectionTask != nil || isSelectionLoading {
+      return true
+    }
+    return selectedSession?.session.sessionId == sessionID
   }
 
   private func performSessionSelection(sessionID: String) async {
