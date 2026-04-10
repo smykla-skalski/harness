@@ -5,6 +5,32 @@ import Testing
 
 @Suite("Daemon controller service management")
 struct DaemonControllerTests {
+  @Test("Start command uses daemon sandbox mode")
+  func startCommandUsesDaemonSandboxMode() {
+    #expect(DaemonController.daemonServeArguments.contains("--sandboxed"))
+  }
+
+  @Test("Process environment pins app group daemon root")
+  func processEnvironmentPinsAppGroupDaemonRoot() {
+    let home = URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    let environment = HarnessMonitorEnvironment(values: [:], homeDirectory: home)
+
+    let values = DaemonController.daemonProcessEnvironment(
+      base: [
+        HarnessMonitorAppGroup.environmentKey: "",
+        "HARNESS_SANDBOXED": "0",
+      ],
+      environment: environment
+    )
+
+    #expect(values[HarnessMonitorAppGroup.environmentKey] == HarnessMonitorAppGroup.identifier)
+    #expect(values["HARNESS_SANDBOXED"] == "1")
+    #expect(
+      values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]
+        == HarnessMonitorPaths.dataRoot(using: environment).path
+    )
+  }
+
   @Test("Installing launch agent registers the bundled service")
   func installingLaunchAgentRegistersBundledService() async throws {
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
