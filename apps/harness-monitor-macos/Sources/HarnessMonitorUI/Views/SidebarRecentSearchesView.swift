@@ -1,4 +1,35 @@
+import HarnessMonitorKit
+import SwiftData
 import SwiftUI
+
+struct SidebarRecentSearchesHeader: View {
+  let isPersistenceAvailable: Bool
+  let applyQuery: (String) -> Void
+  let clearHistory: () -> Void
+  @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
+  private var recentSearches: [RecentSearch]
+
+  private var recentSearchQueries: [String] {
+    guard isPersistenceAvailable else {
+      return []
+    }
+    return Array(recentSearches.prefix(5).map(\.query))
+  }
+
+  var body: some View {
+    if !recentSearchQueries.isEmpty {
+      SidebarRecentSearchesView(
+        queries: recentSearchQueries,
+        isPersistenceAvailable: isPersistenceAvailable,
+        applyQuery: applyQuery,
+        clearHistory: clearHistory
+      )
+      .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+      .padding(.top, HarnessMonitorTheme.spacingXL)
+      .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+    }
+  }
+}
 
 struct SidebarRecentSearchesView: View {
   let queries: [String]
@@ -32,7 +63,7 @@ struct SidebarRecentSearchesView: View {
             Button {
               applyQuery(query)
             } label: {
-              Text(query)
+              Text(verbatim: query)
                 .lineLimit(1)
                 .padding(.horizontal, HarnessMonitorTheme.spacingSM)
                 .padding(.vertical, HarnessMonitorTheme.spacingXS)

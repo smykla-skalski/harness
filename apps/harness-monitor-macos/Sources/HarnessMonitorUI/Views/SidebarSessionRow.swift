@@ -15,7 +15,7 @@ struct SidebarSessionRow: View {
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
-          Text(session.displayTitle)
+          Text(verbatim: session.displayTitle)
             .font(scaled(.system(.body, design: .rounded, weight: .semibold)))
             .italic(session.title.isEmpty)
             .foregroundStyle(session.title.isEmpty ? .secondary : .primary)
@@ -28,12 +28,12 @@ struct SidebarSessionRow: View {
               .foregroundStyle(.secondary)
               .accessibilityLabel("Bookmarked")
           }
-          Text(session.status.title)
+          Text(verbatim: session.status.title)
             .font(scaled(.caption2.weight(.bold)))
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
-        Text(session.sessionId)
+        Text(verbatim: session.sessionId)
           .font(scaled(.caption.monospaced()))
           .truncationMode(.middle)
           .foregroundStyle(.secondary)
@@ -41,7 +41,7 @@ struct SidebarSessionRow: View {
           footerLabel("\(session.metrics.activeAgentCount) active")
           footerLabel("\(session.metrics.inProgressTaskCount) moving")
           Spacer(minLength: 0)
-          Text(lastActivityText)
+          Text(verbatim: lastActivityText)
             .font(scaled(.caption.weight(.medium)))
             .lineLimit(1)
             .foregroundStyle(.secondary)
@@ -53,7 +53,7 @@ struct SidebarSessionRow: View {
   }
 
   private func footerLabel(_ value: String) -> some View {
-    Text(value)
+    Text(verbatim: value)
       .font(scaled(.caption.weight(.medium)))
       .lineLimit(1)
       .foregroundStyle(.secondary)
