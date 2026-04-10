@@ -256,13 +256,8 @@ targets:
         ENABLE_APP_SANDBOX: YES
         ENABLE_INCOMING_NETWORK_CONNECTIONS: NO
         ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
-        INFOPLIST_KEY_CFBundleName: Harness Monitor
-        INFOPLIST_KEY_HarnessMonitorBuildGitCommit: $(HARNESS_MONITOR_BUILD_GIT_COMMIT)
-        INFOPLIST_KEY_HarnessMonitorBuildGitDirty: $(HARNESS_MONITOR_BUILD_GIT_DIRTY)
-        INFOPLIST_KEY_HarnessMonitorBuildStartedAtUTC: $(HARNESS_MONITOR_BUILD_STARTED_AT_UTC)
-        INFOPLIST_KEY_HarnessMonitorBuildWorkspaceFingerprint: $(HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT)
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/HarnessMonitor-Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: $(HARNESS_MONITOR_APP_BUNDLE_ID)
         PRODUCT_NAME: Harness Monitor
   HarnessMonitorUITestHost:
@@ -437,13 +432,8 @@ targets:
         ENABLE_APP_SANDBOX: YES
         ENABLE_INCOMING_NETWORK_CONNECTIONS: NO
         ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor UI Testing
-        INFOPLIST_KEY_CFBundleName: Harness Monitor UI Testing
-        INFOPLIST_KEY_HarnessMonitorBuildGitCommit: $(HARNESS_MONITOR_BUILD_GIT_COMMIT)
-        INFOPLIST_KEY_HarnessMonitorBuildGitDirty: $(HARNESS_MONITOR_BUILD_GIT_DIRTY)
-        INFOPLIST_KEY_HarnessMonitorBuildStartedAtUTC: $(HARNESS_MONITOR_BUILD_STARTED_AT_UTC)
-        INFOPLIST_KEY_HarnessMonitorBuildWorkspaceFingerprint: $(HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT)
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/HarnessMonitor-Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.app.ui-testing
         PRODUCT_NAME: Harness Monitor UI Testing
   HarnessMonitorKitTests:
