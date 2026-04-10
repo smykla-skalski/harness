@@ -147,6 +147,9 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         endpoint: endpoint.clone(),
         started_at: utc_now(),
         token_path: state::auth_token_path().display().to_string(),
+        sandboxed: config.sandboxed,
+        codex_transport: "stdio".to_string(),
+        codex_endpoint: None,
     };
     state::write_manifest(&manifest)?;
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
@@ -1969,6 +1972,9 @@ mod tests {
                     endpoint: "http://127.0.0.1:9999".into(),
                     started_at: "2026-03-28T12:00:00Z".into(),
                     token_path: state::auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    codex_transport: "stdio".to_string(),
+                    codex_endpoint: None,
                 };
                 state::write_manifest(&manifest).expect("manifest");
                 state::append_event("info", "daemon booted").expect("append event");

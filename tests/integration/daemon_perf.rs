@@ -58,6 +58,9 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         endpoint: endpoint.clone(),
         started_at: harness::workspace::utc_now(),
         token_path: String::new(),
+        sandboxed: false,
+        codex_transport: "stdio".to_string(),
+        codex_endpoint: None,
     };
 
     let db_slot = Arc::new(OnceLock::new());
