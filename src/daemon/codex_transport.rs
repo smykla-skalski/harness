@@ -3,8 +3,16 @@ use std::pin::Pin;
 use std::process::Stdio;
 
 use async_trait::async_trait;
+use futures_util::sink::SinkExt;
+use futures_util::stream::StreamExt;
+#[cfg(test)]
+use tokio::io::DuplexStream;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
+use tokio_tungstenite::tungstenite::Error as WsError;
+use tokio_tungstenite::tungstenite::protocol::{CloseFrame, Message, frame::coding::CloseCode};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 use crate::errors::{CliError, CliErrorKind};
 
@@ -100,7 +108,7 @@ impl StdioCodexTransport {
     /// to avoid spawning a real `codex` binary; there is no owning child so
     /// `shutdown` only closes the writer.
     #[cfg(test)]
-    fn from_duplex(writer: tokio::io::DuplexStream, reader: tokio::io::DuplexStream) -> Self {
+    fn from_duplex(writer: DuplexStream, reader: DuplexStream) -> Self {
         Self {
             child: None,
             writer: Box::pin(writer),
@@ -161,10 +169,102 @@ impl Drop for StdioCodexTransport {
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn connect_error(endpoint: &str, error: &WsError) -> CliError {
+    tracing::warn!(%error, endpoint, "codex websocket connect failed");
+    CliErrorKind::workflow_io(format!(
+        "connect codex app-server over websocket at {endpoint}: {error}"
+    ))
+    .into()
+}
+
+/// WebSocket transport that speaks newline-delimited JSON-RPC with a remote
+/// `codex app-server --listen ws://...` process. One JSON-RPC message per
+/// text frame.
+pub struct WebSocketCodexTransport {
+    socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    endpoint: String,
+}
+
+impl WebSocketCodexTransport {
+    /// Connect to a Codex `app-server` exposed over WebSocket.
+    ///
+    /// # Errors
+    ///
+    /// Returns a workflow I/O error when the TCP or WebSocket handshake
+    /// fails so the caller can surface the endpoint to operators.
+    pub async fn connect(endpoint: impl Into<String>) -> Result<Self, CliError> {
+        let endpoint = endpoint.into();
+        let result = connect_async(&endpoint).await;
+        let (socket, _response) = result.map_err(|error| connect_error(&endpoint, &error))?;
+        Ok(Self { socket, endpoint })
+    }
+
+    /// Endpoint URL the transport is bound to.
+    #[must_use]
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+}
+
+#[async_trait]
+impl CodexTransport for WebSocketCodexTransport {
+    async fn send(&mut self, frame: String) -> Result<(), CliError> {
+        self.socket
+            .send(Message::Text(frame.into()))
+            .await
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("send codex websocket frame: {error}")).into()
+            })
+    }
+
+    async fn next_frame(&mut self) -> Result<Option<String>, CliError> {
+        while let Some(message) = self.socket.next().await {
+            let message = message.map_err(|error| {
+                CliErrorKind::workflow_io(format!("read codex websocket frame: {error}"))
+            })?;
+            match message {
+                Message::Text(text) => return Ok(Some(text.to_string())),
+                Message::Binary(bytes) => {
+                    let text = String::from_utf8(bytes.to_vec()).map_err(|error| {
+                        CliErrorKind::workflow_parse(format!(
+                            "decode codex websocket binary frame: {error}"
+                        ))
+                    })?;
+                    return Ok(Some(text));
+                }
+                Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => {}
+                Message::Close(_) => return Ok(None),
+            }
+        }
+        Ok(None)
+    }
+
+    async fn shutdown(mut self: Box<Self>) -> Result<(), CliError> {
+        let _ = self
+            .socket
+            .send(Message::Close(Some(CloseFrame {
+                code: CloseCode::Normal,
+                reason: "harness daemon shutdown".into(),
+            })))
+            .await;
+        let _ = self.socket.close(None).await;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{CodexTransport, StdioCodexTransport};
+    use super::{CodexTransport, StdioCodexTransport, WebSocketCodexTransport};
+    use futures_util::sink::SinkExt;
+    use futures_util::stream::StreamExt;
     use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::accept_async;
+    use tokio_tungstenite::tungstenite::protocol::Message;
 
     #[tokio::test]
     async fn stdio_transport_send_and_receive_roundtrip() {
@@ -203,5 +303,55 @@ mod tests {
         assert!(closed.is_none());
 
         Box::new(transport).shutdown().await.expect("shutdown");
+    }
+
+    #[tokio::test]
+    async fn websocket_transport_connect_fails_without_server() {
+        let result = WebSocketCodexTransport::connect("ws://127.0.0.1:1").await;
+        assert!(result.is_err(), "connect must fail on closed port");
+    }
+
+    #[tokio::test]
+    async fn websocket_transport_roundtrip_against_echo_server() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let endpoint = format!("ws://127.0.0.1:{port}");
+
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept");
+            let mut ws = accept_async(stream).await.expect("ws accept");
+            while let Some(msg) = ws.next().await {
+                match msg {
+                    Ok(Message::Text(text)) => {
+                        if text == "stop" {
+                            break;
+                        }
+                        ws.send(Message::Text(text)).await.expect("echo");
+                    }
+                    Ok(Message::Close(_)) | Err(_) => break,
+                    _ => {}
+                }
+            }
+        });
+
+        let mut transport = WebSocketCodexTransport::connect(endpoint.clone())
+            .await
+            .expect("connect");
+        assert_eq!(transport.endpoint(), endpoint);
+
+        transport
+            .send(r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#.to_string())
+            .await
+            .expect("send");
+        let frame = transport
+            .next_frame()
+            .await
+            .expect("next_frame")
+            .expect("echo frame");
+        assert_eq!(frame, r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#);
+
+        transport.send("stop".to_string()).await.expect("stop send");
+        Box::new(transport).shutdown().await.expect("shutdown");
+        server.await.expect("server task");
     }
 }
