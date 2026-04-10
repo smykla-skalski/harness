@@ -4,6 +4,10 @@ import HarnessMonitorUI
 import SwiftData
 
 struct HarnessMonitorAppConfiguration {
+  private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
+  private static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
+
   let container: ModelContainer?
   let store: HarnessMonitorStore
   let launchMode: HarnessMonitorLaunchMode
@@ -30,10 +34,10 @@ struct HarnessMonitorAppConfiguration {
       "inspectorColumnWidth": 420.0,
     ])
 
-    let environment = HarnessMonitorEnvironment.current
+    let environment = uiTestSafeEnvironment()
     let perfScenario = HarnessMonitorPerfScenario(environment: environment)
     let resolvedEnvironment = perfScenario?.applyingDefaults(to: environment) ?? environment
-    let isUITesting = resolvedEnvironment.values["HARNESS_MONITOR_UI_TESTS"] == "1"
+    let isUITesting = resolvedEnvironment.values[uiTestsEnvironmentKey] == "1"
     let launchMode = HarnessMonitorLaunchMode(environment: resolvedEnvironment)
     let initialThemeMode =
       isUITesting
@@ -111,6 +115,54 @@ struct HarnessMonitorAppConfiguration {
     let backdropMode: HarnessMonitorBackdropMode
     let backgroundImage: HarnessMonitorBackgroundSelection
     let showInspector: Bool
+  }
+
+  private static func uiTestSafeEnvironment() -> HarnessMonitorEnvironment {
+    let environment = HarnessMonitorEnvironment.current
+    let isUITestHost = Bundle.main.bundleIdentifier == uiTestingBundleIdentifier
+    let isUITesting = environment.values[uiTestsEnvironmentKey] == "1" || isUITestHost
+    guard isUITesting else {
+      return environment
+    }
+
+    var values = environment.values
+    values[uiTestsEnvironmentKey] = "1"
+
+    if isUITestHost, isBlank(values[HarnessMonitorLaunchMode.environmentKey]) {
+      values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue
+    }
+
+    if isBlank(values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]) {
+      values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey] = defaultUITestDataHomePath(
+        bundleIdentifier: Bundle.main.bundleIdentifier
+      )
+    }
+
+    return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
+  }
+
+  private static func defaultUITestDataHomePath(bundleIdentifier: String?) -> String {
+    let bundleComponent = storagePathComponent(bundleIdentifier ?? uiTestingBundleIdentifier)
+    return FileManager.default.temporaryDirectory
+      .appendingPathComponent(uiTestDefaultDataRootName, isDirectory: true)
+      .appendingPathComponent(
+        "\(bundleComponent)-\(ProcessInfo.processInfo.processIdentifier)",
+        isDirectory: true
+      )
+      .path
+  }
+
+  private static func storagePathComponent(_ value: String) -> String {
+    let allowedScalars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+    let component = value.unicodeScalars
+      .map { allowedScalars.contains($0) ? String($0) : "-" }
+      .joined()
+      .trimmingCharacters(in: CharacterSet(charactersIn: ".-_"))
+    return component.isEmpty ? "ui-test-host" : component
+  }
+
+  private static func isBlank(_ rawValue: String?) -> Bool {
+    rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
   }
 
   @MainActor
