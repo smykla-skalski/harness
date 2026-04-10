@@ -347,6 +347,39 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
+    try await httpFallbackClient.agentTuis(sessionID: sessionID)
+  }
+
+  public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    try await httpFallbackClient.agentTui(tuiID: tuiID)
+  }
+
+  public func startAgentTui(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await httpFallbackClient.startAgentTui(sessionID: sessionID, request: request)
+  }
+
+  public func sendAgentTuiInput(
+    tuiID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await httpFallbackClient.sendAgentTuiInput(tuiID: tuiID, request: request)
+  }
+
+  public func resizeAgentTui(
+    tuiID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await httpFallbackClient.resizeAgentTui(tuiID: tuiID, request: request)
+  }
+
+  public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    try await httpFallbackClient.stopAgentTui(tuiID: tuiID)
+  }
+
   public func logLevel() async throws -> LogLevelResponse {
     let value = try await send(method: "daemon.log_level")
     return try decode(value)

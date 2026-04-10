@@ -146,6 +146,7 @@ extension HarnessMonitorStore {
         pendingExtensions = nil
       }
       resetSelectedCodexRuns()
+      resetSelectedAgentTuis()
       if sessionID == nil {
         if activeSessionLoadRequest != 0 {
           activeSessionLoadRequest = 0

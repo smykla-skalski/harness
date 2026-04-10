@@ -86,6 +86,21 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     approvalID: String,
     request: CodexApprovalDecisionRequest
   ) async throws -> CodexRunSnapshot
+  func agentTuis(sessionID: String) async throws -> AgentTuiListResponse
+  func agentTui(tuiID: String) async throws -> AgentTuiSnapshot
+  func startAgentTui(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> AgentTuiSnapshot
+  func sendAgentTuiInput(
+    tuiID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> AgentTuiSnapshot
+  func resizeAgentTui(
+    tuiID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> AgentTuiSnapshot
+  func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot
   func startVoiceSession(
     sessionID: String,
     request: VoiceSessionStartRequest
@@ -149,6 +164,39 @@ extension HarnessMonitorClientProtocol {
     request _: CodexApprovalDecisionRequest
   ) async throws -> CodexRunSnapshot {
     throw HarnessMonitorAPIError.server(code: 501, message: "Codex controller unavailable.")
+  }
+
+  public func agentTuis(sessionID _: String) async throws -> AgentTuiListResponse {
+    AgentTuiListResponse(tuis: [])
+  }
+
+  public func agentTui(tuiID _: String) async throws -> AgentTuiSnapshot {
+    throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+  }
+
+  public func startAgentTui(
+    sessionID _: String,
+    request _: AgentTuiStartRequest
+  ) async throws -> AgentTuiSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Agent TUI unavailable.")
+  }
+
+  public func sendAgentTuiInput(
+    tuiID _: String,
+    request _: AgentTuiInputRequest
+  ) async throws -> AgentTuiSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Agent TUI unavailable.")
+  }
+
+  public func resizeAgentTui(
+    tuiID _: String,
+    request _: AgentTuiResizeRequest
+  ) async throws -> AgentTuiSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Agent TUI unavailable.")
+  }
+
+  public func stopAgentTui(tuiID _: String) async throws -> AgentTuiSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Agent TUI unavailable.")
   }
 
   public func startVoiceSession(

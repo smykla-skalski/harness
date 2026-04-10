@@ -7,6 +7,8 @@ struct HarnessMonitorSheetRouter: View {
 
   var body: some View {
     switch sheet {
+    case .agentTui:
+      AgentTuiSheetView(store: store)
     case .codexFlow:
       CodexFlowSheetView(store: store)
     case .sendSignal(let agentID):

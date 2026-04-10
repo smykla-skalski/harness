@@ -3,6 +3,7 @@ use std::env::{current_exe, var};
 use std::fs::File;
 use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -16,6 +17,7 @@ use chrono::{DateTime, Utc};
 use clap::{Args, Subcommand};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
@@ -32,6 +34,10 @@ use super::{codex_bridge, state};
 pub const AGENT_TUI_BRIDGE_LAUNCH_AGENT_LABEL: &str = "io.harness.agent-tui-bridge";
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(5);
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const DEFAULT_BRIDGE_SOCKET_NAME: &str = "agent-tui-bridge.sock";
+const FALLBACK_BRIDGE_SOCKET_PREFIX: &str = "h-agent-tui-";
+const FALLBACK_BRIDGE_SOCKET_SUFFIX: &str = ".sock";
+const UNIX_SOCKET_PATH_LIMIT: usize = if cfg!(target_os = "macos") { 103 } else { 107 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiBridgeState {
@@ -60,7 +66,27 @@ pub fn bridge_state_path() -> PathBuf {
 
 #[must_use]
 pub fn bridge_socket_path() -> PathBuf {
-    state::daemon_root().join("agent-tui-bridge.sock")
+    bridge_socket_path_for_root(&state::daemon_root())
+}
+
+fn bridge_socket_path_for_root(daemon_root: &Path) -> PathBuf {
+    let preferred = daemon_root.join(DEFAULT_BRIDGE_SOCKET_NAME);
+    if unix_socket_path_fits(&preferred) {
+        return preferred;
+    }
+    fallback_bridge_socket_path(daemon_root)
+}
+
+fn unix_socket_path_fits(path: &Path) -> bool {
+    path.as_os_str().as_bytes().len() < UNIX_SOCKET_PATH_LIMIT
+}
+
+fn fallback_bridge_socket_path(daemon_root: &Path) -> PathBuf {
+    let digest = hex::encode(Sha256::digest(daemon_root.as_os_str().as_bytes()));
+    PathBuf::from("/tmp").join(format!(
+        "{FALLBACK_BRIDGE_SOCKET_PREFIX}{}{FALLBACK_BRIDGE_SOCKET_SUFFIX}",
+        &digest[..16]
+    ))
 }
 
 /// Load the published host-bridge state if one has been registered.
@@ -97,13 +123,24 @@ fn write_bridge_state_at(path: &Path, state: &AgentTuiBridgeState) -> Result<(),
 }
 
 fn clear_bridge_state() -> Result<(), CliError> {
-    clear_bridge_state_paths(&bridge_state_path(), &bridge_socket_path())
+    clear_bridge_state_with_fallback(&bridge_state_path(), &bridge_socket_path())
 }
 
 fn clear_bridge_state_paths(state_path: &Path, socket_path: &Path) -> Result<(), CliError> {
     remove_if_exists(state_path)?;
     remove_if_exists(socket_path)?;
     Ok(())
+}
+
+fn clear_bridge_state_with_fallback(
+    state_path: &Path,
+    fallback_socket_path: &Path,
+) -> Result<(), CliError> {
+    let actual_socket_path = read_bridge_state_at(state_path)?.map_or_else(
+        || fallback_socket_path.to_path_buf(),
+        |state| PathBuf::from(state.socket_path),
+    );
+    clear_bridge_state_paths(state_path, &actual_socket_path)
 }
 
 fn remove_if_exists(path: &Path) -> Result<(), CliError> {
@@ -860,7 +897,8 @@ fn stop_bridge_with_paths(
         let _ = client.shutdown();
         wait_until_dead(state.pid, STOP_GRACE_PERIOD)?;
     }
-    clear_bridge_state_paths(state_path, socket_path)?;
+    let actual_socket_path = PathBuf::from(&state.socket_path);
+    clear_bridge_state_paths(state_path, &actual_socket_path)?;
     Ok(AgentTuiBridgeStatusReport {
         running: false,
         socket_path: Some(state.socket_path),
@@ -1192,6 +1230,57 @@ mod tests {
         assert!(!report.running);
         assert_eq!(report.pid, Some(DEFINITELY_DEAD_PID));
         assert!(!state_path.exists());
+    }
+
+    #[test]
+    fn bridge_socket_path_prefers_daemon_root_when_it_fits() {
+        let tmp = tempdir().expect("tempdir");
+        let path = bridge_socket_path_for_root(tmp.path());
+        assert_eq!(path, tmp.path().join(DEFAULT_BRIDGE_SOCKET_NAME));
+    }
+
+    #[test]
+    fn bridge_socket_path_falls_back_to_tmp_when_daemon_root_is_too_long() {
+        let tmp = tempdir().expect("tempdir");
+        let long_root = tmp.path().join(
+            "very/long/path/for/a/daemon/root/that/would/overflow/the/unix/socket/path/limit/on/macos",
+        );
+        let path = bridge_socket_path_for_root(&long_root);
+        assert!(path.starts_with("/tmp"));
+        assert!(unix_socket_path_fits(&path));
+        assert!(
+            path.display()
+                .to_string()
+                .ends_with(FALLBACK_BRIDGE_SOCKET_SUFFIX)
+        );
+    }
+
+    #[test]
+    fn clear_bridge_state_uses_recorded_socket_path() {
+        let tmp = tempdir().expect("tempdir");
+        let (state_path, socket_path, token_path) = sample_paths(tmp.path());
+        let actual_socket_path = tmp.path().join("actual.sock");
+        fs::write(&socket_path, "").expect("write fallback socket");
+        fs::write(&actual_socket_path, "").expect("write actual socket");
+        write_bridge_state_at(
+            &state_path,
+            &AgentTuiBridgeState {
+                socket_path: actual_socket_path.display().to_string(),
+                pid: DEFINITELY_DEAD_PID,
+                started_at: "2026-04-10T12:00:00Z".to_string(),
+                token_path: token_path.display().to_string(),
+            },
+        )
+        .expect("write state");
+
+        clear_bridge_state_with_fallback(&state_path, &socket_path).expect("clear");
+
+        assert!(!state_path.exists());
+        assert!(!actual_socket_path.exists());
+        assert!(
+            socket_path.exists(),
+            "fallback socket should remain untouched"
+        );
     }
 
     #[test]
