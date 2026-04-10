@@ -1,4 +1,5 @@
 use std::env::{current_exe, split_paths, var, var_os};
+use std::fs::File;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -6,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Utc};
 use clap::{Args, Subcommand};
 use fs_err as fs;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -270,6 +272,9 @@ pub struct CodexBridgeStartArgs {
     /// Explicit path to the `codex` binary. Resolved from PATH when absent.
     #[arg(long, value_name = "PATH")]
     pub codex_path: Option<PathBuf>,
+    /// Detach from the terminal and run as a background supervisor.
+    #[arg(long)]
+    pub daemon: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -301,7 +306,7 @@ pub struct CodexBridgeRemoveLaunchAgentArgs {
 }
 
 /// Serialized snapshot of the bridge's live state for `status` / `stop`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodexBridgeStatusReport {
     /// `true` when the bridge PID is still alive on the host.
     pub running: bool,
@@ -315,6 +320,8 @@ pub struct CodexBridgeStatusReport {
     pub started_at: Option<String>,
     /// Best-effort codex binary version string from the bridge state file.
     pub codex_version: Option<String>,
+    /// Seconds since the bridge started, computed from `started_at`.
+    pub uptime_seconds: Option<u64>,
 }
 
 impl CodexBridgeStatusReport {
@@ -327,6 +334,7 @@ impl CodexBridgeStatusReport {
             port: None,
             started_at: None,
             codex_version: None,
+            uptime_seconds: None,
         }
     }
 }
@@ -384,6 +392,7 @@ pub fn status_report() -> Result<CodexBridgeStatusReport, CliError> {
         return Ok(CodexBridgeStatusReport::not_running());
     };
     let running = pid_alive(state.pid);
+    let uptime_seconds = uptime_from_started_at(&state.started_at);
     Ok(CodexBridgeStatusReport {
         running,
         endpoint: Some(state.endpoint),
@@ -391,6 +400,7 @@ pub fn status_report() -> Result<CodexBridgeStatusReport, CliError> {
         port: Some(state.port),
         started_at: Some(state.started_at),
         codex_version: state.codex_version,
+        uptime_seconds,
     })
 }
 
@@ -414,6 +424,7 @@ pub fn stop_bridge() -> Result<CodexBridgeStatusReport, CliError> {
         wait_until_dead(pid, STOP_GRACE_PERIOD)?;
     }
 
+    let uptime_seconds = uptime_from_started_at(&state.started_at);
     clear_bridge_state()?;
     Ok(CodexBridgeStatusReport {
         running: false,
@@ -422,6 +433,7 @@ pub fn stop_bridge() -> Result<CodexBridgeStatusReport, CliError> {
         port: Some(state.port),
         started_at: Some(state.started_at),
         codex_version: state.codex_version,
+        uptime_seconds,
     })
 }
 
@@ -511,8 +523,12 @@ impl Execute for CodexBridgeStartArgs {
 
         let port = self.port.unwrap_or(DEFAULT_CODEX_BRIDGE_PORT);
         let codex_binary = resolve_codex_binary(self.codex_path.as_deref())?;
-        let codex_version = detect_codex_version(&codex_binary);
 
+        if self.daemon {
+            return start_detached(&codex_binary, port);
+        }
+
+        let codex_version = detect_codex_version(&codex_binary);
         let listen_address = format!("ws://127.0.0.1:{port}");
         tracing::info!(
             binary = %codex_binary.display(),
@@ -534,6 +550,50 @@ impl Execute for CodexBridgeStartArgs {
             codex_version,
         ))
     }
+}
+
+fn start_detached(codex_binary: &Path, port: u16) -> Result<i32, CliError> {
+    let harness = current_exe().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "resolve current harness binary: {error}"
+        )))
+    })?;
+    let args = [
+        "codex-bridge",
+        "start",
+        "--port",
+        &port.to_string(),
+        "--codex-path",
+        &codex_binary.display().to_string(),
+    ];
+    let stdout_path = state::daemon_root().join("codex-bridge.stdout.log");
+    let stderr_path = state::daemon_root().join("codex-bridge.stderr.log");
+    state::ensure_daemon_dirs()?;
+    let stdout = File::create(&stdout_path).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "create {}: {error}",
+            stdout_path.display()
+        )))
+    })?;
+    let stderr = File::create(&stderr_path).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "create {}: {error}",
+            stderr_path.display()
+        )))
+    })?;
+    let child = Command::new(&harness)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
+        .spawn()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "spawn detached bridge: {error}"
+            )))
+        })?;
+    println!("codex-bridge started in background (pid {})", child.id());
+    Ok(0)
 }
 
 #[expect(
@@ -651,6 +711,13 @@ fn detect_codex_version(binary: &Path) -> Option<String> {
     Some(trimmed.to_string())
 }
 
+fn uptime_from_started_at(started_at: &str) -> Option<u64> {
+    let started: DateTime<Utc> = DateTime::parse_from_rfc3339(started_at).ok()?.into();
+    let now = Utc::now();
+    let duration = now.signed_duration_since(started);
+    u64::try_from(duration.num_seconds()).ok()
+}
+
 impl Execute for CodexBridgeInstallLaunchAgentArgs {
     #[expect(
         clippy::cognitive_complexity,
@@ -685,12 +752,13 @@ impl Execute for CodexBridgeInstallLaunchAgentArgs {
         }
         write_text(&plist_path, &plist)?;
 
+        if cfg!(target_os = "macos") {
+            best_effort_bootout_bridge();
+            bootstrap_bridge_agent(&plist_path)?;
+        }
+
         tracing::info!(path = %plist_path.display(), "codex-bridge: installed launch agent plist");
         println!("installed {}", plist_path.display());
-        println!(
-            "run `launchctl bootstrap gui/$UID {}` to load it now",
-            plist_path.display()
-        );
         Ok(0)
     }
 }
@@ -701,6 +769,9 @@ impl Execute for CodexBridgeRemoveLaunchAgentArgs {
 
         let plist_path = codex_bridge_launch_agent_plist_path()?;
         let existed = plist_path.is_file();
+        if existed && cfg!(target_os = "macos") {
+            best_effort_bootout_bridge();
+        }
         if existed {
             fs::remove_file(&plist_path).map_err(|error| {
                 CliError::from(CliErrorKind::workflow_io(format!(
@@ -756,6 +827,11 @@ fn render_codex_bridge_launch_agent_plist(harness_binary: &Path, port: u16) -> S
     <string>--port</string>
     <string>{port}</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HARNESS_APP_GROUP_ID</key>
+    <string>Q498EB36N4.io.harnessmonitor</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
@@ -780,6 +856,45 @@ fn render_codex_bridge_launch_agent_plist(harness_binary: &Path, port: u16) -> S
             .join("codex-bridge.stderr.log")
             .display(),
     )
+}
+
+fn bridge_launchd_service_target() -> String {
+    format!(
+        "gui/{}/{CODEX_BRIDGE_LAUNCH_AGENT_LABEL}",
+        uzers::get_current_uid()
+    )
+}
+
+fn best_effort_bootout_bridge() {
+    let target = bridge_launchd_service_target();
+    let _ = Command::new("launchctl")
+        .args(["bootout", &target])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+fn bootstrap_bridge_agent(plist_path: &Path) -> Result<(), CliError> {
+    let domain = format!("gui/{}", uzers::get_current_uid());
+    let output = Command::new("launchctl")
+        .args(["bootstrap", &domain, &plist_path.display().to_string()])
+        .output()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "run launchctl bootstrap: {error}"
+            )))
+        })?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.to_ascii_lowercase().contains("already loaded")
+            && !stderr.to_ascii_lowercase().contains("already bootstrapped")
+        {
+            return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                "launchctl bootstrap failed: {stderr}"
+            ))));
+        }
+    }
+    Ok(())
 }
 
 /// Refuse to run a codex-bridge command that requires host privileges when
@@ -1167,6 +1282,7 @@ mod tests {
             let args = CodexBridgeStartArgs {
                 port: None,
                 codex_path: None,
+                daemon: false,
             };
             let ctx = AppContext::production();
             let error = args.execute(&ctx).expect_err("must refuse");
