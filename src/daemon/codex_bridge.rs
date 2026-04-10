@@ -1,4 +1,6 @@
+use std::env::{split_paths, var_os};
 use std::io;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -8,6 +10,9 @@ use clap::{Args, Subcommand};
 use fs_err as fs;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use tokio::process::Command as TokioCommand;
+use tokio::runtime::Runtime;
+use tokio::signal::ctrl_c;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -15,6 +20,7 @@ use tokio::time::sleep;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
+use crate::workspace::utc_now;
 
 use super::codex_transport;
 use super::service;
@@ -244,10 +250,22 @@ const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum CodexBridgeCommand {
+    /// Start a supervised `codex app-server` and publish its endpoint.
+    Start(CodexBridgeStartArgs),
     /// Stop the running Codex bridge, if any.
     Stop(CodexBridgeStopArgs),
     /// Print the current bridge status.
     Status(CodexBridgeStatusArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CodexBridgeStartArgs {
+    /// Port for `codex app-server --listen ws://127.0.0.1:<port>`.
+    #[arg(long, env = "HARNESS_CODEX_WS_PORT")]
+    pub port: Option<u16>,
+    /// Explicit path to the `codex` binary. Resolved from PATH when absent.
+    #[arg(long, value_name = "PATH")]
+    pub codex_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -298,6 +316,7 @@ impl CodexBridgeStatusReport {
 impl Execute for CodexBridgeCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
+            Self::Start(args) => args.execute(context),
             Self::Stop(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
         }
@@ -460,6 +479,156 @@ fn wait_until_dead(pid: u32, grace: Duration) -> Result<(), CliError> {
         "codex-bridge stop: pid {pid} still alive after {}s",
         grace.as_secs()
     ))))
+}
+
+impl Execute for CodexBridgeStartArgs {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion; tokio-rs/tracing#553"
+    )]
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        ensure_host_context("codex-bridge-start")?;
+
+        let port = self.port.unwrap_or(DEFAULT_CODEX_BRIDGE_PORT);
+        let codex_binary = resolve_codex_binary(self.codex_path.as_deref())?;
+        let codex_version = detect_codex_version(&codex_binary);
+
+        let listen_address = format!("ws://127.0.0.1:{port}");
+        tracing::info!(
+            binary = %codex_binary.display(),
+            %listen_address,
+            version = codex_version.as_deref().unwrap_or("unknown"),
+            "codex-bridge: starting supervised codex app-server"
+        );
+
+        let runtime = Runtime::new().map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "create codex-bridge tokio runtime: {error}"
+            )))
+        })?;
+
+        runtime.block_on(run_bridge_supervisor(
+            &codex_binary,
+            &listen_address,
+            port,
+            codex_version,
+        ))
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+async fn run_bridge_supervisor(
+    codex_binary: &Path,
+    listen_address: &str,
+    port: u16,
+    codex_version: Option<String>,
+) -> Result<i32, CliError> {
+    let mut child = TokioCommand::new(codex_binary)
+        .args(["app-server", "--listen", listen_address])
+        .stdin(Stdio::null())
+        .spawn()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "spawn codex app-server: {error}"
+            )))
+        })?;
+
+    let child_pid = child.id().unwrap_or(0);
+    tracing::info!(pid = child_pid, "codex-bridge: codex app-server spawned");
+
+    write_bridge_state(&CodexBridgeState {
+        endpoint: listen_address.to_string(),
+        pid: child_pid,
+        started_at: utc_now(),
+        port,
+        codex_version,
+    })?;
+    write_bridge_pid(child_pid)?;
+
+    let exit_code = tokio::select! {
+        status = child.wait() => {
+            let status = status.map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "wait for codex app-server: {error}"
+                )))
+            })?;
+            tracing::info!(%status, "codex-bridge: codex app-server exited");
+            status.code().unwrap_or(1)
+        }
+        () = async { ctrl_c().await.ok(); } => {
+            tracing::info!("codex-bridge: received interrupt, stopping child");
+            let _ = child.kill().await;
+            0
+        }
+    };
+
+    clear_bridge_state()?;
+    Ok(exit_code)
+}
+
+/// Resolve the `codex` binary, either from an explicit path or by walking
+/// `PATH` manually. Avoids pulling in a `which` crate for a single lookup.
+///
+/// # Errors
+/// Returns a workflow I/O error when no executable `codex` can be found.
+fn resolve_codex_binary(explicit: Option<&Path>) -> Result<PathBuf, CliError> {
+    if let Some(path) = explicit {
+        if path.is_file() {
+            return Ok(path.to_path_buf());
+        }
+        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+            "codex binary not found at {}",
+            path.display()
+        ))));
+    }
+
+    if let Some(path) = find_on_path("codex") {
+        return Ok(path);
+    }
+
+    Err(CliError::from(CliErrorKind::workflow_io(
+        "codex binary not found on PATH; use --codex-path to specify it".to_string(),
+    )))
+}
+
+fn find_on_path(name: &str) -> Option<PathBuf> {
+    let path_var = var_os("PATH")?;
+    for directory in split_paths(&path_var) {
+        let candidate = directory.join(name);
+        if is_executable(&candidate) {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn is_executable(path: &Path) -> bool {
+    fs::metadata(path)
+        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+/// Best-effort version detection by running `codex --version` before spawn.
+/// Returns `None` on any failure without stopping the bridge.
+fn detect_codex_version(binary: &Path) -> Option<String> {
+    let output = Command::new(binary)
+        .arg("--version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.to_string())
 }
 
 /// Refuse to run a codex-bridge command that requires host privileges when
@@ -716,6 +885,91 @@ mod tests {
             assert_eq!(report.pid, Some(DEFINITELY_DEAD_PID));
             assert!(!codex_endpoint_path().exists());
             assert!(!codex_bridge_pid_path().exists());
+        });
+    }
+
+    #[test]
+    fn resolve_codex_binary_returns_explicit_path_when_file_exists() {
+        with_temp_daemon_root(|| {
+            let tmp = tempdir().expect("tempdir");
+            let binary = tmp.path().join("codex");
+            fs::write(&binary, "#!/bin/sh\n").expect("write");
+            std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755))
+                .expect("chmod");
+            let result = resolve_codex_binary(Some(&binary)).expect("resolve");
+            assert_eq!(result, binary);
+        });
+    }
+
+    #[test]
+    fn resolve_codex_binary_fails_when_explicit_path_missing() {
+        with_temp_daemon_root(|| {
+            let error =
+                resolve_codex_binary(Some(Path::new("/nonexistent/codex"))).expect_err("must fail");
+            assert!(error.message().contains("not found at"));
+        });
+    }
+
+    #[test]
+    fn resolve_codex_binary_finds_on_path() {
+        let tmp = tempdir().expect("tempdir");
+        let binary = tmp.path().join("codex");
+        fs::write(&binary, "#!/bin/sh\n").expect("write");
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        temp_env::with_var("PATH", Some(tmp.path().to_str().expect("utf8")), || {
+            let result = resolve_codex_binary(None).expect("resolve");
+            assert_eq!(result, binary);
+        });
+    }
+
+    #[test]
+    fn resolve_codex_binary_fails_when_not_on_path() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_var("PATH", Some(tmp.path().to_str().expect("utf8")), || {
+            let error = resolve_codex_binary(None).expect_err("must fail");
+            assert!(error.message().contains("not found on PATH"));
+        });
+    }
+
+    #[test]
+    fn is_executable_returns_false_for_missing_file() {
+        assert!(!is_executable(Path::new("/nonexistent/binary")));
+    }
+
+    #[test]
+    fn is_executable_returns_false_for_non_executable_file() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("script");
+        fs::write(&path, "data").expect("write");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+        assert!(!is_executable(&path));
+    }
+
+    #[test]
+    fn is_executable_returns_true_for_executable_file() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("script");
+        fs::write(&path, "#!/bin/sh\n").expect("write");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        assert!(is_executable(&path));
+    }
+
+    #[test]
+    fn detect_codex_version_returns_none_for_missing_binary() {
+        assert!(detect_codex_version(Path::new("/nonexistent/codex")).is_none());
+    }
+
+    #[test]
+    fn start_refuses_when_sandboxed() {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let args = CodexBridgeStartArgs {
+                port: None,
+                codex_path: None,
+            };
+            let ctx = AppContext::production();
+            let error = args.execute(&ctx).expect_err("must refuse");
+            assert_eq!(error.code(), "SANDBOX001");
         });
     }
 
