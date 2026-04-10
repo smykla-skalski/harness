@@ -352,6 +352,7 @@ extension HarnessMonitorStore {
   }
 
   public struct SessionSearchResultsState: Equatable {
+    public var isSearchActive = false
     public var filteredSessionCount = 0
     public var totalSessionCount = 0
     public var visibleSessionIDs: [String] = []
@@ -359,12 +360,14 @@ extension HarnessMonitorStore {
     public var emptyState: SidebarEmptyState = .noSessions
 
     public init(
+      isSearchActive: Bool = false,
       filteredSessionCount: Int = 0,
       totalSessionCount: Int = 0,
       visibleSessionIDs: [String] = [],
       visibleSessions: [SessionSummary] = [],
       emptyState: SidebarEmptyState = .noSessions
     ) {
+      self.isSearchActive = isSearchActive
       self.filteredSessionCount = filteredSessionCount
       self.totalSessionCount = totalSessionCount
       self.visibleSessionIDs = visibleSessionIDs

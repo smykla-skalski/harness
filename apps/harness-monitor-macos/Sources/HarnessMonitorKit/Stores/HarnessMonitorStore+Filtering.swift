@@ -389,6 +389,7 @@ extension HarnessMonitorStore {
         )
       }
       let nextSearchResults = SessionSearchResultsState(
+        isSearchActive: !queryTokens.isEmpty,
         filteredSessionCount: orderedVisibleSessionIDs.count,
         totalSessionCount: catalog.totalSessionCount,
         visibleSessionIDs: orderedVisibleSessionIDs,

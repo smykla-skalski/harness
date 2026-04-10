@@ -106,7 +106,7 @@ struct SidebarView: View {
   }
 
   private var usesFlatSearchResults: Bool {
-    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    searchResults.isSearchActive
   }
 
   private var sidebarFilterStateValue: String {
