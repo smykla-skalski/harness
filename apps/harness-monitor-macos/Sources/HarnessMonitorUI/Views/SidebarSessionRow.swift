@@ -6,6 +6,8 @@ struct SidebarSessionRow: View {
   let isBookmarked: Bool
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -16,7 +18,7 @@ struct SidebarSessionRow: View {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
           Text(session.displayTitle)
-            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+            .font(scaled(.system(.body, design: .rounded, weight: .semibold)))
             .italic(session.title.isEmpty)
             .foregroundStyle(session.title.isEmpty ? .secondary : .primary)
             .lineLimit(1)
@@ -24,17 +26,17 @@ struct SidebarSessionRow: View {
           Spacer(minLength: 12)
           if isBookmarked {
             Image(systemName: "bookmark.fill")
-              .scaledFont(.caption2)
+              .font(scaled(.caption2))
               .foregroundStyle(.secondary)
               .accessibilityLabel("Bookmarked")
           }
           Text(session.status.title)
-            .scaledFont(.caption2.weight(.bold))
+            .font(scaled(.caption2.weight(.bold)))
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
         Text(session.sessionId)
-          .scaledFont(.caption.monospaced())
+          .font(scaled(.caption.monospaced()))
           .truncationMode(.middle)
           .foregroundStyle(.secondary)
         HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -42,7 +44,7 @@ struct SidebarSessionRow: View {
           footerLabel("\(session.metrics.inProgressTaskCount) moving")
           Spacer(minLength: 0)
           Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
-            .scaledFont(.caption.weight(.medium))
+            .font(scaled(.caption.weight(.medium)))
             .lineLimit(1)
             .foregroundStyle(.secondary)
         }
@@ -54,9 +56,13 @@ struct SidebarSessionRow: View {
 
   private func footerLabel(_ value: String) -> some View {
     Text(value)
-      .scaledFont(.caption.weight(.medium))
+      .font(scaled(.caption.weight(.medium)))
       .lineLimit(1)
       .foregroundStyle(.secondary)
+  }
+
+  private func scaled(_ font: Font) -> Font {
+    fontScale == 1.0 ? font : font.scaled(by: fontScale)
   }
 }
 
