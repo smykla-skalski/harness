@@ -2426,16 +2426,14 @@ mod tests {
     #[test]
     fn derive_effective_signal_status_past_expiry_flips_pending_to_expired() {
         let signal = sample_signal_record("2020-01-01T00:00:00Z");
-        let status =
-            derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
+        let status = derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
         assert_eq!(status, SessionSignalStatus::Expired);
     }
 
     #[test]
     fn derive_effective_signal_status_future_expiry_stays_pending() {
         let signal = sample_signal_record("2099-12-31T23:59:59Z");
-        let status =
-            derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
+        let status = derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
         assert_eq!(status, SessionSignalStatus::Pending);
     }
 
@@ -2450,8 +2448,7 @@ mod tests {
     #[test]
     fn derive_effective_signal_status_unparseable_expiry_stays_pending() {
         let signal = sample_signal_record("not-a-timestamp");
-        let status =
-            derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
+        let status = derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
         assert_eq!(status, SessionSignalStatus::Pending);
     }
 

@@ -417,6 +417,13 @@ pub struct SignalAckRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignalCancelRequest {
+    pub actor: String,
+    pub agent_id: String,
+    pub signal_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMutationResponse {
     pub state: SessionState,
 }

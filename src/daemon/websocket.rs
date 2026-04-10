@@ -17,9 +17,9 @@ use crate::errors::CliError;
 use super::http::DaemonHttpState;
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SetLogLevelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, WsErrorPayload, WsPushEvent,
-    WsRequest, WsResponse,
+    SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, WsErrorPayload,
+    WsPushEvent, WsRequest, WsResponse,
 };
 use super::service;
 
@@ -436,6 +436,10 @@ fn dispatch_inner(
         "signal.send" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: SignalSendRequest = serde_json::from_value(params)?;
             service::send_signal(&session_id, &body, db).map_err(Into::into)
+        }),
+        "signal.cancel" => dispatch_mutation(request, state, |session_id, params, db| {
+            let body: SignalCancelRequest = serde_json::from_value(params)?;
+            service::cancel_signal(&session_id, &body, db).map_err(Into::into)
         }),
         "session.observe" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: ObserveSessionRequest = serde_json::from_value(params)?;
