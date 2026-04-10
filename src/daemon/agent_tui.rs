@@ -1,9 +1,27 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "agent TUI protocol types use an explicit domain prefix"
+)]
+
+use std::collections::BTreeMap;
+use std::ffi::OsString;
+use std::io::{ErrorKind, Read as _, Write as _};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
+
+use portable_pty::{Child, CommandBuilder, ExitStatus, MasterPty, PtySize, native_pty_system};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 
 const DEFAULT_ROWS: u16 = 30;
 const DEFAULT_COLS: u16 = 120;
+#[cfg(test)]
+const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
+
+type Shared<T> = Arc<Mutex<T>>;
 
 /// Terminal dimensions used when spawning or resizing an agent TUI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,6 +52,17 @@ impl AgentTuiSize {
             .into());
         }
         Ok(self)
+    }
+}
+
+impl From<AgentTuiSize> for PtySize {
+    fn from(size: AgentTuiSize) -> Self {
+        Self {
+            rows: size.rows,
+            cols: size.cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        }
     }
 }
 
@@ -89,6 +118,55 @@ impl AgentTuiLaunchProfile {
             runtime: runtime.to_string(),
             argv,
         })
+    }
+}
+
+/// Fully resolved process spawn request for a managed agent TUI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentTuiSpawnSpec {
+    pub profile: AgentTuiLaunchProfile,
+    pub project_dir: PathBuf,
+    pub env: BTreeMap<String, String>,
+    pub size: AgentTuiSize,
+}
+
+impl AgentTuiSpawnSpec {
+    /// Build a spawn spec and validate the runtime profile and PTY size.
+    ///
+    /// # Errors
+    /// Returns a workflow parse error when the profile or size is invalid.
+    pub fn new(
+        profile: AgentTuiLaunchProfile,
+        project_dir: PathBuf,
+        env: BTreeMap<String, String>,
+        size: AgentTuiSize,
+    ) -> Result<Self, CliError> {
+        AgentTuiLaunchProfile::from_argv(&profile.runtime, profile.argv.clone())?;
+        Ok(Self {
+            profile,
+            project_dir,
+            env,
+            size: size.validate()?,
+        })
+    }
+}
+
+/// PTY backend boundary used by the TUI manager.
+pub trait AgentTuiBackend {
+    /// Spawn an interactive agent TUI inside a PTY.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error if PTY allocation or process spawning fails.
+    fn spawn(&self, spec: AgentTuiSpawnSpec) -> Result<AgentTuiProcess, CliError>;
+}
+
+/// Cross-platform PTY backend powered by `portable-pty`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PortablePtyAgentTuiBackend;
+
+impl AgentTuiBackend for PortablePtyAgentTuiBackend {
+    fn spawn(&self, spec: AgentTuiSpawnSpec) -> Result<AgentTuiProcess, CliError> {
+        AgentTuiProcess::spawn(spec)
     }
 }
 
@@ -195,6 +273,212 @@ impl TerminalScreenParser {
     }
 }
 
+/// Live process handle for an agent TUI running inside a PTY.
+pub struct AgentTuiProcess {
+    master: Shared<Box<dyn MasterPty + Send>>,
+    child: Shared<Box<dyn Child + Send + Sync>>,
+    writer: Shared<Box<dyn std::io::Write + Send>>,
+    transcript: Shared<Vec<u8>>,
+    screen: Shared<TerminalScreenParser>,
+    reader_thread: Option<JoinHandle<()>>,
+}
+
+impl AgentTuiProcess {
+    /// Spawn a child process into a PTY and start the output reader thread.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error on PTY allocation, command spawn, or stream setup failure.
+    pub fn spawn(spec: AgentTuiSpawnSpec) -> Result<Self, CliError> {
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(spec.size.into())
+            .map_err(|error| CliErrorKind::workflow_io(format!("open agent TUI PTY: {error}")))?;
+        let cmd = command_builder(&spec);
+        let child = pair.slave.spawn_command(cmd).map_err(|error| {
+            CliErrorKind::workflow_io(format!("spawn agent TUI process: {error}"))
+        })?;
+        drop(pair.slave);
+
+        let reader = pair.master.try_clone_reader().map_err(|error| {
+            CliErrorKind::workflow_io(format!("clone agent TUI PTY reader: {error}"))
+        })?;
+        let writer = pair.master.take_writer().map_err(|error| {
+            CliErrorKind::workflow_io(format!("take agent TUI PTY writer: {error}"))
+        })?;
+
+        let transcript = Arc::new(Mutex::new(Vec::new()));
+        let screen = Arc::new(Mutex::new(TerminalScreenParser::new(spec.size)));
+        let reader_thread =
+            spawn_reader_thread(reader, Arc::clone(&transcript), Arc::clone(&screen));
+
+        Ok(Self {
+            master: Arc::new(Mutex::new(pair.master)),
+            child: Arc::new(Mutex::new(child)),
+            writer: Arc::new(Mutex::new(writer)),
+            transcript,
+            screen,
+            reader_thread: Some(reader_thread),
+        })
+    }
+
+    /// Send structured keyboard input to the PTY.
+    ///
+    /// # Errors
+    /// Returns a workflow parse or I/O error when mapping or writing input fails.
+    pub fn send_input(&self, input: &AgentTuiInput) -> Result<(), CliError> {
+        self.write_bytes(&input.to_bytes()?)
+    }
+
+    /// Send raw bytes to the PTY.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when the PTY writer fails.
+    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), CliError> {
+        let mut writer = lock(&self.writer, "agent TUI writer")?;
+        writer
+            .write_all(bytes)
+            .and_then(|()| writer.flush())
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("write agent TUI input: {error}")).into()
+            })
+    }
+
+    /// Resize the PTY and the parsed screen model.
+    ///
+    /// # Errors
+    /// Returns a workflow parse or I/O error when resize fails.
+    pub fn resize(&self, size: AgentTuiSize) -> Result<(), CliError> {
+        let size = size.validate()?;
+        lock(&self.master, "agent TUI PTY master")?
+            .resize(size.into())
+            .map_err(|error| CliErrorKind::workflow_io(format!("resize agent TUI PTY: {error}")))?;
+        lock(&self.screen, "agent TUI screen parser")?.resize(size);
+        Ok(())
+    }
+
+    /// Return the latest parsed terminal screen.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when internal state is poisoned.
+    pub fn screen(&self) -> Result<TerminalScreenSnapshot, CliError> {
+        Ok(lock(&self.screen, "agent TUI screen parser")?.snapshot())
+    }
+
+    /// Return a copy of the raw terminal transcript captured so far.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when internal state is poisoned.
+    pub fn transcript(&self) -> Result<Vec<u8>, CliError> {
+        Ok(lock(&self.transcript, "agent TUI transcript")?.clone())
+    }
+
+    /// Poll the child process for exit status without blocking.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when process polling fails.
+    pub fn try_wait(&self) -> Result<Option<ExitStatus>, CliError> {
+        lock(&self.child, "agent TUI child")?
+            .try_wait()
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("poll agent TUI process: {error}")).into()
+            })
+    }
+
+    /// Wait until the child exits or the timeout elapses.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when polling fails.
+    pub fn wait_timeout(&self, timeout: Duration) -> Result<Option<ExitStatus>, CliError> {
+        let started = Instant::now();
+        loop {
+            if let Some(status) = self.try_wait()? {
+                return Ok(Some(status));
+            }
+            if started.elapsed() >= timeout {
+                return Ok(None);
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// Terminate the child process.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when process termination fails.
+    pub fn kill(&self) -> Result<(), CliError> {
+        lock(&self.child, "agent TUI child")?
+            .kill()
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("kill agent TUI process: {error}")).into()
+            })
+    }
+}
+
+impl Drop for AgentTuiProcess {
+    fn drop(&mut self) {
+        if self
+            .wait_timeout(Duration::from_millis(10))
+            .ok()
+            .flatten()
+            .is_none()
+            && let Ok(mut child) = self.child.lock()
+        {
+            let _ = child.kill();
+        }
+        if let Some(reader_thread) = self.reader_thread.take() {
+            let _ = reader_thread.join();
+        }
+    }
+}
+
+fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
+    let argv = spec
+        .profile
+        .argv
+        .iter()
+        .map(OsString::from)
+        .collect::<Vec<_>>();
+    let mut cmd = CommandBuilder::from_argv(argv);
+    cmd.cwd(spec.project_dir.as_os_str());
+    cmd.env("TERM", "xterm-256color");
+    for (key, value) in &spec.env {
+        cmd.env(key, value);
+    }
+    cmd
+}
+
+fn spawn_reader_thread(
+    mut reader: Box<dyn std::io::Read + Send>,
+    transcript: Shared<Vec<u8>>,
+    screen: Shared<TerminalScreenParser>,
+) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let mut buffer = [0_u8; 8192];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read) => {
+                    let bytes = &buffer[..read];
+                    if let Ok(mut transcript) = transcript.lock() {
+                        transcript.extend_from_slice(bytes);
+                    }
+                    if let Ok(mut screen) = screen.lock() {
+                        screen.process(bytes);
+                    }
+                }
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+    })
+}
+
+fn lock<'a, T>(mutex: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T>, CliError> {
+    mutex
+        .lock()
+        .map_err(|error| CliErrorKind::workflow_io(format!("{name} lock poisoned: {error}")).into())
+}
+
 fn bracketed_paste_bytes(text: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(text.len() + 12);
     bytes.extend_from_slice(b"\x1b[200~");
@@ -227,8 +511,13 @@ fn decode_raw_bytes(data: &str) -> Result<Vec<u8>, CliError> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+    use std::time::Duration;
+
     use super::{
-        AgentTuiInput, AgentTuiKey, AgentTuiLaunchProfile, AgentTuiSize, TerminalScreenParser,
+        AgentTuiBackend, AgentTuiInput, AgentTuiKey, AgentTuiLaunchProfile, AgentTuiSize,
+        AgentTuiSpawnSpec, DEFAULT_WAIT_TIMEOUT, PortablePtyAgentTuiBackend, TerminalScreenParser,
     };
 
     #[test]
@@ -362,5 +651,97 @@ mod tests {
         let resized = parser.snapshot();
         assert_eq!(resized.rows, 10);
         assert_eq!(resized.cols, 40);
+    }
+
+    #[test]
+    fn portable_pty_backend_round_trips_line_input() {
+        let process = spawn_shell("cat");
+        process
+            .send_input(&AgentTuiInput::Text {
+                text: "hello from pty".into(),
+            })
+            .expect("send text");
+        process
+            .send_input(&AgentTuiInput::Key {
+                key: AgentTuiKey::Enter,
+            })
+            .expect("send enter");
+
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            String::from_utf8_lossy(&process.transcript().expect("transcript"))
+                .contains("hello from pty")
+        });
+    }
+
+    #[test]
+    fn portable_pty_backend_preserves_raw_ansi_and_parses_screen_text() {
+        let process = spawn_shell("printf '\\033[31mred\\033[0m\\n'");
+        let status = process
+            .wait_timeout(DEFAULT_WAIT_TIMEOUT)
+            .expect("wait")
+            .expect("status");
+        assert!(status.success());
+
+        let transcript = process.transcript().expect("transcript");
+        assert!(
+            transcript
+                .windows(b"\x1b[31m".len())
+                .any(|chunk| chunk == b"\x1b[31m")
+        );
+        assert!(process.screen().expect("screen").text.contains("red"));
+    }
+
+    #[test]
+    fn portable_pty_backend_sends_control_c() {
+        let process = spawn_shell("sleep 10");
+        process
+            .send_input(&AgentTuiInput::Control { key: 'c' })
+            .expect("send ctrl-c");
+
+        let status = process
+            .wait_timeout(DEFAULT_WAIT_TIMEOUT)
+            .expect("wait for interrupt");
+        assert!(status.is_some(), "process should exit after ctrl-c");
+    }
+
+    #[test]
+    fn portable_pty_backend_resizes_screen_model() {
+        let process = spawn_shell("cat");
+        process
+            .resize(AgentTuiSize { rows: 9, cols: 33 })
+            .expect("resize");
+
+        let screen = process.screen().expect("screen");
+        assert_eq!(screen.rows, 9);
+        assert_eq!(screen.cols, 33);
+    }
+
+    fn spawn_shell(script: &str) -> super::AgentTuiProcess {
+        let profile = AgentTuiLaunchProfile::from_argv(
+            "codex",
+            vec!["sh".to_string(), "-c".to_string(), script.to_string()],
+        )
+        .expect("profile");
+        let spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("."),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        PortablePtyAgentTuiBackend
+            .spawn(spec)
+            .expect("spawn pty process")
+    }
+
+    fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) {
+        let start = std::time::Instant::now();
+        while start.elapsed() < timeout {
+            if condition() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(condition(), "condition should become true before timeout");
     }
 }
