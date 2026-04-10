@@ -109,7 +109,12 @@ extension WebSocketTransport {
     }
     HarnessMonitorLogger.websocket.info("WebSocket reconnecting")
     heartbeatTask?.cancel()
-    cancelWebSocketTaskIfNeeded(closeCode: .goingAway)
+    // Error-recovery path: the existing socket is already dead (that's why
+    // the receive loop threw). Drop it with a plain cancel so URLSession does
+    // not try to write a close frame to a disconnected fd, which logs a
+    // spurious `nw_socket_output_finished ... shutdown(21, SHUT_WR)` warning.
+    webSocketTask?.cancel()
+    webSocketTask = nil
     let wsURL = wsEndpoint()
     var request = URLRequest(url: wsURL)
     request.setValue(
