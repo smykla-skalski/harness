@@ -146,3 +146,142 @@ struct HarnessMonitorStoreCodexTests {
     return store
   }
 }
+
+@MainActor
+@Suite("Harness Monitor agent TUI flow")
+struct HarnessMonitorStoreAgentTuiTests {
+  @Test("Start agent TUI sends request and selects returned snapshot")
+  func startAgentTuiSendsRequestAndSelectsReturnedSnapshot() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+
+    let started = await store.startAgentTui(
+      runtime: .copilot,
+      name: "Copilot TUI",
+      prompt: "Investigate the latest failure.",
+      rows: 30,
+      cols: 110
+    )
+
+    #expect(started)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startAgentTui(
+            sessionID: PreviewFixtures.summary.sessionId,
+            runtime: "copilot",
+            name: "Copilot TUI",
+            prompt: "Investigate the latest failure.",
+            rows: 30,
+            cols: 110
+          )
+        ]
+    )
+    #expect(store.selectedAgentTui?.runtime == "copilot")
+    #expect(store.selectedAgentTui?.size == AgentTuiSize(rows: 30, cols: 110))
+    #expect(store.lastAction == "Agent TUI started")
+  }
+
+  @Test("Agent TUI input updates the selected screen snapshot")
+  func agentTuiInputUpdatesSelectedScreenSnapshot() async {
+    let client = RecordingHarnessClient()
+    let tui = client.agentTuiFixture()
+    client.configureAgentTuis([tui], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedStore(client: client)
+
+    let sent = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: .text("status"))
+
+    #expect(sent)
+    #expect(client.recordedCalls() == [.sendAgentTuiInput(tuiID: tui.tuiId, input: .text("status"))])
+    #expect(store.selectedAgentTui?.screen.text.contains("status") == true)
+  }
+
+  @Test("Agent TUI stream update refreshes selected TUI")
+  func agentTuiStreamUpdateRefreshesSelectedTui() async {
+    let client = RecordingHarnessClient()
+    let running = client.agentTuiFixture(screenText: "copilot> ready")
+    client.configureAgentTuis([running], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedStore(client: client)
+    let updated = client.agentTuiFixture(
+      tuiID: running.tuiId,
+      status: .stopped,
+      screenText: "copilot> done"
+    )
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-10T09:02:00Z",
+        sessionId: PreviewFixtures.summary.sessionId,
+        kind: .agentTuiUpdated(updated)
+      )
+    )
+
+    #expect(store.selectedAgentTui?.tuiId == running.tuiId)
+    #expect(store.selectedAgentTui?.status == .stopped)
+    #expect(store.selectedAgentTui?.screen.text == "copilot> done")
+  }
+
+  @Test("Agent TUI actions stay read-only while daemon is offline")
+  func agentTuiActionsStayReadOnlyWhileDaemonIsOffline() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+    store.connectionState = .offline("daemon down")
+
+    let started = await store.startAgentTui(
+      runtime: .copilot,
+      name: nil,
+      prompt: "Patch it.",
+      rows: 24,
+      cols: 100
+    )
+
+    #expect(started == false)
+    #expect(client.recordedCalls().isEmpty)
+    #expect(store.lastError?.contains("read-only mode") == true)
+  }
+
+  @Test("Start agent TUI sets unavailable flag when daemon returns 501")
+  func startAgentTuiSetsUnavailableFlagOn501() async {
+    let client = RecordingHarnessClient()
+    client.configureAgentTuiStartError(
+      HarnessMonitorAPIError.server(code: 501, message: "agent-tui bridge unavailable")
+    )
+    let store = await selectedStore(client: client)
+
+    let started = await store.startAgentTui(
+      runtime: .copilot,
+      name: nil,
+      prompt: "Test.",
+      rows: 24,
+      cols: 100
+    )
+
+    #expect(started == false)
+    #expect(store.agentTuiUnavailable == true)
+    #expect(store.lastError?.contains("bridge unavailable") == true)
+  }
+
+  @Test("Successful agent TUI start clears unavailable flag")
+  func successfulAgentTuiStartClearsUnavailableFlag() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+    store.agentTuiUnavailable = true
+
+    let started = await store.startAgentTui(
+      runtime: .copilot,
+      name: nil,
+      prompt: "Patch it.",
+      rows: 24,
+      cols: 100
+    )
+
+    #expect(started == true)
+    #expect(store.agentTuiUnavailable == false)
+  }
+
+  private func selectedStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    return store
+  }
+}

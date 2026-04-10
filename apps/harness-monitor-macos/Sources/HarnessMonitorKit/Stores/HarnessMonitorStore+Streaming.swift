@@ -193,6 +193,8 @@ extension HarnessMonitorStore {
       applyCodexRun(run)
     case .codexApprovalRequested(let payload):
       applyCodexApprovalRequested(payload)
+    case .agentTuiUpdated(let tui):
+      applyAgentTui(tui)
     case .unknown:
       break
     }
@@ -267,6 +269,8 @@ extension HarnessMonitorStore {
       applyCodexRun(run)
     case .codexApprovalRequested(let payload):
       applyCodexApprovalRequested(payload)
+    case .agentTuiUpdated(let tui):
+      applyAgentTui(tui)
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
         return

@@ -175,6 +175,47 @@ fn agent_tui_bridge_start_publishes_state_and_stops_cleanly() {
     }
 }
 
+#[test]
+fn agent_tui_bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
+    let tmp = tempdir().expect("tempdir");
+    let data_home = tmp.path().join(
+        "deep/nesting/that/makes/the/default/daemon/socket/path/too/long/for/macos/unix/domain/sockets",
+    );
+    std::fs::create_dir_all(&data_home).expect("create data home");
+
+    let output = run_bridge_with_data_home(&data_home, &["agent-tui-bridge", "start", "--daemon"]);
+    assert!(output.status.success(), "start: {}", output_text(&output));
+
+    let state = wait_for_bridge_state(&data_home);
+    assert!(PathBuf::from(&state.socket_path).starts_with("/tmp"));
+    assert!(
+        state.socket_path.len() < 103,
+        "socket path should fit unix-domain limits: {}",
+        state.socket_path
+    );
+
+    let status_output = run_bridge_with_data_home(&data_home, &["agent-tui-bridge", "status"]);
+    assert!(
+        status_output.status.success(),
+        "status: {}",
+        output_text(&status_output)
+    );
+    let report: AgentTuiBridgeStatusReport =
+        serde_json::from_slice(&status_output.stdout).expect("parse status");
+    assert!(report.running);
+
+    let stop_output = run_bridge_with_data_home(&data_home, &["agent-tui-bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "stop: {}",
+        output_text(&stop_output)
+    );
+    assert!(
+        !PathBuf::from(&state.socket_path).exists(),
+        "socket should be removed after stop"
+    );
+}
+
 fn wait_for_bridge_state(data_home: &std::path::Path) -> AgentTuiBridgeState {
     let state_path = data_home.join("harness/daemon/agent-tui-bridge.json");
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
@@ -194,10 +235,14 @@ fn wait_for_bridge_state(data_home: &std::path::Path) -> AgentTuiBridgeState {
 }
 
 fn run_bridge(tmp: &tempfile::TempDir, args: &[&str]) -> Output {
+    run_bridge_with_data_home(tmp.path(), args)
+}
+
+fn run_bridge_with_data_home(data_home: &std::path::Path, args: &[&str]) -> Output {
     Command::new(harness_binary())
         .args(args)
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_DAEMON_DATA_HOME", data_home)
+        .env("XDG_DATA_HOME", data_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()

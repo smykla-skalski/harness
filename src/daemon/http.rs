@@ -643,12 +643,18 @@ async fn post_agent_tui_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let result = state.agent_tui_manager.start(&session_id, &request);
+    if result.is_ok() {
+        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+        let db_ref = db_guard.as_deref();
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    }
     timed_json(
         "POST",
         "/v1/sessions/{id}/agent-tuis",
         &request_id,
         start,
-        state.agent_tui_manager.start(&session_id, &request),
+        result,
     )
 }
 
@@ -721,12 +727,18 @@ async fn post_agent_tui_stop(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let result = state.agent_tui_manager.stop(&tui_id);
+    if let Ok(snapshot) = &result {
+        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+        let db_ref = db_guard.as_deref();
+        service::broadcast_session_snapshot(&state.sender, &snapshot.session_id, db_ref);
+    }
     timed_json(
         "POST",
         "/v1/agent-tuis/{id}/stop",
         &request_id,
         start,
-        state.agent_tui_manager.stop(&tui_id),
+        result,
     )
 }
 
