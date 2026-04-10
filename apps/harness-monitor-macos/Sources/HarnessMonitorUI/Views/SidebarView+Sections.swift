@@ -20,7 +20,7 @@ extension SidebarView {
   func projectHeader(
     for group: HarnessMonitorStore.SessionGroup
   ) -> some View {
-    Text(group.project.name)
+    Text(verbatim: group.project.name)
       .font(scaledSidebarFont(.system(.headline, design: .rounded, weight: .semibold)))
       .accessibilityAddTraits(.isHeader)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,11 +218,11 @@ private struct SidebarCheckoutDisclosureHeader: View {
           .foregroundStyle(.secondary)
           .frame(width: Self.leadingIconWidth, alignment: .leading)
           .accessibilityHidden(true)
-        Text(group.title)
+        Text(verbatim: group.title)
           .font(titleFont)
           .foregroundStyle(.secondary)
         Spacer()
-        Text("\(group.sessionCount)")
+        Text(verbatim: "\(group.sessionCount)")
           .font(countFont)
           .foregroundStyle(.secondary)
       }
