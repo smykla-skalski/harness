@@ -217,11 +217,6 @@ struct SessionAgentSummaryCard: View {
       }
     }
     .animation(.easeInOut(duration: 0.12), value: isDropTargeted)
-    .transition(
-      .asymmetric(
-        insertion: .scale(scale: 0.95).combined(with: .opacity),
-        removal: .opacity
-      ))
   }
 
   private var taskDropFeedback: AgentTaskDropFeedback? {

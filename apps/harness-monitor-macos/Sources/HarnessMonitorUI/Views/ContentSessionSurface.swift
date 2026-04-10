@@ -16,8 +16,6 @@ struct SessionContentContainer: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let state: SessionContentState
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
   @State private var lastDetail: SessionDetail?
   @State private var lastTimeline: [TimelineEntry] = []
 
@@ -36,10 +34,6 @@ struct SessionContentContainer: View {
     return .dashboard
   }
 
-  private var transitionAnimation: Animation {
-    reduceMotion ? .easeInOut(duration: 0.15) : .spring(duration: 0.3)
-  }
-
   var body: some View {
     ZStack(alignment: .topLeading) {
       switch mode {
@@ -49,7 +43,6 @@ struct SessionContentContainer: View {
           sessionCatalog: store.sessionIndex.catalog,
           dashboardUI: dashboardUI
         )
-        .transition(.opacity)
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
           store: store,
@@ -61,11 +54,8 @@ struct SessionContentContainer: View {
           isExtensionsLoading: state.isExtensionsLoading,
           lastAction: state.lastAction
         )
-        .id(cockpitDetail.session.sessionId)
-        .transition(.opacity)
       }
     }
-    .animation(transitionAnimation, value: mode.identity)
     .onChange(of: state.detail) { _, newDetail in
       if let newDetail {
         lastDetail = newDetail
@@ -85,15 +75,6 @@ struct SessionContentContainer: View {
 private enum SessionContentMode {
   case dashboard
   case cockpit(SessionDetail)
-
-  var identity: String {
-    switch self {
-    case .dashboard:
-      return "dashboard"
-    case .cockpit(let detail):
-      return "cockpit:\(detail.session.sessionId)"
-    }
-  }
 }
 
 #Preview("Session Content - Dashboard") {

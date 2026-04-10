@@ -46,7 +46,6 @@ struct SessionsBoardView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessMonitorTheme.ink)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionsBoardRoot)
   }
