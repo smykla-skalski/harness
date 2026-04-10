@@ -9,6 +9,7 @@ use crate::create::{
     ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
     CreateValidateArgs,
 };
+use crate::daemon::agent_tui_bridge::AgentTuiBridgeCommand;
 use crate::daemon::codex_bridge::CodexBridgeCommand;
 use crate::daemon::transport::DaemonCommand;
 use crate::errors::CliError;
@@ -156,6 +157,12 @@ pub enum Command {
         #[command(subcommand)]
         command: CodexBridgeCommand,
     },
+
+    /// Supervise host PTYs for sandboxed agent TUI sessions.
+    AgentTuiBridge {
+        #[command(subcommand)]
+        command: AgentTuiBridgeCommand,
+    },
 }
 
 /// Dispatch a parsed command to its owning subsystem.
@@ -177,6 +184,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::Session { command } => command.execute(&ctx),
         Command::Daemon { command } => command.execute(&ctx),
         Command::CodexBridge { command } => command.execute(&ctx),
+        Command::AgentTuiBridge { command } => command.execute(&ctx),
     }
 }
 

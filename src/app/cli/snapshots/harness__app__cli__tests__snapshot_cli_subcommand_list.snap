@@ -2,6 +2,7 @@
 source: src/app/cli/tests.rs
 expression: "names.join(\"\\n\")"
 ---
+agent-tui-bridge
 agents
 codex-bridge
 create
