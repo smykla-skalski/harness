@@ -71,7 +71,11 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
             .expect("seed daemon db");
     }
 
-    let codex_controller = CodexControllerHandle::new(sender.clone(), db_slot.clone());
+    let codex_controller = CodexControllerHandle::new(
+        sender.clone(),
+        db_slot.clone(),
+        harness::daemon::codex_transport::CodexTransportKind::Stdio,
+    );
     let state = DaemonHttpState {
         token: token.clone(),
         sender,

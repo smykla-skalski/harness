@@ -22,6 +22,7 @@ use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
 
 use super::codex_controller::CodexControllerHandle;
+use super::codex_transport::{self, CodexTransportKind};
 use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
@@ -72,6 +73,10 @@ pub struct DaemonServeConfig {
     /// invocations, respawning the daemon binary directly) is disabled and
     /// surfaces a structured error instead of attempting the operation.
     pub sandboxed: bool,
+    /// How the daemon should reach its Codex app-server. Sandboxed daemons
+    /// default to WebSocket because they cannot spawn subprocesses; the
+    /// unsandboxed default is stdio. See [`codex_transport_from_env`].
+    pub codex_transport: CodexTransportKind,
 }
 
 impl Default for DaemonServeConfig {
@@ -82,8 +87,16 @@ impl Default for DaemonServeConfig {
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
             sandboxed: false,
+            codex_transport: CodexTransportKind::Stdio,
         }
     }
+}
+
+/// Resolve the Codex transport kind for a given sandbox mode, consulting
+/// `HARNESS_CODEX_WS_URL`. Delegates to [`codex_transport::codex_transport_from_env`].
+#[must_use]
+pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
+    codex_transport::codex_transport_from_env(sandboxed)
 }
 
 /// Returns true when `HARNESS_SANDBOXED` is set to a truthy value (`1`, `true`, `yes`, `on`).
@@ -148,8 +161,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         started_at: utc_now(),
         token_path: state::auth_token_path().display().to_string(),
         sandboxed: config.sandboxed,
-        codex_transport: "stdio".to_string(),
-        codex_endpoint: None,
+        codex_transport: config.codex_transport.manifest_label().to_string(),
+        codex_endpoint: config.codex_transport.endpoint().map(ToString::to_string),
     };
     state::write_manifest(&manifest)?;
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
@@ -168,7 +181,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let daemon_epoch = manifest.started_at.clone();
 
     spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
-    let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone());
+    let codex_controller =
+        CodexControllerHandle::new(sender.clone(), db.clone(), config.codex_transport.clone());
 
     let app_state = DaemonHttpState {
         token,
@@ -2800,6 +2814,38 @@ mod tests {
     fn daemon_serve_config_default_is_unsandboxed() {
         let config = DaemonServeConfig::default();
         assert!(!config.sandboxed);
+        assert_eq!(config.codex_transport, CodexTransportKind::Stdio);
+    }
+
+    #[test]
+    fn codex_transport_from_env_defaults_to_stdio_when_unsandboxed() {
+        temp_env::with_var("HARNESS_CODEX_WS_URL", Option::<&str>::None, || {
+            assert_eq!(codex_transport_from_env(false), CodexTransportKind::Stdio);
+        });
+    }
+
+    #[test]
+    fn codex_transport_from_env_defaults_to_websocket_when_sandboxed() {
+        temp_env::with_var("HARNESS_CODEX_WS_URL", Option::<&str>::None, || {
+            assert_eq!(
+                codex_transport_from_env(true),
+                CodexTransportKind::WebSocket {
+                    endpoint: super::codex_transport::DEFAULT_CODEX_WS_ENDPOINT.to_string(),
+                }
+            );
+        });
+    }
+
+    #[test]
+    fn codex_transport_from_env_overrides_via_environment() {
+        temp_env::with_var("HARNESS_CODEX_WS_URL", Some("ws://10.0.0.5:7000"), || {
+            assert_eq!(
+                codex_transport_from_env(false),
+                CodexTransportKind::WebSocket {
+                    endpoint: "ws://10.0.0.5:7000".to_string(),
+                }
+            );
+        });
     }
 
     #[test]

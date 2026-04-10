@@ -16,6 +16,83 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 use crate::errors::{CliError, CliErrorKind};
 
+/// Default WebSocket endpoint for a user-launched Codex app-server when the
+/// daemon runs under the macOS App Sandbox and cannot spawn child processes.
+pub const DEFAULT_CODEX_WS_ENDPOINT: &str = "ws://127.0.0.1:4500";
+
+/// How the daemon should reach its Codex app-server.
+///
+/// Stdio spawns a local `codex app-server` child process and talks over its
+/// stdin/stdout. WebSocket connects to a user-launched `codex app-server
+/// --listen ws://...` so that a sandboxed daemon can still drive Codex runs
+/// without spawning subprocesses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CodexTransportKind {
+    Stdio,
+    WebSocket { endpoint: String },
+}
+
+impl CodexTransportKind {
+    /// Short textual label written into the daemon manifest for observability.
+    #[must_use]
+    pub fn manifest_label(&self) -> &'static str {
+        match self {
+            Self::Stdio => "stdio",
+            Self::WebSocket { .. } => "websocket",
+        }
+    }
+
+    /// Endpoint URL for the WebSocket variant, or `None` for stdio.
+    #[must_use]
+    pub fn endpoint(&self) -> Option<&str> {
+        match self {
+            Self::Stdio => None,
+            Self::WebSocket { endpoint } => Some(endpoint.as_str()),
+        }
+    }
+
+    /// Construct a live transport that the Codex JSON-RPC state machine can
+    /// drive. Stdio spawns a child process synchronously; the WebSocket
+    /// variant performs an async TCP + WS handshake.
+    ///
+    /// # Errors
+    ///
+    /// Returns a workflow I/O error when the underlying transport fails to
+    /// come up (child spawn, TCP connect, WS handshake).
+    pub async fn connect(&self) -> Result<Box<dyn CodexTransport>, CliError> {
+        match self {
+            Self::Stdio => Ok(Box::new(StdioCodexTransport::spawn()?)),
+            Self::WebSocket { endpoint } => {
+                Ok(Box::new(WebSocketCodexTransport::connect(endpoint).await?))
+            }
+        }
+    }
+}
+
+/// Resolve the transport kind for a given daemon sandbox mode, respecting
+/// the `HARNESS_CODEX_WS_URL` override so operators can point the daemon at
+/// an arbitrary user-launched `codex app-server` instance without a flag.
+///
+/// * Sandboxed daemons always use WebSocket (they cannot spawn children).
+///   The endpoint is `HARNESS_CODEX_WS_URL` or [`DEFAULT_CODEX_WS_ENDPOINT`].
+/// * Unsandboxed daemons default to stdio, unless `HARNESS_CODEX_WS_URL` is
+///   set explicitly to route through a pre-launched server.
+#[must_use]
+pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
+    let override_url = env::var("HARNESS_CODEX_WS_URL")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    match (sandboxed, override_url) {
+        (_, Some(endpoint)) => CodexTransportKind::WebSocket { endpoint },
+        (true, None) => CodexTransportKind::WebSocket {
+            endpoint: DEFAULT_CODEX_WS_ENDPOINT.to_string(),
+        },
+        (false, None) => CodexTransportKind::Stdio,
+    }
+}
+
 /// Async frame-oriented transport carrying newline-delimited JSON-RPC between
 /// the daemon and a Codex `app-server`. Implementations hide whether the far
 /// side is a child process (stdio) or a WebSocket connection.

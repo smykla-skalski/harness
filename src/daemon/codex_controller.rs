@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::codex_transport::{CodexTransport, StdioCodexTransport};
+use super::codex_transport::{CodexTransport, CodexTransportKind};
 use super::db::DaemonDb;
 use super::protocol::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexApprovalRequest,
@@ -27,6 +27,7 @@ struct CodexControllerState {
     sender: broadcast::Sender<StreamEvent>,
     db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     active_runs: Arc<Mutex<HashMap<String, ActiveRun>>>,
+    transport_kind: CodexTransportKind,
 }
 
 #[derive(Clone)]
@@ -48,18 +49,28 @@ enum CodexControlMessage {
 
 impl CodexControllerHandle {
     /// Create a daemon-owned Codex controller.
+    ///
+    /// `transport_kind` selects how each run's Codex app-server is reached -
+    /// either by spawning a local child process (stdio) or by connecting to
+    /// a user-launched server over WebSocket.
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
         db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        transport_kind: CodexTransportKind,
     ) -> Self {
         Self {
             state: Arc::new(CodexControllerState {
                 sender,
                 db,
                 active_runs: Arc::default(),
+                transport_kind,
             }),
         }
+    }
+
+    fn transport_kind(&self) -> &CodexTransportKind {
+        &self.state.transport_kind
     }
 
     /// Start a Codex run for a Harness session.
@@ -328,7 +339,7 @@ impl CodexRunWorker {
             Some("Starting codex app-server"),
             None,
         )?;
-        let transport: Box<dyn CodexTransport> = Box::new(StdioCodexTransport::spawn()?);
+        let transport = self.controller.transport_kind().connect().await?;
         let mut rpc = CodexJsonRpc::new(transport);
         self.initialize(&mut rpc).await?;
         self.start_or_resume_thread(&mut rpc).await?;

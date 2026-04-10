@@ -127,6 +127,11 @@ pub struct DaemonServeArgs {
     /// (`1`, `true`, `yes`, `on`) in the environment.
     #[arg(long)]
     pub sandboxed: bool,
+    /// WebSocket URL of a user-launched `codex app-server --listen ws://...`.
+    /// Overrides the transport selected by sandbox mode; equivalent to
+    /// setting `HARNESS_CODEX_WS_URL`.
+    #[arg(long, value_name = "URL")]
+    pub codex_ws_url: Option<String>,
 }
 
 impl Execute for DaemonServeArgs {
@@ -136,12 +141,22 @@ impl Execute for DaemonServeArgs {
                 "create daemon tokio runtime: {error}"
             )))
         })?;
+        let sandboxed = self.sandboxed || service::sandboxed_from_env();
+        let codex_transport = match self.codex_ws_url.as_ref() {
+            Some(url) if !url.trim().is_empty() => {
+                super::codex_transport::CodexTransportKind::WebSocket {
+                    endpoint: url.trim().to_string(),
+                }
+            }
+            _ => service::codex_transport_from_env(sandboxed),
+        };
         runtime.block_on(service::serve(DaemonServeConfig {
             host: self.host.clone(),
             port: self.port,
             poll_interval: Duration::from_secs(self.refresh_seconds.max(1)),
             observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
-            sandboxed: self.sandboxed || service::sandboxed_from_env(),
+            sandboxed,
+            codex_transport,
         }))?;
         Ok(0)
     }
