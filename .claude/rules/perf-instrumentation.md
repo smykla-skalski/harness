@@ -51,19 +51,37 @@ For every `Scripts/run-instruments-audit.sh` run that is intended to prove a per
    git worktree add /tmp/harness-monitor-audit-<sha>-<date> <sha-or-ref>
    ```
 
-2. Immediately run `mise trust` inside that new worktree before any build or audit command:
+2. Immediately run `mise trust` inside that new worktree before any build, audit,
+   or inspection command:
 
    ```bash
    (cd /tmp/harness-monitor-audit-<sha>-<date> && mise trust)
    ```
 
-   This is required so audit logs do not get polluted by mise trust warnings and so the worktree uses the expected repo tool configuration.
+   This is required so audit logs do not get polluted by mise trust warnings and
+   so the worktree uses the expected repo tool configuration. Do not continue
+   after creating the worktree until `mise trust` has completed cleanly.
 
 3. Run `apps/harness-monitor-macos/Scripts/run-instruments-audit.sh` from inside that worktree. Compare against the baseline path from the main repo only when needed; do not run the audit from the main worktree just to access the baseline.
 
 4. Verify the generated `manifest.json` before trusting the numbers. The embedded commit, dirty flag, workspace fingerprint, host binary hash, and staged host bundle ID must match the worktree/ref being measured.
 
-5. Clean up the temporary worktree when the run is finished and artifacts needed for the report have been copied or recorded:
+5. Before removing the worktree, copy the relevant audit artifacts back to the
+   main workspace so the run can be compared later. Preserve the whole run
+   directory when storage is acceptable. If storage is constrained, preserve at
+   least `manifest.json`, `summary.json`, `summary.csv`, `comparison.json`,
+   `comparison.md`, `captures.tsv`, and the `metrics/` directory. Use an
+   explicit copy command that bypasses shell aliases, such as `command rsync -a`,
+   so local aliases cannot accidentally preserve the temporary `/tmp` path:
+
+   ```bash
+   command rsync -a \
+     /tmp/harness-monitor-audit-<sha>-<date>/tmp/perf/harness-monitor-instruments/runs/<run-id>/ \
+     /path/to/main/workspace/tmp/perf/harness-monitor-instruments/runs/<run-id>/
+   ```
+
+6. Clean up the temporary worktree only after required artifacts have been
+   copied or recorded:
 
    ```bash
    git worktree remove /tmp/harness-monitor-audit-<sha>-<date>
