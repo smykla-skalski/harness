@@ -136,15 +136,23 @@ private struct SessionCockpitSignalCard: View {
         }
       }
 
-      if showsActions {
+      // Keep hidden material/mask overlays out of the render tree; Instruments
+      // still counts their work even when the strip is fully transparent.
+      if isHovered && showsActions {
         SignalHoverActionStrip(
           store: store,
           signal: signal,
           canCancel: canCancel,
           canResend: canResend,
-          isHovered: isHovered
+          reduceMotion: reduceMotion
         )
-        .allowsHitTesting(isHovered)
+        .transition(
+          reduceMotion
+            ? .identity
+            : .opacity.combined(
+              with: .scale(scale: SignalHoverActionStrip.hiddenScale, anchor: .topTrailing)
+            )
+        )
       }
     }
     .onHover { hovered in
@@ -167,7 +175,7 @@ private struct SignalHoverActionStrip: View {
   let signal: SessionSignalRecord
   let canCancel: Bool
   let canResend: Bool
-  let isHovered: Bool
+  let reduceMotion: Bool
 
   @State private var displayScale: CGFloat = SignalHoverActionStrip.hiddenScale
   @State private var isCancelHovering = false
@@ -210,26 +218,17 @@ private struct SignalHoverActionStrip: View {
         )
       }
     }
-    .scaleEffect(displayScale, anchor: .center)
-    .onChange(of: isHovered) { _, newValue in
-      if newValue {
-        if anyIconHovering {
-          withAnimation(.easeOut(duration: 0.12)) {
-            displayScale = Self.settledScale
-          }
-        } else {
-          withAnimation(.interpolatingSpring(mass: 1, stiffness: 180, damping: 6)) {
-            displayScale = Self.bouncingScale
-          }
-        }
-      } else {
-        withAnimation(.easeOut(duration: 0.25)) {
-          displayScale = Self.hiddenScale
-        }
+    .scaleEffect(reduceMotion ? Self.bouncingScale : displayScale, anchor: .center)
+    .onAppear {
+      guard !reduceMotion else {
+        return
+      }
+      withAnimation(.interpolatingSpring(mass: 1, stiffness: 180, damping: 6)) {
+        displayScale = Self.bouncingScale
       }
     }
     .onChange(of: anyIconHovering) { _, newValue in
-      guard newValue, isHovered else { return }
+      guard newValue, !reduceMotion else { return }
       withAnimation(.easeOut(duration: 0.12)) {
         displayScale = Self.settledScale
       }
@@ -283,7 +282,6 @@ private struct SignalHoverActionStrip: View {
         style: .continuous
       )
     )
-    .opacity(isHovered ? 1 : 0)
   }
 }
 
