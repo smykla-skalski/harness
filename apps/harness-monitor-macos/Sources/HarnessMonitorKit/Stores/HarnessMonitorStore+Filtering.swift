@@ -61,7 +61,12 @@ extension HarnessMonitorStore {
     }
 
     public var groupedSessions: [SessionGroup] {
-      projection.groupedSessions
+      guard queryTokens.isEmpty else {
+        return buildGroupedSessions(
+          visibleSessionIDSet: Set(searchResults.visibleSessionIDs)
+        )
+      }
+      return projection.groupedSessions
     }
 
     public var filteredSessionCount: Int {
@@ -313,18 +318,60 @@ extension HarnessMonitorStore {
       debugProjectionRebuildCount += 1
       queryTokens = Self.normalizedQueryTokens(for: controls.searchText)
 
-      let visibleSessionIDs = catalog.sessions.compactMap { summary -> String? in
-        guard let record = sessionRecordsByID[summary.sessionId], matchesCurrentFilters(record)
-        else {
-          return nil
+      var visibleSessionIDSet = Set<String>()
+      visibleSessionIDSet.reserveCapacity(sessionRecordsByID.count)
+      for summary in catalog.sessions {
+        if let record = sessionRecordsByID[summary.sessionId],
+          matchesCurrentFilters(record)
+        {
+          visibleSessionIDSet.insert(summary.sessionId)
         }
-        return summary.sessionId
       }
-      let visibleSessionIDSet = Set(visibleSessionIDs)
       let orderedVisibleSessionIDs = orderedVisibleSessionIDs(in: visibleSessionIDSet)
       let visibleSessions = orderedVisibleSessionIDs.compactMap { sessionRecordsByID[$0]?.summary }
+      let emptyState: SidebarEmptyState
+      if catalog.totalSessionCount == 0 {
+        emptyState = .noSessions
+      } else if orderedVisibleSessionIDs.isEmpty {
+        emptyState = .noMatches
+      } else {
+        emptyState = .sessionsAvailable
+      }
 
-      let groupedSessions = projectCatalogs.compactMap { projectCatalog -> SessionGroup? in
+      if queryTokens.isEmpty {
+        projection.apply(
+          SessionProjectionState(
+            groupedSessions: buildGroupedSessions(visibleSessionIDSet: visibleSessionIDSet),
+            filteredSessionCount: orderedVisibleSessionIDs.count,
+            totalSessionCount: catalog.totalSessionCount,
+            emptyState: emptyState
+          )
+        )
+      } else {
+        projection.applyMetadata(
+          filteredSessionCount: orderedVisibleSessionIDs.count,
+          totalSessionCount: catalog.totalSessionCount,
+          emptyState: emptyState
+        )
+      }
+      let nextSearchResults = SessionSearchResultsState(
+        filteredSessionCount: orderedVisibleSessionIDs.count,
+        totalSessionCount: catalog.totalSessionCount,
+        visibleSessionIDs: orderedVisibleSessionIDs,
+        visibleSessions: visibleSessions,
+        emptyState: emptyState
+      )
+      if searchResults.state != nextSearchResults {
+        searchResults.state = nextSearchResults
+      }
+
+      onChanged?(change)
+    }
+
+    private func buildGroupedSessions(
+      visibleSessionIDSet: Set<String>
+    ) -> [SessionGroup] {
+      projectCatalogs.compactMap { projectCatalog -> SessionGroup? in
         let checkoutGroups =
           projectCatalog.checkouts.compactMap { checkout -> HarnessMonitorStore.CheckoutGroup? in
             let checkoutSessionIDs =
@@ -347,35 +394,6 @@ extension HarnessMonitorStore {
         }
         return SessionGroup(project: projectCatalog.project, checkoutGroups: checkoutGroups)
       }
-      let emptyState: SidebarEmptyState
-      if catalog.totalSessionCount == 0 {
-        emptyState = .noSessions
-      } else if groupedSessions.isEmpty {
-        emptyState = .noMatches
-      } else {
-        emptyState = .sessionsAvailable
-      }
-
-      projection.apply(
-        SessionProjectionState(
-          groupedSessions: groupedSessions,
-          filteredSessionCount: orderedVisibleSessionIDs.count,
-          totalSessionCount: catalog.totalSessionCount,
-          emptyState: emptyState
-        )
-      )
-      let nextSearchResults = SessionSearchResultsState(
-        filteredSessionCount: orderedVisibleSessionIDs.count,
-        totalSessionCount: catalog.totalSessionCount,
-        visibleSessionIDs: orderedVisibleSessionIDs,
-        visibleSessions: visibleSessions,
-        emptyState: emptyState
-      )
-      if searchResults.state != nextSearchResults {
-        searchResults.state = nextSearchResults
-      }
-
-      onChanged?(change)
     }
 
   }
