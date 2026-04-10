@@ -103,6 +103,14 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
     sessionID _: String, taskID _: String, request _: TaskAssignRequest
   ) async throws -> SessionDetail { throw error }
 
+  func dropTask(
+    sessionID _: String, taskID _: String, request _: TaskDropRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func updateTaskQueuePolicy(
+    sessionID _: String, taskID _: String, request _: TaskQueuePolicyRequest
+  ) async throws -> SessionDetail { throw error }
+
   func updateTask(
     sessionID _: String, taskID _: String, request _: TaskUpdateRequest
   ) async throws -> SessionDetail { throw error }

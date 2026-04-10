@@ -69,13 +69,44 @@ public enum HarnessMonitorSchemaV3: VersionedSchema {
   }
 }
 
+public enum HarnessMonitorSchemaV4: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(4, 0, 0) }
+
+  public static var versionString: String {
+    let version = versionIdentifier
+    return "\(version.major).\(version.minor).\(version.patch)"
+  }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      Self.CachedProject.self,
+      Self.CachedSession.self,
+      Self.CachedAgent.self,
+      Self.CachedWorkItem.self,
+      Self.CachedSignalRecord.self,
+      Self.CachedTimelineEntry.self,
+      Self.CachedObserver.self,
+      Self.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
-    [HarnessMonitorSchemaV1.self, HarnessMonitorSchemaV2.self, HarnessMonitorSchemaV3.self]
+    [
+      HarnessMonitorSchemaV1.self,
+      HarnessMonitorSchemaV2.self,
+      HarnessMonitorSchemaV3.self,
+      HarnessMonitorSchemaV4.self,
+    ]
   }
 
   public static var stages: [MigrationStage] {
-    [migrateV1toV2, migrateV2toV3]
+    [migrateV1toV2, migrateV2toV3, migrateV3toV4]
   }
 
   static let migrateV1toV2 = MigrationStage.custom(
@@ -112,5 +143,10 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
 
       try context.save()
     }
+  )
+
+  static let migrateV3toV4 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV3.self,
+    toVersion: HarnessMonitorSchemaV4.self
   )
 }

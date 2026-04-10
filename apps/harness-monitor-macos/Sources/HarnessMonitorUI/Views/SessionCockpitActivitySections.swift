@@ -97,7 +97,7 @@ private struct SessionCockpitSignalCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HarnessMonitorTheme.cardPadding)
       }
-      .harnessInteractiveCardButtonStyle()
+      .harnessInteractiveCardButtonStyle(extraHoverHint: isHovered && showsActions)
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.sessionSignalCard(signal.signal.signalId)
       )
@@ -204,9 +204,35 @@ private struct SignalHoverActionStrip: View {
       }
     }
     .frame(maxHeight: .infinity)
-    .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
+    .padding(.leading, HarnessMonitorTheme.spacingLG * 2)
+    .padding(.trailing, HarnessMonitorTheme.itemSpacing)
     .padding(.vertical, HarnessMonitorTheme.cardPadding)
     .background {
+      Rectangle()
+        .fill(.regularMaterial)
+        .overlay {
+          LinearGradient(
+            colors: [
+              Color.black.opacity(0),
+              Color.black.opacity(0.28),
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+        }
+        .mask {
+          LinearGradient(
+            stops: [
+              .init(color: .clear, location: 0),
+              .init(color: .black.opacity(0.4), location: 0.35),
+              .init(color: .black, location: 0.75),
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+        }
+    }
+    .clipShape(
       UnevenRoundedRectangle(
         topLeadingRadius: 0,
         bottomLeadingRadius: 0,
@@ -214,13 +240,7 @@ private struct SignalHoverActionStrip: View {
         topTrailingRadius: HarnessMonitorTheme.cornerRadiusMD,
         style: .continuous
       )
-      .fill(.regularMaterial)
-    }
-    .overlay(alignment: .leading) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.35))
-        .frame(width: 1)
-    }
+    )
   }
 }
 

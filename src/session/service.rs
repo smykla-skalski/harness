@@ -27,8 +27,8 @@ use super::storage;
 use super::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, PendingLeaderTransfer, SessionMetrics,
     SessionRole, SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
-    SessionTransition, TaskCheckpoint, TaskCheckpointSummary, TaskNote, TaskSeverity, TaskSource,
-    TaskStatus, WorkItem,
+    SessionTransition, TaskCheckpoint, TaskCheckpointSummary, TaskNote, TaskQueuePolicy,
+    TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
 
 const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
@@ -38,6 +38,7 @@ const END_SESSION_SIGNAL_MESSAGE: &str =
 const REMOVE_AGENT_SIGNAL_MESSAGE: &str = "You have been removed from this harness session. Stop current work and leave the harness session.";
 const END_SESSION_SIGNAL_ACTION_HINT: &str = "harness:session:end";
 const REMOVE_AGENT_SIGNAL_ACTION_HINT: &str = "harness:session:remove-agent";
+const START_TASK_SIGNAL_COMMAND: &str = "request_action";
 
 /// Task-specific fields for `create_task_with_source`.
 pub struct TaskSpec<'a> {
@@ -57,6 +58,21 @@ pub struct ResolvedRuntimeSessionAgent {
 
 #[derive(Debug, Clone)]
 pub(crate) struct LeaveSignalRecord {
+    pub(crate) runtime: String,
+    pub(crate) agent_id: String,
+    pub(crate) signal_session_id: String,
+    pub(crate) signal: Signal,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum TaskDropEffect {
+    Started(Box<TaskStartSignalRecord>),
+    Queued { task_id: String, agent_id: String },
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct TaskStartSignalRecord {
+    pub(crate) task_id: String,
     pub(crate) runtime: String,
     pub(crate) agent_id: String,
     pub(crate) signal_session_id: String,
@@ -506,6 +522,70 @@ pub fn assign_task(
     Ok(())
 }
 
+/// Drop a work item onto a session target.
+///
+/// # Errors
+/// Returns `CliError` if the caller lacks permission, the target is invalid,
+/// or signal delivery setup fails for an immediately-started task.
+pub fn drop_task(
+    session_id: &str,
+    task_id: &str,
+    target: &protocol::TaskDropTarget,
+    queue_policy: TaskQueuePolicy,
+    actor_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.drop_task(
+            session_id,
+            task_id,
+            &protocol::TaskDropRequest {
+                actor: actor_id.to_string(),
+                target: target.clone(),
+                queue_policy,
+            },
+        )?;
+        return Ok(());
+    }
+
+    let now = utc_now();
+    let mut effects = Vec::new();
+    storage::update_state(project_dir, session_id, |state| {
+        effects = apply_drop_task(state, task_id, target, queue_policy, actor_id, &now)?;
+        Ok(())
+    })?;
+
+    let start_signals = started_task_signals(&effects);
+    write_prepared_task_start_signals(project_dir, &start_signals)?;
+    append_task_drop_effect_logs(project_dir, session_id, actor_id, &effects)?;
+    Ok(())
+}
+
+/// Change a queued task's reassignment policy.
+///
+/// # Errors
+/// Returns `CliError` if the caller lacks permission or queue promotion signal
+/// delivery fails.
+pub fn update_task_queue_policy(
+    session_id: &str,
+    task_id: &str,
+    queue_policy: TaskQueuePolicy,
+    actor_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let mut effects = Vec::new();
+    storage::update_state(project_dir, session_id, |state| {
+        effects = apply_update_task_queue_policy(state, task_id, queue_policy, actor_id, &now)?;
+        Ok(())
+    })?;
+
+    let start_signals = started_task_signals(&effects);
+    write_prepared_task_start_signals(project_dir, &start_signals)?;
+    append_task_drop_effect_logs(project_dir, session_id, actor_id, &effects)?;
+    Ok(())
+}
+
 /// List work items, optionally filtered by status.
 ///
 /// # Errors
@@ -565,12 +645,17 @@ pub fn update_task(
 
     let now = utc_now();
     let mut from_status = TaskStatus::Open;
+    let mut effects = Vec::new();
 
     storage::update_state(project_dir, session_id, |state| {
         from_status = apply_update_task(state, task_id, status, note, actor_id, &now)?;
+        effects = apply_advance_queued_tasks(state, actor_id, &now)?;
+        refresh_session(state, &now);
         Ok(())
     })?;
 
+    let start_signals = started_task_signals(&effects);
+    write_prepared_task_start_signals(project_dir, &start_signals)?;
     storage::append_log_entry(
         project_dir,
         session_id,
@@ -578,6 +663,7 @@ pub fn update_task(
         Some(actor_id),
         None,
     )?;
+    append_task_drop_effect_logs(project_dir, session_id, actor_id, &effects)?;
 
     Ok(())
 }
@@ -1271,6 +1357,22 @@ pub(crate) fn write_prepared_leave_signals(
     Ok(())
 }
 
+pub(crate) fn write_prepared_task_start_signals(
+    project_dir: &Path,
+    signals: &[TaskStartSignalRecord],
+) -> Result<(), CliError> {
+    for signal in signals {
+        let runtime = runtime::runtime_for_name(&signal.runtime).ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "unknown runtime '{}'",
+                signal.runtime
+            )))
+        })?;
+        runtime.write_signal(project_dir, &signal.signal_session_id, &signal.signal)?;
+    }
+    Ok(())
+}
+
 /// Mark a session as ended. Validates permissions and active-task constraints.
 pub(crate) fn apply_end_session(
     state: &mut SessionState,
@@ -1360,14 +1462,12 @@ pub(crate) fn apply_remove_agent(
     clear_pending_leader_transfer(state, agent_id);
 
     for task in state.tasks.values_mut() {
-        if task.assigned_to.as_deref() == Some(agent_id)
-            && matches!(
-                task.status,
-                TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
-            )
+        if task.assigned_to.as_deref() == Some(agent_id) && !matches!(task.status, TaskStatus::Done)
         {
             task.status = TaskStatus::Open;
             task.assigned_to = None;
+            task.queue_policy = TaskQueuePolicy::Locked;
+            task.queued_at = None;
             task.updated_at = now.to_string();
             task.blocked_reason = None;
             task.completed_at = None;
@@ -1411,6 +1511,8 @@ pub(crate) fn apply_create_task(
         severity: spec.severity,
         status: TaskStatus::Open,
         assigned_to: None,
+        queue_policy: TaskQueuePolicy::Locked,
+        queued_at: None,
         created_at: now.to_string(),
         updated_at: now.to_string(),
         created_by: Some(actor_id.to_string()),
@@ -1455,6 +1557,8 @@ pub(crate) fn apply_assign_task(
         .ok_or_else(|| task_not_found(task_id))?;
     task.assigned_to = Some(agent_id.to_string());
     task.status = TaskStatus::InProgress;
+    task.queue_policy = TaskQueuePolicy::Locked;
+    task.queued_at = None;
     task.updated_at = now.to_string();
     task.blocked_reason = None;
     task.completed_at = None;
@@ -1468,6 +1572,92 @@ pub(crate) fn apply_assign_task(
     touch_agent(state, actor_id, now);
     refresh_session(state, now);
     Ok(())
+}
+
+/// Drop a task onto an extensible session target. The first target action is
+/// worker assignment: start immediately when the worker is free, otherwise
+/// queue against the selected worker.
+pub(crate) fn apply_drop_task(
+    state: &mut SessionState,
+    task_id: &str,
+    target: &protocol::TaskDropTarget,
+    queue_policy: TaskQueuePolicy,
+    actor_id: &str,
+    now: &str,
+) -> Result<Vec<TaskDropEffect>, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::AssignTask)?;
+
+    match target {
+        protocol::TaskDropTarget::Agent { agent_id } => {
+            apply_drop_task_on_agent(state, task_id, agent_id, queue_policy, actor_id, now)
+        }
+    }
+}
+
+pub(crate) fn apply_update_task_queue_policy(
+    state: &mut SessionState,
+    task_id: &str,
+    queue_policy: TaskQueuePolicy,
+    actor_id: &str,
+    now: &str,
+) -> Result<Vec<TaskDropEffect>, CliError> {
+    require_active(state)?;
+    require_permission(state, actor_id, SessionAction::AssignTask)?;
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    task.queue_policy = queue_policy;
+    task.updated_at = now.to_string();
+    touch_agent(state, actor_id, now);
+    let effects = apply_advance_queued_tasks(state, actor_id, now)?;
+    refresh_session(state, now);
+    Ok(effects)
+}
+
+pub(crate) fn apply_advance_queued_tasks(
+    state: &mut SessionState,
+    actor_id: &str,
+    now: &str,
+) -> Result<Vec<TaskDropEffect>, CliError> {
+    let mut effects = Vec::new();
+    let mut free_workers = free_worker_ids(state);
+    free_workers.sort_unstable();
+
+    for worker_id in free_workers.clone() {
+        if start_next_locked_task_for_worker(state, &worker_id, actor_id, now, &mut effects)? {
+            free_workers.retain(|candidate| candidate != &worker_id);
+        }
+    }
+
+    let mut reassignable_tasks: Vec<_> = state
+        .tasks
+        .values()
+        .filter(|task| {
+            task.status == TaskStatus::Open
+                && task.queued_at.is_some()
+                && task.assigned_to.is_some()
+                && task.queue_policy == TaskQueuePolicy::ReassignWhenFree
+        })
+        .map(|task| {
+            (
+                task.queued_at.clone().unwrap_or_default(),
+                task.task_id.clone(),
+            )
+        })
+        .collect();
+    reassignable_tasks.sort_unstable();
+
+    for (_, task_id) in reassignable_tasks {
+        let Some(worker_id) = free_workers.first().cloned() else {
+            break;
+        };
+        start_task_for_agent(state, &task_id, &worker_id, actor_id, now, &mut effects)?;
+        free_workers.remove(0);
+    }
+
+    Ok(effects)
 }
 
 /// Update a task's status. Returns the previous status.
@@ -1495,6 +1685,9 @@ pub(crate) fn apply_update_task(
 
     let from_status = task.status;
     task.status = status;
+    if status != TaskStatus::Open {
+        task.queued_at = None;
+    }
     task.updated_at = now.to_string();
     if let Some(text) = note {
         task.notes.push(TaskNote {
@@ -1570,6 +1763,7 @@ pub(crate) fn apply_record_checkpoint(
     if task.status == TaskStatus::Open {
         task.status = TaskStatus::InProgress;
     }
+    task.queued_at = None;
     task.updated_at = now.to_string();
     task.checkpoint_summary = Some(TaskCheckpointSummary::from(&created));
 
@@ -1646,7 +1840,12 @@ pub(crate) fn build_signal(
         delivery: DeliveryConfig {
             max_retries: 3,
             retry_count: 0,
-            idempotency_key: Some(format!("{session_id}:{agent_id}:{command}")),
+            idempotency_key: Some(format!(
+                "{}:{}:{}",
+                session_id,
+                agent_id,
+                action_hint.unwrap_or(command)
+            )),
         },
     }
 }
@@ -1720,6 +1919,13 @@ pub(crate) fn log_task_assigned(task_id: &str, agent_id: &str) -> SessionTransit
     }
 }
 
+pub(crate) fn log_task_queued(task_id: &str, agent_id: &str) -> SessionTransition {
+    SessionTransition::TaskQueued {
+        task_id: task_id.to_string(),
+        agent_id: agent_id.to_string(),
+    }
+}
+
 pub(crate) fn log_task_status_changed(
     task_id: &str,
     from: TaskStatus,
@@ -1784,6 +1990,58 @@ fn append_leave_signal_logs(
         )?;
     }
     Ok(())
+}
+
+fn append_task_drop_effect_logs(
+    project_dir: &Path,
+    session_id: &str,
+    actor_id: &str,
+    effects: &[TaskDropEffect],
+) -> Result<(), CliError> {
+    for effect in effects {
+        match effect {
+            TaskDropEffect::Started(signal) => {
+                storage::append_log_entry(
+                    project_dir,
+                    session_id,
+                    log_task_assigned(&signal.task_id, &signal.agent_id),
+                    Some(actor_id),
+                    None,
+                )?;
+                storage::append_log_entry(
+                    project_dir,
+                    session_id,
+                    log_signal_sent(
+                        &signal.signal.signal_id,
+                        &signal.agent_id,
+                        &signal.signal.command,
+                    ),
+                    Some(actor_id),
+                    None,
+                )?;
+            }
+            TaskDropEffect::Queued { task_id, agent_id } => {
+                storage::append_log_entry(
+                    project_dir,
+                    session_id,
+                    log_task_queued(task_id, agent_id),
+                    Some(actor_id),
+                    None,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn started_task_signals(effects: &[TaskDropEffect]) -> Vec<TaskStartSignalRecord> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            TaskDropEffect::Started(signal) => Some(signal.as_ref().clone()),
+            TaskDropEffect::Queued { .. } => None,
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -2122,6 +2380,252 @@ fn require_active_target_agent(state: &SessionState, agent_id: &str) -> Result<(
     Ok(())
 }
 
+fn require_active_worker_target_agent(
+    state: &SessionState,
+    agent_id: &str,
+) -> Result<(), CliError> {
+    require_active_target_agent(state, agent_id)?;
+    let agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    if agent.role != SessionRole::Worker {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is a {:?}, not a worker",
+            agent.role
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn apply_drop_task_on_agent(
+    state: &mut SessionState,
+    task_id: &str,
+    agent_id: &str,
+    queue_policy: TaskQueuePolicy,
+    actor_id: &str,
+    now: &str,
+) -> Result<Vec<TaskDropEffect>, CliError> {
+    require_active_worker_target_agent(state, agent_id)?;
+
+    let previous_assignee = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .assigned_to
+        .clone();
+    if let Some(previous_assignee) = previous_assignee.as_deref()
+        && previous_assignee != agent_id
+    {
+        clear_agent_current_task(state, previous_assignee, task_id, now);
+    }
+
+    let mut effects = Vec::new();
+    if is_worker_free(state, agent_id) {
+        start_task_for_agent(state, task_id, agent_id, actor_id, now, &mut effects)?;
+    } else {
+        queue_task_for_agent(state, task_id, agent_id, queue_policy, now)?;
+        effects.push(TaskDropEffect::Queued {
+            task_id: task_id.to_string(),
+            agent_id: agent_id.to_string(),
+        });
+    }
+
+    touch_agent(state, actor_id, now);
+    let advanced = apply_advance_queued_tasks(state, actor_id, now)?;
+    effects.extend(advanced);
+    refresh_session(state, now);
+    Ok(effects)
+}
+
+fn queue_task_for_agent(
+    state: &mut SessionState,
+    task_id: &str,
+    agent_id: &str,
+    queue_policy: TaskQueuePolicy,
+    now: &str,
+) -> Result<(), CliError> {
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    if task.status != TaskStatus::Open {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' is {}, not open",
+            task_status_label(task.status)
+        ))
+        .into());
+    }
+    task.assigned_to = Some(agent_id.to_string());
+    task.queue_policy = queue_policy;
+    task.queued_at = Some(now.to_string());
+    task.updated_at = now.to_string();
+    Ok(())
+}
+
+fn start_task_for_agent(
+    state: &mut SessionState,
+    task_id: &str,
+    agent_id: &str,
+    actor_id: &str,
+    now: &str,
+    effects: &mut Vec<TaskDropEffect>,
+) -> Result<(), CliError> {
+    require_active_worker_target_agent(state, agent_id)?;
+    if !is_worker_free(state, agent_id) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is not free"
+        ))
+        .into());
+    }
+
+    let previous_assignee = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .assigned_to
+        .clone();
+    if let Some(previous_assignee) = previous_assignee.as_deref()
+        && previous_assignee != agent_id
+    {
+        clear_agent_current_task(state, previous_assignee, task_id, now);
+    }
+
+    let signal = build_task_start_signal_record(state, task_id, agent_id, actor_id, now)?;
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    task.assigned_to = Some(agent_id.to_string());
+    task.status = TaskStatus::InProgress;
+    task.queue_policy = TaskQueuePolicy::Locked;
+    task.queued_at = None;
+    task.blocked_reason = None;
+    task.completed_at = None;
+    task.updated_at = now.to_string();
+
+    if let Some(agent) = state.agents.get_mut(agent_id) {
+        agent.current_task_id = Some(task_id.to_string());
+        agent.updated_at = now.to_string();
+        agent.last_activity_at = Some(now.to_string());
+    }
+
+    effects.push(TaskDropEffect::Started(Box::new(signal)));
+    Ok(())
+}
+
+fn build_task_start_signal_record(
+    state: &SessionState,
+    task_id: &str,
+    agent_id: &str,
+    actor_id: &str,
+    now: &str,
+) -> Result<TaskStartSignalRecord, CliError> {
+    let task = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    let agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    let message = task_start_message(task);
+    let action_hint = task_start_action_hint(task_id);
+    let signal = build_signal(
+        actor_id,
+        START_TASK_SIGNAL_COMMAND,
+        &message,
+        Some(&action_hint),
+        &state.session_id,
+        agent_id,
+        now,
+    );
+    Ok(TaskStartSignalRecord {
+        task_id: task_id.to_string(),
+        runtime: agent.runtime.clone(),
+        agent_id: agent_id.to_string(),
+        signal_session_id: agent
+            .agent_session_id
+            .clone()
+            .unwrap_or_else(|| state.session_id.clone()),
+        signal,
+    })
+}
+
+fn task_start_message(task: &WorkItem) -> String {
+    let mut message = format!("Start work on task {}: {}", task.task_id, task.title);
+    if let Some(context) = task.context.as_deref() {
+        message.push_str("\n\nContext:\n");
+        message.push_str(context);
+    }
+    if let Some(suggested_fix) = task.suggested_fix.as_deref() {
+        message.push_str("\n\nSuggested fix:\n");
+        message.push_str(suggested_fix);
+    }
+    message
+}
+
+fn task_start_action_hint(task_id: &str) -> String {
+    format!("task:{task_id}")
+}
+
+fn start_next_locked_task_for_worker(
+    state: &mut SessionState,
+    worker_id: &str,
+    actor_id: &str,
+    now: &str,
+    effects: &mut Vec<TaskDropEffect>,
+) -> Result<bool, CliError> {
+    let mut queued_tasks: Vec<_> = state
+        .tasks
+        .values()
+        .filter(|task| {
+            task.status == TaskStatus::Open
+                && task.assigned_to.as_deref() == Some(worker_id)
+                && task.queued_at.is_some()
+        })
+        .map(|task| {
+            (
+                task.queue_policy,
+                task.queued_at.clone().unwrap_or_default(),
+                task.task_id.clone(),
+            )
+        })
+        .collect();
+    queued_tasks.sort_unstable();
+    let Some((TaskQueuePolicy::Locked, _, task_id)) = queued_tasks.first().cloned() else {
+        return Ok(false);
+    };
+    start_task_for_agent(state, &task_id, worker_id, actor_id, now, effects)?;
+    Ok(true)
+}
+
+fn free_worker_ids(state: &SessionState) -> Vec<String> {
+    state
+        .agents
+        .values()
+        .filter(|agent| agent.status == AgentStatus::Active && agent.role == SessionRole::Worker)
+        .filter(|agent| is_worker_free(state, &agent.agent_id))
+        .map(|agent| agent.agent_id.clone())
+        .collect()
+}
+
+fn is_worker_free(state: &SessionState, agent_id: &str) -> bool {
+    let Some(agent) = state.agents.get(agent_id) else {
+        return false;
+    };
+    agent.status == AgentStatus::Active
+        && agent.role == SessionRole::Worker
+        && agent.current_task_id.is_none()
+        && !state.tasks.values().any(|task| {
+            task.assigned_to.as_deref() == Some(agent_id)
+                && matches!(task.status, TaskStatus::InProgress | TaskStatus::InReview)
+        })
+}
+
 fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
     match runtime_name {
         "claude" => Some(HookAgent::Claude),
@@ -2404,6 +2908,16 @@ fn agent_status_label(status: AgentStatus) -> &'static str {
         AgentStatus::Active => "active",
         AgentStatus::Disconnected => "disconnected",
         AgentStatus::Removed => "removed",
+    }
+}
+
+fn task_status_label(status: TaskStatus) -> &'static str {
+    match status {
+        TaskStatus::Open => "open",
+        TaskStatus::InProgress => "in progress",
+        TaskStatus::InReview => "in review",
+        TaskStatus::Done => "done",
+        TaskStatus::Blocked => "blocked",
     }
 }
 
@@ -2708,6 +3222,277 @@ mod tests {
             let tasks = list_tasks("s4", Some(TaskStatus::Open), project).expect("open");
             assert_eq!(tasks.len(), 1);
             assert!(tasks[0].assigned_to.is_none());
+        });
+    }
+
+    #[test]
+    fn drop_task_queues_for_busy_worker() {
+        with_temp_project(|project| {
+            let state = start_session("test", "", project, Some("claude"), Some("drop-queue-busy"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("busy-worker"))], || {
+                join_session(
+                    "drop-queue-busy",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join")
+            });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+            let active = create_task(
+                "drop-queue-busy",
+                "active",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("active");
+            assign_task(
+                "drop-queue-busy",
+                &active.task_id,
+                &worker_id,
+                &leader_id,
+                project,
+            )
+            .expect("assign active");
+            let queued = create_task(
+                "drop-queue-busy",
+                "queued",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("queued");
+
+            drop_task(
+                "drop-queue-busy",
+                &queued.task_id,
+                &protocol::TaskDropTarget::Agent {
+                    agent_id: worker_id.clone(),
+                },
+                TaskQueuePolicy::Locked,
+                &leader_id,
+                project,
+            )
+            .expect("drop");
+
+            let state = session_status("drop-queue-busy", project).expect("status");
+            let queued_task = state.tasks.get(&queued.task_id).expect("queued task");
+            assert_eq!(queued_task.status, TaskStatus::Open);
+            assert_eq!(queued_task.assigned_to.as_deref(), Some(worker_id.as_str()));
+            assert_eq!(queued_task.queue_policy, TaskQueuePolicy::Locked);
+            assert!(queued_task.queued_at.is_some());
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert_eq!(
+                worker.current_task_id.as_deref(),
+                Some(active.task_id.as_str())
+            );
+        });
+    }
+
+    #[test]
+    fn reassignable_drop_starts_on_free_worker() {
+        with_temp_project(|project| {
+            let state = start_session(
+                "test",
+                "",
+                project,
+                Some("claude"),
+                Some("drop-reassign-free"),
+            )
+            .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let first_joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("busy-worker"))], || {
+                    join_session(
+                        "drop-reassign-free",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join busy")
+                });
+            let busy_worker = first_joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("busy worker")
+                .clone();
+            let second_joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("free-worker"))], || {
+                    join_session(
+                        "drop-reassign-free",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join free")
+                });
+            let free_worker = second_joined
+                .agents
+                .keys()
+                .filter(|id| id.starts_with("codex-"))
+                .find(|id| *id != &busy_worker)
+                .expect("free worker")
+                .clone();
+            let active = create_task(
+                "drop-reassign-free",
+                "active",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("active");
+            assign_task(
+                "drop-reassign-free",
+                &active.task_id,
+                &busy_worker,
+                &leader_id,
+                project,
+            )
+            .expect("assign active");
+            let task = create_task(
+                "drop-reassign-free",
+                "reassignable",
+                Some("pick up immediately"),
+                TaskSeverity::High,
+                &leader_id,
+                project,
+            )
+            .expect("task");
+
+            drop_task(
+                "drop-reassign-free",
+                &task.task_id,
+                &protocol::TaskDropTarget::Agent {
+                    agent_id: busy_worker.clone(),
+                },
+                TaskQueuePolicy::ReassignWhenFree,
+                &leader_id,
+                project,
+            )
+            .expect("drop");
+
+            let state = session_status("drop-reassign-free", project).expect("status");
+            let started = state.tasks.get(&task.task_id).expect("started task");
+            assert_eq!(started.status, TaskStatus::InProgress);
+            assert_eq!(started.assigned_to.as_deref(), Some(free_worker.as_str()));
+            assert!(started.queued_at.is_none());
+            let signals =
+                list_signals("drop-reassign-free", Some(&free_worker), project).expect("signals");
+            assert_eq!(signals.len(), 1);
+            assert_eq!(signals[0].signal.command, START_TASK_SIGNAL_COMMAND);
+            let expected_action_hint = task_start_action_hint(&task.task_id);
+            assert_eq!(
+                signals[0].signal.payload.action_hint.as_deref(),
+                Some(expected_action_hint.as_str())
+            );
+        });
+    }
+
+    #[test]
+    fn locked_queue_advances_when_worker_finishes_current_task() {
+        with_temp_project(|project| {
+            let state = start_session(
+                "test",
+                "",
+                project,
+                Some("claude"),
+                Some("drop-advance-locked"),
+            )
+            .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("advance-worker"))], || {
+                    join_session(
+                        "drop-advance-locked",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join")
+                });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+            let active = create_task(
+                "drop-advance-locked",
+                "active",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("active");
+            assign_task(
+                "drop-advance-locked",
+                &active.task_id,
+                &worker_id,
+                &leader_id,
+                project,
+            )
+            .expect("assign active");
+            let queued = create_task(
+                "drop-advance-locked",
+                "queued",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("queued");
+            drop_task(
+                "drop-advance-locked",
+                &queued.task_id,
+                &protocol::TaskDropTarget::Agent {
+                    agent_id: worker_id.clone(),
+                },
+                TaskQueuePolicy::Locked,
+                &leader_id,
+                project,
+            )
+            .expect("drop");
+
+            update_task(
+                "drop-advance-locked",
+                &active.task_id,
+                TaskStatus::Done,
+                Some("done"),
+                &leader_id,
+                project,
+            )
+            .expect("finish");
+
+            let state = session_status("drop-advance-locked", project).expect("status");
+            let next = state.tasks.get(&queued.task_id).expect("next task");
+            assert_eq!(next.status, TaskStatus::InProgress);
+            assert_eq!(next.assigned_to.as_deref(), Some(worker_id.as_str()));
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert_eq!(
+                worker.current_task_id.as_deref(),
+                Some(queued.task_id.as_str())
+            );
         });
     }
 

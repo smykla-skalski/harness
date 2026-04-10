@@ -2487,8 +2487,8 @@ mod tests {
     fn sample_session_state() -> SessionState {
         use crate::agents::runtime::RuntimeCapabilities;
         use crate::session::types::{
-            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, TaskSeverity, TaskSource,
-            TaskStatus,
+            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, TaskQueuePolicy,
+            TaskSeverity, TaskSource, TaskStatus,
         };
 
         let mut agents = BTreeMap::new();
@@ -2520,6 +2520,8 @@ mod tests {
                 severity: TaskSeverity::High,
                 status: TaskStatus::Open,
                 assigned_to: None,
+                queue_policy: TaskQueuePolicy::Locked,
+                queued_at: None,
                 created_at: "2026-04-03T12:01:00Z".into(),
                 updated_at: "2026-04-03T12:01:00Z".into(),
                 created_by: Some("claude-leader".into()),
@@ -2600,8 +2602,8 @@ mod tests {
     fn performance_session_state(project_index: usize, session_index: usize) -> SessionState {
         use crate::agents::runtime::RuntimeCapabilities;
         use crate::session::types::{
-            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, TaskSeverity, TaskSource,
-            TaskStatus,
+            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, TaskQueuePolicy,
+            TaskSeverity, TaskSource, TaskStatus,
         };
 
         let token = project_index * 100 + session_index;
@@ -2648,6 +2650,8 @@ mod tests {
                     TaskStatus::Open
                 },
                 assigned_to: Some(leader_id.clone()),
+                queue_policy: TaskQueuePolicy::Locked,
+                queued_at: None,
                 created_at: timestamp.clone(),
                 updated_at: timestamp.clone(),
                 created_by: Some(leader_id.clone()),

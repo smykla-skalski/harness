@@ -20,6 +20,16 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     taskID: String,
     request: TaskAssignRequest
   ) async throws -> SessionDetail
+  func dropTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDropRequest
+  ) async throws -> SessionDetail
+  func updateTaskQueuePolicy(
+    sessionID: String,
+    taskID: String,
+    request: TaskQueuePolicyRequest
+  ) async throws -> SessionDetail
   func updateTask(
     sessionID: String,
     taskID: String,

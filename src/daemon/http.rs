@@ -19,7 +19,8 @@ use super::protocol::{
     LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
     SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
+    TaskUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -64,6 +65,14 @@ pub async fn serve(
         .route(
             "/v1/sessions/{session_id}/tasks/{task_id}/assign",
             post(post_task_assign),
+        )
+        .route(
+            "/v1/sessions/{session_id}/tasks/{task_id}/drop",
+            post(post_task_drop),
+        )
+        .route(
+            "/v1/sessions/{session_id}/tasks/{task_id}/queue-policy",
+            post(post_task_queue_policy),
         )
         .route(
             "/v1/sessions/{session_id}/tasks/{task_id}/status",
@@ -343,6 +352,58 @@ async fn post_task_assign(
     timed_json(
         "POST",
         "/v1/sessions/{id}/tasks/{id}/assign",
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_task_drop(
+    Path((session_id, task_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskDropRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::drop_task(&session_id, &task_id, &request, db_ref);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    }
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/tasks/{id}/drop",
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_task_queue_policy(
+    Path((session_id, task_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskQueuePolicyRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::update_task_queue_policy(&session_id, &task_id, &request, db_ref);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    }
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/tasks/{id}/queue-policy",
         &request_id,
         start,
         result,

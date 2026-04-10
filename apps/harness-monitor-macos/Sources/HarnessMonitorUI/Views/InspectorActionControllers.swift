@@ -52,6 +52,7 @@ struct InspectorTaskMutationConsole: View {
   @State private var taskID = ""
   @State private var assigneeID = ""
   @State private var taskStatus: TaskStatus = .inProgress
+  @State private var queuePolicy: TaskQueuePolicy = .locked
   @State private var statusNote = ""
   @State private var checkpointSummary = ""
   @State private var checkpointProgress: Double = 50
@@ -69,6 +70,7 @@ struct InspectorTaskMutationConsole: View {
     _taskID = State(initialValue: selectedTask.taskId)
     _assigneeID = State(initialValue: Self.defaultAssigneeID(for: selectedTask, agents: agents))
     _taskStatus = State(initialValue: selectedTask.status)
+    _queuePolicy = State(initialValue: selectedTask.queuePolicy)
     _checkpointProgress = State(
       initialValue: Double(selectedTask.checkpointSummary?.progress ?? 50)
     )
@@ -90,12 +92,14 @@ struct InspectorTaskMutationConsole: View {
       taskID: $taskID,
       assigneeID: $assigneeID,
       taskStatus: $taskStatus,
+      queuePolicy: $queuePolicy,
       statusNote: $statusNote,
       checkpointSummary: $checkpointSummary,
       checkpointProgress: $checkpointProgress,
       isSessionReadOnly: store.isSessionReadOnly,
       isSessionActionInFlight: store.isSessionActionInFlight,
       assignSelectedTask: submitAssignSelectedTask,
+      updateQueuePolicy: submitUpdateQueuePolicy,
       updateSelectedTask: submitUpdateSelectedTask,
       checkpointSelectedTask: submitCheckpointSelectedTask
     )
@@ -107,6 +111,7 @@ struct InspectorTaskMutationConsole: View {
   private func syncDefaults() {
     taskID = selectedTask.taskId
     taskStatus = selectedTask.status
+    queuePolicy = selectedTask.queuePolicy
 
     if let assignedAgentID = selectedTask.assignedTo {
       let isAssignedAgentAvailable = agents.contains(where: { $0.agentId == assignedAgentID })
@@ -145,6 +150,10 @@ struct InspectorTaskMutationConsole: View {
     Task { await updateSelectedTask() }
   }
 
+  private func submitUpdateQueuePolicy() {
+    Task { await updateQueuePolicy() }
+  }
+
   private func submitCheckpointSelectedTask() {
     Task { await checkpointSelectedTask() }
   }
@@ -172,6 +181,15 @@ struct InspectorTaskMutationConsole: View {
     if success {
       statusNote = ""
     }
+    syncDefaults()
+  }
+
+  private func updateQueuePolicy() async {
+    guard !taskID.isEmpty else {
+      return
+    }
+
+    _ = await store.updateTaskQueuePolicy(taskID: taskID, queuePolicy: queuePolicy)
     syncDefaults()
   }
 

@@ -333,6 +333,22 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     try await sessionDetail(id: "")
   }
 
+  public func dropTask(
+    sessionID _: String,
+    taskID _: String,
+    request _: TaskDropRequest
+  ) async throws -> SessionDetail {
+    try await sessionDetail(id: "")
+  }
+
+  public func updateTaskQueuePolicy(
+    sessionID _: String,
+    taskID _: String,
+    request _: TaskQueuePolicyRequest
+  ) async throws -> SessionDetail {
+    try await sessionDetail(id: "")
+  }
+
   public func updateTask(
     sessionID _: String,
     taskID _: String,
