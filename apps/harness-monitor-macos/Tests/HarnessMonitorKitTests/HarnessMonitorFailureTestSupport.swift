@@ -39,7 +39,25 @@ actor FailingDaemonController: DaemonControlling {
     return PreviewHarnessClient()
   }
 
-  func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
+  func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    if let actionError {
+      throw actionError
+    }
+    return .enabled
+  }
+
+  func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {
+    if let actionError {
+      throw actionError
+    }
+  }
+
+  func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
     if let bootstrapError {
       throw bootstrapError
     }

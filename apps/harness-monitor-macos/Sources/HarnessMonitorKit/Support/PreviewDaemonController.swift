@@ -66,7 +66,20 @@ public actor PreviewDaemonController: DaemonControlling {
     return makeClient()
   }
 
-  public func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
+  public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    isLaunchAgentInstalled = true
+    isDaemonRunning = true
+    return .enabled
+  }
+
+  public func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {}
+
+  public func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
     isDaemonRunning = true
     return makeClient()
   }
