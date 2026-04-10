@@ -215,6 +215,10 @@ public final class HarnessMonitorStore {
     }
   }
 
+  public func focusSidebarSearch() {
+    sidebarUI.searchFocusRequest += 1
+  }
+
   public func startDaemon() async {
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }

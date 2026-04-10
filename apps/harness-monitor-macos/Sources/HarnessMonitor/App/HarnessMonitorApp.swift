@@ -54,6 +54,7 @@ struct HarnessMonitorApp: App {
         decreaseTextSize: decreaseTextSize,
         resetTextSize: resetTextSize,
         refreshStore: refreshStore,
+        focusSidebarSearch: focusSidebarSearch,
         startDaemon: startDaemon,
         installLaunchAgent: installLaunchAgent,
         observeSelectedSession: observeSelectedSession,
@@ -125,6 +126,10 @@ struct HarnessMonitorApp: App {
     Task {
       await store.refresh()
     }
+  }
+
+  private func focusSidebarSearch() {
+    store.focusSidebarSearch()
   }
 
   private func startDaemon() {
