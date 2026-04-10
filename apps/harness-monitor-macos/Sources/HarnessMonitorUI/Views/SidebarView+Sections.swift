@@ -71,19 +71,34 @@ extension SidebarView {
 
   @ViewBuilder
   func sessionRow(_ session: SessionSummary) -> some View {
-    let isSelected = sidebarUI.selectedSessionID == session.sessionId
+    let isSelectedForUITest =
+      HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
+      && sidebarUI.selectedSessionID == session.sessionId
     let row = SidebarSessionListLinkRow(
       session: session,
       isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId),
-      isSelected: isSelected
+      lastActivityText: formatTimestamp(
+        session.lastActivityAt,
+        configuration: dateTimeConfiguration
+      ),
+      fontScale: fontScale
     )
     .equatable()
 
     let baseRow =
       row
       .tag(session.sessionId as String?)
+      .onTapGesture {
+        store.selectSessionFromList(session.sessionId)
+      }
+      .accessibilityAddTraits(.isButton)
       .accessibilityLabel(sessionAccessibilityLabel(for: session))
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
+      .harnessUITestValue(
+        isSelectedForUITest
+          ? "selected, interactive=button, selectionChrome=translucent"
+          : "interactive=button"
+      )
 
     if sidebarUI.isPersistenceAvailable {
       baseRow
@@ -92,7 +107,7 @@ extension SidebarView {
         )
         .accessibilityFrameMarker(
           HarnessMonitorAccessibility.sessionRowSelectionFrame(session.sessionId),
-          when: isSelected
+          when: isSelectedForUITest
         )
         .accessibilityAction(named: "Toggle Bookmark") {
           store.toggleBookmark(
@@ -133,7 +148,7 @@ extension SidebarView {
         )
         .accessibilityFrameMarker(
           HarnessMonitorAccessibility.sessionRowSelectionFrame(session.sessionId),
-          when: isSelected
+          when: isSelectedForUITest
         )
     }
   }

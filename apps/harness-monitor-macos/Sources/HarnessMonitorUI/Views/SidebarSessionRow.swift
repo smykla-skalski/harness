@@ -4,10 +4,8 @@ import SwiftUI
 struct SidebarSessionRow: View {
   let session: SessionSummary
   let isBookmarked: Bool
-  @Environment(\.harnessDateTimeConfiguration)
-  private var dateTimeConfiguration
-  @Environment(\.fontScale)
-  private var fontScale
+  let lastActivityText: String
+  let fontScale: CGFloat
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -43,7 +41,7 @@ struct SidebarSessionRow: View {
           footerLabel("\(session.metrics.activeAgentCount) active")
           footerLabel("\(session.metrics.inProgressTaskCount) moving")
           Spacer(minLength: 0)
-          Text(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
+          Text(lastActivityText)
             .font(scaled(.caption.weight(.medium)))
             .lineLimit(1)
             .foregroundStyle(.secondary)
@@ -70,13 +68,18 @@ struct SidebarSessionRow: View {
   VStack(spacing: HarnessMonitorTheme.sectionSpacing) {
     SidebarSessionRow(
       session: PreviewFixtures.summary,
-      isBookmarked: true
+      isBookmarked: true,
+      lastActivityText: formatTimestamp(PreviewFixtures.summary.lastActivityAt),
+      fontScale: 1
     )
     .padding()
 
+    let overflowSession = PreviewFixtures.overflowSessions[3]
     SidebarSessionRow(
-      session: PreviewFixtures.overflowSessions[3],
-      isBookmarked: false
+      session: overflowSession,
+      isBookmarked: false,
+      lastActivityText: formatTimestamp(overflowSession.lastActivityAt),
+      fontScale: 1
     )
     .padding()
   }

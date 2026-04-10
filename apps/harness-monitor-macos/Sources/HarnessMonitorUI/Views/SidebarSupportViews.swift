@@ -4,28 +4,26 @@ import SwiftUI
 struct SidebarSessionListLinkRow: View, Equatable {
   let session: SessionSummary
   let isBookmarked: Bool
-  let isSelected: Bool
+  let lastActivityText: String
+  let fontScale: CGFloat
 
   var body: some View {
     SidebarSessionRow(
       session: session,
-      isBookmarked: isBookmarked
+      isBookmarked: isBookmarked,
+      lastActivityText: lastActivityText,
+      fontScale: fontScale
     )
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(Rectangle())
-    .background {
-      if isSelected {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          .fill(.selection.opacity(0.18))
-      }
-    }
   }
 
   nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.session == rhs.session
       && lhs.isBookmarked == rhs.isBookmarked
-      && lhs.isSelected == rhs.isSelected
+      && lhs.lastActivityText == rhs.lastActivityText
+      && lhs.fontScale == rhs.fontScale
   }
 }
 
