@@ -69,14 +69,17 @@ impl CodexTransportKind {
     }
 }
 
-/// Resolve the transport kind for a given daemon sandbox mode, respecting
-/// the `HARNESS_CODEX_WS_URL` override so operators can point the daemon at
-/// an arbitrary user-launched `codex app-server` instance without a flag.
+/// Resolve the transport kind for a given daemon sandbox mode, consulting
+/// (in order) an explicit `HARNESS_CODEX_WS_URL`, the codex-bridge endpoint
+/// file published by `harness codex-bridge start`, and finally the sandbox
+/// default.
 ///
 /// * Sandboxed daemons always use WebSocket (they cannot spawn children).
-///   The endpoint is `HARNESS_CODEX_WS_URL` or [`DEFAULT_CODEX_WS_ENDPOINT`].
-/// * Unsandboxed daemons default to stdio, unless `HARNESS_CODEX_WS_URL` is
-///   set explicitly to route through a pre-launched server.
+///   The endpoint falls back to [`DEFAULT_CODEX_WS_ENDPOINT`] when nothing
+///   else is published so the daemon still surfaces a structured
+///   `codex-unavailable` error rather than silently degrading.
+/// * Unsandboxed daemons default to stdio unless an operator has explicitly
+///   opted into WebSocket via the env var or a running bridge.
 #[must_use]
 pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
     let override_url = env::var("HARNESS_CODEX_WS_URL")
@@ -84,12 +87,35 @@ pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
 
-    match (sandboxed, override_url) {
-        (_, Some(endpoint)) => CodexTransportKind::WebSocket { endpoint },
-        (true, None) => CodexTransportKind::WebSocket {
+    if let Some(endpoint) = override_url {
+        return CodexTransportKind::WebSocket { endpoint };
+    }
+
+    if let Some(endpoint) = bridge_endpoint_from_state_file() {
+        return CodexTransportKind::WebSocket { endpoint };
+    }
+
+    if sandboxed {
+        return CodexTransportKind::WebSocket {
             endpoint: DEFAULT_CODEX_WS_ENDPOINT.to_string(),
-        },
-        (false, None) => CodexTransportKind::Stdio,
+        };
+    }
+
+    CodexTransportKind::Stdio
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn bridge_endpoint_from_state_file() -> Option<String> {
+    match super::codex_bridge::read_bridge_state() {
+        Ok(Some(state)) => Some(state.endpoint),
+        Ok(None) => None,
+        Err(error) => {
+            tracing::warn!(%error, "failed to read codex-bridge state file; falling back to defaults");
+            None
+        }
     }
 }
 
@@ -332,13 +358,132 @@ impl CodexTransport for WebSocketCodexTransport {
 
 #[cfg(test)]
 mod tests {
-    use super::{CodexTransport, StdioCodexTransport, WebSocketCodexTransport};
+    use super::{
+        CodexTransport, CodexTransportKind, DEFAULT_CODEX_WS_ENDPOINT, StdioCodexTransport,
+        WebSocketCodexTransport, codex_transport_from_env,
+    };
+    use crate::daemon::codex_bridge::{CodexBridgeState, write_bridge_state};
     use futures_util::sink::SinkExt;
     use futures_util::stream::StreamExt;
+    use tempfile::tempdir;
     use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::TcpListener;
     use tokio_tungstenite::accept_async;
     use tokio_tungstenite::tungstenite::protocol::Message;
+
+    fn with_isolated_env<F: FnOnce()>(f: F) {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "HARNESS_DAEMON_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("HARNESS_APP_GROUP_ID", None),
+                ("HARNESS_CODEX_WS_URL", None),
+                ("XDG_DATA_HOME", None),
+            ],
+            f,
+        );
+    }
+
+    #[test]
+    fn codex_transport_from_env_defaults_stdio_when_unsandboxed() {
+        with_isolated_env(|| {
+            assert_eq!(codex_transport_from_env(false), CodexTransportKind::Stdio);
+        });
+    }
+
+    #[test]
+    fn codex_transport_from_env_defaults_websocket_when_sandboxed() {
+        with_isolated_env(|| {
+            assert_eq!(
+                codex_transport_from_env(true),
+                CodexTransportKind::WebSocket {
+                    endpoint: DEFAULT_CODEX_WS_ENDPOINT.to_string(),
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn codex_transport_from_env_prefers_environment_override() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "HARNESS_DAEMON_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("HARNESS_APP_GROUP_ID", None),
+                ("HARNESS_CODEX_WS_URL", Some("ws://127.0.0.1:7777")),
+                ("XDG_DATA_HOME", None),
+            ],
+            || {
+                // Publish a bridge state too; env override must still win.
+                write_bridge_state(&CodexBridgeState {
+                    endpoint: "ws://127.0.0.1:9999".to_string(),
+                    pid: 1,
+                    started_at: "2026-04-10T00:00:00Z".to_string(),
+                    port: 9999,
+                    codex_version: None,
+                })
+                .expect("write bridge state");
+
+                assert_eq!(
+                    codex_transport_from_env(true),
+                    CodexTransportKind::WebSocket {
+                        endpoint: "ws://127.0.0.1:7777".to_string(),
+                    },
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn codex_transport_from_env_uses_bridge_state_when_no_override() {
+        with_isolated_env(|| {
+            write_bridge_state(&CodexBridgeState {
+                endpoint: "ws://127.0.0.1:4501".to_string(),
+                pid: 1,
+                started_at: "2026-04-10T00:00:00Z".to_string(),
+                port: 4501,
+                codex_version: None,
+            })
+            .expect("write bridge state");
+
+            assert_eq!(
+                codex_transport_from_env(false),
+                CodexTransportKind::WebSocket {
+                    endpoint: "ws://127.0.0.1:4501".to_string(),
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn codex_transport_from_env_bridge_state_unblocks_unsandboxed_ws() {
+        with_isolated_env(|| {
+            write_bridge_state(&CodexBridgeState {
+                endpoint: "ws://127.0.0.1:4500".to_string(),
+                pid: 1,
+                started_at: "2026-04-10T00:00:00Z".to_string(),
+                port: 4500,
+                codex_version: None,
+            })
+            .expect("write bridge state");
+
+            // Unsandboxed: normally defaults to stdio, but the presence of a
+            // bridge state file means the operator has explicitly signed up
+            // for websocket transport via `harness codex-bridge start`.
+            assert_eq!(
+                codex_transport_from_env(false),
+                CodexTransportKind::WebSocket {
+                    endpoint: "ws://127.0.0.1:4500".to_string(),
+                },
+            );
+        });
+    }
 
     #[tokio::test]
     async fn stdio_transport_send_and_receive_roundtrip() {
