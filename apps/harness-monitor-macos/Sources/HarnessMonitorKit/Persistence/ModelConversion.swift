@@ -242,8 +242,10 @@ extension CachedWorkItem {
       title: title,
       context: context,
       severity: TaskSeverity(rawValue: severityRaw) ?? .medium,
-      status: TaskStatus(rawValue: statusRaw) ?? .open,
+      status: TaskStatus(rawOrLegacyValue: statusRaw) ?? .open,
       assignedTo: assignedTo,
+      queuePolicy: TaskQueuePolicy(rawOrLegacyValue: queuePolicyRaw) ?? .locked,
+      queuedAt: queuedAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
       createdBy: createdBy,
@@ -262,6 +264,8 @@ extension CachedWorkItem {
     severityRaw = item.severity.rawValue
     statusRaw = item.status.rawValue
     assignedTo = item.assignedTo
+    queuePolicyRaw = item.queuePolicy.rawValue
+    queuedAt = item.queuedAt
     createdAt = item.createdAt
     updatedAt = item.updatedAt
     createdBy = item.createdBy
@@ -283,6 +287,8 @@ extension WorkItem {
       severityRaw: severity.rawValue,
       statusRaw: status.rawValue,
       assignedTo: assignedTo,
+      queuePolicyRaw: queuePolicy.rawValue,
+      queuedAt: queuedAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
       createdBy: createdBy,

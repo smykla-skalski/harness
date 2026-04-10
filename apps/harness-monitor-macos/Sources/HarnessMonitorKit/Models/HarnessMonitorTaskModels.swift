@@ -22,10 +22,38 @@ public enum TaskSeverity: String, Codable, CaseIterable, Sendable {
 
 public enum TaskStatus: String, Codable, CaseIterable, Sendable {
   case open
-  case inProgress
-  case inReview
+  case inProgress = "in_progress"
+  case inReview = "in_review"
   case done
   case blocked
+
+  init?(rawOrLegacyValue value: String) {
+    switch value {
+    case "inProgress":
+      self = .inProgress
+    case "inReview":
+      self = .inReview
+    default:
+      self.init(rawValue: value)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let value = try container.decode(String.self)
+    guard let status = Self(rawOrLegacyValue: value) else {
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Invalid task status: \(value)"
+      )
+    }
+    self = status
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
 
   public var title: String {
     switch self {
@@ -39,6 +67,70 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
       "Done"
     case .blocked:
       "Blocked"
+    }
+  }
+}
+
+public extension WorkItem {
+  var isQueuedForWorker: Bool {
+    status == .open && assignedTo != nil && queuedAt != nil
+  }
+
+  var isLeaderAssignable: Bool {
+    status == .open && assignedTo == nil
+  }
+
+  var isReassignableQueuedTask: Bool {
+    isQueuedForWorker && queuePolicy == .reassignWhenFree
+  }
+
+  var assignmentSummary: String {
+    guard let assignedTo else {
+      return "Unassigned"
+    }
+    if isQueuedForWorker {
+      return "Queued for \(assignedTo)"
+    }
+    return assignedTo
+  }
+}
+
+public enum TaskQueuePolicy: String, Codable, CaseIterable, Sendable {
+  case locked
+  case reassignWhenFree = "reassign_when_free"
+
+  init?(rawOrLegacyValue value: String) {
+    switch value {
+    case "reassignWhenFree":
+      self = .reassignWhenFree
+    default:
+      self.init(rawValue: value)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let value = try container.decode(String.self)
+    guard let policy = Self(rawOrLegacyValue: value) else {
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Invalid task queue policy: \(value)"
+      )
+    }
+    self = policy
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+
+  public var title: String {
+    switch self {
+    case .locked:
+      "Locked"
+    case .reassignWhenFree:
+      "Reassign if free"
     }
   }
 }
@@ -98,6 +190,8 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
   public let severity: TaskSeverity
   public let status: TaskStatus
   public let assignedTo: String?
+  public let queuePolicy: TaskQueuePolicy
+  public let queuedAt: String?
   public let createdAt: String
   public let updatedAt: String
   public let createdBy: String?
@@ -117,6 +211,8 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     case severity
     case status
     case assignedTo
+    case queuePolicy
+    case queuedAt
     case createdAt
     case updatedAt
     case createdBy
@@ -135,6 +231,8 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     severity: TaskSeverity,
     status: TaskStatus,
     assignedTo: String?,
+    queuePolicy: TaskQueuePolicy = .locked,
+    queuedAt: String? = nil,
     createdAt: String,
     updatedAt: String,
     createdBy: String?,
@@ -151,6 +249,8 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     self.severity = severity
     self.status = status
     self.assignedTo = assignedTo
+    self.queuePolicy = queuePolicy
+    self.queuedAt = queuedAt
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.createdBy = createdBy
@@ -170,6 +270,9 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     severity = try container.decode(TaskSeverity.self, forKey: .severity)
     status = try container.decode(TaskStatus.self, forKey: .status)
     assignedTo = try container.decodeIfPresent(String.self, forKey: .assignedTo)
+    queuePolicy =
+      try container.decodeIfPresent(TaskQueuePolicy.self, forKey: .queuePolicy) ?? .locked
+    queuedAt = try container.decodeIfPresent(String.self, forKey: .queuedAt)
     createdAt = try container.decode(String.self, forKey: .createdAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)

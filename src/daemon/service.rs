@@ -30,7 +30,7 @@ use super::protocol::{
     ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionExtensionsPayload, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
     SetLogLevelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
+    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -644,6 +644,104 @@ pub fn assign_task(
     session_detail(session_id, db)
 }
 
+/// Drop a task onto an extensible target through the shared session service.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved, the drop is invalid,
+/// or task-start signal delivery fails.
+pub fn drop_task(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDropRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
+    {
+        let now = utc_now();
+        let project_dir = project_dir_for_db_session(db, session_id)?;
+        let effects = session_service::apply_drop_task(
+            &mut state,
+            task_id,
+            &request.target,
+            request.queue_policy,
+            &request.actor,
+            &now,
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        write_task_start_signals(&project_dir, &effects)?;
+        append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
+        refresh_signal_index_for_db(db, session_id)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
+    }
+
+    let resolved = index::resolve_session(session_id)?;
+    let project_dir = effective_project_dir(&resolved);
+    session_service::drop_task(
+        session_id,
+        task_id,
+        &request.target,
+        request.queue_policy,
+        &request.actor,
+        project_dir,
+    )?;
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
+}
+
+/// Update a queued task's reassignment policy.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved, the task is missing,
+/// or queue promotion signal delivery fails.
+pub fn update_task_queue_policy(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskQueuePolicyRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
+    {
+        let now = utc_now();
+        let project_dir = project_dir_for_db_session(db, session_id)?;
+        let effects = session_service::apply_update_task_queue_policy(
+            &mut state,
+            task_id,
+            request.queue_policy,
+            &request.actor,
+            &now,
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        write_task_start_signals(&project_dir, &effects)?;
+        append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
+        refresh_signal_index_for_db(db, session_id)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
+    }
+
+    let resolved = index::resolve_session(session_id)?;
+    let project_dir = effective_project_dir(&resolved);
+    session_service::update_task_queue_policy(
+        session_id,
+        task_id,
+        request.queue_policy,
+        &request.actor,
+        project_dir,
+    )?;
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
+}
+
 /// Update a task status through the shared session service.
 ///
 /// # Errors
@@ -657,24 +755,31 @@ pub fn update_task(
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
+        let now = utc_now();
         let from_status = session_service::apply_update_task(
             &mut state,
             task_id,
             request.status,
             request.note.as_deref(),
             &request.actor,
-            &utc_now(),
+            &now,
         )?;
+        let effects =
+            session_service::apply_advance_queued_tasks(&mut state, &request.actor, &now)?;
+        let project_dir = project_dir_for_db_session(db, session_id)?;
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
+        write_task_start_signals(&project_dir, &effects)?;
         db.append_log_entry(&build_log_entry(
             session_id,
             session_service::log_task_status_changed(task_id, from_status, request.status),
             Some(&request.actor),
             None,
         ))?;
+        append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
+        refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         return session_detail(session_id, Some(db));
@@ -1593,6 +1698,59 @@ fn project_dir_for_db_session(
         .resolve_session(session_id)?
         .ok_or_else(|| session_not_found(session_id))?;
     Ok(effective_project_dir(&resolved).to_path_buf())
+}
+
+fn write_task_start_signals(
+    project_dir: &Path,
+    effects: &[session_service::TaskDropEffect],
+) -> Result<(), CliError> {
+    let signals: Vec<_> = effects
+        .iter()
+        .filter_map(|effect| match effect {
+            session_service::TaskDropEffect::Started(signal) => Some(signal.as_ref().clone()),
+            session_service::TaskDropEffect::Queued { .. } => None,
+        })
+        .collect();
+    session_service::write_prepared_task_start_signals(project_dir, &signals)
+}
+
+fn append_task_drop_effect_logs(
+    db: &super::db::DaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    effects: &[session_service::TaskDropEffect],
+) -> Result<(), CliError> {
+    for effect in effects {
+        match effect {
+            session_service::TaskDropEffect::Started(signal) => {
+                db.append_log_entry(&build_log_entry(
+                    session_id,
+                    session_service::log_task_assigned(&signal.task_id, &signal.agent_id),
+                    Some(actor_id),
+                    None,
+                ))?;
+                db.append_log_entry(&build_log_entry(
+                    session_id,
+                    session_service::log_signal_sent(
+                        &signal.signal.signal_id,
+                        &signal.agent_id,
+                        &signal.signal.command,
+                    ),
+                    Some(actor_id),
+                    None,
+                ))?;
+            }
+            session_service::TaskDropEffect::Queued { task_id, agent_id } => {
+                db.append_log_entry(&build_log_entry(
+                    session_id,
+                    session_service::log_task_queued(task_id, agent_id),
+                    Some(actor_id),
+                    None,
+                ))?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn build_log_entry(

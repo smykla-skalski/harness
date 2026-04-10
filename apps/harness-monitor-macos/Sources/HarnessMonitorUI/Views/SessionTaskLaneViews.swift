@@ -1,8 +1,24 @@
 import HarnessMonitorKit
 import SwiftUI
+import UniformTypeIdentifiers
+
+struct TaskDragPayload: Codable, Transferable {
+  let sessionID: String
+  let taskID: String
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .harnessMonitorTask)
+  }
+}
+
+extension UTType {
+  static let harnessMonitorTask = UTType(exportedAs: "io.harnessmonitor.task")
+}
 
 struct SessionTaskListSection: View {
+  let sessionID: String
   let tasks: [WorkItem]
+  let isSessionReadOnly: Bool
   let companionAgentCount: Int
   let inspectTask: (String) -> Void
 
@@ -34,7 +50,12 @@ struct SessionTaskListSection: View {
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(tasks) { task in
-            SessionTaskSummaryCard(task: task, inspectTask: inspectTask)
+            SessionTaskSummaryCard(
+              sessionID: sessionID,
+              task: task,
+              isDragEnabled: !isSessionReadOnly && task.isDraggableForWorkerDrop,
+              inspectTask: inspectTask
+            )
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -45,10 +66,41 @@ struct SessionTaskListSection: View {
 }
 
 struct SessionTaskSummaryCard: View {
+  let sessionID: String
   let task: WorkItem
+  let isDragEnabled: Bool
   let inspectTask: (String) -> Void
 
+  private var dragPayload: TaskDragPayload {
+    TaskDragPayload(sessionID: sessionID, taskID: task.taskId)
+  }
+
   var body: some View {
+    cardButton
+      .taskCardDrag(payload: dragPayload, isEnabled: isDragEnabled)
+      .contextMenu {
+        Button {
+          inspectTask(task.taskId)
+        } label: {
+          Label("Inspect", systemImage: "info.circle")
+        }
+        Divider()
+        Button {
+          HarnessMonitorClipboard.copy(task.taskId)
+        } label: {
+          Label("Copy Task ID", systemImage: "doc.on.doc")
+        }
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
+      .transition(
+        .asymmetric(
+          insertion: .scale(scale: 0.95).combined(with: .opacity),
+          removal: .opacity
+        ))
+  }
+
+  private var cardButton: some View {
     Button {
       inspectTask(task.taskId)
     } label: {
@@ -71,11 +123,11 @@ struct SessionTaskSummaryCard: View {
           .lineLimit(2)
         Spacer(minLength: 0)
         HStack(alignment: .firstTextBaseline) {
-          Text(task.status.title)
+          Text(task.assignmentStateTitle)
             .scaledFont(.caption.weight(.bold))
-            .foregroundStyle(taskStatusColor(for: task.status))
+            .foregroundStyle(task.assignmentStateColor)
           Spacer()
-          Text(task.assignedTo ?? "unassigned")
+          Text(task.assignmentSummary)
             .scaledFont(.caption.monospaced())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
@@ -89,31 +141,49 @@ struct SessionTaskSummaryCard: View {
       .padding(HarnessMonitorTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
-    .contextMenu {
-      Button {
-        inspectTask(task.taskId)
-      } label: {
-        Label("Inspect", systemImage: "info.circle")
-      }
-      Divider()
-      Button {
-        HarnessMonitorClipboard.copy(task.taskId)
-      } label: {
-        Label("Copy Task ID", systemImage: "doc.on.doc")
-      }
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
-    .transition(
-      .asymmetric(
-        insertion: .scale(scale: 0.95).combined(with: .opacity),
-        removal: .opacity
-      ))
   }
 }
 
 #Preview("Task summary") {
-  SessionTaskSummaryCard(task: PreviewFixtures.tasks[0], inspectTask: { _ in })
+  SessionTaskSummaryCard(
+    sessionID: PreviewFixtures.summary.sessionId,
+    task: PreviewFixtures.tasks[0],
+    isDragEnabled: true,
+    inspectTask: { _ in }
+  )
     .padding()
     .frame(width: 320)
+}
+
+private extension View {
+  @ViewBuilder
+  func taskCardDrag(payload: TaskDragPayload, isEnabled: Bool) -> some View {
+    if isEnabled {
+      draggable(payload) {
+        Text(payload.taskID)
+          .scaledFont(.caption.bold())
+          .harnessPillPadding()
+          .harnessContentPill()
+      }
+    } else {
+      self
+    }
+  }
+}
+
+private extension WorkItem {
+  var isDraggableForWorkerDrop: Bool {
+    isLeaderAssignable || isReassignableQueuedTask
+  }
+
+  var assignmentStateTitle: String {
+    if isQueuedForWorker {
+      return queuePolicy == .reassignWhenFree ? "Queued · reassignable" : "Queued"
+    }
+    return status.title
+  }
+
+  var assignmentStateColor: Color {
+    isQueuedForWorker ? HarnessMonitorTheme.caution : taskStatusColor(for: status)
+  }
 }

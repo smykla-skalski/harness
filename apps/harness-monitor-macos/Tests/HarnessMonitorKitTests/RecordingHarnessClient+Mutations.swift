@@ -75,6 +75,89 @@ extension RecordingHarnessClient {
     return detail
   }
 
+  func dropTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDropRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .dropTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        target: request.target,
+        queuePolicy: request.queuePolicy,
+        actor: request.actor
+      )
+    )
+
+    detail = replacingTask(taskID) { task in
+      let agentID: String
+      switch request.target {
+      case .agent(let droppedAgentID):
+        agentID = droppedAgentID
+      }
+      return WorkItem(
+        taskId: task.taskId,
+        title: task.title,
+        context: task.context,
+        severity: task.severity,
+        status: .inProgress,
+        assignedTo: agentID,
+        queuePolicy: .locked,
+        queuedAt: nil,
+        createdAt: task.createdAt,
+        updatedAt: "2026-03-28T14:20:30Z",
+        createdBy: task.createdBy,
+        notes: task.notes,
+        suggestedFix: task.suggestedFix,
+        source: task.source,
+        blockedReason: nil,
+        completedAt: nil,
+        checkpointSummary: task.checkpointSummary
+      )
+    }
+    return detail
+  }
+
+  func updateTaskQueuePolicy(
+    sessionID: String,
+    taskID: String,
+    request: TaskQueuePolicyRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .updateTaskQueuePolicy(
+        sessionID: sessionID,
+        taskID: taskID,
+        queuePolicy: request.queuePolicy,
+        actor: request.actor
+      )
+    )
+    detail = replacingTask(taskID) { task in
+      WorkItem(
+        taskId: task.taskId,
+        title: task.title,
+        context: task.context,
+        severity: task.severity,
+        status: task.status,
+        assignedTo: task.assignedTo,
+        queuePolicy: request.queuePolicy,
+        queuedAt: task.queuedAt,
+        createdAt: task.createdAt,
+        updatedAt: "2026-03-28T14:20:45Z",
+        createdBy: task.createdBy,
+        notes: task.notes,
+        suggestedFix: task.suggestedFix,
+        source: task.source,
+        blockedReason: task.blockedReason,
+        completedAt: task.completedAt,
+        checkpointSummary: task.checkpointSummary
+      )
+    }
+    return detail
+  }
+
   func updateTask(
     sessionID: String,
     taskID: String,
