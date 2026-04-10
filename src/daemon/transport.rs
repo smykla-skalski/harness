@@ -121,6 +121,12 @@ pub struct DaemonServeArgs {
     /// Poll interval in seconds for daemon-owned observe loops.
     #[arg(long, default_value_t = 5)]
     pub observe_seconds: u64,
+    /// Run in macOS App Sandbox mode. Disables subprocess features (launchctl
+    /// install/remove, daemon respawn) and surfaces structured errors instead.
+    /// Enabled automatically when `HARNESS_SANDBOXED` is set to a truthy value
+    /// (`1`, `true`, `yes`, `on`) in the environment.
+    #[arg(long)]
+    pub sandboxed: bool,
 }
 
 impl Execute for DaemonServeArgs {
@@ -135,6 +141,7 @@ impl Execute for DaemonServeArgs {
             port: self.port,
             poll_interval: Duration::from_secs(self.refresh_seconds.max(1)),
             observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
+            sandboxed: self.sandboxed || service::sandboxed_from_env(),
         }))?;
         Ok(0)
     }
@@ -566,8 +573,45 @@ fn print_json<T: serde::Serialize>(value: &T) -> Result<(), CliError> {
 mod tests {
     use super::*;
     use crate::daemon::state;
+    use clap::Parser;
     use std::cell::RefCell;
     use std::rc::Rc;
+
+    #[derive(Debug, Parser)]
+    struct DaemonServeArgsTestHarness {
+        #[command(flatten)]
+        args: DaemonServeArgs,
+    }
+
+    #[test]
+    fn daemon_serve_args_default_is_unsandboxed() {
+        let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
+        assert!(!parsed.args.sandboxed);
+    }
+
+    #[test]
+    fn daemon_serve_args_accepts_sandboxed_flag() {
+        let parsed = DaemonServeArgsTestHarness::try_parse_from(["test", "--sandboxed"]).unwrap();
+        assert!(parsed.args.sandboxed);
+    }
+
+    #[test]
+    fn daemon_serve_args_enables_sandbox_via_env() {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
+            let effective = parsed.args.sandboxed || service::sandboxed_from_env();
+            assert!(effective);
+        });
+    }
+
+    #[test]
+    fn daemon_serve_args_ignores_env_when_unset() {
+        temp_env::with_var("HARNESS_SANDBOXED", Option::<&str>::None, || {
+            let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
+            let effective = parsed.args.sandboxed || service::sandboxed_from_env();
+            assert!(!effective);
+        });
+    }
 
     fn sample_launch_agent_status(installed: bool, loaded: bool) -> launchd::LaunchAgentStatus {
         launchd::LaunchAgentStatus {

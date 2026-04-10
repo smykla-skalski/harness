@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::id as process_id;
 use std::slice;
@@ -65,6 +66,12 @@ pub struct DaemonServeConfig {
     pub port: u16,
     pub poll_interval: Duration,
     pub observe_interval: Duration,
+    /// Whether the daemon is running inside the macOS App Sandbox.
+    ///
+    /// When true, subprocess-based platform integration (e.g. `launchctl`
+    /// invocations, respawning the daemon binary directly) is disabled and
+    /// surfaces a structured error instead of attempting the operation.
+    pub sandboxed: bool,
 }
 
 impl Default for DaemonServeConfig {
@@ -74,7 +81,44 @@ impl Default for DaemonServeConfig {
             port: 0,
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
+            sandboxed: false,
         }
+    }
+}
+
+/// Returns true when `HARNESS_SANDBOXED` is set to a truthy value (`1`, `true`, `yes`, `on`).
+#[must_use]
+pub fn sandboxed_from_env() -> bool {
+    env::var("HARNESS_SANDBOXED").ok().is_some_and(|value| {
+        matches!(
+            value.trim(),
+            "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+        )
+    })
+}
+
+/// Returns true when the current working directory is under
+/// `Library/Group Containers/`, which is a strong signal that the process
+/// launched inside the macOS App Sandbox.
+#[must_use]
+pub fn cwd_looks_sandboxed() -> bool {
+    env::current_dir()
+        .ok()
+        .and_then(|path| path.into_os_string().into_string().ok())
+        .is_some_and(|path| path.contains("Library/Group Containers/"))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_sandbox_startup(sandboxed: bool) {
+    tracing::info!(sandboxed, "daemon starting");
+    if !sandboxed && cwd_looks_sandboxed() {
+        tracing::warn!(
+            "daemon cwd is under Library/Group Containers/ but HARNESS_SANDBOXED is unset; \
+             subprocess features may fail under the macOS App Sandbox"
+        );
     }
 }
 
@@ -83,6 +127,8 @@ impl Default for DaemonServeConfig {
 /// # Errors
 /// Returns `CliError` on bind or filesystem failures.
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
+    log_sandbox_startup(config.sandboxed);
+
     state::ensure_daemon_dirs()?;
     let daemon_lock = state::acquire_singleton_lock()?;
     let token = state::ensure_auth_token()?;
@@ -2741,6 +2787,39 @@ mod tests {
                 .expect("load")
                 .expect("present");
             assert_eq!(db_state.agents.len(), 2);
+        });
+    }
+
+    #[test]
+    fn daemon_serve_config_default_is_unsandboxed() {
+        let config = DaemonServeConfig::default();
+        assert!(!config.sandboxed);
+    }
+
+    #[test]
+    fn sandboxed_from_env_detects_truthy_values() {
+        for value in ["1", "true", "TRUE", "yes", "YES", "on", "ON"] {
+            temp_env::with_var("HARNESS_SANDBOXED", Some(value), || {
+                assert!(
+                    sandboxed_from_env(),
+                    "expected HARNESS_SANDBOXED={value} to enable sandbox mode"
+                );
+            });
+        }
+    }
+
+    #[test]
+    fn sandboxed_from_env_rejects_falsy_and_unset_values() {
+        for value in ["0", "false", "no", "off", "", "anything-else"] {
+            temp_env::with_var("HARNESS_SANDBOXED", Some(value), || {
+                assert!(
+                    !sandboxed_from_env(),
+                    "expected HARNESS_SANDBOXED={value} to leave sandbox mode disabled"
+                );
+            });
+        }
+        temp_env::with_var("HARNESS_SANDBOXED", Option::<&str>::None, || {
+            assert!(!sandboxed_from_env());
         });
     }
 }
