@@ -27,6 +27,7 @@ enum HarnessMonitorUITestAccessibility {
   static let sidebarRoot = "harness.sidebar.root"
   static let previewProjectHeader = "harness.sidebar.project-header.project-6ccf8d0a"
   static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"
+  static let previewCheckoutHeader = "harness.sidebar.worktree-header.project-6ccf8d0a"
   static let previewSessionRow = "harness.sidebar.session.sess-harness"
   static let previewSessionRowFrame = "harness.sidebar.session.sess-harness.frame"
   static let signalRegressionSecondarySessionRow = "harness.sidebar.session.sess-harness-secondary"

@@ -108,4 +108,31 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(filterState.label.contains("status=active"))
     XCTAssertTrue(filterState.label.contains("sort=recentActivity"))
   }
+
+  func testCheckoutHeaderOnlyTogglesSessionDisclosure() throws {
+    let app = launch(mode: "preview")
+    let checkoutHeader = element(in: app, identifier: Accessibility.previewCheckoutHeader)
+    let sessionRow = previewSessionTrigger(in: app)
+
+    XCTAssertTrue(checkoutHeader.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+
+    tapPreviewSession(in: app)
+
+    let observeButton = button(in: app, identifier: Accessibility.observeSummaryButton)
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+
+    tapElement(in: app, identifier: Accessibility.previewCheckoutHeader)
+
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(
+      sessionRow.waitForExistence(timeout: Self.actionTimeout),
+      "The checkout header should collapse its sessions without clearing the current selection"
+    )
+
+    tapElement(in: app, identifier: Accessibility.previewCheckoutHeader)
+
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+  }
 }

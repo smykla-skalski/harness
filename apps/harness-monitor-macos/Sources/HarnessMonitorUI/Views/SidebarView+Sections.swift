@@ -43,6 +43,7 @@ extension SidebarView {
     } label: {
       checkoutHeader(for: group)
     }
+    .selectionDisabled(true)
   }
 
   func checkoutHeader(
