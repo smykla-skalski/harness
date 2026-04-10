@@ -291,6 +291,7 @@ extension HarnessMonitorStore {
     public var isSelectionLoading = false
     public var isExtensionsLoading = false
     public var lastAction = ""
+    public var isTaskDragActive = false
 
     public init() {}
   }
