@@ -513,6 +513,20 @@ schemes:
       targets:
         - name: HarnessMonitorKitTests
         - name: HarnessMonitorUITests
+  HarnessMonitor (External Daemon):
+    build:
+      targets:
+        HarnessMonitor: all
+        HarnessMonitorKit: all
+        HarnessMonitorUI: all
+    run:
+      environmentVariables:
+        - variable: HARNESS_MONITOR_EXTERNAL_DAEMON
+          value: "1"
+          isEnabled: true
+        - variable: HARNESS_BOOTSTRAP_TIMEOUT_SECONDS
+          value: "60"
+          isEnabled: true
   HarnessMonitorUIPreviews:
     build:
       config: Preview
