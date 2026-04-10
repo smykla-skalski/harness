@@ -6,10 +6,17 @@ enum HarnessMonitorMarkdownTextSelection {
   case enabled
 }
 
+enum HarnessMonitorMarkdownTextRendering {
+  case rich
+  case plainPreview
+}
+
 struct HarnessMonitorMarkdownText: View {
   let markdown: String
   let font: Font
   let textSelection: HarnessMonitorMarkdownTextSelection
+  let rendering: HarnessMonitorMarkdownTextRendering
+  let lineLimit: Int?
 
   @Environment(\.fontScale)
   private var fontScale
@@ -17,11 +24,15 @@ struct HarnessMonitorMarkdownText: View {
   init(
     _ markdown: String,
     font: Font = .body,
-    textSelection: HarnessMonitorMarkdownTextSelection = .disabled
+    textSelection: HarnessMonitorMarkdownTextSelection = .disabled,
+    rendering: HarnessMonitorMarkdownTextRendering = .rich,
+    lineLimit: Int? = nil
   ) {
     self.markdown = markdown
     self.font = font
     self.textSelection = textSelection
+    self.rendering = rendering
+    self.lineLimit = lineLimit
   }
 
   var body: some View {
@@ -46,11 +57,20 @@ struct HarnessMonitorMarkdownText: View {
 
   @ViewBuilder
   private var content: some View {
-    switch textSelection {
-    case .disabled:
-      baseContent
-    case .enabled:
-      baseContent.textual.textSelection(.enabled)
+    switch rendering {
+    case .rich:
+      switch textSelection {
+      case .disabled:
+        baseContent
+      case .enabled:
+        baseContent.textual.textSelection(.enabled)
+      }
+    case .plainPreview:
+      Text(verbatim: markdown)
+        .scaledFont(font)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .multilineTextAlignment(.leading)
+        .lineLimit(lineLimit)
     }
   }
 }
