@@ -231,13 +231,6 @@ private struct TaskDraggingOverlay: View {
         .fill(HarnessMonitorTheme.accent.opacity(0.32))
         .frame(width: 112, height: 112)
         .blur(radius: 24)
-      Circle()
-        .fill(.regularMaterial)
-        .frame(width: 72, height: 72)
-        .overlay {
-          Circle()
-            .stroke(HarnessMonitorTheme.accent.opacity(0.3), lineWidth: 1)
-        }
       TaskDragGestureIcon(size: 44)
         .foregroundStyle(HarnessMonitorTheme.accent)
     }
