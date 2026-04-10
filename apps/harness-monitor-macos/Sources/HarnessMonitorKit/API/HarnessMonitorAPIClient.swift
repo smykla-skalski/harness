@@ -141,6 +141,13 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/sessions/\(sessionID)/signal", body: request)
   }
 
+  public func cancelSignal(
+    sessionID: String,
+    request: SignalCancelRequest
+  ) async throws -> SessionDetail {
+    try await post("/v1/sessions/\(sessionID)/signal-cancel", body: request)
+  }
+
   public func observeSession(
     sessionID: String,
     request: ObserveSessionRequest

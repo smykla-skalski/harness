@@ -77,6 +77,18 @@ public struct SignalSendRequest: Codable, Equatable, Sendable {
   public let actionHint: String?
 }
 
+public struct SignalCancelRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let agentId: String
+  public let signalId: String
+
+  public init(actor: String, agentId: String, signalId: String) {
+    self.actor = actor
+    self.agentId = agentId
+    self.signalId = signalId
+  }
+}
+
 public struct ErrorEnvelope: Codable, Equatable, Sendable {
   public struct ErrorDetail: Codable, Equatable, Sendable {
     public let code: String

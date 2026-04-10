@@ -215,6 +215,48 @@ extension RecordingHarnessClient {
     return detail
   }
 
+  func cancelSignal(
+    sessionID: String,
+    request: SignalCancelRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .cancelSignal(
+        sessionID: sessionID,
+        agentID: request.agentId,
+        signalID: request.signalId,
+        actor: request.actor
+      )
+    )
+    let updatedSignals = detail.signals.map { record -> SessionSignalRecord in
+      guard record.signal.signalId == request.signalId else { return record }
+      return SessionSignalRecord(
+        runtime: record.runtime,
+        agentId: record.agentId,
+        sessionId: record.sessionId,
+        status: .rejected,
+        signal: record.signal,
+        acknowledgment: SignalAck(
+          signalId: record.signal.signalId,
+          acknowledgedAt: "2026-03-28T14:26:00Z",
+          result: .rejected,
+          agent: record.agentId,
+          sessionId: sessionID,
+          details: "cancelled by \(request.actor)"
+        )
+      )
+    }
+    detail = SessionDetail(
+      session: detail.session,
+      agents: detail.agents,
+      tasks: detail.tasks,
+      signals: updatedSignals,
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
+    )
+    return detail
+  }
+
   func logLevel() async throws -> LogLevelResponse {
     LogLevelResponse(level: "info", filter: "harness=info")
   }

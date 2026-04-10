@@ -2,9 +2,10 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionCockpitSignalsSection: View {
+  let store: HarnessMonitorStore
   let signals: [SessionSignalRecord]
   let isExtensionsLoading: Bool
-  let inspectSignal: (String) -> Void
+  let isSessionReadOnly: Bool
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -25,54 +26,12 @@ struct SessionCockpitSignalsSection: View {
       }
       LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         ForEach(signals) { signal in
-          Button {
-            inspectSignal(signal.signal.signalId)
-          } label: {
-            HStack(alignment: .top) {
-              VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-                Text(signal.signal.command)
-                  .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-                Text(signal.signal.payload.message)
-                  .scaledFont(.subheadline)
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                  .multilineTextAlignment(.leading)
-              }
-              Spacer()
-              VStack(alignment: .trailing, spacing: HarnessMonitorTheme.itemSpacing) {
-                let effectiveStatus = signal.effectiveStatus
-                Text(effectiveStatus.title)
-                  .scaledFont(.caption.bold())
-                  .foregroundStyle(signalStatusColor(for: effectiveStatus))
-                Text(formatTimestamp(signal.signal.createdAt, configuration: dateTimeConfiguration))
-                  .scaledFont(.caption.monospaced())
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(HarnessMonitorTheme.cardPadding)
-          }
-          .harnessInteractiveCardButtonStyle()
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.sessionSignalCard(signal.signal.signalId)
+          SessionCockpitSignalCard(
+            store: store,
+            signal: signal,
+            isSessionReadOnly: isSessionReadOnly,
+            dateTimeConfiguration: dateTimeConfiguration
           )
-          .contextMenu {
-            Button {
-              inspectSignal(signal.signal.signalId)
-            } label: {
-              Label("Inspect", systemImage: "info.circle")
-            }
-            Divider()
-            Button {
-              HarnessMonitorClipboard.copy(signal.signal.signalId)
-            } label: {
-              Label("Copy Signal ID", systemImage: "doc.on.doc")
-            }
-          }
-          .transition(
-            .asymmetric(
-              insertion: .scale(scale: 0.95).combined(with: .opacity),
-              removal: .opacity
-            ))
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,11 +40,196 @@ struct SessionCockpitSignalsSection: View {
   }
 }
 
+private struct SessionCockpitSignalCard: View {
+  let store: HarnessMonitorStore
+  let signal: SessionSignalRecord
+  let isSessionReadOnly: Bool
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+
+  @State private var isHovered = false
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+
+  private var effectiveStatus: SessionSignalStatus {
+    signal.effectiveStatus
+  }
+
+  private var canCancel: Bool {
+    !isSessionReadOnly && effectiveStatus == .pending
+  }
+
+  private var canResend: Bool {
+    !isSessionReadOnly && effectiveStatus == .expired
+  }
+
+  private var showsActions: Bool {
+    canCancel || canResend
+  }
+
+  private var hoverAnimation: Animation? {
+    reduceMotion ? nil : .easeOut(duration: 0.15)
+  }
+
+  var body: some View {
+    ZStack(alignment: .trailing) {
+      Button {
+        store.inspect(signalID: signal.signal.signalId)
+      } label: {
+        HStack(alignment: .top) {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+            Text(signal.signal.command)
+              .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+            Text(signal.signal.payload.message)
+              .scaledFont(.subheadline)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .multilineTextAlignment(.leading)
+          }
+          Spacer()
+          VStack(alignment: .trailing, spacing: HarnessMonitorTheme.itemSpacing) {
+            Text(effectiveStatus.title)
+              .scaledFont(.caption.bold())
+              .foregroundStyle(signalStatusColor(for: effectiveStatus))
+            Text(formatTimestamp(signal.signal.createdAt, configuration: dateTimeConfiguration))
+              .scaledFont(.caption.monospaced())
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HarnessMonitorTheme.cardPadding)
+      }
+      .harnessInteractiveCardButtonStyle()
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.sessionSignalCard(signal.signal.signalId)
+      )
+      .contextMenu {
+        Button {
+          store.inspect(signalID: signal.signal.signalId)
+        } label: {
+          Label("Inspect", systemImage: "info.circle")
+        }
+        if canCancel {
+          Button(role: .destructive) {
+            Task {
+              await store.cancelSignal(
+                signalID: signal.signal.signalId,
+                agentID: signal.agentId
+              )
+            }
+          } label: {
+            Label("Cancel Signal", systemImage: "xmark.circle")
+          }
+        }
+        if canResend {
+          Button {
+            Task { await store.resendSignal(signal) }
+          } label: {
+            Label("Resend Signal", systemImage: "arrow.clockwise")
+          }
+        }
+        Divider()
+        Button {
+          HarnessMonitorClipboard.copy(signal.signal.signalId)
+        } label: {
+          Label("Copy Signal ID", systemImage: "doc.on.doc")
+        }
+      }
+
+      if showsActions {
+        SignalHoverActionStrip(
+          store: store,
+          signal: signal,
+          canCancel: canCancel,
+          canResend: canResend
+        )
+        .opacity(isHovered ? 1 : 0)
+        .allowsHitTesting(isHovered)
+      }
+    }
+    .onHover { hovered in
+      withAnimation(hoverAnimation) {
+        isHovered = hovered
+      }
+    }
+    .transition(
+      .asymmetric(
+        insertion: .scale(scale: 0.95).combined(with: .opacity),
+        removal: .opacity
+      )
+    )
+  }
+}
+
+private struct SignalHoverActionStrip: View {
+  let store: HarnessMonitorStore
+  let signal: SessionSignalRecord
+  let canCancel: Bool
+  let canResend: Bool
+
+  var body: some View {
+    VStack(spacing: HarnessMonitorTheme.itemSpacing) {
+      if canCancel {
+        Button {
+          Task {
+            await store.cancelSignal(
+              signalID: signal.signal.signalId,
+              agentID: signal.agentId
+            )
+          }
+        } label: {
+          Image(systemName: "xmark.circle")
+            .symbolRenderingMode(.hierarchical)
+            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+            .foregroundStyle(HarnessMonitorTheme.danger)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .help("Cancel pending signal")
+        .accessibilityLabel("Cancel signal")
+      }
+      if canResend {
+        Button {
+          Task { await store.resendSignal(signal) }
+        } label: {
+          Image(systemName: "arrow.clockwise")
+            .symbolRenderingMode(.hierarchical)
+            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+            .foregroundStyle(HarnessMonitorTheme.accent)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .help("Resend signal")
+        .accessibilityLabel("Resend signal")
+      }
+    }
+    .frame(maxHeight: .infinity)
+    .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
+    .padding(.vertical, HarnessMonitorTheme.cardPadding)
+    .background {
+      UnevenRoundedRectangle(
+        topLeadingRadius: 0,
+        bottomLeadingRadius: 0,
+        bottomTrailingRadius: HarnessMonitorTheme.cornerRadiusMD,
+        topTrailingRadius: HarnessMonitorTheme.cornerRadiusMD,
+        style: .continuous
+      )
+      .fill(.regularMaterial)
+    }
+    .overlay(alignment: .leading) {
+      Rectangle()
+        .fill(HarnessMonitorTheme.controlBorder.opacity(0.35))
+        .frame(width: 1)
+    }
+  }
+}
+
 #Preview("Signals") {
   SessionCockpitSignalsSection(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     signals: PreviewFixtures.signals,
     isExtensionsLoading: false,
-    inspectSignal: { _ in }
+    isSessionReadOnly: false
   )
   .padding()
   .frame(width: 960)
