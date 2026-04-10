@@ -103,51 +103,50 @@ extension HarnessMonitorStore {
       let hydrationQueue = await self.persistedSnapshotHydrationQueue(for: prioritySessions)
       guard !hydrationQueue.isEmpty else { return }
 
+      var batch: [(detail: SessionDetail, timeline: [TimelineEntry])] = []
+      batch.reserveCapacity(hydrationQueue.count)
+
       for summary in hydrationQueue {
         guard !Task.isCancelled, self.connectionState == .online else {
-          return
+          break
         }
-        await self.hydratePersistedSnapshot(summary: summary, using: client)
-      }
-    }
-  }
 
-  private func hydratePersistedSnapshot(
-    summary: SessionSummary,
-    using client: any HarnessMonitorClientProtocol
-  ) async {
-    do {
-      let measuredDetail = try await Self.measureOperation {
-        try await client.sessionDetail(id: summary.sessionId)
+        do {
+          let measuredDetail = try await Self.measureOperation {
+            try await client.sessionDetail(id: summary.sessionId)
+          }
+          let measuredTimeline = try await Self.measureOperation {
+            try await client.timeline(sessionID: summary.sessionId)
+          }
+          self.recordRequestSuccess()
+          self.recordRequestSuccess()
+
+          batch.append((detail: measuredDetail.value, timeline: measuredTimeline.value))
+
+          let isSelected = self.selectedSessionID == summary.sessionId
+          let needsUpdate = self.selectedSession == nil || self.isShowingCachedData
+          if isSelected && needsUpdate {
+            self.applySelectedSessionSnapshot(
+              sessionID: summary.sessionId,
+              detail: measuredDetail.value,
+              timeline: measuredTimeline.value,
+              showingCachedData: false
+            )
+          }
+        } catch {
+          guard !Task.isCancelled else {
+            return
+          }
+          self.appendConnectionEvent(
+            kind: .error,
+            detail: "Persisted snapshot refresh failed for \(summary.sessionId)"
+          )
+        }
       }
-      let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: summary.sessionId)
+
+      if !batch.isEmpty {
+        await self.cacheSessionDetails(batch, markViewed: false)
       }
-      recordRequestSuccess()
-      recordRequestSuccess()
-      await cacheSessionDetail(
-        measuredDetail.value,
-        timeline: measuredTimeline.value,
-        markViewed: false
-      )
-      let isSelected = selectedSessionID == summary.sessionId
-      let needsUpdate = selectedSession == nil || isShowingCachedData
-      if isSelected && needsUpdate {
-        applySelectedSessionSnapshot(
-          sessionID: summary.sessionId,
-          detail: measuredDetail.value,
-          timeline: measuredTimeline.value,
-          showingCachedData: false
-        )
-      }
-    } catch {
-      guard !Task.isCancelled else {
-        return
-      }
-      appendConnectionEvent(
-        kind: .error,
-        detail: "Persisted snapshot refresh failed for \(summary.sessionId)"
-      )
     }
   }
 
