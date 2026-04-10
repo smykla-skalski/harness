@@ -30,6 +30,8 @@ enum HarnessMonitorUITestAccessibility {
   static let previewCheckoutHeader = "harness.sidebar.worktree-header.project-6ccf8d0a"
   static let previewSessionRow = "harness.sidebar.session.sess-harness"
   static let previewSessionRowFrame = "harness.sidebar.session.sess-harness.frame"
+  static let previewSessionRowSelectionFrame =
+    "harness.sidebar.session.sess-harness.selection.frame"
   static let signalRegressionSecondarySessionRow = "harness.sidebar.session.sess-harness-secondary"
   static let previewSignalCard = "harness.session.signal.sig-ui-1"
   static let singleAgentSessionRow = "harness.sidebar.session.sess-harness-solo"

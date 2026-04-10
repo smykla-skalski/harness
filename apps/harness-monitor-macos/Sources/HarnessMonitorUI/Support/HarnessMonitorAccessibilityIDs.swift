@@ -149,6 +149,10 @@ public enum HarnessMonitorAccessibility {
     "\(sessionRow(sessionID)).frame"
   }
 
+  static func sessionRowSelectionFrame(_ sessionID: String) -> String {
+    "\(sessionRow(sessionID)).selection.frame"
+  }
+
   static func projectHeader(_ projectID: String) -> String {
     "harness.sidebar.project-header.\(slug(projectID))"
   }

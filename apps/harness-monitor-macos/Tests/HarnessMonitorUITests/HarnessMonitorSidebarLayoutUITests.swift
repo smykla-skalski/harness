@@ -122,7 +122,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let observeButton = button(in: app, identifier: Accessibility.observeSummaryButton)
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
 
-    tapElement(in: app, identifier: Accessibility.previewCheckoutHeader)
+    tapTrailingEdge(of: checkoutHeader, in: app)
 
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertFalse(
@@ -130,9 +130,49 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
       "The checkout header should collapse its sessions without clearing the current selection"
     )
 
-    tapElement(in: app, identifier: Accessibility.previewCheckoutHeader)
+    tapTrailingEdge(of: checkoutHeader, in: app)
 
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+  }
+
+  func testSelectedSessionChromeFillsFullSessionRowHeight() throws {
+    let app = launch(mode: "preview")
+    let sessionRow = previewSessionTrigger(in: app)
+    let sessionRowFrame = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
+
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sessionRowFrame.waitForExistence(timeout: Self.actionTimeout))
+
+    tapPreviewSession(in: app)
+
+    let observeButton = button(in: app, identifier: Accessibility.observeSummaryButton)
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+
+    let selectedFrame = frameElement(
+      in: app,
+      identifier: Accessibility.previewSessionRowSelectionFrame
+    )
+    XCTAssertTrue(selectedFrame.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertEqual(selectedFrame.frame.minY, sessionRowFrame.frame.minY, accuracy: 2)
+    XCTAssertEqual(selectedFrame.frame.height, sessionRowFrame.frame.height, accuracy: 2)
+  }
+
+  private func tapTrailingEdge(
+    of element: XCUIElement,
+    in app: XCUIApplication
+  ) {
+    let window = window(in: app, containing: element)
+    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+
+    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+    origin
+      .withOffset(
+        CGVector(
+          dx: element.frame.maxX - window.frame.minX - 8,
+          dy: element.frame.midY - window.frame.minY
+        )
+      )
+      .tap()
   }
 }
