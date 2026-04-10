@@ -131,6 +131,8 @@ extension HarnessMonitorStore {
   // MARK: - Selection
 
   public func primeSessionSelection(_ sessionID: String?) {
+    let isChangingSelectedSession = selectedSession?.session.sessionId != sessionID
+
     withUISyncBatch {
       recordNavigation(to: sessionID)
       cancelSessionPushFallback()
@@ -144,29 +146,27 @@ extension HarnessMonitorStore {
         pendingExtensions = nil
       }
       resetSelectedCodexRuns()
-    }
-
-    guard let sessionID else {
-      withUISyncBatch {
+      if sessionID == nil {
         if activeSessionLoadRequest != 0 {
           activeSessionLoadRequest = 0
         }
         isSelectionLoading = false
         selectedSession = nil
         timeline = []
+      } else if isChangingSelectedSession {
+        isSelectionLoading = true
+        selectedSession = nil
+        timeline = []
       }
+    }
+
+    guard let sessionID else {
       stopSessionStream()
       return
     }
 
     guard selectedSession?.session.sessionId != sessionID else {
       return
-    }
-
-    withUISyncBatch {
-      isSelectionLoading = true
-      selectedSession = nil
-      timeline = []
     }
   }
 

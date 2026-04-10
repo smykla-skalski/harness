@@ -241,7 +241,6 @@ struct ContentDetailColumn: View {
         timeline: selection.timeline,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isSessionActionInFlight: contentSession.isSessionActionInFlight,
-        isSelectionLoading: contentSession.isSelectionLoading,
         isExtensionsLoading: contentSession.isExtensionsLoading,
         lastAction: contentSession.lastAction
       )
