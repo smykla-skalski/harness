@@ -72,7 +72,7 @@ struct SessionTaskSummaryCard: View {
   let isDragEnabled: Bool
   let inspectTask: (String) -> Void
   @State private var isHovered = false
-  @GestureState private var isDragGestureActive = false
+  @State private var isDragPreviewPresented = false
 
   private var dragPayload: TaskDragPayload {
     TaskDragPayload(
@@ -83,7 +83,7 @@ struct SessionTaskSummaryCard: View {
   }
 
   private var isDragging: Bool {
-    isDragEnabled && isDragGestureActive
+    isDragEnabled && isDragPreviewPresented
   }
 
   var body: some View {
@@ -110,15 +110,10 @@ struct SessionTaskSummaryCard: View {
       .opacity(isDragging ? 0.82 : 1)
       .scaleEffect(isDragging ? 0.985 : 1)
       .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD))
-      .taskCardDrag(payload: dragPayload, isEnabled: isDragEnabled)
-      .simultaneousGesture(
-        DragGesture(minimumDistance: 1)
-          .updating($isDragGestureActive) { _, state, _ in
-            guard isDragEnabled else {
-              return
-            }
-            state = true
-          }
+      .taskCardDrag(
+        payload: dragPayload,
+        isEnabled: isDragEnabled,
+        previewDidChangePresentation: setDragPreviewPresented
       )
       .onContinuousHover { phase in
         withAnimation(.easeOut(duration: 0.15)) {
@@ -154,7 +149,17 @@ struct SessionTaskSummaryCard: View {
       .accessibilityValue(isDragging ? "Dragging" : "")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
       .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
-      .animation(.easeOut(duration: 0.12), value: isDragging)
+      .animation(isDragging ? .easeOut(duration: 0.10) : nil, value: isDragging)
+  }
+
+  private func setDragPreviewPresented(_ isPresented: Bool) {
+    guard isDragPreviewPresented != isPresented else {
+      return
+    }
+    isDragPreviewPresented = isPresented
+    if !isPresented {
+      isHovered = false
+    }
   }
 
   private var cardSurface: some View {
@@ -209,10 +214,17 @@ struct SessionTaskSummaryCard: View {
 
 private extension View {
   @ViewBuilder
-  func taskCardDrag(payload: TaskDragPayload, isEnabled: Bool) -> some View {
+  func taskCardDrag(
+    payload: TaskDragPayload,
+    isEnabled: Bool,
+    previewDidChangePresentation: @escaping (Bool) -> Void
+  ) -> some View {
     if isEnabled {
       draggable(payload) {
-        TaskDragPreview(taskID: payload.taskID)
+        TaskDragPreview(
+          taskID: payload.taskID,
+          didChangePresentation: previewDidChangePresentation
+        )
       }
     } else {
       self
@@ -242,6 +254,7 @@ private struct TaskDraggingOverlay: View {
 
 private struct TaskDragPreview: View {
   let taskID: String
+  let didChangePresentation: (Bool) -> Void
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -260,6 +273,12 @@ private struct TaskDragPreview: View {
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(HarnessMonitorTheme.accent.opacity(0.5), lineWidth: 1)
+    }
+    .onAppear {
+      didChangePresentation(true)
+    }
+    .onDisappear {
+      didChangePresentation(false)
     }
   }
 }
