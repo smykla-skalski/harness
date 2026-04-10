@@ -285,7 +285,9 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class ContentSessionSlice {
+    public var selectedSessionDetail: SessionDetail?
     public var selectedSessionSummary: SessionSummary?
+    public var timeline: [TimelineEntry] = []
     public var isSessionReadOnly = true
     public var isSessionActionInFlight = false
     public var isSelectionLoading = false
