@@ -79,7 +79,12 @@ private struct SessionCockpitSignalCard: View {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             Text(signal.signal.command)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-            HarnessMonitorMarkdownText(signal.signal.payload.message, font: .subheadline)
+            HarnessMonitorMarkdownText(
+              signal.signal.payload.message,
+              font: .subheadline,
+              rendering: .plainPreview,
+              lineLimit: 3
+            )
           }
           Spacer()
           VStack(alignment: .trailing, spacing: HarnessMonitorTheme.itemSpacing) {
