@@ -425,7 +425,7 @@ private struct SessionCockpitTimelineEntryRow: View {
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
       SessionTimelineEntryMarker()
-      Text(formatTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))
+      Text(formatTimelineTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))
         .scaledFont(.caption.monospaced())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
