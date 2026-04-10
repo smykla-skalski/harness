@@ -104,6 +104,27 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
   }
 
+  @Test("Content session detail state tracks selected session detail and timeline")
+  func contentSessionDetailStateTracksSelectedSessionDetailAndTimeline() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.contentUI.session.selectedSessionDetail,
+          store.contentUI.session.timeline
+        )
+      },
+      after: {
+        await store.selectSession(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange)
+    #expect(store.contentUI.session.selectedSessionDetail == PreviewFixtures.detail)
+    #expect(store.contentUI.session.timeline == PreviewFixtures.timeline)
+  }
+
   @Test("Priming current session does not invalidate content or inspector slices")
   func primingCurrentSessionDoesNotInvalidateContentOrInspectorSlices() async {
     let store = await makeBootstrappedStore()

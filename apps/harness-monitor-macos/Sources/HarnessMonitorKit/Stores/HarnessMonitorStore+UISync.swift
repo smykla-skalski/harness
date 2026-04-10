@@ -148,7 +148,9 @@ extension HarnessMonitorStore {
     assign(connectionState, to: \.connectionState, on: contentToolbar)
     assign(isBusy, to: \.isBusy, on: contentToolbar)
 
+    assign(selectedDetail, to: \.selectedSessionDetail, on: contentSession)
     assign(selectedSessionSummary, to: \.selectedSessionSummary, on: contentSession)
+    assign(selection.timeline, to: \.timeline, on: contentSession)
     assign(isSessionReadOnly, to: \.isSessionReadOnly, on: contentSession)
     assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: contentSession)
     assign(isSelectionLoading, to: \.isSelectionLoading, on: contentSession)

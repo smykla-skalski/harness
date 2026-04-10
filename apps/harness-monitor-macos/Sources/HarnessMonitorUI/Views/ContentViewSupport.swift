@@ -236,9 +236,9 @@ struct ContentDetailColumn: View {
       store: store,
       dashboardUI: dashboardUI,
       state: SessionContentState(
-        detail: selection.matchedSelectedSession,
+        detail: contentSession.selectedSessionDetail,
         summary: contentSession.selectedSessionSummary,
-        timeline: selection.timeline,
+        timeline: contentSession.timeline,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isSessionActionInFlight: contentSession.isSessionActionInFlight,
         isExtensionsLoading: contentSession.isExtensionsLoading,
@@ -248,7 +248,7 @@ struct ContentDetailColumn: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
-      if selection.matchedSelectedSession != nil {
+      if contentSession.selectedSessionDetail != nil {
         store.inspectorSelection = .none
         return .handled
       }
