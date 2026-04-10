@@ -9,6 +9,7 @@ use crate::create::{
     ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
     CreateValidateArgs,
 };
+use crate::daemon::codex_bridge::CodexBridgeCommand;
 use crate::daemon::transport::DaemonCommand;
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
@@ -149,6 +150,12 @@ pub enum Command {
         #[command(subcommand)]
         command: DaemonCommand,
     },
+
+    /// Supervise an external `codex app-server` bridge for the sandboxed daemon.
+    CodexBridge {
+        #[command(subcommand)]
+        command: CodexBridgeCommand,
+    },
 }
 
 /// Dispatch a parsed command to its owning subsystem.
@@ -169,6 +176,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::Observe(args) => args.execute(&ctx),
         Command::Session { command } => command.execute(&ctx),
         Command::Daemon { command } => command.execute(&ctx),
+        Command::CodexBridge { command } => command.execute(&ctx),
     }
 }
 
