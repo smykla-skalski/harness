@@ -51,7 +51,7 @@ struct HarnessMonitorMarkdownText: View {
       .textual.paragraphStyle(HarnessMonitorMarkdownParagraphStyle())
       .textual.blockQuoteStyle(HarnessMonitorMarkdownBlockQuoteStyle())
       .textual.codeBlockStyle(HarnessMonitorMarkdownCodeBlockStyle())
-      .textual.listItemStyle(HarnessMonitorMarkdownListItemStyle())
+      .textual.unorderedListMarker(HarnessMonitorMarkdownUnorderedListMarker())
       .textual.overflowMode(.wrap)
   }
 
@@ -162,13 +162,15 @@ private struct HarnessMonitorMarkdownCodeBlockStyle: StructuredText.CodeBlockSty
   }
 }
 
-private struct HarnessMonitorMarkdownListItemStyle: StructuredText.ListItemStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
-      configuration.marker
-        .foregroundStyle(HarnessMonitorTheme.accent)
-        .fontWeight(.semibold)
-      configuration.block
-    }
+private struct HarnessMonitorMarkdownUnorderedListMarker: StructuredText.UnorderedListMarker {
+  func makeBody(configuration _: Configuration) -> some View {
+    Image(systemName: "circle.fill")
+      .foregroundStyle(HarnessMonitorTheme.accent)
+      .textual.fontScale(0.32)
+      .textual.frame(
+        width: .fontScaled(1.35),
+        height: .fontScaled(1.0),
+        alignment: .center
+      )
   }
 }
