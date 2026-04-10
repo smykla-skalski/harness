@@ -162,6 +162,7 @@ public final class HarnessMonitorStore {
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
   private var hasBootstrapped = false
+  private var isBootstrapping = false
   private var isReconnecting = false
   private var reconnectRequestedDuringReconnect = false
   private var lastActionDismissTask: Task<Void, Never>?
@@ -237,6 +238,9 @@ public final class HarnessMonitorStore {
     connectionState = .connecting
     lastError = nil
 
+    isBootstrapping = true
+    defer { isBootstrapping = false }
+
     switch daemonOwnership {
     case .external:
       await bootstrapExternalDaemon()
@@ -285,6 +289,9 @@ public final class HarnessMonitorStore {
         ?? "External daemon not running. Start it with `harness daemon dev` in a terminal."
       markConnectionOffline(message)
       await restorePersistedSessionState()
+      // External mode: keep the manifest watcher running while offline so
+      // the first valid manifest write auto-reconnects without a user action.
+      startManifestWatcher()
     }
   }
 
@@ -408,7 +415,10 @@ public final class HarnessMonitorStore {
   }
 
   public func reconnect() async {
-    if isReconnecting {
+    // If a bootstrap is already running (e.g. the watcher fired mid-warm-up
+    // in external mode), record the request so bootstrap can replay it and
+    // return; avoids re-entering bootstrap from the MainActor hop.
+    if isBootstrapping || isReconnecting {
       reconnectRequestedDuringReconnect = true
       return
     }
