@@ -204,7 +204,7 @@ private struct SignalHoverActionStrip: View {
       }
     }
     .frame(maxHeight: .infinity)
-    .padding(.leading, HarnessMonitorTheme.spacingLG * 2)
+    .padding(.leading, HarnessMonitorTheme.spacingLG * 4)
     .padding(.trailing, HarnessMonitorTheme.itemSpacing)
     .padding(.vertical, HarnessMonitorTheme.cardPadding)
     .background {
@@ -214,7 +214,7 @@ private struct SignalHoverActionStrip: View {
           LinearGradient(
             colors: [
               Color.black.opacity(0),
-              Color.black.opacity(0.28),
+              Color.black.opacity(0.45),
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -224,8 +224,8 @@ private struct SignalHoverActionStrip: View {
           LinearGradient(
             stops: [
               .init(color: .clear, location: 0),
-              .init(color: .black.opacity(0.4), location: 0.35),
-              .init(color: .black, location: 0.75),
+              .init(color: .black.opacity(0.5), location: 0.2),
+              .init(color: .black, location: 0.5),
             ],
             startPoint: .leading,
             endPoint: .trailing
