@@ -32,6 +32,26 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
     )
 
+    public static let taskDrop = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: PreviewFixtures.projects,
+      sessions: [PreviewFixtures.taskDropSummary],
+      detail: PreviewFixtures.taskDropDetail,
+      timeline: PreviewFixtures.timeline,
+      readySessionID: PreviewFixtures.summary.sessionId,
+      detailsBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.taskDropDetail],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
+    )
+
     public static let dashboardLanding = Self(
       health: HealthResponse(
         status: "ok",
@@ -228,6 +248,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   private let fixtures: Fixtures
+  private let state: PreviewHarnessClientState
   private let isLaunchAgentInstalled: Bool
 
   var readySessionID: String? {
@@ -239,6 +260,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     isLaunchAgentInstalled: Bool
   ) {
     self.fixtures = fixtures
+    self.state = PreviewHarnessClientState(fixtures: fixtures)
     self.isLaunchAgentInstalled = isLaunchAgentInstalled
   }
 
@@ -301,11 +323,11 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func sessions() async throws -> [SessionSummary] {
-    fixtures.sessions
+    await state.sessions()
   }
 
   public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
-    guard let detail = fixtures.detail(for: id, scope: scope) else {
+    guard let detail = await state.detail(for: id, scope: scope) else {
       throw HarnessMonitorAPIError.server(
         code: 404,
         message: "No preview session detail available."
@@ -315,7 +337,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    fixtures.timeline(for: sessionID)
+    await state.timeline(for: sessionID)
   }
 
   public func createTask(
@@ -334,11 +356,11 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func dropTask(
-    sessionID _: String,
-    taskID _: String,
-    request _: TaskDropRequest
+    sessionID: String,
+    taskID: String,
+    request: TaskDropRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await state.dropTask(sessionID: sessionID, taskID: taskID, request: request)
   }
 
   public func updateTaskQueuePolicy(
@@ -422,5 +444,199 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
     LogLevelResponse(level: level, filter: "harness=\(level)")
+  }
+}
+
+private actor PreviewHarnessClientState {
+  fileprivate static let mutationTimestamp = "2026-03-28T14:20:30Z"
+
+  private var sessionSummaries: [SessionSummary]
+  private var detailsBySessionID: [String: SessionDetail]
+  private var coreDetailsBySessionID: [String: SessionDetail]
+  private var timelinesBySessionID: [String: [TimelineEntry]]
+  private let fallbackDetail: SessionDetail?
+  private let fallbackTimeline: [TimelineEntry]
+
+  init(fixtures: PreviewHarnessClient.Fixtures) {
+    self.sessionSummaries = fixtures.sessions
+    self.detailsBySessionID = fixtures.detailsBySessionID
+    self.coreDetailsBySessionID = fixtures.coreDetailsBySessionID
+    self.timelinesBySessionID = fixtures.timelinesBySessionID
+    self.fallbackDetail = fixtures.detail
+    self.fallbackTimeline = fixtures.timeline
+  }
+
+  func sessions() -> [SessionSummary] {
+    sessionSummaries
+  }
+
+  func detail(for sessionID: String, scope: String?) -> SessionDetail? {
+    if scope == "core", let coreDetail = coreDetailsBySessionID[sessionID] {
+      return coreDetail
+    }
+
+    if let scopedDetail = detailsBySessionID[sessionID] {
+      return scopedDetail
+    }
+
+    return fallbackDetail
+  }
+
+  func timeline(for sessionID: String) -> [TimelineEntry] {
+    timelinesBySessionID[sessionID] ?? fallbackTimeline
+  }
+
+  func dropTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDropRequest
+  ) throws -> SessionDetail {
+    guard let detail = detail(for: sessionID, scope: nil) else {
+      throw HarnessMonitorAPIError.server(
+        code: 404,
+        message: "No preview session detail available."
+      )
+    }
+
+    guard let taskIndex = detail.tasks.firstIndex(where: { $0.taskId == taskID }) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview task available.")
+    }
+
+    let targetAgentID: String
+    switch request.target {
+    case .agent(let agentID):
+      targetAgentID = agentID
+    }
+
+    guard let agentIndex = detail.agents.firstIndex(where: { $0.agentId == targetAgentID }) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview agent available.")
+    }
+
+    let agent = detail.agents[agentIndex]
+    guard agent.role == .worker, agent.status == .active else {
+      throw HarnessMonitorAPIError.server(code: 409, message: "Preview agent cannot take tasks.")
+    }
+
+    var tasks = detail.tasks
+    var agents = detail.agents
+    let task = tasks[taskIndex]
+    let startsImmediately = agent.currentTaskId == nil
+
+    tasks[taskIndex] = task.replacingAssignment(
+      status: startsImmediately ? .inProgress : .open,
+      assignedTo: targetAgentID,
+      queuePolicy: request.queuePolicy,
+      queuedAt: startsImmediately ? nil : Self.mutationTimestamp,
+      updatedAt: Self.mutationTimestamp
+    )
+    if startsImmediately {
+      agents[agentIndex] = agent.replacingCurrentTask(taskID)
+    }
+
+    let updatedDetail = SessionDetail(
+      session: detail.session.replacing(tasks: tasks, agents: agents),
+      agents: agents,
+      tasks: tasks,
+      signals: detail.signals,
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
+    )
+
+    detailsBySessionID[sessionID] = updatedDetail
+    if coreDetailsBySessionID[sessionID] != nil {
+      coreDetailsBySessionID[sessionID] = updatedDetail
+    }
+    if let sessionIndex = sessionSummaries.firstIndex(where: { $0.sessionId == sessionID }) {
+      sessionSummaries[sessionIndex] = updatedDetail.session
+    }
+    return updatedDetail
+  }
+}
+
+private extension WorkItem {
+  func replacingAssignment(
+    status: TaskStatus,
+    assignedTo: String,
+    queuePolicy: TaskQueuePolicy,
+    queuedAt: String?,
+    updatedAt: String
+  ) -> WorkItem {
+    WorkItem(
+      taskId: taskId,
+      title: title,
+      context: context,
+      severity: severity,
+      status: status,
+      assignedTo: assignedTo,
+      queuePolicy: queuePolicy,
+      queuedAt: queuedAt,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      createdBy: createdBy,
+      notes: notes,
+      suggestedFix: suggestedFix,
+      source: source,
+      blockedReason: nil,
+      completedAt: completedAt,
+      checkpointSummary: checkpointSummary
+    )
+  }
+}
+
+private extension AgentRegistration {
+  func replacingCurrentTask(_ taskID: String) -> AgentRegistration {
+    AgentRegistration(
+      agentId: agentId,
+      name: name,
+      runtime: runtime,
+      role: role,
+      capabilities: capabilities,
+      joinedAt: joinedAt,
+      updatedAt: updatedAt,
+      status: status,
+      agentSessionId: agentSessionId,
+      lastActivityAt: lastActivityAt,
+      currentTaskId: taskID,
+      runtimeCapabilities: runtimeCapabilities
+    )
+  }
+}
+
+private extension SessionSummary {
+  func replacing(tasks: [WorkItem], agents: [AgentRegistration]) -> SessionSummary {
+    SessionSummary(
+      projectId: projectId,
+      projectName: projectName,
+      projectDir: projectDir,
+      contextRoot: contextRoot,
+      checkoutId: checkoutId,
+      checkoutRoot: checkoutRoot,
+      isWorktree: isWorktree,
+      worktreeName: worktreeName,
+      sessionId: sessionId,
+      title: title,
+      context: context,
+      status: status,
+      createdAt: createdAt,
+      updatedAt: PreviewHarnessClientState.mutationTimestamp,
+      lastActivityAt: PreviewHarnessClientState.mutationTimestamp,
+      leaderId: leaderId,
+      observeId: observeId,
+      pendingLeaderTransfer: pendingLeaderTransfer,
+      metrics: SessionMetrics(tasks: tasks, agents: agents)
+    )
+  }
+}
+
+private extension SessionMetrics {
+  init(tasks: [WorkItem], agents: [AgentRegistration]) {
+    self.init(
+      agentCount: agents.count,
+      activeAgentCount: agents.filter { $0.status == .active }.count,
+      openTaskCount: tasks.filter { $0.status == .open }.count,
+      inProgressTaskCount: tasks.filter { $0.status == .inProgress }.count,
+      blockedTaskCount: tasks.filter { $0.status == .blocked }.count,
+      completedTaskCount: tasks.filter { $0.status == .done }.count
+    )
   }
 }

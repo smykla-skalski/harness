@@ -97,6 +97,7 @@ enum HarnessMonitorUITestAccessibility {
   static let observeSummaryButton = "harness.session.observe.summary"
   static let endSessionButton = "harness.session.action.end"
   static let pendingLeaderTransferCard = "harness.session.pending-transfer"
+  static let taskDropQueueCard = "harness.session.task.task-drop-queue"
   static let taskUICard = "harness.session.task.task-ui"
   static let taskRoutingCard = "harness.session.task.task-routing"
   static let leaderAgentCard = "harness.session.agent.leader-claude"
