@@ -285,6 +285,10 @@ extension HarnessMonitorStore {
     set { sessionIndex.searchText = newValue }
   }
 
+  public func flushPendingSearchRebuild() {
+    sessionIndex.flushPendingSearchRebuild()
+  }
+
   public var sessionFilter: SessionFilter {
     get { sessionIndex.sessionFilter }
     set { sessionIndex.sessionFilter = newValue }
