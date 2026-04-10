@@ -71,7 +71,7 @@ private struct SessionCockpitSignalCard: View {
   }
 
   var body: some View {
-    ZStack(alignment: .trailing) {
+    ZStack(alignment: .topTrailing) {
       Button {
         store.inspect(signalID: signal.signal.signalId)
       } label: {
@@ -79,10 +79,7 @@ private struct SessionCockpitSignalCard: View {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             Text(signal.signal.command)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-            Text(signal.signal.payload.message)
-              .scaledFont(.subheadline)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .multilineTextAlignment(.leading)
+            HarnessMonitorMarkdownText(signal.signal.payload.message, font: .subheadline)
           }
           Spacer()
           VStack(alignment: .trailing, spacing: HarnessMonitorTheme.itemSpacing) {

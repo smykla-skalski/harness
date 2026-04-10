@@ -242,6 +242,7 @@
 		E152F66CC1DAF41C07BE5888 /* SessionMetricGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91919FD8204152E459478258 /* SessionMetricGrid.swift */; };
 		E26300215BCCA02C4E93E58C /* ManifestWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05111A8A9A29ED087FD9D443 /* ManifestWatcher.swift */; };
 		E2D02D14A471B733654612B2 /* HarnessMonitorUITestQuerySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32F9114D1201ED131648E5D4 /* HarnessMonitorUITestQuerySupport.swift */; };
+		E3997DBDB66EA932B0C090C9 /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = ABBB769033B954808F9775CF /* Textual */; };
 		E4DD704B4C31371CAB816391 /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FD80682916667B6B21F9E2 /* DaemonController.swift */; };
 		E504559309296CFD9C8189B3 /* HarnessMonitorStoreFilteringProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DCD91C5409D5FA0BA6A33D8 /* HarnessMonitorStoreFilteringProjectionTests.swift */; };
 		E514BFCF933790043BB87453 /* ToolbarCenterpieceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07E29C046A6B69D433F89D96 /* ToolbarCenterpieceView.swift */; };
@@ -259,6 +260,7 @@
 		EF6273094DD4442419C715C9 /* SidebarRecentSearchesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDB0395C5A195204276D877 /* SidebarRecentSearchesView.swift */; };
 		EFC49CF8FE0C4BB5E37273B4 /* HarnessMonitorStore+UserData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF1220415B83E40F5B793F3 /* HarnessMonitorStore+UserData.swift */; };
 		EFE95F066B4B39478507983A /* HarnessMonitorAppLlamaAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7E3267822B03CA1B899ACA /* HarnessMonitorAppLlamaAnimation.swift */; };
+		F0A88E7DE6EF23BC39E3FDDB /* HarnessMonitorMarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C7F9F17CA95FF65C04D8AF /* HarnessMonitorMarkdownText.swift */; };
 		F17C13EEA40669A4252BDA11 /* WebSocketTransportInternal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98FEDA87292685F3D9776B71 /* WebSocketTransportInternal.swift */; };
 		F20A586BA7816ADB650FC7B7 /* HarnessMonitorSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8F56F79F97655ADFBDAB6B /* HarnessMonitorSchema.swift */; };
 		F2EDA4264A7D3CFB03BD7B5F /* HarnessMonitorKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 09069D489D24200773820893 /* HarnessMonitorKit.framework */; };
@@ -387,6 +389,7 @@
 		0E0231ACBCCF2303FE5C4CD4 /* WebSocketProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketProtocol.swift; sourceTree = "<group>"; };
 		10DF564102122118B0A5356D /* HarnessMonitorStoreConnectionMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreConnectionMetricsTests.swift; sourceTree = "<group>"; };
 		1368C56A7B0800E7F19537D9 /* HarnessMonitorStore+Streaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Streaming.swift"; sourceTree = "<group>"; };
+		13C7F9F17CA95FF65C04D8AF /* HarnessMonitorMarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorMarkdownText.swift; sourceTree = "<group>"; };
 		14833F1940D213ADC0E38B33 /* HarnessMonitorNotificationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorNotificationModels.swift; sourceTree = "<group>"; };
 		14AF847B83E27E7A729BEB54 /* HarnessMonitorFailureTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorFailureTestSupport.swift; sourceTree = "<group>"; };
 		1820BB62D03AB5543161189D /* HarnessMonitorClipboardSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorClipboardSupport.swift; sourceTree = "<group>"; };
@@ -635,6 +638,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				820D99E8CF8086F1CD96316E /* HarnessMonitorKit.framework in Frameworks */,
+				E3997DBDB66EA932B0C090C9 /* Textual in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -888,6 +892,7 @@
 				EC0211D4FCB94846E190A556 /* HarnessMonitorColumnScrollView.swift */,
 				DCD4F043DF5F089C16502598 /* HarnessMonitorControls.swift */,
 				C6C421D22AFF8671AEEFBBCC /* HarnessMonitorInteractiveCardChrome.swift */,
+				13C7F9F17CA95FF65C04D8AF /* HarnessMonitorMarkdownText.swift */,
 				C66858CBB4CE9F193CBE1663 /* HarnessMonitorSheetModifier.swift */,
 				F446D2FAD8F56A75E08952CF /* HarnessMonitorSheetRouter.swift */,
 				4469D7A4AF48AE54407B2E39 /* HarnessMonitorSidebarRowChrome.swift */,
@@ -1167,6 +1172,7 @@
 			);
 			name = HarnessMonitorUI;
 			packageProductDependencies = (
+				ABBB769033B954808F9775CF /* Textual */,
 			);
 			productName = HarnessMonitorUI;
 			productReference = 27FFC8FD56EF67F172C70CE9 /* HarnessMonitorUI.framework */;
@@ -1258,6 +1264,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CFA266FE0315A53597F98D13 /* XCRemoteSwiftPackageReference "lottie-ios" */,
+				63A362061DE6DE59AA0BC848 /* XCRemoteSwiftPackageReference "textual" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 74DC590F949A5775E777835B /* Products */;
@@ -1532,6 +1539,7 @@
 				8163C8042BCBA5A5AE9AAE74 /* HarnessMonitorFormatters.swift in Sources */,
 				311539606CD5182A1E302719 /* HarnessMonitorGlass.swift in Sources */,
 				63C9DB331CE5C4CB08362D22 /* HarnessMonitorInteractiveCardChrome.swift in Sources */,
+				F0A88E7DE6EF23BC39E3FDDB /* HarnessMonitorMarkdownText.swift in Sources */,
 				C94558A987079A80B059CB69 /* HarnessMonitorSheetModifier.swift in Sources */,
 				0052C8E5676C548B13402478 /* HarnessMonitorSheetRouter.swift in Sources */,
 				4649322197E15F2EED61F2BE /* HarnessMonitorSidebarRowChrome.swift in Sources */,
@@ -1842,7 +1850,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 18.15.3;
+				MARKETING_VERSION = 18.16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1971,7 +1979,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 18.15.3;
+				MARKETING_VERSION = 18.16.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2311,7 +2319,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 18.15.3;
+				MARKETING_VERSION = 18.16.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2509,6 +2517,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		63A362061DE6DE59AA0BC848 /* XCRemoteSwiftPackageReference "textual" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/textual";
+			requirement = {
+				kind = exactVersion;
+				version = 0.3.1;
+			};
+		};
 		CFA266FE0315A53597F98D13 /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/airbnb/lottie-ios";
@@ -2529,6 +2545,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CFA266FE0315A53597F98D13 /* XCRemoteSwiftPackageReference "lottie-ios" */;
 			productName = Lottie;
+		};
+		ABBB769033B954808F9775CF /* Textual */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 63A362061DE6DE59AA0BC848 /* XCRemoteSwiftPackageReference "textual" */;
+			productName = Textual;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
