@@ -1,7 +1,7 @@
-use std::env::current_exe;
+use std::env::{self, current_exe};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::LazyLock;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -31,6 +31,9 @@ static DAEMON_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Cl
 pub enum DaemonCommand {
     /// Serve the local daemon HTTP API.
     Serve(DaemonServeArgs),
+    /// Serve an unsandboxed dev daemon whose manifest the sandboxed Harness
+    /// Monitor app can read. Thin wrapper over `serve` with dev defaults.
+    Dev(DaemonDevArgs),
     /// Show daemon manifest and project/session counts.
     Status,
     /// Stop the local daemon.
@@ -51,6 +54,7 @@ impl Execute for DaemonCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
             Self::Serve(args) => args.execute(context),
+            Self::Dev(args) => args.execute(context),
             Self::Status => {
                 let report = service::status_report()?;
                 print_json(&report)?;
@@ -160,6 +164,162 @@ impl Execute for DaemonServeArgs {
         }))?;
         Ok(0)
     }
+}
+
+/// Default macOS app group identifier for the sandboxed Harness Monitor app.
+/// The unsandboxed dev daemon writes its manifest into this group's container
+/// so the sandboxed `SwiftUI` app can read it without extra env plumbing.
+pub const HARNESS_MONITOR_APP_GROUP_ID: &str = "Q498EB36N4.io.harnessmonitor";
+
+#[derive(Debug, Clone, Args)]
+pub struct DaemonDevArgs {
+    /// Host interface to bind.
+    #[arg(long, default_value = "127.0.0.1")]
+    pub host: String,
+    /// TCP port to bind. Use 0 for an ephemeral port.
+    #[arg(long, default_value_t = 0)]
+    pub port: u16,
+    /// macOS app group identifier used when resolving the daemon data root.
+    /// Defaults to the sandboxed Harness Monitor app's group so the monitor
+    /// can read the manifest written by this process.
+    #[arg(long, default_value = HARNESS_MONITOR_APP_GROUP_ID)]
+    pub app_group_id: String,
+    /// Optional WebSocket URL of an externally-managed `codex app-server`.
+    /// Leave unset to let the unsandboxed dev daemon spawn codex over stdio,
+    /// which is the whole point of dev mode (no codex bridge required).
+    #[arg(long, value_name = "URL")]
+    pub codex_ws_url: Option<String>,
+}
+
+/// Describes how `harness daemon dev` should spawn the inner `daemon serve`
+/// child. Extracted so the command wiring can be unit-tested without
+/// actually spawning a process.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DaemonDevSpawnPlan {
+    args: Vec<String>,
+    set_env: Vec<(String, String)>,
+    unset_env: Vec<String>,
+    log_effective_app_group: Option<String>,
+}
+
+impl DaemonDevArgs {
+    fn ensure_not_sandboxed() -> Result<(), CliError> {
+        if service::sandboxed_from_env() {
+            return Err(CliError::from(CliErrorKind::workflow_io(
+                "cannot run `harness daemon dev` while HARNESS_SANDBOXED is set; \
+                 unset it or use `harness daemon serve` instead",
+            )));
+        }
+        Ok(())
+    }
+
+    fn spawn_plan(&self) -> DaemonDevSpawnPlan {
+        let mut args = vec![
+            "daemon".to_string(),
+            "serve".to_string(),
+            "--host".to_string(),
+            self.host.clone(),
+            "--port".to_string(),
+            self.port.to_string(),
+        ];
+        if let Some(url) = self.codex_ws_url.as_deref().map(str::trim)
+            && !url.is_empty()
+        {
+            args.push("--codex-ws-url".to_string());
+            args.push(url.to_string());
+        }
+
+        let mut set_env = Vec::new();
+        let mut log_effective_app_group = None;
+        if env::var_os("HARNESS_APP_GROUP_ID").is_none() {
+            set_env.push((
+                "HARNESS_APP_GROUP_ID".to_string(),
+                self.app_group_id.clone(),
+            ));
+            log_effective_app_group = Some(self.app_group_id.clone());
+        }
+
+        DaemonDevSpawnPlan {
+            args,
+            set_env,
+            unset_env: vec!["HARNESS_SANDBOXED".to_string()],
+            log_effective_app_group,
+        }
+    }
+}
+
+impl Execute for DaemonDevArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        Self::ensure_not_sandboxed()?;
+        let binary = resolve_current_exe_for("dev daemon")?;
+        let plan = self.spawn_plan();
+        plan.log_effective_app_group();
+        let status = plan.spawn(&binary)?;
+        Ok(exit_code_from_status(status))
+    }
+}
+
+impl DaemonDevSpawnPlan {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion; tokio-rs/tracing#553"
+    )]
+    fn log_effective_app_group(&self) {
+        let Some(app_group) = self.log_effective_app_group.as_deref() else {
+            return;
+        };
+        tracing::info!(
+            app_group_id = %app_group,
+            "daemon dev: defaulted HARNESS_APP_GROUP_ID so sandboxed monitor app can read the manifest",
+        );
+    }
+
+    fn spawn(&self, binary: &Path) -> Result<ExitStatus, CliError> {
+        let mut command = Command::new(binary);
+        command.args(&self.args);
+        for (key, value) in &self.set_env {
+            command.env(key, value);
+        }
+        for key in &self.unset_env {
+            command.env_remove(key);
+        }
+        command
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        command.status().map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "spawn harness daemon serve for dev daemon: {error}"
+            )))
+        })
+    }
+}
+
+fn resolve_current_exe_for(context: &'static str) -> Result<PathBuf, CliError> {
+    current_exe().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "resolve current harness binary for {context}: {error}"
+        )))
+    })
+}
+
+fn exit_code_from_status(status: ExitStatus) -> i32 {
+    if let Some(code) = status.code() {
+        return code;
+    }
+    signal_exit_code(status).unwrap_or(1)
+}
+
+#[cfg(unix)]
+fn signal_exit_code(status: ExitStatus) -> Option<i32> {
+    use std::os::unix::process::ExitStatusExt;
+    status.signal().map(|signal| 128 + signal)
+}
+
+#[cfg(not(unix))]
+fn signal_exit_code(_status: ExitStatus) -> Option<i32> {
+    None
 }
 
 fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
@@ -603,6 +763,170 @@ mod tests {
     struct DaemonServeArgsTestHarness {
         #[command(flatten)]
         args: DaemonServeArgs,
+    }
+
+    #[derive(Debug, Parser)]
+    struct DaemonDevArgsTestHarness {
+        #[command(flatten)]
+        args: DaemonDevArgs,
+    }
+
+    #[test]
+    fn daemon_dev_args_defaults_to_harness_monitor_app_group() {
+        let parsed = DaemonDevArgsTestHarness::try_parse_from(["test"]).unwrap();
+        assert_eq!(parsed.args.app_group_id, HARNESS_MONITOR_APP_GROUP_ID);
+        assert_eq!(parsed.args.host, "127.0.0.1");
+        assert_eq!(parsed.args.port, 0);
+        assert!(parsed.args.codex_ws_url.is_none());
+    }
+
+    #[test]
+    fn daemon_dev_args_accepts_overrides() {
+        let parsed = DaemonDevArgsTestHarness::try_parse_from([
+            "test",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9999",
+            "--app-group-id",
+            "com.example.group",
+            "--codex-ws-url",
+            "ws://127.0.0.1:7777",
+        ])
+        .unwrap();
+        assert_eq!(parsed.args.host, "0.0.0.0");
+        assert_eq!(parsed.args.port, 9999);
+        assert_eq!(parsed.args.app_group_id, "com.example.group");
+        assert_eq!(
+            parsed.args.codex_ws_url.as_deref(),
+            Some("ws://127.0.0.1:7777")
+        );
+    }
+
+    #[test]
+    fn daemon_dev_rejects_when_sandboxed_env_truthy() {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let error = DaemonDevArgs::ensure_not_sandboxed()
+                .expect_err("dev mode must refuse to run under sandbox env");
+            let message = error.to_string();
+            assert!(
+                message.contains("HARNESS_SANDBOXED"),
+                "error should mention the offending env var, got: {message}"
+            );
+        });
+    }
+
+    #[test]
+    fn daemon_dev_allows_when_sandboxed_env_unset() {
+        temp_env::with_var("HARNESS_SANDBOXED", Option::<&str>::None, || {
+            DaemonDevArgs::ensure_not_sandboxed().expect("dev mode should run when unsandboxed");
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_forwards_host_and_port_to_serve() {
+        let dev = DaemonDevArgs {
+            host: "127.0.0.1".to_string(),
+            port: 8123,
+            app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
+            codex_ws_url: None,
+        };
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+            let plan = dev.spawn_plan();
+            assert_eq!(
+                plan.args,
+                vec![
+                    "daemon".to_string(),
+                    "serve".to_string(),
+                    "--host".to_string(),
+                    "127.0.0.1".to_string(),
+                    "--port".to_string(),
+                    "8123".to_string(),
+                ]
+            );
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_includes_codex_ws_url() {
+        let dev = DaemonDevArgs {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
+            codex_ws_url: Some("ws://127.0.0.1:7777".to_string()),
+        };
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+            let plan = dev.spawn_plan();
+            assert!(plan.args.contains(&"--codex-ws-url".to_string()));
+            assert!(plan.args.contains(&"ws://127.0.0.1:7777".to_string()));
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_skips_blank_codex_ws_url() {
+        let dev = DaemonDevArgs {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
+            codex_ws_url: Some("   ".to_string()),
+        };
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+            let plan = dev.spawn_plan();
+            assert!(!plan.args.contains(&"--codex-ws-url".to_string()));
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_defaults_app_group_when_env_unset() {
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Option::<&str>::None, || {
+            let dev = DaemonDevArgs {
+                host: "127.0.0.1".to_string(),
+                port: 0,
+                app_group_id: "com.example.custom".to_string(),
+                codex_ws_url: None,
+            };
+            let plan = dev.spawn_plan();
+            assert_eq!(
+                plan.set_env,
+                vec![(
+                    "HARNESS_APP_GROUP_ID".to_string(),
+                    "com.example.custom".to_string(),
+                )]
+            );
+            assert_eq!(
+                plan.log_effective_app_group.as_deref(),
+                Some("com.example.custom")
+            );
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_preserves_existing_app_group_env() {
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+            let dev = DaemonDevArgs {
+                host: "127.0.0.1".to_string(),
+                port: 0,
+                app_group_id: "com.example.custom".to_string(),
+                codex_ws_url: None,
+            };
+            let plan = dev.spawn_plan();
+            assert!(plan.set_env.is_empty());
+            assert!(plan.log_effective_app_group.is_none());
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_always_clears_sandbox_env_for_child() {
+        let dev = DaemonDevArgs {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
+            codex_ws_url: None,
+        };
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+            let plan = dev.spawn_plan();
+            assert_eq!(plan.unset_env, vec!["HARNESS_SANDBOXED".to_string()]);
+        });
     }
 
     #[test]
