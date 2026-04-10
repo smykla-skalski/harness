@@ -156,6 +156,10 @@ struct PreferencesGeneralSection: View {
     return caption.isEmpty ? fallback : caption
   }
 
+  private var sandboxManifest: DaemonManifest? {
+    store.daemonStatus?.manifest
+  }
+
   private var databaseSize: String {
     let bytes =
       store.diagnostics?.workspace.databaseSizeBytes
@@ -277,6 +281,20 @@ struct PreferencesGeneralSection: View {
           }
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Launchd"))
+        LabeledContent("Sandbox") {
+          if sandboxManifest?.sandboxed == true {
+            Text("Enabled")
+              .scaledFont(.caption)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 3)
+              .background(HarnessMonitorTheme.accent.opacity(0.18), in: Capsule())
+              .foregroundStyle(HarnessMonitorTheme.accent)
+          } else {
+            Text(sandboxManifest == nil ? "Unknown" : "Off")
+              .foregroundStyle(.secondary)
+          }
+        }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Sandbox"))
         LabeledContent("Database Size") {
           Text(databaseSize)
         }
