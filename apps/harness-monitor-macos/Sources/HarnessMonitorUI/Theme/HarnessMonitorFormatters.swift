@@ -167,6 +167,20 @@ func formatTimestamp(_ date: Date) -> String {
   return formatter
 }()
 
+@MainActor private let sameYearTimelineRestFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "MMM HH:mm:ss"
+  return formatter
+}()
+
+@MainActor private let crossYearTimelineRestFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "MMM yyyy HH:mm:ss"
+  return formatter
+}()
+
 @MainActor
 func formatTimestamp(
   _ date: Date,
@@ -179,6 +193,34 @@ func formatTimestamp(
   formatter.calendar = calendar
   formatter.timeZone = timeZone
   return formatter.string(from: date)
+}
+
+@MainActor
+func formatTimelineTimestamp(
+  _ date: Date,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  let timeZone = configuration.effectiveTimeZone
+  let calendar = Calendar.autoupdatingCurrent
+  let isSameYear = calendar.isDate(date, equalTo: .now, toGranularity: .year)
+  let restFormatter = isSameYear ? sameYearTimelineRestFormatter : crossYearTimelineRestFormatter
+  restFormatter.calendar = calendar
+  restFormatter.timeZone = timeZone
+  var dayCalendar = calendar
+  dayCalendar.timeZone = timeZone
+  let day = dayCalendar.component(.day, from: date)
+  return String(format: "%2d %@", day, restFormatter.string(from: date))
+}
+
+@MainActor
+func formatTimelineTimestamp(
+  _ value: String?,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  guard let value, let date = parsedTimestampDate(from: value) else {
+    return value ?? "n/a"
+  }
+  return formatTimelineTimestamp(date, configuration: configuration)
 }
 
 @MainActor
