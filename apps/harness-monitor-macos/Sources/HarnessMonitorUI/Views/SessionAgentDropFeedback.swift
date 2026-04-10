@@ -167,7 +167,7 @@ struct AgentTaskDropFeedbackOverlay: View {
       .foregroundStyle(feedback.tint)
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .harnessControlPillGlass(tint: feedback.tint)
+      .harnessDragFeedbackPillSurface(tint: feedback.tint)
       .overlay {
         Capsule()
           .stroke(feedback.tint.opacity(0.3), lineWidth: 1)

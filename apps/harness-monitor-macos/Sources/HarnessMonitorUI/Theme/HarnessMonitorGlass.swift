@@ -152,3 +152,57 @@ extension View {
     modifier(HarnessMonitorControlPillGlassModifier(tint: tint))
   }
 }
+
+private struct HarnessMonitorDragFeedbackSurfaceModifier<Surface: InsettableShape>: ViewModifier {
+  let shape: Surface
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.42 : 0.32
+    }
+    return colorSchemeContrast == .increased ? 0.26 : 0.18
+  }
+
+  private var strokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.46 : 0.28
+  }
+
+  private var strokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  func body(content: Content) -> some View {
+    // SwiftUI drag previews are rendered through a snapshot path that rejects
+    // Liquid Glass SDF output on macOS 26.
+    content
+      .background {
+        shape.fill(tint.opacity(fillOpacity))
+      }
+      .overlay {
+        shape.strokeBorder(tint.opacity(strokeOpacity), lineWidth: strokeWidth)
+      }
+  }
+}
+
+extension View {
+  func harnessDragFeedbackSurface(
+    cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusSM,
+    tint: Color = HarnessMonitorTheme.ink
+  ) -> some View {
+    modifier(
+      HarnessMonitorDragFeedbackSurfaceModifier(
+        shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+        tint: tint
+      )
+    )
+  }
+
+  func harnessDragFeedbackPillSurface(tint: Color = HarnessMonitorTheme.ink) -> some View {
+    modifier(HarnessMonitorDragFeedbackSurfaceModifier(shape: Capsule(), tint: tint))
+  }
+}

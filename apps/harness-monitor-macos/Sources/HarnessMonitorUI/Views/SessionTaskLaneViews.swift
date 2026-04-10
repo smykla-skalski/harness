@@ -210,7 +210,7 @@ private struct TaskDraggingOverlay: View {
   var body: some View {
     ZStack {
       Color.clear
-        .harnessFloatingControlGlass(
+        .harnessDragFeedbackSurface(
           cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
           tint: HarnessMonitorTheme.accent
         )
@@ -243,7 +243,7 @@ private struct TaskDragPreview: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .harnessFloatingControlGlass(
+    .harnessDragFeedbackSurface(
       cornerRadius: 8,
       tint: HarnessMonitorTheme.accent
     )
