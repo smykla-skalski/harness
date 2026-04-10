@@ -19,7 +19,13 @@ struct SessionContentContainer: View {
   @State private var lastTimeline: [TimelineEntry] = []
 
   private var activeDetail: SessionDetail? {
-    state.detail ?? lastDetail
+    if let detail = state.detail {
+      return detail
+    }
+    guard lastDetail?.session.sessionId == state.summary?.sessionId else {
+      return nil
+    }
+    return lastDetail
   }
 
   private var activeTimeline: [TimelineEntry] {
@@ -29,6 +35,9 @@ struct SessionContentContainer: View {
   private var mode: SessionContentMode {
     if let activeDetail {
       return .cockpit(activeDetail)
+    }
+    if let summary = state.summary {
+      return .loading(summary)
     }
     return .dashboard
   }
@@ -52,6 +61,8 @@ struct SessionContentContainer: View {
           isExtensionsLoading: state.isExtensionsLoading,
           lastAction: state.lastAction
         )
+      case .loading(let summary):
+        SessionCockpitLoadingSurface(summary: summary)
       }
     }
     .onChange(of: state.detail) { _, newDetail in
@@ -61,7 +72,7 @@ struct SessionContentContainer: View {
       }
     }
     .onChange(of: state.summary?.sessionId) { _, newID in
-      if newID == nil {
+      if lastDetail?.session.sessionId != newID {
         lastDetail = nil
         lastTimeline = []
       }
@@ -73,6 +84,27 @@ struct SessionContentContainer: View {
 private enum SessionContentMode {
   case dashboard
   case cockpit(SessionDetail)
+  case loading(SessionSummary)
+}
+
+private struct SessionCockpitLoadingSurface: View {
+  let summary: SessionSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      Label(summary.displayTitle, systemImage: "arrow.trianglehead.2.clockwise")
+        .font(.system(.title3, design: .rounded, weight: .semibold))
+      Text("Loading session details")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      ProgressView()
+        .controlSize(.small)
+    }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Loading \(summary.displayTitle)")
+  }
 }
 
 #Preview("Session Content - Dashboard") {
