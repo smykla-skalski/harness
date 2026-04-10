@@ -95,18 +95,17 @@ struct SessionTaskSummaryCard: View {
           .fill(Color.primary.opacity(isDragging || isHovered ? 0.08 : 0.04))
       }
       .overlay {
+        if isDragging {
+          TaskDraggingOverlay()
+            .transition(.opacity)
+        }
+      }
+      .overlay {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
           .strokeBorder(
             isDragging ? HarnessMonitorTheme.accent : Color.clear,
             lineWidth: isDragging ? 2 : 0
           )
-      }
-      .overlay(alignment: .topTrailing) {
-        if isDragging {
-          TaskDraggingBadge()
-            .padding(HarnessMonitorTheme.spacingSM)
-            .transition(.opacity.combined(with: .scale(scale: 0.96)))
-        }
       }
       .opacity(isDragging ? 0.82 : 1)
       .scaleEffect(isDragging ? 0.985 : 1)
@@ -221,18 +220,30 @@ private extension View {
   }
 }
 
-private struct TaskDraggingBadge: View {
+private struct TaskDraggingOverlay: View {
   var body: some View {
-    Label("Dragging", systemImage: "arrow.up.and.person.rectangle.portrait")
-      .scaledFont(.caption2.weight(.bold))
-      .harnessPillPadding()
-      .background(.regularMaterial, in: Capsule())
-      .foregroundStyle(HarnessMonitorTheme.accent)
-      .overlay {
-        Capsule()
-          .stroke(HarnessMonitorTheme.accent.opacity(0.45), lineWidth: 1)
-      }
-      .allowsHitTesting(false)
+    ZStack {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .fill(.regularMaterial)
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .fill(HarnessMonitorTheme.accent.opacity(0.18))
+      Circle()
+        .fill(HarnessMonitorTheme.accent.opacity(0.32))
+        .frame(width: 112, height: 112)
+        .blur(radius: 24)
+      Circle()
+        .fill(.regularMaterial)
+        .frame(width: 72, height: 72)
+        .overlay {
+          Circle()
+            .stroke(HarnessMonitorTheme.accent.opacity(0.3), lineWidth: 1)
+        }
+      TaskDragGestureIcon(size: 44)
+        .foregroundStyle(HarnessMonitorTheme.accent)
+    }
+    .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous))
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
   }
 }
 
@@ -241,8 +252,8 @@ private struct TaskDragPreview: View {
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      Image(systemName: "arrow.up.and.person.rectangle.portrait")
-        .imageScale(.small)
+      TaskDragGestureIcon(size: 14)
+        .foregroundStyle(HarnessMonitorTheme.accent)
       VStack(alignment: .leading, spacing: 2) {
         Text("Assign task")
           .scaledFont(.caption.weight(.bold))
@@ -257,6 +268,19 @@ private struct TaskDragPreview: View {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(HarnessMonitorTheme.accent.opacity(0.5), lineWidth: 1)
     }
+  }
+}
+
+private struct TaskDragGestureIcon: View {
+  let size: CGFloat
+
+  var body: some View {
+    HarnessMonitorUIAssets.image(named: "TaskDragHandGesture")
+      .renderingMode(.template)
+      .resizable()
+      .scaledToFit()
+      .frame(width: size, height: size)
+      .accessibilityHidden(true)
   }
 }
 
