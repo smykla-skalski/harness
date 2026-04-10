@@ -912,6 +912,21 @@ fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
             )
                 .into_response()
         }
+        Err(error) if error.code() == "CODEX001" => {
+            let endpoint = match error.kind() {
+                CliErrorKind::Common(common) => common.codex_endpoint().unwrap_or(""),
+                _ => "",
+            };
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({
+                    "error": "codex-unavailable",
+                    "endpoint": endpoint,
+                    "hint": "run: codex app-server --listen ws://127.0.0.1:4500",
+                })),
+            )
+                .into_response()
+        }
         Err(error) => (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
@@ -938,6 +953,7 @@ fn timed_json<T: serde::Serialize>(
     let status: u16 = match &result {
         Ok(_) => 200,
         Err(error) if error.code() == "SANDBOX001" => 501,
+        Err(error) if error.code() == "CODEX001" => 503,
         Err(_) => 400,
     };
     log_request(method, path, status, duration_ms, request_id);

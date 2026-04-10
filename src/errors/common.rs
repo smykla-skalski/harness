@@ -61,6 +61,8 @@ pub enum CommonError {
     JsonParse { detail: Cow<'static, str> },
     #[error("sandbox feature disabled: {feature}")]
     SandboxFeatureDisabled { feature: Cow<'static, str> },
+    #[error("codex app-server unavailable at {endpoint}")]
+    CodexServerUnavailable { endpoint: Cow<'static, str> },
 }
 
 impl CommonError {
@@ -91,6 +93,7 @@ impl CommonError {
             Self::UsageError { .. } => "USAGE",
             Self::JsonParse { .. } => "JSON",
             Self::SandboxFeatureDisabled { .. } => "SANDBOX001",
+            Self::CodexServerUnavailable { .. } => "CODEX001",
         }
     }
 
@@ -105,7 +108,8 @@ impl CommonError {
             | Self::HookPayloadInvalid { .. }
             | Self::ClusterError { .. }
             | Self::UsageError { .. }
-            | Self::SandboxFeatureDisabled { .. } => 1,
+            | Self::SandboxFeatureDisabled { .. }
+            | Self::CodexServerUnavailable { .. } => 1,
             Self::MissingFile { .. }
             | Self::InvalidJson { .. }
             | Self::PathNotFound { .. }
@@ -275,6 +279,22 @@ impl CommonError {
     pub fn sandbox_feature(&self) -> Option<&str> {
         match self {
             Self::SandboxFeatureDisabled { feature } => Some(feature.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn codex_server_unavailable(endpoint: impl Into<Cow<'static, str>>) -> Self {
+        Self::CodexServerUnavailable {
+            endpoint: endpoint.into(),
+        }
+    }
+
+    /// Returns the endpoint URL when this error is `CodexServerUnavailable`.
+    #[must_use]
+    pub fn codex_endpoint(&self) -> Option<&str> {
+        match self {
+            Self::CodexServerUnavailable { endpoint } => Some(endpoint.as_ref()),
             _ => None,
         }
     }
