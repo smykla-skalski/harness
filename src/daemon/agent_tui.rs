@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::io::{ErrorKind, Read as _, Write as _};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread::{self, JoinHandle};
@@ -173,7 +173,7 @@ pub struct PortablePtyAgentTuiBackend;
 
 impl AgentTuiBackend for PortablePtyAgentTuiBackend {
     fn spawn(&self, spec: AgentTuiSpawnSpec) -> Result<AgentTuiProcess, CliError> {
-        AgentTuiProcess::spawn(spec)
+        AgentTuiProcess::spawn(&spec)
     }
 }
 
@@ -514,6 +514,14 @@ impl AgentTuiManagerHandle {
         drop(db_guard);
 
         let transcript_path = transcript_path(&project_dir, &profile.runtime, &tui_id);
+        let snapshot_context = AgentTuiSnapshotContext {
+            session_id,
+            agent_id: &agent_id,
+            tui_id: &tui_id,
+            profile: &profile,
+            project_dir: &project_dir,
+            transcript_path: &transcript_path,
+        };
         let process = spawn_agent_tui_process(
             session_id,
             &agent_id,
@@ -523,36 +531,18 @@ impl AgentTuiManagerHandle {
             size,
         )?;
 
-        if let Some(prompt) = request.prompt.as_deref().filter(|value| !value.is_empty()) {
-            if let Err(error) = send_initial_prompt(&process, prompt) {
-                let _ = process.kill();
-                let snapshot = failed_snapshot(
-                    session_id,
-                    &agent_id,
-                    &tui_id,
-                    &profile,
-                    &project_dir,
-                    size,
-                    &transcript_path,
-                    error.to_string(),
-                );
-                let _ = self.save_and_broadcast("agent_tui_failed", &snapshot);
-                return Err(error);
-            }
+        if let Some(prompt) = request.prompt.as_deref().filter(|value| !value.is_empty())
+            && let Err(error) = send_initial_prompt(&process, prompt)
+        {
+            let _ = process.kill();
+            let snapshot = failed_snapshot(&snapshot_context, size, error.to_string());
+            let _ = self.save_and_broadcast("agent_tui_failed", &snapshot);
+            return Err(error);
         }
 
         let process = Arc::new(process);
         self.active()?.insert(tui_id.clone(), Arc::clone(&process));
-        let snapshot = self.snapshot_from_process(
-            session_id,
-            &agent_id,
-            &tui_id,
-            &profile,
-            &project_dir,
-            &transcript_path,
-            &process,
-            AgentTuiStatus::Running,
-        )?;
+        let snapshot = snapshot_from_process(&snapshot_context, &process, AgentTuiStatus::Running)?;
         self.save_and_broadcast("agent_tui_started", &snapshot)?;
         Ok(snapshot)
     }
@@ -614,16 +604,18 @@ impl AgentTuiManagerHandle {
         if let Some(process) = process {
             process.kill()?;
             let _ = process.wait_timeout(Duration::from_millis(500))?;
-            let mut stopped = self.snapshot_from_process(
-                &snapshot.session_id,
-                &snapshot.agent_id,
-                &snapshot.tui_id,
-                &AgentTuiLaunchProfile::from_argv(&snapshot.runtime, snapshot.argv.clone())?,
-                Path::new(&snapshot.project_dir),
-                Path::new(&snapshot.transcript_path),
-                &process,
-                AgentTuiStatus::Stopped,
-            )?;
+            let profile =
+                AgentTuiLaunchProfile::from_argv(&snapshot.runtime, snapshot.argv.clone())?;
+            let snapshot_context = AgentTuiSnapshotContext {
+                session_id: &snapshot.session_id,
+                agent_id: &snapshot.agent_id,
+                tui_id: &snapshot.tui_id,
+                profile: &profile,
+                project_dir: Path::new(&snapshot.project_dir),
+                transcript_path: Path::new(&snapshot.transcript_path),
+            };
+            let mut stopped =
+                snapshot_from_process(&snapshot_context, &process, AgentTuiStatus::Stopped)?;
             stopped.created_at = snapshot.created_at;
             self.save_and_broadcast("agent_tui_stopped", &stopped)?;
             return Ok(stopped);
@@ -688,39 +680,6 @@ impl AgentTuiManagerHandle {
         Ok(snapshot)
     }
 
-    fn snapshot_from_process(
-        &self,
-        session_id: &str,
-        agent_id: &str,
-        tui_id: &str,
-        profile: &AgentTuiLaunchProfile,
-        project_dir: &Path,
-        transcript_path: &Path,
-        process: &AgentTuiProcess,
-        status: AgentTuiStatus,
-    ) -> Result<AgentTuiSnapshot, CliError> {
-        let screen = process.screen()?;
-        write_transcript(transcript_path, &process.transcript()?)?;
-        let now = utc_now();
-        Ok(AgentTuiSnapshot {
-            tui_id: tui_id.to_string(),
-            session_id: session_id.to_string(),
-            agent_id: agent_id.to_string(),
-            runtime: profile.runtime.clone(),
-            status,
-            argv: profile.argv.clone(),
-            project_dir: project_dir.display().to_string(),
-            size: screen.size(),
-            screen,
-            transcript_path: transcript_path.display().to_string(),
-            exit_code: None,
-            signal: None,
-            error: None,
-            created_at: now.clone(),
-            updated_at: now,
-        })
-    }
-
     fn save_and_broadcast(
         &self,
         event_name: &str,
@@ -742,11 +701,47 @@ impl AgentTuiManagerHandle {
     }
 }
 
+struct AgentTuiSnapshotContext<'a> {
+    session_id: &'a str,
+    agent_id: &'a str,
+    tui_id: &'a str,
+    profile: &'a AgentTuiLaunchProfile,
+    project_dir: &'a Path,
+    transcript_path: &'a Path,
+}
+
+fn snapshot_from_process(
+    context: &AgentTuiSnapshotContext<'_>,
+    process: &AgentTuiProcess,
+    status: AgentTuiStatus,
+) -> Result<AgentTuiSnapshot, CliError> {
+    let screen = process.screen()?;
+    write_transcript(context.transcript_path, &process.transcript()?)?;
+    let now = utc_now();
+    Ok(AgentTuiSnapshot {
+        tui_id: context.tui_id.to_string(),
+        session_id: context.session_id.to_string(),
+        agent_id: context.agent_id.to_string(),
+        runtime: context.profile.runtime.clone(),
+        status,
+        argv: context.profile.argv.clone(),
+        project_dir: context.project_dir.display().to_string(),
+        size: screen.size(),
+        screen,
+        transcript_path: context.transcript_path.display().to_string(),
+        exit_code: None,
+        signal: None,
+        error: None,
+        created_at: now.clone(),
+        updated_at: now,
+    })
+}
+
 /// Live process handle for an agent TUI running inside a PTY.
 pub struct AgentTuiProcess {
     master: Shared<Box<dyn MasterPty + Send>>,
     child: Shared<Box<dyn Child + Send + Sync>>,
-    writer: Shared<Box<dyn std::io::Write + Send>>,
+    writer: Shared<Box<dyn Write + Send>>,
     transcript: Shared<Vec<u8>>,
     screen: Shared<TerminalScreenParser>,
     reader_thread: Option<JoinHandle<()>>,
@@ -757,12 +752,12 @@ impl AgentTuiProcess {
     ///
     /// # Errors
     /// Returns a workflow I/O error on PTY allocation, command spawn, or stream setup failure.
-    pub fn spawn(spec: AgentTuiSpawnSpec) -> Result<Self, CliError> {
+    pub fn spawn(spec: &AgentTuiSpawnSpec) -> Result<Self, CliError> {
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(spec.size.into())
             .map_err(|error| CliErrorKind::workflow_io(format!("open agent TUI PTY: {error}")))?;
-        let cmd = command_builder(&spec);
+        let cmd = command_builder(spec);
         let child = pair.slave.spawn_command(cmd).map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn agent TUI process: {error}"))
         })?;
@@ -1000,28 +995,23 @@ fn write_transcript(path: &Path, transcript: &[u8]) -> Result<(), CliError> {
 }
 
 fn failed_snapshot(
-    session_id: &str,
-    agent_id: &str,
-    tui_id: &str,
-    profile: &AgentTuiLaunchProfile,
-    project_dir: &Path,
+    context: &AgentTuiSnapshotContext<'_>,
     size: AgentTuiSize,
-    transcript_path: &Path,
     error: String,
 ) -> AgentTuiSnapshot {
     let screen = TerminalScreenParser::new(size).snapshot();
     let now = utc_now();
     AgentTuiSnapshot {
-        tui_id: tui_id.to_string(),
-        session_id: session_id.to_string(),
-        agent_id: agent_id.to_string(),
-        runtime: profile.runtime.clone(),
+        tui_id: context.tui_id.to_string(),
+        session_id: context.session_id.to_string(),
+        agent_id: context.agent_id.to_string(),
+        runtime: context.profile.runtime.clone(),
         status: AgentTuiStatus::Failed,
-        argv: profile.argv.clone(),
-        project_dir: project_dir.display().to_string(),
+        argv: context.profile.argv.clone(),
+        project_dir: context.project_dir.display().to_string(),
         size,
         screen,
-        transcript_path: transcript_path.display().to_string(),
+        transcript_path: context.transcript_path.display().to_string(),
         exit_code: None,
         signal: None,
         error: Some(error),
@@ -1047,7 +1037,7 @@ fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
 }
 
 fn spawn_reader_thread(
-    mut reader: Box<dyn std::io::Read + Send>,
+    mut reader: Box<dyn Read + Send>,
     transcript: Shared<Vec<u8>>,
     screen: Shared<TerminalScreenParser>,
 ) -> JoinHandle<()> {
@@ -1065,7 +1055,7 @@ fn spawn_reader_thread(
                         screen.process(bytes);
                     }
                 }
-                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(error) if error.kind() == ErrorKind::Interrupted => {}
                 Err(_) => break,
             }
         }

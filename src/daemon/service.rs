@@ -183,6 +183,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 
     spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
     let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
+    let agent_tui_manager =
+        super::agent_tui::AgentTuiManagerHandle::new(sender.clone(), db.clone(), config.sandboxed);
     let _bridge_watcher = codex_bridge::spawn_bridge_endpoint_watcher(config.sandboxed);
 
     let app_state = DaemonHttpState {
@@ -193,6 +195,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         replay_buffer,
         db,
         codex_controller,
+        agent_tui_manager,
     };
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;

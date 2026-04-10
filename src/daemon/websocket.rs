@@ -927,6 +927,11 @@ mod tests {
             replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
             db: db.clone(),
             codex_controller: crate::daemon::codex_controller::CodexControllerHandle::new(
+                sender.clone(),
+                db.clone(),
+                false,
+            ),
+            agent_tui_manager: crate::daemon::agent_tui::AgentTuiManagerHandle::new(
                 sender, db, false,
             ),
         }
