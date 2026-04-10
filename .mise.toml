@@ -26,7 +26,7 @@ description = "Format and apply clippy fixes"
 run = ["cargo fmt", "cargo clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
-description = "Build release binary, sign it, reinstall the daemon launch agent, and validate the installed daemon"
+description = "Build release binary, sign it, install to ~/.local/bin, and validate the installed binary"
 run = [
   "cargo build --release",
   "./scripts/install-harness-release.sh",
