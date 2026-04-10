@@ -14,6 +14,7 @@ public struct ContentView: View {
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
+  private let auditBuildState: AuditBuildDisplayState?
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage("showInspector")
   private var persistedShowInspector = true
@@ -49,46 +50,20 @@ public struct ContentView: View {
     ].joined(separator: ", ")
   }
 
-  private var auditBuildState: AuditBuildDisplayState? {
-    guard HarnessMonitorUITestEnvironment.isEnabled else {
-      return nil
-    }
-
-    let info = Bundle.main.infoDictionary ?? [:]
-    let environment = ProcessInfo.processInfo.environment
-    let provenance = bundleBuildProvenance()
-
-    return AuditBuildDisplayState(
-      auditRunID: environment["HARNESS_MONITOR_AUDIT_RUN_ID"] ?? "none",
-      auditLabel: environment["HARNESS_MONITOR_AUDIT_LABEL"] ?? "none",
-      launchMode: environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live",
-      perfScenario: environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none",
-      previewScenario: environment["HARNESS_MONITOR_PREVIEW_SCENARIO"] ?? "default",
-      buildCommit: provenance["HarnessMonitorBuildGitCommit"]
-        ?? stringValue(in: info, key: "HarnessMonitorBuildGitCommit", fallback: "unknown"),
-      buildDirty: provenance["HarnessMonitorBuildGitDirty"]
-        ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown"),
-      buildFingerprint: provenance["HarnessMonitorBuildWorkspaceFingerprint"]
-        ?? stringValue(
-          in: info,
-          key: "HarnessMonitorBuildWorkspaceFingerprint",
-          fallback: "unknown"
-        ),
-      buildStartedAtUTC: provenance["HarnessMonitorBuildStartedAtUTC"]
-        ?? stringValue(
-          in: info,
-          key: "HarnessMonitorBuildStartedAtUTC",
-          fallback: "unknown"
-        ),
-      expectedCommit: environment["HARNESS_MONITOR_AUDIT_GIT_COMMIT"],
-      expectedDirty: environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"],
-      expectedFingerprint: environment["HARNESS_MONITOR_AUDIT_WORKSPACE_FINGERPRINT"],
-      expectedBuildStartedAtUTC: environment["HARNESS_MONITOR_AUDIT_BUILD_STARTED_AT_UTC"]
-    )
-  }
-
   private var auditBuildAccessibilityValue: String? {
     auditBuildState?.accessibilityValue
+  }
+
+  private var auditBuildBadgeState: AuditBuildDisplayState? {
+    guard let auditBuildState else {
+      return nil
+    }
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
+      || auditBuildState.status == "mismatch"
+    {
+      return auditBuildState
+    }
+    return nil
   }
 
   private var toolbarLayoutWidth: CGFloat {
@@ -114,6 +89,7 @@ public struct ContentView: View {
     self.contentChrome = store.contentUI.chrome
     self.contentSession = store.contentUI.session
     self.contentDashboard = store.contentUI.dashboard
+    self.auditBuildState = Self.resolveAuditBuildState()
   }
 
   public var body: some View {
@@ -198,31 +174,33 @@ public struct ContentView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay {
-      ZStack {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.appChromeState,
-          text: appChromeAccessibilityValue
-        )
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.toolbarChromeState,
-          text: toolbarChromeAccessibilityValue
-        )
-        if let auditBuildAccessibilityValue {
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        ZStack {
           AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.auditBuildState,
-            text: auditBuildAccessibilityValue
+            identifier: HarnessMonitorAccessibility.appChromeState,
+            text: appChromeAccessibilityValue
+          )
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.toolbarChromeState,
+            text: toolbarChromeAccessibilityValue
+          )
+          if let auditBuildAccessibilityValue {
+            AccessibilityTextMarker(
+              identifier: HarnessMonitorAccessibility.auditBuildState,
+              text: auditBuildAccessibilityValue
+            )
+          }
+          ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
+            text: toolbarCenterpieceDisplayMode.rawValue
           )
         }
-        ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
-          text: toolbarCenterpieceDisplayMode.rawValue
-        )
       }
     }
     .overlay(alignment: .topTrailing) {
-      if let auditBuildState, auditBuildState.showsVisibleBadge {
-        AuditBuildBadge(state: auditBuildState)
+      if let auditBuildBadgeState, auditBuildBadgeState.showsVisibleBadge {
+        AuditBuildBadge(state: auditBuildBadgeState)
           .padding(.top, HarnessMonitorTheme.spacingSM)
           .padding(.trailing, HarnessMonitorTheme.spacingLG)
       }
@@ -331,7 +309,45 @@ public struct ContentView: View {
     toolbarBaselineLeadingInset = nextValue
   }
 
-  private func stringValue(
+  private static func resolveAuditBuildState() -> AuditBuildDisplayState? {
+    guard HarnessMonitorUITestEnvironment.isEnabled else {
+      return nil
+    }
+
+    let info = Bundle.main.infoDictionary ?? [:]
+    let environment = ProcessInfo.processInfo.environment
+    let provenance = bundleBuildProvenance()
+
+    return AuditBuildDisplayState(
+      auditRunID: environment["HARNESS_MONITOR_AUDIT_RUN_ID"] ?? "none",
+      auditLabel: environment["HARNESS_MONITOR_AUDIT_LABEL"] ?? "none",
+      launchMode: environment["HARNESS_MONITOR_LAUNCH_MODE"] ?? "live",
+      perfScenario: environment["HARNESS_MONITOR_PERF_SCENARIO"] ?? "none",
+      previewScenario: environment["HARNESS_MONITOR_PREVIEW_SCENARIO"] ?? "default",
+      buildCommit: provenance["HarnessMonitorBuildGitCommit"]
+        ?? stringValue(in: info, key: "HarnessMonitorBuildGitCommit", fallback: "unknown"),
+      buildDirty: provenance["HarnessMonitorBuildGitDirty"]
+        ?? stringValue(in: info, key: "HarnessMonitorBuildGitDirty", fallback: "unknown"),
+      buildFingerprint: provenance["HarnessMonitorBuildWorkspaceFingerprint"]
+        ?? stringValue(
+          in: info,
+          key: "HarnessMonitorBuildWorkspaceFingerprint",
+          fallback: "unknown"
+        ),
+      buildStartedAtUTC: provenance["HarnessMonitorBuildStartedAtUTC"]
+        ?? stringValue(
+          in: info,
+          key: "HarnessMonitorBuildStartedAtUTC",
+          fallback: "unknown"
+        ),
+      expectedCommit: environment["HARNESS_MONITOR_AUDIT_GIT_COMMIT"],
+      expectedDirty: environment["HARNESS_MONITOR_AUDIT_GIT_DIRTY"],
+      expectedFingerprint: environment["HARNESS_MONITOR_AUDIT_WORKSPACE_FINGERPRINT"],
+      expectedBuildStartedAtUTC: environment["HARNESS_MONITOR_AUDIT_BUILD_STARTED_AT_UTC"]
+    )
+  }
+
+  private static func stringValue(
     in infoDictionary: [String: Any],
     key: String,
     fallback: String
@@ -344,7 +360,7 @@ public struct ContentView: View {
     return trimmed.isEmpty ? fallback : trimmed
   }
 
-  private func bundleBuildProvenance() -> [String: String] {
+  private static func bundleBuildProvenance() -> [String: String] {
     guard
       let url = Bundle.main.url(
         forResource: "HarnessMonitorBuildProvenance",

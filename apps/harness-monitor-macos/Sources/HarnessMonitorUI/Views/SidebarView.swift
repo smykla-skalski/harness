@@ -211,7 +211,7 @@ struct SidebarView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
     .overlay {
-      if HarnessMonitorUITestEnvironment.isEnabled {
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
         AccessibilityTextMarker(
           identifier: HarnessMonitorAccessibility.sidebarFilterState,
           text: sidebarFilterStateValue
