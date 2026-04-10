@@ -70,6 +70,24 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
   }
 
+  @Test("Search projection skips publishing grouped sidebar trees")
+  func searchProjectionSkipsPublishingGroupedSidebarTrees() async {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    let initialGroupedSessions = store.sessionIndex.projection.groupedSessions
+
+    let groupedProjectionInvalidated = await didInvalidate(
+      { store.sessionIndex.projection.groupedSessions },
+      after: {
+        store.searchText = "active"
+      }
+    )
+
+    #expect(groupedProjectionInvalidated == false)
+    #expect(store.sessionIndex.projection.groupedSessions == initialGroupedSessions)
+    #expect(store.visibleSessionIDs == ["active"])
+    #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["active"])
+  }
+
   @Test("Sort order changes update projection without rebuilding the catalog")
   func sortOrderChangesUpdateProjectionWithoutCatalogRebuild() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
