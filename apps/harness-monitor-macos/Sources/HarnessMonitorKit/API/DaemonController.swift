@@ -109,12 +109,14 @@ public struct DaemonController: DaemonControlling {
     @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
   private let transportPreference: TransportPreference
   private let launchAgentManager: any DaemonLaunchAgentManaging
+  private let ownership: DaemonOwnership
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
     transportPreference: TransportPreference = .auto,
     launchAgentManager: any DaemonLaunchAgentManaging =
       ServiceManagementDaemonLaunchAgentManager(),
+    ownership: DaemonOwnership = .managed,
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
         HarnessMonitorAPIClient(connection: $0)
@@ -123,6 +125,7 @@ public struct DaemonController: DaemonControlling {
     self.environment = environment
     self.transportPreference = transportPreference
     self.launchAgentManager = launchAgentManager
+    self.ownership = ownership
     self.sessionFactory = sessionFactory
   }
 
@@ -208,12 +211,17 @@ public struct DaemonController: DaemonControlling {
   ) async throws -> any HarnessMonitorClientProtocol {
     let deadline = ContinuousClock.now + timeout
     var lastError: (any Error)?
+    var sawUnreachableManifest = false
     while ContinuousClock.now < deadline {
       do {
         let connection = try loadConnection()
         if await endpointIsListening(connection.endpoint) {
           return try await bootstrap(connection: connection)
         }
+        // Manifest decoded but nothing is bound on its endpoint. Could be a
+        // restart in progress (managed) or a daemon killed without cleanup
+        // (external). Track so the final error message reflects reality.
+        sawUnreachableManifest = true
       } catch {
         lastError = error
       }
@@ -221,6 +229,11 @@ public struct DaemonController: DaemonControlling {
     }
     if let client = try? await bootstrapClient() {
       return client
+    }
+    if ownership == .external, sawUnreachableManifest {
+      throw DaemonControlError.externalDaemonOffline(
+        manifestPath: HarnessMonitorPaths.manifestURL(using: environment).path
+      )
     }
     throw lastError ?? DaemonControlError.daemonDidNotStart
   }
