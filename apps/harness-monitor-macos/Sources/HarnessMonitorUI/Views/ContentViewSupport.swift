@@ -185,6 +185,7 @@ struct ContentDetailColumn: View {
   let selection: HarnessMonitorStore.SelectionSlice
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
+  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @Binding var showInspector: Bool
@@ -236,9 +237,9 @@ struct ContentDetailColumn: View {
       store: store,
       dashboardUI: dashboardUI,
       state: SessionContentState(
-        detail: contentSession.selectedSessionDetail,
+        detail: contentSessionDetail.selectedSessionDetail,
         summary: contentSession.selectedSessionSummary,
-        timeline: contentSession.timeline,
+        timeline: contentSessionDetail.timeline,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isSessionActionInFlight: contentSession.isSessionActionInFlight,
         isExtensionsLoading: contentSession.isExtensionsLoading,
@@ -248,7 +249,7 @@ struct ContentDetailColumn: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
-      if contentSession.selectedSessionDetail != nil {
+      if contentSessionDetail.selectedSessionDetail != nil {
         store.inspectorSelection = .none
         return .handled
       }

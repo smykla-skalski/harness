@@ -19,6 +19,7 @@ public struct ContentView: View {
   let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
+  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
   private let auditBuildState: AuditBuildDisplayState?
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -94,6 +95,7 @@ public struct ContentView: View {
     self.contentToolbar = store.contentUI.toolbar
     self.contentChrome = store.contentUI.chrome
     self.contentSession = store.contentUI.session
+    self.contentSessionDetail = store.contentUI.sessionDetail
     self.contentDashboard = store.contentUI.dashboard
     self.auditBuildState = Self.resolveAuditBuildState()
   }
@@ -258,6 +260,7 @@ public struct ContentView: View {
       selection: store.selection,
       contentChrome: contentChrome,
       contentSession: contentSession,
+      contentSessionDetail: contentSessionDetail,
       contentToolbar: contentToolbar,
       dashboardUI: contentDashboard,
       showInspector: $showInspector,
