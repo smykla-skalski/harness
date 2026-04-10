@@ -256,6 +256,65 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     }
   }
 
+  @Test("startDaemon registers the launch agent when notRegistered then connects")
+  func startDaemonRegistersWhenNotRegisteredThenConnects() async {
+    let daemon = RecordingDaemonController(launchAgentInstalled: false)
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.startDaemon()
+
+    #expect(store.connectionState == .online)
+  }
+
+  @Test("startDaemon with requiresApproval marks offline without warming up")
+  func startDaemonWithRequiresApprovalMarksOffline() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .requiresApproval,
+      warmUpError: DaemonControlError.daemonDidNotStart
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.startDaemon()
+
+    if case .offline(let reason) = store.connectionState {
+      #expect(reason.contains("approval"))
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+  }
+
+  @Test("startDaemon with enabled agent connects via awaitManifestWarmUp")
+  func startDaemonWithEnabledAgentConnects() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .enabled
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.startDaemon()
+
+    #expect(store.connectionState == .online)
+  }
+
+  @Test("startDaemon surfaces awaitManifestWarmUp failure as offline")
+  func startDaemonSurfacesWarmUpFailureAsOffline() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .enabled,
+      warmUpError: DaemonControlError.daemonDidNotStart
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.startDaemon()
+
+    if case .offline = store.connectionState {
+      // expected
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+  }
+
   @Test("Prepare for termination cancels background work and shuts down the client")
   func prepareForTerminationCancelsBackgroundWorkAndShutsDownClient() async {
     let client = RecordingHarnessClient()

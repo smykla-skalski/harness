@@ -123,7 +123,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
-    HarnessMonitorLogger.lifecycle.info("Bootstrapping daemon client")
+    HarnessMonitorLogger.lifecycle.debug("Bootstrapping daemon client")
     let manifest = try loadManifest()
     let token = try loadToken(path: manifest.tokenPath)
     let connection = HarnessMonitorConnection(
