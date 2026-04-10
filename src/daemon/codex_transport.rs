@@ -381,8 +381,24 @@ mod tests {
 
     #[tokio::test]
     async fn websocket_transport_connect_fails_without_server() {
-        let result = WebSocketCodexTransport::connect("ws://127.0.0.1:1").await;
-        assert!(result.is_err(), "connect must fail on closed port");
+        let error = WebSocketCodexTransport::connect("ws://127.0.0.1:1")
+            .await
+            .err()
+            .expect("connect must fail on closed port");
+        assert_eq!(error.code(), "CODEX001");
+    }
+
+    #[tokio::test]
+    async fn codex_transport_kind_websocket_connect_surfaces_codex001() {
+        let kind = super::CodexTransportKind::WebSocket {
+            endpoint: "ws://127.0.0.1:1".to_string(),
+        };
+        let error = kind
+            .connect()
+            .await
+            .err()
+            .expect("connect must fail on closed port");
+        assert_eq!(error.code(), "CODEX001");
     }
 
     #[tokio::test]
