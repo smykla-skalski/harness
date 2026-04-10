@@ -1,4 +1,7 @@
+import AppKit
+import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
 import UserNotifications
 
@@ -38,6 +41,21 @@ struct HarnessMonitorNotificationTests {
     #expect(content.attachments.first?.type == "public.png")
     #expect(content.sound != nil)
     #expect(content.userInfo["source"] as? String == "preferences")
+    #expect(try sampleImageHasAlpha(at: writer.sampleImageURL()) == false)
+  }
+
+  @Test("Asset writer rewrites stale alpha sample images")
+  func assetWriterRewritesStaleAlphaSampleImages() throws {
+    let environment = try temporaryEnvironment()
+    let writer = HarnessMonitorNotificationAssetWriter(environment: environment)
+    let url = try writer.sampleImageURL()
+    try makeOpaqueAlphaPNGData().write(to: url, options: .atomic)
+
+    #expect(try sampleImageHasAlpha(at: url))
+
+    _ = try writer.sampleImageURL()
+
+    #expect(try sampleImageHasAlpha(at: url) == false)
   }
 
   @Test("Factory registers status, text input, and full control categories")
@@ -125,5 +143,45 @@ struct HarnessMonitorNotificationTests {
       values: ["XDG_DATA_HOME": root.path],
       homeDirectory: root
     )
+  }
+
+  private func sampleImageHasAlpha(at url: URL) throws -> Bool {
+    let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
+    let properties = try #require(
+      CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?)
+
+    return properties[kCGImagePropertyHasAlpha] as? Bool == true
+  }
+
+  private func makeOpaqueAlphaPNGData() throws -> Data {
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+    let imageSize = 24
+    let imageRect = CGRect(x: 0, y: 0, width: imageSize, height: imageSize)
+    guard
+      let context = CGContext(
+        data: nil,
+        width: imageSize,
+        height: imageSize,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: colorSpace,
+        bitmapInfo: bitmapInfo
+      )
+    else {
+      throw HarnessMonitorNotificationError.assetGenerationFailed("test alpha PNG")
+    }
+
+    context.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1))
+    context.fill(imageRect)
+
+    guard
+      let image = context.makeImage(),
+      let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    else {
+      throw HarnessMonitorNotificationError.assetGenerationFailed("test alpha PNG")
+    }
+
+    return data
   }
 }

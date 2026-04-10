@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import ImageIO
 
 public protocol HarnessMonitorNotificationAssetWriting: Sendable {
   @MainActor
@@ -24,10 +25,21 @@ public struct HarnessMonitorNotificationAssetWriter: HarnessMonitorNotificationA
     try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
     let url = directory.appendingPathComponent(Self.sampleImageName)
-    if !fileManager.fileExists(atPath: url.path) {
+    if !fileManager.fileExists(atPath: url.path) || Self.cachedSampleImageRequiresRewrite(at: url) {
       try Self.makeSampleImageData().write(to: url, options: .atomic)
     }
     return url
+  }
+
+  private static func cachedSampleImageRequiresRewrite(at url: URL) -> Bool {
+    guard
+      let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?
+    else {
+      return true
+    }
+
+    return properties[kCGImagePropertyHasAlpha] as? Bool == true
   }
 
   private static func makeSampleImageData() throws -> Data {
@@ -42,7 +54,7 @@ public struct HarnessMonitorNotificationAssetWriter: HarnessMonitorNotificationA
         bitsPerComponent: 8,
         bytesPerRow: 0,
         space: colorSpace,
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
       )
     else {
       throw HarnessMonitorNotificationError.assetGenerationFailed("sample PNG")
