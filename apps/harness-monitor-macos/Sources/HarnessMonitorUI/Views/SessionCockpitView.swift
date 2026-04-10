@@ -67,7 +67,6 @@ struct SessionCockpitView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessMonitorTheme.ink)
   }
 }
 
