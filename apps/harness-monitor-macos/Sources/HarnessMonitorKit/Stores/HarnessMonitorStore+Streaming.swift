@@ -302,15 +302,29 @@ extension HarnessMonitorStore {
 
   func startManifestWatcher() {
     stopManifestWatcher()
+    let daemonRoot = HarnessMonitorPaths.daemonRoot()
+    // The dispatch source opens the daemon directory; create it first so the
+    // watcher still starts when the dev daemon has never run yet. This is
+    // required for external daemon mode where the app may launch before the
+    // terminal daemon exists.
+    try? FileManager.default.createDirectory(
+      at: daemonRoot,
+      withIntermediateDirectories: true
+    )
     let manifestURL = HarnessMonitorPaths.manifestURL()
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
-    guard let data = FileManager.default.contents(atPath: manifestURL.path),
+    let currentEndpoint: String
+    if let data = FileManager.default.contents(atPath: manifestURL.path),
       let manifest = try? decoder.decode(DaemonManifest.self, from: data)
-    else {
-      return
+    {
+      currentEndpoint = manifest.endpoint
+    } else {
+      // Manifest missing or undecodable; start with an empty sentinel so the
+      // first valid manifest write triggers reconnect.
+      currentEndpoint = ""
     }
-    let watcher = ManifestWatcher(currentEndpoint: manifest.endpoint) { [weak self] in
+    let watcher = ManifestWatcher(currentEndpoint: currentEndpoint) { [weak self] in
       Task { @MainActor [weak self] in
         guard let self else { return }
         self.appendConnectionEvent(
