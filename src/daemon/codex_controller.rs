@@ -1,5 +1,7 @@
 use std::collections::{HashMap, VecDeque};
+use std::net::TcpStream;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -78,6 +80,35 @@ impl CodexControllerHandle {
         codex_transport::codex_transport_from_env(self.state.sandboxed)
     }
 
+    /// When the resolved transport is WebSocket, do a synchronous TCP connect
+    /// probe to verify the endpoint is reachable before queueing the run.
+    /// Returns `CODEX001` immediately when the probe fails so the HTTP layer
+    /// surfaces 503 in the POST response rather than failing asynchronously
+    /// in the worker.
+    fn preflight_websocket_probe(&self) -> Result<(), CliError> {
+        let transport = self.current_transport_kind();
+        let Some(endpoint) = transport.endpoint() else {
+            return Ok(());
+        };
+        let Some(addr) = endpoint
+            .strip_prefix("ws://")
+            .or_else(|| endpoint.strip_prefix("wss://"))
+        else {
+            return Ok(());
+        };
+        if TcpStream::connect_timeout(
+            &addr
+                .parse()
+                .unwrap_or_else(|_| ([127, 0, 0, 1], 4500).into()),
+            Duration::from_secs(1),
+        )
+        .is_err()
+        {
+            return Err(CliErrorKind::codex_server_unavailable(endpoint.to_string()).into());
+        }
+        Ok(())
+    }
+
     /// Start a Codex run for a Harness session.
     ///
     /// # Errors
@@ -92,6 +123,8 @@ impl CodexControllerHandle {
         if prompt.is_empty() {
             return Err(CliErrorKind::workflow_parse("codex prompt cannot be empty").into());
         }
+
+        self.preflight_websocket_probe()?;
 
         let project_dir = self.project_dir_for_session(session_id)?;
         let now = utc_now();
