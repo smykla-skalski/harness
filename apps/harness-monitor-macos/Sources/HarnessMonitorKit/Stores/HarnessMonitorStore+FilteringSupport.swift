@@ -370,6 +370,7 @@ extension HarnessMonitorStore {
     searchText = ""
     sessionFilter = .all
     sessionFocusFilter = .all
+    flushPendingSearchRebuild()
   }
 }
 
