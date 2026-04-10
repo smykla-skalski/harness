@@ -175,6 +175,34 @@ struct PreferencesGeneralSection: View {
     effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt
   }
 
+  private var daemonModeLabel: String {
+    switch store.daemonOwnership {
+    case .managed:
+      "Managed (SMAppService)"
+    case .external:
+      "External (CLI)"
+    }
+  }
+
+  private var externalDaemonCommand: String {
+    "harness daemon dev"
+  }
+
+  @ViewBuilder
+  private var daemonModeRow: some View {
+    LabeledContent("Daemon mode") {
+      VStack(alignment: .trailing, spacing: 2) {
+        Text(daemonModeLabel)
+        if store.daemonOwnership == .external {
+          Text("Run `\(externalDaemonCommand)` in a terminal")
+            .scaledFont(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Daemon Mode"))
+  }
+
   private static let logLevels = ["trace", "debug", "info", "warn", "error"]
 
   private var daemonLogLevelBinding: Binding<String> {
@@ -272,15 +300,18 @@ struct PreferencesGeneralSection: View {
         LabeledContent("Version", value: version)
           .textSelection(.enabled)
           .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Version"))
-        LabeledContent("Launchd") {
-          VStack(alignment: .trailing, spacing: 2) {
-            Text(launchAgentState)
-            Text(launchAgentCaption)
-              .scaledFont(.caption)
-              .foregroundStyle(.secondary)
+        daemonModeRow
+        if store.daemonOwnership == .managed {
+          LabeledContent("Launchd") {
+            VStack(alignment: .trailing, spacing: 2) {
+              Text(launchAgentState)
+              Text(launchAgentCaption)
+                .scaledFont(.caption)
+                .foregroundStyle(.secondary)
+            }
           }
+          .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Launchd"))
         }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Launchd"))
         LabeledContent("Sandbox") {
           if sandboxManifest?.sandboxed == true {
             Text("Enabled")
