@@ -99,6 +99,47 @@ struct HarnessMonitorStoreCodexTests {
     #expect(store.lastError?.contains("read-only mode") == true)
   }
 
+  @Test("Start Codex run sets codexUnavailable when daemon returns 503")
+  func startCodexRunSetsCodexUnavailableOn503() async {
+    let client = RecordingHarnessClient()
+    client.configureCodexStartError(
+      HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable")
+    )
+    let store = await selectedStore(client: client)
+
+    let started = await store.startCodexRun(prompt: "Test.", mode: .report)
+
+    #expect(started == false)
+    #expect(store.codexUnavailable == true)
+    #expect(store.lastError?.contains("codex-unavailable") == true)
+  }
+
+  @Test("Successful Codex run clears codexUnavailable flag")
+  func successfulCodexRunClearsCodexUnavailable() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+    store.codexUnavailable = true
+
+    let started = await store.startCodexRun(prompt: "Patch it.", mode: .report)
+
+    #expect(started == true)
+    #expect(store.codexUnavailable == false)
+  }
+
+  @Test("Non-503 error does not set codexUnavailable")
+  func non503ErrorDoesNotSetCodexUnavailable() async {
+    let client = RecordingHarnessClient()
+    client.configureCodexStartError(
+      HarnessMonitorAPIError.server(code: 400, message: "bad request")
+    )
+    let store = await selectedStore(client: client)
+
+    let started = await store.startCodexRun(prompt: "Test.", mode: .report)
+
+    #expect(started == false)
+    #expect(store.codexUnavailable == false)
+  }
+
   private func selectedStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
     let store = await makeBootstrappedStore(client: client)
     await store.selectSession(PreviewFixtures.summary.sessionId)
