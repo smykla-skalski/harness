@@ -1,9 +1,9 @@
 ---
 source: src/app/cli/tests.rs
-assertion_line: 889
 expression: "names.join(\"\\n\")"
 ---
 agents
+codex-bridge
 create
 daemon
 hook

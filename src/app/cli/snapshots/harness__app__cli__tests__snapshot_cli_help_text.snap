@@ -1,6 +1,5 @@
 ---
 source: src/app/cli/tests.rs
-assertion_line: 881
 expression: help
 ---
 Harness CLI
@@ -8,15 +7,16 @@ Harness CLI
 Usage: harness [OPTIONS] <COMMAND>
 
 Commands:
-  hook     Run a harness hook for a skill
-  run      Suite:run commands grouped by domain
-  create   Suite:create commands grouped by domain
-  setup    Setup environment and cluster commands
-  agents   Shared harness-managed agent lifecycle commands
-  observe  Observe and classify harness-managed agent session logs
-  session  Multi-agent session orchestration
-  daemon   Local daemon for the Harness app
-  help     Print this message or the help of the given subcommand(s)
+  hook          Run a harness hook for a skill
+  run           Suite:run commands grouped by domain
+  create        Suite:create commands grouped by domain
+  setup         Setup environment and cluster commands
+  agents        Shared harness-managed agent lifecycle commands
+  observe       Observe and classify harness-managed agent session logs
+  session       Multi-agent session orchestration
+  daemon        Local daemon for the Harness app
+  codex-bridge  Supervise an external `codex app-server` bridge for the sandboxed daemon
+  help          Print this message or the help of the given subcommand(s)
 
 Options:
       --delay <DELAY>  Seconds to wait before executing the command. Accepts fractional values (e.g. 0.5). Use instead of `sleep N && harness ...` [default: 0]

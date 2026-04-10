@@ -492,8 +492,7 @@ impl AgentTuiManagerHandle {
         let marker_capability = format!("agent-tui:{tui_id}");
         let db = self.db()?;
         let db_guard = lock_db(&db)?;
-        let project_dir =
-            resolve_tui_project_dir(&db_guard, session_id, request.project_dir.as_deref())?;
+        let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
         let joined = super::service::join_session_direct(
             session_id,
             &SessionJoinRequest {
@@ -506,20 +505,20 @@ impl AgentTuiManagerHandle {
                         .clone()
                         .unwrap_or_else(|| format!("{} TUI", profile.runtime)),
                 ),
-                project_dir: project_dir.display().to_string(),
+                project_dir: project.project_dir.display().to_string(),
             },
             Some(&db_guard),
         )?;
         let agent_id = agent_id_for_tui(&joined, &marker_capability)?;
         drop(db_guard);
 
-        let transcript_path = transcript_path(&project_dir, &profile.runtime, &tui_id);
+        let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
         let snapshot_context = AgentTuiSnapshotContext {
             session_id,
             agent_id: &agent_id,
             tui_id: &tui_id,
             profile: &profile,
-            project_dir: &project_dir,
+            project_dir: &project.project_dir,
             transcript_path: &transcript_path,
         };
         let process = spawn_agent_tui_process(
@@ -527,7 +526,7 @@ impl AgentTuiManagerHandle {
             &agent_id,
             &tui_id,
             profile.clone(),
-            &project_dir,
+            &project.project_dir,
             size,
         )?;
 
@@ -911,23 +910,37 @@ fn agent_tui_capabilities(existing: &[String], marker_capability: &str) -> Vec<S
     capabilities
 }
 
-fn resolve_tui_project_dir(
+struct ResolvedTuiProject {
+    project_dir: PathBuf,
+    context_root: PathBuf,
+}
+
+fn resolve_tui_project(
     db: &DaemonDb,
     session_id: &str,
     project_dir: Option<&str>,
-) -> Result<PathBuf, CliError> {
+) -> Result<ResolvedTuiProject, CliError> {
     if let Some(project_dir) = project_dir.filter(|value| !value.trim().is_empty()) {
-        return Ok(PathBuf::from(project_dir));
+        let project_dir = PathBuf::from(project_dir);
+        return Ok(ResolvedTuiProject {
+            context_root: project_context_dir(&project_dir),
+            project_dir,
+        });
     }
 
     let resolved = db.resolve_session(session_id)?.ok_or_else(|| {
         CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
     })?;
-    Ok(resolved
+    let context_root = resolved.project.context_root;
+    let project_dir = resolved
         .project
         .project_dir
         .or(resolved.project.repository_root)
-        .unwrap_or(resolved.project.context_root))
+        .unwrap_or_else(|| context_root.clone());
+    Ok(ResolvedTuiProject {
+        project_dir,
+        context_root,
+    })
 }
 
 fn agent_id_for_tui(state: &SessionState, marker_capability: &str) -> Result<String, CliError> {
@@ -974,8 +987,8 @@ fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Result<(), Cl
     })
 }
 
-fn transcript_path(project_dir: &Path, runtime: &str, tui_id: &str) -> PathBuf {
-    project_context_dir(project_dir)
+fn transcript_path(context_root: &Path, runtime: &str, tui_id: &str) -> PathBuf {
+    context_root
         .join("agents")
         .join("tui")
         .join(runtime)
@@ -1344,123 +1357,128 @@ mod tests {
     #[test]
     fn manager_starts_registers_steers_and_stops_tui() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        let data_home = tmp.path().join("xdg");
         let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
         fs_err::create_dir_all(&project_dir).expect("project dir");
-        temp_env::with_vars(
-            [("XDG_DATA_HOME", Some(data_home.to_str().expect("xdg path")))],
-            || {
-                let db = DaemonDb::open_in_memory().expect("open db");
-                let project = crate::daemon::index::discovered_project_for_checkout(&project_dir);
-                db.sync_project(&project).expect("sync project");
-                let state = session_service::build_new_session(
-                    "managed tui test",
-                    "managed tui",
-                    "sess-tui-manager",
-                    "claude",
-                    None,
-                    &utc_now(),
-                );
-                db.sync_session(&project.project_id, &state)
-                    .expect("sync session");
-
-                let db_slot = Arc::new(OnceLock::new());
-                db_slot
-                    .set(Arc::new(Mutex::new(db)))
-                    .expect("install test db");
-                let (sender, mut receiver) = broadcast::channel(8);
-                let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
-                let snapshot = manager
-                    .start(
-                        "sess-tui-manager",
-                        &AgentTuiStartRequest {
-                            runtime: "codex".into(),
-                            role: SessionRole::Worker,
-                            capabilities: vec!["test-harness".into()],
-                            name: Some("PTY worker".into()),
-                            prompt: None,
-                            project_dir: Some(project_dir.display().to_string()),
-                            argv: vec!["sh".into(), "-c".into(), "cat".into()],
-                            rows: 5,
-                            cols: 40,
-                        },
-                    )
-                    .expect("start manager TUI");
-
-                assert_eq!(snapshot.status, AgentTuiStatus::Running);
-                assert_eq!(snapshot.runtime, "codex");
-                assert_eq!(snapshot.argv, vec!["sh", "-c", "cat"]);
-                assert!(PathBuf::from(&snapshot.transcript_path).exists());
-
-                let started_event = receiver.try_recv().expect("started event");
-                assert_eq!(started_event.event, "agent_tui_started");
-                assert_eq!(
-                    started_event.session_id.as_deref(),
-                    Some("sess-tui-manager")
-                );
-
-                {
-                    let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
-                    let state = db_guard
-                        .load_session_state("sess-tui-manager")
-                        .expect("load state")
-                        .expect("state present");
-                    let joined = state.agents.get(&snapshot.agent_id).expect("joined agent");
-                    assert_eq!(joined.runtime, "codex");
-                    assert!(joined.capabilities.iter().any(|item| item == "agent-tui"));
-                    assert!(
-                        joined
-                            .capabilities
-                            .iter()
-                            .any(|item| item == &format!("agent-tui:{}", snapshot.tui_id))
-                    );
-                }
-
-                manager
-                    .input(
-                        &snapshot.tui_id,
-                        &AgentTuiInputRequest {
-                            input: AgentTuiInput::Text {
-                                text: "hello from manager".into(),
-                            },
-                        },
-                    )
-                    .expect("send text");
-                manager
-                    .input(
-                        &snapshot.tui_id,
-                        &AgentTuiInputRequest {
-                            input: AgentTuiInput::Key {
-                                key: AgentTuiKey::Enter,
-                            },
-                        },
-                    )
-                    .expect("send enter");
-
-                wait_until(DEFAULT_WAIT_TIMEOUT, || {
-                    manager
-                        .get(&snapshot.tui_id)
-                        .expect("refresh snapshot")
-                        .screen
-                        .text
-                        .contains("hello from manager")
-                });
-
-                let resized = manager
-                    .resize(
-                        &snapshot.tui_id,
-                        &AgentTuiResizeRequest { rows: 9, cols: 33 },
-                    )
-                    .expect("resize");
-                assert_eq!(resized.size, AgentTuiSize { rows: 9, cols: 33 });
-
-                let stopped = manager.stop(&snapshot.tui_id).expect("stop");
-                assert_eq!(stopped.status, AgentTuiStatus::Stopped);
-                let transcript =
-                    fs_err::read(&stopped.transcript_path).expect("read transcript file");
-                assert!(String::from_utf8_lossy(&transcript).contains("hello from manager"));
-            },
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-manager".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-manager".into(),
+            checkout_name: "Directory".into(),
+            context_root: context_root.clone(),
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "managed tui test",
+            "managed tui",
+            "sess-tui-manager",
+            "claude",
+            None,
+            &utc_now(),
         );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, mut receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = manager
+            .start(
+                "sess-tui-manager",
+                &AgentTuiStartRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec!["test-harness".into()],
+                    name: Some("PTY worker".into()),
+                    prompt: None,
+                    project_dir: None,
+                    argv: vec!["sh".into(), "-c".into(), "cat".into()],
+                    rows: 5,
+                    cols: 40,
+                },
+            )
+            .expect("start manager TUI");
+
+        assert_eq!(snapshot.status, AgentTuiStatus::Running);
+        assert_eq!(snapshot.runtime, "codex");
+        assert_eq!(snapshot.argv, vec!["sh", "-c", "cat"]);
+        assert!(PathBuf::from(&snapshot.transcript_path).exists());
+        assert!(PathBuf::from(&snapshot.transcript_path).starts_with(&context_root));
+
+        let started_event = receiver.try_recv().expect("started event");
+        assert_eq!(started_event.event, "agent_tui_started");
+        assert_eq!(
+            started_event.session_id.as_deref(),
+            Some("sess-tui-manager")
+        );
+
+        {
+            let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
+            let state = db_guard
+                .load_session_state("sess-tui-manager")
+                .expect("load state")
+                .expect("state present");
+            let joined = state.agents.get(&snapshot.agent_id).expect("joined agent");
+            assert_eq!(joined.runtime, "codex");
+            assert!(joined.capabilities.iter().any(|item| item == "agent-tui"));
+            assert!(
+                joined
+                    .capabilities
+                    .iter()
+                    .any(|item| item == &format!("agent-tui:{}", snapshot.tui_id))
+            );
+        }
+
+        manager
+            .input(
+                &snapshot.tui_id,
+                &AgentTuiInputRequest {
+                    input: AgentTuiInput::Text {
+                        text: "hello from manager".into(),
+                    },
+                },
+            )
+            .expect("send text");
+        manager
+            .input(
+                &snapshot.tui_id,
+                &AgentTuiInputRequest {
+                    input: AgentTuiInput::Key {
+                        key: AgentTuiKey::Enter,
+                    },
+                },
+            )
+            .expect("send enter");
+
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            manager
+                .get(&snapshot.tui_id)
+                .expect("refresh snapshot")
+                .screen
+                .text
+                .contains("hello from manager")
+        });
+
+        let resized = manager
+            .resize(
+                &snapshot.tui_id,
+                &AgentTuiResizeRequest { rows: 9, cols: 33 },
+            )
+            .expect("resize");
+        assert_eq!(resized.size, AgentTuiSize { rows: 9, cols: 33 });
+
+        let stopped = manager.stop(&snapshot.tui_id).expect("stop");
+        assert_eq!(stopped.status, AgentTuiStatus::Stopped);
+        let transcript = fs_err::read(&stopped.transcript_path).expect("read transcript file");
+        assert!(String::from_utf8_lossy(&transcript).contains("hello from manager"));
     }
 
     fn spawn_shell(script: &str) -> super::AgentTuiProcess {
