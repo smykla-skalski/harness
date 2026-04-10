@@ -50,6 +50,7 @@ async-stream = "0.3.6"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 async-trait = "0.1.83"
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect"] }
 
 [dev-dependencies]
 assert_cmd = "2.2.0"
