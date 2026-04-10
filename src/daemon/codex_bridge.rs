@@ -687,8 +687,7 @@ fn find_on_path(name: &str) -> Option<PathBuf> {
 
 fn is_executable(path: &Path) -> bool {
     fs::metadata(path)
-        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
 }
 
 /// Best-effort version detection by running `codex --version` before spawn.
