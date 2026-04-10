@@ -38,6 +38,9 @@ struct CodexFlowSheetView: View {
       Divider()
       ScrollView {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          if store.codexUnavailable {
+            codexUnavailableBanner
+          }
           promptSection
           if let selectedRun {
             runSection(selectedRun)
@@ -273,5 +276,30 @@ struct CodexFlowSheetView: View {
       )
       resolvingApprovalID = nil
     }
+  }
+
+  private var codexUnavailableBanner: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Label("Codex is not running", systemImage: "exclamationmark.triangle")
+        .scaledFont(.headline)
+        .foregroundStyle(.orange)
+      Text("Harness Monitor runs sandboxed and cannot start Codex directly. Run this in a terminal:")
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text("harness codex-bridge start")
+        .scaledFont(.body.monospaced())
+        .textSelection(.enabled)
+        .padding(HarnessMonitorTheme.spacingSM)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+      Button("Copy command") {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("harness codex-bridge start", forType: .string)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowRecoveryBanner)
   }
 }

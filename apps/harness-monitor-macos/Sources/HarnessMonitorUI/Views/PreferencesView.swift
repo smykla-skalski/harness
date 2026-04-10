@@ -46,6 +46,8 @@ public struct PreferencesView: View {
             reconnect: { await store.reconnect() },
             refreshDiagnostics: { await store.refreshDiagnostics() }
           )
+        case .codex:
+          PreferencesCodexSection(store: store)
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:

@@ -41,9 +41,16 @@ extension HarnessMonitorStore {
         )
       }
       recordRequestSuccess()
+      codexUnavailable = false
       applyCodexRun(measuredRun.value)
       showLastAction("Codex run started")
       return true
+    } catch let apiError as HarnessMonitorAPIError {
+      if case .server(let code, _) = apiError, code == 503 {
+        codexUnavailable = true
+      }
+      lastError = apiError.localizedDescription
+      return false
     } catch {
       lastError = error.localizedDescription
       return false

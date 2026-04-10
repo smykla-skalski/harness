@@ -98,6 +98,7 @@ public final class HarnessMonitorStore {
       scheduleUISync([.content])
     }
   }
+  public var codexUnavailable = false
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
       guard oldValue != selectedCodexRuns else { return }
@@ -374,6 +375,7 @@ public final class HarnessMonitorStore {
       if let oldClient {
         await oldClient.shutdown()
       }
+      codexUnavailable = false
       hasBootstrapped = true
       await bootstrap()
 
