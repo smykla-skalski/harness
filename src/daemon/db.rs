@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection, types::Type};
 
 use crate::agents::runtime::event::ConversationEvent;
+use crate::agents::runtime::signal::Signal;
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::errors::{CliError, CliErrorKind};
@@ -867,6 +868,12 @@ impl DaemonDb {
 
     /// Load signals for a session from the index.
     ///
+    /// Pending signals whose `expires_at` has passed are surfaced as
+    /// `Expired` at read time so every caller sees a correct status without
+    /// a background sweeper or a schema change. Signals keep their stored
+    /// status once an ack has been written, so acknowledged/rejected/deferred
+    /// rows pass through unchanged.
+    ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
     pub fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
@@ -896,18 +903,19 @@ impl DaemonDb {
         for row in rows {
             let (signal_json, ack_json, runtime, agent_id, sid, status_str) =
                 row.map_err(|error| db_error(format!("read signal row: {error}")))?;
-            let signal = serde_json::from_str(&signal_json)
+            let signal: Signal = serde_json::from_str(&signal_json)
                 .map_err(|error| db_error(format!("parse signal: {error}")))?;
             let acknowledgment = ack_json
                 .as_deref()
                 .and_then(|json| serde_json::from_str(json).ok());
-            let status = match status_str.as_str() {
+            let stored = match status_str.as_str() {
                 "pending" => SessionSignalStatus::Pending,
                 "acknowledged" => SessionSignalStatus::Acknowledged,
                 "rejected" => SessionSignalStatus::Rejected,
                 "deferred" => SessionSignalStatus::Deferred,
                 _ => SessionSignalStatus::Expired,
             };
+            let status = derive_effective_signal_status(stored, &signal);
             signals.push(SessionSignalRecord {
                 runtime,
                 agent_id,
@@ -2229,6 +2237,19 @@ INSERT INTO change_tracking (scope, version, updated_at)
 VALUES ('global', 0, datetime('now'));
 ";
 
+fn derive_effective_signal_status(
+    stored: SessionSignalStatus,
+    signal: &Signal,
+) -> SessionSignalStatus {
+    if stored != SessionSignalStatus::Pending {
+        return stored;
+    }
+    match chrono::DateTime::parse_from_rfc3339(&signal.expires_at) {
+        Ok(expires_at) if expires_at < chrono::Utc::now() => SessionSignalStatus::Expired,
+        _ => stored,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2367,6 +2388,89 @@ mod tests {
             )
             .expect("global version");
         assert_eq!(version, 0);
+    }
+
+    fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
+        use crate::agents::runtime::signal::{DeliveryConfig, SignalPayload, SignalPriority};
+        use serde_json::json;
+
+        SessionSignalRecord {
+            runtime: "claude".into(),
+            agent_id: "claude-leader".into(),
+            session_id: "sess-test-1".into(),
+            status: SessionSignalStatus::Pending,
+            signal: Signal {
+                signal_id: "sig-test-1".into(),
+                version: 1,
+                created_at: "2026-04-03T12:00:00Z".into(),
+                expires_at: expires_at.into(),
+                source_agent: "claude".into(),
+                command: "inject_context".into(),
+                priority: SignalPriority::Normal,
+                payload: SignalPayload {
+                    message: "test".into(),
+                    action_hint: None,
+                    related_files: vec![],
+                    metadata: json!({}),
+                },
+                delivery: DeliveryConfig {
+                    max_retries: 3,
+                    retry_count: 0,
+                    idempotency_key: None,
+                },
+            },
+            acknowledgment: None,
+        }
+    }
+
+    #[test]
+    fn derive_effective_signal_status_past_expiry_flips_pending_to_expired() {
+        let signal = sample_signal_record("2020-01-01T00:00:00Z");
+        let status =
+            derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
+        assert_eq!(status, SessionSignalStatus::Expired);
+    }
+
+    #[test]
+    fn derive_effective_signal_status_future_expiry_stays_pending() {
+        let signal = sample_signal_record("2099-12-31T23:59:59Z");
+        let status =
+            derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
+        assert_eq!(status, SessionSignalStatus::Pending);
+    }
+
+    #[test]
+    fn derive_effective_signal_status_acknowledged_passes_through() {
+        let signal = sample_signal_record("2020-01-01T00:00:00Z");
+        let status =
+            derive_effective_signal_status(SessionSignalStatus::Acknowledged, &signal.signal);
+        assert_eq!(status, SessionSignalStatus::Acknowledged);
+    }
+
+    #[test]
+    fn derive_effective_signal_status_unparseable_expiry_stays_pending() {
+        let signal = sample_signal_record("not-a-timestamp");
+        let status =
+            derive_effective_signal_status(SessionSignalStatus::Pending, &signal.signal);
+        assert_eq!(status, SessionSignalStatus::Pending);
+    }
+
+    #[test]
+    fn load_signals_reports_expired_for_past_pending() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let record = sample_signal_record("2020-01-01T00:00:00Z");
+        db.sync_signal_index(&state.session_id, std::slice::from_ref(&record))
+            .expect("sync signals");
+
+        let loaded = db.load_signals(&state.session_id).expect("load signals");
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].status, SessionSignalStatus::Expired);
     }
 
     fn sample_project() -> DiscoveredProject {
