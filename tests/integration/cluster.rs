@@ -228,6 +228,7 @@ fn global_zone_up_orchestration() {
         [
             ("PATH", Some(new_path.as_str())),
             ("HOME", Some(tmp.path().to_str().unwrap())),
+            ("HARNESS_CONTAINER_RUNTIME", Some("docker-cli")),
         ],
         || {
             let result = cluster_cmd(k3d_cluster_args(
