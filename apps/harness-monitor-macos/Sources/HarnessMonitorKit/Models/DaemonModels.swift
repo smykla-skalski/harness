@@ -6,13 +6,48 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
   public let endpoint: String
   public let startedAt: String
   public let tokenPath: String
+  public let sandboxed: Bool
+  public let codexTransport: String
+  public let codexEndpoint: String?
 
-  public init(version: String, pid: Int, endpoint: String, startedAt: String, tokenPath: String) {
+  public init(
+    version: String,
+    pid: Int,
+    endpoint: String,
+    startedAt: String,
+    tokenPath: String,
+    sandboxed: Bool = false,
+    codexTransport: String = "stdio",
+    codexEndpoint: String? = nil
+  ) {
     self.version = version
     self.pid = pid
     self.endpoint = endpoint
     self.startedAt = startedAt
     self.tokenPath = tokenPath
+    self.sandboxed = sandboxed
+    self.codexTransport = codexTransport
+    self.codexEndpoint = codexEndpoint
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case version, pid, endpoint, startedAt, tokenPath
+    case sandboxed, codexTransport, codexEndpoint
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      version: try container.decode(String.self, forKey: .version),
+      pid: try container.decode(Int.self, forKey: .pid),
+      endpoint: try container.decode(String.self, forKey: .endpoint),
+      startedAt: try container.decode(String.self, forKey: .startedAt),
+      tokenPath: try container.decode(String.self, forKey: .tokenPath),
+      sandboxed: try container.decodeIfPresent(Bool.self, forKey: .sandboxed) ?? false,
+      codexTransport: try container.decodeIfPresent(String.self, forKey: .codexTransport)
+        ?? "stdio",
+      codexEndpoint: try container.decodeIfPresent(String.self, forKey: .codexEndpoint)
+    )
   }
 }
 
