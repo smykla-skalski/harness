@@ -15,7 +15,7 @@ use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
     SessionStatus, TaskCheckpoint, WorkItem,
 };
-use crate::workspace::utc_now;
+use crate::workspace::{project_context_dir, project_context_id, utc_now};
 
 /// `SQLite`-backed storage for the harness daemon. Replaces the file-based
 /// discovery layer with indexed queries while keeping file writes for
@@ -461,7 +461,7 @@ impl DaemonDb {
         self.conn
             .query_row(
                 "SELECT
-                    (SELECT COUNT(DISTINCT project_id) FROM projects WHERE is_worktree = 0) AS project_count,
+                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(repository_root, ''), project_dir, project_id)) FROM projects) AS project_count,
                     (SELECT COUNT(*) FROM projects WHERE is_worktree = 1) AS worktree_count,
                     (SELECT COUNT(*) FROM sessions) AS session_count",
                 [],
@@ -487,7 +487,7 @@ impl DaemonDb {
             .conn
             .prepare(
                 "SELECT
-                    p.project_id, p.name, p.project_dir, p.context_root,
+                    p.project_id, p.name, p.project_dir, p.repository_root, p.context_root,
                     p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name,
                     COUNT(CASE WHEN s.is_active = 1 THEN 1 END) AS active_count,
                     COUNT(s.session_id) AS total_count
@@ -504,13 +504,14 @@ impl DaemonDb {
                     project_id: row.get(0)?,
                     name: row.get(1)?,
                     project_dir: row.get(2)?,
-                    context_root: row.get(3)?,
-                    checkout_id: row.get(4)?,
-                    checkout_name: row.get(5)?,
-                    is_worktree: row.get(6)?,
-                    worktree_name: row.get(7)?,
-                    active_session_count: row.get(8)?,
-                    total_session_count: row.get(9)?,
+                    repository_root: row.get(3)?,
+                    context_root: row.get(4)?,
+                    checkout_id: row.get(5)?,
+                    checkout_name: row.get(6)?,
+                    is_worktree: row.get(7)?,
+                    worktree_name: row.get(8)?,
+                    active_session_count: row.get(9)?,
+                    total_session_count: row.get(10)?,
                 })
             })
             .map_err(|error| db_error(format!("query project summaries: {error}")))?;
@@ -522,13 +523,14 @@ impl DaemonDb {
         let mut grouped: BTreeMap<String, ProjectSummary> = BTreeMap::new();
 
         for row in all_rows {
+            let project_id = row.summary_project_id();
             let entry = grouped
-                .entry(row.project_id.clone())
+                .entry(project_id.clone())
                 .or_insert_with(|| ProjectSummary {
-                    project_id: row.project_id.clone(),
-                    name: row.name.clone(),
-                    project_dir: row.project_dir.clone(),
-                    context_root: row.context_root.clone(),
+                    project_id,
+                    name: row.summary_project_name(),
+                    project_dir: row.summary_project_dir(),
+                    context_root: row.summary_context_root(),
                     active_session_count: 0,
                     total_session_count: 0,
                     worktrees: Vec::new(),
@@ -571,8 +573,8 @@ impl DaemonDb {
                     s.session_id, s.title, s.context, s.status, s.created_at, s.updated_at,
                     s.last_activity_at, s.leader_id, s.observe_id,
                     s.pending_leader_transfer, s.metrics_json,
-                    p.project_id, p.name, p.project_dir, p.context_root,
-                    p.checkout_id, p.is_worktree, p.worktree_name
+                    p.project_id, p.name, p.project_dir, p.repository_root, p.context_root,
+                    p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name
                  FROM sessions s
                  JOIN projects p ON p.project_id = s.project_id
                  ORDER BY s.updated_at DESC",
@@ -596,10 +598,12 @@ impl DaemonDb {
                     project_id: row.get(11)?,
                     project_name: row.get(12)?,
                     project_dir: row.get(13)?,
-                    context_root: row.get(14)?,
-                    checkout_id: row.get(15)?,
-                    is_worktree: row.get(16)?,
-                    worktree_name: row.get(17)?,
+                    repository_root: row.get(14)?,
+                    context_root: row.get(15)?,
+                    checkout_id: row.get(16)?,
+                    checkout_name: row.get(17)?,
+                    is_worktree: row.get(18)?,
+                    worktree_name: row.get(19)?,
                 })
             })
             .map_err(|error| db_error(format!("query session summaries: {error}")))?;
@@ -1804,6 +1808,7 @@ struct ProjectRow {
     project_id: String,
     name: String,
     project_dir: Option<String>,
+    repository_root: Option<String>,
     context_root: String,
     checkout_id: String,
     checkout_name: String,
@@ -1828,10 +1833,30 @@ struct SessionSummaryRow {
     project_id: String,
     project_name: String,
     project_dir: Option<String>,
+    repository_root: Option<String>,
     context_root: String,
     checkout_id: String,
+    checkout_name: String,
     is_worktree: bool,
     worktree_name: Option<String>,
+}
+
+impl ProjectRow {
+    fn summary_project_id(&self) -> String {
+        summary_project_id(&self.project_id, self.repository_root.as_deref())
+    }
+
+    fn summary_project_name(&self) -> String {
+        summary_project_name(&self.name, self.repository_root.as_deref())
+    }
+
+    fn summary_project_dir(&self) -> Option<String> {
+        summary_project_dir(self.project_dir.as_deref(), self.repository_root.as_deref())
+    }
+
+    fn summary_context_root(&self) -> String {
+        summary_context_root(&self.context_root, self.repository_root.as_deref())
+    }
 }
 
 impl SessionSummaryRow {
@@ -1848,16 +1873,26 @@ impl SessionSummaryRow {
             .and_then(|json| serde_json::from_str(&json).ok());
         let metrics = serde_json::from_str(&self.metrics_json).unwrap_or_default();
         let checkout_root = self.project_dir.clone().unwrap_or_default();
+        let project_id = summary_project_id(&self.project_id, self.repository_root.as_deref());
+        let project_name =
+            summary_project_name(&self.project_name, self.repository_root.as_deref());
+        let project_dir =
+            summary_project_dir(self.project_dir.as_deref(), self.repository_root.as_deref());
+        let context_root =
+            summary_context_root(&self.context_root, self.repository_root.as_deref());
+        let worktree_name = self
+            .worktree_name
+            .or_else(|| self.is_worktree.then_some(self.checkout_name));
 
         SessionSummary {
-            project_id: self.project_id,
-            project_name: self.project_name,
-            project_dir: self.project_dir,
-            context_root: self.context_root,
+            project_id,
+            project_name,
+            project_dir,
+            context_root,
             checkout_id: self.checkout_id,
             checkout_root,
             is_worktree: self.is_worktree,
-            worktree_name: self.worktree_name,
+            worktree_name,
             session_id: self.session_id,
             title: self.title,
             context: self.context,
@@ -1871,6 +1906,41 @@ impl SessionSummaryRow {
             metrics,
         }
     }
+}
+
+fn summary_project_id(project_id: &str, repository_root: Option<&str>) -> String {
+    repository_path(repository_root)
+        .and_then(project_context_id)
+        .unwrap_or_else(|| project_id.to_string())
+}
+
+fn summary_project_name(name: &str, repository_root: Option<&str>) -> String {
+    repository_path(repository_root)
+        .and_then(Path::file_name)
+        .map_or_else(
+            || name.to_string(),
+            |name| name.to_string_lossy().to_string(),
+        )
+}
+
+fn summary_project_dir(project_dir: Option<&str>, repository_root: Option<&str>) -> Option<String> {
+    repository_root
+        .filter(|path| !path.trim().is_empty())
+        .or(project_dir.filter(|path| !path.trim().is_empty()))
+        .map(ToString::to_string)
+}
+
+fn summary_context_root(context_root: &str, repository_root: Option<&str>) -> String {
+    repository_path(repository_root).map_or_else(
+        || context_root.to_string(),
+        |root| project_context_dir(root).display().to_string(),
+    )
+}
+
+fn repository_path(repository_root: Option<&str>) -> Option<&Path> {
+    repository_root
+        .filter(|path| !path.trim().is_empty())
+        .map(Path::new)
 }
 
 /// Extract the serde tag from a serialized `SessionTransition` JSON string.
@@ -2484,6 +2554,47 @@ mod tests {
         }
     }
 
+    fn sample_repository_project(root: &str) -> DiscoveredProject {
+        let root = PathBuf::from(root);
+        let project_id = project_context_id(&root).expect("project id");
+        DiscoveredProject {
+            project_id: project_id.clone(),
+            name: root
+                .file_name()
+                .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
+            project_dir: Some(root.clone()),
+            repository_root: Some(root),
+            checkout_id: project_id,
+            checkout_name: "Repository".into(),
+            context_root: "/tmp/data/projects/repository".into(),
+            is_worktree: false,
+            worktree_name: None,
+        }
+    }
+
+    fn sample_worktree_project(repository_root: &str, worktree_root: &str) -> DiscoveredProject {
+        let repository_root = PathBuf::from(repository_root);
+        let worktree_root = PathBuf::from(worktree_root);
+        let checkout_id = project_context_id(&worktree_root).expect("checkout id");
+        let name = repository_root
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().to_string());
+        let worktree_name = worktree_root
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().to_string());
+        DiscoveredProject {
+            project_id: checkout_id.clone(),
+            name,
+            project_dir: Some(worktree_root),
+            repository_root: Some(repository_root),
+            checkout_id,
+            checkout_name: worktree_name.clone(),
+            context_root: "/tmp/data/projects/worktree".into(),
+            is_worktree: true,
+            worktree_name: Some(worktree_name),
+        }
+    }
+
     fn sample_session_state() -> SessionState {
         use crate::agents::runtime::RuntimeCapabilities;
         use crate::session::types::{
@@ -2552,6 +2663,13 @@ mod tests {
             pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         }
+    }
+
+    fn sample_session_state_with_id(session_id: &str) -> SessionState {
+        let mut state = sample_session_state();
+        state.session_id = session_id.to_string();
+        state.title = session_id.to_string();
+        state
     }
 
     fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapshot {
@@ -2774,6 +2892,68 @@ mod tests {
             )
             .expect("query project");
         assert_eq!(name, "renamed");
+    }
+
+    #[test]
+    fn project_summaries_group_worktrees_under_repository_root() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let repository = sample_repository_project("/tmp/kuma");
+        let worktree =
+            sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-a");
+        let repository_id = project_context_id(Path::new("/tmp/kuma")).expect("repository id");
+
+        db.sync_project(&repository).expect("sync repository");
+        db.sync_project(&worktree).expect("sync worktree");
+        let state = sample_session_state_with_id("sess-worktree");
+        db.sync_session(&worktree.project_id, &state)
+            .expect("sync worktree session");
+
+        let summaries = db.list_project_summaries().expect("project summaries");
+        assert_eq!(summaries.len(), 1);
+        let summary = &summaries[0];
+        assert_eq!(summary.project_id, repository_id);
+        assert_eq!(summary.name, "kuma");
+        assert_eq!(summary.project_dir.as_deref(), Some("/tmp/kuma"));
+        assert_eq!(summary.total_session_count, 1);
+        assert_eq!(summary.worktrees.len(), 1);
+        assert_eq!(summary.worktrees[0].name, "feature-a");
+        assert_eq!(summary.worktrees[0].checkout_id, worktree.checkout_id);
+        assert_eq!(
+            summary.worktrees[0].checkout_root,
+            "/tmp/kuma/.claude/worktrees/feature-a"
+        );
+        assert_eq!(summary.worktrees[0].total_session_count, 1);
+    }
+
+    #[test]
+    fn session_summaries_group_worktree_project_fields_under_repository_root() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let worktree =
+            sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-a");
+        let repository_id = project_context_id(Path::new("/tmp/kuma")).expect("repository id");
+        let repository_context_root = project_context_dir(Path::new("/tmp/kuma"))
+            .display()
+            .to_string();
+
+        db.sync_project(&worktree).expect("sync worktree");
+        let state = sample_session_state_with_id("sess-worktree");
+        db.sync_session(&worktree.project_id, &state)
+            .expect("sync worktree session");
+
+        let summaries = db.list_session_summaries_full().expect("session summaries");
+        assert_eq!(summaries.len(), 1);
+        let summary = &summaries[0];
+        assert_eq!(summary.project_id, repository_id);
+        assert_eq!(summary.project_name, "kuma");
+        assert_eq!(summary.project_dir.as_deref(), Some("/tmp/kuma"));
+        assert_eq!(summary.context_root, repository_context_root);
+        assert_eq!(summary.checkout_id, worktree.checkout_id);
+        assert_eq!(
+            summary.checkout_root,
+            "/tmp/kuma/.claude/worktrees/feature-a"
+        );
+        assert!(summary.is_worktree);
+        assert_eq!(summary.worktree_name.as_deref(), Some("feature-a"));
     }
 
     #[test]

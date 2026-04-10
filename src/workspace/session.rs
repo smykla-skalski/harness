@@ -143,6 +143,15 @@ pub fn project_context_dir(project_dir: &Path) -> PathBuf {
         .join(format!("project-{digest}"))
 }
 
+/// Stable project context directory name for a project path.
+#[must_use]
+pub fn project_context_id(project_dir: &Path) -> Option<String> {
+    project_context_dir(project_dir)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(ToString::to_string)
+}
+
 /// Check whether a path is already a context root (or a subdirectory of one)
 /// under `harness_data_root()/projects/project-{hex16}`.
 ///

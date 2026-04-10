@@ -1,5 +1,9 @@
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::ffi::OsStr;
+use std::path::{Component, Path, PathBuf};
+
+use gix_discover::{
+    path::from_plain_file as read_plain_git_path, repository::Path as GixRepositoryPath, upwards,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GitCheckoutKind {
@@ -32,43 +36,111 @@ impl GitCheckoutIdentity {
 #[must_use]
 pub fn resolve_git_checkout_identity(path: &Path) -> Option<GitCheckoutIdentity> {
     let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(&resolved)
-        .args([
-            "rev-parse",
-            "--path-format=absolute",
-            "--show-toplevel",
-            "--git-common-dir",
-        ])
-        .output()
-        .ok()?;
-    if !output.status.success() {
+    upwards(&resolved)
+        .ok()
+        .and_then(|(repository, _trust)| identity_from_discovered_repository(repository))
+        .or_else(|| infer_known_worktree_identity(&resolved))
+}
+
+fn identity_from_discovered_repository(
+    repository: GixRepositoryPath,
+) -> Option<GitCheckoutIdentity> {
+    match repository {
+        GixRepositoryPath::WorkTree(work_dir) => {
+            let checkout_root = canonicalized(work_dir);
+            Some(GitCheckoutIdentity {
+                repository_root: checkout_root.clone(),
+                checkout_root,
+                kind: GitCheckoutKind::Repository,
+            })
+        }
+        GixRepositoryPath::LinkedWorkTree { work_dir, git_dir } => {
+            let checkout_root = canonicalized(work_dir);
+            let repository_root = linked_worktree_repository_root(&git_dir)?;
+            let kind = if repository_root == checkout_root {
+                GitCheckoutKind::Repository
+            } else {
+                GitCheckoutKind::Worktree {
+                    name: linked_worktree_name(&checkout_root, &git_dir),
+                }
+            };
+            Some(GitCheckoutIdentity {
+                repository_root,
+                checkout_root,
+                kind,
+            })
+        }
+        GixRepositoryPath::Repository(repository_root) => {
+            let repository_root = canonicalized(repository_root);
+            Some(GitCheckoutIdentity {
+                checkout_root: repository_root.clone(),
+                repository_root,
+                kind: GitCheckoutKind::Repository,
+            })
+        }
+    }
+}
+
+fn linked_worktree_repository_root(git_dir: &Path) -> Option<PathBuf> {
+    let common_dir = read_plain_git_path(&git_dir.join("commondir"))?.ok()?;
+    let common_dir = if common_dir.is_absolute() {
+        common_dir
+    } else {
+        git_dir.join(common_dir)
+    };
+    canonicalized(common_dir).parent().map(Path::to_path_buf)
+}
+
+fn linked_worktree_name(checkout_root: &Path, git_dir: &Path) -> String {
+    checkout_root
+        .file_name()
+        .or_else(|| git_dir.file_name())
+        .map_or_else(String::new, |name| name.to_string_lossy().to_string())
+}
+
+fn canonicalized(path: PathBuf) -> PathBuf {
+    path.canonicalize().unwrap_or(path)
+}
+
+#[must_use]
+pub fn infer_known_worktree_identity(path: &Path) -> Option<GitCheckoutIdentity> {
+    let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let components: Vec<_> = resolved.components().collect();
+    let marker_index = components.windows(3).position(is_known_worktree_marker)?;
+    let worktree_name = component_text(components[marker_index + 2])?;
+    let repository_root = build_path_from_components(&components[..marker_index]);
+    let checkout_root = build_path_from_components(&components[..=marker_index + 2]);
+
+    if repository_root.as_os_str().is_empty() || checkout_root.as_os_str().is_empty() {
         return None;
     }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut lines = stdout.lines();
-    let raw_checkout = PathBuf::from(lines.next()?);
-    let git_common_dir = PathBuf::from(lines.next()?);
-    let raw_repository = git_common_dir.parent()?.to_path_buf();
-    let checkout_root = raw_checkout.canonicalize().unwrap_or(raw_checkout);
-    let repository_root = raw_repository.canonicalize().unwrap_or(raw_repository);
-    let kind = if checkout_root == repository_root {
-        GitCheckoutKind::Repository
-    } else {
-        GitCheckoutKind::Worktree {
-            name: checkout_root
-                .file_name()
-                .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
-        }
-    };
 
     Some(GitCheckoutIdentity {
         repository_root,
         checkout_root,
-        kind,
+        kind: GitCheckoutKind::Worktree {
+            name: worktree_name,
+        },
     })
+}
+
+fn is_known_worktree_marker(components: &[Component<'_>]) -> bool {
+    components[0].as_os_str() == OsStr::new(".claude")
+        && components[1].as_os_str() == OsStr::new("worktrees")
+        && !components[2].as_os_str().is_empty()
+}
+
+fn component_text(component: Component<'_>) -> Option<String> {
+    let text = component.as_os_str().to_string_lossy().trim().to_string();
+    (!text.is_empty()).then_some(text)
+}
+
+fn build_path_from_components(components: &[Component<'_>]) -> PathBuf {
+    let mut path = PathBuf::new();
+    for component in components {
+        path.push(component.as_os_str());
+    }
+    path
 }
 
 #[must_use]
@@ -86,7 +158,10 @@ mod tests {
     use fs_err as fs;
     use tempfile::tempdir;
 
-    use super::{GitCheckoutKind, canonical_checkout_root, resolve_git_checkout_identity};
+    use super::{
+        GitCheckoutKind, canonical_checkout_root, infer_known_worktree_identity,
+        resolve_git_checkout_identity,
+    };
 
     fn git(path: &std::path::Path, args: &[&str]) {
         let status = Command::new("git")
@@ -157,6 +232,23 @@ mod tests {
             }
         );
         assert_eq!(canonical_checkout_root(&worktree), expected_worktree);
+    }
+
+    #[test]
+    fn infer_known_worktree_identity_uses_claude_worktree_layout_without_git() {
+        let root = std::path::PathBuf::from("/repo");
+        let worktree = root.join(".claude/worktrees/feature-branch");
+
+        let identity = infer_known_worktree_identity(&worktree).expect("identity");
+
+        assert_eq!(identity.repository_root, root);
+        assert_eq!(identity.checkout_root, worktree);
+        assert_eq!(
+            identity.kind,
+            GitCheckoutKind::Worktree {
+                name: "feature-branch".to_string(),
+            }
+        );
     }
 
     #[test]

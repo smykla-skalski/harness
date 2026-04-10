@@ -1,5 +1,11 @@
 use std::collections::BTreeMap;
 
+use super::index::{self, DiscoveredProject, ResolvedSession};
+use super::protocol::{
+    AgentToolActivitySummary, ObserverActiveWorker, ObserverAgentSessionSummary,
+    ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
+    SessionExtensionsPayload, SessionSummary, WorktreeSummary,
+};
 use crate::agents::runtime::event::ConversationEventKind;
 use crate::agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals, signal_matches_session,
@@ -10,14 +16,6 @@ use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
 use crate::session::types::{
     SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
-};
-use crate::workspace::project_context_dir;
-
-use super::index::{self, DiscoveredProject, ResolvedSession};
-use super::protocol::{
-    AgentToolActivitySummary, ObserverActiveWorker, ObserverAgentSessionSummary,
-    ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
-    SessionExtensionsPayload, SessionSummary, WorktreeSummary,
 };
 /// Build summaries for all discovered projects.
 ///
@@ -30,7 +28,7 @@ pub fn project_summaries() -> Result<Vec<ProjectSummary>, CliError> {
     let mut worktree_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for session in sessions {
         let entry = project_counts
-            .entry(session.project.project_id.clone())
+            .entry(session.project.summary_project_id())
             .or_insert((0, 0));
         entry.1 += 1;
         if session.state.status == SessionStatus::Active {
@@ -49,24 +47,14 @@ pub fn project_summaries() -> Result<Vec<ProjectSummary>, CliError> {
 
     let mut grouped = BTreeMap::<String, ProjectSummary>::new();
     for project in projects {
-        let repository_root = project
-            .repository_root
-            .clone()
-            .or_else(|| project.project_dir.clone());
-        let project_dir = repository_root
-            .as_ref()
-            .map(|path| path.display().to_string());
-        let context_root = repository_root.as_ref().map_or_else(
-            || project.context_root.display().to_string(),
-            |path| project_context_dir(path).display().to_string(),
-        );
+        let project_id = project.summary_project_id();
         let entry = grouped
-            .entry(project.project_id.clone())
+            .entry(project_id.clone())
             .or_insert_with(|| ProjectSummary {
-                project_id: project.project_id.clone(),
-                name: project.name.clone(),
-                project_dir,
-                context_root,
+                project_id,
+                name: project.summary_project_name(),
+                project_dir: project.summary_project_dir(),
+                context_root: project.summary_context_root(),
                 active_session_count: 0,
                 total_session_count: 0,
                 worktrees: Vec::new(),
@@ -251,14 +239,10 @@ fn load_signals_for_resolved(
 
 fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
     SessionSummary {
-        project_id: resolved.project.project_id.clone(),
-        project_name: resolved.project.name.clone(),
-        project_dir: resolved
-            .project
-            .repository_root
-            .as_ref()
-            .map(|path| path.display().to_string()),
-        context_root: resolved.project.context_root.display().to_string(),
+        project_id: resolved.project.summary_project_id(),
+        project_name: resolved.project.summary_project_name(),
+        project_dir: resolved.project.summary_project_dir(),
+        context_root: resolved.project.summary_context_root(),
         checkout_id: resolved.project.checkout_id.clone(),
         checkout_root: resolved
             .project

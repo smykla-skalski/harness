@@ -11,7 +11,8 @@ use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
 use crate::workspace::{
-    canonical_checkout_root, harness_data_root, project_context_dir, resolve_git_checkout_identity,
+    canonical_checkout_root, harness_data_root, project_context_dir, project_context_id,
+    resolve_git_checkout_identity,
 };
 use fs_err as fs;
 use serde::Deserialize;
@@ -38,6 +39,40 @@ pub struct DiscoveredProject {
     pub context_root: PathBuf,
     pub is_worktree: bool,
     pub worktree_name: Option<String>,
+}
+
+impl DiscoveredProject {
+    #[must_use]
+    pub fn summary_project_id(&self) -> String {
+        self.repository_root
+            .as_deref()
+            .and_then(project_context_id)
+            .unwrap_or_else(|| self.project_id.clone())
+    }
+
+    #[must_use]
+    pub fn summary_project_name(&self) -> String {
+        self.repository_root
+            .as_deref()
+            .and_then(path_file_name)
+            .unwrap_or_else(|| self.name.clone())
+    }
+
+    #[must_use]
+    pub fn summary_project_dir(&self) -> Option<String> {
+        self.repository_root
+            .as_deref()
+            .or(self.project_dir.as_deref())
+            .map(|path| path.display().to_string())
+    }
+
+    #[must_use]
+    pub fn summary_context_root(&self) -> String {
+        self.repository_root.as_deref().map_or_else(
+            || self.context_root.display().to_string(),
+            |root| project_context_dir(root).display().to_string(),
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -500,10 +535,11 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
     let checkout_id = project_context_dir_name(&context_root).unwrap_or_default();
 
     if let Some(identity) = resolve_git_checkout_identity(&checkout_root) {
-        let project_id = project_context_dir_name(&project_context_dir(&identity.repository_root))
-            .unwrap_or_default();
+        let repository_project_id =
+            project_context_dir_name(&project_context_dir(&identity.repository_root))
+                .unwrap_or_default();
         let name = identity.repository_root.file_name().map_or_else(
-            || project_id.clone(),
+            || repository_project_id.clone(),
             |name| name.to_string_lossy().to_string(),
         );
         let is_worktree = identity.is_worktree();
@@ -520,7 +556,7 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
         };
 
         return DiscoveredProject {
-            project_id,
+            project_id: checkout_id.clone(),
             name,
             project_dir: Some(identity.checkout_root),
             repository_root: Some(identity.repository_root),
@@ -551,12 +587,14 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
 
 fn build_discovered_project(context_root: &Path) -> Option<DiscoveredProject> {
     let identity = infer_checkout_identity(context_root)?;
-    let project_id = project_context_dir_name(&project_context_dir(&identity.repository_root))
-        .unwrap_or_default();
+    let repository_project_id =
+        project_context_dir_name(&project_context_dir(&identity.repository_root))
+            .unwrap_or_default();
     let name = identity.repository_root.file_name().map_or_else(
-        || project_id.clone(),
+        || repository_project_id.clone(),
         |name| name.to_string_lossy().to_string(),
     );
+    let checkout_id = project_context_dir_name(context_root).unwrap_or_default();
     let checkout_name = if identity.is_worktree {
         identity.worktree_name.clone().unwrap_or_else(|| {
             identity
@@ -569,11 +607,11 @@ fn build_discovered_project(context_root: &Path) -> Option<DiscoveredProject> {
     };
 
     Some(DiscoveredProject {
-        project_id,
+        project_id: checkout_id.clone(),
         name,
         project_dir: Some(identity.checkout_root),
         repository_root: Some(identity.repository_root),
-        checkout_id: project_context_dir_name(context_root).unwrap_or_default(),
+        checkout_id,
         checkout_name,
         context_root: context_root.to_path_buf(),
         is_worktree: identity.is_worktree,
@@ -629,7 +667,7 @@ fn migrate_and_log_context(source: &Path, target: &Path) -> Result<(), CliError>
 
 fn infer_checkout_identity(context_root: &Path) -> Option<InferredCheckout> {
     if let Some(origin) = storage::load_project_origin(context_root)
-        && let Some(checkout_root) = origin.checkout_root.as_deref().map(PathBuf::from)
+        && let Some(checkout_root) = origin_checkout_root(&origin)
     {
         if let Some(identity) = resolve_git_checkout_identity(&checkout_root) {
             let is_worktree = identity.is_worktree();
@@ -663,6 +701,16 @@ fn infer_checkout_identity(context_root: &Path) -> Option<InferredCheckout> {
         is_worktree,
         worktree_name,
     })
+}
+
+fn origin_checkout_root(origin: &storage::ProjectOriginRecord) -> Option<PathBuf> {
+    origin
+        .checkout_root
+        .as_deref()
+        .or(Some(origin.recorded_from_dir.as_str()))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
 }
 
 fn infer_ledger_cwd(context_root: &Path) -> Option<PathBuf> {
@@ -929,6 +977,11 @@ fn project_context_dir_name(path: &Path) -> Option<String> {
         .map(|name| name.to_string_lossy().to_string())
 }
 
+fn path_file_name(path: &Path) -> Option<String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
+}
+
 fn session_state_path(context_root: &Path, session_id: &str) -> PathBuf {
     context_root
         .join("orchestration")
@@ -986,6 +1039,32 @@ mod tests {
             fs::create_dir_all(parent).expect("create parent");
         }
         fs::write(path, contents).expect("write file");
+    }
+
+    #[test]
+    fn infer_checkout_identity_uses_recorded_origin_when_checkout_root_is_missing() {
+        let tmp = tempdir().expect("tempdir");
+        let context_root = tmp.path().join("context");
+        let project_dir = tmp.path().join("project-name");
+        fs::create_dir_all(&project_dir).expect("create project dir");
+        write_text(
+            &context_root.join("project-origin.json"),
+            &serde_json::json!({
+                "recorded_from_dir": project_dir.display().to_string(),
+                "repository_root": null,
+                "checkout_root": null,
+                "is_worktree": false,
+                "worktree_name": null,
+                "recorded_at": "2026-04-10T10:00:00Z",
+            })
+            .to_string(),
+        );
+
+        let identity = infer_checkout_identity(&context_root).expect("identity");
+
+        assert_eq!(identity.repository_root, project_dir);
+        assert_eq!(identity.checkout_root, project_dir);
+        assert!(!identity.is_worktree);
     }
 
     #[test]
