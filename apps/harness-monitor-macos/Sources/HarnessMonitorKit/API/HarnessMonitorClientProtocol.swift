@@ -52,6 +52,10 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     sessionID: String,
     request: SignalSendRequest
   ) async throws -> SessionDetail
+  func cancelSignal(
+    sessionID: String,
+    request: SignalCancelRequest
+  ) async throws -> SessionDetail
   func observeSession(
     sessionID: String,
     request: ObserveSessionRequest
