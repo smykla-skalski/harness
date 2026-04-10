@@ -927,9 +927,7 @@ mod tests {
             replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
             db: db.clone(),
             codex_controller: crate::daemon::codex_controller::CodexControllerHandle::new(
-                sender,
-                db,
-                crate::daemon::codex_transport::CodexTransportKind::Stdio,
+                sender, db, false,
             ),
         }
     }
