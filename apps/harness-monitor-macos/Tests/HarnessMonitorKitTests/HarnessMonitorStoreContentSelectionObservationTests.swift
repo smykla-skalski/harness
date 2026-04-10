@@ -21,6 +21,7 @@ struct HarnessMonitorContentSelectionTests {
       { store.contentUI.toolbar.toolbarMetrics },
       after: {
         store.searchText = "preview"
+        store.flushPendingSearchRebuild()
       }
     )
     #expect(filterInvalidated == false)

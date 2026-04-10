@@ -216,6 +216,7 @@ struct HarnessMonitorStoreInspectorTests {
       { store.inspectorUI.primaryContent },
       after: {
         store.searchText = "preview"
+        store.flushPendingSearchRebuild()
       }
     )
 
