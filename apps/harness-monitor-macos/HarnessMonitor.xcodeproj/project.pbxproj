@@ -190,6 +190,7 @@
 		AF56300AD89D3A4AA9C2071F /* ServerSentEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E7C6AD7FC7DC6B8F574285 /* ServerSentEventsTests.swift */; };
 		B112BC9721AA6983EF6CD536 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6DFA230C28165C5AF0365371 /* Lottie */; };
 		B18C8D2F94F3B5C655EC4752 /* SessionTaskLaneViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707394EEA2DA5DE9174191BB /* SessionTaskLaneViews.swift */; };
+		B2FADE1182F1CEB6B7665DE3 /* DaemonManifestDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B6EF1154EFB25CF4CF6F71 /* DaemonManifestDecodingTests.swift */; };
 		B425188E03C5813D17D943BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7C50373172AFC22A0DD94523 /* Assets.xcassets */; };
 		B4CBFA1EA1295191ED29CD90 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BCBC5959481D5B05E95B487 /* PreviewFixtures.swift */; };
 		B63CB643CD3FAB3A9C73AF58 /* DaemonModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABA319C6585B0E20EAF5D62B /* DaemonModelsTests.swift */; };
@@ -607,6 +608,7 @@
 		F4CFA4F227E34EE75862F84C /* LegacyCachedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyCachedModels.swift; sourceTree = "<group>"; };
 		F564467A6E0A166496746F97 /* SessionsBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsBoardView.swift; sourceTree = "<group>"; };
 		F776E7BB01E4D96FD050BDA0 /* InspectorDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorDetailViews.swift; sourceTree = "<group>"; };
+		F7B6EF1154EFB25CF4CF6F71 /* DaemonManifestDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonManifestDecodingTests.swift; sourceTree = "<group>"; };
 		F860FD8C4C65017AE3D757C1 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		FA64A474877B07E69355E05D /* SidebarView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarView+Sections.swift"; sourceTree = "<group>"; };
 		FA8FF74A0FBAAB8978915321 /* HarnessMonitorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTheme.swift; sourceTree = "<group>"; };
@@ -813,6 +815,7 @@
 				4867E04ECF63D0A2715695EF /* CachedModelsTests.swift */,
 				447650C240AC036E1222DB52 /* ConnectionModelsTests.swift */,
 				19BBE392E8070647D7427DAD /* DaemonControllerTests.swift */,
+				F7B6EF1154EFB25CF4CF6F71 /* DaemonManifestDecodingTests.swift */,
 				ABA319C6585B0E20EAF5D62B /* DaemonModelsTests.swift */,
 				2B82544B8D7FEC165A767D27 /* HarnessMonitorActionTestSupport.swift */,
 				14AF847B83E27E7A729BEB54 /* HarnessMonitorFailureTestSupport.swift */,
@@ -1449,6 +1452,7 @@
 				4F6BBF37BDC6EC822ED36C92 /* CachedModelsTests.swift in Sources */,
 				616DD8C34CC0151BD79FF4D3 /* ConnectionModelsTests.swift in Sources */,
 				C2949E5EEE6FFD85CD548BA0 /* DaemonControllerTests.swift in Sources */,
+				B2FADE1182F1CEB6B7665DE3 /* DaemonManifestDecodingTests.swift in Sources */,
 				B63CB643CD3FAB3A9C73AF58 /* DaemonModelsTests.swift in Sources */,
 				5E4753F6502FAA1A8FE7B334 /* HarnessMonitorActionTestSupport.swift in Sources */,
 				35F025A53298CFBB24332F36 /* HarnessMonitorFailureTestSupport.swift in Sources */,
