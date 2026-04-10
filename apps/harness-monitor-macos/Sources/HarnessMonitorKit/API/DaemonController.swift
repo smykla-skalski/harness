@@ -152,9 +152,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
-    let binary = try bundledHarnessBinaryURL()
-    try startDetachedDaemon(binary: binary)
-    return try await waitForHealthyClient()
+    try await waitForHealthyClient()
   }
 
   public func stopDaemon() async throws -> String {
@@ -169,13 +167,14 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {
-    let binary = try bundledHarnessBinaryURL()
-    let result = try await run(executable: binary, arguments: ["daemon", "status"])
-    guard result.exitCode == 0 else {
-      throw DaemonControlError.commandFailed(result.stderr.nonEmpty ?? result.stdout)
+    let launchAgent = launchAgentStatus()
+    let client = try await bootstrapClient()
+    defer {
+      Task.detached { await client.shutdown() }
     }
-    let report = try makeDecoder().decode(DaemonStatusReport.self, from: Data(result.stdout.utf8))
-    return report.replacingLaunchAgentStatus(launchAgentStatus())
+    let report = try await client.diagnostics()
+    return DaemonStatusReport(diagnosticsReport: report)
+      .replacingLaunchAgentStatus(launchAgent)
   }
 
   public func installLaunchAgent() async throws -> String {
@@ -246,91 +245,6 @@ public struct DaemonController: DaemonControlling {
     return url
   }
 
-  private func bundledHarnessBinaryURL() throws -> URL {
-    let candidates = [
-      Bundle.main.url(forAuxiliaryExecutable: "harness"),
-      Bundle.main.bundleURL
-        .appendingPathComponent("Contents", isDirectory: true)
-        .appendingPathComponent("Helpers", isDirectory: true)
-        .appendingPathComponent("harness"),
-    ].compactMap(\.self)
-
-    if let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
-    {
-      return match
-    }
-
-    throw DaemonControlError.harnessBinaryNotFound
-  }
-
-  @discardableResult
-  private func startDetachedDaemon(binary: URL) throws -> Process {
-    let process = Process()
-    process.executableURL = binary
-    process.arguments = Self.daemonServeArguments
-    process.environment = processEnvironment()
-    process.standardOutput = FileHandle.nullDevice
-    process.standardError = FileHandle.nullDevice
-    try process.run()
-    return process
-  }
-
-  private func run(executable: URL, arguments: [String]) async throws -> CommandResult {
-    try await Task.detached(priority: .userInitiated) {
-      let process = Process()
-      process.executableURL = executable
-      process.arguments = arguments
-      process.environment = processEnvironment()
-
-      let stdout = Pipe()
-      let stderr = Pipe()
-      process.standardOutput = stdout
-      process.standardError = stderr
-
-      try process.run()
-      process.waitUntilExit()
-
-      let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
-      let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
-
-      return CommandResult(
-        exitCode: process.terminationStatus,
-        stdout: String(data: stdoutData, encoding: .utf8) ?? "",
-        stderr: String(data: stderrData, encoding: .utf8) ?? ""
-      )
-    }.value
-  }
-
-  private func processEnvironment() -> [String: String] {
-    Self.daemonProcessEnvironment(
-      base: ProcessInfo.processInfo.environment,
-      environment: environment
-    )
-  }
-
-  static var daemonServeArguments: [String] {
-    ["daemon", "serve", "--host", "127.0.0.1", "--port", "0", "--sandboxed"]
-  }
-
-  static func daemonProcessEnvironment(
-    base: [String: String],
-    environment: HarnessMonitorEnvironment
-  ) -> [String: String] {
-    var values = base
-    values.merge(environment.values) { _, new in new }
-    values[HarnessMonitorAppGroup.environmentKey] =
-      values[HarnessMonitorAppGroup.environmentKey]?.nonEmpty
-      ?? HarnessMonitorAppGroup.identifier
-    values["HARNESS_SANDBOXED"] = "1"
-
-    if values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?.nonEmpty == nil {
-      values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey] =
-        HarnessMonitorPaths.dataRoot(using: environment).path
-    }
-
-    return values
-  }
-
   private func launchAgentStatus() -> LaunchAgentStatus {
     switch launchAgentManager.registrationState() {
     case .enabled:
@@ -393,15 +307,3 @@ extension DaemonStatusReport {
   }
 }
 
-private struct CommandResult: Sendable {
-  let exitCode: Int32
-  let stdout: String
-  let stderr: String
-}
-
-extension String {
-  fileprivate var nonEmpty: String? {
-    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-  }
-}
