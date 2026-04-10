@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -5,6 +6,8 @@ struct PreferencesActionButtons: View {
   let store: HarnessMonitorStore
   let isLoading: Bool
   @Binding var isRemoveLaunchAgentConfirmationPresented: Bool
+
+  private static let externalDaemonCommand = "harness daemon dev"
 
   var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -30,35 +33,48 @@ struct PreferencesActionButtons: View {
           ),
           action: { await store.refreshDiagnostics() }
         )
-        HarnessMonitorAsyncActionButton(
-          title: "Start Daemon",
-          tint: nil,
-          variant: .prominent,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
-            "Start Daemon"
-          ),
-          action: { await store.startDaemon() }
-        )
-        HarnessMonitorAsyncActionButton(
-          title: "Install Launch Agent",
-          tint: .secondary,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
-            "Install Launch Agent"
-          ),
-          action: { await store.installLaunchAgent() }
-        )
-        HarnessMonitorActionButton(
-          title: "Remove Launch Agent",
-          tint: .red,
-          variant: .bordered,
-          accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
-            "Remove Launch Agent"
+        if store.daemonOwnership == .managed {
+          HarnessMonitorAsyncActionButton(
+            title: "Start Daemon",
+            tint: nil,
+            variant: .prominent,
+            isLoading: isLoading,
+            accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
+              "Start Daemon"
+            ),
+            action: { await store.startDaemon() }
           )
-        ) {
-          isRemoveLaunchAgentConfirmationPresented = true
+          HarnessMonitorAsyncActionButton(
+            title: "Install Launch Agent",
+            tint: .secondary,
+            variant: .bordered,
+            isLoading: isLoading,
+            accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
+              "Install Launch Agent"
+            ),
+            action: { await store.installLaunchAgent() }
+          )
+          HarnessMonitorActionButton(
+            title: "Remove Launch Agent",
+            tint: .red,
+            variant: .bordered,
+            accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
+              "Remove Launch Agent"
+            )
+          ) {
+            isRemoveLaunchAgentConfirmationPresented = true
+          }
+        } else {
+          HarnessMonitorActionButton(
+            title: "Copy Dev Command",
+            tint: .secondary,
+            variant: .bordered,
+            accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
+              "Copy Dev Command"
+            )
+          ) {
+            copyExternalDaemonCommandToClipboard()
+          }
         }
         HarnessMonitorActionButton(
           title: "Reset Onboarding",
@@ -73,6 +89,12 @@ struct PreferencesActionButtons: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func copyExternalDaemonCommandToClipboard() {
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString(Self.externalDaemonCommand, forType: .string)
   }
 }
 
