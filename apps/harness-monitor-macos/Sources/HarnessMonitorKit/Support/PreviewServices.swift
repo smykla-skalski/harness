@@ -1,10 +1,32 @@
 import Foundation
 
 public actor PreviewVoiceCaptureService: VoiceCaptureProviding {
+  public enum Behavior: Sendable {
+    case transcript(String)
+    case failure(any Error & Sendable)
+  }
+
+  public struct PreviewFailure: LocalizedError, Sendable {
+    public let message: String
+
+    public init(message: String) {
+      self.message = message
+    }
+
+    public var errorDescription: String? {
+      message
+    }
+  }
+
+  public static let defaultTranscript = "Preview voice input for Harness Monitor"
+
+  private let behavior: Behavior
   private var continuation: VoiceCaptureEventStream.Continuation?
   private var emissionTask: Task<Void, Never>?
 
-  public init() {}
+  public init(behavior: Behavior? = nil) {
+    self.behavior = behavior ?? .transcript(Self.defaultTranscript)
+  }
 
   public nonisolated func capture(configuration _: VoiceCaptureConfiguration) -> VoiceCaptureEventStream {
     VoiceCaptureEventStream { continuation in
@@ -36,21 +58,27 @@ public actor PreviewVoiceCaptureService: VoiceCaptureProviding {
     emissionTask = Task {
       try? await Task.sleep(for: .milliseconds(120))
       guard !Task.isCancelled else { return }
-      continuation.yield(
-        .transcript(
-          VoiceTranscriptSegment(
-            sequence: 1,
-            text: "Preview voice input for Harness Monitor",
-            isFinal: true,
-            startedAtSeconds: 0,
-            durationSeconds: 0.5
+      switch behavior {
+      case .transcript(let text):
+        continuation.yield(
+          .transcript(
+            VoiceTranscriptSegment(
+              sequence: 1,
+              text: text,
+              isFinal: true,
+              startedAtSeconds: 0,
+              durationSeconds: 0.5
+            )
           )
         )
-      )
-      try? await Task.sleep(for: .milliseconds(80))
-      guard !Task.isCancelled else { return }
-      continuation.yield(.state(.finishing))
-      continuation.finish()
+        try? await Task.sleep(for: .milliseconds(80))
+        guard !Task.isCancelled else { return }
+        continuation.yield(.state(.finishing))
+        continuation.finish()
+      case .failure(let error):
+        continuation.yield(.state(.failed))
+        continuation.finish(throwing: error)
+      }
     }
   }
 }
