@@ -73,6 +73,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case manifestUnreadable
   case daemonOffline
   case daemonDidNotStart
+  case externalDaemonOffline(manifestPath: String)
   case commandFailed(String)
 
   public var errorDescription: String? {
@@ -87,6 +88,9 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
       "The harness daemon is offline. Start the daemon to load live sessions."
     case .daemonDidNotStart:
       "The harness daemon did not become healthy before the timeout."
+    case .externalDaemonOffline(let manifestPath):
+      "External daemon not running. Start it in a terminal: `harness daemon dev`. "
+        + "Manifest expected at \(manifestPath)."
     case .commandFailed(let message):
       message
     }

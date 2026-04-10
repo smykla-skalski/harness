@@ -139,6 +139,7 @@ public final class HarnessMonitorStore {
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
 
   let daemonController: any DaemonControlling
+  public let daemonOwnership: DaemonOwnership
   let fileViewer: any FileViewerActivating
   @ObservationIgnored public let voiceCapture: any VoiceCaptureProviding
   public let modelContext: ModelContext?
@@ -171,6 +172,7 @@ public final class HarnessMonitorStore {
   public convenience init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
+    daemonOwnership: DaemonOwnership = .managed,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) {
@@ -178,6 +180,7 @@ public final class HarnessMonitorStore {
       daemonController: daemonController,
       fileViewer: fileViewer,
       voiceCapture: NativeVoiceCaptureService(),
+      daemonOwnership: daemonOwnership,
       modelContainer: modelContainer,
       persistenceError: persistenceError
     )
@@ -187,6 +190,7 @@ public final class HarnessMonitorStore {
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
     voiceCapture: any VoiceCaptureProviding,
+    daemonOwnership: DaemonOwnership = .managed,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) {
@@ -198,6 +202,7 @@ public final class HarnessMonitorStore {
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.daemonController = daemonController
+    self.daemonOwnership = daemonOwnership
     self.fileViewer = fileViewer
     self.voiceCapture = voiceCapture
     self.modelContext = modelContainer?.mainContext
@@ -232,6 +237,15 @@ public final class HarnessMonitorStore {
     connectionState = .connecting
     lastError = nil
 
+    switch daemonOwnership {
+    case .external:
+      await bootstrapExternalDaemon()
+    case .managed:
+      await bootstrapManagedDaemon()
+    }
+  }
+
+  private func bootstrapManagedDaemon() async {
     let registrationState = await daemonController.launchAgentRegistrationState()
     switch registrationState {
     case .notRegistered, .notFound:
@@ -255,6 +269,21 @@ public final class HarnessMonitorStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+      await restorePersistedSessionState()
+    }
+  }
+
+  private func bootstrapExternalDaemon() async {
+    do {
+      let client = try await daemonController.awaitManifestWarmUp(
+        timeout: bootstrapWarmUpTimeout
+      )
+      await connect(using: client)
+    } catch {
+      let message =
+        (error as? DaemonControlError)?.errorDescription
+        ?? "External daemon not running. Start it with `harness daemon dev` in a terminal."
+      markConnectionOffline(message)
       await restorePersistedSessionState()
     }
   }

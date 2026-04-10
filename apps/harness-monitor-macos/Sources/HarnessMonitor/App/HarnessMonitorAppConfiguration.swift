@@ -127,6 +127,10 @@ struct HarnessMonitorAppConfiguration {
 
     var values = environment.values
     values[uiTestsEnvironmentKey] = "1"
+    // Never let an external-daemon developer env leak into UI tests; UI tests
+    // always run against managed/preview controllers, not a real terminal
+    // daemon.
+    values[DaemonOwnership.environmentKey] = "0"
 
     if isUITestHost, isBlank(values[HarnessMonitorLaunchMode.environmentKey]) {
       values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue

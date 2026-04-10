@@ -59,6 +59,7 @@ enum HarnessMonitorAppStoreFactory {
     case .live:
       return HarnessMonitorStore(
         daemonController: DaemonController(environment: environment),
+        daemonOwnership: DaemonOwnership(environment: environment),
         modelContainer: modelContainer,
         persistenceError: persistenceError
       )
