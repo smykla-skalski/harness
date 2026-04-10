@@ -181,8 +181,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let daemon_epoch = manifest.started_at.clone();
 
     spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
-    let codex_controller =
-        CodexControllerHandle::new(sender.clone(), db.clone(), config.codex_transport.clone());
+    let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
 
     let app_state = DaemonHttpState {
         token,

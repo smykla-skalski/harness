@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::codex_transport::{CodexTransport, CodexTransportKind};
+use super::codex_transport::{self, CodexTransport, CodexTransportKind};
 use super::db::DaemonDb;
 use super::protocol::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexApprovalRequest,
@@ -27,7 +27,7 @@ struct CodexControllerState {
     sender: broadcast::Sender<StreamEvent>,
     db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     active_runs: Arc<Mutex<HashMap<String, ActiveRun>>>,
-    transport_kind: CodexTransportKind,
+    sandboxed: bool,
 }
 
 #[derive(Clone)]
@@ -50,27 +50,32 @@ enum CodexControlMessage {
 impl CodexControllerHandle {
     /// Create a daemon-owned Codex controller.
     ///
-    /// `transport_kind` selects how each run's Codex app-server is reached -
-    /// either by spawning a local child process (stdio) or by connecting to
-    /// a user-launched server over WebSocket.
+    /// `sandboxed` is the daemon's sandbox-mode flag. Transport selection is
+    /// re-evaluated on every [`Self::current_transport_kind`] call so runs
+    /// pick up a bridge endpoint the moment `harness codex-bridge start`
+    /// publishes it, without having to restart the daemon.
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
         db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-        transport_kind: CodexTransportKind,
+        sandboxed: bool,
     ) -> Self {
         Self {
             state: Arc::new(CodexControllerState {
                 sender,
                 db,
                 active_runs: Arc::default(),
-                transport_kind,
+                sandboxed,
             }),
         }
     }
 
-    fn transport_kind(&self) -> &CodexTransportKind {
-        &self.state.transport_kind
+    /// Resolve the transport to use for a new run right now. Consults the
+    /// env, any running codex-bridge, and the sandbox default in that order
+    /// (see [`codex_transport::codex_transport_from_env`]).
+    #[must_use]
+    pub fn current_transport_kind(&self) -> CodexTransportKind {
+        codex_transport::codex_transport_from_env(self.state.sandboxed)
     }
 
     /// Start a Codex run for a Harness session.
@@ -339,7 +344,7 @@ impl CodexRunWorker {
             Some("Starting codex app-server"),
             None,
         )?;
-        let transport = self.controller.transport_kind().connect().await?;
+        let transport = self.controller.current_transport_kind().connect().await?;
         let mut rpc = CodexJsonRpc::new(transport);
         self.initialize(&mut rpc).await?;
         self.start_or_resume_thread(&mut rpc).await?;
