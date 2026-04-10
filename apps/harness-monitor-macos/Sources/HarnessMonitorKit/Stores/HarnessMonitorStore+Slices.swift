@@ -219,6 +219,7 @@ extension HarnessMonitorStore {
   public final class SessionSearchResultsSlice {
     public internal(set) var state = SessionSearchResultsState()
 
+    public var isSearchActive: Bool { state.isSearchActive }
     public var filteredSessionCount: Int { state.filteredSessionCount }
     public var totalSessionCount: Int { state.totalSessionCount }
     public var visibleSessionIDs: [String] { state.visibleSessionIDs }
