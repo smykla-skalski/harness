@@ -62,7 +62,7 @@ struct SidebarSessionRow: View {
   }
 
   private func scaled(_ font: Font) -> Font {
-    fontScale == 1.0 ? font : font.scaled(by: fontScale)
+    HarnessMonitorTextSize.scaledFont(font, by: fontScale)
   }
 }
 

@@ -5,12 +5,14 @@ struct SidebarRecentSearchesView: View {
   let isPersistenceAvailable: Bool
   let applyQuery: (String) -> Void
   let clearHistory: () -> Void
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack {
         Text("Recent Searches")
-          .scaledFont(.caption.bold())
+          .font(scaled(.caption.bold()))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
 
         Spacer()
@@ -18,7 +20,7 @@ struct SidebarRecentSearchesView: View {
         if isPersistenceAvailable {
           Button("Clear", action: clearHistory)
             .harnessDismissButtonStyle()
-            .scaledFont(.caption)
+            .font(scaled(.caption))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearSearchHistoryButton)
         }
@@ -40,5 +42,9 @@ struct SidebarRecentSearchesView: View {
         }
       }
     }
+  }
+
+  private func scaled(_ font: Font) -> Font {
+    HarnessMonitorTextSize.scaledFont(font, by: fontScale)
   }
 }

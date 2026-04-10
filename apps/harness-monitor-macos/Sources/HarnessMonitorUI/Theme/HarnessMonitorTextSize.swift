@@ -31,8 +31,11 @@ public enum HarnessMonitorTextSize {
 
   public static func nativeFormControlFont(at index: Int) -> Font {
     let font = Font.body
-    let scale = scale(at: index)
-    return scale == 1.0 ? font : font.scaled(by: scale)
+    return scaledFont(font, by: scale(at: index))
+  }
+
+  static func scaledFont(_ font: Font, by scale: CGFloat) -> Font {
+    scale == 1.0 ? font : font.scaled(by: scale)
   }
 
   public static func controlSize(at index: Int) -> ControlSize {
@@ -88,7 +91,7 @@ private struct ScaledFontModifier: ViewModifier {
   private var scale
 
   func body(content: Content) -> some View {
-    content.font(scale == 1.0 ? font : font.scaled(by: scale))
+    content.font(HarnessMonitorTextSize.scaledFont(font, by: scale))
   }
 }
 
@@ -110,9 +113,8 @@ private struct HarnessMonitorFormContainerModifier: ViewModifier {
   private var scale
 
   func body(content: Content) -> some View {
-    let font: Font = scale == 1.0 ? .body : .body.scaled(by: scale)
     content
-      .font(font)
+      .font(HarnessMonitorTextSize.scaledFont(.body, by: scale))
       .formStyle(.grouped)
       .scrollIndicators(.automatic)
   }

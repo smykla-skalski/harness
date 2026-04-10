@@ -21,7 +21,7 @@ extension SidebarView {
     for group: HarnessMonitorStore.SessionGroup
   ) -> some View {
     Text(group.project.name)
-      .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+      .font(scaledSidebarFont(.system(.headline, design: .rounded, weight: .semibold)))
       .accessibilityAddTraits(.isHeader)
       .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityIdentifier(
@@ -50,14 +50,14 @@ extension SidebarView {
   ) -> some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       Image(systemName: group.isWorktree ? "square.3.layers.3d.down.right" : "folder")
-        .scaledFont(.caption.weight(.semibold))
+        .font(scaledSidebarFont(.caption.weight(.semibold)))
         .foregroundStyle(.secondary)
       Text(group.title)
-        .scaledFont(.caption.weight(.semibold))
+        .font(scaledSidebarFont(.caption.weight(.semibold)))
         .foregroundStyle(.secondary)
       Spacer()
       Text("\(group.sessionCount)")
-        .scaledFont(.caption2.monospacedDigit())
+        .font(scaledSidebarFont(.caption2.monospacedDigit()))
         .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
