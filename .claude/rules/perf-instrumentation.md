@@ -39,6 +39,38 @@ Do not set `HARNESS_MONITOR_LAUNCH_MODE` explicitly in perf tests. The scenario'
 
 Perf tests take 8-12 seconds per scenario per iteration (3 iterations default). They steal window focus and are inherently noisy. Do not add them to the default `xcodebuild test` lane. Run them with `-only-testing:HarnessMonitorUITests/HarnessMonitorPerfTests` or as individual methods.
 
+## Isolate instrumentation runs in a temporary worktree
+
+Instrumentation/audit runs must not execute from a dirty shared worktree. They build, stage, launch, and trace app bundles, so parallel edits in the main checkout can make the run measure the wrong source revision or mix unrelated changes into the build.
+
+For every `Scripts/run-instruments-audit.sh` run that is intended to prove a performance fix:
+
+1. Create a temporary worktree from the exact commit or ref under test, preferably under `/tmp`, for example:
+
+   ```bash
+   git worktree add /tmp/harness-monitor-audit-<sha>-<date> <sha-or-ref>
+   ```
+
+2. Immediately run `mise trust` inside that new worktree before any build or audit command:
+
+   ```bash
+   (cd /tmp/harness-monitor-audit-<sha>-<date> && mise trust)
+   ```
+
+   This is required so audit logs do not get polluted by mise trust warnings and so the worktree uses the expected repo tool configuration.
+
+3. Run `apps/harness-monitor-macos/Scripts/run-instruments-audit.sh` from inside that worktree. Compare against the baseline path from the main repo only when needed; do not run the audit from the main worktree just to access the baseline.
+
+4. Verify the generated `manifest.json` before trusting the numbers. The embedded commit, dirty flag, workspace fingerprint, host binary hash, and staged host bundle ID must match the worktree/ref being measured.
+
+5. Clean up the temporary worktree when the run is finished and artifacts needed for the report have been copied or recorded:
+
+   ```bash
+   git worktree remove /tmp/harness-monitor-audit-<sha>-<date>
+   ```
+
+Leaving audit worktrees behind is not acceptable. If cleanup fails because a process still owns files in the worktree, stop the leftover process and rerun `git worktree remove`.
+
 ## xctrace scripts
 
 The Python scripts under `Scripts/` parse Instruments XML exports. They must stay compatible with the xctrace export format, which uses ref-based deduplication for elements. The `dereference` function in `extract-instruments-metrics.py` handles transitive refs (ref -> ref -> element).
