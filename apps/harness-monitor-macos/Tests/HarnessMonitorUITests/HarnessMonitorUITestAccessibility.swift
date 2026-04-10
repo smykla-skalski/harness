@@ -161,9 +161,14 @@ enum HarnessMonitorUITestAccessibility {
   static let sendSignalSheet = "harness.sheet.send-signal"
   static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
+  static let sendSignalSheetMessageVoiceButton = "harness.sheet.send-signal.message.voice"
   static let sendSignalSheetActionHintField = "harness.sheet.send-signal.action-hint"
   static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
   static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
+  static let voiceInputPopover = "harness.voice-input.popover"
+  static let voiceInputTranscript = "harness.voice-input.transcript"
+  static let voiceInputInsertButton = "harness.voice-input.insert"
+  static let voiceInputStopButton = "harness.voice-input.stop"
   static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
 
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {

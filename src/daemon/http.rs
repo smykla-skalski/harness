@@ -20,7 +20,8 @@ use super::protocol::{
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
     SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
     TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskUpdateRequest,
+    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    VoiceTranscriptUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -46,7 +47,40 @@ pub async fn serve(
     state: DaemonHttpState,
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), CliError> {
-    let app = Router::new()
+    let app = daemon_http_router().with_state(state);
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            if *shutdown_rx.borrow() {
+                return;
+            }
+            while shutdown_rx.changed().await.is_ok() {
+                if *shutdown_rx.borrow() {
+                    break;
+                }
+            }
+        })
+        .await
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "serve daemon http api: {error}"
+            )))
+        })
+}
+
+fn daemon_http_router() -> Router<DaemonHttpState> {
+    Router::new()
+        .merge(core_routes())
+        .merge(session_routes())
+        .merge(task_routes())
+        .merge(agent_routes())
+        .merge(signal_routes())
+        .merge(codex_routes())
+        .merge(voice_routes())
+}
+
+fn core_routes() -> Router<DaemonHttpState> {
+    Router::new()
         .route("/v1/health", get(get_health))
         .route("/v1/diagnostics", get(get_diagnostics))
         .route("/v1/daemon/stop", post(post_stop_daemon))
@@ -55,12 +89,30 @@ pub async fn serve(
             get(get_log_level).put(put_log_level),
         )
         .route("/v1/projects", get(get_projects))
+        .route("/v1/ws", get(super::websocket::ws_upgrade_handler))
+        .route("/v1/stream", get(stream_global))
+}
+
+fn session_routes() -> Router<DaemonHttpState> {
+    Router::new()
         .route("/v1/sessions", get(get_sessions).post(post_session_start))
         .route("/v1/sessions/{session_id}", get(get_session))
         .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
-        .route("/v1/ws", get(super::websocket::ws_upgrade_handler))
-        .route("/v1/stream", get(stream_global))
         .route("/v1/sessions/{session_id}/stream", get(stream_session))
+        .route("/v1/sessions/{session_id}/join", post(post_session_join))
+        .route("/v1/sessions/{session_id}/end", post(post_end_session))
+        .route(
+            "/v1/sessions/{session_id}/observe",
+            post(post_observe_session),
+        )
+        .route(
+            "/v1/sessions/{session_id}/voice-sessions",
+            post(post_voice_session),
+        )
+}
+
+fn task_routes() -> Router<DaemonHttpState> {
+    Router::new()
         .route("/v1/sessions/{session_id}/task", post(post_task_create))
         .route(
             "/v1/sessions/{session_id}/tasks/{task_id}/assign",
@@ -82,6 +134,10 @@ pub async fn serve(
             "/v1/sessions/{session_id}/tasks/{task_id}/checkpoint",
             post(post_task_checkpoint),
         )
+}
+
+fn agent_routes() -> Router<DaemonHttpState> {
+    Router::new()
         .route(
             "/v1/sessions/{session_id}/agents/{agent_id}/role",
             post(post_role_change),
@@ -94,8 +150,10 @@ pub async fn serve(
             "/v1/sessions/{session_id}/leader",
             post(post_transfer_leader),
         )
-        .route("/v1/sessions/{session_id}/join", post(post_session_join))
-        .route("/v1/sessions/{session_id}/end", post(post_end_session))
+}
+
+fn signal_routes() -> Router<DaemonHttpState> {
+    Router::new()
         .route("/v1/sessions/{session_id}/signal", post(post_send_signal))
         .route(
             "/v1/sessions/{session_id}/signal-cancel",
@@ -105,10 +163,10 @@ pub async fn serve(
             "/v1/sessions/{session_id}/signal-ack",
             post(post_signal_ack),
         )
-        .route(
-            "/v1/sessions/{session_id}/observe",
-            post(post_observe_session),
-        )
+}
+
+fn codex_routes() -> Router<DaemonHttpState> {
+    Router::new()
         .route(
             "/v1/sessions/{session_id}/codex-runs",
             get(get_codex_runs).post(post_codex_run),
@@ -123,25 +181,22 @@ pub async fn serve(
             "/v1/codex-runs/{run_id}/approvals/{approval_id}",
             post(post_codex_approval),
         )
-        .with_state(state);
+}
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            if *shutdown_rx.borrow() {
-                return;
-            }
-            while shutdown_rx.changed().await.is_ok() {
-                if *shutdown_rx.borrow() {
-                    break;
-                }
-            }
-        })
-        .await
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "serve daemon http api: {error}"
-            )))
-        })
+fn voice_routes() -> Router<DaemonHttpState> {
+    Router::new()
+        .route(
+            "/v1/voice-sessions/{voice_session_id}/audio",
+            post(post_voice_audio_chunk),
+        )
+        .route(
+            "/v1/voice-sessions/{voice_session_id}/transcript",
+            post(post_voice_transcript),
+        )
+        .route(
+            "/v1/voice-sessions/{voice_session_id}/finish",
+            post(post_voice_finish),
+        )
 }
 
 async fn get_health(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
@@ -755,6 +810,86 @@ async fn post_codex_approval(
         state
             .codex_controller
             .resolve_approval(&run_id, &approval_id, &request),
+    )
+}
+
+async fn post_voice_session(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<VoiceSessionStartRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/voice-sessions",
+        &request_id,
+        start,
+        super::voice::start_session(&session_id, &request),
+    )
+}
+
+async fn post_voice_audio_chunk(
+    Path(voice_session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<VoiceAudioChunkRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/voice-sessions/{id}/audio",
+        &request_id,
+        start,
+        super::voice::append_audio_chunk(&voice_session_id, &request).await,
+    )
+}
+
+async fn post_voice_transcript(
+    Path(voice_session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<VoiceTranscriptUpdateRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/voice-sessions/{id}/transcript",
+        &request_id,
+        start,
+        super::voice::append_transcript(&voice_session_id, &request),
+    )
+}
+
+async fn post_voice_finish(
+    Path(voice_session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<VoiceSessionFinishRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/voice-sessions/{id}/finish",
+        &request_id,
+        start,
+        super::voice::finish_session(&voice_session_id, &request),
     )
 }
 
