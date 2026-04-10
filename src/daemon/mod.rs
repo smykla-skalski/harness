@@ -30,5 +30,6 @@ pub mod snapshot;
 pub mod state;
 pub mod timeline;
 pub mod transport;
+pub mod voice;
 pub mod watch;
 pub mod websocket;

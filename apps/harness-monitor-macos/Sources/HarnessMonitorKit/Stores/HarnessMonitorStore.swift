@@ -140,6 +140,7 @@ public final class HarnessMonitorStore {
 
   let daemonController: any DaemonControlling
   let fileViewer: any FileViewerActivating
+  @ObservationIgnored public let voiceCapture: any VoiceCaptureProviding
   public let modelContext: ModelContext?
   let cacheService: SessionCacheService?
   var client: (any HarnessMonitorClientProtocol)?
@@ -167,9 +168,25 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
 
+  public convenience init(
+    daemonController: any DaemonControlling,
+    fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
+    modelContainer: ModelContainer? = nil,
+    persistenceError: String? = nil
+  ) {
+    self.init(
+      daemonController: daemonController,
+      fileViewer: fileViewer,
+      voiceCapture: NativeVoiceCaptureService(),
+      modelContainer: modelContainer,
+      persistenceError: persistenceError
+    )
+  }
+
   public init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
+    voiceCapture: any VoiceCaptureProviding,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) {
@@ -182,6 +199,7 @@ public final class HarnessMonitorStore {
     self.inspectorUI = InspectorUISlice()
     self.daemonController = daemonController
     self.fileViewer = fileViewer
+    self.voiceCapture = voiceCapture
     self.modelContext = modelContainer?.mainContext
     if let modelContainer {
       self.cacheService = SessionCacheService(modelContainer: modelContainer)

@@ -5,9 +5,8 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
   func testSendSignalSheetPresentsAndDismissesWithEscape() throws {
-    let app = launch(mode: "preview")
+    let app = launchInCockpitPreview()
 
-    tapPreviewSession(in: app)
     openSendSignalSheet(in: app)
 
     // Verify sheet appeared.
@@ -39,9 +38,8 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
   }
 
   func testSendSignalSheetDismissesWithCancelButton() throws {
-    let app = launch(mode: "preview")
+    let app = launchInCockpitPreview()
 
-    tapPreviewSession(in: app)
     openSendSignalSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
@@ -59,9 +57,8 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
   }
 
   func testSendSignalSheetFormInteraction() throws {
-    let app = launch(mode: "preview")
+    let app = launchInCockpitPreview()
 
-    tapPreviewSession(in: app)
     openSendSignalSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
@@ -91,29 +88,73 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     // Clean up.
     app.typeKey(.escape, modifierFlags: [])
   }
+
+  func testSendSignalVoicePopoverRecordsPreviewTranscript() throws {
+    let app = launchInCockpitPreview()
+
+    openSendSignalSheet(in: app)
+
+    let voiceButton = button(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
+    XCTAssertTrue(voiceButton.waitForExistence(timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: voiceButton)
+
+    let popover = element(in: app, identifier: Accessibility.voiceInputPopover)
+    XCTAssertTrue(
+      popover.waitForExistence(timeout: Self.actionTimeout),
+      "Voice input popover should open from the message field"
+    )
+
+    let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
+    XCTAssertTrue(recordButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(recordButton.label.contains("Record"))
+    tapViaCoordinate(in: app, element: recordButton)
+
+    let transcript = element(in: app, identifier: Accessibility.voiceInputTranscript)
+    let transcriptText = app.staticTexts["Preview voice input for Harness Monitor"].firstMatch
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        (transcript.exists
+          && transcript.label.contains("Preview voice input for Harness Monitor"))
+          || transcriptText.exists
+      },
+      "Preview voice capture should produce a transcript without microphone access"
+    )
+
+    let insertButton = button(in: app, identifier: Accessibility.voiceInputInsertButton)
+    XCTAssertTrue(insertButton.waitForExistence(timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: insertButton)
+
+    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let value = messageField.value as? String
+        return value?.contains("Preview voice input for Harness Monitor") == true
+      },
+      "Inserted voice transcript should update the message field"
+    )
+  }
 }
 
 extension HarnessMonitorSheetUITests {
-  /// Scroll the cockpit to reveal agent cards and right-click the leader
-  /// agent card to open the "Send Signal" context menu item.
+  fileprivate func launchInCockpitPreview() -> XCUIApplication {
+    launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+  }
+
+  /// Right-click the already-loaded leader agent card to open the "Send Signal"
+  /// context menu item.
   fileprivate func openSendSignalSheet(in app: XCUIApplication) {
     let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
-    XCTAssertTrue(agentCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        agentCard.exists && !agentCard.frame.isEmpty
+      },
+      "Leader agent card should be visible in cockpit preview"
+    )
 
-    // Agent cards live inside HarnessMonitorAdaptiveGridLayout and may be
-    // below the fold. Scroll the content area down to bring them into view.
-    let contentFrame = frameElement(in: app, identifier: Accessibility.contentRootFrame)
-    if contentFrame.exists {
-      dragUp(in: app, element: contentFrame, distanceRatio: 3.0)
-      RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
-    }
-
-    // Right-click via coordinate since custom layouts report isHittable=false.
-    guard let coordinate = centerCoordinate(in: app, for: agentCard) else {
-      XCTFail("Cannot resolve coordinate for agent card")
-      return
-    }
-    coordinate.rightClick()
+    agentCard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
 
     let signalMenuItem = app.menuItems["Send Signal"].firstMatch
     XCTAssertTrue(

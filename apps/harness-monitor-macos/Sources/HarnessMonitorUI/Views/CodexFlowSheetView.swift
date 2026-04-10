@@ -75,9 +75,19 @@ struct CodexFlowSheetView: View {
 
   private var promptSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Prompt")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      HStack {
+        Text("Prompt")
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Spacer()
+        HarnessVoiceInputButton(
+          store: store,
+          text: $prompt,
+          label: "Dictate Codex prompt",
+          routeTarget: { .codexPrompt },
+          accessibilityIdentifier: HarnessMonitorAccessibility.codexFlowPromptVoiceButton
+        )
+      }
       TextField("Ask Codex to investigate or patch this session", text: $prompt, axis: .vertical)
         .harnessNativeFormControl()
         .lineLimit(4, reservesSpace: true)
@@ -195,9 +205,19 @@ struct CodexFlowSheetView: View {
 
   private func contextSection(_ run: CodexRunSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("New Context")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      HStack {
+        Text("New Context")
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Spacer()
+        HarnessVoiceInputButton(
+          store: store,
+          text: $context,
+          label: "Dictate Codex context",
+          routeTarget: { .codexContext(runID: run.runId) },
+          accessibilityIdentifier: HarnessMonitorAccessibility.codexFlowContextVoiceButton
+        )
+      }
       TextField("Add context to the active turn", text: $context, axis: .vertical)
         .harnessNativeFormControl()
         .lineLimit(3, reservesSpace: true)

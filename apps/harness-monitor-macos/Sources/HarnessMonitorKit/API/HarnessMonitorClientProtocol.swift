@@ -86,6 +86,22 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     approvalID: String,
     request: CodexApprovalDecisionRequest
   ) async throws -> CodexRunSnapshot
+  func startVoiceSession(
+    sessionID: String,
+    request: VoiceSessionStartRequest
+  ) async throws -> VoiceSessionStartResponse
+  func appendVoiceAudioChunk(
+    voiceSessionID: String,
+    request: VoiceAudioChunkRequest
+  ) async throws -> VoiceSessionMutationResponse
+  func appendVoiceTranscript(
+    voiceSessionID: String,
+    request: VoiceTranscriptUpdateRequest
+  ) async throws -> VoiceSessionMutationResponse
+  func finishVoiceSession(
+    voiceSessionID: String,
+    request: VoiceSessionFinishRequest
+  ) async throws -> VoiceSessionMutationResponse
   func logLevel() async throws -> LogLevelResponse
   func setLogLevel(_ level: String) async throws -> LogLevelResponse
 }
@@ -133,6 +149,34 @@ extension HarnessMonitorClientProtocol {
     request _: CodexApprovalDecisionRequest
   ) async throws -> CodexRunSnapshot {
     throw HarnessMonitorAPIError.server(code: 501, message: "Codex controller unavailable.")
+  }
+
+  public func startVoiceSession(
+    sessionID _: String,
+    request _: VoiceSessionStartRequest
+  ) async throws -> VoiceSessionStartResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+  }
+
+  public func appendVoiceAudioChunk(
+    voiceSessionID _: String,
+    request _: VoiceAudioChunkRequest
+  ) async throws -> VoiceSessionMutationResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+  }
+
+  public func appendVoiceTranscript(
+    voiceSessionID _: String,
+    request _: VoiceTranscriptUpdateRequest
+  ) async throws -> VoiceSessionMutationResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
+  }
+
+  public func finishVoiceSession(
+    voiceSessionID _: String,
+    request _: VoiceSessionFinishRequest
+  ) async throws -> VoiceSessionMutationResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Voice capture unavailable.")
   }
 }
 

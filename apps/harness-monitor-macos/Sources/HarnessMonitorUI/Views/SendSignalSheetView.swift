@@ -68,9 +68,26 @@ struct SendSignalSheetView: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.sendSignalSheetCommandField)
       }
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        Text("Message")
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        HStack {
+          Text("Message")
+            .scaledFont(.caption.bold())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Spacer()
+          HarnessVoiceInputButton(
+            store: store,
+            text: $message,
+            label: "Dictate signal message",
+            routeTarget: {
+              let trimmedHint = actionHint.trimmingCharacters(in: .whitespacesAndNewlines)
+              return VoiceRouteTarget.signal(
+                agentID: agentID,
+                command: command.trimmingCharacters(in: .whitespacesAndNewlines),
+                actionHint: trimmedHint.isEmpty ? nil : trimmedHint
+              )
+            },
+            accessibilityIdentifier: HarnessMonitorAccessibility.sendSignalSheetMessageVoiceButton
+          )
+        }
         TextField("Message", text: $message, axis: .vertical)
           .harnessNativeFormControl()
           .focused($focusedField, equals: .message)

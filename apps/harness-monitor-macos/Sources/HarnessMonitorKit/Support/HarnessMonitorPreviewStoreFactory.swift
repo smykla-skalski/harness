@@ -29,6 +29,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     let configuration = configuration(for: scenario)
     let store = HarnessMonitorStore(
       daemonController: PreviewDaemonController(mode: configuration.mode),
+      voiceCapture: PreviewVoiceCaptureService(),
       modelContainer: modelContainer,
       persistenceError: persistenceError
     )
