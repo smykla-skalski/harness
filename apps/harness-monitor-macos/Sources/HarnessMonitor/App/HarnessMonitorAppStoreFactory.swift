@@ -51,13 +51,13 @@ enum HarnessMonitorAppStoreFactory {
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
         modelContainer: modelContainer,
-        persistenceError: persistenceError
+        persistenceError: persistenceError,
+        voiceCapture: previewVoiceCapture(environment: environment)
       )
     }
 
     switch HarnessMonitorLaunchMode(environment: environment) {
     case .live:
-      return HarnessMonitorStore(
       let ownership = DaemonOwnership(environment: environment)
       return HarnessMonitorStore(
         daemonController: DaemonController(
@@ -73,16 +73,46 @@ enum HarnessMonitorAppStoreFactory {
         daemonController: PreviewDaemonController(
           previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]
         ),
-        voiceCapture: PreviewVoiceCaptureService(),
+        voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
         persistenceError: persistenceError
       )
     case .empty:
       return HarnessMonitorStore(
         daemonController: PreviewDaemonController(mode: .empty),
-        voiceCapture: PreviewVoiceCaptureService(),
+        voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
         persistenceError: persistenceError
+      )
+    }
+  }
+
+  private static func previewVoiceCapture(
+    environment: HarnessMonitorEnvironment
+  ) -> any VoiceCaptureProviding {
+    let failure = environment.values["HARNESS_MONITOR_PREVIEW_VOICE_FAILURE"]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let failure, !failure.isEmpty else {
+      return PreviewVoiceCaptureService()
+    }
+
+    switch failure.lowercased() {
+    case "speech-assets":
+      let localeIdentifier =
+        environment.values["HARNESS_MONITOR_PREVIEW_VOICE_LOCALE"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let locale: String
+      if let localeIdentifier, !localeIdentifier.isEmpty {
+        locale = localeIdentifier
+      } else {
+        locale = "en_PL"
+      }
+      return PreviewVoiceCaptureService(
+        behavior: .failure(NativeVoiceCaptureError.speechAssetsUnavailable(locale))
+      )
+    default:
+      return PreviewVoiceCaptureService(
+        behavior: .failure(PreviewVoiceCaptureService.PreviewFailure(message: failure))
       )
     }
   }

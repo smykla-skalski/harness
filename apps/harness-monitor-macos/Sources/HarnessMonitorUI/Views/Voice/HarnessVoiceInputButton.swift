@@ -22,6 +22,7 @@ struct HarnessVoiceInputButton: View {
   @State private var agentBridgeSinkEnabled = true
   @State private var remoteProcessorSinkEnabled = false
   @State private var remoteProcessorText = ""
+  @State private var failurePresentation: VoiceCaptureFailurePresentation?
 
   private static let pendingAudioChunkLimit = 24
   private static let pendingTranscriptSegmentLimit = 16
@@ -71,6 +72,30 @@ struct HarnessVoiceInputButton: View {
   }
 
   private var popoverContent: some View {
+    ZStack {
+      popoverControls
+        .blur(radius: failurePresentation == nil ? 0 : 2)
+        .allowsHitTesting(failurePresentation == nil)
+        .accessibilityHidden(failurePresentation != nil)
+
+      if let failurePresentation {
+        VoiceCaptureFailureOverlay(
+          presentation: failurePresentation,
+          retry: retryAfterFailure,
+          close: closeFailure
+        )
+        .transition(.opacity)
+      }
+    }
+    .frame(width: VoiceCapturePopoverMetrics.width, alignment: .topLeading)
+    .frame(minHeight: VoiceCapturePopoverMetrics.minimumHeight, alignment: .topLeading)
+    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .animation(.easeInOut(duration: 0.12), value: failurePresentation)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputPopover)
+  }
+
+  private var popoverControls: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         Label(statusText, systemImage: isRecording ? "waveform" : "mic")
@@ -101,9 +126,6 @@ struct HarnessVoiceInputButton: View {
       }
     }
     .padding(HarnessMonitorTheme.spacingLG)
-    .frame(width: 380)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputPopover)
   }
 
   @ViewBuilder
@@ -174,8 +196,15 @@ struct HarnessVoiceInputButton: View {
 
   private func startCapture() {
     guard !isRecording else { return }
+    failurePresentation = nil
     if remoteProcessorSinkEnabled, remoteProcessorURL() == nil {
       statusText = "Remote processor URL must be HTTPS."
+      failurePresentation = VoiceCaptureFailurePresentation(
+        title: "Remote Processor Unavailable",
+        message: "Remote processor URL must be HTTPS.",
+        recoverySuggestion:
+          "Turn off Remote processor or enter a full HTTPS URL for the voice processor, then try again."
+      )
       return
     }
 
@@ -230,9 +259,11 @@ struct HarnessVoiceInputButton: View {
           isRecording = false
         }
       } catch {
-        statusText = error.localizedDescription
+        statusText = "Voice capture failed"
         isRecording = false
         processingSessionTask.cancel()
+        finishFailedVoiceSession()
+        failurePresentation = VoiceCaptureFailurePresentation(error: error)
       }
     }
   }
@@ -281,6 +312,7 @@ struct HarnessVoiceInputButton: View {
     captureTask = nil
     processingSessionTask = nil
     self.voiceSessionID = nil
+    failurePresentation = nil
     pendingAudioChunks.removeAll(keepingCapacity: true)
     pendingTranscriptSegments.removeAll(keepingCapacity: true)
     if isRecording {
@@ -321,6 +353,7 @@ struct HarnessVoiceInputButton: View {
     processingSessionTask?.cancel()
     captureTask = nil
     processingSessionTask = nil
+    failurePresentation = nil
     pendingAudioChunks.removeAll(keepingCapacity: true)
     pendingTranscriptSegments.removeAll(keepingCapacity: true)
     statusText = "Inserted"
@@ -353,6 +386,31 @@ struct HarnessVoiceInputButton: View {
       pendingTranscriptSegments.removeFirst()
     }
     pendingTranscriptSegments.append(segment)
+  }
+
+  private func finishFailedVoiceSession() {
+    let failedVoiceSessionID = voiceSessionID
+    voiceSessionID = nil
+    pendingAudioChunks.removeAll(keepingCapacity: true)
+    pendingTranscriptSegments.removeAll(keepingCapacity: true)
+    guard let failedVoiceSessionID else { return }
+    Task {
+      await store.finishVoiceProcessingSession(
+        voiceSessionID: failedVoiceSessionID,
+        reason: .cancelled,
+        confirmedText: nil
+      )
+    }
+  }
+
+  private func retryAfterFailure() {
+    failurePresentation = nil
+    startCapture()
+  }
+
+  private func closeFailure() {
+    failurePresentation = nil
+    isPopoverPresented = false
   }
 
   private func appendFinalTranscript(_ text: String) {
@@ -391,5 +449,142 @@ struct HarnessVoiceInputButton: View {
     case .failed:
       "Voice capture failed"
     }
+  }
+}
+
+private struct VoiceCaptureFailurePresentation: Equatable {
+  let title: String
+  let message: String
+  let recoverySuggestion: String
+
+  init(
+    title: String,
+    message: String,
+    recoverySuggestion: String
+  ) {
+    self.title = title
+    self.message = message
+    self.recoverySuggestion = recoverySuggestion
+  }
+
+  init(error: Error) {
+    let message = error.localizedDescription
+    if let voiceError = error as? NativeVoiceCaptureError {
+      self = Self(error: voiceError, message: message)
+      return
+    }
+    self.init(
+      title: "Voice Capture Failed",
+      message: message,
+      recoverySuggestion:
+        "Check microphone access and installed dictation languages in System Settings, then try again."
+    )
+  }
+
+  private init(error: NativeVoiceCaptureError, message: String) {
+    switch error {
+    case .microphonePermissionDenied:
+      self.init(
+        title: "Microphone Access Needed",
+        message: message,
+        recoverySuggestion:
+          "Open System Settings > Privacy & Security > Microphone, allow Harness Monitor, then try recording again."
+      )
+    case .speechAssetsUnavailable(let locale):
+      self.init(
+        title: "Speech Assets Needed",
+        message: message,
+        recoverySuggestion:
+          "Open System Settings > Keyboard > Dictation, add or download a supported English dictation language such as English (US), then try recording again. macOS does not have an on-device speech asset ready for \(locale)."
+      )
+    case .unsupportedLocale(let locale):
+      self.init(
+        title: "Speech Language Unsupported",
+        message: message,
+        recoverySuggestion:
+          "Change the macOS language or dictation language to a Speech-supported locale such as English (US), then try recording again. Harness Monitor asked for \(locale)."
+      )
+    case .speechUnavailable:
+      self.init(
+        title: "Speech Unavailable",
+        message: message,
+        recoverySuggestion:
+          "Make sure speech recognition and dictation are available on this Mac, install the required language assets in System Settings, then try recording again."
+      )
+    case .noInputFormat, .couldNotCopyAudioBuffer, .couldNotConvertAudioBuffer:
+      self.init(
+        title: "Microphone Audio Unavailable",
+        message: message,
+        recoverySuggestion:
+          "Check the selected microphone in System Settings > Sound > Input, then try recording again."
+      )
+    }
+  }
+}
+
+private enum VoiceCapturePopoverMetrics {
+  static let width: CGFloat = 420
+  static let minimumHeight: CGFloat = 320
+}
+
+private struct VoiceCaptureFailureOverlay: View {
+  let presentation: VoiceCaptureFailurePresentation
+  let retry: () -> Void
+  let close: () -> Void
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      Rectangle()
+        .fill(.regularMaterial)
+        .accessibilityHidden(true)
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+        Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
+          .scaledFont(.headline)
+          .foregroundStyle(.primary)
+
+        Text(presentation.message)
+          .scaledFont(.body)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel(presentation.message)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureMessage)
+
+        Divider()
+
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          Text("How to fix it")
+            .scaledFont(.caption.bold())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Text(presentation.recoverySuggestion)
+            .scaledFont(.body)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(presentation.recoverySuggestion)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureInstructions)
+        }
+
+        Spacer(minLength: HarnessMonitorTheme.itemSpacing)
+
+        HStack {
+          Spacer()
+          Button("Close", action: close)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureCloseButton)
+          Button("Try Again", action: retry)
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureRetryButton)
+        }
+      }
+      .padding(HarnessMonitorTheme.spacingLG)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .overlay {
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(.quaternary)
+        .accessibilityHidden(true)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureOverlay)
   }
 }

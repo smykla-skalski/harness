@@ -133,22 +133,67 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       "Inserted voice transcript should update the message field"
     )
   }
+
+  func testSendSignalVoicePopoverSurfacesSpeechAssetRecovery() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_VOICE_FAILURE": "speech-assets"]
+    )
+
+    openSendSignalSheet(in: app)
+
+    let voiceButton = button(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
+    XCTAssertTrue(voiceButton.waitForExistence(timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: voiceButton)
+
+    let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
+    XCTAssertTrue(recordButton.waitForExistence(timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: recordButton)
+
+    let overlay = element(in: app, identifier: Accessibility.voiceInputFailureOverlay)
+    XCTAssertTrue(
+      overlay.waitForExistence(timeout: Self.actionTimeout),
+      "Speech asset failures should cover the voice popover with a recovery panel"
+    )
+
+    let message = element(in: app, identifier: Accessibility.voiceInputFailureMessage)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        message.exists && message.label.contains("Speech assets for en_PL are unavailable")
+      },
+      "Recovery panel should show the full Speech asset error"
+    )
+
+    let instructions = element(in: app, identifier: Accessibility.voiceInputFailureInstructions)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        instructions.exists
+          && instructions.label.contains("System Settings")
+          && instructions.label.contains("English (US)")
+      },
+      "Recovery panel should explain how to install or select usable speech assets"
+    )
+  }
 }
 
 extension HarnessMonitorSheetUITests {
-  fileprivate func launchInCockpitPreview() -> XCUIApplication {
-    launch(
+  fileprivate func launchInCockpitPreview(
+    additionalEnvironment: [String: String] = [:]
+  ) -> XCUIApplication {
+    var environment = ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    environment.merge(additionalEnvironment) { _, new in new }
+    return launch(
       mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+      additionalEnvironment: environment
     )
   }
 
   /// Right-click the already-loaded leader agent card to open the "Send Signal"
   /// context menu item.
   fileprivate func openSendSignalSheet(in app: XCUIApplication) {
+    app.activate()
     let agentCard = button(in: app, identifier: Accessibility.leaderAgentCard)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
+      waitUntil(timeout: Self.actionTimeout, pollInterval: 0.02) {
         agentCard.exists && !agentCard.frame.isEmpty
       },
       "Leader agent card should be visible in cockpit preview"
