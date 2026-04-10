@@ -23,6 +23,7 @@ struct SidebarView: View {
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
   @FocusState private var isSearchFocused: Bool
+  private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
 
@@ -185,8 +186,12 @@ struct SidebarView: View {
     }
     .onAppear(perform: hydrateCollapsedStateIfNeeded)
     .onChange(of: sidebarVisible, initial: true) { _, isVisible in
+      let nextPhase = isVisible ? 1.0 : 0.0
+      guard sidebarVisibilityPhase != nextPhase else {
+        return
+      }
       withAnimation(.easeInOut(duration: 0.18)) {
-        sidebarVisibilityPhase = isVisible ? 1 : 0
+        sidebarVisibilityPhase = nextPhase
       }
     }
     .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
@@ -285,11 +290,16 @@ struct SidebarView: View {
   }
 
   func updateSidebarWidth(_ width: CGFloat) {
-    let clampedWidth = max(width, 0)
-    guard abs(clampedWidth - sidebarWidth) >= 0.5 else {
+    let quantizedWidth =
+      max(
+        (width / Self.sidebarWidthMeasurementQuantum).rounded()
+          * Self.sidebarWidthMeasurementQuantum,
+        0
+      )
+    guard abs(quantizedWidth - sidebarWidth) >= 1 else {
       return
     }
-    sidebarWidth = clampedWidth
+    sidebarWidth = quantizedWidth
   }
 
   func syncCollapsedProjects(from rawValue: String) {

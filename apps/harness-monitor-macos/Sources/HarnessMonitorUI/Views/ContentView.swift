@@ -4,6 +4,12 @@ import SwiftUI
 enum ContentToolbarLayoutWidth {
   static let minimumWidth: CGFloat = 320
   static let defaultWidth: CGFloat = 1_000
+  static let measurementQuantum: CGFloat = 16
+
+  static func normalized(_ width: CGFloat) -> CGFloat {
+    let clampedWidth = max(width, minimumWidth)
+    return (clampedWidth / measurementQuantum).rounded() * measurementQuantum
+  }
 }
 
 public struct ContentView: View {
@@ -67,7 +73,7 @@ public struct ContentView: View {
   }
 
   private var toolbarLayoutWidth: CGFloat {
-    max(detailColumnWidth, ContentToolbarLayoutWidth.minimumWidth)
+    ContentToolbarLayoutWidth.normalized(detailColumnWidth)
   }
 
   private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {

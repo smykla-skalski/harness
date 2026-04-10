@@ -209,12 +209,13 @@ struct ContentDetailColumn: View {
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { width in
+      let nextWidth = ContentToolbarLayoutWidth.normalized(width)
       guard !isLayoutAnimating,
-        abs(width - detailColumnWidth) >= 1
+        abs(nextWidth - detailColumnWidth) >= 1
       else {
         return
       }
-      detailColumnWidth = width
+      detailColumnWidth = nextWidth
     }
     .toolbar {
       ContentPrimaryToolbarItems(
