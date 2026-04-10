@@ -207,4 +207,119 @@ struct SessionCacheHydrationMemoryTests {
     #expect(client.readCallCount(.sessionDetail("sess-recent-0")) == 0)
     #expect(client.readCallCount(.sessionDetail("sess-recent-2")) == 0)
   }
+
+  @Test("Batch cacheSessionDetails persists all entries under a single save")
+  func batchCacheSessionDetailsPersistsAllEntries() async throws {
+    let store = harness.makeStore()
+    let project = makeProject(totalSessionCount: 3, activeSessionCount: 3)
+
+    let sessions = (0..<3).map { index in
+      makeSession(
+        .init(
+          sessionId: "sess-batch-\(index)",
+          context: "Batch \(index)",
+          status: .active,
+          leaderId: "leader-batch-\(index)",
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        ))
+    }
+
+    await store.cacheSessionList(sessions, projects: [project])
+
+    let entries: [(detail: SessionDetail, timeline: [TimelineEntry])] = sessions.map { summary in
+      (
+        detail: makeSessionDetail(
+          summary: summary,
+          workerID: "worker-\(summary.sessionId)",
+          workerName: "Worker"
+        ),
+        timeline: makeTimelineEntries(
+          sessionID: summary.sessionId,
+          agentID: summary.leaderId ?? "",
+          summary: "Batch entry"
+        )
+      )
+    }
+
+    await store.cacheSessionDetails(entries, markViewed: false)
+
+    for summary in sessions {
+      let cached = await store.loadCachedSessionDetail(sessionID: summary.sessionId)
+      #expect(cached != nil)
+      #expect(cached?.detail.agents.count == 2)
+      #expect(cached?.timeline.first?.summary == "Batch entry")
+    }
+
+    let queue = await store.persistedSnapshotHydrationQueue(for: sessions)
+    #expect(queue.isEmpty)
+  }
+
+  @Test("Batch cacheSessionDetails upserts existing rows and diffs relationships")
+  func batchCacheSessionDetailsUpsertsExistingRows() async throws {
+    let store = harness.makeStore()
+    let project = makeProject(totalSessionCount: 2, activeSessionCount: 2)
+
+    let sessions = (0..<2).map { index in
+      makeSession(
+        .init(
+          sessionId: "sess-upsert-\(index)",
+          context: "Upsert \(index)",
+          status: .active,
+          leaderId: "leader-upsert-\(index)",
+          openTaskCount: 0,
+          inProgressTaskCount: 0,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        ))
+    }
+
+    await store.cacheSessionList(sessions, projects: [project])
+
+    let initialEntries: [(detail: SessionDetail, timeline: [TimelineEntry])] = sessions.map {
+      summary in
+      (
+        detail: makeSessionDetail(
+          summary: summary,
+          workerID: "worker-\(summary.sessionId)",
+          workerName: "Worker v1"
+        ),
+        timeline: makeTimelineEntries(
+          sessionID: summary.sessionId,
+          agentID: summary.leaderId ?? "",
+          summary: "First entry"
+        )
+      )
+    }
+
+    await store.cacheSessionDetails(initialEntries, markViewed: false)
+
+    let updatedEntries: [(detail: SessionDetail, timeline: [TimelineEntry])] = sessions.map {
+      summary in
+      (
+        detail: makeSessionDetail(
+          summary: summary,
+          workerID: "worker-\(summary.sessionId)-new",
+          workerName: "Worker v2"
+        ),
+        timeline: makeTimelineEntries(
+          sessionID: summary.sessionId,
+          agentID: summary.leaderId ?? "",
+          summary: "Updated entry"
+        )
+      )
+    }
+
+    await store.cacheSessionDetails(updatedEntries, markViewed: false)
+
+    for summary in sessions {
+      let cached = await store.loadCachedSessionDetail(sessionID: summary.sessionId)
+      #expect(cached != nil)
+      #expect(cached?.detail.agents.contains { $0.name == "Worker v2" } == true)
+      #expect(cached?.detail.agents.contains { $0.name == "Worker v1" } == false)
+      #expect(cached?.timeline.first?.summary == "Updated entry")
+    }
+  }
 }
