@@ -233,10 +233,18 @@ struct SessionAgentSummaryCard: View {
   }
 
   private func handleTaskDrop(_ payloads: [TaskDragPayload], _: CGPoint) -> Bool {
-    guard let targetAgentID = taskDropAction.targetAgentID,
-      let payload = payloads.first,
-      payload.sessionID == sessionID
-    else {
+    guard let payload = payloads.first else {
+      store.reportDropRejection("Cannot assign task: no task payload in drop.")
+      return false
+    }
+    guard payload.sessionID == sessionID else {
+      store.reportDropRejection(
+        "Cannot assign task: drag source does not belong to this session."
+      )
+      return false
+    }
+    guard let targetAgentID = taskDropAction.targetAgentID else {
+      store.reportDropRejection(taskDropAction.feedback.accessibilityLabel)
       return false
     }
     Task {
