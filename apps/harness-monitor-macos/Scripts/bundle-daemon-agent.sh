@@ -84,6 +84,7 @@ plist_target="$launch_agents_dir/io.harnessmonitor.daemon.plist"
 /bin/cp "$daemon_source" "$daemon_target"
 /bin/chmod 755 "$daemon_target"
 /bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" "$plist_target"
+/usr/bin/plutil -lint "$plist_target"
 
 if ! /usr/bin/otool -l "$daemon_target" | /usr/bin/grep -q "__info_plist"; then
   printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target" >&2
@@ -97,7 +98,9 @@ if [ "${CODE_SIGNING_ALLOWED:-NO}" = "YES" ] \
     --force \
     --sign "$EXPANDED_CODE_SIGN_IDENTITY" \
     --options runtime \
+    --timestamp \
     --identifier io.harnessmonitor.daemon \
     --entitlements "$PROJECT_DIR/HarnessMonitorDaemon.entitlements" \
     "$daemon_target"
+  /usr/bin/codesign --verify --verbose=2 "$daemon_target"
 fi
