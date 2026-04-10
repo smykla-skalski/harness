@@ -1,7 +1,10 @@
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
+use clap::{Args, Subcommand};
 use fs_err as fs;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -9,10 +12,12 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
 
 use super::codex_transport;
+use super::service;
 use super::state;
 
 pub const CODEX_BRIDGE_LAUNCH_AGENT_LABEL: &str = "io.harness.codex-bridge";
@@ -225,6 +230,252 @@ fn apply_bridge_state_to_manifest(sandboxed: bool) {
     );
 }
 
+/// How long to wait for a supervised codex process to exit after sending
+/// `SIGTERM` before `codex-bridge stop` gives up and reports the failure.
+const STOP_GRACE_PERIOD: Duration = Duration::from_secs(5);
+const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Top-level `harness codex-bridge` subcommand tree.
+///
+/// The bridge supervises an external `codex app-server` process on loopback
+/// and publishes its endpoint so a sandboxed daemon can connect via WebSocket.
+/// All subcommands must run outside the macOS App Sandbox; `start` and the
+/// launch-agent helpers refuse to run when `HARNESS_SANDBOXED=1`.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum CodexBridgeCommand {
+    /// Stop the running Codex bridge, if any.
+    Stop(CodexBridgeStopArgs),
+    /// Print the current bridge status.
+    Status(CodexBridgeStatusArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CodexBridgeStopArgs {
+    /// Print the final status as JSON instead of a one-line summary.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CodexBridgeStatusArgs {
+    /// Print a plain one-line summary instead of the JSON payload.
+    #[arg(long)]
+    pub plain: bool,
+}
+
+/// Serialized snapshot of the bridge's live state for `status` / `stop`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CodexBridgeStatusReport {
+    /// `true` when the bridge PID is still alive on the host.
+    pub running: bool,
+    /// Loopback WebSocket URL if a bridge state file is present.
+    pub endpoint: Option<String>,
+    /// PID of the supervised codex app-server, when known.
+    pub pid: Option<u32>,
+    /// Port the bridge published, when known.
+    pub port: Option<u16>,
+    /// ISO 8601 timestamp the bridge first registered the state file.
+    pub started_at: Option<String>,
+    /// Best-effort codex binary version string from the bridge state file.
+    pub codex_version: Option<String>,
+}
+
+impl CodexBridgeStatusReport {
+    #[must_use]
+    pub const fn not_running() -> Self {
+        Self {
+            running: false,
+            endpoint: None,
+            pid: None,
+            port: None,
+            started_at: None,
+            codex_version: None,
+        }
+    }
+}
+
+impl Execute for CodexBridgeCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Stop(args) => args.execute(context),
+            Self::Status(args) => args.execute(context),
+        }
+    }
+}
+
+impl Execute for CodexBridgeStatusArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let report = status_report()?;
+        if self.plain {
+            print_status_plain(&report);
+        } else {
+            let json = serde_json::to_string_pretty(&report).map_err(|error| {
+                CliError::from(CliErrorKind::workflow_serialize(error.to_string()))
+            })?;
+            println!("{json}");
+        }
+        Ok(0)
+    }
+}
+
+impl Execute for CodexBridgeStopArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let report = stop_bridge()?;
+        if self.json {
+            let json = serde_json::to_string_pretty(&report).map_err(|error| {
+                CliError::from(CliErrorKind::workflow_serialize(error.to_string()))
+            })?;
+            println!("{json}");
+        } else {
+            print_status_plain(&report);
+        }
+        Ok(0)
+    }
+}
+
+/// Build a status report for the bridge by combining the persisted state file
+/// with a live PID liveness probe.
+///
+/// # Errors
+/// Returns a workflow parse error if the bridge state file exists but cannot
+/// be decoded. A missing file returns `not_running`, not an error.
+pub fn status_report() -> Result<CodexBridgeStatusReport, CliError> {
+    let Some(state) = read_bridge_state()? else {
+        return Ok(CodexBridgeStatusReport::not_running());
+    };
+    let running = pid_alive(state.pid);
+    Ok(CodexBridgeStatusReport {
+        running,
+        endpoint: Some(state.endpoint),
+        pid: Some(state.pid),
+        port: Some(state.port),
+        started_at: Some(state.started_at),
+        codex_version: state.codex_version,
+    })
+}
+
+/// Send `SIGTERM` to the supervised codex process (if any), wait for it to
+/// exit, clear the state files, and return the final status. Idempotent: a
+/// missing state file is a successful no-op.
+///
+/// # Errors
+/// Returns a workflow I/O error when `/bin/kill` cannot be invoked, or when
+/// state file cleanup fails.
+pub fn stop_bridge() -> Result<CodexBridgeStatusReport, CliError> {
+    let Some(state) = read_bridge_state()? else {
+        // Clean up any stray pid file just in case, then report not-running.
+        clear_bridge_state()?;
+        return Ok(CodexBridgeStatusReport::not_running());
+    };
+
+    let pid = state.pid;
+    if pid_alive(pid) {
+        send_signal(pid, "-TERM")?;
+        wait_until_dead(pid, STOP_GRACE_PERIOD)?;
+    }
+
+    clear_bridge_state()?;
+    Ok(CodexBridgeStatusReport {
+        running: false,
+        endpoint: Some(state.endpoint),
+        pid: Some(pid),
+        port: Some(state.port),
+        started_at: Some(state.started_at),
+        codex_version: state.codex_version,
+    })
+}
+
+fn print_status_plain(report: &CodexBridgeStatusReport) {
+    if report.running {
+        let endpoint = report.endpoint.as_deref().unwrap_or("?");
+        let pid = report
+            .pid
+            .map_or_else(|| "?".to_string(), |pid| pid.to_string());
+        println!("running at {endpoint} (pid {pid})");
+    } else if let Some(endpoint) = report.endpoint.as_deref() {
+        println!("not running (stale endpoint {endpoint})");
+    } else {
+        println!("not running");
+    }
+}
+
+/// Probe liveness of `pid` via `/bin/kill -0`. Returns `false` on any error,
+/// since an inaccessible PID is equivalent to a dead one for bridge purposes.
+/// Swallows stderr so routine "no such process" probes do not spam logs.
+#[must_use]
+pub fn pid_alive(pid: u32) -> bool {
+    Command::new("/bin/kill")
+        .args(["-0", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// Invoke `/bin/kill -<signal> <pid>`. `-0` can be used for liveness probes,
+/// but this helper is meant for side-effectful signals where a failure to
+/// deliver is a real error.
+fn send_signal(pid: u32, signal: &str) -> Result<(), CliError> {
+    let status = Command::new("/bin/kill")
+        .args([signal, &pid.to_string()])
+        .status()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "run /bin/kill {signal} {pid}: {error}"
+            )))
+        })?;
+
+    if status.success() {
+        return Ok(());
+    }
+
+    // Kill failing usually means the PID is gone already, which we treat as
+    // idempotent for -TERM. Surface other signal failures loudly.
+    if signal == "-TERM" && !pid_alive(pid) {
+        return Ok(());
+    }
+
+    Err(CliError::from(CliErrorKind::workflow_io(format!(
+        "/bin/kill {signal} {pid} exited with {status}"
+    ))))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn wait_until_dead(pid: u32, grace: Duration) -> Result<(), CliError> {
+    let start = Instant::now();
+    while start.elapsed() < grace {
+        if !pid_alive(pid) {
+            tracing::info!(pid, "codex-bridge: supervised process exited");
+            return Ok(());
+        }
+        thread::sleep(STOP_POLL_INTERVAL);
+    }
+
+    tracing::warn!(pid, "codex-bridge: process still alive after SIGTERM grace");
+    Err(CliError::from(CliErrorKind::workflow_io(format!(
+        "codex-bridge stop: pid {pid} still alive after {}s",
+        grace.as_secs()
+    ))))
+}
+
+/// Refuse to run a codex-bridge command that requires host privileges when
+/// the process is running under the macOS App Sandbox.
+///
+/// # Errors
+/// Returns `SandboxFeatureDisabled` when `HARNESS_SANDBOXED` is truthy.
+pub fn ensure_host_context(feature: &'static str) -> Result<(), CliError> {
+    if service::sandboxed_from_env() {
+        return Err(CliError::from(CliErrorKind::sandbox_feature_disabled(
+            feature,
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380,6 +631,106 @@ mod tests {
                 reloaded.codex_endpoint.as_deref(),
                 Some("ws://127.0.0.1:4500")
             );
+        });
+    }
+
+    fn live_state_for_current_process() -> CodexBridgeState {
+        CodexBridgeState {
+            endpoint: "ws://127.0.0.1:4500".to_string(),
+            pid: std::process::id(),
+            started_at: "2026-04-10T12:00:00Z".to_string(),
+            port: 4500,
+            codex_version: Some("0.102.0".to_string()),
+        }
+    }
+
+    /// A PID that is guaranteed not to belong to a live process on macOS.
+    /// PID 1 (launchd) is always alive on macOS, so we pick a high number
+    /// that no normal system would assign. If a process happens to own it
+    /// the test will fail loudly, which is the intended behavior.
+    const DEFINITELY_DEAD_PID: u32 = 2_000_000_000;
+
+    #[test]
+    fn pid_alive_reports_true_for_current_process() {
+        assert!(pid_alive(std::process::id()));
+    }
+
+    #[test]
+    fn pid_alive_reports_false_for_unlikely_pid() {
+        assert!(!pid_alive(DEFINITELY_DEAD_PID));
+    }
+
+    #[test]
+    fn status_report_reports_not_running_when_state_missing() {
+        with_temp_daemon_root(|| {
+            let report = status_report().expect("status");
+            assert_eq!(report, CodexBridgeStatusReport::not_running());
+        });
+    }
+
+    #[test]
+    fn status_report_reports_running_when_pid_alive() {
+        with_temp_daemon_root(|| {
+            write_bridge_state(&live_state_for_current_process()).expect("write state");
+            let report = status_report().expect("status");
+            assert!(report.running);
+            assert_eq!(report.endpoint.as_deref(), Some("ws://127.0.0.1:4500"));
+            assert_eq!(report.pid, Some(std::process::id()));
+            assert_eq!(report.port, Some(4500));
+        });
+    }
+
+    #[test]
+    fn status_report_reports_stale_state_as_not_running() {
+        with_temp_daemon_root(|| {
+            let mut stale = live_state_for_current_process();
+            stale.pid = DEFINITELY_DEAD_PID;
+            write_bridge_state(&stale).expect("write state");
+            let report = status_report().expect("status");
+            assert!(!report.running);
+            assert_eq!(report.pid, Some(DEFINITELY_DEAD_PID));
+            assert_eq!(report.endpoint.as_deref(), Some("ws://127.0.0.1:4500"));
+        });
+    }
+
+    #[test]
+    fn stop_bridge_is_idempotent_when_state_missing() {
+        with_temp_daemon_root(|| {
+            let report = stop_bridge().expect("stop");
+            assert_eq!(report, CodexBridgeStatusReport::not_running());
+            assert!(!codex_endpoint_path().exists());
+            assert!(!codex_bridge_pid_path().exists());
+        });
+    }
+
+    #[test]
+    fn stop_bridge_clears_stale_state_without_signaling() {
+        with_temp_daemon_root(|| {
+            let mut stale = live_state_for_current_process();
+            stale.pid = DEFINITELY_DEAD_PID;
+            write_bridge_state(&stale).expect("write state");
+            write_bridge_pid(DEFINITELY_DEAD_PID).expect("write pid");
+
+            let report = stop_bridge().expect("stop");
+            assert!(!report.running);
+            assert_eq!(report.pid, Some(DEFINITELY_DEAD_PID));
+            assert!(!codex_endpoint_path().exists());
+            assert!(!codex_bridge_pid_path().exists());
+        });
+    }
+
+    #[test]
+    fn ensure_host_context_refuses_when_sandboxed() {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let error = ensure_host_context("test").expect_err("must refuse");
+            assert_eq!(error.code(), "SANDBOX001");
+        });
+    }
+
+    #[test]
+    fn ensure_host_context_allows_when_unsandboxed() {
+        temp_env::with_var("HARNESS_SANDBOXED", Option::<&str>::None, || {
+            ensure_host_context("test").expect("allowed outside sandbox");
         });
     }
 }
