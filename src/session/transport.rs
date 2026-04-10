@@ -1,12 +1,16 @@
 use std::env;
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
+use clap::{Args, Subcommand, ValueEnum};
 use serde::Serialize;
 
 use crate::app::command_context::{
     AppContext, Execute, resolve_project_dir as resolve_project_path,
 };
+use crate::daemon::agent_tui::{
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest, AgentTuiStartRequest,
+};
+use crate::daemon::client::DaemonClient;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 
@@ -38,6 +42,11 @@ pub enum SessionCommand {
     Signal {
         #[command(subcommand)]
         command: SessionSignalCommand,
+    },
+    /// Managed interactive agent TUI processes.
+    Tui {
+        #[command(subcommand)]
+        command: SessionTuiCommand,
     },
     /// Observe all agents in a session.
     Observe(SessionObserveArgs),
@@ -75,6 +84,24 @@ pub enum SessionSignalCommand {
     List(SignalListArgs),
 }
 
+/// Session TUI subcommands.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum SessionTuiCommand {
+    /// Start an agent runtime in a managed PTY.
+    Start(TuiStartArgs),
+    /// List managed TUIs for a session.
+    List(TuiListArgs),
+    /// Show the latest snapshot for one managed TUI.
+    Show(TuiShowArgs),
+    /// Send keyboard-like input to an active managed TUI.
+    Input(TuiInputArgs),
+    /// Resize an active managed TUI.
+    Resize(TuiResizeArgs),
+    /// Stop an active managed TUI.
+    Stop(TuiStopArgs),
+}
+
 impl Execute for SessionCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
@@ -86,6 +113,7 @@ impl Execute for SessionCommand {
             Self::TransferLeader(args) => args.execute(context),
             Self::Task { command } => command.execute(context),
             Self::Signal { command } => command.execute(context),
+            Self::Tui { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
             Self::Title(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
@@ -115,6 +143,19 @@ impl Execute for SessionSignalCommand {
     }
 }
 
+impl Execute for SessionTuiCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Start(args) => args.execute(context),
+            Self::List(args) => args.execute(context),
+            Self::Show(args) => args.execute(context),
+            Self::Input(args) => args.execute(context),
+            Self::Resize(args) => args.execute(context),
+            Self::Stop(args) => args.execute(context),
+        }
+    }
+}
+
 fn resolve_project_dir(hint: Option<&str>) -> String {
     let path = hint.filter(|value| !value.trim().is_empty()).map_or_else(
         || env::current_dir().unwrap_or_else(|_| ".".into()),
@@ -130,6 +171,25 @@ fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
     println!("{json}");
     Ok(())
+}
+
+fn daemon_client() -> Result<&'static DaemonClient, CliError> {
+    DaemonClient::try_connect().ok_or_else(|| {
+        CliErrorKind::workflow_io(
+            "harness daemon is not running; start the daemon before using managed TUIs",
+        )
+        .into()
+    })
+}
+
+fn capability_args(values: &[String]) -> Vec<String> {
+    values
+        .iter()
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .collect()
 }
 
 #[derive(Debug, Clone, Args)]
@@ -604,6 +664,221 @@ impl Execute for SignalListArgs {
                 );
             }
         }
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TuiStartArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Agent runtime to launch.
+    #[arg(long, value_enum)]
+    pub runtime: HookAgent,
+    /// Role to register the managed TUI agent as.
+    #[arg(long, value_enum, default_value = "worker")]
+    pub role: SessionRole,
+    /// Capability tag. May be repeated or comma-separated.
+    #[arg(long = "capability")]
+    pub capabilities: Vec<String>,
+    /// Human-readable agent display name.
+    #[arg(long)]
+    pub name: Option<String>,
+    /// Optional first prompt to submit after launch.
+    #[arg(long)]
+    pub prompt: Option<String>,
+    /// Project directory. Defaults to the daemon's session project.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+    /// Override argv, one argument per --arg.
+    #[arg(long = "arg")]
+    pub argv: Vec<String>,
+    /// Initial PTY rows.
+    #[arg(long, default_value_t = 30)]
+    pub rows: u16,
+    /// Initial PTY columns.
+    #[arg(long, default_value_t = 120)]
+    pub cols: u16,
+}
+
+impl Execute for TuiStartArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = AgentTuiStartRequest {
+            runtime: agent_to_str(self.runtime).to_string(),
+            role: self.role,
+            capabilities: capability_args(&self.capabilities),
+            name: self.name.clone(),
+            prompt: self.prompt.clone(),
+            project_dir: self
+                .project_dir
+                .as_deref()
+                .map(|hint| resolve_project_dir(Some(hint))),
+            argv: self.argv.clone(),
+            rows: self.rows,
+            cols: self.cols,
+        };
+        let snapshot = daemon_client()?.start_agent_tui(&self.session_id, &request)?;
+        print_json(&snapshot)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TuiListArgs {
+    /// Session ID.
+    pub session_id: String,
+}
+
+impl Execute for TuiListArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response = daemon_client()?.list_agent_tuis(&self.session_id)?;
+        print_json(&response)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TuiShowArgs {
+    /// Managed TUI ID.
+    pub tui_id: String,
+}
+
+impl Execute for TuiShowArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let snapshot = daemon_client()?.get_agent_tui(&self.tui_id)?;
+        print_json(&snapshot)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum TuiKeyArg {
+    Enter,
+    Escape,
+    Tab,
+    Backspace,
+    ArrowUp,
+    ArrowDown,
+    ArrowRight,
+    ArrowLeft,
+}
+
+impl From<TuiKeyArg> for AgentTuiKey {
+    fn from(value: TuiKeyArg) -> Self {
+        match value {
+            TuiKeyArg::Enter => Self::Enter,
+            TuiKeyArg::Escape => Self::Escape,
+            TuiKeyArg::Tab => Self::Tab,
+            TuiKeyArg::Backspace => Self::Backspace,
+            TuiKeyArg::ArrowUp => Self::ArrowUp,
+            TuiKeyArg::ArrowDown => Self::ArrowDown,
+            TuiKeyArg::ArrowRight => Self::ArrowRight,
+            TuiKeyArg::ArrowLeft => Self::ArrowLeft,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TuiInputArgs {
+    /// Managed TUI ID.
+    pub tui_id: String,
+    /// Send plain text bytes.
+    #[arg(long)]
+    pub text: Option<String>,
+    /// Send bracketed paste text.
+    #[arg(long)]
+    pub paste: Option<String>,
+    /// Send a named key.
+    #[arg(long, value_enum)]
+    pub key: Option<TuiKeyArg>,
+    /// Send a Ctrl+key combination.
+    #[arg(long)]
+    pub control: Option<char>,
+    /// Send raw bytes encoded as base64.
+    #[arg(long)]
+    pub raw_base64: Option<String>,
+}
+
+impl Execute for TuiInputArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let snapshot = daemon_client()?.send_agent_tui_input(
+            &self.tui_id,
+            &AgentTuiInputRequest {
+                input: self.input()?,
+            },
+        )?;
+        print_json(&snapshot)?;
+        Ok(0)
+    }
+}
+
+impl TuiInputArgs {
+    fn input(&self) -> Result<AgentTuiInput, CliError> {
+        let selected = usize::from(self.text.is_some())
+            + usize::from(self.paste.is_some())
+            + usize::from(self.key.is_some())
+            + usize::from(self.control.is_some())
+            + usize::from(self.raw_base64.is_some());
+        if selected != 1 {
+            return Err(CliErrorKind::workflow_parse(
+                "provide exactly one of --text, --paste, --key, --control, or --raw-base64",
+            )
+            .into());
+        }
+        if let Some(text) = &self.text {
+            return Ok(AgentTuiInput::Text { text: text.clone() });
+        }
+        if let Some(text) = &self.paste {
+            return Ok(AgentTuiInput::Paste { text: text.clone() });
+        }
+        if let Some(key) = self.key {
+            return Ok(AgentTuiInput::Key { key: key.into() });
+        }
+        if let Some(key) = self.control {
+            return Ok(AgentTuiInput::Control { key });
+        }
+        Ok(AgentTuiInput::RawBytesBase64 {
+            data: self.raw_base64.clone().unwrap_or_default(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TuiResizeArgs {
+    /// Managed TUI ID.
+    pub tui_id: String,
+    /// New PTY rows.
+    #[arg(long)]
+    pub rows: u16,
+    /// New PTY columns.
+    #[arg(long)]
+    pub cols: u16,
+}
+
+impl Execute for TuiResizeArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let snapshot = daemon_client()?.resize_agent_tui(
+            &self.tui_id,
+            &AgentTuiResizeRequest {
+                rows: self.rows,
+                cols: self.cols,
+            },
+        )?;
+        print_json(&snapshot)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TuiStopArgs {
+    /// Managed TUI ID.
+    pub tui_id: String,
+}
+
+impl Execute for TuiStopArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let snapshot = daemon_client()?.stop_agent_tui(&self.tui_id)?;
+        print_json(&snapshot)?;
         Ok(0)
     }
 }
