@@ -3241,9 +3241,6 @@ mod tests {
         let worktree =
             sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-a");
         let repository_id = project_context_id(Path::new("/tmp/kuma")).expect("repository id");
-        let repository_context_root = project_context_dir(Path::new("/tmp/kuma"))
-            .display()
-            .to_string();
 
         db.sync_project(&worktree).expect("sync worktree");
         let state = sample_session_state_with_id("sess-worktree");
@@ -3256,7 +3253,13 @@ mod tests {
         assert_eq!(summary.project_id, repository_id);
         assert_eq!(summary.project_name, "kuma");
         assert_eq!(summary.project_dir.as_deref(), Some("/tmp/kuma"));
-        assert_eq!(summary.context_root, repository_context_root);
+        assert!(
+            summary
+                .context_root
+                .ends_with(&format!("projects/{repository_id}")),
+            "unexpected repository context root: {}",
+            summary.context_root
+        );
         assert_eq!(summary.checkout_id, worktree.checkout_id);
         assert_eq!(
             summary.checkout_root,

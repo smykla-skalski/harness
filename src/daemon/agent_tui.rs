@@ -20,6 +20,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::{project_context_dir, utc_now};
 
+use super::agent_tui_bridge::{AgentTuiBridgeClient, AgentTuiBridgeStartSpec};
 use super::db::DaemonDb;
 use super::protocol::{SessionJoinRequest, StreamEvent};
 
@@ -483,7 +484,7 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiStartRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            return Err(CliErrorKind::sandbox_feature_disabled("agent-tui.local-pty").into());
+            return self.start_via_bridge(session_id, request);
         }
 
         let profile = request.launch_profile()?;
@@ -546,6 +547,53 @@ impl AgentTuiManagerHandle {
         Ok(snapshot)
     }
 
+    fn start_via_bridge(
+        &self,
+        session_id: &str,
+        request: &AgentTuiStartRequest,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        let profile = request.launch_profile()?;
+        let size = request.size()?;
+        let tui_id = format!("agent-tui-{}", Uuid::new_v4());
+        let marker_capability = format!("agent-tui:{tui_id}");
+        let db = self.db()?;
+        let db_guard = lock_db(&db)?;
+        let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
+        let joined = super::service::join_session_direct(
+            session_id,
+            &SessionJoinRequest {
+                runtime: profile.runtime.clone(),
+                role: request.role,
+                capabilities: agent_tui_capabilities(&request.capabilities, &marker_capability),
+                name: Some(
+                    request
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| format!("{} TUI", profile.runtime)),
+                ),
+                project_dir: project.project_dir.display().to_string(),
+            },
+            Some(&db_guard),
+        )?;
+        let agent_id = agent_id_for_tui(&joined, &marker_capability)?;
+        drop(db_guard);
+
+        let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
+        let bridge = AgentTuiBridgeClient::from_state_file()?;
+        let snapshot = bridge.start(&AgentTuiBridgeStartSpec {
+            session_id: session_id.to_string(),
+            agent_id,
+            tui_id,
+            profile,
+            project_dir: project.project_dir,
+            transcript_path,
+            size,
+            prompt: request.prompt.clone(),
+        })?;
+        self.save_and_broadcast("agent_tui_started", &snapshot)?;
+        Ok(snapshot)
+    }
+
     /// List managed TUI snapshots for a session.
     ///
     /// # Errors
@@ -562,6 +610,11 @@ impl AgentTuiManagerHandle {
     /// Returns [`CliError`] when DB access fails or the TUI is missing.
     pub fn get(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.load_snapshot(tui_id)?;
+        if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
+            let snapshot = AgentTuiBridgeClient::from_state_file()?.get(tui_id)?;
+            self.save_and_broadcast("agent_tui_updated", &snapshot)?;
+            return Ok(snapshot);
+        }
         self.refresh_snapshot(snapshot)
     }
 
@@ -574,6 +627,11 @@ impl AgentTuiManagerHandle {
         tui_id: &str,
         request: &AgentTuiInputRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
+        if self.state.sandboxed {
+            let snapshot = AgentTuiBridgeClient::from_state_file()?.input(tui_id, request)?;
+            self.save_and_broadcast("agent_tui_updated", &snapshot)?;
+            return Ok(snapshot);
+        }
         let process = self.active_process(tui_id)?;
         process.send_input(&request.input)?;
         self.get(tui_id)
@@ -588,6 +646,11 @@ impl AgentTuiManagerHandle {
         tui_id: &str,
         request: &AgentTuiResizeRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
+        if self.state.sandboxed {
+            let snapshot = AgentTuiBridgeClient::from_state_file()?.resize(tui_id, request)?;
+            self.save_and_broadcast("agent_tui_updated", &snapshot)?;
+            return Ok(snapshot);
+        }
         let process = self.active_process(tui_id)?;
         process.resize(request.size()?)?;
         self.get(tui_id)
@@ -599,6 +662,11 @@ impl AgentTuiManagerHandle {
     /// Returns [`CliError`] when the TUI is missing or process termination fails.
     pub fn stop(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.load_snapshot(tui_id)?;
+        if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
+            let stopped = AgentTuiBridgeClient::from_state_file()?.stop(tui_id)?;
+            self.save_and_broadcast("agent_tui_stopped", &stopped)?;
+            return Ok(stopped);
+        }
         let process = self.remove_active(tui_id)?;
         if let Some(process) = process {
             process.kill()?;
@@ -700,16 +768,16 @@ impl AgentTuiManagerHandle {
     }
 }
 
-struct AgentTuiSnapshotContext<'a> {
-    session_id: &'a str,
-    agent_id: &'a str,
-    tui_id: &'a str,
-    profile: &'a AgentTuiLaunchProfile,
-    project_dir: &'a Path,
-    transcript_path: &'a Path,
+pub(super) struct AgentTuiSnapshotContext<'a> {
+    pub(super) session_id: &'a str,
+    pub(super) agent_id: &'a str,
+    pub(super) tui_id: &'a str,
+    pub(super) profile: &'a AgentTuiLaunchProfile,
+    pub(super) project_dir: &'a Path,
+    pub(super) transcript_path: &'a Path,
 }
 
-fn snapshot_from_process(
+pub(super) fn snapshot_from_process(
     context: &AgentTuiSnapshotContext<'_>,
     process: &AgentTuiProcess,
     status: AgentTuiStatus,
@@ -962,7 +1030,7 @@ fn agent_id_for_tui(state: &SessionState, marker_capability: &str) -> Result<Str
         })
 }
 
-fn spawn_agent_tui_process(
+pub(super) fn spawn_agent_tui_process(
     session_id: &str,
     agent_id: &str,
     tui_id: &str,
@@ -978,7 +1046,7 @@ fn spawn_agent_tui_process(
     PortablePtyAgentTuiBackend.spawn(spec)
 }
 
-fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Result<(), CliError> {
+pub(super) fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Result<(), CliError> {
     process.send_input(&AgentTuiInput::Text {
         text: prompt.to_string(),
     })?;
@@ -1326,32 +1394,6 @@ mod tests {
         let screen = process.screen().expect("screen");
         assert_eq!(screen.rows, 9);
         assert_eq!(screen.cols, 33);
-    }
-
-    #[test]
-    fn manager_rejects_local_pty_when_sandboxed() {
-        let (sender, _) = broadcast::channel(4);
-        let manager = AgentTuiManagerHandle::new(sender, Arc::new(OnceLock::new()), true);
-
-        let error = manager
-            .start(
-                "sess-sandbox",
-                &AgentTuiStartRequest {
-                    runtime: "copilot".into(),
-                    role: SessionRole::Worker,
-                    capabilities: Vec::new(),
-                    name: None,
-                    prompt: None,
-                    project_dir: None,
-                    argv: Vec::new(),
-                    rows: 5,
-                    cols: 40,
-                },
-            )
-            .expect_err("sandboxed manager should reject local PTY");
-
-        assert_eq!(error.code(), "SANDBOX001");
-        assert!(error.to_string().contains("agent-tui.local-pty"));
     }
 
     #[test]
