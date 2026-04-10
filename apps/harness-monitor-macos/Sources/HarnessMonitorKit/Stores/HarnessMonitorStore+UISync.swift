@@ -103,6 +103,7 @@ extension HarnessMonitorStore {
     let contentToolbar = contentUI.toolbar
     let contentChrome = contentUI.chrome
     let contentSession = contentUI.session
+    let contentSessionDetail = contentUI.sessionDetail
     let contentDashboard = contentUI.dashboard
     let toolbarMetrics = ToolbarMetricsState(
       projectCount: daemonStatus?.projectCount ?? sessionIndex.projects.count,
@@ -148,9 +149,9 @@ extension HarnessMonitorStore {
     assign(connectionState, to: \.connectionState, on: contentToolbar)
     assign(isBusy, to: \.isBusy, on: contentToolbar)
 
-    assign(selectedDetail, to: \.selectedSessionDetail, on: contentSession)
+    assign(selectedDetail, to: \.selectedSessionDetail, on: contentSessionDetail)
     assign(selectedSessionSummary, to: \.selectedSessionSummary, on: contentSession)
-    assign(selection.timeline, to: \.timeline, on: contentSession)
+    assign(selection.timeline, to: \.timeline, on: contentSessionDetail)
     assign(isSessionReadOnly, to: \.isSessionReadOnly, on: contentSession)
     assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: contentSession)
     assign(isSelectionLoading, to: \.isSelectionLoading, on: contentSession)

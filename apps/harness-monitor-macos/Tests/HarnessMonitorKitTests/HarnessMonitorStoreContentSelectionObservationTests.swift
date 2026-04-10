@@ -111,8 +111,8 @@ struct HarnessMonitorContentSelectionTests {
     let didChange = await didInvalidate(
       {
         (
-          store.contentUI.session.selectedSessionDetail,
-          store.contentUI.session.timeline
+          store.contentUI.sessionDetail.selectedSessionDetail,
+          store.contentUI.sessionDetail.timeline
         )
       },
       after: {
@@ -121,8 +121,8 @@ struct HarnessMonitorContentSelectionTests {
     )
 
     #expect(didChange)
-    #expect(store.contentUI.session.selectedSessionDetail == PreviewFixtures.detail)
-    #expect(store.contentUI.session.timeline == PreviewFixtures.timeline)
+    #expect(store.contentUI.sessionDetail.selectedSessionDetail == PreviewFixtures.detail)
+    #expect(store.contentUI.sessionDetail.timeline == PreviewFixtures.timeline)
   }
 
   @Test("Priming current session does not invalidate content or inspector slices")
