@@ -41,7 +41,6 @@ struct SessionCockpitView: View {
           SessionTaskListSection(
             sessionID: detail.session.sessionId,
             tasks: detail.tasks,
-            isSessionReadOnly: isSessionReadOnly,
             companionAgentCount: detail.agents.count,
             inspectTask: store.inspect(taskID:)
           )
