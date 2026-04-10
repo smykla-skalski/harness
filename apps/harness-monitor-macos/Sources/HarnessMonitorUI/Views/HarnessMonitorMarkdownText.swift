@@ -35,6 +35,12 @@ struct HarnessMonitorMarkdownText: View {
       .font(HarnessMonitorTextSize.scaledFont(font, by: fontScale))
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .multilineTextAlignment(.leading)
+      .textual.inlineStyle(.harnessMonitorMarkdown)
+      .textual.headingStyle(HarnessMonitorMarkdownHeadingStyle())
+      .textual.paragraphStyle(HarnessMonitorMarkdownParagraphStyle())
+      .textual.blockQuoteStyle(HarnessMonitorMarkdownBlockQuoteStyle())
+      .textual.codeBlockStyle(HarnessMonitorMarkdownCodeBlockStyle())
+      .textual.listItemStyle(HarnessMonitorMarkdownListItemStyle())
       .textual.overflowMode(.wrap)
   }
 
@@ -45,6 +51,104 @@ struct HarnessMonitorMarkdownText: View {
       baseContent
     case .enabled:
       baseContent.textual.textSelection(.enabled)
+    }
+  }
+}
+
+private extension InlineStyle {
+  static var harnessMonitorMarkdown: InlineStyle {
+    InlineStyle()
+      .code(
+        .monospaced,
+        .fontScale(0.92),
+        .foregroundColor(HarnessMonitorTheme.ink),
+        .backgroundColor(HarnessMonitorTheme.accent.opacity(0.10))
+      )
+      .strong(.fontWeight(.semibold), .foregroundColor(HarnessMonitorTheme.ink))
+      .link(
+        .foregroundColor(HarnessMonitorTheme.accent),
+        .underlineStyle(.single)
+      )
+  }
+}
+
+private struct HarnessMonitorMarkdownHeadingStyle: StructuredText.HeadingStyle {
+  private static let fontScales: [CGFloat] = [1.16, 1.10, 1.04, 1.0, 0.96, 0.94]
+
+  func makeBody(configuration: Configuration) -> some View {
+    let headingLevel = min(max(configuration.headingLevel, 1), 6)
+
+    configuration.label
+      .foregroundStyle(HarnessMonitorTheme.ink)
+      .fontWeight(headingLevel <= 2 ? .bold : .semibold)
+      .textual.fontScale(Self.fontScales[headingLevel - 1])
+      .textual.lineSpacing(.fontScaled(0.12))
+      .textual.blockSpacing(.fontScaled(top: 0.55, bottom: 0.25))
+  }
+}
+
+private struct HarnessMonitorMarkdownParagraphStyle: StructuredText.ParagraphStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .textual.lineSpacing(.fontScaled(0.18))
+      .textual.blockSpacing(.fontScaled(top: 0.35))
+  }
+}
+
+private struct HarnessMonitorMarkdownBlockQuoteStyle: StructuredText.BlockQuoteStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      RoundedRectangle(cornerRadius: 2, style: .continuous)
+        .fill(HarnessMonitorTheme.accent.opacity(0.65))
+        .frame(width: 3)
+      configuration.label
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      HarnessMonitorTheme.accent.opacity(0.07),
+      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+    )
+    .textual.blockSpacing(.fontScaled(top: 0.55, bottom: 0.2))
+  }
+}
+
+private struct HarnessMonitorMarkdownCodeBlockStyle: StructuredText.CodeBlockStyle {
+  @Environment(\.fontScale)
+  private var fontScale
+
+  func makeBody(configuration: Configuration) -> some View {
+    Overflow {
+      configuration.label
+        .font(HarnessMonitorTextSize.scaledFont(.caption.monospaced(), by: fontScale))
+        .foregroundStyle(HarnessMonitorTheme.ink)
+        .textual.lineSpacing(.fontScaled(0.20))
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, HarnessMonitorTheme.spacingSM)
+        .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    }
+    .background(
+      HarnessMonitorTheme.ink.opacity(0.06),
+      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+    }
+    .textual.blockSpacing(.fontScaled(top: 0.55, bottom: 0.2))
+  }
+}
+
+private struct HarnessMonitorMarkdownListItemStyle: StructuredText.ListItemStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+      configuration.marker
+        .foregroundStyle(HarnessMonitorTheme.accent)
+        .fontWeight(.semibold)
+      configuration.block
     }
   }
 }
