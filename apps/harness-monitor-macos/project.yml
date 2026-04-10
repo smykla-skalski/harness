@@ -51,7 +51,12 @@ targets:
     sources:
       - Sources/HarnessMonitorKit
     dependencies:
+      - sdk: AppKit.framework
+      - sdk: ApplicationServices.framework
+      - sdk: AVFAudio.framework
+      - sdk: CoreMedia.framework
       - sdk: SwiftData.framework
+      - sdk: Speech.framework
       - sdk: IOKit.framework
       - sdk: ServiceManagement.framework
       - sdk: UserNotifications.framework

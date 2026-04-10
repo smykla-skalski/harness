@@ -1,5 +1,60 @@
 import Foundation
 
+public actor PreviewVoiceCaptureService: VoiceCaptureProviding {
+  private var continuation: VoiceCaptureEventStream.Continuation?
+  private var emissionTask: Task<Void, Never>?
+
+  public init() {}
+
+  public nonisolated func capture(configuration _: VoiceCaptureConfiguration) -> VoiceCaptureEventStream {
+    VoiceCaptureEventStream { continuation in
+      let task = Task {
+        await self.start(continuation: continuation)
+      }
+      continuation.onTermination = { _ in
+        task.cancel()
+        Task {
+          await self.stop()
+        }
+      }
+    }
+  }
+
+  public func stop() async {
+    emissionTask?.cancel()
+    emissionTask = nil
+    continuation?.yield(.state(.cancelled))
+    continuation?.finish()
+    continuation = nil
+  }
+
+  private func start(continuation: VoiceCaptureEventStream.Continuation) {
+    emissionTask?.cancel()
+    self.continuation = continuation
+    continuation.yield(.state(.requestingPermission))
+    continuation.yield(.state(.recording))
+    emissionTask = Task {
+      try? await Task.sleep(for: .milliseconds(120))
+      guard !Task.isCancelled else { return }
+      continuation.yield(
+        .transcript(
+          VoiceTranscriptSegment(
+            sequence: 1,
+            text: "Preview voice input for Harness Monitor",
+            isFinal: true,
+            startedAtSeconds: 0,
+            durationSeconds: 0.5
+          )
+        )
+      )
+      try? await Task.sleep(for: .milliseconds(80))
+      guard !Task.isCancelled else { return }
+      continuation.yield(.state(.finishing))
+      continuation.finish()
+    }
+  }
+}
+
 public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable {
   public struct Fixtures: Sendable {
     let health: HealthResponse

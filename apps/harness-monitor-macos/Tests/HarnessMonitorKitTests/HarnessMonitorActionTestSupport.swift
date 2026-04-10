@@ -54,6 +54,15 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       resumeThreadID: String?
     )
     case steerCodexRun(runID: String, prompt: String)
+    case startVoiceSession(sessionID: String, sinks: [VoiceProcessingSink], actor: String)
+    case appendVoiceAudioChunk(voiceSessionID: String, sequence: UInt64, actor: String)
+    case appendVoiceTranscript(voiceSessionID: String, sequence: UInt64, actor: String)
+    case finishVoiceSession(
+      voiceSessionID: String,
+      reason: VoiceSessionFinishReason,
+      confirmedText: String?,
+      actor: String
+    )
     case transferLeader(sessionID: String, newLeaderID: String, reason: String?, actor: String)
     case updateTaskQueuePolicy(
       sessionID: String,

@@ -28,6 +28,10 @@
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Harness Monitor records voice only when you press a voice input control so it can transcribe your instruction.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Harness Monitor transcribes your voice into text you can confirm before sending to agents or fields.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>

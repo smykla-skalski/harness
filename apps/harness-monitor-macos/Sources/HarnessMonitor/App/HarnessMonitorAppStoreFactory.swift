@@ -55,23 +55,29 @@ enum HarnessMonitorAppStoreFactory {
       )
     }
 
-    let controller: any DaemonControlling
-
     switch HarnessMonitorLaunchMode(environment: environment) {
     case .live:
-      controller = DaemonController(environment: environment)
+      return HarnessMonitorStore(
+        daemonController: DaemonController(environment: environment),
+        modelContainer: modelContainer,
+        persistenceError: persistenceError
+      )
     case .preview:
-      controller = PreviewDaemonController(
-        previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]
+      return HarnessMonitorStore(
+        daemonController: PreviewDaemonController(
+          previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]
+        ),
+        voiceCapture: PreviewVoiceCaptureService(),
+        modelContainer: modelContainer,
+        persistenceError: persistenceError
       )
     case .empty:
-      controller = PreviewDaemonController(mode: .empty)
+      return HarnessMonitorStore(
+        daemonController: PreviewDaemonController(mode: .empty),
+        voiceCapture: PreviewVoiceCaptureService(),
+        modelContainer: modelContainer,
+        persistenceError: persistenceError
+      )
     }
-
-    return HarnessMonitorStore(
-      daemonController: controller,
-      modelContainer: modelContainer,
-      persistenceError: persistenceError
-    )
   }
 }
