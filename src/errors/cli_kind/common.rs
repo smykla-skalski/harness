@@ -107,4 +107,9 @@ impl CliErrorKind {
     pub fn json_parse(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Common(CommonError::json_parse(detail))
     }
+
+    #[must_use]
+    pub fn sandbox_feature_disabled(feature: impl Into<Cow<'static, str>>) -> Self {
+        Self::Common(CommonError::sandbox_feature_disabled(feature))
+    }
 }
