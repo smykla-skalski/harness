@@ -69,6 +69,15 @@ public enum JSONValue: Codable, Equatable, Sendable {
       try container.encode(value)
     }
   }
+
+  public var isStructurallyEmpty: Bool {
+    switch self {
+    case .null: true
+    case .object(let dict): dict.isEmpty
+    case .array(let items): items.isEmpty
+    case .bool, .number, .string: false
+    }
+  }
 }
 
 public struct SignalPayload: Codable, Equatable, Sendable {
@@ -182,6 +191,28 @@ public struct SessionSignalRecord: Codable, Equatable, Identifiable, Sendable {
   public let acknowledgment: SignalAck?
 
   public var id: String { signal.signalId }
+}
+
+extension SessionSignalRecord {
+  public func effectiveStatus(now: Date = .now) -> SessionSignalStatus {
+    guard status == .pending else { return status }
+    guard let expires = Self.parseExpiresAt(signal.expiresAt) else { return status }
+    return expires < now ? .expired : .pending
+  }
+
+  public var effectiveStatus: SessionSignalStatus {
+    effectiveStatus(now: .now)
+  }
+
+  static func parseExpiresAt(_ value: String) -> Date? {
+    let withFraction = Date.ISO8601FormatStyle().year().month().day()
+      .timeZone(separator: .omitted)
+      .time(includingFractionalSeconds: true)
+    if let date = try? withFraction.parse(value) {
+      return date
+    }
+    return try? Date.ISO8601FormatStyle().parse(value)
+  }
 }
 
 public struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {

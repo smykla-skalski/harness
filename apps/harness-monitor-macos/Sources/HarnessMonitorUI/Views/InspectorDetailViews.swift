@@ -61,9 +61,11 @@ struct SessionInspectorSummaryCard: View {
 struct SignalInspectorCard: View {
   let signal: SessionSignalRecord
 
+  private var effectiveStatus: SessionSignalStatus { signal.effectiveStatus }
+
   private var facts: [InspectorFact] {
     [
-      .init(title: "Status", value: signal.status.title),
+      .init(title: "Status", value: effectiveStatus.title),
       .init(title: "Agent", value: signal.agentId),
       .init(title: "Runtime", value: signal.runtime),
       .init(title: "Priority", value: signal.signal.priority.title),
@@ -79,20 +81,6 @@ struct SignalInspectorCard: View {
       Text(signal.signal.payload.message)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
-      DisclosureGroup("Delivery") {
-        InspectorFactGrid(
-          facts: [
-            .init(title: "Retries", value: "\(signal.signal.delivery.retryCount)"),
-            .init(title: "Max Retries", value: "\(signal.signal.delivery.maxRetries)"),
-            .init(
-              title: "Idempotency",
-              value: signal.signal.delivery.idempotencyKey ?? "Not set"
-            ),
-          ]
-        )
-      }
-      .scaledFont(.caption.bold())
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if let actionHint = signal.signal.payload.actionHint, !actionHint.isEmpty {
         InspectorSection(title: "Action Hint") {
           Text(actionHint)
@@ -113,18 +101,23 @@ struct SignalInspectorCard: View {
                 .lineLimit(2)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      DisclosureGroup("Metadata") {
-        Text(verbatim: signal.signal.payload.metadata.prettyPrintedJSONString())
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .textSelection(.enabled)
+      if !signal.signal.payload.metadata.isStructurallyEmpty {
+        DisclosureGroup("Metadata") {
+          Text(verbatim: signal.signal.payload.metadata.prettyPrintedJSONString())
+            .scaledFont(.caption.monospaced())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      .scaledFont(.caption.bold())
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if let acknowledgment = signal.acknowledgment {
         InspectorSection(title: "Acknowledgment") {
           InspectorFactGrid(
