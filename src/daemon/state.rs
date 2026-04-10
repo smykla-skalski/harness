@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::io::{self, Write as _};
 use std::os::unix::fs::PermissionsExt;
@@ -9,12 +10,14 @@ use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
-use crate::workspace::{dirs_home, harness_data_root, utc_now};
+use crate::workspace::{dirs_home, harness_data_root, host_home_dir, utc_now};
 
 const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
 const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
 const LEGACY_LAUNCH_AGENT_PLIST: &str = "io.harness.monitor.daemon.plist";
 const DAEMON_LOCK_FILE: &str = "daemon.lock";
+const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
+const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonManifest {
@@ -57,7 +60,33 @@ impl Drop for DaemonLockGuard {
 
 #[must_use]
 pub fn daemon_root() -> PathBuf {
+    if let Some(value) = context_scope_value(DAEMON_DATA_HOME_ENV) {
+        return PathBuf::from(value).join("harness").join("daemon");
+    }
+    if let Some(value) = context_scope_value(APP_GROUP_ID_ENV) {
+        return host_home_dir()
+            .join("Library")
+            .join("Group Containers")
+            .join(value)
+            .join("harness")
+            .join("daemon");
+    }
     harness_data_root().join("daemon")
+}
+
+fn context_scope_value(name: &str) -> Option<String> {
+    let value = env::var(name).unwrap_or_default();
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.starts_with("${") && trimmed.ends_with('}') {
+        return None;
+    }
+    if trimmed.eq_ignore_ascii_case("unset") {
+        return None;
+    }
+    Some(trimmed.to_string())
 }
 
 #[must_use]
@@ -171,6 +200,26 @@ pub fn load_manifest() -> Result<Option<DaemonManifest>, CliError> {
         return Ok(None);
     }
     read_json_typed(&manifest_path()).map(Some)
+}
+
+/// Load the manifest only when the daemon singleton lock is currently held.
+///
+/// Stale manifests can remain after forced process termination, so status
+/// commands should not treat a manifest file alone as proof that the daemon is
+/// online.
+///
+/// # Errors
+/// Returns `CliError` when the manifest cannot be loaded or a stale manifest
+/// cannot be removed.
+pub fn load_running_manifest() -> Result<Option<DaemonManifest>, CliError> {
+    let Some(manifest) = load_manifest()? else {
+        return Ok(None);
+    };
+    if daemon_lock_is_held() {
+        return Ok(Some(manifest));
+    }
+    clear_manifest_for_pid(manifest.pid)?;
+    Ok(None)
 }
 
 /// Persist the daemon manifest atomically.
@@ -334,6 +383,69 @@ mod tests {
     }
 
     #[test]
+    fn daemon_root_prefers_explicit_daemon_data_home() {
+        let tmp = tempdir().expect("tempdir");
+        let daemon_data_home = tmp.path().join("daemon-data-home");
+        let xdg_data_home = tmp.path().join("xdg-data-home");
+
+        temp_env::with_vars(
+            [
+                (
+                    "HARNESS_DAEMON_DATA_HOME",
+                    Some(daemon_data_home.to_str().expect("utf8 path")),
+                ),
+                (
+                    "XDG_DATA_HOME",
+                    Some(xdg_data_home.to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                assert_eq!(
+                    daemon_root(),
+                    daemon_data_home.join("harness").join("daemon")
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn daemon_root_uses_app_group_without_relocating_session_data() {
+        let tmp = tempdir().expect("tempdir");
+
+        temp_env::with_vars(
+            [
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "HARNESS_HOST_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("XDG_DATA_HOME", None),
+                ("HARNESS_DAEMON_DATA_HOME", None),
+                ("HARNESS_APP_GROUP_ID", Some("Q498EB36N4.io.harnessmonitor")),
+            ],
+            || {
+                assert_eq!(
+                    daemon_root(),
+                    tmp.path()
+                        .join("Library")
+                        .join("Group Containers")
+                        .join("Q498EB36N4.io.harnessmonitor")
+                        .join("harness")
+                        .join("daemon")
+                );
+                assert_ne!(
+                    harness_data_root(),
+                    tmp.path()
+                        .join("Library")
+                        .join("Group Containers")
+                        .join("Q498EB36N4.io.harnessmonitor")
+                        .join("harness")
+                );
+            },
+        );
+    }
+
+    #[test]
     fn manifest_round_trip() {
         let tmp = tempdir().expect("tempdir");
         temp_env::with_vars(
@@ -411,6 +523,35 @@ mod tests {
 
                 clear_manifest_for_pid(777).expect("clear owned manifest");
                 assert!(!manifest_path().exists(), "owned pid should clear manifest");
+            },
+        );
+    }
+
+    #[test]
+    fn load_running_manifest_clears_stale_manifest_when_lock_is_free() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                write_manifest(&DaemonManifest {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    pid: 9191,
+                    endpoint: "http://127.0.0.1:9191".into(),
+                    started_at: "2026-04-10T07:05:00Z".into(),
+                    token_path: auth_token_path().display().to_string(),
+                })
+                .expect("manifest");
+
+                let manifest = load_running_manifest().expect("load running manifest");
+
+                assert!(manifest.is_none(), "stale manifest should be hidden");
+                assert!(
+                    !manifest_path().exists(),
+                    "stale manifest should be removed"
+                );
             },
         );
     }

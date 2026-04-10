@@ -12,6 +12,28 @@ fn data_root_prefers_xdg_data_home() {
 }
 
 #[test]
+fn data_root_ignores_monitor_app_group_when_xdg_data_home_is_absent() {
+    let tmp = tempfile::tempdir().unwrap();
+    temp_env::with_vars(
+        [
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+            ("HARNESS_HOST_HOME", Some(tmp.path().to_str().unwrap())),
+            ("XDG_DATA_HOME", None),
+            ("HARNESS_APP_GROUP_ID", Some("Q498EB36N4.io.harnessmonitor")),
+        ],
+        || {
+            assert_ne!(
+                data_root(),
+                tmp.path()
+                    .join("Library")
+                    .join("Group Containers")
+                    .join("Q498EB36N4.io.harnessmonitor")
+            );
+        },
+    );
+}
+
+#[test]
 fn explicit_project_context_path_uses_project_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg_data = tmp.path().join("xdg-data");

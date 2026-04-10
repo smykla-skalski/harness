@@ -6,11 +6,20 @@ use sha2::{Digest, Sha256};
 use crate::errors::CliError;
 
 use super::canonical_checkout_root;
+#[cfg(target_os = "macos")]
+use super::paths::host_home_dir;
 use super::paths::{dirs_home, harness_data_root};
 
 /// XDG data root (`XDG_DATA_HOME` or `~/.local/share`).
 #[must_use]
 pub fn data_root() -> PathBuf {
+    if let Some(value) = context_scope_value("XDG_DATA_HOME") {
+        return PathBuf::from(value);
+    }
+    #[cfg(target_os = "macos")]
+    if context_scope_value("HARNESS_APP_GROUP_ID").is_some() {
+        return host_home_dir().join("Library").join("Application Support");
+    }
     user_dirs::data_dir().unwrap_or_else(|_| dirs_home().join(".local").join("share"))
 }
 

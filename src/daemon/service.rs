@@ -264,7 +264,7 @@ pub fn status_report() -> Result<DaemonStatusReport, CliError> {
     };
 
     Ok(DaemonStatusReport {
-        manifest: state::load_manifest()?,
+        manifest: state::load_running_manifest()?,
         launch_agent: launchd::launch_agent_status(),
         project_count,
         worktree_count,
