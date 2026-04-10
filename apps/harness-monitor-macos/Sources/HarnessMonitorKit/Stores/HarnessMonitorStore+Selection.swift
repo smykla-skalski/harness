@@ -4,47 +4,75 @@ import Foundation
 extension HarnessMonitorStore {
   public var selectedSessionID: String? {
     get { selection.selectedSessionID }
-    set { selection.selectedSessionID = newValue }
+    set {
+      guard selection.selectedSessionID != newValue else { return }
+      selection.selectedSessionID = newValue
+    }
   }
 
   public var selectedSession: SessionDetail? {
     get { selection.selectedSession }
-    set { selection.selectedSession = newValue }
+    set {
+      guard selection.selectedSession != newValue else { return }
+      selection.selectedSession = newValue
+    }
   }
 
   public var timeline: [TimelineEntry] {
     get { selection.timeline }
-    set { selection.timeline = newValue }
+    set {
+      guard selection.timeline != newValue else { return }
+      selection.timeline = newValue
+    }
   }
 
   public var inspectorSelection: InspectorSelection {
     get { selection.inspectorSelection }
-    set { selection.inspectorSelection = newValue }
+    set {
+      guard selection.inspectorSelection != newValue else { return }
+      selection.inspectorSelection = newValue
+    }
   }
 
   public var actionActorID: String? {
     get { selection.actionActorID }
-    set { selection.actionActorID = newValue }
+    set {
+      guard selection.actionActorID != newValue else { return }
+      selection.actionActorID = newValue
+    }
   }
 
   public var selectedActionActorID: String {
     get { resolvedActionActor() ?? "" }
-    set { actionActorID = newValue.isEmpty ? nil : newValue }
+    set {
+      let normalizedActorID = newValue.isEmpty ? nil : newValue
+      guard actionActorID != normalizedActorID else { return }
+      actionActorID = normalizedActorID
+    }
   }
 
   public var isSelectionLoading: Bool {
     get { selection.isSelectionLoading }
-    set { selection.isSelectionLoading = newValue }
+    set {
+      guard selection.isSelectionLoading != newValue else { return }
+      selection.isSelectionLoading = newValue
+    }
   }
 
   public var isExtensionsLoading: Bool {
     get { selection.isExtensionsLoading }
-    set { selection.isExtensionsLoading = newValue }
+    set {
+      guard selection.isExtensionsLoading != newValue else { return }
+      selection.isExtensionsLoading = newValue
+    }
   }
 
   public var isSessionActionInFlight: Bool {
     get { selection.isSessionActionInFlight }
-    set { selection.isSessionActionInFlight = newValue }
+    set {
+      guard selection.isSessionActionInFlight != newValue else { return }
+      selection.isSessionActionInFlight = newValue
+    }
   }
 
   // MARK: - Navigation history
@@ -74,7 +102,9 @@ extension HarnessMonitorStore {
     guard !isNavigatingHistory else { return }
     guard selectedSessionID != sessionID else { return }
     navigationBackStack.append(selectedSessionID)
-    navigationForwardStack.removeAll()
+    if !navigationForwardStack.isEmpty {
+      navigationForwardStack.removeAll()
+    }
   }
 
   private func loadSessionWithoutHistory(_ sessionID: String?) async {
@@ -103,15 +133,21 @@ extension HarnessMonitorStore {
       cancelSessionPushFallback()
       selectedSessionID = sessionID
       inspectorSelection = .none
-      lastError = nil
+      if lastError != nil {
+        lastError = nil
+      }
       isExtensionsLoading = false
-      pendingExtensions = nil
+      if pendingExtensions != nil {
+        pendingExtensions = nil
+      }
       resetSelectedCodexRuns()
     }
 
     guard let sessionID else {
       withUISyncBatch {
-        activeSessionLoadRequest = 0
+        if activeSessionLoadRequest != 0 {
+          activeSessionLoadRequest = 0
+        }
         isSelectionLoading = false
         selectedSession = nil
         timeline = []
