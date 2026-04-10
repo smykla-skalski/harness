@@ -2817,16 +2817,32 @@ mod tests {
         assert_eq!(config.codex_transport, CodexTransportKind::Stdio);
     }
 
+    fn with_isolated_transport_env<F: FnOnce()>(ws_url: Option<&str>, f: F) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "HARNESS_DAEMON_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("HARNESS_APP_GROUP_ID", None),
+                ("HARNESS_CODEX_WS_URL", ws_url),
+                ("XDG_DATA_HOME", None),
+            ],
+            f,
+        );
+    }
+
     #[test]
     fn codex_transport_from_env_defaults_to_stdio_when_unsandboxed() {
-        temp_env::with_var("HARNESS_CODEX_WS_URL", Option::<&str>::None, || {
+        with_isolated_transport_env(None, || {
             assert_eq!(codex_transport_from_env(false), CodexTransportKind::Stdio);
         });
     }
 
     #[test]
     fn codex_transport_from_env_defaults_to_websocket_when_sandboxed() {
-        temp_env::with_var("HARNESS_CODEX_WS_URL", Option::<&str>::None, || {
+        with_isolated_transport_env(None, || {
             assert_eq!(
                 codex_transport_from_env(true),
                 CodexTransportKind::WebSocket {
@@ -2838,7 +2854,7 @@ mod tests {
 
     #[test]
     fn codex_transport_from_env_overrides_via_environment() {
-        temp_env::with_var("HARNESS_CODEX_WS_URL", Some("ws://10.0.0.5:7000"), || {
+        with_isolated_transport_env(Some("ws://10.0.0.5:7000"), || {
             assert_eq!(
                 codex_transport_from_env(false),
                 CodexTransportKind::WebSocket {
