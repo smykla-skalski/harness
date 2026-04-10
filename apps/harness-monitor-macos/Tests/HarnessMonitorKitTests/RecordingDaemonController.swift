@@ -25,6 +25,24 @@ actor RecordingDaemonController: DaemonControlling {
     return .enabled
   }
 
+  func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    launchAgentInstalled ? .enabled : .notRegistered
+  }
+
+  func launchAgentSnapshot() async -> LaunchAgentStatus {
+    LaunchAgentStatus(
+      installed: launchAgentInstalled,
+      loaded: launchAgentInstalled,
+      label: "io.harness.daemon",
+      path: "/tmp/io.harness.daemon.plist",
+      domainTarget: "gui/501",
+      serviceTarget: "gui/501/io.harness.daemon",
+      state: launchAgentInstalled ? "running" : nil,
+      pid: launchAgentInstalled ? 4_242 : nil,
+      lastExitStatus: launchAgentInstalled ? 0 : nil
+    )
+  }
+
   func awaitLaunchAgentState(
     _ target: DaemonLaunchAgentRegistrationState,
     timeout: Duration

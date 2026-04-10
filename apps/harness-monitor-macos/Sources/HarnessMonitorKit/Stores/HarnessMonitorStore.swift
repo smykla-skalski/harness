@@ -188,6 +188,12 @@ public final class HarnessMonitorStore {
       self.cacheService = nil
     }
     self.persistenceError = persistenceError
+    if let raw = ProcessInfo.processInfo.environment["HARNESS_BOOTSTRAP_TIMEOUT_SECONDS"],
+      let seconds = Double(raw),
+      seconds > 0
+    {
+      self.bootstrapWarmUpTimeout = .seconds(seconds)
+    }
     bindUISlices()
     refreshBookmarkedSessionIds()
     syncAllUI()
@@ -207,8 +213,26 @@ public final class HarnessMonitorStore {
     connectionState = .connecting
     lastError = nil
 
+    let registrationState = await daemonController.launchAgentRegistrationState()
+    switch registrationState {
+    case .notRegistered, .notFound:
+      await applyLaunchAgentOfflineState(
+        reason: "Launch agent not installed. Install to start the daemon."
+      )
+      return
+    case .requiresApproval:
+      await applyLaunchAgentOfflineState(
+        reason: "Launch agent needs approval in System Settings > General > Login Items."
+      )
+      return
+    case .enabled:
+      break
+    }
+
     do {
-      let client = try await daemonController.bootstrapClient()
+      let client = try await daemonController.awaitManifestWarmUp(
+        timeout: bootstrapWarmUpTimeout
+      )
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
@@ -218,6 +242,29 @@ public final class HarnessMonitorStore {
 
   public func focusSidebarSearch() {
     sidebarUI.searchFocusRequest += 1
+  }
+
+  private func applyLaunchAgentOfflineState(reason: String) async {
+    let launchAgent = await daemonController.launchAgentSnapshot()
+    daemonStatus = DaemonStatusReport(
+      manifest: nil,
+      launchAgent: launchAgent,
+      projectCount: 0,
+      worktreeCount: 0,
+      sessionCount: 0,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "",
+        manifestPath: "",
+        authTokenPath: "",
+        authTokenPresent: false,
+        eventsPath: "",
+        databasePath: "",
+        databaseSizeBytes: 0,
+        lastEvent: nil
+      )
+    )
+    markConnectionOffline(reason)
+    await restorePersistedSessionState()
   }
 
   public func startDaemon() async {
