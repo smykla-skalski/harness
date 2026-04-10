@@ -437,6 +437,8 @@ from pathlib import Path
 root = Path(sys.argv[1])
 include_paths = [
     root / "HarnessMonitor.entitlements",
+    root / "HarnessMonitorUITestHost.entitlements",
+    root / "HarnessMonitorDaemon.entitlements",
     root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
     root / "Sources" / "HarnessMonitor",
     root / "Sources" / "HarnessMonitorKit",
