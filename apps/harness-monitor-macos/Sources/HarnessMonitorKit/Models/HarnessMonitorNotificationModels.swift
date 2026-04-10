@@ -6,7 +6,6 @@ public enum HarnessMonitorNotificationAuthorizationProfile: String, CaseIterable
 {
   case standard
   case provisional
-  case critical
 
   public var id: String { rawValue }
 
@@ -14,7 +13,6 @@ public enum HarnessMonitorNotificationAuthorizationProfile: String, CaseIterable
     switch self {
     case .standard: "Alert, Sound, Badge"
     case .provisional: "Provisional"
-    case .critical: "Critical"
     }
   }
 
@@ -24,8 +22,6 @@ public enum HarnessMonitorNotificationAuthorizationProfile: String, CaseIterable
       [.alert, .sound, .badge, .providesAppNotificationSettings]
     case .provisional:
       [.alert, .sound, .badge, .provisional, .providesAppNotificationSettings]
-    case .critical:
-      [.alert, .sound, .badge, .criticalAlert, .providesAppNotificationSettings]
     }
   }
 }
@@ -62,9 +58,6 @@ public enum HarnessMonitorNotificationCategoryKind: String, CaseIterable, Identi
 public enum HarnessMonitorNotificationSoundMode: String, CaseIterable, Identifiable, Sendable {
   case none
   case systemDefault
-  case customSample
-  case criticalDefault
-  case criticalSample
 
   public var id: String { rawValue }
 
@@ -72,16 +65,6 @@ public enum HarnessMonitorNotificationSoundMode: String, CaseIterable, Identifia
     switch self {
     case .none: "None"
     case .systemDefault: "Default"
-    case .customSample: "Custom Sample"
-    case .criticalDefault: "Critical Default"
-    case .criticalSample: "Critical Sample"
-    }
-  }
-
-  public var usesCriticalAlert: Bool {
-    switch self {
-    case .criticalDefault, .criticalSample: true
-    case .none, .systemDefault, .customSample: false
     }
   }
 }
@@ -153,7 +136,6 @@ public enum HarnessMonitorNotificationInterruptionMode: String, CaseIterable, Id
   case passive
   case active
   case timeSensitive
-  case critical
 
   public var id: String { rawValue }
 
@@ -162,7 +144,6 @@ public enum HarnessMonitorNotificationInterruptionMode: String, CaseIterable, Id
     case .passive: "Passive"
     case .active: "Active"
     case .timeSensitive: "Time Sensitive"
-    case .critical: "Critical"
     }
   }
 
@@ -171,7 +152,6 @@ public enum HarnessMonitorNotificationInterruptionMode: String, CaseIterable, Id
     case .passive: .passive
     case .active: .active
     case .timeSensitive: .timeSensitive
-    case .critical: .critical
     }
   }
 }
@@ -190,7 +170,6 @@ public struct HarnessMonitorNotificationDraft: Equatable, Sendable {
   public var includesUserInfo: Bool
   public var category: HarnessMonitorNotificationCategoryKind
   public var soundMode: HarnessMonitorNotificationSoundMode
-  public var criticalVolume: Double
   public var attachmentMode: HarnessMonitorNotificationAttachmentMode
   public var hidesAttachmentThumbnail: Bool
   public var thumbnailClipping: HarnessMonitorNotificationThumbnailClipping
@@ -215,7 +194,6 @@ public struct HarnessMonitorNotificationDraft: Equatable, Sendable {
     includesUserInfo: Bool = true,
     category: HarnessMonitorNotificationCategoryKind = .fullControls,
     soundMode: HarnessMonitorNotificationSoundMode = .systemDefault,
-    criticalVolume: Double = 0.8,
     attachmentMode: HarnessMonitorNotificationAttachmentMode = .sampleImage,
     hidesAttachmentThumbnail: Bool = false,
     thumbnailClipping: HarnessMonitorNotificationThumbnailClipping = .full,
@@ -239,7 +217,6 @@ public struct HarnessMonitorNotificationDraft: Equatable, Sendable {
     self.includesUserInfo = includesUserInfo
     self.category = category
     self.soundMode = soundMode
-    self.criticalVolume = criticalVolume
     self.attachmentMode = attachmentMode
     self.hidesAttachmentThumbnail = hidesAttachmentThumbnail
     self.thumbnailClipping = thumbnailClipping
@@ -261,7 +238,6 @@ public struct HarnessMonitorNotificationSettingsSnapshot: Equatable, Sendable {
   public var lockScreenSetting: String
   public var alertStyle: String
   public var showPreviews: String
-  public var criticalAlertSetting: String
   public var timeSensitiveSetting: String
   public var scheduledDeliverySetting: String
   public var directMessagesSetting: String
@@ -276,7 +252,6 @@ public struct HarnessMonitorNotificationSettingsSnapshot: Equatable, Sendable {
     lockScreenSetting: "unknown",
     alertStyle: "unknown",
     showPreviews: "unknown",
-    criticalAlertSetting: "unknown",
     timeSensitiveSetting: "unknown",
     scheduledDeliverySetting: "unknown",
     directMessagesSetting: "unknown",
@@ -292,7 +267,6 @@ public struct HarnessMonitorNotificationSettingsSnapshot: Equatable, Sendable {
     lockScreenSetting: "enabled",
     alertStyle: "banner",
     showPreviews: "always",
-    criticalAlertSetting: "disabled",
     timeSensitiveSetting: "enabled",
     scheduledDeliverySetting: "not supported",
     directMessagesSetting: "not supported",
