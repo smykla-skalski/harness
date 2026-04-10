@@ -59,6 +59,8 @@ pub enum CommonError {
     UsageError { detail: Cow<'static, str> },
     #[error("{detail}")]
     JsonParse { detail: Cow<'static, str> },
+    #[error("sandbox feature disabled: {feature}")]
+    SandboxFeatureDisabled { feature: Cow<'static, str> },
 }
 
 impl CommonError {
@@ -88,6 +90,7 @@ impl CommonError {
             Self::ClusterError { .. } => "CLUSTER",
             Self::UsageError { .. } => "USAGE",
             Self::JsonParse { .. } => "JSON",
+            Self::SandboxFeatureDisabled { .. } => "SANDBOX001",
         }
     }
 
@@ -101,7 +104,8 @@ impl CommonError {
             | Self::Serialize { .. }
             | Self::HookPayloadInvalid { .. }
             | Self::ClusterError { .. }
-            | Self::UsageError { .. } => 1,
+            | Self::UsageError { .. }
+            | Self::SandboxFeatureDisabled { .. } => 1,
             Self::MissingFile { .. }
             | Self::InvalidJson { .. }
             | Self::PathNotFound { .. }
@@ -256,6 +260,22 @@ impl CommonError {
     pub fn json_parse(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::JsonParse {
             detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn sandbox_feature_disabled(feature: impl Into<Cow<'static, str>>) -> Self {
+        Self::SandboxFeatureDisabled {
+            feature: feature.into(),
+        }
+    }
+
+    /// Returns the feature name when this error is `SandboxFeatureDisabled`.
+    #[must_use]
+    pub fn sandbox_feature(&self) -> Option<&str> {
+        match self {
+            Self::SandboxFeatureDisabled { feature } => Some(feature.as_ref()),
+            _ => None,
         }
     }
 

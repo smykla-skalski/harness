@@ -898,6 +898,20 @@ async fn post_signal_ack(
 fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
     match result {
         Ok(value) => Json(value).into_response(),
+        Err(error) if error.code() == "SANDBOX001" => {
+            let feature = match error.kind() {
+                CliErrorKind::Common(common) => common.sandbox_feature().unwrap_or(""),
+                _ => "",
+            };
+            (
+                StatusCode::NOT_IMPLEMENTED,
+                Json(serde_json::json!({
+                    "error": "sandbox-disabled",
+                    "feature": feature,
+                })),
+            )
+                .into_response()
+        }
         Err(error) => (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
@@ -921,7 +935,11 @@ fn timed_json<T: serde::Serialize>(
 ) -> Response {
     let elapsed = start.elapsed().as_millis();
     let duration_ms = u64::try_from(elapsed).unwrap_or(u64::MAX);
-    let status: u16 = if result.is_ok() { 200 } else { 400 };
+    let status: u16 = match &result {
+        Ok(_) => 200,
+        Err(error) if error.code() == "SANDBOX001" => 501,
+        Err(_) => 400,
+    };
     log_request(method, path, status, duration_ms, request_id);
     map_json(result)
 }

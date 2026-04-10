@@ -149,11 +149,12 @@ impl Execute for DaemonServeArgs {
 
 fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
+    let sandboxed = service::sandboxed_from_env();
     stop_daemon_with(
         cfg!(target_os = "macos"),
         &launch_agent,
         try_load_manifest,
-        launchd::bootout_launch_agent,
+        || launchd::bootout_launch_agent(sandboxed),
         request_shutdown_if_running,
         wait_for_daemon_shutdown,
     )
@@ -189,17 +190,18 @@ where
 
 fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
+    let sandboxed = service::sandboxed_from_env();
     restart_daemon_with(
         cfg!(target_os = "macos"),
         &launch_agent,
         binary,
         try_load_manifest,
-        launchd::bootout_launch_agent,
+        || launchd::bootout_launch_agent(sandboxed),
         request_shutdown_if_running,
         wait_for_daemon_shutdown,
-        launchd::restart_launch_agent,
+        || launchd::restart_launch_agent(sandboxed),
         |binary| {
-            let mut child = spawn_daemon(binary)?;
+            let mut child = spawn_daemon(sandboxed, binary)?;
             let _ = wait_for_healthy_daemon(Some(&mut child))?;
             Ok(())
         },
@@ -450,7 +452,12 @@ fn daemon_url(endpoint: &str, path: &str) -> String {
     format!("{}{path}", endpoint.trim_end_matches('/'))
 }
 
-fn spawn_daemon(binary: &Path) -> Result<Child, CliError> {
+fn spawn_daemon(sandboxed: bool, binary: &Path) -> Result<Child, CliError> {
+    if sandboxed {
+        return Err(CliError::from(CliErrorKind::sandbox_feature_disabled(
+            "daemon-spawn",
+        )));
+    }
     let log_path = state::daemon_root().join("daemon.stderr.log");
     let _ = fs::create_dir_all(state::daemon_root());
     let stderr_file = fs::OpenOptions::new()
@@ -508,7 +515,7 @@ impl Execute for DaemonInstallLaunchAgentArgs {
                     "resolve current harness binary: {error}"
                 )))
             })?;
-        let path = launchd::install_launch_agent(&binary)?;
+        let path = launchd::install_launch_agent(service::sandboxed_from_env(), &binary)?;
         if self.json {
             print_json(&launchd::launch_agent_status())?;
         } else {
@@ -527,7 +534,7 @@ pub struct DaemonRemoveLaunchAgentArgs {
 
 impl Execute for DaemonRemoveLaunchAgentArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let removed = launchd::remove_launch_agent()?;
+        let removed = launchd::remove_launch_agent(service::sandboxed_from_env())?;
         if self.json {
             print_json(&launchd::launch_agent_status())?;
         } else {
@@ -900,5 +907,13 @@ mod tests {
             calls.borrow().as_slice(),
             ["request_shutdown", "start_manual:/tmp/harness"]
         );
+    }
+
+    #[test]
+    fn spawn_daemon_refuses_in_sandbox_mode() {
+        let error = spawn_daemon(true, Path::new("/nonexistent/harness"))
+            .expect_err("sandbox mode must refuse spawn");
+        assert_eq!(error.code(), "SANDBOX001");
+        assert!(error.to_string().contains("daemon-spawn"));
     }
 }
