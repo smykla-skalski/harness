@@ -182,6 +182,52 @@ public actor SessionCacheService {
     return insertedCount
   }
 
+  @discardableResult
+  func cacheSessionDetails(
+    _ entries: [(detail: SessionDetail, timeline: [TimelineEntry])],
+    markViewed: Bool = false
+  ) -> Int {
+    guard !entries.isEmpty else {
+      return 0
+    }
+
+    let context = makeContext()
+    let ids = entries.map(\.detail.session.sessionId)
+    let descriptor = FetchDescriptor<CachedSession>(
+      predicate: #Predicate { ids.contains($0.sessionId) }
+    )
+    let existingByID: [String: CachedSession] = Dictionary(
+      uniqueKeysWithValues: ((try? context.fetch(descriptor)) ?? []).map { ($0.sessionId, $0) }
+    )
+
+    var insertedCount = 0
+    for (detail, timeline) in entries {
+      let cached: CachedSession
+      if let existing = existingByID[detail.session.sessionId] {
+        existing.update(from: detail.session)
+        cached = existing
+      } else {
+        cached = detail.session.toCachedSession()
+        context.insert(cached)
+        insertedCount += 1
+      }
+
+      if markViewed {
+        cached.lastViewedAt = .now
+      }
+
+      syncAgents(detail.agents, on: cached, context: context)
+      syncTasks(detail.tasks, on: cached, context: context)
+      syncSignals(detail.signals, on: cached, context: context)
+      syncTimeline(timeline, on: cached, context: context)
+      syncActivity(detail.agentActivity, on: cached, context: context)
+      syncObserver(detail.observer, on: cached, context: context)
+    }
+
+    try? context.save()
+    return insertedCount
+  }
+
   func cacheSessionSummary(
     _ summary: SessionSummary,
     project: ProjectSummary?

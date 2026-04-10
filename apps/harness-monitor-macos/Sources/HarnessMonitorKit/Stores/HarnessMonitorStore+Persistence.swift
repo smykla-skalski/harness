@@ -26,6 +26,16 @@ extension HarnessMonitorStore {
     updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
   }
 
+  func cacheSessionDetails(
+    _ entries: [(detail: SessionDetail, timeline: [TimelineEntry])],
+    markViewed: Bool = false
+  ) async {
+    guard let cacheService, persistenceError == nil else { return }
+    guard !entries.isEmpty else { return }
+    let insertedCount = await cacheService.cacheSessionDetails(entries, markViewed: markViewed)
+    updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+  }
+
   func cacheSessionSummary(
     _ summary: SessionSummary,
     project: ProjectSummary?
