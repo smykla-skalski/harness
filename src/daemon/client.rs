@@ -8,6 +8,10 @@ use uuid::Uuid;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 
+use super::agent_tui::{
+    AgentTuiInputRequest, AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSnapshot,
+    AgentTuiStartRequest,
+};
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
@@ -182,6 +186,35 @@ impl DaemonClient {
         self.post(&format!("/v1/sessions/{session_id}/signal-cancel"), request)
     }
 
+    pub fn start_agent_tui(
+        &self,
+        session_id: &str,
+        request: &AgentTuiStartRequest,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        self.post(&format!("/v1/sessions/{session_id}/agent-tuis"), request)
+    }
+
+    pub fn send_agent_tui_input(
+        &self,
+        tui_id: &str,
+        request: &AgentTuiInputRequest,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        self.post(&format!("/v1/agent-tuis/{tui_id}/input"), request)
+    }
+
+    pub fn resize_agent_tui(
+        &self,
+        tui_id: &str,
+        request: &AgentTuiResizeRequest,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        self.post(&format!("/v1/agent-tuis/{tui_id}/resize"), request)
+    }
+
+    pub fn stop_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        let body = serde_json::json!({});
+        self.post(&format!("/v1/agent-tuis/{tui_id}/stop"), &body)
+    }
+
     // --- Read operations ---
 
     pub fn get_session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
@@ -190,6 +223,14 @@ impl DaemonClient {
 
     pub fn list_sessions(&self) -> Result<Vec<SessionSummary>, CliError> {
         self.get("/v1/sessions")
+    }
+
+    pub fn list_agent_tuis(&self, session_id: &str) -> Result<AgentTuiListResponse, CliError> {
+        self.get(&format!("/v1/sessions/{session_id}/agent-tuis"))
+    }
+
+    pub fn get_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        self.get(&format!("/v1/agent-tuis/{tui_id}"))
     }
 
     // --- HTTP helpers ---

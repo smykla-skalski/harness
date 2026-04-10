@@ -14,6 +14,7 @@ use tokio::sync::{broadcast, watch};
 
 use crate::errors::{CliError, CliErrorKind};
 
+use super::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use super::protocol::{
     AgentRemoveRequest, CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest,
     LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
@@ -36,6 +37,7 @@ pub struct DaemonHttpState {
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
     pub db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
     pub codex_controller: super::codex_controller::CodexControllerHandle,
+    pub agent_tui_manager: super::agent_tui::AgentTuiManagerHandle,
 }
 
 /// Serve the daemon's HTTP API.
@@ -74,6 +76,7 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(session_routes())
         .merge(task_routes())
         .merge(agent_routes())
+        .merge(agent_tui_routes())
         .merge(signal_routes())
         .merge(codex_routes())
         .merge(voice_routes())
@@ -150,6 +153,21 @@ fn agent_routes() -> Router<DaemonHttpState> {
             "/v1/sessions/{session_id}/leader",
             post(post_transfer_leader),
         )
+}
+
+fn agent_tui_routes() -> Router<DaemonHttpState> {
+    Router::new()
+        .route(
+            "/v1/sessions/{session_id}/agent-tuis",
+            get(get_agent_tuis).post(post_agent_tui_start),
+        )
+        .route("/v1/agent-tuis/{tui_id}", get(get_agent_tui))
+        .route("/v1/agent-tuis/{tui_id}/input", post(post_agent_tui_input))
+        .route(
+            "/v1/agent-tuis/{tui_id}/resize",
+            post(post_agent_tui_resize),
+        )
+        .route("/v1/agent-tuis/{tui_id}/stop", post(post_agent_tui_stop))
 }
 
 fn signal_routes() -> Router<DaemonHttpState> {
@@ -592,6 +610,123 @@ async fn post_transfer_leader(
         &request_id,
         start,
         result,
+    )
+}
+
+async fn get_agent_tuis(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        "/v1/sessions/{id}/agent-tuis",
+        &request_id,
+        start,
+        state.agent_tui_manager.list(&session_id),
+    )
+}
+
+async fn post_agent_tui_start(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AgentTuiStartRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/agent-tuis",
+        &request_id,
+        start,
+        state.agent_tui_manager.start(&session_id, &request),
+    )
+}
+
+async fn get_agent_tui(
+    Path(tui_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        "/v1/agent-tuis/{id}",
+        &request_id,
+        start,
+        state.agent_tui_manager.get(&tui_id),
+    )
+}
+
+async fn post_agent_tui_input(
+    Path(tui_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AgentTuiInputRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/agent-tuis/{id}/input",
+        &request_id,
+        start,
+        state.agent_tui_manager.input(&tui_id, &request),
+    )
+}
+
+async fn post_agent_tui_resize(
+    Path(tui_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AgentTuiResizeRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/agent-tuis/{id}/resize",
+        &request_id,
+        start,
+        state.agent_tui_manager.resize(&tui_id, &request),
+    )
+}
+
+async fn post_agent_tui_stop(
+    Path(tui_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/agent-tuis/{id}/stop",
+        &request_id,
+        start,
+        state.agent_tui_manager.stop(&tui_id),
     )
 }
 
