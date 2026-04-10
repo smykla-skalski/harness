@@ -145,6 +145,7 @@ struct HarnessMonitorStoreTests {
     ]
 
     store.searchText = "harness leader-alpha"
+    store.flushPendingSearchRebuild()
     store.sessionFilter = .all
 
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-a"])
