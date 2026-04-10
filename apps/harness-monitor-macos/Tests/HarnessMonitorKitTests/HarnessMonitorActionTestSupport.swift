@@ -36,6 +36,17 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       actor: String
     )
     case interruptCodexRun(runID: String)
+    case startAgentTui(
+      sessionID: String,
+      runtime: String,
+      name: String?,
+      prompt: String?,
+      rows: Int,
+      cols: Int
+    )
+    case sendAgentTuiInput(tuiID: String, input: AgentTuiInput)
+    case resizeAgentTui(tuiID: String, rows: Int, cols: Int)
+    case stopAgentTui(tuiID: String)
     case endSession(sessionID: String, actor: String)
     case observeSession(sessionID: String, actor: String)
     case removeAgent(sessionID: String, agentID: String, actor: String)
@@ -105,7 +116,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
   private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
+  private var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   private var _codexStartError: (any Error)?
+  private var _agentTuiStartError: (any Error)?
   private var _globalStreamEvents: [DaemonPushEvent] = []
   private var _globalStreamError: (any Error)?
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
@@ -269,12 +282,26 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     }
   }
 
+  func configureAgentTuis(_ tuis: [AgentTuiSnapshot], for sessionID: String) {
+    lock.withLock {
+      _agentTuisBySessionID[sessionID] = tuis
+    }
+  }
+
   func configureCodexStartError(_ error: (any Error)?) {
     lock.withLock { _codexStartError = error }
   }
 
+  func configureAgentTuiStartError(_ error: (any Error)?) {
+    lock.withLock { _agentTuiStartError = error }
+  }
+
   func configuredCodexStartError() -> (any Error)? {
     lock.withLock { _codexStartError }
+  }
+
+  func configuredAgentTuiStartError() -> (any Error)? {
+    lock.withLock { _agentTuiStartError }
   }
 
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
@@ -304,9 +331,17 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredCodexRuns(for sessionID: String) -> [CodexRunSnapshot] {
     lock.withLock { _codexRunsBySessionID[sessionID] ?? [] }
   }
+  func configuredAgentTuis(for sessionID: String) -> [AgentTuiSnapshot] {
+    lock.withLock { _agentTuisBySessionID[sessionID] ?? [] }
+  }
   func configuredCodexRun(id runID: String) -> CodexRunSnapshot? {
     lock.withLock {
       _codexRunsBySessionID.values.flatMap(\.self).first { $0.runId == runID }
+    }
+  }
+  func configuredAgentTui(id tuiID: String) -> AgentTuiSnapshot? {
+    lock.withLock {
+      _agentTuisBySessionID.values.flatMap(\.self).first { $0.tuiId == tuiID }
     }
   }
   func recordCodexRun(_ run: CodexRunSnapshot) {
@@ -315,6 +350,14 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       runs.removeAll { $0.runId == run.runId }
       runs.insert(run, at: 0)
       _codexRunsBySessionID[run.sessionId] = runs
+    }
+  }
+  func recordAgentTui(_ tui: AgentTuiSnapshot) {
+    lock.withLock {
+      var tuis = _agentTuisBySessionID[tui.sessionId] ?? []
+      tuis.removeAll { $0.tuiId == tui.tuiId }
+      tuis.insert(tui, at: 0)
+      _agentTuisBySessionID[tui.sessionId] = tuis
     }
   }
   func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { _globalStreamEvents } }

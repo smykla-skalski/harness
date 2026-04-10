@@ -556,6 +556,7 @@ impl AgentTuiManagerHandle {
         let size = request.size()?;
         let tui_id = format!("agent-tui-{}", Uuid::new_v4());
         let marker_capability = format!("agent-tui:{tui_id}");
+        let bridge = AgentTuiBridgeClient::from_state_file()?;
         let db = self.db()?;
         let db_guard = lock_db(&db)?;
         let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
@@ -579,7 +580,6 @@ impl AgentTuiManagerHandle {
         drop(db_guard);
 
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
-        let bridge = AgentTuiBridgeClient::from_state_file()?;
         let snapshot = bridge.start(&AgentTuiBridgeStartSpec {
             session_id: session_id.to_string(),
             agent_id,
@@ -1521,6 +1521,84 @@ mod tests {
         assert_eq!(stopped.status, AgentTuiStatus::Stopped);
         let transcript = fs_err::read(&stopped.transcript_path).expect("read transcript file");
         assert!(String::from_utf8_lossy(&transcript).contains("hello from manager"));
+    }
+
+    #[test]
+    fn sandboxed_start_without_bridge_does_not_join_agent() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        let daemon_home = tmp.path().join("daemon-home");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-manager".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-manager".into(),
+            checkout_name: "Directory".into(),
+            context_root: context_root.clone(),
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "managed tui test",
+            "managed tui",
+            "sess-tui-manager",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), true);
+
+        temp_env::with_vars(
+            [(
+                "HARNESS_DAEMON_DATA_HOME",
+                Some(daemon_home.to_str().expect("utf8 daemon home")),
+            )],
+            || {
+                let error = manager
+                    .start(
+                        "sess-tui-manager",
+                        &AgentTuiStartRequest {
+                            runtime: "copilot".into(),
+                            role: SessionRole::Worker,
+                            capabilities: vec![],
+                            name: Some("Copilot TUI".into()),
+                            prompt: Some("hello".into()),
+                            project_dir: None,
+                            argv: vec![],
+                            rows: 24,
+                            cols: 80,
+                        },
+                    )
+                    .expect_err("start should fail without bridge");
+
+                assert!(error.message().contains("agent-tui.host-bridge"));
+            },
+        );
+
+        let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
+        let state = db_guard
+            .load_session_state("sess-tui-manager")
+            .expect("load state")
+            .expect("state present");
+        assert!(state.agents.values().all(|agent| {
+            agent
+                .capabilities
+                .iter()
+                .all(|capability| capability != "agent-tui")
+        }));
     }
 
     fn spawn_shell(script: &str) -> super::AgentTuiProcess {

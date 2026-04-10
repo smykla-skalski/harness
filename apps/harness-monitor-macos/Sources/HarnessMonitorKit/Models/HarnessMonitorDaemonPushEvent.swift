@@ -20,6 +20,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case logLevelChanged(LogLevelResponse)
     case codexRunUpdated(CodexRunSnapshot)
     case codexApprovalRequested(CodexApprovalRequestedPayload)
+    case agentTuiUpdated(AgentTuiSnapshot)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -101,6 +102,12 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         kind: .codexApprovalRequested(
           try streamEvent.decodePayload(as: CodexApprovalRequestedPayload.self)
         )
+      )
+    case "agent_tui_started", "agent_tui_updated", "agent_tui_stopped", "agent_tui_failed":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .agentTuiUpdated(try streamEvent.decodePayload(as: AgentTuiSnapshot.self))
       )
     default:
       return Self(

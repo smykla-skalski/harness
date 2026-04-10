@@ -107,6 +107,122 @@ extension RecordingHarnessClient {
     return updated
   }
 
+  func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
+    AgentTuiListResponse(tuis: configuredAgentTuis(for: sessionID))
+  }
+
+  func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    if let tui = configuredAgentTui(id: tuiID) {
+      return tui
+    }
+    throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+  }
+
+  func startAgentTui(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await sleepIfNeeded(configuredMutationDelay())
+    if let error = configuredAgentTuiStartError() {
+      throw error
+    }
+    calls.append(
+      .startAgentTui(
+        sessionID: sessionID,
+        runtime: request.runtime,
+        name: request.name,
+        prompt: request.prompt,
+        rows: request.rows,
+        cols: request.cols
+      )
+    )
+    let tui = agentTuiFixture(
+      tuiID: "agent-tui-\(configuredAgentTuis(for: sessionID).count + 1)",
+      sessionID: sessionID,
+      runtime: request.runtime,
+      status: .running,
+      rows: request.rows,
+      cols: request.cols
+    )
+    recordAgentTui(tui)
+    return tui
+  }
+
+  func sendAgentTuiInput(
+    tuiID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(.sendAgentTuiInput(tuiID: tuiID, input: request.input))
+    guard let tui = configuredAgentTui(id: tuiID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    let updatedScreenText: String =
+      switch request.input {
+      case .text(let text), .paste(let text):
+        [tui.screen.text, text].filter { !$0.isEmpty }.joined(separator: "\n")
+      case .key(let key):
+        [tui.screen.text, "[\(key.title)]"].filter { !$0.isEmpty }.joined(separator: "\n")
+      case .control(let key):
+        [tui.screen.text, "[Ctrl-\(String(key).uppercased())]"].filter { !$0.isEmpty }.joined(
+          separator: "\n")
+      case .rawBytesBase64:
+        [tui.screen.text, "[raw bytes]"].filter { !$0.isEmpty }.joined(separator: "\n")
+      }
+    let updated = agentTuiFixture(
+      tuiID: tui.tuiId,
+      sessionID: tui.sessionId,
+      runtime: tui.runtime,
+      status: tui.status,
+      rows: tui.size.rows,
+      cols: tui.size.cols,
+      screenText: updatedScreenText
+    )
+    recordAgentTui(updated)
+    return updated
+  }
+
+  func resizeAgentTui(
+    tuiID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(.resizeAgentTui(tuiID: tuiID, rows: request.rows, cols: request.cols))
+    guard let tui = configuredAgentTui(id: tuiID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    let updated = agentTuiFixture(
+      tuiID: tui.tuiId,
+      sessionID: tui.sessionId,
+      runtime: tui.runtime,
+      status: tui.status,
+      rows: request.rows,
+      cols: request.cols,
+      screenText: tui.screen.text
+    )
+    recordAgentTui(updated)
+    return updated
+  }
+
+  func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(.stopAgentTui(tuiID: tuiID))
+    guard let tui = configuredAgentTui(id: tuiID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    let updated = agentTuiFixture(
+      tuiID: tui.tuiId,
+      sessionID: tui.sessionId,
+      runtime: tui.runtime,
+      status: .stopped,
+      rows: tui.size.rows,
+      cols: tui.size.cols,
+      screenText: tui.screen.text
+    )
+    recordAgentTui(updated)
+    return updated
+  }
+
   func codexRunFixture(
     runID: String = "codex-run-1",
     sessionID: String = PreviewFixtures.summary.sessionId,
@@ -151,6 +267,41 @@ extension RecordingHarnessClient {
       cwd: PreviewFixtures.summary.contextRoot,
       command: "cargo test --lib",
       filePath: nil
+    )
+  }
+
+  func agentTuiFixture(
+    tuiID: String = "agent-tui-1",
+    sessionID: String = PreviewFixtures.summary.sessionId,
+    runtime: String = AgentTuiRuntime.copilot.rawValue,
+    status: AgentTuiStatus = .running,
+    rows: Int = 32,
+    cols: Int = 120,
+    screenText: String = "copilot> ready",
+    error: String? = nil
+  ) -> AgentTuiSnapshot {
+    AgentTuiSnapshot(
+      tuiId: tuiID,
+      sessionId: sessionID,
+      agentId: "agent-\(tuiID)",
+      runtime: runtime,
+      status: status,
+      argv: [runtime],
+      projectDir: PreviewFixtures.summary.projectDir ?? PreviewFixtures.summary.contextRoot,
+      size: AgentTuiSize(rows: rows, cols: cols),
+      screen: AgentTuiScreenSnapshot(
+        rows: rows,
+        cols: cols,
+        cursorRow: 1,
+        cursorCol: min(12, max(cols, 1)),
+        text: screenText
+      ),
+      transcriptPath: PreviewFixtures.summary.contextRoot + "/transcripts/\(tuiID).log",
+      exitCode: status == .stopped ? 0 : nil,
+      signal: nil,
+      error: error,
+      createdAt: "2026-04-10T09:00:00Z",
+      updatedAt: "2026-04-10T09:01:00Z"
     )
   }
 }

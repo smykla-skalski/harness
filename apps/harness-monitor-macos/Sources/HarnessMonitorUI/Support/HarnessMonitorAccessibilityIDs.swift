@@ -122,6 +122,21 @@ public enum HarnessMonitorAccessibility {
   static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
   static let connectionCard = "harness.preferences.connection-card"
   static let cornerOverlay = "harness.corner-overlay"
+  static let agentTuiButton = "harness.session.agent-tui"
+  static let agentTuiSheet = "harness.sheet.agent-tui"
+  static let agentTuiSelector = "harness.sheet.agent-tui.selector"
+  static let agentTuiRuntimePicker = "harness.sheet.agent-tui.runtime"
+  static let agentTuiNameField = "harness.sheet.agent-tui.name"
+  static let agentTuiPromptField = "harness.sheet.agent-tui.prompt"
+  static let agentTuiInputField = "harness.sheet.agent-tui.input"
+  static let agentTuiInputModePicker = "harness.sheet.agent-tui.input-mode"
+  static let agentTuiRefreshButton = "harness.sheet.agent-tui.refresh"
+  static let agentTuiStartButton = "harness.sheet.agent-tui.start"
+  static let agentTuiSendButton = "harness.sheet.agent-tui.send"
+  static let agentTuiResizeButton = "harness.sheet.agent-tui.resize"
+  static let agentTuiStopButton = "harness.sheet.agent-tui.stop"
+  static let agentTuiRevealTranscriptButton = "harness.sheet.agent-tui.transcript"
+  static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
   static let codexFlowButton = "harness.session.codex-flow"
   static let codexFlowSheet = "harness.sheet.codex-flow"
   static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
@@ -212,6 +227,10 @@ public enum HarnessMonitorAccessibility {
 
   static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
     "harness.sheet.codex-flow.approval.\(slug(approvalID)).\(slug(decision))"
+  }
+
+  static func agentTuiKeyButton(_ key: String) -> String {
+    "harness.sheet.agent-tui.key.\(slug(key))"
   }
 
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {

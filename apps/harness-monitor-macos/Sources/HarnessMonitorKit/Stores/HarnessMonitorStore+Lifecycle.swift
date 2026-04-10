@@ -157,6 +157,7 @@ extension HarnessMonitorStore {
         showingCachedData: false
       )
       _ = await refreshCodexRuns(using: client, sessionID: sessionID)
+      _ = await refreshAgentTuis(using: client, sessionID: sessionID)
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
           let insertedCount = await service.cacheSessionDetail(

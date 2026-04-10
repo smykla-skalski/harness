@@ -50,11 +50,13 @@ public final class HarnessMonitorStore {
 
   public enum PresentedSheet: Identifiable, Equatable {
     case codexFlow
+    case agentTui
     case sendSignal(agentID: String)
 
     public var id: String {
       switch self {
       case .codexFlow: "codexFlow"
+      case .agentTui: "agentTui"
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       }
     }
@@ -99,6 +101,7 @@ public final class HarnessMonitorStore {
     }
   }
   public var codexUnavailable = false
+  public var agentTuiUnavailable = false
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
       guard oldValue != selectedCodexRuns else { return }
@@ -108,6 +111,18 @@ public final class HarnessMonitorStore {
   public var selectedCodexRun: CodexRunSnapshot? {
     didSet {
       guard oldValue != selectedCodexRun else { return }
+      scheduleUISync([.content])
+    }
+  }
+  public var selectedAgentTuis: [AgentTuiSnapshot] = [] {
+    didSet {
+      guard oldValue != selectedAgentTuis else { return }
+      scheduleUISync([.content])
+    }
+  }
+  public var selectedAgentTui: AgentTuiSnapshot? {
+    didSet {
+      guard oldValue != selectedAgentTui else { return }
       scheduleUISync([.content])
     }
   }
@@ -433,6 +448,7 @@ public final class HarnessMonitorStore {
         await oldClient.shutdown()
       }
       codexUnavailable = false
+      agentTuiUnavailable = false
       hasBootstrapped = true
       await bootstrap()
 

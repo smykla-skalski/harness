@@ -3,6 +3,8 @@ use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use harness::daemon::agent_tui::{AgentTuiSnapshot, AgentTuiStatus};
+use harness::daemon::agent_tui_bridge::AgentTuiBridgeStatusReport;
 use harness::daemon::service::DaemonStatusReport;
 use harness::session::types::SessionState;
 use tempfile::tempdir;
@@ -11,6 +13,7 @@ use tokio::runtime::Runtime;
 const DAEMON_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_WAIT_INTERVAL: Duration = Duration::from_millis(250);
 const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(1);
+const COMMAND_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test]
 fn daemon_stop_stops_running_manual_daemon() {
@@ -224,9 +227,152 @@ fn daemon_only_session_status_and_end_work_after_list() {
     wait_for_child_exit(&mut daemon);
 }
 
+#[test]
+fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let _status = wait_for_daemon_ready(&home, &xdg);
+    let mut bridge = spawn_agent_tui_bridge(&home, &xdg);
+    let _bridge_status = wait_for_bridge_ready(&home, &xdg);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let session_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "start",
+            "--title",
+            "sandboxed agent tui",
+            "--context",
+            "verify sandboxed daemon can start bridged agent tui",
+            "--runtime",
+            "codex",
+            "--session-id",
+            "sandboxed-agent-tui-session",
+            "--project-dir",
+            project_arg,
+        ],
+    );
+    assert!(
+        session_output.status.success(),
+        "session start failed: {}",
+        output_text(&session_output)
+    );
+    let session: SessionState =
+        serde_json::from_slice(&session_output.stdout).expect("parse session start");
+
+    let start_output = run_harness_with_timeout(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "tui",
+            "start",
+            session.session_id.as_str(),
+            "--runtime",
+            "codex",
+            "--role",
+            "worker",
+            "--name",
+            "Shell TUI",
+            "--arg=sh",
+            "--arg=-c",
+            "--arg=cat",
+        ],
+        COMMAND_WAIT_TIMEOUT,
+    );
+    assert!(
+        start_output.status.success(),
+        "tui start failed: {}",
+        output_text(&start_output)
+    );
+    let started: AgentTuiSnapshot =
+        serde_json::from_slice(&start_output.stdout).expect("parse tui start");
+    assert_eq!(started.status, AgentTuiStatus::Running);
+    assert_eq!(started.session_id, session.session_id);
+
+    let text_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "tui",
+            "input",
+            started.tui_id.as_str(),
+            "--text",
+            "bridge ok",
+        ],
+    );
+    assert!(
+        text_output.status.success(),
+        "tui text failed: {}",
+        output_text(&text_output)
+    );
+
+    let enter_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "tui",
+            "input",
+            started.tui_id.as_str(),
+            "--key",
+            "enter",
+        ],
+    );
+    assert!(
+        enter_output.status.success(),
+        "tui enter failed: {}",
+        output_text(&enter_output)
+    );
+    let echoed: AgentTuiSnapshot =
+        serde_json::from_slice(&enter_output.stdout).expect("parse tui input");
+    assert!(echoed.screen.text.contains("bridge ok"));
+
+    let stop_output = run_harness(
+        &home,
+        &xdg,
+        &["session", "tui", "stop", started.tui_id.as_str()],
+    );
+    assert!(
+        stop_output.status.success(),
+        "tui stop failed: {}",
+        output_text(&stop_output)
+    );
+    let stopped: AgentTuiSnapshot =
+        serde_json::from_slice(&stop_output.stdout).expect("parse tui stop");
+    assert_eq!(stopped.status, AgentTuiStatus::Stopped);
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["agent-tui-bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
 fn spawn_daemon_serve(home: &Path, xdg: &Path) -> Child {
+    spawn_daemon_serve_with_args(home, xdg, &[])
+}
+
+fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) -> Child {
+    let mut args = vec!["daemon", "serve", "--host", "127.0.0.1", "--port", "0"];
+    args.extend(extra_args);
     Command::new(harness_binary())
-        .args(["daemon", "serve", "--host", "127.0.0.1", "--port", "0"])
+        .args(&args)
         .env("HOME", home)
         .env("XDG_DATA_HOME", xdg)
         .stdin(Stdio::null())
@@ -236,6 +382,18 @@ fn spawn_daemon_serve(home: &Path, xdg: &Path) -> Child {
         .expect("spawn daemon serve")
 }
 
+fn spawn_agent_tui_bridge(home: &Path, xdg: &Path) -> Child {
+    Command::new(harness_binary())
+        .args(["agent-tui-bridge", "start"])
+        .env("HOME", home)
+        .env("XDG_DATA_HOME", xdg)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn agent tui bridge")
+}
+
 fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
     Command::new(harness_binary())
         .args(args)
@@ -243,6 +401,34 @@ fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
         .env("XDG_DATA_HOME", xdg)
         .output()
         .expect("run harness")
+}
+
+fn run_harness_with_timeout(home: &Path, xdg: &Path, args: &[&str], timeout: Duration) -> Output {
+    let mut child = Command::new(harness_binary())
+        .args(args)
+        .env("HOME", home)
+        .env("XDG_DATA_HOME", xdg)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn harness");
+
+    let deadline = Instant::now() + timeout;
+    loop {
+        if child.try_wait().expect("poll harness").is_some() {
+            return child.wait_with_output().expect("collect harness output");
+        }
+        if Instant::now() >= deadline {
+            child.kill().expect("kill timed out harness process");
+            let output = child.wait_with_output().expect("collect timed out output");
+            panic!(
+                "command did not exit before timeout: args={args:?} output={}",
+                output_text(&output)
+            );
+        }
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
 }
 
 fn init_git_repo(path: &Path) {
@@ -309,6 +495,26 @@ fn wait_for_child_exit(child: &mut Child) {
         assert!(
             Instant::now() < deadline,
             "daemon child did not exit before timeout"
+        );
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
+}
+
+fn wait_for_bridge_ready(home: &Path, xdg: &Path) -> AgentTuiBridgeStatusReport {
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        let output = run_harness(home, xdg, &["agent-tui-bridge", "status"]);
+        if output.status.success() {
+            let report: AgentTuiBridgeStatusReport =
+                serde_json::from_slice(&output.stdout).expect("parse bridge status");
+            if report.running {
+                return report;
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "bridge did not become ready before timeout: {}",
+            output_text(&output)
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }

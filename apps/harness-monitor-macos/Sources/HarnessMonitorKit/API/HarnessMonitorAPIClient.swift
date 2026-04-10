@@ -205,6 +205,39 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/codex-runs/\(runID)/approvals/\(approvalID)", body: request)
   }
 
+  public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
+    try await get("/v1/sessions/\(sessionID)/agent-tuis")
+  }
+
+  public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    try await get("/v1/agent-tuis/\(tuiID)")
+  }
+
+  public func startAgentTui(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await post("/v1/sessions/\(sessionID)/agent-tuis", body: request)
+  }
+
+  public func sendAgentTuiInput(
+    tuiID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await post("/v1/agent-tuis/\(tuiID)/input", body: request)
+  }
+
+  public func resizeAgentTui(
+    tuiID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await post("/v1/agent-tuis/\(tuiID)/resize", body: request)
+  }
+
+  public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    try await post("/v1/agent-tuis/\(tuiID)/stop", body: EmptyBody())
+  }
+
   public func startVoiceSession(
     sessionID: String,
     request: VoiceSessionStartRequest

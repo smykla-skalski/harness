@@ -8,6 +8,7 @@ struct SessionActionDock: View {
   let inspectTask: (String) -> Void
   let inspectAgent: (String) -> Void
   let inspectObserver: () -> Void
+  let openAgentTui: () -> Void
   let openCodexFlow: () -> Void
 
   private var firstTaskID: String? {
@@ -75,6 +76,13 @@ struct SessionActionDock: View {
             accessibilityID: nil
           )
           flowButton(
+            title: "Agent TUI",
+            subtitle: "Drive Copilot or Codex",
+            symbol: "terminal",
+            action: openAgentTui,
+            accessibilityID: HarnessMonitorAccessibility.agentTuiButton
+          )
+          flowButton(
             title: "Codex Flow",
             subtitle: "Ask for a report or patch",
             symbol: "sparkles",
@@ -103,6 +111,13 @@ struct SessionActionDock: View {
             symbol: "eye",
             action: focusObserver,
             accessibilityID: nil
+          )
+          flowButton(
+            title: "Agent TUI",
+            subtitle: "Drive Copilot or Codex",
+            symbol: "terminal",
+            action: openAgentTui,
+            accessibilityID: HarnessMonitorAccessibility.agentTuiButton
           )
           flowButton(
             title: "Codex Flow",
@@ -176,6 +191,7 @@ extension View {
     inspectTask: { _ in },
     inspectAgent: { _ in },
     inspectObserver: {},
+    openAgentTui: {},
     openCodexFlow: {}
   )
   .padding()
