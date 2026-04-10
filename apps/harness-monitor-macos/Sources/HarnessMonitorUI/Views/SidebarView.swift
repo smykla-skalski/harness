@@ -1,5 +1,4 @@
 import HarnessMonitorKit
-import SwiftData
 import SwiftUI
 
 struct SidebarView: View {
@@ -9,8 +8,6 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
-  @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
-  private var recentSearches: [RecentSearch]
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -59,13 +56,6 @@ struct SidebarView: View {
     } else {
       decodedStorageSet(from: collapsedCheckoutKeysStorage)
     }
-  }
-
-  private var recentSearchQueries: [String] {
-    guard sidebarUI.isPersistenceAvailable else {
-      return []
-    }
-    return Array(recentSearches.prefix(5).map(\.query))
   }
 
   func scaledSidebarFont(_ font: Font) -> Font {
@@ -262,17 +252,11 @@ struct SidebarView: View {
   }
 
   @ViewBuilder private var sidebarHeader: some View {
-    if !recentSearchQueries.isEmpty {
-      SidebarRecentSearchesView(
-        queries: recentSearchQueries,
-        isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
-        applyQuery: applyRecentSearch,
-        clearHistory: { _ = store.clearSearchHistory() }
-      )
-      .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
-      .padding(.top, HarnessMonitorTheme.spacingXL)
-      .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
-    }
+    SidebarRecentSearchesHeader(
+      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+      applyQuery: applyRecentSearch,
+      clearHistory: { _ = store.clearSearchHistory() }
+    )
   }
 
   func decodedStorageSet(from rawValue: String) -> Set<String> {
