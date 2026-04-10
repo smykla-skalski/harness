@@ -18,8 +18,8 @@ use super::protocol::{
     AgentRemoveRequest, CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest,
     LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
-    SignalAckRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskUpdateRequest,
+    SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -88,6 +88,10 @@ pub async fn serve(
         .route("/v1/sessions/{session_id}/join", post(post_session_join))
         .route("/v1/sessions/{session_id}/end", post(post_end_session))
         .route("/v1/sessions/{session_id}/signal", post(post_send_signal))
+        .route(
+            "/v1/sessions/{session_id}/signal-cancel",
+            post(post_cancel_signal),
+        )
         .route(
             "/v1/sessions/{session_id}/signal-ack",
             post(post_signal_ack),
@@ -515,6 +519,32 @@ async fn post_send_signal(
     timed_json(
         "POST",
         "/v1/sessions/{id}/signal",
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_cancel_signal(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SignalCancelRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::cancel_signal(&session_id, &request, db_ref);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    }
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/signal-cancel",
         &request_id,
         start,
         result,

@@ -8,8 +8,9 @@ use serde_json::Value;
 
 use crate::agents::runtime;
 use crate::agents::runtime::signal::{
-    AckResult, DeliveryConfig, Signal, SignalPayload, SignalPriority, read_acknowledged_signals,
-    read_acknowledgments, read_pending_signals, signal_matches_session,
+    AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
+    acknowledge_signal as write_signal_ack, read_acknowledged_signals, read_acknowledgments,
+    read_pending_signals, signal_matches_session,
 };
 use crate::agents::service as agents_service;
 use crate::daemon::client::DaemonClient;
@@ -695,6 +696,82 @@ pub fn send_signal(
         signal,
         acknowledgment: None,
     })
+}
+
+/// Cancel a pending signal by writing a rejected acknowledgment and moving the
+/// signal file out of pending.
+///
+/// Signal delivery is passive: the runtime's agent hook cycles read pending
+/// signals and write acks. When a user cancels from the monitor, we write the
+/// rejected ack directly and move the file so the next hook cycle does not
+/// deliver the signal, and the monitor shows a consistent state on its next
+/// snapshot.
+///
+/// # Errors
+/// Returns `CliError` when the session/agent cannot be resolved, the signal
+/// file cannot be found, or ack persistence fails.
+pub fn cancel_signal(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    actor_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        client.cancel_signal(
+            session_id,
+            &protocol::SignalCancelRequest {
+                actor: actor_id.to_string(),
+                agent_id: agent_id.to_string(),
+                signal_id: signal_id.to_string(),
+            },
+        )?;
+        return Ok(());
+    }
+
+    let state = load_state_or_err(session_id, project_dir)?;
+    let agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found in session '{session_id}'"
+        )))
+    })?;
+    let runtime = runtime::runtime_for_name(&agent.runtime).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "unknown runtime '{}'",
+            agent.runtime
+        )))
+    })?;
+
+    let now = utc_now();
+    let signal_session_id = agent.agent_session_id.as_deref().unwrap_or(session_id);
+    let signal_dir = runtime.signal_dir(project_dir, signal_session_id);
+
+    let pending = read_pending_signals(&signal_dir)?;
+    let matched = pending.iter().any(|signal| signal.signal_id == signal_id);
+    if !matched {
+        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+            "signal '{signal_id}' is not pending for agent '{agent_id}'"
+        ))));
+    }
+
+    let ack = SignalAck {
+        signal_id: signal_id.to_string(),
+        acknowledged_at: now,
+        result: AckResult::Rejected,
+        agent: signal_session_id.to_string(),
+        session_id: session_id.to_string(),
+        details: Some(format!("cancelled by {actor_id}")),
+    };
+    write_signal_ack(&signal_dir, &ack)?;
+
+    storage::append_log_entry(
+        project_dir,
+        session_id,
+        log_signal_acknowledged(signal_id, agent_id, AckResult::Rejected),
+        Some(actor_id),
+        None,
+    )?;
+    Ok(())
 }
 
 /// List all signals for a session, optionally narrowed to one agent.
