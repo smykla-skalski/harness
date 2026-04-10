@@ -5,14 +5,20 @@ import Foundation
 actor RecordingDaemonController: DaemonControlling {
   private let client: any HarnessMonitorClientProtocol
   private var launchAgentInstalled: Bool
+  private let registrationStateOverride: DaemonLaunchAgentRegistrationState?
+  private let warmUpError: (any Error)?
   private var lastEventMessage = "daemon ready"
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
-    launchAgentInstalled: Bool = true
+    launchAgentInstalled: Bool = true,
+    registrationState: DaemonLaunchAgentRegistrationState? = nil,
+    warmUpError: (any Error)? = nil
   ) {
     self.client = client
     self.launchAgentInstalled = launchAgentInstalled
+    self.registrationStateOverride = registrationState
+    self.warmUpError = warmUpError
   }
 
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -26,7 +32,10 @@ actor RecordingDaemonController: DaemonControlling {
   }
 
   func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
-    launchAgentInstalled ? .enabled : .notRegistered
+    if let registrationStateOverride {
+      return registrationStateOverride
+    }
+    return launchAgentInstalled ? .enabled : .notRegistered
   }
 
   func launchAgentSnapshot() async -> LaunchAgentStatus {
@@ -51,7 +60,10 @@ actor RecordingDaemonController: DaemonControlling {
   func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
-    client
+    if let warmUpError {
+      throw warmUpError
+    }
+    return client
   }
 
   func stopDaemon() async throws -> String {
