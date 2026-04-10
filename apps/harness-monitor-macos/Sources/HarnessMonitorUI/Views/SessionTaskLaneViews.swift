@@ -93,11 +93,6 @@ struct SessionTaskSummaryCard: View {
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
       .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
-      .transition(
-        .asymmetric(
-          insertion: .scale(scale: 0.95).combined(with: .opacity),
-          removal: .opacity
-        ))
   }
 
   private var cardButton: some View {
