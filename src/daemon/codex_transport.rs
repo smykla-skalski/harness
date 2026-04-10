@@ -252,10 +252,7 @@ impl Drop for StdioCodexTransport {
 )]
 fn connect_error(endpoint: &str, error: &WsError) -> CliError {
     tracing::warn!(%error, endpoint, "codex websocket connect failed");
-    CliErrorKind::workflow_io(format!(
-        "connect codex app-server over websocket at {endpoint}: {error}"
-    ))
-    .into()
+    CliErrorKind::codex_server_unavailable(endpoint.to_string()).into()
 }
 
 /// WebSocket transport that speaks newline-delimited JSON-RPC with a remote

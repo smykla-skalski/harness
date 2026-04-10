@@ -112,4 +112,9 @@ impl CliErrorKind {
     pub fn sandbox_feature_disabled(feature: impl Into<Cow<'static, str>>) -> Self {
         Self::Common(CommonError::sandbox_feature_disabled(feature))
     }
+
+    #[must_use]
+    pub fn codex_server_unavailable(endpoint: impl Into<Cow<'static, str>>) -> Self {
+        Self::Common(CommonError::codex_server_unavailable(endpoint))
+    }
 }
