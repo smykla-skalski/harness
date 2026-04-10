@@ -73,10 +73,7 @@ struct SidebarView: View {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
-        if newValue == nil,
-          sidebarUI.selectedSessionID != nil,
-          renderedSidebarSelectionID == nil
-        {
+        if newValue == nil, sidebarUI.selectedSessionID != nil {
           return
         }
         guard sidebarUI.selectedSessionID != newValue else {
