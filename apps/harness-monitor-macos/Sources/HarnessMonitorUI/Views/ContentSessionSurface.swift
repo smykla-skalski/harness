@@ -7,7 +7,6 @@ struct SessionContentState: Equatable {
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
-  let isSelectionLoading: Bool
   let isExtensionsLoading: Bool
   let lastAction: String
 }
@@ -50,7 +49,6 @@ struct SessionContentContainer: View {
           timeline: activeTimeline,
           isSessionReadOnly: state.isSessionReadOnly,
           isSessionActionInFlight: state.isSessionActionInFlight,
-          isSelectionLoading: state.isSelectionLoading,
           isExtensionsLoading: state.isExtensionsLoading,
           lastAction: state.lastAction
         )
@@ -89,7 +87,6 @@ private enum SessionContentMode {
       timeline: [],
       isSessionReadOnly: false,
       isSessionActionInFlight: false,
-      isSelectionLoading: false,
       isExtensionsLoading: false,
       lastAction: ""
     )
@@ -109,7 +106,6 @@ private enum SessionContentMode {
       timeline: store.timeline,
       isSessionReadOnly: false,
       isSessionActionInFlight: false,
-      isSelectionLoading: false,
       isExtensionsLoading: false,
       lastAction: ""
     )
