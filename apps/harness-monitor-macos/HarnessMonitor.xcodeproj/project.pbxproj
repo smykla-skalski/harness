@@ -145,6 +145,7 @@
 		876A3B7DF9E46E157FDA5320 /* HarnessCornerAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92F77298438F1472B200E97F /* HarnessCornerAnimation.swift */; };
 		88ECC8B054E0E49C69A58B77 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F181CC71AF8F04C79E026133 /* PreferencesView.swift */; };
 		8959911A4DAF5826282A4830 /* PreferencesPreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F6C88C0DF83003B80943217 /* PreferencesPreviewSupport.swift */; };
+		897F7BFC842913343E8A8C88 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F860FD8C4C65017AE3D757C1 /* ServiceManagement.framework */; };
 		8A706C472D6C9A7A08B8492B /* HarnessMonitorSettingsWindowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2284B51AFC363674B81DD047 /* HarnessMonitorSettingsWindowUITests.swift */; };
 		8B8291D47C0B0708AD17FCB9 /* PreferencesActionButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0586AF1E51CB81CF1255F9E /* PreferencesActionButtons.swift */; };
 		8CF39CEE55EF558874EA2C3B /* ToolbarStatusTickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41F114327C03F60BE0D7A82 /* ToolbarStatusTickerView.swift */; };
@@ -209,6 +210,7 @@
 		BF007DC418B1F5F85D21BD8D /* HarnessMonitorAgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F868E10AF9F59AE42EF376 /* HarnessMonitorAgentModels.swift */; };
 		C1D00280D52BFF7A40C5D3F9 /* HarnessMonitorSessionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F394511B40C7D2E7A640E9B /* HarnessMonitorSessionModelsTests.swift */; };
 		C288C3665006EA6F116299DA /* PreferencesPathsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CA79D1E29A2CCAAE233AB4E /* PreferencesPathsSection.swift */; };
+		C2949E5EEE6FFD85CD548BA0 /* DaemonControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BBE392E8070647D7427DAD /* DaemonControllerTests.swift */; };
 		C2A1384EC2A82AE9C87077A8 /* SidebarFooterAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B52AE9A0E2E04398D2100E9F /* SidebarFooterAccessory.swift */; };
 		C3BFDFC1EBB52DF4E106C556 /* HarnessMonitorNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB297E0D86E265032222924C /* HarnessMonitorNotificationTests.swift */; };
 		C460A9166506F0DF255F34B8 /* SessionsBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F564467A6E0A166496746F97 /* SessionsBoardView.swift */; };
@@ -363,13 +365,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0064D3D4AAC77E5E5B21C8B5 /* Harness Monitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Harness Monitor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0064D3D4AAC77E5E5B21C8B5 /* HarnessMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HarnessMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0078395048BD22D435F463D7 /* HarnessMonitorStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreTests.swift; sourceTree = "<group>"; };
 		008D1CDC1AF4DB7304D2B662 /* HarnessMonitorStoreDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreDatabaseTests.swift; sourceTree = "<group>"; };
 		0143A1BACAAE538108C311B0 /* ObserverSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverSummaryTests.swift; sourceTree = "<group>"; };
 		04422B69E0A41F6580C212C7 /* HarnessMonitorStore+Sheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Sheets.swift"; sourceTree = "<group>"; };
 		05111A8A9A29ED087FD9D443 /* ManifestWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManifestWatcher.swift; sourceTree = "<group>"; };
-		06785C940F1CF2DB6A8464A6 /* Harness Monitor UI Testing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Harness Monitor UI Testing.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		06785C940F1CF2DB6A8464A6 /* HarnessMonitorUITestHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HarnessMonitorUITestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		07E29C046A6B69D433F89D96 /* ToolbarCenterpieceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarCenterpieceView.swift; sourceTree = "<group>"; };
 		0899D148FE7AC7397A330481 /* HarnessMonitorTimelineUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTimelineUITests.swift; sourceTree = "<group>"; };
 		08B2220C31BD7F5C7AE521BD /* HarnessMonitorToolbarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorToolbarUITests.swift; sourceTree = "<group>"; };
@@ -386,6 +388,7 @@
 		14AF847B83E27E7A729BEB54 /* HarnessMonitorFailureTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorFailureTestSupport.swift; sourceTree = "<group>"; };
 		1820BB62D03AB5543161189D /* HarnessMonitorClipboardSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorClipboardSupport.swift; sourceTree = "<group>"; };
 		187E3B263EE718EFFC1E7A35 /* PreviewHarnessClient+Streaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreviewHarnessClient+Streaming.swift"; sourceTree = "<group>"; };
+		19BBE392E8070647D7427DAD /* DaemonControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonControllerTests.swift; sourceTree = "<group>"; };
 		1BBB863FC1191D3B82A20DED /* HarnessMonitorStore+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Persistence.swift"; sourceTree = "<group>"; };
 		1CC071E58DF0C4C4698D90E4 /* HarnessMonitorStore+Codex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Codex.swift"; sourceTree = "<group>"; };
 		1DA96E935B3B6815855184C2 /* HarnessMonitorUITestDiagnosticsSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorUITestDiagnosticsSupport.swift; sourceTree = "<group>"; };
@@ -604,6 +607,7 @@
 		F4CFA4F227E34EE75862F84C /* LegacyCachedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyCachedModels.swift; sourceTree = "<group>"; };
 		F564467A6E0A166496746F97 /* SessionsBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsBoardView.swift; sourceTree = "<group>"; };
 		F776E7BB01E4D96FD050BDA0 /* InspectorDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorDetailViews.swift; sourceTree = "<group>"; };
+		F860FD8C4C65017AE3D757C1 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		FA64A474877B07E69355E05D /* SidebarView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarView+Sections.swift"; sourceTree = "<group>"; };
 		FA8FF74A0FBAAB8978915321 /* HarnessMonitorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTheme.swift; sourceTree = "<group>"; };
 		FBE82B902AC63B48B141B220 /* HarnessMonitorStoreFilteringBasicsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreFilteringBasicsTests.swift; sourceTree = "<group>"; };
@@ -654,6 +658,7 @@
 			files = (
 				00CEFE78CB7E8A4CB30447DA /* SwiftData.framework in Frameworks */,
 				14F05273583C1FEC07BDB504 /* IOKit.framework in Frameworks */,
+				897F7BFC842913343E8A8C88 /* ServiceManagement.framework in Frameworks */,
 				572857AC3A69B8E10F6741E2 /* UserNotifications.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -794,6 +799,7 @@
 			isa = PBXGroup;
 			children = (
 				0C92556F4D47D324A6E5E73D /* IOKit.framework */,
+				F860FD8C4C65017AE3D757C1 /* ServiceManagement.framework */,
 				97812099F9E7ED0F33A84FA7 /* SwiftData.framework */,
 				9277EB39AF2DF97F3A7C1529 /* UserNotifications.framework */,
 			);
@@ -806,6 +812,7 @@
 				5E0286A8A2D9E8F55E2BC377 /* CachedModelsDetailTests.swift */,
 				4867E04ECF63D0A2715695EF /* CachedModelsTests.swift */,
 				447650C240AC036E1222DB52 /* ConnectionModelsTests.swift */,
+				19BBE392E8070647D7427DAD /* DaemonControllerTests.swift */,
 				ABA319C6585B0E20EAF5D62B /* DaemonModelsTests.swift */,
 				2B82544B8D7FEC165A767D27 /* HarnessMonitorActionTestSupport.swift */,
 				14AF847B83E27E7A729BEB54 /* HarnessMonitorFailureTestSupport.swift */,
@@ -949,11 +956,11 @@
 		74DC590F949A5775E777835B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				0064D3D4AAC77E5E5B21C8B5 /* Harness Monitor.app */,
+				0064D3D4AAC77E5E5B21C8B5 /* HarnessMonitor.app */,
 				09069D489D24200773820893 /* HarnessMonitorKit.framework */,
 				D6BFFCA05161188D1B2F207C /* HarnessMonitorKitTests.xctest */,
 				27FFC8FD56EF67F172C70CE9 /* HarnessMonitorUI.framework */,
-				06785C940F1CF2DB6A8464A6 /* Harness Monitor UI Testing.app */,
+				06785C940F1CF2DB6A8464A6 /* HarnessMonitorUITestHost.app */,
 				EE8CE92BB4906F7EFF253E94 /* HarnessMonitorUITests.xctest */,
 			);
 			name = Products;
@@ -1076,6 +1083,7 @@
 				B3926AD6D4787C28E771F0D0 /* Resources */,
 				BFF93F23772C60ADBE0270B6 /* Frameworks */,
 				BF441EBCA3624C6391354B48 /* Embed Frameworks */,
+				9E0689F1047B613E097FC86A /* Bundle Daemon Agent */,
 				DA38DAF609E267E70318A8E0 /* Clear Gatekeeper Metadata */,
 			);
 			buildRules = (
@@ -1089,7 +1097,7 @@
 				6DFA230C28165C5AF0365371 /* Lottie */,
 			);
 			productName = HarnessMonitorUITestHost;
-			productReference = 06785C940F1CF2DB6A8464A6 /* Harness Monitor UI Testing.app */;
+			productReference = 06785C940F1CF2DB6A8464A6 /* HarnessMonitorUITestHost.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4CFA53E461E3B9F02750C66C /* HarnessMonitor */ = {
@@ -1100,6 +1108,7 @@
 				794E3ED501C01CC1F425FDFF /* Resources */,
 				D7ADD664BB66A22A819C5094 /* Frameworks */,
 				A416F51547E3146295AED88F /* Embed Frameworks */,
+				5D25A480C73A0E3065B50B2A /* Bundle Daemon Agent */,
 				761668FE234D068F7E69F4B7 /* Clear Gatekeeper Metadata */,
 			);
 			buildRules = (
@@ -1113,7 +1122,7 @@
 				7361ACFA674EF5EFC9CF3EEE /* Lottie */,
 			);
 			productName = HarnessMonitor;
-			productReference = 0064D3D4AAC77E5E5B21C8B5 /* Harness Monitor.app */;
+			productReference = 0064D3D4AAC77E5E5B21C8B5 /* HarnessMonitor.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4FA94D124B8AEDED3C2831AA /* HarnessMonitorKit */ = {
@@ -1200,7 +1209,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					099EE9962C22A9770B773C0D = {
 						DevelopmentTeam = Q498EB36N4;
@@ -1285,6 +1294,32 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		5D25A480C73A0E3065B50B2A /* Bundle Daemon Agent */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
+				"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
+				"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
+				"$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
+			);
+			name = "Bundle Daemon Agent";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/bash \"$PROJECT_DIR/Scripts/bundle-daemon-agent.sh\"\n";
+		};
 		761668FE234D068F7E69F4B7 /* Clear Gatekeeper Metadata */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -1295,7 +1330,13 @@
 			);
 			inputPaths = (
 				"$(PROJECT_DIR)/HarnessMonitor.entitlements",
+				"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
 				"$(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj",
+				"$(PROJECT_DIR)/Resources",
+				"$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
+				"$(PROJECT_DIR)/Sources/HarnessMonitor",
+				"$(PROJECT_DIR)/Sources/HarnessMonitorKit",
+				"$(PROJECT_DIR)/Sources/HarnessMonitorUI",
 			);
 			name = "Clear Gatekeeper Metadata";
 			outputFileListPaths = (
@@ -1305,7 +1346,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\n\nif [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nresolve_repo_root() {\n  local candidate=\"$PROJECT_DIR\"\n  while [ \"$candidate\" != \"/\" ]; do\n    if [ -d \"$candidate/.git\" ]; then\n      printf '%s\\n' \"$candidate\"\n      return\n    fi\n    candidate=\"$(dirname \"$candidate\")\"\n  done\n  printf '%s\\n' \"$PROJECT_DIR\"\n}\n\nworkspace_tree_fingerprint() {\n  python3 - \"$PROJECT_DIR\" <<'PY'\nfrom __future__ import annotations\n\nimport hashlib\nimport sys\nfrom pathlib import Path\n\nroot = Path(sys.argv[1])\ninclude_paths = [\n    root / \"HarnessMonitor.entitlements\",\n    root / \"HarnessMonitor.xcodeproj\" / \"project.pbxproj\",\n    root / \"Sources\" / \"HarnessMonitor\",\n    root / \"Sources\" / \"HarnessMonitorKit\",\n    root / \"Sources\" / \"HarnessMonitorUI\",\n]\ndigest = hashlib.sha256()\n\nfor include_path in include_paths:\n    if not include_path.exists():\n        continue\n\n    if include_path.is_file():\n        file_paths = [include_path]\n    else:\n        file_paths = sorted(\n            candidate for candidate in include_path.rglob(\"*\") if candidate.is_file()\n        )\n\n    for file_path in file_paths:\n        relative_path = file_path.relative_to(root).as_posix()\n        digest.update(relative_path.encode(\"utf-8\"))\n        digest.update(b\"\\0\")\n        with file_path.open(\"rb\") as handle:\n            for chunk in iter(lambda: handle.read(1024 * 1024), b\"\"):\n                digest.update(chunk)\n        digest.update(b\"\\0\")\n\nprint(digest.hexdigest())\nPY\n}\n\nrepo_root=\"$(resolve_repo_root)\"\nbuild_commit=\"${HARNESS_MONITOR_BUILD_GIT_COMMIT:-}\"\nif [ -z \"$build_commit\" ]; then\n  build_commit=\"$(git -C \"$repo_root\" rev-parse HEAD 2>/dev/null || printf 'unknown')\"\nfi\n\nbuild_dirty=\"${HARNESS_MONITOR_BUILD_GIT_DIRTY:-}\"\nif [ -z \"$build_dirty\" ]; then\n  if [ -n \"$(git -C \"$repo_root\" status --short 2>/dev/null || true)\" ]; then\n    build_dirty=\"true\"\n  else\n    build_dirty=\"false\"\n  fi\nfi\n\nbuild_workspace_fingerprint=\"${HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT:-}\"\nif [ -z \"$build_workspace_fingerprint\" ]; then\n  build_workspace_fingerprint=\"$(workspace_tree_fingerprint)\"\nfi\n\nbuild_started_at_utc=\"${HARNESS_MONITOR_BUILD_STARTED_AT_UTC:-}\"\nif [ -z \"$build_started_at_utc\" ]; then\n  build_started_at_utc=\"$(TZ=UTC /bin/date +%Y-%m-%dT%H:%M:%SZ)\"\nfi\n\nwrite_build_provenance() {\n  local provenance_path=\"${SCRIPT_OUTPUT_FILE_0:-$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/HarnessMonitorBuildProvenance.plist}\"\n  local resources_dir\n  resources_dir=\"$(dirname \"$provenance_path\")\"\n\n  /bin/mkdir -p \"$resources_dir\"\n  /bin/cat > \"$provenance_path\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>HarnessMonitorBuildGitCommit</key>\n  <string>${build_commit}</string>\n  <key>HarnessMonitorBuildGitDirty</key>\n  <string>${build_dirty}</string>\n  <key>HarnessMonitorBuildWorkspaceFingerprint</key>\n  <string>${build_workspace_fingerprint}</string>\n  <key>HarnessMonitorBuildStartedAtUTC</key>\n  <string>${build_started_at_utc}</string>\n</dict>\n</plist>\nEOF\n}\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nwrite_build_provenance\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
+			shellScript = "set -eu\n\nif [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nresolve_repo_root() {\n  local candidate=\"$PROJECT_DIR\"\n  while [ \"$candidate\" != \"/\" ]; do\n    if [ -d \"$candidate/.git\" ]; then\n      printf '%s\\n' \"$candidate\"\n      return\n    fi\n    candidate=\"$(dirname \"$candidate\")\"\n  done\n  printf '%s\\n' \"$PROJECT_DIR\"\n}\n\nworkspace_tree_fingerprint() {\n  python3 - \"$PROJECT_DIR\" <<'PY'\nfrom __future__ import annotations\n\nimport hashlib\nimport sys\nfrom pathlib import Path\n\nroot = Path(sys.argv[1])\ninclude_paths = [\n    root / \"HarnessMonitor.entitlements\",\n    root / \"HarnessMonitorDaemon.entitlements\",\n    root / \"HarnessMonitor.xcodeproj\" / \"project.pbxproj\",\n    root / \"Resources\",\n    root / \"Scripts\" / \"bundle-daemon-agent.sh\",\n    root / \"Sources\" / \"HarnessMonitor\",\n    root / \"Sources\" / \"HarnessMonitorKit\",\n    root / \"Sources\" / \"HarnessMonitorUI\",\n]\ndigest = hashlib.sha256()\n\nfor include_path in include_paths:\n    if not include_path.exists():\n        continue\n\n    if include_path.is_file():\n        file_paths = [include_path]\n    else:\n        file_paths = sorted(\n            candidate for candidate in include_path.rglob(\"*\") if candidate.is_file()\n        )\n\n    for file_path in file_paths:\n        relative_path = file_path.relative_to(root).as_posix()\n        digest.update(relative_path.encode(\"utf-8\"))\n        digest.update(b\"\\0\")\n        with file_path.open(\"rb\") as handle:\n            for chunk in iter(lambda: handle.read(1024 * 1024), b\"\"):\n                digest.update(chunk)\n        digest.update(b\"\\0\")\n\nprint(digest.hexdigest())\nPY\n}\n\nrepo_root=\"$(resolve_repo_root)\"\nbuild_commit=\"${HARNESS_MONITOR_BUILD_GIT_COMMIT:-}\"\nif [ -z \"$build_commit\" ]; then\n  build_commit=\"$(git -C \"$repo_root\" rev-parse HEAD 2>/dev/null || printf 'unknown')\"\nfi\n\nbuild_dirty=\"${HARNESS_MONITOR_BUILD_GIT_DIRTY:-}\"\nif [ -z \"$build_dirty\" ]; then\n  if [ -n \"$(git -C \"$repo_root\" status --short 2>/dev/null || true)\" ]; then\n    build_dirty=\"true\"\n  else\n    build_dirty=\"false\"\n  fi\nfi\n\nbuild_workspace_fingerprint=\"${HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT:-}\"\nif [ -z \"$build_workspace_fingerprint\" ]; then\n  if [ \"${ENABLE_USER_SCRIPT_SANDBOXING:-}\" = \"YES\" ]; then\n    build_workspace_fingerprint=\"unavailable-user-script-sandbox\"\n  else\n    build_workspace_fingerprint=\"$(workspace_tree_fingerprint)\"\n  fi\nfi\n\nbuild_started_at_utc=\"${HARNESS_MONITOR_BUILD_STARTED_AT_UTC:-}\"\nif [ -z \"$build_started_at_utc\" ]; then\n  build_started_at_utc=\"$(TZ=UTC /bin/date +%Y-%m-%dT%H:%M:%SZ)\"\nfi\n\nwrite_build_provenance() {\n  local provenance_path=\"${SCRIPT_OUTPUT_FILE_0:-$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/HarnessMonitorBuildProvenance.plist}\"\n  local resources_dir\n  resources_dir=\"$(dirname \"$provenance_path\")\"\n\n  /bin/mkdir -p \"$resources_dir\"\n  /bin/cat > \"$provenance_path\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>HarnessMonitorBuildGitCommit</key>\n  <string>${build_commit}</string>\n  <key>HarnessMonitorBuildGitDirty</key>\n  <string>${build_dirty}</string>\n  <key>HarnessMonitorBuildWorkspaceFingerprint</key>\n  <string>${build_workspace_fingerprint}</string>\n  <key>HarnessMonitorBuildStartedAtUTC</key>\n  <string>${build_started_at_utc}</string>\n</dict>\n</plist>\nEOF\n}\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nwrite_build_provenance\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
 		};
 		8D380C1A18375B364AD27E7F /* Clear Gatekeeper Metadata */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1326,6 +1367,32 @@
 			shellPath = /bin/sh;
 			shellScript = "if [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n\nfor runner in \"$BUILT_PRODUCTS_DIR\"/*-Runner.app; do\n  if [ -e \"$runner\" ]; then\n    strip_attrs \"$runner\"\n  fi\ndone\n";
 		};
+		9E0689F1047B613E097FC86A /* Bundle Daemon Agent */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
+				"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
+				"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
+				"$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
+			);
+			name = "Bundle Daemon Agent";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/bash \"$PROJECT_DIR/Scripts/bundle-daemon-agent.sh\"\n";
+		};
 		DA38DAF609E267E70318A8E0 /* Clear Gatekeeper Metadata */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -1336,7 +1403,13 @@
 			);
 			inputPaths = (
 				"$(PROJECT_DIR)/HarnessMonitor.entitlements",
+				"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
 				"$(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj",
+				"$(PROJECT_DIR)/Resources",
+				"$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
+				"$(PROJECT_DIR)/Sources/HarnessMonitor",
+				"$(PROJECT_DIR)/Sources/HarnessMonitorKit",
+				"$(PROJECT_DIR)/Sources/HarnessMonitorUI",
 			);
 			name = "Clear Gatekeeper Metadata";
 			outputFileListPaths = (
@@ -1346,7 +1419,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\n\nif [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nresolve_repo_root() {\n  local candidate=\"$PROJECT_DIR\"\n  while [ \"$candidate\" != \"/\" ]; do\n    if [ -d \"$candidate/.git\" ]; then\n      printf '%s\\n' \"$candidate\"\n      return\n    fi\n    candidate=\"$(dirname \"$candidate\")\"\n  done\n  printf '%s\\n' \"$PROJECT_DIR\"\n}\n\nworkspace_tree_fingerprint() {\n  python3 - \"$PROJECT_DIR\" <<'PY'\nfrom __future__ import annotations\n\nimport hashlib\nimport sys\nfrom pathlib import Path\n\nroot = Path(sys.argv[1])\ninclude_paths = [\n    root / \"HarnessMonitor.entitlements\",\n    root / \"HarnessMonitor.xcodeproj\" / \"project.pbxproj\",\n    root / \"Sources\" / \"HarnessMonitor\",\n    root / \"Sources\" / \"HarnessMonitorKit\",\n    root / \"Sources\" / \"HarnessMonitorUI\",\n]\ndigest = hashlib.sha256()\n\nfor include_path in include_paths:\n    if not include_path.exists():\n        continue\n\n    if include_path.is_file():\n        file_paths = [include_path]\n    else:\n        file_paths = sorted(\n            candidate for candidate in include_path.rglob(\"*\") if candidate.is_file()\n        )\n\n    for file_path in file_paths:\n        relative_path = file_path.relative_to(root).as_posix()\n        digest.update(relative_path.encode(\"utf-8\"))\n        digest.update(b\"\\0\")\n        with file_path.open(\"rb\") as handle:\n            for chunk in iter(lambda: handle.read(1024 * 1024), b\"\"):\n                digest.update(chunk)\n        digest.update(b\"\\0\")\n\nprint(digest.hexdigest())\nPY\n}\n\nrepo_root=\"$(resolve_repo_root)\"\nbuild_commit=\"${HARNESS_MONITOR_BUILD_GIT_COMMIT:-}\"\nif [ -z \"$build_commit\" ]; then\n  build_commit=\"$(git -C \"$repo_root\" rev-parse HEAD 2>/dev/null || printf 'unknown')\"\nfi\n\nbuild_dirty=\"${HARNESS_MONITOR_BUILD_GIT_DIRTY:-}\"\nif [ -z \"$build_dirty\" ]; then\n  if [ -n \"$(git -C \"$repo_root\" status --short 2>/dev/null || true)\" ]; then\n    build_dirty=\"true\"\n  else\n    build_dirty=\"false\"\n  fi\nfi\n\nbuild_workspace_fingerprint=\"${HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT:-}\"\nif [ -z \"$build_workspace_fingerprint\" ]; then\n  build_workspace_fingerprint=\"$(workspace_tree_fingerprint)\"\nfi\n\nbuild_started_at_utc=\"${HARNESS_MONITOR_BUILD_STARTED_AT_UTC:-}\"\nif [ -z \"$build_started_at_utc\" ]; then\n  build_started_at_utc=\"$(TZ=UTC /bin/date +%Y-%m-%dT%H:%M:%SZ)\"\nfi\n\nwrite_build_provenance() {\n  local provenance_path=\"${SCRIPT_OUTPUT_FILE_0:-$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/HarnessMonitorBuildProvenance.plist}\"\n  local resources_dir\n  resources_dir=\"$(dirname \"$provenance_path\")\"\n\n  /bin/mkdir -p \"$resources_dir\"\n  /bin/cat > \"$provenance_path\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>HarnessMonitorBuildGitCommit</key>\n  <string>${build_commit}</string>\n  <key>HarnessMonitorBuildGitDirty</key>\n  <string>${build_dirty}</string>\n  <key>HarnessMonitorBuildWorkspaceFingerprint</key>\n  <string>${build_workspace_fingerprint}</string>\n  <key>HarnessMonitorBuildStartedAtUTC</key>\n  <string>${build_started_at_utc}</string>\n</dict>\n</plist>\nEOF\n}\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nwrite_build_provenance\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
+			shellScript = "set -eu\n\nif [ \"${XCODE_RUNNING_FOR_PREVIEWS:-}\" = \"1\" ] || [[ \"${BUILD_DIR:-}\" == *\"/Previews/\"* ]]; then\n  exit 0\nfi\n\nresolve_repo_root() {\n  local candidate=\"$PROJECT_DIR\"\n  while [ \"$candidate\" != \"/\" ]; do\n    if [ -d \"$candidate/.git\" ]; then\n      printf '%s\\n' \"$candidate\"\n      return\n    fi\n    candidate=\"$(dirname \"$candidate\")\"\n  done\n  printf '%s\\n' \"$PROJECT_DIR\"\n}\n\nworkspace_tree_fingerprint() {\n  python3 - \"$PROJECT_DIR\" <<'PY'\nfrom __future__ import annotations\n\nimport hashlib\nimport sys\nfrom pathlib import Path\n\nroot = Path(sys.argv[1])\ninclude_paths = [\n    root / \"HarnessMonitor.entitlements\",\n    root / \"HarnessMonitorDaemon.entitlements\",\n    root / \"HarnessMonitor.xcodeproj\" / \"project.pbxproj\",\n    root / \"Resources\",\n    root / \"Scripts\" / \"bundle-daemon-agent.sh\",\n    root / \"Sources\" / \"HarnessMonitor\",\n    root / \"Sources\" / \"HarnessMonitorKit\",\n    root / \"Sources\" / \"HarnessMonitorUI\",\n]\ndigest = hashlib.sha256()\n\nfor include_path in include_paths:\n    if not include_path.exists():\n        continue\n\n    if include_path.is_file():\n        file_paths = [include_path]\n    else:\n        file_paths = sorted(\n            candidate for candidate in include_path.rglob(\"*\") if candidate.is_file()\n        )\n\n    for file_path in file_paths:\n        relative_path = file_path.relative_to(root).as_posix()\n        digest.update(relative_path.encode(\"utf-8\"))\n        digest.update(b\"\\0\")\n        with file_path.open(\"rb\") as handle:\n            for chunk in iter(lambda: handle.read(1024 * 1024), b\"\"):\n                digest.update(chunk)\n        digest.update(b\"\\0\")\n\nprint(digest.hexdigest())\nPY\n}\n\nrepo_root=\"$(resolve_repo_root)\"\nbuild_commit=\"${HARNESS_MONITOR_BUILD_GIT_COMMIT:-}\"\nif [ -z \"$build_commit\" ]; then\n  build_commit=\"$(git -C \"$repo_root\" rev-parse HEAD 2>/dev/null || printf 'unknown')\"\nfi\n\nbuild_dirty=\"${HARNESS_MONITOR_BUILD_GIT_DIRTY:-}\"\nif [ -z \"$build_dirty\" ]; then\n  if [ -n \"$(git -C \"$repo_root\" status --short 2>/dev/null || true)\" ]; then\n    build_dirty=\"true\"\n  else\n    build_dirty=\"false\"\n  fi\nfi\n\nbuild_workspace_fingerprint=\"${HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT:-}\"\nif [ -z \"$build_workspace_fingerprint\" ]; then\n  if [ \"${ENABLE_USER_SCRIPT_SANDBOXING:-}\" = \"YES\" ]; then\n    build_workspace_fingerprint=\"unavailable-user-script-sandbox\"\n  else\n    build_workspace_fingerprint=\"$(workspace_tree_fingerprint)\"\n  fi\nfi\n\nbuild_started_at_utc=\"${HARNESS_MONITOR_BUILD_STARTED_AT_UTC:-}\"\nif [ -z \"$build_started_at_utc\" ]; then\n  build_started_at_utc=\"$(TZ=UTC /bin/date +%Y-%m-%dT%H:%M:%SZ)\"\nfi\n\nwrite_build_provenance() {\n  local provenance_path=\"${SCRIPT_OUTPUT_FILE_0:-$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/HarnessMonitorBuildProvenance.plist}\"\n  local resources_dir\n  resources_dir=\"$(dirname \"$provenance_path\")\"\n\n  /bin/mkdir -p \"$resources_dir\"\n  /bin/cat > \"$provenance_path\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>HarnessMonitorBuildGitCommit</key>\n  <string>${build_commit}</string>\n  <key>HarnessMonitorBuildGitDirty</key>\n  <string>${build_dirty}</string>\n  <key>HarnessMonitorBuildWorkspaceFingerprint</key>\n  <string>${build_workspace_fingerprint}</string>\n  <key>HarnessMonitorBuildStartedAtUTC</key>\n  <string>${build_started_at_utc}</string>\n</dict>\n</plist>\nEOF\n}\n\nstrip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nwrite_build_provenance\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1374,6 +1447,7 @@
 				8DC3C0D43218C5D79C8C4FE3 /* CachedModelsDetailTests.swift in Sources */,
 				4F6BBF37BDC6EC822ED36C92 /* CachedModelsTests.swift in Sources */,
 				616DD8C34CC0151BD79FF4D3 /* ConnectionModelsTests.swift in Sources */,
+				C2949E5EEE6FFD85CD548BA0 /* DaemonControllerTests.swift in Sources */,
 				B63CB643CD3FAB3A9C73AF58 /* DaemonModelsTests.swift in Sources */,
 				5E4753F6502FAA1A8FE7B334 /* HarnessMonitorActionTestSupport.swift in Sources */,
 				35F025A53298CFBB24332F36 /* HarnessMonitorFailureTestSupport.swift in Sources */,
@@ -1752,6 +1826,7 @@
 				HARNESS_MONITOR_APP_BUNDLE_ID = io.harnessmonitor.app;
 				HARNESS_MONITOR_BUILD_GIT_COMMIT = "local-dev";
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
+				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -1878,6 +1953,7 @@
 				HARNESS_MONITOR_APP_BUNDLE_ID = io.harnessmonitor.app;
 				HARNESS_MONITOR_BUILD_GIT_COMMIT = "local-dev";
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
+				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -1903,6 +1979,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor";
 				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
@@ -1958,6 +2037,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
@@ -2002,6 +2084,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor";
 				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
@@ -2028,6 +2113,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
@@ -2072,6 +2160,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor";
 				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
@@ -2098,6 +2189,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_CFBundleName = "Harness Monitor UI Testing";
 				INFOPLIST_KEY_HarnessMonitorBuildGitCommit = "$(HARNESS_MONITOR_BUILD_GIT_COMMIT)";
@@ -2227,6 +2321,7 @@
 				HARNESS_MONITOR_APP_BUNDLE_ID = io.harnessmonitor.app;
 				HARNESS_MONITOR_BUILD_GIT_COMMIT = "local-dev";
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
+				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
