@@ -24,12 +24,13 @@ public enum HarnessMonitorPreviewStoreFactory {
   public static func makeStore(
     for scenario: Scenario,
     modelContainer: ModelContainer? = nil,
-    persistenceError: String? = nil
+    persistenceError: String? = nil,
+    voiceCapture: any VoiceCaptureProviding = PreviewVoiceCaptureService()
   ) -> HarnessMonitorStore {
     let configuration = configuration(for: scenario)
     let store = HarnessMonitorStore(
       daemonController: PreviewDaemonController(mode: configuration.mode),
-      voiceCapture: PreviewVoiceCaptureService(),
+      voiceCapture: voiceCapture,
       modelContainer: modelContainer,
       persistenceError: persistenceError
     )

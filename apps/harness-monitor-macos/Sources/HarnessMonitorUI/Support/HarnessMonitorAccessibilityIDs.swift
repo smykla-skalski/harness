@@ -152,6 +152,11 @@ public enum HarnessMonitorAccessibility {
   static let voiceInputInsertButton = "harness.voice-input.insert"
   static let voiceInputStopButton = "harness.voice-input.stop"
   static let voiceInputRemoteURLField = "harness.voice-input.remote-url"
+  static let voiceInputFailureOverlay = "harness.voice-input.failure"
+  static let voiceInputFailureMessage = "harness.voice-input.failure.message"
+  static let voiceInputFailureInstructions = "harness.voice-input.failure.instructions"
+  static let voiceInputFailureRetryButton = "harness.voice-input.failure.retry"
+  static let voiceInputFailureCloseButton = "harness.voice-input.failure.close"
 
   static func sessionRow(_ sessionID: String) -> String {
     "harness.sidebar.session.\(sessionID)"

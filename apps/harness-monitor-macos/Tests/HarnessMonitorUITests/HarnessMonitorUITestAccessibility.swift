@@ -169,6 +169,9 @@ enum HarnessMonitorUITestAccessibility {
   static let voiceInputTranscript = "harness.voice-input.transcript"
   static let voiceInputInsertButton = "harness.voice-input.insert"
   static let voiceInputStopButton = "harness.voice-input.stop"
+  static let voiceInputFailureOverlay = "harness.voice-input.failure"
+  static let voiceInputFailureMessage = "harness.voice-input.failure.message"
+  static let voiceInputFailureInstructions = "harness.voice-input.failure.instructions"
   static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
 
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
