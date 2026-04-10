@@ -92,10 +92,16 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
 
   private var perfScenarioStateText: String? {
-    guard let perfScenario else {
+    guard shouldPublishPerfScenarioState,
+      let perfScenario
+    else {
       return nil
     }
     return "scenario=\(perfScenario.rawValue), status=\(perfScenarioStatus.rawValue)"
+  }
+
+  private var shouldPublishPerfScenarioState: Bool {
+    HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
   }
 
   func body(content: Content) -> some View {
@@ -125,25 +131,32 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     hasRunPerfScenario = true
 
     if perfScenario.includesBootstrapInMeasurement {
-      perfScenarioStatus = .running
+      publishPerfScenarioStatus(.running)
       await HarnessMonitorPerfDriver.run(
         scenario: perfScenario,
         store: store,
         openWindow: openWindow
       )
-      perfScenarioStatus = .completed
+      publishPerfScenarioStatus(.completed)
       return
     }
 
-    perfScenarioStatus = .bootstrapping
+    publishPerfScenarioStatus(.bootstrapping)
     await store.bootstrapIfNeeded()
-    perfScenarioStatus = .running
+    publishPerfScenarioStatus(.running)
     await HarnessMonitorPerfDriver.run(
       scenario: perfScenario,
       store: store,
       openWindow: openWindow
     )
-    perfScenarioStatus = .completed
+    publishPerfScenarioStatus(.completed)
+  }
+
+  private func publishPerfScenarioStatus(_ status: HarnessMonitorPerfScenarioStatus) {
+    guard shouldPublishPerfScenarioState else {
+      return
+    }
+    perfScenarioStatus = status
   }
 }
 
