@@ -58,8 +58,13 @@ enum HarnessMonitorAppStoreFactory {
     switch HarnessMonitorLaunchMode(environment: environment) {
     case .live:
       return HarnessMonitorStore(
-        daemonController: DaemonController(environment: environment),
-        daemonOwnership: DaemonOwnership(environment: environment),
+      let ownership = DaemonOwnership(environment: environment)
+      return HarnessMonitorStore(
+        daemonController: DaemonController(
+          environment: environment,
+          ownership: ownership
+        ),
+        daemonOwnership: ownership,
         modelContainer: modelContainer,
         persistenceError: persistenceError
       )
