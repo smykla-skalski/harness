@@ -22,7 +22,13 @@ resolve_repo_root() {
 }
 
 repo_root="$(resolve_repo_root)"
-target_dir="${CARGO_TARGET_DIR:-$repo_root/target}"
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+  target_dir="$CARGO_TARGET_DIR"
+elif [ -n "${TARGET_TEMP_DIR:-}" ]; then
+  target_dir="$TARGET_TEMP_DIR/cargo-target"
+else
+  target_dir="$repo_root/target"
+fi
 configuration="${CONFIGURATION:-Debug}"
 profile_dir="debug"
 cargo_args=(rustc --bin harness)
@@ -66,6 +72,9 @@ if [ -z "$daemon_source" ]; then
   daemon_info_link_plist="${TARGET_TEMP_DIR:-$target_dir}/io.harnessmonitor.daemon.$daemon_info_digest.Info.plist"
   /bin/mkdir -p "$(dirname "$daemon_info_link_plist")"
   /bin/cp "$daemon_info_plist" "$daemon_info_link_plist"
+  if [ -n "${MARKETING_VERSION:-}" ]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING_VERSION}" "$daemon_info_link_plist"
+  fi
   CARGO_TARGET_DIR="$target_dir" "$cargo_bin" "${cargo_args[@]}" -- \
     -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist"
 fi

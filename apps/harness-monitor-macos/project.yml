@@ -30,7 +30,7 @@ settings:
     HARNESS_MONITOR_BUILD_GIT_COMMIT: local-dev
     HARNESS_MONITOR_BUILD_GIT_DIRTY: false
     HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT: local-dev
-    MARKETING_VERSION: 18.15.3
+    MARKETING_VERSION: 18.16.0
   configs:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
@@ -40,6 +40,9 @@ packages:
   Lottie:
     url: https://github.com/airbnb/lottie-ios
     majorVersion: 4.6.0
+  Textual:
+    url: https://github.com/gonzalezreal/textual
+    exactVersion: 0.3.1
 targets:
   HarnessMonitorKit:
     type: framework
@@ -72,6 +75,7 @@ targets:
       - Sources/HarnessMonitorUI
     dependencies:
       - target: HarnessMonitorKit
+      - package: Textual
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -90,6 +94,8 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - Sources/HarnessMonitor
+    resources:
+      - Resources/PrivacyInfo.xcprivacy
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
@@ -266,6 +272,8 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - Sources/HarnessMonitor
+    resources:
+      - Resources/PrivacyInfo.xcprivacy
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
