@@ -16,6 +16,10 @@ extension HarnessMonitorStore {
     return true
   }
 
+  public func reportDropRejection(_ reason: String) {
+    lastError = reason
+  }
+
   @discardableResult
   public func createTask(
     title: String,
