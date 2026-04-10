@@ -69,25 +69,46 @@ public final class HarnessMonitorStore {
   public let inspectorUI: InspectorUISlice
 
   public var lastAction = "" {
-    didSet { scheduleUISync([.content, .inspector]) }
+    didSet {
+      guard oldValue != lastAction else { return }
+      scheduleUISync([.content, .inspector])
+    }
   }
   public var lastError: String? {
-    didSet { scheduleUISync([.inspector]) }
+    didSet {
+      guard oldValue != lastError else { return }
+      scheduleUISync([.inspector])
+    }
   }
   public var persistenceError: String? {
-    didSet { scheduleUISync([.content, .sidebar, .inspector]) }
+    didSet {
+      guard oldValue != persistenceError else { return }
+      scheduleUISync([.content, .sidebar, .inspector])
+    }
   }
   public var presentedSheet: PresentedSheet? {
-    didSet { scheduleUISync([.content]) }
+    didSet {
+      guard oldValue != presentedSheet else { return }
+      scheduleUISync([.content])
+    }
   }
   public var pendingConfirmation: PendingConfirmation? {
-    didSet { scheduleUISync([.content]) }
+    didSet {
+      guard oldValue != pendingConfirmation else { return }
+      scheduleUISync([.content])
+    }
   }
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
-    didSet { scheduleUISync([.content]) }
+    didSet {
+      guard oldValue != selectedCodexRuns else { return }
+      scheduleUISync([.content])
+    }
   }
   public var selectedCodexRun: CodexRunSnapshot? {
-    didSet { scheduleUISync([.content]) }
+    didSet {
+      guard oldValue != selectedCodexRun else { return }
+      scheduleUISync([.content])
+    }
   }
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
@@ -95,15 +116,22 @@ public final class HarnessMonitorStore {
   }
   public var sleepPreventionEnabled = false {
     didSet {
+      guard oldValue != sleepPreventionEnabled else { return }
       sleepAssertion.update(hasActiveSessions: sleepPreventionEnabled)
       scheduleUISync([.content])
     }
   }
   public var navigationBackStack: [String?] = [] {
-    didSet { scheduleUISync([.content]) }
+    didSet {
+      guard oldValue != navigationBackStack else { return }
+      scheduleUISync([.content])
+    }
   }
   public var navigationForwardStack: [String?] = [] {
-    didSet { scheduleUISync([.content]) }
+    didSet {
+      guard oldValue != navigationForwardStack else { return }
+      scheduleUISync([.content])
+    }
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var lastActionDismissDelay: Duration = .seconds(4)

@@ -13,35 +13,59 @@ extension HarnessMonitorStore {
 
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
     public var connectionState: ConnectionState = .idle {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != connectionState else { return }
+        onChanged?(.shellState)
+      }
     }
     public var daemonStatus: DaemonStatusReport? {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != daemonStatus else { return }
+        onChanged?(.shellState)
+      }
     }
     public var diagnostics: DaemonDiagnosticsReport?
     public var health: HealthResponse?
     public var isRefreshing = false {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != isRefreshing else { return }
+        onChanged?(.shellState)
+      }
     }
     public var isDiagnosticsRefreshInFlight = false
     public var isDaemonActionInFlight = false {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != isDaemonActionInFlight else { return }
+        onChanged?(.shellState)
+      }
     }
     public var activeTransport: TransportKind = .httpSSE
     public var connectionMetrics: ConnectionMetrics = .initial {
-      didSet { onChanged?(.metrics) }
+      didSet {
+        guard oldValue != connectionMetrics else { return }
+        onChanged?(.metrics)
+      }
     }
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
     public var daemonLogLevel: String?
     public var isShowingCachedData = false {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != isShowingCachedData else { return }
+        onChanged?(.shellState)
+      }
     }
     public var persistedSessionCount = 0 {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != persistedSessionCount else { return }
+        onChanged?(.shellState)
+      }
     }
     public var lastPersistedSnapshotAt: Date? {
-      didSet { onChanged?(.shellState) }
+      didSet {
+        guard oldValue != lastPersistedSnapshotAt else { return }
+        onChanged?(.shellState)
+      }
     }
   }
 
@@ -61,28 +85,52 @@ extension HarnessMonitorStore {
 
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
     public var selectedSessionID: String? {
-      didSet { onChanged?(.selectedSessionID) }
+      didSet {
+        guard oldValue != selectedSessionID else { return }
+        onChanged?(.selectedSessionID)
+      }
     }
     public var selectedSession: SessionDetail? {
-      didSet { onChanged?(.selectedSession) }
+      didSet {
+        guard oldValue != selectedSession else { return }
+        onChanged?(.selectedSession)
+      }
     }
     public var timeline: [TimelineEntry] = [] {
-      didSet { onChanged?(.timeline) }
+      didSet {
+        guard oldValue != timeline else { return }
+        onChanged?(.timeline)
+      }
     }
     public var inspectorSelection: InspectorSelection = .none {
-      didSet { onChanged?(.inspectorSelection) }
+      didSet {
+        guard oldValue != inspectorSelection else { return }
+        onChanged?(.inspectorSelection)
+      }
     }
     public var actionActorID: String? {
-      didSet { onChanged?(.actionActorID) }
+      didSet {
+        guard oldValue != actionActorID else { return }
+        onChanged?(.actionActorID)
+      }
     }
     public var isSelectionLoading = false {
-      didSet { onChanged?(.selectionLoading) }
+      didSet {
+        guard oldValue != isSelectionLoading else { return }
+        onChanged?(.selectionLoading)
+      }
     }
     public var isExtensionsLoading = false {
-      didSet { onChanged?(.extensionsLoading) }
+      didSet {
+        guard oldValue != isExtensionsLoading else { return }
+        onChanged?(.extensionsLoading)
+      }
     }
     public var isSessionActionInFlight = false {
-      didSet { onChanged?(.sessionAction) }
+      didSet {
+        guard oldValue != isSessionActionInFlight else { return }
+        onChanged?(.sessionAction)
+      }
     }
 
     public var matchedSelectedSession: SessionDetail? {
@@ -101,7 +149,10 @@ extension HarnessMonitorStore {
   public final class UserDataSlice {
     @ObservationIgnored public var onChanged: (() -> Void)?
     public var bookmarkedSessionIds: Set<String> = [] {
-      didSet { onChanged?() }
+      didSet {
+        guard oldValue != bookmarkedSessionIds else { return }
+        onChanged?()
+      }
     }
 
     public init() {}
