@@ -182,6 +182,7 @@ struct SidebarView: View {
       }
     }
     .onSubmit(of: .search) {
+      store.flushPendingSearchRebuild()
       if sidebarUI.isPersistenceAvailable {
         _ = store.recordSearch(controls.searchText)
       }
@@ -366,6 +367,7 @@ struct SidebarView: View {
 
   private func applyRecentSearch(_ query: String) {
     store.searchText = query
+    store.flushPendingSearchRebuild()
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
     }

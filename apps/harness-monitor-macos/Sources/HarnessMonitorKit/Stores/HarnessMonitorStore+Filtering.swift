@@ -21,8 +21,11 @@ extension HarnessMonitorStore {
     @ObservationIgnored private var sessionIndicesByID: [String: Int] = [:]
     @ObservationIgnored var projectCatalogs: [ProjectCatalog] = []
     @ObservationIgnored var queryTokens: [String] = []
+    @ObservationIgnored private var searchRebuildTask: Task<Void, Never>?
     @ObservationIgnored private(set) var debugCatalogRebuildCount = 0
     @ObservationIgnored private(set) var debugProjectionRebuildCount = 0
+
+    private static let searchRebuildDebounceNanoseconds: UInt64 = 150_000_000
 
     public var projects: [ProjectSummary] {
       get { catalog.projects }
@@ -110,6 +113,7 @@ extension HarnessMonitorStore {
         return false
       }
 
+      cancelPendingSearchRebuild()
       suppressRefresh = true
       catalog.projects = projects
       catalog.sessions = sessions
@@ -134,8 +138,10 @@ extension HarnessMonitorStore {
 
         switch summaryChangeImpact(from: existing, to: summary) {
         case .catalog:
+          cancelPendingSearchRebuild()
           rebuildCatalogAndProjection()
         case .projection:
+          cancelPendingSearchRebuild()
           patchCatalog(existingSummary: existing, updatedSummary: summary)
           rebuildProjection(change: .data)
         case .summaryOnly:
@@ -150,8 +156,17 @@ extension HarnessMonitorStore {
       suppressRefresh = true
       catalog.sessions = updated
       suppressRefresh = false
+      cancelPendingSearchRebuild()
       rebuildCatalogAndProjection()
       return true
+    }
+
+    public func flushPendingSearchRebuild() {
+      guard searchRebuildTask != nil else {
+        return
+      }
+      cancelPendingSearchRebuild()
+      rebuildProjection(change: .projection)
     }
 
     public func sessionSummary(for sessionID: String?) -> SessionSummary? {
@@ -185,7 +200,10 @@ extension HarnessMonitorStore {
         Self.normalizedQueryTokens(for: controls.searchText)
         != Self.normalizedQueryTokens(for: newValue)
       controls.searchText = newValue
-      refreshProjectionIfNeeded(didChangeQuery)
+      guard didChangeQuery, !suppressRefresh else {
+        return
+      }
+      scheduleSearchRebuild(for: newValue)
     }
 
     private func updateSessionFilter(_ newValue: SessionFilter) {
@@ -216,7 +234,27 @@ extension HarnessMonitorStore {
       guard changed, !suppressRefresh else {
         return
       }
+      cancelPendingSearchRebuild()
       rebuildProjection(change: .projection)
+    }
+
+    private func scheduleSearchRebuild(for targetSearchText: String) {
+      searchRebuildTask?.cancel()
+      searchRebuildTask = Task { @MainActor [weak self] in
+        try? await Task.sleep(nanoseconds: Self.searchRebuildDebounceNanoseconds)
+        guard !Task.isCancelled, let self else {
+          return
+        }
+        guard self.controls.searchText == targetSearchText else {
+          return
+        }
+        self.rebuildProjection(change: .projection)
+      }
+    }
+
+    private func cancelPendingSearchRebuild() {
+      searchRebuildTask?.cancel()
+      searchRebuildTask = nil
     }
 
     private func rebuildCatalogAndProjection() {
@@ -315,6 +353,8 @@ extension HarnessMonitorStore {
     }
 
     private func rebuildProjection(change: Change) {
+      searchRebuildTask?.cancel()
+      searchRebuildTask = nil
       debugProjectionRebuildCount += 1
       queryTokens = Self.normalizedQueryTokens(for: controls.searchText)
 
