@@ -4,11 +4,13 @@ import HarnessMonitorKit
 
 @MainActor
 final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
+  private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private let handledSignals = [SIGTERM, SIGINT, SIGHUP]
   private let hidesDockIconForPerfRuns =
     ProcessInfo.processInfo.environment["HARNESS_MONITOR_PERF_HIDE_DOCK_ICON"] == "1"
   private let launchMode = HarnessMonitorLaunchMode(
-    environment: ProcessInfo.processInfo.environment
+    environment: HarnessMonitorAppDelegate.launchEnvironment()
   )
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
@@ -17,8 +19,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   override init() {
     super.init()
     installSignalHandlers()
-    let environment = ProcessInfo.processInfo.environment
-    let isUITestRun = environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+    let environment = Self.launchEnvironment()
+    let isUITestRun = environment[Self.uiTestsEnvironmentKey] == "1"
     let keepsAnimations = environment["HARNESS_MONITOR_KEEP_ANIMATIONS"] == "1"
     if isUITestRun && !keepsAnimations {
       disableAnimationsForUITesting()
@@ -112,5 +114,23 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     signal(handledSignal, SIG_DFL)
     kill(getpid(), handledSignal)
     _exit(128 + handledSignal)
+  }
+
+  private static func launchEnvironment() -> [String: String] {
+    let environment = ProcessInfo.processInfo.environment
+    guard Bundle.main.bundleIdentifier == uiTestingBundleIdentifier else {
+      return environment
+    }
+
+    var values = environment
+    values[uiTestsEnvironmentKey] = "1"
+    if isBlank(values[HarnessMonitorLaunchMode.environmentKey]) {
+      values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue
+    }
+    return values
+  }
+
+  private static func isBlank(_ rawValue: String?) -> Bool {
+    rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
   }
 }

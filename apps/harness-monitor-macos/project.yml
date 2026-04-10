@@ -30,7 +30,7 @@ settings:
     HARNESS_MONITOR_BUILD_GIT_COMMIT: local-dev
     HARNESS_MONITOR_BUILD_GIT_DIRTY: false
     HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT: local-dev
-    MARKETING_VERSION: 18.14.3
+    MARKETING_VERSION: 18.15.1
   configs:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
@@ -288,6 +288,7 @@ targets:
         basedOnDependencyAnalysis: false
         inputFiles:
           - $(PROJECT_DIR)/HarnessMonitor.entitlements
+          - $(PROJECT_DIR)/HarnessMonitorUITestHost.entitlements
           - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
           - $(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj
           - $(PROJECT_DIR)/Resources
@@ -327,6 +328,7 @@ targets:
           root = Path(sys.argv[1])
           include_paths = [
               root / "HarnessMonitor.entitlements",
+              root / "HarnessMonitorUITestHost.entitlements",
               root / "HarnessMonitorDaemon.entitlements",
               root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
               root / "Resources",
@@ -426,7 +428,7 @@ targets:
           strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
     settings:
       base:
-        CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
+        CODE_SIGN_ENTITLEMENTS: HarnessMonitorUITestHost.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
         ENABLE_APP_SANDBOX: YES
