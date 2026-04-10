@@ -14,6 +14,7 @@ HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Test
 HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
 SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
 UI_TESTS_ENV="HARNESS_MONITOR_UI_TESTS=1"
+DAEMON_DATA_HOME_ENV_KEY="HARNESS_DAEMON_DATA_HOME"
 UI_ACCESSIBILITY_MARKERS_ENV="HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS=0"
 KEEP_ANIMATIONS_ENV="HARNESS_MONITOR_KEEP_ANIMATIONS=1"
 LAUNCH_MODE_ENV="HARNESS_MONITOR_LAUNCH_MODE=preview"
@@ -674,9 +675,12 @@ record_capture() {
   local preview_scenario
   preview_scenario="$(preview_scenario_for "$scenario")"
   local template_dir="$traces_root/$template_slug"
+  local daemon_data_home="$run_dir/app-data/$template_slug/$scenario"
   mkdir -p "$template_dir"
+  mkdir -p "$daemon_data_home"
   local trace_path="$template_dir/${scenario}.trace"
   local toc_path="$template_dir/${scenario}.toc.xml"
+  local daemon_data_home_env="$DAEMON_DATA_HOME_ENV_KEY=$daemon_data_home"
   local launched_process_path
 
   printf 'Recording %s / %s (%ss)...\n' "$template" "$scenario" "$duration_seconds"
@@ -686,9 +690,10 @@ record_capture() {
     --template "$template" \
     --time-limit "${duration_seconds}s" \
     --output "$trace_path" \
-      --env "$UI_TESTS_ENV" \
-      --env "$UI_ACCESSIBILITY_MARKERS_ENV" \
-      --env "$KEEP_ANIMATIONS_ENV" \
+    --env "$UI_TESTS_ENV" \
+    --env "$daemon_data_home_env" \
+    --env "$UI_ACCESSIBILITY_MARKERS_ENV" \
+    --env "$KEEP_ANIMATIONS_ENV" \
     --env "$LAUNCH_MODE_ENV" \
     --env "$HIDE_DOCK_ENV" \
     --env "$audit_commit_env" \
@@ -745,9 +750,10 @@ PY
   cleanup_host_processes
   assert_audit_source_unchanged "after recording $template / $scenario"
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$scenario" "$template" "$duration_seconds" "${trace_path#"$run_dir"/}" \
-    "$record_status" "$end_reason" "$preview_scenario" "$launched_process_path" >>"$capture_records_file"
+    "$record_status" "$end_reason" "$preview_scenario" "$launched_process_path" \
+    "$daemon_data_home" >>"$capture_records_file"
 }
 
 for scenario in "${selected_scenarios[@]}"; do
@@ -864,6 +870,7 @@ for line in Path(capture_records_path).read_text(encoding="utf-8").splitlines():
         end_reason,
         preview_scenario,
         launched_process_path,
+        daemon_data_home,
     ) = line.split("\t")
     captures.append(
         {
@@ -877,6 +884,7 @@ for line in Path(capture_records_path).read_text(encoding="utf-8").splitlines():
             "launched_process_path": launched_process_path,
             "environment": {
                 **default_environment,
+                "HARNESS_DAEMON_DATA_HOME": daemon_data_home,
                 "HARNESS_MONITOR_PREVIEW_SCENARIO": preview_scenario,
                 "HARNESS_MONITOR_PERF_SCENARIO": scenario,
             },

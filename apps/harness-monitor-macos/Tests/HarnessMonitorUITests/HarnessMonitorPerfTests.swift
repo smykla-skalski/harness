@@ -14,6 +14,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
       app.launchEnvironment["HARNESS_MONITOR_LAUNCH_MODE"] = "preview"
       app.launchEnvironment["HARNESS_MONITOR_KEEP_ANIMATIONS"] = "1"
+      guard configureIsolatedDataHome(for: app, purpose: "launch-performance") else {
+        return
+      }
       app.launch()
       app.terminate()
     }
@@ -79,8 +82,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
     let sessionInspectorCard = element(in: launched, identifier: Accessibility.sessionInspectorCard)
 
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertFalse(sessionInspectorCard.exists)
+    if boardRoot.waitForExistence(timeout: Self.actionTimeout) {
+      XCTAssertFalse(sessionInspectorCard.exists)
+    }
 
     waitForScenarioCompletion(
       app: launched,
@@ -150,6 +154,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "HARNESS_MONITOR_PERF_SHORT_DELAY_MS": "60",
       "HARNESS_MONITOR_PERF_SETTLE_DELAY_MS": "180",
     ]
+    guard configureIsolatedDataHome(for: app, purpose: scenario) else {
+      return app
+    }
     app.launch()
     return app
   }

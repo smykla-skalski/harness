@@ -3,6 +3,7 @@ import XCTest
 @MainActor
 class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
+  nonisolated static let daemonDataHomeKey = "HARNESS_DAEMON_DATA_HOME"
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
   nonisolated static let actionTimeout: TimeInterval = 2
@@ -34,6 +35,9 @@ extension HarnessMonitorUITestCase {
     app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
     app.launchEnvironment[Self.launchModeKey] = mode
+    guard configureIsolatedDataHome(for: app, purpose: mode) else {
+      return app
+    }
     app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
     app.launch()
     XCTAssertTrue(
@@ -56,6 +60,53 @@ extension HarnessMonitorUITestCase {
       }
     )
     return app
+  }
+
+  @discardableResult
+  func configureIsolatedDataHome(
+    for app: XCUIApplication,
+    purpose: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) -> Bool {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("HarnessMonitorUITests", isDirectory: true)
+      .appendingPathComponent(
+        storageDirectoryName(for: purpose),
+        isDirectory: true
+      )
+
+    do {
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    } catch {
+      XCTFail(
+        "Failed to create isolated UI-test data home at \(root.path): \(error)",
+        file: file,
+        line: line
+      )
+      return false
+    }
+
+    app.launchEnvironment[Self.daemonDataHomeKey] = root.path
+    addTeardownBlock { @MainActor in
+      try? FileManager.default.removeItem(at: root)
+    }
+    return true
+  }
+
+  private func storageDirectoryName(for purpose: String) -> String {
+    let testName = storagePathComponent(name)
+    let purposeName = storagePathComponent(purpose)
+    return "\(testName)-\(purposeName)-\(UUID().uuidString)"
+  }
+
+  private func storagePathComponent(_ value: String) -> String {
+    let allowedScalars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+    let component = value.unicodeScalars
+      .map { allowedScalars.contains($0) ? String($0) : "-" }
+      .joined()
+      .trimmingCharacters(in: CharacterSet(charactersIn: ".-_"))
+    return component.isEmpty ? "launch" : component
   }
 
   func openSettings(in app: XCUIApplication) {

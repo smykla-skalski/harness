@@ -312,6 +312,7 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
+    public var searchFocusRequest = 0
   }
 
   @MainActor
