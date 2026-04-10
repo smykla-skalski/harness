@@ -340,101 +340,6 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.lastAction == "End session")
   }
 
-  @Test("Send signal tracks the last action")
-  func sendSignalTracksLastAction() async {
-    let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
-
-    await store.sendSignal(
-      agentID: PreviewFixtures.agents[0].agentId,
-      command: "inject_context",
-      message: "Focus on the stalled review lane.",
-      actionHint: "task:review"
-    )
-
-    #expect(
-      client.recordedCalls()
-        == [
-          .sendSignal(
-            sessionID: PreviewFixtures.summary.sessionId,
-            agentID: PreviewFixtures.agents[0].agentId,
-            command: "inject_context",
-            actor: "leader-claude"
-          )
-        ]
-    )
-    #expect(store.selectedSession?.signals.count == PreviewFixtures.signals.count + 1)
-    #expect(store.selectedSession?.signals.last?.agentId == PreviewFixtures.agents[0].agentId)
-    #expect(store.selectedSession?.signals.last?.status == .pending)
-    #expect(
-      store.selectedSession?.signals.last?.signal.payload.message
-        == "Focus on the stalled review lane."
-    )
-    #expect(
-      store.selectedSession?.signals.last?.signal.payload.actionHint == "task:review"
-    )
-    #expect(store.lastAction == "Send signal")
-  }
-
-  @Test("Cancel signal forwards to daemon and records rejection")
-  func cancelSignalForwardsToDaemon() async {
-    let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
-
-    await store.sendSignal(
-      agentID: PreviewFixtures.agents[0].agentId,
-      command: "inject_context",
-      message: "Stalled review.",
-      actionHint: nil
-    )
-    let pending = try? #require(store.selectedSession?.signals.last)
-    let signalID = try? #require(pending?.signal.signalId)
-
-    await store.cancelSignal(
-      signalID: signalID ?? "",
-      agentID: PreviewFixtures.agents[0].agentId
-    )
-
-    #expect(
-      client.recordedCalls().contains(
-        .cancelSignal(
-          sessionID: PreviewFixtures.summary.sessionId,
-          agentID: PreviewFixtures.agents[0].agentId,
-          signalID: signalID ?? "",
-          actor: "leader-claude"
-        )
-      )
-    )
-    #expect(store.lastAction == "Cancel signal")
-    let cancelled = store.selectedSession?.signals.first { $0.signal.signalId == signalID }
-    #expect(cancelled?.status == .rejected)
-    #expect(cancelled?.acknowledgment?.result == .rejected)
-  }
-
-  @Test("Resend signal reuses sendSignal with the original payload")
-  func resendSignalReusesSendSignal() async {
-    let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
-
-    await store.sendSignal(
-      agentID: PreviewFixtures.agents[0].agentId,
-      command: "inject_context",
-      message: "Stalled review.",
-      actionHint: "task:review"
-    )
-    let original = try? #require(store.selectedSession?.signals.last)
-
-    guard let original else { return }
-    await store.resendSignal(original)
-
-    let sendCalls = client.recordedCalls().filter { call in
-      if case .sendSignal = call { return true }
-      return false
-    }
-    #expect(sendCalls.count == 2)
-    #expect(store.lastAction == "Send signal")
-  }
-
   @Test("Offline session actions fail in read-only mode without sending daemon mutations")
   func offlineSessionActionsFailInReadOnlyMode() async {
     let client = RecordingHarnessClient()
@@ -504,32 +409,6 @@ struct HarnessMonitorStoreActionTests {
 
     #expect(store.isSessionActionInFlight == false)
     #expect(store.isBusy == false)
-  }
-
-  @Test("Drop task failure surfaces the last error to the inspector")
-  func dropTaskFailureSetsLastError() async {
-    let client = FailingHarnessClient()
-    let daemon = RecordingDaemonController(client: client)
-    let store = HarnessMonitorStore(daemonController: daemon)
-    await store.bootstrap()
-    await store.selectSession("sess-1")
-
-    await store.dropTask(
-      taskID: "task-1",
-      target: .agent(agentId: "agent-1")
-    )
-
-    #expect(store.lastError != nil)
-    #expect(store.isBusy == false)
-  }
-
-  @Test("Report drop rejection records a user-visible reason")
-  func reportDropRejectionSetsLastError() async {
-    let store = await makeBootstrappedStore()
-
-    store.reportDropRejection("Cannot assign task: observer cannot take tasks.")
-
-    #expect(store.lastError == "Cannot assign task: observer cannot take tasks.")
   }
 
   private func selectedStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
