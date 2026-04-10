@@ -90,8 +90,10 @@ struct SignalInspectorCard: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text(signal.signal.command)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
-      Text(signal.signal.payload.message)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      HarnessMonitorMarkdownText(
+        signal.signal.payload.message,
+        textSelection: .enabled
+      )
       InspectorFactGrid(facts: facts)
       if let expires = pendingExpiresAt {
         Label {
