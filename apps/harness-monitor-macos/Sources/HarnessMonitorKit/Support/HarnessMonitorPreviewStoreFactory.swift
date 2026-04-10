@@ -15,6 +15,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case dashboardLanding
     case dashboardLoaded
     case cockpitLoaded
+    case taskDropCockpit
     case offlineCached
     case sidebarOverflow
     case empty
@@ -100,6 +101,8 @@ extension HarnessMonitorPreviewStoreFactory {
       return dashboardConfiguration()
     case .cockpitLoaded:
       return cockpitConfiguration()
+    case .taskDropCockpit:
+      return taskDropConfiguration()
     case .offlineCached:
       return offlineCachedConfiguration()
     case .sidebarOverflow:
@@ -155,6 +158,23 @@ extension HarnessMonitorPreviewStoreFactory {
         sessionFilter: .active,
         selectedSessionID: PreviewFixtures.summary.sessionId,
         selectedDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
+    )
+  }
+
+  fileprivate static func taskDropConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.taskDrop
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
+    return liveConfiguration(
+      mode: .taskDrop,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [PreviewFixtures.taskDropSummary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: PreviewFixtures.taskDropSummary.sessionId,
+        selectedDetail: PreviewFixtures.taskDropDetail,
         timeline: PreviewFixtures.timeline
       )
     )

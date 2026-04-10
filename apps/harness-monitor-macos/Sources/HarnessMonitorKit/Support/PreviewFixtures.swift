@@ -133,6 +133,55 @@ public enum PreviewFixtures {
     ),
   ]
 
+  public static let taskDropTask = WorkItem(
+    taskId: "task-drop-queue",
+    title: "Queue the drag-and-drop smoke task",
+    context: "Drag this open task onto the busy worker card.",
+    severity: .medium,
+    status: .open,
+    assignedTo: nil,
+    createdAt: "2026-03-28T14:10:00Z",
+    updatedAt: "2026-03-28T14:10:00Z",
+    createdBy: "leader-claude",
+    notes: [],
+    suggestedFix: "Drop it onto worker-codex and verify it becomes queued.",
+    source: .manual,
+    blockedReason: nil,
+    completedAt: nil,
+    checkpointSummary: nil
+  )
+
+  public static let taskDropTasks = [taskDropTask] + tasks
+
+  public static let taskDropSummary = SessionSummary(
+    projectId: summary.projectId,
+    projectName: summary.projectName,
+    projectDir: summary.projectDir,
+    contextRoot: summary.contextRoot,
+    checkoutId: summary.checkoutId,
+    checkoutRoot: summary.checkoutRoot,
+    isWorktree: summary.isWorktree,
+    worktreeName: summary.worktreeName,
+    sessionId: summary.sessionId,
+    title: summary.title,
+    context: summary.context,
+    status: summary.status,
+    createdAt: summary.createdAt,
+    updatedAt: "2026-03-28T14:18:30Z",
+    lastActivityAt: "2026-03-28T14:18:30Z",
+    leaderId: summary.leaderId,
+    observeId: summary.observeId,
+    pendingLeaderTransfer: summary.pendingLeaderTransfer,
+    metrics: SessionMetrics(
+      agentCount: summary.metrics.agentCount,
+      activeAgentCount: summary.metrics.activeAgentCount,
+      openTaskCount: summary.metrics.openTaskCount + 1,
+      inProgressTaskCount: summary.metrics.inProgressTaskCount,
+      blockedTaskCount: summary.metrics.blockedTaskCount,
+      completedTaskCount: summary.metrics.completedTaskCount
+    )
+  )
+
   public static let signals = [
     SessionSignalRecord(
       runtime: "codex",
@@ -148,7 +197,20 @@ public enum PreviewFixtures {
         command: "inject_context",
         priority: .high,
         payload: SignalPayload(
-          message: "Focus on the session cockpit and preserve the daemon API contract.",
+          message: """
+            ## BackendRef recovery checklist
+
+            Render the dangling backend reference request as Markdown:
+
+            1. Apply a `MeshAccessLog` that references a missing MOTB.
+            2. Verify the sidecar reports no rejected listener warnings.
+            3. Confirm `UnresolvedBackendRefs` appears in policy status.
+            4. Recover by creating the referenced MOTB and checking access logs again.
+
+            ```bash
+            harness run apply --manifest groups/g12
+            ```
+            """,
           actionHint: "Open the selected session timeline and refresh.",
           relatedFiles: ["src/daemon/protocol.rs"],
           metadata: .object(["source": .string("preview")])

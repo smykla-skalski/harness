@@ -109,6 +109,37 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.timeline.isEmpty)
   }
 
+  @Test("Task drop preview queues work on a busy worker")
+  func taskDropPreviewQueuesWorkOnBusyWorker() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: .taskDrop,
+      isLaunchAgentInstalled: true
+    )
+
+    let detail = try await client.dropTask(
+      sessionID: PreviewFixtures.taskDropSummary.sessionId,
+      taskID: PreviewFixtures.taskDropTask.taskId,
+      request: TaskDropRequest(
+        actor: "leader-claude",
+        target: .agent(agentId: "worker-codex"),
+        queuePolicy: .locked
+      )
+    )
+
+    let task = try #require(
+      detail.tasks.first { $0.taskId == PreviewFixtures.taskDropTask.taskId }
+    )
+    #expect(task.assignedTo == "worker-codex")
+    #expect(task.isQueuedForWorker)
+    #expect(task.queuePolicy == .locked)
+    #expect(task.queuedAt != nil)
+    #expect(task.status == .open)
+
+    let agent = try #require(detail.agents.first { $0.agentId == "worker-codex" })
+    #expect(agent.currentTaskId == "task-ui")
+    #expect(detail.session.metrics.openTaskCount == 1)
+  }
+
   @Test("Preview store factory seeds empty state without stale selection")
   func previewStoreFactorySeedsEmptyState() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
@@ -133,7 +164,8 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     await store.bootstrap()
 
     #expect(
-      store.connectionState == .offline(DaemonControlError.daemonOffline.localizedDescription)
+      store.connectionState
+        == .offline("Launch agent not installed. Install to start the daemon.")
     )
     #expect(store.daemonStatus?.launchAgent.installed == false)
     #expect(store.sessions.isEmpty)
@@ -141,7 +173,7 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     await store.startDaemon()
 
     #expect(store.connectionState == .online)
-    #expect(store.daemonStatus?.launchAgent.installed == false)
+    #expect(store.daemonStatus?.launchAgent.installed == true)
     #expect(store.sessions.isEmpty)
     #expect(store.health?.status == "ok")
   }

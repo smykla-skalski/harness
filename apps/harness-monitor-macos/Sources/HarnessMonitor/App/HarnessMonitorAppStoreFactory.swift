@@ -7,6 +7,7 @@ enum HarnessMonitorAppStoreFactory {
     case dashboardLanding = "dashboard-landing"
     case dashboard
     case cockpit
+    case taskDrop = "task-drop"
     case offlineCached = "offline-cached"
     case overflow
     case empty
@@ -29,6 +30,8 @@ enum HarnessMonitorAppStoreFactory {
         .dashboardLoaded
       case .cockpit:
         .cockpitLoaded
+      case .taskDrop:
+        .taskDropCockpit
       case .offlineCached:
         .offlineCached
       case .overflow:

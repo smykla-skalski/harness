@@ -4,6 +4,7 @@ public actor PreviewDaemonController: DaemonControlling {
   public enum Mode: Sendable {
     case dashboardLanding
     case populated
+    case taskDrop
     case overflow
     case pagedTimeline
     case signalRegression
@@ -22,6 +23,8 @@ public actor PreviewDaemonController: DaemonControlling {
         PreviewHarnessClient.Fixtures.dashboardLanding
       case .populated:
         PreviewHarnessClient.Fixtures.populated
+      case .taskDrop:
+        PreviewHarnessClient.Fixtures.taskDrop
       case .overflow:
         PreviewHarnessClient.Fixtures.overflow
       case .pagedTimeline:
@@ -53,6 +56,8 @@ public actor PreviewDaemonController: DaemonControlling {
         Mode.signalRegression
       case "single-agent":
         Mode.singleAgent
+      case "task-drop":
+        Mode.taskDrop
       default:
         Mode.populated
       }

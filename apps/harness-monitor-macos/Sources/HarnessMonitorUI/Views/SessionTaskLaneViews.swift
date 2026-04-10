@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct TaskDragPayload: Codable, Transferable {
   let sessionID: String
   let taskID: String
+  let queuePolicy: TaskQueuePolicy
 
   static var transferRepresentation: some TransferRepresentation {
     CodableRepresentation(contentType: .harnessMonitorTask)
@@ -12,7 +13,7 @@ struct TaskDragPayload: Codable, Transferable {
 }
 
 extension UTType {
-  static let harnessMonitorTask = UTType(exportedAs: "io.harnessmonitor.task")
+  static let harnessMonitorTask = UTType(exportedAs: "io.harnessmonitor.task", conformingTo: .json)
 }
 
 struct SessionTaskListSection: View {
@@ -70,14 +71,69 @@ struct SessionTaskSummaryCard: View {
   let task: WorkItem
   let isDragEnabled: Bool
   let inspectTask: (String) -> Void
+  @State private var isHovered = false
+  @GestureState private var isDragGestureActive = false
 
   private var dragPayload: TaskDragPayload {
-    TaskDragPayload(sessionID: sessionID, taskID: task.taskId)
+    TaskDragPayload(
+      sessionID: sessionID,
+      taskID: task.taskId,
+      queuePolicy: task.queuePolicy
+    )
+  }
+
+  private var isDragging: Bool {
+    isDragEnabled && isDragGestureActive
   }
 
   var body: some View {
-    cardButton
+    ZStack {
+      cardSurface
+    }
+      .background {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .fill(Color.primary.opacity(isDragging || isHovered ? 0.08 : 0.04))
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .strokeBorder(
+            isDragging ? HarnessMonitorTheme.accent : Color.clear,
+            lineWidth: isDragging ? 2 : 0
+          )
+      }
+      .overlay(alignment: .topTrailing) {
+        if isDragging {
+          TaskDraggingBadge()
+            .padding(HarnessMonitorTheme.spacingSM)
+            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        }
+      }
+      .opacity(isDragging ? 0.82 : 1)
+      .scaleEffect(isDragging ? 0.985 : 1)
+      .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD))
       .taskCardDrag(payload: dragPayload, isEnabled: isDragEnabled)
+      .simultaneousGesture(
+        DragGesture(minimumDistance: 1)
+          .updating($isDragGestureActive) { _, state, _ in
+            guard isDragEnabled else {
+              return
+            }
+            state = true
+          }
+      )
+      .onContinuousHover { phase in
+        withAnimation(.easeOut(duration: 0.15)) {
+          switch phase {
+          case .active:
+            isHovered = true
+          case .ended:
+            isHovered = false
+          }
+        }
+      }
+      .onTapGesture {
+        inspectTask(task.taskId)
+      }
       .contextMenu {
         Button {
           inspectTask(task.taskId)
@@ -91,51 +147,53 @@ struct SessionTaskSummaryCard: View {
           Label("Copy Task ID", systemImage: "doc.on.doc")
         }
       }
+      .accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.isButton)
+      .accessibilityAction {
+        inspectTask(task.taskId)
+      }
+      .accessibilityValue(isDragging ? "Dragging" : "")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
       .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
+      .animation(.easeOut(duration: 0.12), value: isDragging)
   }
 
-  private var cardButton: some View {
-    Button {
-      inspectTask(task.taskId)
-    } label: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        HStack(alignment: .top) {
-          Text(task.title)
-            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-            .lineLimit(2)
-          Spacer()
-          Text(task.severity.title)
-            .scaledFont(.caption.bold())
-            .harnessPillPadding()
-            .background(severityColor(for: task.severity), in: Capsule())
-            .foregroundStyle(HarnessMonitorTheme.onContrast)
-        }
-        Text(task.context ?? "No extra context")
-          .scaledFont(.subheadline)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .multilineTextAlignment(.leading)
+  private var cardSurface: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      HStack(alignment: .top) {
+        Text(task.title)
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
           .lineLimit(2)
-        Spacer(minLength: 0)
-        HStack(alignment: .firstTextBaseline) {
-          Text(task.assignmentStateTitle)
-            .scaledFont(.caption.weight(.bold))
-            .foregroundStyle(task.assignmentStateColor)
-          Spacer()
-          Text(task.assignmentSummary)
-            .scaledFont(.caption.monospaced())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-        }
+        Spacer()
+        Text(task.severity.title)
+          .scaledFont(.caption.bold())
+          .harnessPillPadding()
+          .background(severityColor(for: task.severity), in: Capsule())
+          .foregroundStyle(HarnessMonitorTheme.onContrast)
       }
-      .frame(
-        maxWidth: .infinity,
-        minHeight: SessionCockpitLayout.laneCardHeight,
-        alignment: .topLeading
-      )
-      .padding(HarnessMonitorTheme.cardPadding)
+      Text(task.context ?? "No extra context")
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .multilineTextAlignment(.leading)
+        .lineLimit(2)
+      Spacer(minLength: 0)
+      HStack(alignment: .firstTextBaseline) {
+        Text(task.assignmentStateTitle)
+          .scaledFont(.caption.weight(.bold))
+          .foregroundStyle(task.assignmentStateColor)
+        Spacer()
+        Text(task.assignmentSummary)
+          .scaledFont(.caption.monospaced())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+      }
     }
-    .harnessInteractiveCardButtonStyle()
+    .frame(
+      maxWidth: .infinity,
+      minHeight: SessionCockpitLayout.laneCardHeight,
+      alignment: .topLeading
+    )
+    .padding(HarnessMonitorTheme.cardPadding)
   }
 }
 
@@ -155,13 +213,49 @@ private extension View {
   func taskCardDrag(payload: TaskDragPayload, isEnabled: Bool) -> some View {
     if isEnabled {
       draggable(payload) {
-        Text(payload.taskID)
-          .scaledFont(.caption.bold())
-          .harnessPillPadding()
-          .harnessContentPill()
+        TaskDragPreview(taskID: payload.taskID)
       }
     } else {
       self
+    }
+  }
+}
+
+private struct TaskDraggingBadge: View {
+  var body: some View {
+    Label("Dragging", systemImage: "arrow.up.and.person.rectangle.portrait")
+      .scaledFont(.caption2.weight(.bold))
+      .harnessPillPadding()
+      .background(.regularMaterial, in: Capsule())
+      .foregroundStyle(HarnessMonitorTheme.accent)
+      .overlay {
+        Capsule()
+          .stroke(HarnessMonitorTheme.accent.opacity(0.45), lineWidth: 1)
+      }
+      .allowsHitTesting(false)
+  }
+}
+
+private struct TaskDragPreview: View {
+  let taskID: String
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: "arrow.up.and.person.rectangle.portrait")
+        .imageScale(.small)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Assign task")
+          .scaledFont(.caption.weight(.bold))
+        Text(taskID)
+          .scaledFont(.caption2.monospaced())
+      }
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(HarnessMonitorTheme.accent.opacity(0.5), lineWidth: 1)
     }
   }
 }
