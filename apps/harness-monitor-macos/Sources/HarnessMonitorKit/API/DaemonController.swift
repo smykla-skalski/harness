@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 
 public protocol DaemonControlling: Sendable {
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol
@@ -7,6 +8,54 @@ public protocol DaemonControlling: Sendable {
   func daemonStatus() async throws -> DaemonStatusReport
   func installLaunchAgent() async throws -> String
   func removeLaunchAgent() async throws -> String
+}
+
+public enum DaemonLaunchAgentRegistrationState: Equatable, Sendable {
+  case notRegistered
+  case enabled
+  case requiresApproval
+  case notFound
+}
+
+public protocol DaemonLaunchAgentManaging: Sendable {
+  func registrationState() -> DaemonLaunchAgentRegistrationState
+  func register() throws
+  func unregister() throws
+}
+
+public struct ServiceManagementDaemonLaunchAgentManager: DaemonLaunchAgentManaging {
+  private let plistName: String
+
+  public init(plistName: String = HarnessMonitorPaths.launchAgentPlistName) {
+    self.plistName = plistName
+  }
+
+  public func registrationState() -> DaemonLaunchAgentRegistrationState {
+    switch service.status {
+    case .notRegistered:
+      .notRegistered
+    case .enabled:
+      .enabled
+    case .requiresApproval:
+      .requiresApproval
+    case .notFound:
+      .notFound
+    @unknown default:
+      .notFound
+    }
+  }
+
+  public func register() throws {
+    try service.register()
+  }
+
+  public func unregister() throws {
+    try service.unregister()
+  }
+
+  private var service: SMAppService {
+    SMAppService.agent(plistName: plistName)
+  }
 }
 
 public enum DaemonControlError: Error, LocalizedError, Equatable {
@@ -20,7 +69,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   public var errorDescription: String? {
     switch self {
     case .harnessBinaryNotFound:
-      "Unable to locate the harness binary. Set HARNESS_BINARY or install harness first."
+      "Unable to locate the bundled harness daemon helper."
     case .manifestMissing:
       "The harness daemon manifest is missing."
     case .manifestUnreadable:
@@ -46,10 +95,13 @@ public struct DaemonController: DaemonControlling {
   private let sessionFactory:
     @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
   private let transportPreference: TransportPreference
+  private let launchAgentManager: any DaemonLaunchAgentManaging
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
     transportPreference: TransportPreference = .auto,
+    launchAgentManager: any DaemonLaunchAgentManaging =
+      ServiceManagementDaemonLaunchAgentManager(),
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
         HarnessMonitorAPIClient(connection: $0)
@@ -57,6 +109,7 @@ public struct DaemonController: DaemonControlling {
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
+    self.launchAgentManager = launchAgentManager
     self.sessionFactory = sessionFactory
   }
 
@@ -69,6 +122,9 @@ public struct DaemonController: DaemonControlling {
       token: token
     )
 
+    let httpClient = sessionFactory(connection)
+    _ = try await httpClient.health()
+
     if transportPreference != .http {
       if let wsClient = try? await bootstrapWebSocket(connection: connection) {
         return wsClient
@@ -78,57 +134,79 @@ public struct DaemonController: DaemonControlling {
       }
     }
 
-    let client = sessionFactory(connection)
-    _ = try await client.health()
-    return client
+    return httpClient
   }
 
   private func bootstrapWebSocket(
     connection: HarnessMonitorConnection
   ) async throws -> WebSocketTransport {
     let transport = WebSocketTransport(connection: connection)
-    try await transport.connect()
-    _ = try await transport.health()
-    return transport
+    do {
+      try await transport.connect()
+      _ = try await transport.health()
+      return transport
+    } catch {
+      await transport.shutdown()
+      throw error
+    }
   }
 
   public func startDaemonClient() async throws -> any HarnessMonitorClientProtocol {
-    let binary = try harnessBinaryURL()
+    let binary = try bundledHarnessBinaryURL()
     try startDetachedDaemon(binary: binary)
     return try await waitForHealthyClient()
   }
 
   public func stopDaemon() async throws -> String {
+    if launchAgentManager.registrationState() == .enabled {
+      try launchAgentManager.unregister()
+      return "stopped"
+    }
+
     let client = try await bootstrapClient()
     let response = try await client.stopDaemon()
     return response.status
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {
-    let binary = try harnessBinaryURL()
+    let binary = try bundledHarnessBinaryURL()
     let result = try await run(executable: binary, arguments: ["daemon", "status"])
     guard result.exitCode == 0 else {
       throw DaemonControlError.commandFailed(result.stderr.nonEmpty ?? result.stdout)
     }
-    return try makeDecoder().decode(DaemonStatusReport.self, from: Data(result.stdout.utf8))
+    let report = try makeDecoder().decode(DaemonStatusReport.self, from: Data(result.stdout.utf8))
+    return report.replacingLaunchAgentStatus(launchAgentStatus())
   }
 
   public func installLaunchAgent() async throws -> String {
-    let binary = try harnessBinaryURL()
-    let result = try await run(executable: binary, arguments: ["daemon", "install-launch-agent"])
-    guard result.exitCode == 0 else {
-      throw DaemonControlError.commandFailed(result.stderr.nonEmpty ?? result.stdout)
+    switch launchAgentManager.registrationState() {
+    case .enabled:
+      return "launch agent already installed"
+    case .requiresApproval:
+      throw DaemonControlError.commandFailed(
+        "Enable Harness Monitor daemon in System Settings > General > Login Items."
+      )
+    case .notRegistered, .notFound:
+      try launchAgentManager.register()
+      switch launchAgentManager.registrationState() {
+      case .enabled:
+        return "launch agent installed"
+      case .requiresApproval:
+        return "launch agent registered; approval required in System Settings"
+      case .notRegistered, .notFound:
+        throw DaemonControlError.commandFailed("launch agent registration did not complete")
+      }
     }
-    return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   public func removeLaunchAgent() async throws -> String {
-    let binary = try harnessBinaryURL()
-    let result = try await run(executable: binary, arguments: ["daemon", "remove-launch-agent"])
-    guard result.exitCode == 0 else {
-      throw DaemonControlError.commandFailed(result.stderr.nonEmpty ?? result.stdout)
+    switch launchAgentManager.registrationState() {
+    case .notRegistered, .notFound:
+      return "launch agent not installed"
+    case .enabled, .requiresApproval:
+      try launchAgentManager.unregister()
+      return "launch agent removed"
     }
-    return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   private func waitForHealthyClient() async throws -> any HarnessMonitorClientProtocol {
@@ -168,22 +246,17 @@ public struct DaemonController: DaemonControlling {
     return url
   }
 
-  private func harnessBinaryURL() throws -> URL {
-    if let explicit = environment.values["HARNESS_BINARY"], !explicit.isEmpty {
-      let url = URL(fileURLWithPath: explicit)
-      if FileManager.default.isExecutableFile(atPath: url.path) {
-        return url
-      }
-    }
-
+  private func bundledHarnessBinaryURL() throws -> URL {
     let candidates = [
-      environment.homeDirectory.appendingPathComponent(".local/bin/harness"),
-      URL(fileURLWithPath: "/opt/homebrew/bin/harness"),
-      URL(fileURLWithPath: "/usr/local/bin/harness"),
-    ]
+      Bundle.main.url(forAuxiliaryExecutable: "harness"),
+      Bundle.main.bundleURL
+        .appendingPathComponent("Contents", isDirectory: true)
+        .appendingPathComponent("Helpers", isDirectory: true)
+        .appendingPathComponent("harness"),
+    ].compactMap(\.self)
 
-    let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
-    if let match {
+    if let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
+    {
       return match
     }
 
@@ -195,6 +268,7 @@ public struct DaemonController: DaemonControlling {
     let process = Process()
     process.executableURL = binary
     process.arguments = ["daemon", "serve", "--host", "127.0.0.1", "--port", "0"]
+    process.environment = processEnvironment()
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
     try process.run()
@@ -206,6 +280,7 @@ public struct DaemonController: DaemonControlling {
       let process = Process()
       process.executableURL = executable
       process.arguments = arguments
+      process.environment = processEnvironment()
 
       let stdout = Pipe()
       let stderr = Pipe()
@@ -226,10 +301,80 @@ public struct DaemonController: DaemonControlling {
     }.value
   }
 
+  private func processEnvironment() -> [String: String] {
+    var values = ProcessInfo.processInfo.environment
+    values.merge(environment.values) { _, new in new }
+    values[HarnessMonitorAppGroup.environmentKey] =
+      values[HarnessMonitorAppGroup.environmentKey]?.nonEmpty
+      ?? HarnessMonitorAppGroup.identifier
+
+    if values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?.nonEmpty == nil {
+      values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey] =
+        HarnessMonitorPaths.dataRoot(using: environment).path
+    }
+
+    return values
+  }
+
+  private func launchAgentStatus() -> LaunchAgentStatus {
+    switch launchAgentManager.registrationState() {
+    case .enabled:
+      LaunchAgentStatus(
+        installed: true,
+        loaded: true,
+        label: "io.harnessmonitor.daemon",
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        serviceTarget: "io.harnessmonitor.daemon",
+        state: "enabled"
+      )
+    case .requiresApproval:
+      LaunchAgentStatus(
+        installed: true,
+        loaded: false,
+        label: "io.harnessmonitor.daemon",
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        serviceTarget: "io.harnessmonitor.daemon",
+        statusError: "Approval required in System Settings > General > Login Items"
+      )
+    case .notRegistered:
+      LaunchAgentStatus(
+        installed: false,
+        loaded: false,
+        label: "io.harnessmonitor.daemon",
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        serviceTarget: "io.harnessmonitor.daemon"
+      )
+    case .notFound:
+      LaunchAgentStatus(
+        installed: false,
+        loaded: false,
+        label: "io.harnessmonitor.daemon",
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        serviceTarget: "io.harnessmonitor.daemon",
+        statusError: "Bundled daemon launch agent plist was not found"
+      )
+    }
+  }
+
   private func makeDecoder() -> JSONDecoder {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
+  }
+}
+
+extension DaemonStatusReport {
+  fileprivate func replacingLaunchAgentStatus(
+    _ launchAgent: LaunchAgentStatus
+  ) -> DaemonStatusReport {
+    DaemonStatusReport(
+      manifest: manifest,
+      launchAgent: launchAgent,
+      projectCount: projectCount,
+      worktreeCount: worktreeCount,
+      sessionCount: sessionCount,
+      diagnostics: diagnostics
+    )
   }
 }
 

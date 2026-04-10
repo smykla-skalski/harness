@@ -15,16 +15,49 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
   public static let current = Self()
 }
 
+public enum HarnessMonitorAppGroup {
+  public static let identifier = "Q498EB36N4.io.harnessmonitor"
+  public static let environmentKey = "HARNESS_APP_GROUP_ID"
+  public static let daemonDataHomeEnvironmentKey = "HARNESS_DAEMON_DATA_HOME"
+}
+
 public enum HarnessMonitorPaths {
   public static func dataRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
+    let daemonDataHomeValue = environment.values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    if let daemonDataHomeValue, !daemonDataHomeValue.isEmpty {
+      return URL(fileURLWithPath: daemonDataHomeValue, isDirectory: true)
+    }
+
     let value = environment.values["XDG_DATA_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines)
     if let value, !value.isEmpty {
       return URL(fileURLWithPath: value, isDirectory: true)
     }
 
-    return environment.homeDirectory
+    if let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines),
+      !value.isEmpty
+    {
+      return appGroupContainerURL(identifier: value, using: environment)
+    }
+
+    if let containerURL = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
+    ) {
+      return containerURL
+    }
+
+    return appGroupContainerURL(identifier: HarnessMonitorAppGroup.identifier, using: environment)
+  }
+
+  private static func appGroupContainerURL(
+    identifier: String,
+    using environment: HarnessMonitorEnvironment
+  ) -> URL {
+    environment.homeDirectory
       .appendingPathComponent("Library", isDirectory: true)
-      .appendingPathComponent("Application Support", isDirectory: true)
+      .appendingPathComponent("Group Containers", isDirectory: true)
+      .appendingPathComponent(identifier, isDirectory: true)
   }
 
   public static func harnessRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
@@ -51,12 +84,11 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("thumbnails", isDirectory: true)
   }
 
-  public static func launchAgentURL(
-    using environment: HarnessMonitorEnvironment = .current
-  ) -> URL {
-    environment.homeDirectory
-      .appendingPathComponent("Library", isDirectory: true)
-      .appendingPathComponent("LaunchAgents", isDirectory: true)
-      .appendingPathComponent("io.harness.daemon.plist")
+  public static var launchAgentPlistName: String {
+    "io.harnessmonitor.daemon.plist"
+  }
+
+  public static var launchAgentBundleRelativePath: String {
+    "Contents/Library/LaunchAgents/\(launchAgentPlistName)"
   }
 }

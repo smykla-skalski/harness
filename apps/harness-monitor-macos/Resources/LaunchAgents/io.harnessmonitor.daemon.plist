@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>io.harnessmonitor.app</string>
+	</array>
+	<key>BundleProgram</key>
+	<string>Contents/Helpers/harness</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HARNESS_APP_GROUP_ID</key>
+		<string>Q498EB36N4.io.harnessmonitor</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>io.harnessmonitor.daemon</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>harness</string>
+		<string>daemon</string>
+		<string>serve</string>
+		<string>--host</string>
+		<string>127.0.0.1</string>
+		<string>--port</string>
+		<string>0</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
