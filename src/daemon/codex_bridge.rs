@@ -1,4 +1,4 @@
-use std::env::{split_paths, var_os};
+use std::env::{current_exe, split_paths, var, var_os};
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -256,6 +256,10 @@ pub enum CodexBridgeCommand {
     Stop(CodexBridgeStopArgs),
     /// Print the current bridge status.
     Status(CodexBridgeStatusArgs),
+    /// Install a user `LaunchAgent` that auto-starts the Codex bridge at login.
+    InstallLaunchAgent(CodexBridgeInstallLaunchAgentArgs),
+    /// Remove the Codex bridge `LaunchAgent` and clean up state files.
+    RemoveLaunchAgent(CodexBridgeRemoveLaunchAgentArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -280,6 +284,20 @@ pub struct CodexBridgeStatusArgs {
     /// Print a plain one-line summary instead of the JSON payload.
     #[arg(long)]
     pub plain: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CodexBridgeInstallLaunchAgentArgs {
+    /// Port for the bridge `LaunchAgent` to pass to `codex-bridge start`.
+    #[arg(long)]
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CodexBridgeRemoveLaunchAgentArgs {
+    /// Print confirmation as JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// Serialized snapshot of the bridge's live state for `status` / `stop`.
@@ -319,6 +337,8 @@ impl Execute for CodexBridgeCommand {
             Self::Start(args) => args.execute(context),
             Self::Stop(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
+            Self::InstallLaunchAgent(args) => args.execute(context),
+            Self::RemoveLaunchAgent(args) => args.execute(context),
         }
     }
 }
@@ -629,6 +649,137 @@ fn detect_codex_version(binary: &Path) -> Option<String> {
         return None;
     }
     Some(trimmed.to_string())
+}
+
+impl Execute for CodexBridgeInstallLaunchAgentArgs {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion; tokio-rs/tracing#553"
+    )]
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        ensure_host_context("codex-bridge-install-launch-agent")?;
+
+        let harness_binary = current_exe().map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "resolve current harness binary: {error}"
+            )))
+        })?;
+
+        resolve_codex_binary(None).map_err(|_| {
+            CliError::from(CliErrorKind::workflow_io(
+                "codex binary not found on PATH; install codex before adding the launch agent"
+                    .to_string(),
+            ))
+        })?;
+
+        let port = self.port.unwrap_or(DEFAULT_CODEX_BRIDGE_PORT);
+        let plist = render_codex_bridge_launch_agent_plist(&harness_binary, port);
+
+        let plist_path = codex_bridge_launch_agent_plist_path()?;
+        if let Some(parent) = plist_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "create launch agent dir: {error}"
+                )))
+            })?;
+        }
+        write_text(&plist_path, &plist)?;
+
+        tracing::info!(path = %plist_path.display(), "codex-bridge: installed launch agent plist");
+        println!("installed {}", plist_path.display());
+        println!(
+            "run `launchctl bootstrap gui/$UID {}` to load it now",
+            plist_path.display()
+        );
+        Ok(0)
+    }
+}
+
+impl Execute for CodexBridgeRemoveLaunchAgentArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        ensure_host_context("codex-bridge-remove-launch-agent")?;
+
+        let plist_path = codex_bridge_launch_agent_plist_path()?;
+        let existed = plist_path.is_file();
+        if existed {
+            fs::remove_file(&plist_path).map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "remove codex-bridge plist: {error}"
+                )))
+            })?;
+        }
+        clear_bridge_state()?;
+
+        if self.json {
+            let json = serde_json::json!({
+                "removed": existed,
+                "path": plist_path.display().to_string(),
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json).unwrap_or_default()
+            );
+        } else if existed {
+            println!("removed {}", plist_path.display());
+        } else {
+            println!("not installed");
+        }
+        Ok(0)
+    }
+}
+
+fn codex_bridge_launch_agent_plist_path() -> Result<PathBuf, CliError> {
+    let home = var("HOME").map_err(|_| {
+        CliError::from(CliErrorKind::workflow_io(
+            "HOME is not set; cannot determine LaunchAgent path".to_string(),
+        ))
+    })?;
+    Ok(PathBuf::from(home)
+        .join("Library")
+        .join("LaunchAgents")
+        .join(format!("{CODEX_BRIDGE_LAUNCH_AGENT_LABEL}.plist")))
+}
+
+fn render_codex_bridge_launch_agent_plist(harness_binary: &Path, port: u16) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>{label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{binary}</string>
+    <string>codex-bridge</string>
+    <string>start</string>
+    <string>--port</string>
+    <string>{port}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>LimitLoadToSessionType</key>
+  <string>Aqua</string>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>{stdout}</string>
+  <key>StandardErrorPath</key>
+  <string>{stderr}</string>
+</dict>
+</plist>
+"#,
+        label = CODEX_BRIDGE_LAUNCH_AGENT_LABEL,
+        binary = harness_binary.display(),
+        stdout = state::daemon_root()
+            .join("codex-bridge.stdout.log")
+            .display(),
+        stderr = state::daemon_root()
+            .join("codex-bridge.stderr.log")
+            .display(),
+    )
 }
 
 /// Refuse to run a codex-bridge command that requires host privileges when
@@ -958,6 +1109,56 @@ mod tests {
     #[test]
     fn detect_codex_version_returns_none_for_missing_binary() {
         assert!(detect_codex_version(Path::new("/nonexistent/codex")).is_none());
+    }
+
+    #[test]
+    fn render_codex_bridge_plist_contains_expected_fields() {
+        let plist =
+            render_codex_bridge_launch_agent_plist(Path::new("/usr/local/bin/harness"), 4500);
+        assert!(plist.contains(CODEX_BRIDGE_LAUNCH_AGENT_LABEL));
+        assert!(plist.contains("codex-bridge"));
+        assert!(plist.contains("start"));
+        assert!(plist.contains("<string>4500</string>"));
+        assert!(plist.contains("Aqua"));
+        assert!(plist.contains("Interactive"));
+        assert!(plist.contains("/usr/local/bin/harness"));
+    }
+
+    #[test]
+    fn render_codex_bridge_plist_uses_custom_port() {
+        let plist =
+            render_codex_bridge_launch_agent_plist(Path::new("/usr/local/bin/harness"), 9999);
+        assert!(plist.contains("<string>9999</string>"));
+    }
+
+    #[test]
+    fn codex_bridge_launch_agent_plist_path_uses_home() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_var("HOME", Some(tmp.path().to_str().expect("utf8")), || {
+            let path = codex_bridge_launch_agent_plist_path().expect("path");
+            assert!(path.ends_with("Library/LaunchAgents/io.harness.codex-bridge.plist"));
+            assert!(path.starts_with(tmp.path()));
+        });
+    }
+
+    #[test]
+    fn install_launch_agent_refuses_when_sandboxed() {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let args = CodexBridgeInstallLaunchAgentArgs { port: None };
+            let ctx = AppContext::production();
+            let error = args.execute(&ctx).expect_err("must refuse");
+            assert_eq!(error.code(), "SANDBOX001");
+        });
+    }
+
+    #[test]
+    fn remove_launch_agent_refuses_when_sandboxed() {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let args = CodexBridgeRemoveLaunchAgentArgs { json: false };
+            let ctx = AppContext::production();
+            let error = args.execute(&ctx).expect_err("must refuse");
+            assert_eq!(error.code(), "SANDBOX001");
+        });
     }
 
     #[test]
