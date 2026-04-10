@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 /// Prefix used for harness-owned resources (containers, networks, temp dirs).
 pub const HARNESS_PREFIX: &str = "harness-";
+const HARNESS_HOST_HOME_ENV: &str = "HARNESS_HOST_HOME";
 
 fn fallback_home_dir() -> PathBuf {
     env::temp_dir().join(format!("{HARNESS_PREFIX}{}", uzers::get_current_uid()))
@@ -17,6 +18,43 @@ pub fn utc_now() -> String {
 #[must_use]
 pub fn dirs_home() -> PathBuf {
     user_dirs::home_dir().unwrap_or_else(|_| fallback_home_dir())
+}
+
+#[must_use]
+pub(crate) fn host_home_dir() -> PathBuf {
+    if let Some(value) = env_value(HARNESS_HOST_HOME_ENV) {
+        return PathBuf::from(value);
+    }
+    account_home_dir()
+        .or_else(|| env_value("HOME").map(PathBuf::from))
+        .unwrap_or_else(dirs_home)
+}
+
+#[cfg(unix)]
+fn account_home_dir() -> Option<PathBuf> {
+    use uzers::os::unix::UserExt as _;
+
+    uzers::get_user_by_uid(uzers::get_current_uid()).map(|user| user.home_dir().to_path_buf())
+}
+
+#[cfg(not(unix))]
+fn account_home_dir() -> Option<PathBuf> {
+    None
+}
+
+fn env_value(name: &str) -> Option<String> {
+    let value = env::var(name).unwrap_or_default();
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.starts_with("${") && trimmed.ends_with('}') {
+        return None;
+    }
+    if trimmed.eq_ignore_ascii_case("unset") {
+        return None;
+    }
+    Some(trimmed.to_string())
 }
 
 /// Harness data root: `data_root/harness`.
