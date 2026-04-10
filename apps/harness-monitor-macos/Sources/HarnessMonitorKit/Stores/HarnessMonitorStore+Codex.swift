@@ -96,6 +96,9 @@ extension HarnessMonitorStore {
   }
 
   func resetSelectedCodexRuns() {
+    guard !selectedCodexRuns.isEmpty || selectedCodexRun != nil else {
+      return
+    }
     selectedCodexRuns = []
     selectedCodexRun = nil
   }

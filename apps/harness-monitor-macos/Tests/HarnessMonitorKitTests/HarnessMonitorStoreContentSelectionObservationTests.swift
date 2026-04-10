@@ -103,4 +103,38 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange)
     #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
   }
+
+  @Test("Priming current session does not invalidate content or inspector slices")
+  func primingCurrentSessionDoesNotInvalidateContentOrInspectorSlices() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let contentChanged = await didInvalidate(
+      {
+        (
+          store.contentUI.shell.selectedSessionID,
+          store.contentUI.session.selectedSessionSummary,
+          store.contentUI.session.isSelectionLoading,
+          store.contentUI.toolbar.canNavigateBack,
+          store.contentUI.toolbar.canNavigateForward,
+          store.contentUI.chrome.sessionStatus
+        )
+      },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    let inspectorChanged = await didInvalidate(
+      { store.inspectorUI.primaryContent },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(contentChanged == false)
+    #expect(inspectorChanged == false)
+    #expect(store.selectedSession == PreviewFixtures.detail)
+    #expect(store.isSelectionLoading == false)
+  }
 }
