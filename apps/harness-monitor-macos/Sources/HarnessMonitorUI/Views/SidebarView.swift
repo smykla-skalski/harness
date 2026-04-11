@@ -13,13 +13,7 @@ struct SidebarView: View {
   @Environment(\.fontScale)
   var fontScale
 
-  @SceneStorage("sidebar.collapsed-project-ids")
-  var collapsedProjectIDsStorage = ""
-  @SceneStorage("sidebar.collapsed-checkout-keys")
-  var collapsedCheckoutKeysStorage = ""
-  @State private var collapsedProjectIDsState: Set<String> = []
-  @State private var collapsedCheckoutKeysState: Set<String> = []
-  @State private var hasHydratedCollapsedState = false
+  @State private var collapsedCheckoutKeys: Set<String> = []
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
   @FocusState private var isSearchFocused: Bool
@@ -41,22 +35,6 @@ struct SidebarView: View {
     self.searchResults = searchResults
     self.sidebarUI = sidebarUI
     self.sidebarVisible = sidebarVisible
-  }
-
-  var collapsedProjectIDs: Set<String> {
-    if hasHydratedCollapsedState {
-      collapsedProjectIDsState
-    } else {
-      decodedStorageSet(from: collapsedProjectIDsStorage)
-    }
-  }
-
-  var collapsedCheckoutKeys: Set<String> {
-    if hasHydratedCollapsedState {
-      collapsedCheckoutKeysState
-    } else {
-      decodedStorageSet(from: collapsedCheckoutKeysStorage)
-    }
   }
 
   private var sidebarSelection: Binding<String?> {
@@ -112,7 +90,6 @@ struct SidebarView: View {
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
-      collapsedProjectIDs: collapsedProjectIDs,
       collapsedCheckoutKeys: collapsedCheckoutKeys
     )
   }
@@ -141,17 +118,16 @@ struct SidebarView: View {
   }
 
   var body: some View {
-    SidebarSessionListContent(
-      renderState: sidebarListRenderState,
-      selection: sidebarSelection,
-      selectSession: { store.selectSessionFromList($0) },
-      toggleBookmark: { sessionID, projectID in
-        store.toggleBookmark(sessionId: sessionID, projectId: projectID)
-      },
-      setProjectCollapsed: setProjectCollapsed,
-      setCheckoutCollapsed: setCheckoutCollapsed
-    )
-    .equatable()
+    List(selection: sidebarSelection) {
+      SidebarSessionListContent(
+        renderState: sidebarListRenderState,
+        selectSession: { store.selectSessionFromList($0) },
+        toggleBookmark: { sessionID, projectID in
+          store.toggleBookmark(sessionId: sessionID, projectId: projectID)
+        },
+        setCheckoutCollapsed: setCheckoutCollapsed
+      )
+    }
     .listStyle(.sidebar)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .searchable(
@@ -199,7 +175,6 @@ struct SidebarView: View {
     } action: { width in
       updateSidebarWidth(width)
     }
-    .onAppear(perform: hydrateCollapsedStateIfNeeded)
     .onChange(of: sidebarVisible, initial: true) { _, isVisible in
       let nextPhase = isVisible ? 1.0 : 0.0
       guard sidebarVisibilityPhase != nextPhase else {
@@ -211,12 +186,6 @@ struct SidebarView: View {
     }
     .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
       isSearchFocused = true
-    }
-    .onChange(of: collapsedProjectIDsStorage) { _, newValue in
-      syncCollapsedProjects(from: newValue)
-    }
-    .onChange(of: collapsedCheckoutKeysStorage) { _, newValue in
-      syncCollapsedCheckouts(from: newValue)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
@@ -240,31 +209,6 @@ struct SidebarView: View {
     )
   }
 
-  func decodedStorageSet(from rawValue: String) -> Set<String> {
-    Set(
-      rawValue
-        .split(separator: "\n")
-        .map(String.init)
-        .filter { !$0.isEmpty }
-    )
-  }
-
-  func encodedStorageSet(
-    _ values: Set<String>
-  ) -> String {
-    values.sorted().joined(separator: "\n")
-  }
-
-  func hydrateCollapsedStateIfNeeded() {
-    guard !hasHydratedCollapsedState else {
-      return
-    }
-
-    collapsedProjectIDsState = decodedStorageSet(from: collapsedProjectIDsStorage)
-    collapsedCheckoutKeysState = decodedStorageSet(from: collapsedCheckoutKeysStorage)
-    hasHydratedCollapsedState = true
-  }
-
   func updateSidebarWidth(_ width: CGFloat) {
     let quantizedWidth =
       max(
@@ -278,63 +222,14 @@ struct SidebarView: View {
     sidebarWidth = quantizedWidth
   }
 
-  func syncCollapsedProjects(from rawValue: String) {
-    guard hasHydratedCollapsedState else {
-      return
-    }
-
-    let decoded = decodedStorageSet(from: rawValue)
-    guard decoded != collapsedProjectIDsState else {
-      return
-    }
-    collapsedProjectIDsState = decoded
-  }
-
-  func syncCollapsedCheckouts(from rawValue: String) {
-    guard hasHydratedCollapsedState else {
-      return
-    }
-
-    let decoded = decodedStorageSet(from: rawValue)
-    guard decoded != collapsedCheckoutKeysState else {
-      return
-    }
-    collapsedCheckoutKeysState = decoded
-  }
-
-  func setProjectCollapsed(
-    projectID: String,
-    isCollapsed: Bool
-  ) {
-    hydrateCollapsedStateIfNeeded()
-
-    if isCollapsed {
-      collapsedProjectIDsState.insert(projectID)
-    } else {
-      collapsedProjectIDsState.remove(projectID)
-    }
-
-    let encoded = encodedStorageSet(collapsedProjectIDsState)
-    if collapsedProjectIDsStorage != encoded {
-      collapsedProjectIDsStorage = encoded
-    }
-  }
-
   func setCheckoutCollapsed(
     checkoutKey: String,
     isCollapsed: Bool
   ) {
-    hydrateCollapsedStateIfNeeded()
-
     if isCollapsed {
-      collapsedCheckoutKeysState.insert(checkoutKey)
+      collapsedCheckoutKeys.insert(checkoutKey)
     } else {
-      collapsedCheckoutKeysState.remove(checkoutKey)
-    }
-
-    let encoded = encodedStorageSet(collapsedCheckoutKeysState)
-    if collapsedCheckoutKeysStorage != encoded {
-      collapsedCheckoutKeysStorage = encoded
+      collapsedCheckoutKeys.remove(checkoutKey)
     }
   }
 
