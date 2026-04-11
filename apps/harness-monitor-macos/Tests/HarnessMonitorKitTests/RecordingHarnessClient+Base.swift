@@ -99,12 +99,18 @@ extension RecordingHarnessClient {
     recordReadCall(.sessionDetail(id))
     recordSessionDetailScope(id: id, scope: scope)
     try await sleepIfNeeded(configuredDetailDelay(for: id))
+    if let error = configuredSessionDetailError(for: id) {
+      throw error
+    }
     return configuredSessionDetail(id: id) ?? detail
   }
 
   func timeline(sessionID: String) async throws -> [TimelineEntry] {
     recordReadCall(.timeline(sessionID))
     try await sleepIfNeeded(configuredTimelineDelay(for: sessionID))
+    if let error = configuredTimelineError(for: sessionID) {
+      throw error
+    }
     return configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline
   }
 

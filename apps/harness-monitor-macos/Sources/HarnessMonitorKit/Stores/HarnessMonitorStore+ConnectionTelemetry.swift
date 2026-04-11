@@ -216,7 +216,12 @@ extension HarnessMonitorStore {
       connectionMetrics.reconnectCount += 1
     }
     connectionMetrics.reconnectAttempt = max(connectionMetrics.reconnectAttempt, nextAttempt)
-    lastError = error.localizedDescription
+    // Background reconnect: log silently. Surface state through the existing
+    // refresh-spinner / SessionDataAvailabilityBanner instead of the toast,
+    // which is reserved for explicit user actions.
+    HarnessMonitorLogger.store.warning(
+      "reconnecting \(scope, privacy: .public) attempt \(nextAttempt): \(error.localizedDescription, privacy: .public)"
+    )
     appendConnectionEvent(
       kind: .reconnecting,
       detail: "Reconnecting \(scope) (attempt \(nextAttempt))"

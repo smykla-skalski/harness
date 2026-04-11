@@ -137,26 +137,38 @@ extension HarnessMonitorStore {
       }
 
       pendingSessionPushFallback = nil
-      do {
-        let measuredTimeline = try await Self.measureOperation {
-          try await client.timeline(sessionID: sessionID)
-        }
-        recordRequestSuccess()
-        guard selectedSessionID == sessionID else {
-          return
-        }
-        timeline = measuredTimeline.value
-        if let selectedSession {
-          scheduleCacheWrite { service in
-            let insertedCount = await service.cacheSessionDetail(
-              selectedSession, timeline: measuredTimeline.value
-            )
-            self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
-          }
-        }
-      } catch {
-        lastError = error.localizedDescription
+      await self.performPushFallbackTimelineRefresh(using: client, sessionID: sessionID)
+    }
+  }
+
+  func performPushFallbackTimelineRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async {
+    do {
+      let measuredTimeline = try await Self.measureOperation {
+        try await client.timeline(sessionID: sessionID)
       }
+      recordRequestSuccess()
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      timeline = measuredTimeline.value
+      if let selectedSession {
+        scheduleCacheWrite { service in
+          let insertedCount = await service.cacheSessionDetail(
+            selectedSession, timeline: measuredTimeline.value
+          )
+          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+        }
+      }
+    } catch {
+      // Background timer: log silently. The phantom "Daemon error" the
+      // inspector used to show came from this catch block writing into
+      // `lastError`, which the Action Console banner then rendered.
+      HarnessMonitorLogger.store.warning(
+        "push fallback timeline refresh failed: \(error.localizedDescription, privacy: .public)"
+      )
     }
   }
 

@@ -174,8 +174,13 @@ extension HarnessMonitorStore {
         return
       }
 
+      // Background hydration: log silently. The fallback to cached/index data
+      // below is the user-visible recovery; we do not surface a toast for an
+      // automatic load the user did not explicitly invoke.
+      HarnessMonitorLogger.store.warning(
+        "session detail hydration failed for \(sessionID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
       withUISyncBatch {
-        lastError = error.localizedDescription
         isExtensionsLoading = false
       }
 

@@ -121,9 +121,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _sessionSummaries: [SessionSummary]?
   private var _sessionDetailsByID: [String: SessionDetail] = [:]
   private var _detailDelays: [String: Duration] = [:]
+  private var _sessionDetailErrorsByID: [String: any Error] = [:]
   private var _sessionDetailScopesByID: [String: [String?]] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
+  private var _timelineErrorsByID: [String: any Error] = [:]
   private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   private var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   private var _codexStartError: (any Error)?
@@ -250,6 +252,34 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
         _detailDelays.removeValue(forKey: sessionID)
       }
     }
+  }
+
+  func configureSessionDetailError(_ error: (any Error)?, for sessionID: String) {
+    lock.withLock {
+      if let error {
+        _sessionDetailErrorsByID[sessionID] = error
+      } else {
+        _sessionDetailErrorsByID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configuredSessionDetailError(for sessionID: String) -> (any Error)? {
+    lock.withLock { _sessionDetailErrorsByID[sessionID] }
+  }
+
+  func configureTimelineError(_ error: (any Error)?, for sessionID: String) {
+    lock.withLock {
+      if let error {
+        _timelineErrorsByID[sessionID] = error
+      } else {
+        _timelineErrorsByID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configuredTimelineError(for sessionID: String) -> (any Error)? {
+    lock.withLock { _timelineErrorsByID[sessionID] }
   }
 
   func configureTimelineDelay(_ delay: Duration?, for sessionID: String) {
