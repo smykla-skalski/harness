@@ -7,7 +7,11 @@ extension HarnessMonitorStore {
   @Observable
   public final class ConnectionSlice {
     public enum Change {
-      case shellState
+      case connectionState
+      case daemonStatus
+      case refreshState
+      case daemonActivity
+      case persistedDataAvailability
       case metrics
     }
 
@@ -15,13 +19,13 @@ extension HarnessMonitorStore {
     public var connectionState: ConnectionState = .idle {
       didSet {
         guard oldValue != connectionState else { return }
-        onChanged?(.shellState)
+        onChanged?(.connectionState)
       }
     }
     public var daemonStatus: DaemonStatusReport? {
       didSet {
         guard oldValue != daemonStatus else { return }
-        onChanged?(.shellState)
+        onChanged?(.daemonStatus)
       }
     }
     public var diagnostics: DaemonDiagnosticsReport?
@@ -29,14 +33,14 @@ extension HarnessMonitorStore {
     public var isRefreshing = false {
       didSet {
         guard oldValue != isRefreshing else { return }
-        onChanged?(.shellState)
+        onChanged?(.refreshState)
       }
     }
     public var isDiagnosticsRefreshInFlight = false
     public var isDaemonActionInFlight = false {
       didSet {
         guard oldValue != isDaemonActionInFlight else { return }
-        onChanged?(.shellState)
+        onChanged?(.daemonActivity)
       }
     }
     public var activeTransport: TransportKind = .httpSSE
@@ -52,19 +56,19 @@ extension HarnessMonitorStore {
     public var isShowingCachedData = false {
       didSet {
         guard oldValue != isShowingCachedData else { return }
-        onChanged?(.shellState)
+        onChanged?(.persistedDataAvailability)
       }
     }
     public var persistedSessionCount = 0 {
       didSet {
         guard oldValue != persistedSessionCount else { return }
-        onChanged?(.shellState)
+        onChanged?(.persistedDataAvailability)
       }
     }
     public var lastPersistedSnapshotAt: Date? {
       didSet {
         guard oldValue != lastPersistedSnapshotAt else { return }
-        onChanged?(.shellState)
+        onChanged?(.persistedDataAvailability)
       }
     }
   }

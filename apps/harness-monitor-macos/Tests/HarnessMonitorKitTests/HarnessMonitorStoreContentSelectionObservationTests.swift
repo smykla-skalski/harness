@@ -83,6 +83,66 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
+  @Test("Daemon status churn skips shell session chrome and inspector resync")
+  func daemonStatusChurnSkipsShellSessionChromeAndInspectorResync() async {
+    let store = await makeBootstrappedStore()
+    guard let daemonStatus = store.daemonStatus else {
+      Issue.record("Missing daemon status after bootstrap")
+      return
+    }
+
+    store.debugResetUISyncCounts()
+    store.daemonStatus = DaemonStatusReport(
+      manifest: daemonStatus.manifest,
+      launchAgent: daemonStatus.launchAgent,
+      projectCount: daemonStatus.projectCount + 1,
+      worktreeCount: daemonStatus.worktreeCount,
+      sessionCount: daemonStatus.sessionCount,
+      diagnostics: daemonStatus.diagnostics
+    )
+
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
+    #expect(store.debugUISyncCount(for: .contentDashboard) == 1)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
+  @Test("Daemon busy churn only resyncs toolbar and dashboard")
+  func daemonBusyChurnOnlyResyncsToolbarAndDashboard() async {
+    let store = await makeBootstrappedStore()
+    store.debugResetUISyncCounts()
+
+    store.isDaemonActionInFlight = true
+
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
+    #expect(store.debugUISyncCount(for: .contentDashboard) == 1)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
+  @Test("Persisted data availability churn skips shell session dashboard and inspector")
+  func persistedDataAvailabilityChurnSkipsShellSessionDashboardAndInspector() async {
+    let store = await makeBootstrappedStore()
+    store.connectionState = .offline("Daemon offline")
+    store.debugResetUISyncCounts()
+
+    store.persistedSessionCount = 1
+
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 1)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
+    #expect(store.debugUISyncCount(for: .contentDashboard) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
   @Test("Content toolbar centerpiece ignores session selection churn")
   func contentToolbarCenterpieceIgnoresSessionSelectionChurn() async {
     let store = await makeBootstrappedStore()

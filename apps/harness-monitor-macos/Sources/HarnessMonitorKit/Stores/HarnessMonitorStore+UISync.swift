@@ -27,7 +27,7 @@ extension HarnessMonitorStore {
   func bindUISlices() {
     connection.onChanged = { [weak self] change in
       switch change {
-      case .shellState:
+      case .connectionState:
         self?.scheduleUISync([
           .contentShell,
           .contentToolbar,
@@ -35,6 +35,21 @@ extension HarnessMonitorStore {
           .contentSession,
           .contentDashboard,
           .inspector,
+        ])
+      case .daemonStatus:
+        self?.scheduleUISync([
+          .contentToolbar,
+          .contentDashboard,
+        ])
+      case .refreshState, .daemonActivity:
+        self?.scheduleUISync([
+          .contentToolbar,
+          .contentDashboard,
+        ])
+      case .persistedDataAvailability:
+        self?.scheduleUISync([
+          .contentToolbar,
+          .contentChrome,
         ])
       case .metrics:
         self?.scheduleUISync([.sidebar])
