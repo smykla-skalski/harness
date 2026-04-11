@@ -180,6 +180,7 @@ struct SidebarSessionListContent: View {
       .onTapGesture {
         selectSession(session.sessionId)
       }
+      .contentShape(Rectangle())
       .accessibilityAddTraits(.isButton)
       .accessibilityLabel(sessionAccessibilityLabel(for: session))
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
