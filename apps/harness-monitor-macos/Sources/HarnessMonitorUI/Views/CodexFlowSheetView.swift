@@ -331,6 +331,7 @@ struct CodexFlowSheetView: View {
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(store.isDaemonActionInFlight || isSubmitting)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowEnableBridgeButton)
       }
       CopyableCommandBox(
         command: codexBridgeCommand,
@@ -740,6 +741,7 @@ struct AgentTuiSheetView: View {
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(store.isDaemonActionInFlight || isSubmitting)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiEnableBridgeButton)
       }
       CopyableCommandBox(
         command: agentTuiBridgeCommand,

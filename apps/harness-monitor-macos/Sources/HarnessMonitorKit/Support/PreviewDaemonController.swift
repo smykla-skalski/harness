@@ -13,10 +13,14 @@ public actor PreviewDaemonController: DaemonControlling {
   }
 
   private let fixtures: PreviewHarnessClient.Fixtures
+  private let hostBridgeState: PreviewHostBridgeState
   private var isDaemonRunning: Bool
   private var isLaunchAgentInstalled: Bool
 
-  public init(mode: Mode = .populated) {
+  public init(
+    mode: Mode = .populated,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil
+  ) {
     let fixtures =
       switch mode {
       case .dashboardLanding:
@@ -38,11 +42,15 @@ public actor PreviewDaemonController: DaemonControlling {
       }
 
     self.fixtures = fixtures
+    hostBridgeState = PreviewHostBridgeState(override: hostBridgeOverride)
     self.isDaemonRunning = mode != .empty
     self.isLaunchAgentInstalled = mode != .empty
   }
 
-  public init(previewFixtureSetRawValue rawValue: String?) {
+  public init(
+    previewFixtureSetRawValue rawValue: String?,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil
+  ) {
     let normalizedValue = rawValue?
       .trimmingCharacters(in: .whitespacesAndNewlines)
       .lowercased()
@@ -61,7 +69,7 @@ public actor PreviewDaemonController: DaemonControlling {
       default:
         Mode.populated
       }
-    self.init(mode: mode)
+    self.init(mode: mode, hostBridgeOverride: hostBridgeOverride)
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -113,7 +121,7 @@ public actor PreviewDaemonController: DaemonControlling {
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {
-    makeStatusReport()
+    await makeStatusReport()
   }
 
   public func installLaunchAgent() async throws -> String {
@@ -129,18 +137,22 @@ public actor PreviewDaemonController: DaemonControlling {
   private func makeClient() -> PreviewHarnessClient {
     PreviewHarnessClient(
       fixtures: fixtures,
-      isLaunchAgentInstalled: isLaunchAgentInstalled
+      isLaunchAgentInstalled: isLaunchAgentInstalled,
+      hostBridgeState: hostBridgeState
     )
   }
 
-  private func makeStatusReport() -> DaemonStatusReport {
-    DaemonStatusReport(
+  private func makeStatusReport() async -> DaemonStatusReport {
+    let manifestState = await hostBridgeState.manifestState()
+    return DaemonStatusReport(
       manifest: DaemonManifest(
         version: fixtures.health.version,
         pid: fixtures.health.pid,
         endpoint: fixtures.health.endpoint,
         startedAt: fixtures.health.startedAt,
-        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
+        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
+        sandboxed: manifestState.sandboxed,
+        hostBridge: manifestState.hostBridge
       ),
       launchAgent: LaunchAgentStatus(
         installed: isLaunchAgentInstalled,

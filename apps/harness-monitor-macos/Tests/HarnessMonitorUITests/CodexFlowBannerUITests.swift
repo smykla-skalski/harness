@@ -4,56 +4,63 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
-  func testAgentTuiInlineCopyButtonExists() throws {
+  func testAgentTuiEnableNowRemovesRecoveryBannerAfterSuccessfulReconfigure() throws {
     let app = launchInCockpitPreview(
-      additionalEnvironment: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": "agent-tui"]
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_CAPABILITIES": "codex",
+        "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RECONFIGURE": "apply",
+      ]
     )
 
     openAgentTuiSheet(in: app)
 
-    let sheet = element(in: app, identifier: Accessibility.agentTuiSheet)
-    XCTAssertTrue(
-      sheet.waitForExistence(timeout: Self.actionTimeout),
-      "Agent TUI sheet should appear after tapping the dock button"
-    )
-
     let banner = element(in: app, identifier: Accessibility.agentTuiRecoveryBanner)
-    XCTAssertTrue(
-      banner.waitForExistence(timeout: Self.actionTimeout),
-      "Agent TUI recovery banner should appear when bridge excludes agent-tui"
-    )
+    let enableButton = button(in: app, identifier: Accessibility.agentTuiEnableBridgeButton)
+    let startButton = button(in: app, identifier: Accessibility.agentTuiStartButton)
 
-    let copyButton = button(in: app, identifier: Accessibility.agentTuiCopyCommandButton)
+    XCTAssertTrue(waitForElement(banner, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(enableButton, timeout: Self.fastActionTimeout))
+
+    tapButton(in: app, identifier: Accessibility.agentTuiEnableBridgeButton)
+
     XCTAssertTrue(
-      copyButton.waitForExistence(timeout: Self.actionTimeout),
-      "Inline copy command button should exist inside the agent-tui recovery banner"
+      waitUntil(timeout: Self.actionTimeout) {
+        !banner.exists && startButton.exists
+      },
+      "Successful host bridge reconfigure should dismiss the recovery banner and restore the start action"
     )
+    XCTAssertFalse(enableButton.exists)
   }
 
-  func testCodexInlineCopyButtonExists() throws {
+  func testAgentTuiEnableNowFallsBackToBridgeStartWhenBridgeStops() throws {
     let app = launchInCockpitPreview(
-      additionalEnvironment: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": "codex"]
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_CAPABILITIES": "codex",
+        "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RECONFIGURE": "bridge-stopped",
+      ]
     )
 
-    openCodexFlowSheet(in: app)
+    openAgentTuiSheet(in: app)
 
-    let sheet = element(in: app, identifier: Accessibility.codexFlowSheet)
+    let banner = element(in: app, identifier: Accessibility.agentTuiRecoveryBanner)
+    let enableButton = button(in: app, identifier: Accessibility.agentTuiEnableBridgeButton)
+    let copyButton = button(in: app, identifier: Accessibility.agentTuiCopyCommandButton)
+    let unavailableTitle = app.staticTexts["Agent TUI host bridge is not running"]
+    let startCommand = app.staticTexts["harness bridge start"]
+
+    XCTAssertTrue(waitForElement(banner, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(enableButton, timeout: Self.fastActionTimeout))
+
+    tapButton(in: app, identifier: Accessibility.agentTuiEnableBridgeButton)
+
     XCTAssertTrue(
-      sheet.waitForExistence(timeout: Self.actionTimeout),
-      "Codex Flow sheet should appear after tapping the dock button"
+      waitUntil(timeout: Self.actionTimeout) {
+        banner.exists && unavailableTitle.exists && startCommand.exists
+      },
+      "Stopped host bridge recovery should keep the banner visible, switch it to the unavailable copy, and show the start command"
     )
-
-    let banner = element(in: app, identifier: Accessibility.codexFlowRecoveryBanner)
-    XCTAssertTrue(
-      banner.waitForExistence(timeout: Self.actionTimeout),
-      "Codex recovery banner should appear when bridge excludes codex"
-    )
-
-    let copyButton = button(in: app, identifier: Accessibility.codexFlowCopyCommandButton)
-    XCTAssertTrue(
-      copyButton.waitForExistence(timeout: Self.actionTimeout),
-      "Inline copy command button should exist inside the codex recovery banner"
-    )
+    XCTAssertFalse(enableButton.exists)
+    XCTAssertTrue(copyButton.exists)
   }
 }
 
