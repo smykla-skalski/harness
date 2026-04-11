@@ -473,6 +473,188 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
     wait_for_child_exit(&mut daemon);
 }
 
+#[test]
+fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mock_codex = create_mock_codex(tmp.path());
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let status = wait_for_daemon_ready(&home, &xdg);
+    let mut bridge = spawn_bridge(
+        &home,
+        &xdg,
+        &[
+            "--capability",
+            "codex",
+            "--codex-port",
+            "14512",
+            "--codex-path",
+            mock_codex.to_str().expect("utf8 codex path"),
+        ],
+    );
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let session = start_session(&home, &xdg, project_arg, "sandboxed-agent-tui-reconfigure");
+    let manifest = status.manifest.as_ref().expect("daemon manifest");
+    let endpoint = manifest.endpoint.clone();
+    let token = read_daemon_token(&manifest.token_path);
+
+    let (reconfigure_status, reconfigure_body) = post_json(
+        &endpoint,
+        &token,
+        "/v1/bridge/reconfigure",
+        json!({
+            "enable": ["agent-tui"],
+        }),
+    );
+    assert_eq!(
+        reconfigure_status, 200,
+        "unexpected body: {reconfigure_body}"
+    );
+    assert!(reconfigure_body["capabilities"]["codex"].is_object());
+    assert!(reconfigure_body["capabilities"]["agent-tui"].is_object());
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex", "agent-tui"]);
+
+    let (http_status, body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        json!({
+            "runtime": "codex",
+            "name": "Reconfigured TUI",
+            "prompt": "verify enabled agent-tui capability",
+            "argv": ["sh", "-c", "cat"],
+            "rows": 24,
+            "cols": 80,
+        }),
+    );
+    assert_eq!(http_status, 200, "unexpected body: {body}");
+    let snapshot: AgentTuiSnapshot =
+        serde_json::from_value(body).expect("parse agent tui snapshot");
+    assert_eq!(snapshot.status, AgentTuiStatus::Running);
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let status = wait_for_daemon_ready(&home, &xdg);
+    let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let session = start_session(
+        &home,
+        &xdg,
+        project_arg,
+        "sandboxed-agent-tui-disable-force",
+    );
+    let manifest = status.manifest.as_ref().expect("daemon manifest");
+    let endpoint = manifest.endpoint.clone();
+    let token = read_daemon_token(&manifest.token_path);
+
+    let (start_status, start_body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        json!({
+            "runtime": "codex",
+            "name": "Disable force TUI",
+            "prompt": "verify reconfigure conflict mapping",
+            "argv": ["sh", "-c", "cat"],
+            "rows": 24,
+            "cols": 80,
+        }),
+    );
+    assert_eq!(start_status, 200, "unexpected body: {start_body}");
+
+    let (reconfigure_status, reconfigure_body) = post_json(
+        &endpoint,
+        &token,
+        "/v1/bridge/reconfigure",
+        json!({
+            "disable": ["agent-tui"],
+        }),
+    );
+    assert_eq!(
+        reconfigure_status, 409,
+        "unexpected body: {reconfigure_body}"
+    );
+    assert_eq!(reconfigure_body["error"]["code"], "KSRCLI092");
+    assert!(
+        reconfigure_body["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("--force")),
+        "unexpected body: {reconfigure_body}"
+    );
+
+    let (forced_status, forced_body) = post_json(
+        &endpoint,
+        &token,
+        "/v1/bridge/reconfigure",
+        json!({
+            "disable": ["agent-tui"],
+            "force": true,
+        }),
+    );
+    assert_eq!(forced_status, 200, "unexpected body: {forced_body}");
+    assert!(forced_body["capabilities"]["agent-tui"].is_null());
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &[]);
+
+    let (restart_status, restart_body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        json!({
+            "runtime": "codex",
+            "name": "Excluded again",
+            "prompt": "verify excluded agent-tui capability",
+            "argv": ["sh", "-c", "cat"],
+            "rows": 24,
+            "cols": 80,
+        }),
+    );
+    assert_eq!(restart_status, 501, "unexpected body: {restart_body}");
+    assert_eq!(restart_body["error"], "sandbox-disabled");
+    assert_eq!(restart_body["feature"], "agent-tui.host-bridge");
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
 fn spawn_daemon_serve(home: &Path, xdg: &Path) -> Child {
     spawn_daemon_serve_with_args(home, xdg, &[])
 }

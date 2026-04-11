@@ -183,6 +183,127 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
 }
 
 #[test]
+fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
+    let tmp = tempdir().expect("tempdir");
+    let mock_codex = create_mock_codex(tmp.path());
+
+    let mut bridge = Command::new(harness_binary())
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "agent-tui",
+            "--codex-port",
+            "14502",
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn bridge");
+
+    let initial_state = wait_for_bridge_state(tmp.path());
+    let output = run_bridge(
+        &tmp,
+        &["bridge", "reconfigure", "--enable", "codex", "--json"],
+    );
+    assert!(
+        output.status.success(),
+        "reconfigure: {}",
+        output_text(&output)
+    );
+
+    let report: BridgeStatusReport = serde_json::from_slice(&output.stdout).expect("parse");
+    assert_eq!(report.pid, Some(initial_state.pid));
+    assert!(report.capabilities.contains_key("agent-tui"));
+    let codex = report.capabilities.get("codex").expect("codex capability");
+    assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14502"));
+    assert_eq!(
+        codex.metadata.get("port").map(String::as_str),
+        Some("14502")
+    );
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+}
+
+#[test]
+fn bridge_reconfigure_persists_capabilities_across_restart() {
+    let tmp = tempdir().expect("tempdir");
+    let mock_codex = create_mock_codex(tmp.path());
+
+    let mut bridge = Command::new(harness_binary())
+        .args(["bridge", "start", "--codex-port", "14503", "--codex-path"])
+        .arg(&mock_codex)
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn bridge");
+
+    let _initial_state = wait_for_bridge_state(tmp.path());
+    let output = run_bridge(
+        &tmp,
+        &["bridge", "reconfigure", "--disable", "codex", "--json"],
+    );
+    assert!(
+        output.status.success(),
+        "reconfigure: {}",
+        output_text(&output)
+    );
+    let report: BridgeStatusReport = serde_json::from_slice(&output.stdout).expect("parse");
+    assert!(report.capabilities.contains_key("agent-tui"));
+    assert!(!report.capabilities.contains_key("codex"));
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+
+    let mut restarted = Command::new(harness_binary())
+        .args(["bridge", "start"])
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn restarted bridge");
+
+    let restarted_state = wait_for_bridge_state(tmp.path());
+    assert!(restarted_state.capabilities.contains_key("agent-tui"));
+    assert!(!restarted_state.capabilities.contains_key("codex"));
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "cleanup stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut restarted);
+}
+
+#[test]
 fn bridge_install_launch_agent_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let output = Command::new(harness_binary())
@@ -252,6 +373,20 @@ fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
             Instant::now() < deadline,
             "bridge state file did not appear at {}",
             state_path.display()
+        );
+        thread::sleep(BRIDGE_POLL_INTERVAL);
+    }
+}
+
+fn wait_for_bridge_exit(bridge: &mut std::process::Child) {
+    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
+    loop {
+        if bridge.try_wait().expect("poll bridge").is_some() {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "bridge process did not exit before timeout"
         );
         thread::sleep(BRIDGE_POLL_INTERVAL);
     }
