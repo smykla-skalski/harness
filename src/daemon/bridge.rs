@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::env::{current_exe, split_paths, var, var_os};
+use std::fmt;
 use std::fs::File;
 use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
@@ -1420,6 +1421,48 @@ pub fn bridge_config_path() -> PathBuf {
 }
 
 #[must_use]
+pub(crate) fn bridge_lock_path() -> PathBuf {
+    state::daemon_root().join(state::BRIDGE_LOCK_FILE)
+}
+
+/// RAII guard that holds the exclusive `bridge.lock` flock.
+///
+/// Dropping the guard releases the lock so the kernel can clean up even on
+/// panic or abnormal exit.
+#[must_use = "drop the guard to release the bridge lock"]
+pub(crate) struct BridgeLockGuard {
+    _guard: state::FlockGuard,
+}
+
+impl fmt::Debug for BridgeLockGuard {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("BridgeLockGuard").finish()
+    }
+}
+
+/// Acquire the exclusive `bridge.lock` for the current process lifetime.
+///
+/// Must be called before `run_bridge_server` binds the Unix socket so that a
+/// racing second `harness bridge start` cannot unlink the live socket before
+/// its own lock acquisition fails.
+///
+/// # Errors
+/// Returns [`CliError`] when another bridge instance already holds the lock or
+/// the lock file cannot be created.
+pub(crate) fn acquire_bridge_lock_exclusive() -> Result<BridgeLockGuard, CliError> {
+    state::ensure_daemon_dirs()?;
+    state::acquire_flock_exclusive(&bridge_lock_path(), "bridge")
+        .map_err(|_| {
+            CliErrorKind::workflow_io(format!(
+                "another `harness bridge` instance is already running at {}",
+                bridge_lock_path().display()
+            ))
+            .into()
+        })
+        .map(|guard| BridgeLockGuard { _guard: guard })
+}
+
+#[must_use]
 pub fn bridge_socket_path() -> PathBuf {
     bridge_socket_path_for_root(&state::daemon_root())
 }
@@ -1478,6 +1521,12 @@ fn clear_bridge_state() -> Result<(), CliError> {
         .map_or_else(bridge_socket_path, |state| PathBuf::from(state.socket_path));
     remove_if_exists(&bridge_state_path())?;
     remove_if_exists(&socket_path)?;
+    // On macOS, unlinking a flocked file is legal: the kernel holds the inode
+    // until the fd is closed, so the Drop on the BridgeLockGuard frame
+    // (which runs after clear_bridge_state returns) releases the flock
+    // naturally. The file is removed here so stale lock files do not
+    // accumulate if the bridge crashes before a clean shutdown.
+    remove_if_exists(&bridge_lock_path())?;
     Ok(())
 }
 
@@ -1802,8 +1851,17 @@ fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bool, CliErro
     Ok(true)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "each branch handles a distinct server-lifecycle step; splitting further would obscure the flow"
+)]
 fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     state::ensure_daemon_dirs()?;
+    // Acquire the bridge lock BEFORE unlinking the socket so a racing second
+    // `harness bridge start` cannot unlink the live socket of the first
+    // instance before failing its own lock acquisition.
+    let _bridge_lock = acquire_bridge_lock_exclusive()?;
+    tracing::info!(path = %bridge_lock_path().display(), "bridge lock acquired");
     remove_if_exists(&config.socket_path)?;
     let listener = UnixListener::bind(&config.socket_path).map_err(|error| {
         CliErrorKind::workflow_io(format!(
@@ -2591,5 +2649,74 @@ mod tests {
         let path = bridge_socket_path_for_root(&long_root);
         assert!(path.starts_with("/tmp"));
         assert!(unix_socket_path_fits(&path));
+    }
+
+    // --- bridge.lock unit tests ---
+
+    #[test]
+    fn acquire_bridge_lock_succeeds_when_unheld() {
+        with_temp_daemon_root(|| {
+            let _guard = acquire_bridge_lock_exclusive().expect("first acquire should succeed");
+            assert!(bridge_lock_path().exists(), "lock file should exist");
+        });
+    }
+
+    #[test]
+    fn acquire_bridge_lock_fails_when_another_holder_exists() {
+        with_temp_daemon_root(|| {
+            let _guard = acquire_bridge_lock_exclusive().expect("first acquire");
+            let error = acquire_bridge_lock_exclusive().expect_err("second acquire should fail");
+            assert!(
+                error.to_string().contains("bridge"),
+                "error should mention bridge: {error}"
+            );
+        });
+    }
+
+    #[test]
+    fn bridge_lock_guard_releases_on_drop() {
+        with_temp_daemon_root(|| {
+            let guard = acquire_bridge_lock_exclusive().expect("acquire");
+            drop(guard);
+            let _guard2 =
+                acquire_bridge_lock_exclusive().expect("re-acquire after drop should succeed");
+        });
+    }
+
+    #[test]
+    fn bridge_lock_is_held_is_false_when_no_holder() {
+        with_temp_daemon_root(|| {
+            assert!(
+                !state::flock_is_held_at(&bridge_lock_path()),
+                "no holder yet"
+            );
+        });
+    }
+
+    #[test]
+    fn bridge_lock_is_held_is_true_while_guard_is_alive() {
+        with_temp_daemon_root(|| {
+            let guard = acquire_bridge_lock_exclusive().expect("acquire");
+            assert!(
+                state::flock_is_held_at(&bridge_lock_path()),
+                "should be held"
+            );
+            drop(guard);
+            assert!(
+                !state::flock_is_held_at(&bridge_lock_path()),
+                "should be released"
+            );
+        });
+    }
+
+    #[test]
+    fn clear_bridge_state_removes_lock_file() {
+        with_temp_daemon_root(|| {
+            state::ensure_daemon_dirs().expect("dirs");
+            // Create the lock file as if the bridge had been running.
+            std::fs::write(bridge_lock_path(), "").expect("create lock file");
+            clear_bridge_state().expect("clear");
+            assert!(!bridge_lock_path().exists(), "lock file should be removed");
+        });
     }
 }
