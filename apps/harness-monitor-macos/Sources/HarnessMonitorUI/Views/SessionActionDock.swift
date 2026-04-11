@@ -4,7 +4,6 @@ import SwiftUI
 struct SessionActionDock: View {
   let detail: SessionDetail
   let isSessionActionInFlight: Bool
-  let lastAction: String
   let inspectTask: (String) -> Void
   let inspectAgent: (String) -> Void
   let inspectObserver: () -> Void
@@ -35,12 +34,6 @@ struct SessionActionDock: View {
           if isSessionActionInFlight {
             HarnessMonitorSpinner()
               .transition(.opacity)
-          } else if !lastAction.isEmpty {
-            Text(lastAction)
-              .scaledFont(.caption.bold())
-              .foregroundStyle(HarnessMonitorTheme.success)
-              .accessibilityIdentifier(HarnessMonitorAccessibility.actionToast)
-              .transition(.opacity)
           }
           let taskWord = detail.tasks.count == 1 ? "task" : "tasks"
           let agentWord = detail.agents.count == 1 ? "agent" : "agents"
@@ -49,7 +42,6 @@ struct SessionActionDock: View {
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
         .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
-        .animation(.spring(duration: 0.2), value: lastAction.isEmpty)
       }
 
       ViewThatFits(in: .horizontal) {
@@ -187,7 +179,6 @@ extension View {
   SessionActionDock(
     detail: PreviewFixtures.detail,
     isSessionActionInFlight: false,
-    lastAction: "Observe action queued",
     inspectTask: { _ in },
     inspectAgent: { _ in },
     inspectObserver: {},

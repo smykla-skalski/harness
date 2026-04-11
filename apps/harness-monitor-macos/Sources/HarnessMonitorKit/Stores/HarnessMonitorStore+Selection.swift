@@ -138,9 +138,6 @@ extension HarnessMonitorStore {
       cancelSessionPushFallback()
       selectedSessionID = sessionID
       inspectorSelection = .none
-      if lastError != nil {
-        lastError = nil
-      }
       isExtensionsLoading = false
       if pendingExtensions != nil {
         pendingExtensions = nil

@@ -10,8 +10,6 @@ struct InspectorActionSections: View {
       InspectorActionStatusBanner(
         isSessionReadOnly: context.isSessionReadOnly,
         isSessionActionInFlight: context.isSessionActionInFlight,
-        lastAction: context.lastAction,
-        lastError: context.lastError,
         actionActorOptions: context.actionActorOptions,
         actionActorID: Binding(
           get: { context.selectedActionActorID },

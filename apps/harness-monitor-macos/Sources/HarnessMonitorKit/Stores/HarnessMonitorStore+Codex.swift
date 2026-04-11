@@ -8,13 +8,12 @@ extension HarnessMonitorStore {
     force: Bool = false
   ) async -> HostBridgeCapabilityMutationResult {
     guard let client else {
-      lastError = "Daemon unavailable."
+      presentFailureFeedback("Daemon unavailable.")
       return .failed
     }
 
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
-    lastError = nil
 
     return await mutateHostBridgeCapability(
       using: client,
@@ -43,13 +42,12 @@ extension HarnessMonitorStore {
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
-      lastError = "Codex prompt cannot be empty."
+      presentFailureFeedback("Codex prompt cannot be empty.")
       return false
     }
 
     isSessionActionInFlight = true
     defer { isSessionActionInFlight = false }
-    lastError = nil
 
     do {
       let measuredRun = try await Self.measureOperation {
@@ -72,10 +70,10 @@ extension HarnessMonitorStore {
       if case .server(let code, _) = apiError, code == 501 || code == 503 {
         markHostBridgeIssue(for: "codex", statusCode: code)
       }
-      lastError = apiError.localizedDescription
+      presentFailureFeedback(apiError.localizedDescription)
       return false
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }
@@ -87,7 +85,7 @@ extension HarnessMonitorStore {
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
-      lastError = "Codex context cannot be empty."
+      presentFailureFeedback("Codex context cannot be empty.")
       return false
     }
 
@@ -168,7 +166,7 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else {
         return false
       }
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }
@@ -179,7 +177,6 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     isSessionActionInFlight = true
     defer { isSessionActionInFlight = false }
-    lastError = nil
 
     do {
       let measuredRun = try await Self.measureOperation {
@@ -194,10 +191,10 @@ extension HarnessMonitorStore {
       if case .server(let code, _) = apiError {
         markHostBridgeIssue(for: "codex", statusCode: code)
       }
-      lastError = apiError.localizedDescription
+      presentFailureFeedback(apiError.localizedDescription)
       return false
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }
@@ -245,7 +242,7 @@ extension HarnessMonitorStore {
     guard guardSessionActionsAvailable() else { return false }
     guard let client, let sessionID = selectedSessionID else { return false }
     guard rows > 0, cols > 0 else {
-      lastError = "Terminal size must be greater than zero."
+      presentFailureFeedback("Terminal size must be greater than zero.")
       return false
     }
 
@@ -291,7 +288,7 @@ extension HarnessMonitorStore {
     guard guardSessionActionsAvailable() else { return false }
     guard let client else { return false }
     guard rows > 0, cols > 0 else {
-      lastError = "Terminal size must be greater than zero."
+      presentFailureFeedback("Terminal size must be greater than zero.")
       return false
     }
 
@@ -385,8 +382,6 @@ extension HarnessMonitorStore {
     actionName: String? = nil,
     mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot
   ) async -> Bool {
-    lastError = nil
-
     do {
       let measuredTui = try await Self.measureOperation {
         try await mutation()
@@ -416,7 +411,7 @@ extension HarnessMonitorStore {
     {
       markHostBridgeIssue(for: "agent-tui", statusCode: code)
     }
-    lastError = error.localizedDescription
+    presentFailureFeedback(error.localizedDescription)
     return false
   }
 
@@ -482,16 +477,16 @@ extension HarnessMonitorStore {
         applyStoppedHostBridgeState()
         let friendlyMessage = "The shared host bridge is not running. Start it and try again."
         appendConnectionEvent(kind: .error, detail: friendlyMessage)
-        lastError = friendlyMessage
+        presentFailureFeedback(friendlyMessage)
         return .failed
       }
       if case .server(let code, _) = apiError, code == 501 || code == 503 {
         markHostBridgeIssue(for: capability, statusCode: code)
       }
-      lastError = apiError.localizedDescription
+      presentFailureFeedback(apiError.localizedDescription)
       return .failed
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return .failed
     }
   }
@@ -546,7 +541,7 @@ extension HarnessMonitorStore {
         "Connected daemon does not support live host bridge reconfiguration yet. "
         + "Restart `harness daemon dev` and try again."
       appendConnectionEvent(kind: .error, detail: message)
-      lastError = message
+      presentFailureFeedback(message)
       return .failed
     case .managed:
       appendConnectionEvent(
@@ -568,7 +563,7 @@ extension HarnessMonitorStore {
         )
         return .success
       } catch {
-        lastError = error.localizedDescription
+        presentFailureFeedback(error.localizedDescription)
         return .failed
       }
     }
@@ -603,7 +598,7 @@ extension HarnessMonitorStore {
     await connect(using: refreshedClient)
     guard connectionState == .online else {
       throw DaemonControlError.commandFailed(
-        lastError ?? "The harness daemon did not become healthy before the timeout."
+        "The harness daemon did not become healthy before the timeout."
       )
     }
     return refreshedClient
