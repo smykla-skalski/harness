@@ -332,28 +332,37 @@ extension HarnessMonitorStore {
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let currentEndpoint: String
     let currentStartedAt: String?
+    let currentRevision: UInt64
     if let data = FileManager.default.contents(atPath: manifestURL.path),
       let manifest = try? decoder.decode(DaemonManifest.self, from: data)
     {
       currentEndpoint = manifest.endpoint
       currentStartedAt = manifest.startedAt
+      currentRevision = manifest.revision
     } else {
       // Manifest missing or undecodable; start with an empty sentinel so the
       // first valid manifest write triggers reconnect.
       currentEndpoint = ""
       currentStartedAt = nil
+      currentRevision = 0
     }
     let watcher = ManifestWatcher(
       currentEndpoint: currentEndpoint,
-      currentStartedAt: currentStartedAt
-    ) { [weak self] in
+      currentStartedAt: currentStartedAt,
+      currentRevision: currentRevision
+    ) { [weak self] change in
       Task { @MainActor [weak self] in
         guard let self else { return }
-        self.appendConnectionEvent(
-          kind: .reconnecting,
-          detail: "Daemon manifest changed, re-bootstrapping"
-        )
-        await self.reconnect()
+        switch change {
+        case .connectionChange:
+          self.appendConnectionEvent(
+            kind: .reconnecting,
+            detail: "Daemon manifest changed, re-bootstrapping"
+          )
+          await self.reconnect()
+        case .inPlaceUpdate(let manifest):
+          self.applyManifestRevision(manifest)
+        }
       }
     }
     manifestWatcher = watcher
