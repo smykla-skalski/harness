@@ -17,9 +17,8 @@
 //! ```
 
 pub mod agent_tui;
-pub mod agent_tui_bridge;
+pub mod bridge;
 pub mod client;
-pub mod codex_bridge;
 pub mod codex_controller;
 pub mod codex_transport;
 pub mod db;
