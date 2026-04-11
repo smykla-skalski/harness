@@ -8,8 +8,9 @@ extension HarnessMonitorUITestCase {
   func tapSession(in app: XCUIApplication, identifier: String) {
     let sessionRow = sessionTrigger(in: app, identifier: identifier)
     XCTAssertTrue(
-      sessionRow.exists || sessionRow.waitForExistence(timeout: Self.actionTimeout)
+      waitForElement(sessionRow, timeout: Self.fastActionTimeout)
     )
+    guard !sessionRowIsSelected(sessionRow) else { return }
     if sessionRow.isHittable {
       sessionRow.tap()
       return
@@ -41,10 +42,12 @@ extension HarnessMonitorUITestCase {
     let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
     while Date.now < deadline {
-      app.activate()
+      if app.state != .runningForeground {
+        app.activate()
+      }
 
       let button = button(in: app, identifier: identifier)
-      if button.exists || button.waitForExistence(timeout: Self.fastPollInterval) {
+      if waitForElement(button, timeout: Self.fastPollInterval) {
         if button.isHittable {
           button.tap()
           return
@@ -66,10 +69,12 @@ extension HarnessMonitorUITestCase {
     let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
     while Date.now < deadline {
-      app.activate()
+      if app.state != .runningForeground {
+        app.activate()
+      }
 
       let target = button(in: app, title: title)
-      if target.exists || target.waitForExistence(timeout: Self.fastPollInterval) {
+      if waitForElement(target, timeout: Self.fastPollInterval) {
         if target.isHittable {
           target.tap()
           return
@@ -91,10 +96,12 @@ extension HarnessMonitorUITestCase {
     let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
     while Date.now < deadline {
-      app.activate()
+      if app.state != .runningForeground {
+        app.activate()
+      }
 
       let target = element(in: app, identifier: identifier)
-      if target.exists || target.waitForExistence(timeout: Self.fastPollInterval) {
+      if waitForElement(target, timeout: Self.fastPollInterval) {
         if target.isHittable {
           target.tap()
           return
@@ -165,6 +172,31 @@ extension HarnessMonitorUITestCase {
     }
 
     return condition()
+  }
+
+  func waitForElement(
+    _ element: XCUIElement,
+    timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout
+  ) -> Bool {
+    element.exists || element.waitForExistence(timeout: timeout)
+  }
+
+  func sessionRowIsSelected(_ sessionRow: XCUIElement) -> Bool {
+    guard sessionRow.exists else { return false }
+
+    if let rawValue = sessionRow.value as? String {
+      return rawValue
+        .split(separator: ",")
+        .contains { component in
+          component.trimmingCharacters(in: .whitespacesAndNewlines) == "selected"
+        }
+    }
+
+    if let rawValue = sessionRow.value as? NSNumber {
+      return rawValue.boolValue
+    }
+
+    return false
   }
 
   func centerCoordinate(

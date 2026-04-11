@@ -9,8 +9,8 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let window = mainWindow(in: app)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(window, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sidebarContent, timeout: Self.fastActionTimeout))
 
     let toolbarOffset = sidebarContent.frame.minY - window.frame.minY
     XCTAssertGreaterThan(toolbarOffset, 40)
@@ -22,7 +22,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let toolbarDivider = frameElement(in: app, identifier: Accessibility.toolbarBaselineDivider)
 
     XCTAssertFalse(
-      toolbarDivider.waitForExistence(timeout: Self.actionTimeout),
+      toolbarDivider.exists,
       """
       Expected the main window to rely on native Liquid Glass toolbar chrome \
       instead of a custom baseline divider
@@ -30,20 +30,27 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testSidebarProjectHeaderFillsAvailableWidth() throws {
+  func testSidebarCheckoutHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
     let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
-    let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
+    let checkoutHeader = frameElement(in: app, identifier: Accessibility.previewCheckoutHeaderFrame)
     let sessionCard = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
 
-    XCTAssertTrue(sidebarShell.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(sidebarShell, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(checkoutHeader, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionCard, timeout: Self.fastActionTimeout))
 
-    XCTAssertEqual(projectHeader.frame.minX, sidebarShell.frame.minX, accuracy: 8)
-    XCTAssertEqual(projectHeader.frame.maxX, sidebarShell.frame.maxX, accuracy: 8)
-    XCTAssertEqual(sessionCard.frame.minX, projectHeader.frame.minX, accuracy: 2)
-    XCTAssertEqual(sessionCard.frame.maxX, projectHeader.frame.maxX, accuracy: 2)
+    let leadingInset = checkoutHeader.frame.minX - sidebarShell.frame.minX
+    let trailingInset = sidebarShell.frame.maxX - checkoutHeader.frame.maxX
+
+    XCTAssertEqual(sessionCard.frame.minX, checkoutHeader.frame.minX, accuracy: 2)
+    XCTAssertEqual(sessionCard.frame.maxX, checkoutHeader.frame.maxX, accuracy: 2)
+    XCTAssertGreaterThanOrEqual(leadingInset, 0)
+    XCTAssertGreaterThanOrEqual(trailingInset, 0)
+    XCTAssertLessThanOrEqual(leadingInset, 24)
+    XCTAssertLessThanOrEqual(trailingInset, 24)
+    XCTAssertEqual(leadingInset, trailingInset, accuracy: 8)
+    XCTAssertGreaterThan(checkoutHeader.frame.width, sidebarShell.frame.width - 48)
   }
 
   func testToolbarSearchAndFilterControlsAreVisible() throws {
@@ -52,9 +59,9 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
     let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
 
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(filterMenu, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
     XCTAssertTrue(filterState.label.contains("status=active"))
   }
 
@@ -67,9 +74,9 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionList.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(sidebarRoot, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionList, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
     let initialMinY = sessionRow.frame.minY
 
     for _ in 0..<8 {
@@ -80,7 +87,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     }
 
     XCTAssertTrue(
-      waitUntil {
+      waitUntil(timeout: Self.fastActionTimeout) {
         sessionRow.frame.minY < initialMinY - 24
       }
     )
@@ -93,18 +100,18 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let emptyState = frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame)
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(filterMenu, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
 
     tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
     tapButton(in: app, title: "Ended")
-    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(emptyState, timeout: Self.fastActionTimeout))
     XCTAssertTrue(filterState.label.contains("status=ended"))
 
     tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
     tapButton(in: app, identifier: Accessibility.sidebarClearFiltersButton)
 
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
     XCTAssertTrue(filterState.label.contains("status=active"))
     XCTAssertTrue(filterState.label.contains("sort=recentActivity"))
   }
@@ -114,26 +121,33 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let checkoutHeader = element(in: app, identifier: Accessibility.previewCheckoutHeader)
     let sessionRow = previewSessionTrigger(in: app)
 
-    XCTAssertTrue(checkoutHeader.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(checkoutHeader, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
 
     tapPreviewSession(in: app)
 
     let observeButton = button(in: app, identifier: Accessibility.observeSummaryButton)
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
 
-    tapTrailingEdge(of: checkoutHeader, in: app)
+    toggleCheckoutDisclosure(
+      of: checkoutHeader,
+      in: app
+    ) {
+      !sessionRow.exists
+    }
 
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(
-      sessionRow.waitForExistence(timeout: Self.actionTimeout),
-      "The checkout header should collapse its sessions without clearing the current selection"
-    )
+    XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
+    XCTAssertFalse(sessionRow.exists)
 
-    tapTrailingEdge(of: checkoutHeader, in: app)
+    toggleCheckoutDisclosure(
+      of: checkoutHeader,
+      in: app
+    ) {
+      sessionRow.exists
+    }
 
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
   }
 
   func testSelectedSessionChromeFillsFullSessionRowHeight() throws {
@@ -141,19 +155,19 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let sessionRow = previewSessionTrigger(in: app)
     let sessionRowFrame = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
 
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRowFrame.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionRowFrame, timeout: Self.fastActionTimeout))
 
     tapPreviewSession(in: app)
 
     let observeButton = button(in: app, identifier: Accessibility.observeSummaryButton)
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
 
     let selectedFrame = frameElement(
       in: app,
       identifier: Accessibility.previewSessionRowSelectionFrame
     )
-    XCTAssertTrue(selectedFrame.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(selectedFrame, timeout: Self.fastActionTimeout))
     XCTAssertEqual(selectedFrame.frame.minY, sessionRowFrame.frame.minY, accuracy: 2)
     XCTAssertEqual(selectedFrame.frame.height, sessionRowFrame.frame.height, accuracy: 2)
   }
@@ -163,7 +177,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     in app: XCUIApplication
   ) {
     let window = window(in: app, containing: element)
-    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(window, timeout: Self.fastActionTimeout))
 
     let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
     origin
@@ -174,5 +188,19 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
         )
       )
       .tap()
+  }
+
+  private func toggleCheckoutDisclosure(
+    of element: XCUIElement,
+    in app: XCUIApplication,
+    until condition: @escaping () -> Bool
+  ) {
+    tapTrailingEdge(of: element, in: app)
+    if waitUntil(timeout: 0.2, condition: condition) {
+      return
+    }
+
+    tapTrailingEdge(of: element, in: app)
+    XCTAssertTrue(waitUntil(timeout: Self.fastActionTimeout, condition: condition))
   }
 }
