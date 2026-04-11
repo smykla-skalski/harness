@@ -351,28 +351,48 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct SessionSearchResultsState: Equatable {
+  public struct SessionSearchPresentationState: Equatable {
     public var isSearchActive = false
-    public var filteredSessionCount = 0
-    public var totalSessionCount = 0
-    public var visibleSessionIDs: [String] = []
-    public var visibleSessions: [SessionSummary] = []
     public var emptyState: SidebarEmptyState = .noSessions
 
     public init(
       isSearchActive: Bool = false,
-      filteredSessionCount: Int = 0,
-      totalSessionCount: Int = 0,
-      visibleSessionIDs: [String] = [],
-      visibleSessions: [SessionSummary] = [],
       emptyState: SidebarEmptyState = .noSessions
     ) {
       self.isSearchActive = isSearchActive
-      self.filteredSessionCount = filteredSessionCount
-      self.totalSessionCount = totalSessionCount
+      self.emptyState = emptyState
+    }
+  }
+
+  public struct SessionSearchResultsListState: Equatable {
+    public var visibleSessionIDs: [String] = []
+    public var visibleSessions: [SessionSummary] = []
+
+    public init(
+      visibleSessionIDs: [String] = [],
+      visibleSessions: [SessionSummary] = []
+    ) {
       self.visibleSessionIDs = visibleSessionIDs
       self.visibleSessions = visibleSessions
-      self.emptyState = emptyState
+    }
+  }
+
+  public struct SessionSearchResultsState: Equatable {
+    public var presentation = SessionSearchPresentationState()
+    public var filteredSessionCount = 0
+    public var totalSessionCount = 0
+    public var list = SessionSearchResultsListState()
+
+    public init(
+      presentation: SessionSearchPresentationState = SessionSearchPresentationState(),
+      filteredSessionCount: Int = 0,
+      totalSessionCount: Int = 0,
+      list: SessionSearchResultsListState = SessionSearchResultsListState()
+    ) {
+      self.presentation = presentation
+      self.filteredSessionCount = filteredSessionCount
+      self.totalSessionCount = totalSessionCount
+      self.list = list
     }
   }
 }

@@ -48,6 +48,20 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
+  @Test("Content shell window title ignores last action churn")
+  func contentShellWindowTitleIgnoresLastActionChurn() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      { store.contentUI.shell.windowTitle },
+      after: {
+        store.lastAction = "Refresh complete"
+      }
+    )
+
+    #expect(didChange == false)
+  }
+
   @Test("Content dashboard state ignores session selection churn")
   func contentDashboardStateIgnoresSessionSelectionChurn() async {
     let store = await makeBootstrappedStore()
@@ -102,6 +116,66 @@ struct HarnessMonitorContentSelectionTests {
 
     #expect(didChange)
     #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
+  }
+
+  @Test("Priming session selection updates content shell selection state")
+  func primingSessionSelectionUpdatesContentShellSelectionState() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      { store.contentUI.shell.selectedSessionID },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange)
+    #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.contentUI.shell.isSelectionLoading)
+  }
+
+  @Test("Priming session selection updates sidebar selection state")
+  func primingSessionSelectionUpdatesSidebarSelectionState() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      { store.sidebarUI.selectedSessionID },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange)
+    #expect(store.sidebarUI.selectedSessionID == PreviewFixtures.summary.sessionId)
+  }
+
+  @Test("Priming session selection updates inspector primary content")
+  func primingSessionSelectionUpdatesInspectorPrimaryContent() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      { store.inspectorUI.primaryContent },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange)
+  }
+
+  @Test("Inspector primary content ignores action status churn")
+  func inspectorPrimaryContentIgnoresActionStatusChurn() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let didChange = await didInvalidate(
+      { store.inspectorUI.primaryContent },
+      after: {
+        store.lastAction = "Task created"
+      }
+    )
+
+    #expect(didChange == false)
   }
 
   @Test("Content session detail state tracks selected session detail and timeline")

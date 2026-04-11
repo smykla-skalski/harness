@@ -104,6 +104,47 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["active"])
   }
 
+  @Test("Search list-facing state ignores count-only churn")
+  func searchListFacingStateIgnoresCountOnlyChurn() async {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    store.searchText = "active"
+    store.flushPendingSearchRebuild()
+
+    let hiddenSession = makeSession(
+      .init(
+        sessionId: "hidden-ended",
+        context: "Hidden ended lane",
+        status: .ended,
+        leaderId: "leader-hidden",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 0
+      )
+    )
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.sessionIndex.searchResults.isSearchActive,
+          store.sessionIndex.searchResults.emptyState,
+          store.sessionIndex.searchResults.visibleSessionIDs,
+          store.sessionIndex.searchResults.visibleSessions.map(\.sessionId)
+        )
+      },
+      after: {
+        var sessions = store.sessions
+        sessions.append(hiddenSession)
+        store.sessions = sessions
+      }
+    )
+
+    #expect(didChange == false)
+    #expect(store.sessionIndex.searchResults.totalSessionCount == 4)
+    #expect(store.visibleSessionIDs == ["active"])
+  }
+
   @Test("Sort order changes update projection without rebuilding the catalog")
   func sortOrderChangesUpdateProjectionWithoutCatalogRebuild() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
