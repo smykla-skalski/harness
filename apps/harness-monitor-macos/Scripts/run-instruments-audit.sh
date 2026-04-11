@@ -37,11 +37,13 @@ BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
 AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
 AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
-SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-1}"
+SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-0}"
 STAGED_HOST_APP_PATH=""
 STAGED_HOST_BINARY_PATH=""
 STAGED_HOST_BUNDLE_ID=""
 STAGED_HOST_LAUNCHER_PATH=""
+AUDIT_DAEMON_BUNDLE_MODE="unknown"
+AUDIT_DAEMON_CARGO_TARGET_DIR=""
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -93,6 +95,15 @@ contains() {
   return 1
 }
 
+resolve_common_repo_root() {
+  local common_git_dir
+  common_git_dir="$(git -C "$REPO_ROOT" rev-parse --git-common-dir)"
+  if [[ "$common_git_dir" != /* ]]; then
+    common_git_dir="$REPO_ROOT/$common_git_dir"
+  fi
+  CDPATH='' cd -- "$common_git_dir/.." && pwd
+}
+
 preview_scenario_for() {
   case "$1" in
     launch-dashboard|select-session-cockpit)
@@ -130,10 +141,18 @@ duration_for() {
   esac
 }
 
+COMMON_REPO_ROOT="$(resolve_common_repo_root)"
+AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
+
 build_release_targets() {
   local daemon_bundle_env=()
   if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
+    AUDIT_DAEMON_BUNDLE_MODE="skipped"
     daemon_bundle_env=("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1")
+  else
+    AUDIT_DAEMON_BUNDLE_MODE="shared-cargo-target"
+    mkdir -p "$AUDIT_DAEMON_CARGO_TARGET_DIR"
+    daemon_bundle_env=("CARGO_TARGET_DIR=$AUDIT_DAEMON_CARGO_TARGET_DIR")
   fi
 
   purge_release_products
@@ -618,6 +637,8 @@ if [[ "$SKIP_BUILD" == "1" ]]; then
 else
   if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
     printf 'Skipping daemon helper rebundle during audit builds. Set HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE=0 to force the full bundle step.\n'
+  else
+    printf 'Using shared daemon helper Cargo target dir during audit builds: %s\n' "$AUDIT_DAEMON_CARGO_TARGET_DIR"
   fi
   build_release_targets
 fi
@@ -675,6 +696,10 @@ printf 'Host mtime (UTC): %s\n' "$host_binary_mtime_utc"
 printf 'Workspace fingerprint: %s\n' "$workspace_fingerprint"
 printf 'Build started at (UTC): %s\n' "$build_started_at_utc"
 printf 'Audit commit stamp: %s dirty=%s\n' "$git_commit" "$git_dirty"
+printf 'Audit daemon bundle mode: %s\n' "$AUDIT_DAEMON_BUNDLE_MODE"
+if [[ "$AUDIT_DAEMON_BUNDLE_MODE" == "shared-cargo-target" ]]; then
+  printf 'Audit daemon Cargo target dir: %s\n' "$AUDIT_DAEMON_CARGO_TARGET_DIR"
+fi
 
 stage_launch_host
 
@@ -803,7 +828,7 @@ macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_LAUNCHER_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
+python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_LAUNCHER_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$SKIP_DAEMON_BUNDLE" "$AUDIT_DAEMON_BUNDLE_MODE" "$AUDIT_DAEMON_CARGO_TARGET_DIR" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -848,6 +873,9 @@ from pathlib import Path
     shipping_binary_sha256,
     shipping_bundle_sha256,
     shipping_binary_mtime_utc,
+    audit_daemon_bundle_requested_skip,
+    audit_daemon_bundle_mode,
+    audit_daemon_cargo_target_dir,
     capture_records_path,
     ui_tests_env,
     ui_accessibility_markers_env,
@@ -951,6 +979,11 @@ manifest = {
         "staged_host_bundle_id": staged_host_bundle_id,
     },
     "build_provenance": {
+        "audit_daemon_bundle": {
+            "requested_skip": audit_daemon_bundle_requested_skip == "1",
+            "mode": audit_daemon_bundle_mode,
+            "cargo_target_dir": audit_daemon_cargo_target_dir,
+        },
         "host": {
             "embedded_commit": host_embedded_commit,
             "embedded_dirty": host_embedded_dirty,
