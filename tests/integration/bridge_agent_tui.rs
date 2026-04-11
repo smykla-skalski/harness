@@ -48,6 +48,7 @@ fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", tmp.path())
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -154,6 +155,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", tmp.path())
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -171,6 +173,10 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
             ),
             (
                 "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "HARNESS_HOST_HOME",
                 Some(tmp.path().to_str().expect("utf8 daemon root")),
             ),
             ("HARNESS_APP_GROUP_ID", None),
@@ -277,6 +283,7 @@ fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Output {
         .args(args)
         .env("HARNESS_DAEMON_DATA_HOME", data_home)
         .env("XDG_DATA_HOME", data_home)
+        .env("HARNESS_HOST_HOME", data_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()
