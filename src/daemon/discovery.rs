@@ -345,6 +345,34 @@ mod tests {
     }
 
     #[test]
+    fn running_daemon_location_picks_xdg_when_only_xdg_is_live() {
+        let tmp = tempdir().expect("tempdir");
+        let home = tmp.path();
+        let xdg_daemon = home.join("harness").join("daemon");
+        let _holder = fake_running_daemon(&xdg_daemon);
+        temp_env::with_vars(
+            [
+                ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
+                ("HARNESS_APP_GROUP_ID", None),
+                ("XDG_DATA_HOME", Some(home.to_str().expect("utf8 path"))),
+                ("HOME", Some(home.to_str().expect("utf8 path"))),
+                ("HARNESS_HOST_HOME", Some(home.to_str().expect("utf8 path"))),
+            ],
+            || {
+                reset_override();
+                let running = running_daemon_location().expect("xdg daemon alive");
+                assert_eq!(running.root, xdg_daemon);
+                // Natural default on a vanilla host without HARNESS_APP_GROUP_ID
+                // is exactly the XDG path, so the kind we see is
+                // `NaturalDefault` (the group container appears as a later
+                // candidate but only on macOS and only when not deduped).
+                assert!(matches!(running.kind, DaemonLocationKind::NaturalDefault));
+                reset_override();
+            },
+        );
+    }
+
+    #[test]
     fn running_daemon_location_picks_group_container_when_only_it_is_live() {
         if !cfg!(target_os = "macos") {
             return;
