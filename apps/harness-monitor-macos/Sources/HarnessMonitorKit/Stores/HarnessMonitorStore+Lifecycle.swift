@@ -36,7 +36,7 @@ extension HarnessMonitorStore {
       connectionEvents.removeFirst(connectionEvents.count - 50)
     }
     switch kind {
-    case .connected:
+    case .connected, .info:
       HarnessMonitorLogger.store.info("\(detail, privacy: .public)")
     case .disconnected, .error:
       HarnessMonitorLogger.store.warning("\(detail, privacy: .public)")
