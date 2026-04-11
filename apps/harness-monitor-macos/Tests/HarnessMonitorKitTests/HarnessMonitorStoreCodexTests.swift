@@ -216,6 +216,43 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.screen.text.contains("status") == true)
   }
 
+  @Test("Agent TUI input chases a fresher snapshot after a stale action response")
+  func agentTuiInputRefreshesAfterStaleActionResponse() async {
+    let client = RecordingHarnessClient()
+    let running = client.agentTuiFixture(screenText: "copilot> ready")
+    let stale = client.agentTuiFixture(
+      tuiID: running.tuiId,
+      sessionID: running.sessionId,
+      runtime: running.runtime,
+      status: .running,
+      rows: running.size.rows,
+      cols: running.size.cols,
+      screenText: "copilot> ready"
+    )
+    let refreshed = client.agentTuiFixture(
+      tuiID: running.tuiId,
+      sessionID: running.sessionId,
+      runtime: running.runtime,
+      status: .running,
+      rows: running.size.rows,
+      cols: running.size.cols,
+      screenText: "copilot> ready\nstatus"
+    )
+    client.configureAgentTuis([running], for: PreviewFixtures.summary.sessionId)
+    client.configureAgentTuiInputResponses([stale], for: running.tuiId)
+    client.configureAgentTuiReadSnapshots([refreshed], for: running.tuiId)
+    let store = await selectedStore(client: client)
+
+    let sent = await store.sendAgentTuiInput(tuiID: running.tuiId, input: .text("status"))
+
+    #expect(sent)
+    #expect(store.selectedAgentTui?.screen.text == "copilot> ready")
+
+    try? await Task.sleep(for: .seconds(1))
+
+    #expect(store.selectedAgentTui?.screen.text == "copilot> ready\nstatus")
+  }
+
   @Test("Agent TUI stream update refreshes selected TUI")
   func agentTuiStreamUpdateRefreshesSelectedTui() async {
     let client = RecordingHarnessClient()

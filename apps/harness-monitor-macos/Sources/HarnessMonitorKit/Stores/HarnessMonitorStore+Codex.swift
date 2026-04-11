@@ -1,6 +1,9 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private static let agentTuiActionRefreshDelay = Duration.milliseconds(250)
+  private static let agentTuiActionRefreshAttempts = 4
+
   @discardableResult
   public func setHostBridgeCapability(
     _ capability: String,
@@ -221,12 +224,14 @@ extension HarnessMonitorStore {
 extension HarnessMonitorStore {
   @discardableResult
   public func refreshSelectedAgentTuis() async -> Bool {
+    cancelAgentTuiActionRefresh()
     guard let client, let sessionID = selectedSessionID else { return false }
     return await refreshAgentTuis(using: client, sessionID: sessionID)
   }
 
   @discardableResult
   public func refreshSelectedAgentTui() async -> Bool {
+    cancelAgentTuiActionRefresh()
     guard let client, let tuiID = selectedAgentTui?.tuiId else { return false }
     return await refreshAgentTui(using: client, tuiID: tuiID)
   }
@@ -249,7 +254,7 @@ extension HarnessMonitorStore {
     let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    return await mutateAgentTui(actionName: "Agent TUI started") {
+    return await mutateAgentTui(using: client, actionName: "Agent TUI started") {
       try await client.startAgentTui(
         sessionID: sessionID,
         request: AgentTuiStartRequest(
@@ -271,7 +276,7 @@ extension HarnessMonitorStore {
     guard guardSessionActionsAvailable() else { return false }
     guard let client else { return false }
 
-    return await mutateAgentTui {
+    return await mutateAgentTui(using: client) {
       try await client.sendAgentTuiInput(
         tuiID: tuiID,
         request: AgentTuiInputRequest(input: input)
@@ -292,7 +297,7 @@ extension HarnessMonitorStore {
       return false
     }
 
-    return await mutateAgentTui(actionName: "Agent TUI resized") {
+    return await mutateAgentTui(using: client, actionName: "Agent TUI resized") {
       try await client.resizeAgentTui(
         tuiID: tuiID,
         request: AgentTuiResizeRequest(rows: rows, cols: cols)
@@ -305,22 +310,30 @@ extension HarnessMonitorStore {
     guard guardSessionActionsAvailable() else { return false }
     guard let client else { return false }
 
-    return await mutateAgentTui(actionName: "Agent TUI stopped") {
+    return await mutateAgentTui(using: client, actionName: "Agent TUI stopped") {
       try await client.stopAgentTui(tuiID: tuiID)
     }
   }
 
   public func selectAgentTui(tuiID: String?) {
+    let previousTuiID = selectedAgentTui?.tuiId
     guard let tuiID else {
       selectedAgentTui = preferredAgentTui(from: selectedAgentTuis)
+      if selectedAgentTui?.tuiId != previousTuiID {
+        cancelAgentTuiActionRefresh()
+      }
       return
     }
     selectedAgentTui = selectedAgentTuis.first(where: { $0.tuiId == tuiID })
       ?? preferredAgentTui(from: selectedAgentTuis)
+    if selectedAgentTui?.tuiId != previousTuiID {
+      cancelAgentTuiActionRefresh()
+    }
   }
 
   func resetSelectedAgentTuis() {
     clearHostBridgeIssue(for: "agent-tui")
+    cancelAgentTuiActionRefresh()
     guard !selectedAgentTuis.isEmpty || selectedAgentTui != nil else {
       return
     }
@@ -354,6 +367,7 @@ extension HarnessMonitorStore {
         return true
       }
       clearHostBridgeIssue(for: "agent-tui")
+      cancelAgentTuiActionRefresh()
       selectedAgentTuis = measuredTuis.value.tuis
       selectedAgentTui = preferredAgentTui(from: measuredTuis.value.tuis)
       return true
@@ -379,6 +393,7 @@ extension HarnessMonitorStore {
   }
 
   private func mutateAgentTui(
+    using client: any HarnessMonitorClientProtocol,
     actionName: String? = nil,
     mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot
   ) async -> Bool {
@@ -389,6 +404,7 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       clearHostBridgeIssue(for: "agent-tui")
       applyAgentTui(measuredTui.value)
+      scheduleAgentTuiActionRefresh(using: client, baseline: measuredTui.value)
       if let actionName {
         presentSuccessFeedback(actionName)
       }
@@ -413,6 +429,87 @@ extension HarnessMonitorStore {
     }
     presentFailureFeedback(error.localizedDescription)
     return false
+  }
+
+  private func scheduleAgentTuiActionRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    baseline: AgentTuiSnapshot
+  ) {
+    guard baseline.status.isActive else {
+      cancelAgentTuiActionRefresh(for: baseline.tuiId)
+      return
+    }
+
+    agentTuiActionRefreshSequence &+= 1
+    let token = agentTuiActionRefreshSequence
+    pendingAgentTuiActionRefresh = (tuiID: baseline.tuiId, token: token)
+    agentTuiActionRefreshTask?.cancel()
+    agentTuiActionRefreshTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      defer {
+        if pendingAgentTuiActionRefresh?.token == token {
+          pendingAgentTuiActionRefresh = nil
+          agentTuiActionRefreshTask = nil
+        }
+      }
+
+      for _ in 0 ..< Self.agentTuiActionRefreshAttempts {
+        try? await Task.sleep(for: Self.agentTuiActionRefreshDelay)
+        guard !Task.isCancelled else {
+          return
+        }
+        guard
+          pendingAgentTuiActionRefresh?.token == token,
+          pendingAgentTuiActionRefresh?.tuiID == baseline.tuiId,
+          selectedAgentTui?.tuiId == baseline.tuiId
+        else {
+          return
+        }
+        if selectedAgentTui != baseline {
+          return
+        }
+        let updated = await refreshAgentTuiAfterAction(using: client, baseline: baseline)
+        if updated || selectedAgentTui?.status.isActive != true {
+          return
+        }
+      }
+    }
+  }
+
+  func cancelAgentTuiActionRefresh(for tuiID: String? = nil) {
+    guard tuiID == nil || pendingAgentTuiActionRefresh?.tuiID == tuiID else {
+      return
+    }
+
+    pendingAgentTuiActionRefresh = nil
+    agentTuiActionRefreshTask?.cancel()
+    agentTuiActionRefreshTask = nil
+  }
+
+  private func refreshAgentTuiAfterAction(
+    using client: any HarnessMonitorClientProtocol,
+    baseline: AgentTuiSnapshot
+  ) async -> Bool {
+    do {
+      let measuredTui = try await Self.measureOperation {
+        try await client.agentTui(tuiID: baseline.tuiId)
+      }
+      recordRequestSuccess()
+      guard selectedAgentTui?.tuiId == baseline.tuiId else {
+        return true
+      }
+      clearHostBridgeIssue(for: "agent-tui")
+      applyAgentTui(measuredTui.value)
+      return measuredTui.value != baseline
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "agent TUI post-action refresh failed for \(baseline.tuiId, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
+      return true
+    }
   }
 
   private func preferredAgentTui(from tuis: [AgentTuiSnapshot]) -> AgentTuiSnapshot? {
@@ -546,6 +643,7 @@ extension HarnessMonitorStore {
     clearHostBridgeIssue(for: capability)
     applyHostBridgeStatus(status)
     if capability == "agent-tui" && !enabled {
+      cancelAgentTuiActionRefresh()
       selectedAgentTuis = []
       selectedAgentTui = nil
     }

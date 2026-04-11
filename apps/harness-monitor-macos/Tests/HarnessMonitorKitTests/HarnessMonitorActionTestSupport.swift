@@ -128,6 +128,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _timelineErrorsByID: [String: any Error] = [:]
   private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   private var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
+  private var _agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
+  private var _agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
   private var _codexStartError: (any Error)?
   private var _agentTuiStartError: (any Error)?
   private var _hostBridgeReconfigureError: (any Error)?
@@ -329,6 +331,18 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     }
   }
 
+  func configureAgentTuiInputResponses(_ snapshots: [AgentTuiSnapshot], for tuiID: String) {
+    lock.withLock {
+      _agentTuiInputResponsesByID[tuiID] = snapshots
+    }
+  }
+
+  func configureAgentTuiReadSnapshots(_ snapshots: [AgentTuiSnapshot], for tuiID: String) {
+    lock.withLock {
+      _agentTuiReadSnapshotsByID[tuiID] = snapshots
+    }
+  }
+
   func configureCodexStartError(_ error: (any Error)?) {
     lock.withLock { _codexStartError = error }
   }
@@ -399,6 +413,22 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredAgentTui(id tuiID: String) -> AgentTuiSnapshot? {
     lock.withLock {
       _agentTuisBySessionID.values.flatMap(\.self).first { $0.tuiId == tuiID }
+    }
+  }
+  func dequeueConfiguredAgentTuiInputResponse(id tuiID: String) -> AgentTuiSnapshot? {
+    lock.withLock {
+      dequeueAgentTuiSnapshot(
+        from: &_agentTuiInputResponsesByID,
+        tuiID: tuiID
+      )
+    }
+  }
+  func dequeueConfiguredAgentTuiReadSnapshot(id tuiID: String) -> AgentTuiSnapshot? {
+    lock.withLock {
+      dequeueAgentTuiSnapshot(
+        from: &_agentTuiReadSnapshotsByID,
+        tuiID: tuiID
+      )
     }
   }
   func recordCodexRun(_ run: CodexRunSnapshot) {
@@ -479,5 +509,27 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     lock.withLock {
       _shutdownCallCount += 1
     }
+  }
+
+  private func dequeueAgentTuiSnapshot(
+    from storage: inout [String: [AgentTuiSnapshot]],
+    tuiID: String
+  ) -> AgentTuiSnapshot? {
+    guard var snapshots = storage[tuiID], let snapshot = snapshots.first else {
+      return nil
+    }
+
+    snapshots.removeFirst()
+    if snapshots.isEmpty {
+      storage.removeValue(forKey: tuiID)
+    } else {
+      storage[tuiID] = snapshots
+    }
+
+    var tuis = _agentTuisBySessionID[snapshot.sessionId] ?? []
+    tuis.removeAll { $0.tuiId == snapshot.tuiId }
+    tuis.insert(snapshot, at: 0)
+    _agentTuisBySessionID[snapshot.sessionId] = tuis
+    return snapshot
   }
 }

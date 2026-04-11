@@ -168,13 +168,16 @@ public final class HarnessMonitorStore {
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   var selectionTask: Task<Void, Never>?
   var pendingCacheWriteTask: Task<Void, Never>?
+  @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
   var latencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
   var sessionLoadSequence: UInt64 = 0
   var sessionPushFallbackSequence: UInt64 = 0
+  @ObservationIgnored var agentTuiActionRefreshSequence: UInt64 = 0
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
+  @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
   private var hasBootstrapped = false
