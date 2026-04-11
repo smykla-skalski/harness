@@ -199,6 +199,20 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.sessionDetail.timeline == PreviewFixtures.timeline)
   }
 
+  @Test("Hydrating the selected session detail skips shell resync when the summary is already selected")
+  func selectedSessionHydrationSkipsShellResync() async {
+    let store = await makeBootstrappedStore()
+    store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+    store.debugResetUISyncCounts()
+
+    store.selectedSession = PreviewFixtures.detail
+
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 1)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 1)
+    #expect(store.debugUISyncCount(for: .inspector) == 1)
+  }
+
   @Test("Priming current session does not invalidate content or inspector slices")
   func primingCurrentSessionDoesNotInvalidateContentOrInspectorSlices() async {
     let store = await makeBootstrappedStore()
