@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
-AUDIT_SCRIPT="$SCRIPT_DIR/run-instruments-audit.sh"
 WORKTREE_ROOT="${HARNESS_MONITOR_AUDIT_WORKTREE_ROOT:-/private/tmp}"
 
 usage() {
@@ -124,10 +123,16 @@ trap cleanup EXIT INT TERM
 
 git -C "$REPO_ROOT" worktree add --detach "$worktree_path" "$resolved_commit"
 
+audit_script_path="$worktree_path/apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
+if [[ ! -x "$audit_script_path" ]]; then
+  printf 'Audit script not found in worktree: %s\n' "$audit_script_path" >&2
+  exit 1
+fi
+
 (
   cd "$worktree_path"
   mise trust
-  "$AUDIT_SCRIPT" "${audit_args[@]}"
+  "$audit_script_path" "${audit_args[@]}"
 ) 2>&1 | tee "$audit_stdout_log"
 
 run_dir="$(awk -F'Artifacts written to ' '/Artifacts written to / {print $2}' "$audit_stdout_log" | tail -n 1)"
