@@ -52,7 +52,6 @@ extension HarnessMonitorStore {
         ])
       case .selectedSession:
         self?.scheduleUISync([
-          .contentShell,
           .contentChrome,
           .contentSessionDetail,
           .inspector,
