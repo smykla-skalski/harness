@@ -109,10 +109,10 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(filterState.label.contains("status=ended"))
 
     tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
-    tapButton(in: app, identifier: Accessibility.sidebarClearFiltersButton)
+    tapButton(in: app, title: "Clear Filters")
 
     XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(filterState.label.contains("status=active"))
+    XCTAssertTrue(filterState.label.contains("status=all"))
     XCTAssertTrue(filterState.label.contains("sort=recentActivity"))
   }
 
