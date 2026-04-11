@@ -103,8 +103,24 @@ struct HarnessMonitorStoreCodexTests {
     #expect(store.lastError?.contains("read-only mode") == true)
   }
 
-  @Test("Start Codex run sets codexUnavailable when daemon returns 503")
-  func startCodexRunSetsCodexUnavailableOn503() async {
+  @Test("Start Codex run sets codexUnavailable when sandboxed daemon returns 503")
+  func startCodexRunSetsCodexUnavailableOnSandboxed503() async {
+    let client = RecordingHarnessClient()
+    client.configureCodexStartError(
+      HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable")
+    )
+    let store = await selectedStore(client: client)
+    store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
+
+    let started = await store.startCodexRun(prompt: "Test.", mode: .report)
+
+    #expect(started == false)
+    #expect(store.codexUnavailable == true)
+    #expect(store.lastError?.contains("codex-unavailable") == true)
+  }
+
+  @Test("Start Codex run keeps host bridge ready when daemon is not sandboxed")
+  func startCodexRunDoesNotSetCodexUnavailableOnUnsandboxed503() async {
     let client = RecordingHarnessClient()
     client.configureCodexStartError(
       HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable")
@@ -114,7 +130,7 @@ struct HarnessMonitorStoreCodexTests {
     let started = await store.startCodexRun(prompt: "Test.", mode: .report)
 
     #expect(started == false)
-    #expect(store.codexUnavailable == true)
+    #expect(store.codexUnavailable == false)
     #expect(store.lastError?.contains("codex-unavailable") == true)
   }
 
@@ -244,8 +260,30 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.lastError?.contains("read-only mode") == true)
   }
 
-  @Test("Start agent TUI sets unavailable flag when daemon returns 501")
-  func startAgentTuiSetsUnavailableFlagOn501() async {
+  @Test("Start agent TUI sets unavailable flag when sandboxed daemon returns 501")
+  func startAgentTuiSetsUnavailableFlagOnSandboxed501() async {
+    let client = RecordingHarnessClient()
+    client.configureAgentTuiStartError(
+      HarnessMonitorAPIError.server(code: 501, message: "agent-tui bridge unavailable")
+    )
+    let store = await selectedStore(client: client)
+    store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
+
+    let started = await store.startAgentTui(
+      runtime: .copilot,
+      name: nil,
+      prompt: "Test.",
+      rows: 24,
+      cols: 100
+    )
+
+    #expect(started == false)
+    #expect(store.agentTuiUnavailable == true)
+    #expect(store.lastError?.contains("bridge unavailable") == true)
+  }
+
+  @Test("Start agent TUI keeps host bridge ready when daemon is not sandboxed")
+  func startAgentTuiDoesNotSetUnavailableFlagOnUnsandboxed501() async {
     let client = RecordingHarnessClient()
     client.configureAgentTuiStartError(
       HarnessMonitorAPIError.server(code: 501, message: "agent-tui bridge unavailable")
@@ -261,7 +299,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     )
 
     #expect(started == false)
-    #expect(store.agentTuiUnavailable == true)
+    #expect(store.agentTuiUnavailable == false)
     #expect(store.lastError?.contains("bridge unavailable") == true)
   }
 
@@ -671,37 +709,38 @@ struct HarnessMonitorStoreHostBridgeTests {
     #expect(store.lastAction == "Disabled Agent TUI host bridge")
   }
 
-  private func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
-    DaemonStatusReport(
-      manifest: DaemonManifest(
-        version: "19.2.1",
-        pid: 111,
-        endpoint: "http://127.0.0.1:9999",
-        startedAt: "2026-04-11T09:00:00Z",
-        tokenPath: "/tmp/token",
-        sandboxed: true,
-        hostBridge: hostBridge
-      ),
-      launchAgent: LaunchAgentStatus(
-        installed: true,
-        loaded: true,
-        label: "io.harness.daemon",
-        path: "/tmp/io.harness.daemon.plist"
-      ),
-      projectCount: 1,
-      sessionCount: 1,
-      diagnostics: DaemonDiagnostics(
-        daemonRoot: "/tmp/harness/daemon",
-        manifestPath: "/tmp/harness/daemon/manifest.json",
-        authTokenPath: "/tmp/token",
-        authTokenPresent: true,
-        eventsPath: "/tmp/harness/daemon/events.jsonl",
-        databasePath: "/tmp/harness/daemon/harness.db",
-        databaseSizeBytes: 1_024,
-        lastEvent: nil
-      )
+}
+
+private func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
+  DaemonStatusReport(
+    manifest: DaemonManifest(
+      version: "19.3.0",
+      pid: 111,
+      endpoint: "http://127.0.0.1:9999",
+      startedAt: "2026-04-11T09:00:00Z",
+      tokenPath: "/tmp/token",
+      sandboxed: true,
+      hostBridge: hostBridge
+    ),
+    launchAgent: LaunchAgentStatus(
+      installed: true,
+      loaded: true,
+      label: "io.harness.daemon",
+      path: "/tmp/io.harness.daemon.plist"
+    ),
+    projectCount: 1,
+    sessionCount: 1,
+    diagnostics: DaemonDiagnostics(
+      daemonRoot: "/tmp/harness/daemon",
+      manifestPath: "/tmp/harness/daemon/manifest.json",
+      authTokenPath: "/tmp/token",
+      authTokenPresent: true,
+      eventsPath: "/tmp/harness/daemon/events.jsonl",
+      databasePath: "/tmp/harness/daemon/harness.db",
+      databaseSizeBytes: 1_024,
+      lastEvent: nil
     )
-  }
+  )
 }
 
 actor HostBridgeRecoveryDaemonController: DaemonControlling {
