@@ -39,6 +39,7 @@ AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
 SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-0}"
 FORCE_CLEAN="${HARNESS_MONITOR_AUDIT_FORCE_CLEAN:-0}"
+BUILD_SHIPPING="${HARNESS_MONITOR_AUDIT_BUILD_SHIPPING:-0}"
 STAGED_HOST_APP_PATH=""
 STAGED_HOST_BINARY_PATH=""
 STAGED_HOST_BUNDLE_ID=""
@@ -173,15 +174,17 @@ build_release_targets() {
   purge_release_products
 
   if [[ "$FORCE_CLEAN" == "1" ]]; then
-    xcodebuild \
-      -project "$PROJECT_PATH" \
-      -scheme "$SHIPPING_SCHEME" \
-      -configuration Release \
-      -derivedDataPath "$DERIVED_DATA_PATH" \
-      clean \
-      "${common_build_env[@]}" \
-      CODE_SIGNING_ALLOWED=NO \
-      -quiet
+    if [[ "$BUILD_SHIPPING" == "1" ]]; then
+      xcodebuild \
+        -project "$PROJECT_PATH" \
+        -scheme "$SHIPPING_SCHEME" \
+        -configuration Release \
+        -derivedDataPath "$DERIVED_DATA_PATH" \
+        clean \
+        "${common_build_env[@]}" \
+        CODE_SIGNING_ALLOWED=NO \
+        -quiet
+    fi
 
     xcodebuild \
       -project "$PROJECT_PATH" \
@@ -194,20 +197,22 @@ build_release_targets() {
       -quiet
   fi
 
-  xcodebuild \
-    -project "$PROJECT_PATH" \
-    -scheme "$SHIPPING_SCHEME" \
-    -configuration Release \
-    -derivedDataPath "$DERIVED_DATA_PATH" \
-    build \
-    "${common_build_env[@]}" \
-    "${daemon_bundle_env[@]}" \
-    "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
-    "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
-    "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT=$workspace_fingerprint" \
-    "HARNESS_MONITOR_BUILD_STARTED_AT_UTC=$build_started_at_utc" \
-    CODE_SIGNING_ALLOWED=NO \
-    -quiet
+  if [[ "$BUILD_SHIPPING" == "1" ]]; then
+    xcodebuild \
+      -project "$PROJECT_PATH" \
+      -scheme "$SHIPPING_SCHEME" \
+      -configuration Release \
+      -derivedDataPath "$DERIVED_DATA_PATH" \
+      build \
+      "${common_build_env[@]}" \
+      "${daemon_bundle_env[@]}" \
+      "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
+      "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
+      "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT=$workspace_fingerprint" \
+      "HARNESS_MONITOR_BUILD_STARTED_AT_UTC=$build_started_at_utc" \
+      CODE_SIGNING_ALLOWED=NO \
+      -quiet
+  fi
 
   xcodebuild \
     -project "$PROJECT_PATH" \
@@ -663,6 +668,11 @@ else
   fi
   printf 'Using audit build arch: %s\n' "$AUDIT_BUILD_ARCH"
   printf 'Disabling code coverage and index-store emission for audit builds.\n'
+  if [[ "$BUILD_SHIPPING" == "1" ]]; then
+    printf 'Building shipping app alongside the audit host because HARNESS_MONITOR_AUDIT_BUILD_SHIPPING=1.\n'
+  else
+    printf 'Skipping shipping app build for faster feedback. Set HARNESS_MONITOR_AUDIT_BUILD_SHIPPING=1 when you need the extra artifact.\n'
+  fi
   if [[ "$FORCE_CLEAN" == "1" ]]; then
     printf 'Forcing a clean audit build because HARNESS_MONITOR_AUDIT_FORCE_CLEAN=1.\n'
   else
@@ -677,23 +687,31 @@ if [[ ! -x "$HOST_BINARY_PATH" ]]; then
   exit 1
 fi
 
-host_info_plist="$HOST_APP_PATH/Contents/Info.plist"
-shipping_info_plist="$SHIPPING_APP_PATH/Contents/Info.plist"
 host_embedded_commit="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_COMMIT_KEY")"
 host_embedded_dirty="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_DIRTY_KEY")"
 host_embedded_workspace_fingerprint="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_WORKSPACE_FINGERPRINT_KEY")"
 host_embedded_started_at_utc="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_STARTED_AT_UTC_KEY")"
-shipping_embedded_commit="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_COMMIT_KEY")"
-shipping_embedded_dirty="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_DIRTY_KEY")"
-shipping_embedded_workspace_fingerprint="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_WORKSPACE_FINGERPRINT_KEY")"
-shipping_embedded_started_at_utc="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_STARTED_AT_UTC_KEY")"
+shipping_embedded_commit=""
+shipping_embedded_dirty=""
+shipping_embedded_workspace_fingerprint=""
+shipping_embedded_started_at_utc=""
 
 host_binary_sha256="$(binary_sha256 "$HOST_BINARY_PATH")"
-shipping_binary_sha256="$(binary_sha256 "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
 host_bundle_sha256="$(bundle_sha256 "$HOST_APP_PATH")"
-shipping_bundle_sha256="$(bundle_sha256 "$SHIPPING_APP_PATH")"
 host_binary_mtime_utc="$(binary_mtime_utc "$HOST_BINARY_PATH")"
-shipping_binary_mtime_utc="$(binary_mtime_utc "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
+shipping_binary_sha256=""
+shipping_bundle_sha256=""
+shipping_binary_mtime_utc=""
+
+if [[ "$BUILD_SHIPPING" == "1" ]]; then
+  shipping_embedded_commit="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_COMMIT_KEY")"
+  shipping_embedded_dirty="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_DIRTY_KEY")"
+  shipping_embedded_workspace_fingerprint="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_WORKSPACE_FINGERPRINT_KEY")"
+  shipping_embedded_started_at_utc="$(bundle_provenance_value "$SHIPPING_APP_PATH" "$BUILD_STARTED_AT_UTC_KEY")"
+  shipping_binary_sha256="$(binary_sha256 "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
+  shipping_bundle_sha256="$(bundle_sha256 "$SHIPPING_APP_PATH")"
+  shipping_binary_mtime_utc="$(binary_mtime_utc "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor")"
+fi
 
 if [[ "$host_embedded_commit" != "$git_commit" || "$host_embedded_dirty" != "$git_dirty" || "$host_embedded_workspace_fingerprint" != "$workspace_fingerprint" ]]; then
   if [[ "$SKIP_BUILD" == "1" ]]; then
@@ -706,7 +724,7 @@ if [[ "$host_embedded_commit" != "$git_commit" || "$host_embedded_dirty" != "$gi
   fi
 fi
 
-if [[ "$shipping_embedded_commit" != "$git_commit" || "$shipping_embedded_dirty" != "$git_dirty" || "$shipping_embedded_workspace_fingerprint" != "$workspace_fingerprint" ]]; then
+if [[ "$BUILD_SHIPPING" == "1" && ( "$shipping_embedded_commit" != "$git_commit" || "$shipping_embedded_dirty" != "$git_dirty" || "$shipping_embedded_workspace_fingerprint" != "$workspace_fingerprint" ) ]]; then
   if [[ "$SKIP_BUILD" == "1" ]]; then
     printf 'Shipping build provenance mismatch: expected commit=%s dirty=%s fingerprint=%s but bundle reports commit=%s dirty=%s fingerprint=%s. Continuing because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n' \
       "$git_commit" "$git_dirty" "$workspace_fingerprint" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" >&2
@@ -862,7 +880,7 @@ macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_LAUNCHER_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$SKIP_DAEMON_BUNDLE" "$AUDIT_DAEMON_BUNDLE_MODE" "$AUDIT_DAEMON_CARGO_TARGET_DIR" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
+python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_LAUNCHER_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$BUILD_SHIPPING" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$SKIP_DAEMON_BUNDLE" "$AUDIT_DAEMON_BUNDLE_MODE" "$AUDIT_DAEMON_CARGO_TARGET_DIR" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -900,6 +918,7 @@ from pathlib import Path
     host_binary_sha256,
     host_bundle_sha256,
     host_binary_mtime_utc,
+    shipping_built,
     shipping_embedded_commit,
     shipping_embedded_dirty,
     shipping_embedded_workspace_fingerprint,
@@ -1028,6 +1047,7 @@ manifest = {
             "binary_mtime_utc": host_binary_mtime_utc,
         },
         "shipping": {
+            "built": shipping_built == "1",
             "embedded_commit": shipping_embedded_commit,
             "embedded_dirty": shipping_embedded_dirty,
             "embedded_workspace_fingerprint": shipping_embedded_workspace_fingerprint,
