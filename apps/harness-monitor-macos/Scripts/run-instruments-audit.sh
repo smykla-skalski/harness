@@ -38,12 +38,14 @@ AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
 AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
 SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-0}"
+FORCE_CLEAN="${HARNESS_MONITOR_AUDIT_FORCE_CLEAN:-0}"
 STAGED_HOST_APP_PATH=""
 STAGED_HOST_BINARY_PATH=""
 STAGED_HOST_BUNDLE_ID=""
 STAGED_HOST_LAUNCHER_PATH=""
 AUDIT_DAEMON_BUNDLE_MODE="unknown"
 AUDIT_DAEMON_CARGO_TARGET_DIR=""
+AUDIT_BUILD_ARCH=""
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -144,12 +146,21 @@ duration_for() {
 COMMON_REPO_ROOT="$(resolve_common_repo_root)"
 DERIVED_DATA_PATH="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/xcode-derived"
 AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
+AUDIT_BUILD_ARCH="${HARNESS_MONITOR_AUDIT_BUILD_ARCH:-$(uname -m)}"
 HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Testing.app"
 HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
 SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
 
 build_release_targets() {
   local daemon_bundle_env=()
+  local common_build_env=(
+    "ARCHS=$AUDIT_BUILD_ARCH"
+    "ONLY_ACTIVE_ARCH=YES"
+    "ENABLE_CODE_COVERAGE=NO"
+    "CLANG_COVERAGE_MAPPING=NO"
+    "GCC_GENERATE_TEST_COVERAGE_FILES=NO"
+    "COMPILER_INDEX_STORE_ENABLE=NO"
+  )
   if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
     AUDIT_DAEMON_BUNDLE_MODE="skipped"
     daemon_bundle_env=("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1")
@@ -161,23 +172,27 @@ build_release_targets() {
 
   purge_release_products
 
-  xcodebuild \
-    -project "$PROJECT_PATH" \
-    -scheme "$SHIPPING_SCHEME" \
-    -configuration Release \
-    -derivedDataPath "$DERIVED_DATA_PATH" \
-    clean \
-    CODE_SIGNING_ALLOWED=NO \
-    -quiet
+  if [[ "$FORCE_CLEAN" == "1" ]]; then
+    xcodebuild \
+      -project "$PROJECT_PATH" \
+      -scheme "$SHIPPING_SCHEME" \
+      -configuration Release \
+      -derivedDataPath "$DERIVED_DATA_PATH" \
+      clean \
+      "${common_build_env[@]}" \
+      CODE_SIGNING_ALLOWED=NO \
+      -quiet
 
-  xcodebuild \
-    -project "$PROJECT_PATH" \
-    -scheme "$HOST_SCHEME" \
-    -configuration Release \
-    -derivedDataPath "$DERIVED_DATA_PATH" \
-    clean \
-    CODE_SIGNING_ALLOWED=NO \
-    -quiet
+    xcodebuild \
+      -project "$PROJECT_PATH" \
+      -scheme "$HOST_SCHEME" \
+      -configuration Release \
+      -derivedDataPath "$DERIVED_DATA_PATH" \
+      clean \
+      "${common_build_env[@]}" \
+      CODE_SIGNING_ALLOWED=NO \
+      -quiet
+  fi
 
   xcodebuild \
     -project "$PROJECT_PATH" \
@@ -185,6 +200,7 @@ build_release_targets() {
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     build \
+    "${common_build_env[@]}" \
     "${daemon_bundle_env[@]}" \
     "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
     "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
@@ -199,6 +215,7 @@ build_release_targets() {
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     build \
+    "${common_build_env[@]}" \
     "${daemon_bundle_env[@]}" \
     "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
     "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
@@ -643,6 +660,13 @@ else
     printf 'Skipping daemon helper rebundle during audit builds. Set HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE=0 to force the full bundle step.\n'
   else
     printf 'Using shared daemon helper Cargo target dir during audit builds: %s\n' "$AUDIT_DAEMON_CARGO_TARGET_DIR"
+  fi
+  printf 'Using audit build arch: %s\n' "$AUDIT_BUILD_ARCH"
+  printf 'Disabling code coverage and index-store emission for audit builds.\n'
+  if [[ "$FORCE_CLEAN" == "1" ]]; then
+    printf 'Forcing a clean audit build because HARNESS_MONITOR_AUDIT_FORCE_CLEAN=1.\n'
+  else
+    printf 'Using incremental audit builds. Set HARNESS_MONITOR_AUDIT_FORCE_CLEAN=1 to force a clean rebuild.\n'
   fi
   build_release_targets
 fi
