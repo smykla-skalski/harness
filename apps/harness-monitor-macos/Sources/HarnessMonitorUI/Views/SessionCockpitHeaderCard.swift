@@ -69,6 +69,7 @@ struct SessionCockpitHeaderCard: View {
       variant: .prominent,
       tint: nil,
       isExternallyDisabled: isSessionReadOnly,
+      accessibilityIdentifier: HarnessMonitorAccessibility.observeSessionButton,
       help: isSessionReadOnly ? "Unavailable while the daemon is offline." : "",
       action: { observeSelectedSession() }
     )
