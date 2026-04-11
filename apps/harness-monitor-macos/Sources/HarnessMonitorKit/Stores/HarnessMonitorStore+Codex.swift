@@ -448,18 +448,25 @@ extension HarnessMonitorStore {
   /// Preserves launch agent, project counts, diagnostics, and every other
   /// daemon status field.
   ///
+  /// Also emits a `.info` entry in the connection timeline so operators
+  /// can see revision transitions in the visible event log without
+  /// grepping the unified log. No `reconnect`, no HTTP round-trip, no
+  /// stream teardown - exactly one observable slice assignment on the
+  /// MainActor per update.
+  ///
   /// No-op when `daemonStatus` is nil (bootstrap has not finished) - the
   /// initial `daemonStatus` assignment will carry the latest manifest
-  /// anyway via `refreshDaemonStatus`. The `ManifestWatcher` already logs
-  /// the revision transition via `HarnessMonitorLogger.lifecycle.info`, so
-  /// this method deliberately does not emit a connection event and keeps
-  /// the store's visible timeline uncluttered.
+  /// anyway via `refreshDaemonStatus`.
   func applyManifestRevision(_ manifest: DaemonManifest) {
     guard let current = daemonStatus else {
       return
     }
     daemonStatus = current.updating(hostBridge: manifest.hostBridge)
     clearTransientHostBridgeIssues()
+    appendConnectionEvent(
+      kind: .info,
+      detail: "Daemon host bridge refreshed (revision \(manifest.revision))"
+    )
   }
 
   private func mutateHostBridgeCapability(

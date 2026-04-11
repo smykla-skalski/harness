@@ -117,6 +117,10 @@ public enum ConnectionEventKind: String, Equatable, Sendable {
   case reconnecting
   case fallback
   case error
+  /// Purely informational updates (e.g. an in-place daemon manifest refresh
+  /// that did not disturb the active connection). Surfaced in the
+  /// connection timeline without implying any state change.
+  case info
 
   public var title: String {
     switch self {
@@ -130,6 +134,8 @@ public enum ConnectionEventKind: String, Equatable, Sendable {
       "Fallback"
     case .error:
       "Error"
+    case .info:
+      "Info"
     }
   }
 }
