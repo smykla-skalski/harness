@@ -5,7 +5,7 @@ struct SidebarSessionListRenderState: Equatable {
   let projectionGroups: [HarnessMonitorStore.SessionGroup]
   let searchPresentation: HarnessMonitorStore.SessionSearchPresentationState
   let searchList: HarnessMonitorStore.SessionSearchResultsListState
-  let selectedSessionID: String?
+  let selectedSessionIDForAccessibilityMarkers: String?
   let bookmarkedSessionIDs: Set<String>
   let isPersistenceAvailable: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
@@ -162,7 +162,7 @@ struct SidebarSessionListContent: View {
   private func sessionRow(_ session: SessionSummary) -> some View {
     let isSelectedForUITest =
       HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
-      && renderState.selectedSessionID == session.sessionId
+      && renderState.selectedSessionIDForAccessibilityMarkers == session.sessionId
     let row = SidebarSessionListLinkRow(
       session: session,
       isBookmarked: renderState.bookmarkedSessionIDs.contains(session.sessionId),
