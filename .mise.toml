@@ -1,6 +1,18 @@
 [tools]
 rust = "nightly"
 
+[tasks."version:show"]
+description = "Print the canonical harness package version"
+run = "./scripts/version.sh show"
+
+[tasks."version:sync"]
+description = "Sync all derived version surfaces from Cargo.toml"
+run = "./scripts/version.sh sync"
+
+[tasks."version:check"]
+description = "Verify all derived version surfaces are in sync"
+run = "./scripts/version.sh check"
+
 [tasks."test:unit"]
 description = "Run unit tests"
 run = "cargo test --lib"
@@ -19,7 +31,7 @@ depends = ["test:unit", "test:integration"]
 
 [tasks.check]
 description = "Type-check without building"
-run = ["cargo check", "cargo clippy --lib"]
+run = ["./scripts/version.sh check", "cargo check", "cargo clippy --lib"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"

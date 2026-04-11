@@ -2,7 +2,12 @@
 set -euo pipefail
 
 ROOT="${SRCROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 XCODEGEN_BIN="${XCODEGEN_BIN:-$(command -v xcodegen || true)}"
+
+if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
+  "$REPO_ROOT/scripts/version.sh" sync-monitor
+fi
 
 if [ -z "${XCODEGEN_BIN}" ]; then
   for candidate in /opt/homebrew/bin/xcodegen /usr/local/bin/xcodegen; do
