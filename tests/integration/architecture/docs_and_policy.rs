@@ -220,6 +220,37 @@ fn repo_version_surfaces_stay_in_sync() {
 }
 
 #[test]
+fn monitor_and_daemon_logging_defaults_stay_verbose() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let app_info = read_repo_file(root, "apps/harness-monitor-macos/Resources/HarnessMonitor-Info.plist");
+    let launch_agent = read_repo_file(
+        root,
+        "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
+    );
+    let agents = read_repo_file(root, "AGENTS.md");
+    let claude = read_repo_file(root, "CLAUDE.md");
+
+    assert!(
+        app_info.contains("<key>OSLogPreferences</key>")
+            && app_info.contains("<string>Debug</string>"),
+        "Harness Monitor app Info.plist should keep OSLogPreferences at Debug persistence/enabling for investigation-grade logging"
+    );
+    assert!(
+        launch_agent.contains("<key>RUST_LOG</key>")
+            && launch_agent.contains("<string>harness=trace</string>"),
+        "bundled launch agent should pin the daemon default filter to harness=trace"
+    );
+    assert!(
+        agents.contains("Default filter: `RUST_LOG=harness=trace`"),
+        "AGENTS.md should document the trace default filter"
+    );
+    assert!(
+        claude.contains("Default filter: `RUST_LOG=harness=trace`"),
+        "CLAUDE.md should document the trace default filter"
+    );
+}
+
+#[test]
 fn docs_describe_automatic_version_sync_workflow() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let agents = read_repo_file(root, "AGENTS.md");

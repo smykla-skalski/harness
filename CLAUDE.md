@@ -117,7 +117,7 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 - Use structured fields: `warn!(%error, "failed to load context")`, `info!(name = %value, "message")`
 - No `#[instrument]` unless explicitly requested
 - Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
-- Default filter: `RUST_LOG=harness=info`
+- Default filter: `RUST_LOG=harness=trace`
 
 ## Gotchas
 

@@ -647,7 +647,10 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func logLevel() async throws -> LogLevelResponse {
-    LogLevelResponse(level: "info", filter: "harness=info")
+    LogLevelResponse(
+      level: HarnessMonitorLogger.defaultDaemonLogLevel,
+      filter: HarnessMonitorLogger.defaultDaemonFilter
+    )
   }
 
   public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
