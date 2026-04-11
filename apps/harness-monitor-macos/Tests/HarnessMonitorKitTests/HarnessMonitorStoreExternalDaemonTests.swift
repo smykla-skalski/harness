@@ -240,6 +240,78 @@ struct HarnessMonitorStoreExternalDaemonTests {
     let response = try await controller.installLaunchAgent()
     #expect(response.contains("already installed"))
   }
+
+  @Test("Manifest watcher fires when a manifest is written to the daemon dir")
+  func manifestWatcherFiresOnFirstWrite() async throws {
+    let tempRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
+    let daemonDir = tempRoot
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("daemon", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: daemonDir,
+      withIntermediateDirectories: true
+    )
+    defer {
+      try? FileManager.default.removeItem(at: tempRoot)
+    }
+
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path,
+      ]
+    )
+
+    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    #expect(manifestURL.path.hasPrefix(tempRoot.path))
+
+    let counter = FireCounter()
+    let watcher = ManifestWatcher(
+      environment: environment,
+      currentEndpoint: ""
+    ) {
+      counter.bump()
+    }
+    watcher.start()
+    defer { watcher.stop() }
+
+    // Let the DispatchSource finish attaching before the write.
+    try await Task.sleep(for: .milliseconds(150))
+
+    // Mimic the daemon's atomic tmp-file + rename write path.
+    let tmpURL = daemonDir.appendingPathComponent("manifest.json.tmp")
+    let payload = #"{"endpoint":"http://127.0.0.1:8765"}"#
+    try payload.write(to: tmpURL, atomically: true, encoding: .utf8)
+    try FileManager.default.moveItem(at: tmpURL, to: manifestURL)
+
+    // Poll briefly; the dispatch source fires on a background queue.
+    var fired = false
+    for _ in 0..<20 {
+      if counter.value > 0 {
+        fired = true
+        break
+      }
+      try await Task.sleep(for: .milliseconds(100))
+    }
+    #expect(fired, "ManifestWatcher did not fire after manifest write")
+  }
+}
+
+private final class FireCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var count = 0
+
+  func bump() {
+    lock.lock()
+    count += 1
+    lock.unlock()
+  }
+
+  var value: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return count
+  }
 }
 
 /// Deterministic launch agent manager for guard/state tests. Unlike
