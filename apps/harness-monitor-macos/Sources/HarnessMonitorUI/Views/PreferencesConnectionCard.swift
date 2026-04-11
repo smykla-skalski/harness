@@ -16,6 +16,7 @@ private func connectionEventIcon(for kind: ConnectionEventKind) -> String {
   case .reconnecting: "arrow.clockwise"
   case .fallback: "exclamationmark.triangle.fill"
   case .error: "exclamationmark.octagon.fill"
+  case .info: "info.circle.fill"
   }
 }
 
@@ -26,6 +27,7 @@ private func connectionEventColor(for kind: ConnectionEventKind) -> Color {
   case .reconnecting: HarnessMonitorTheme.caution
   case .fallback: HarnessMonitorTheme.caution
   case .error: HarnessMonitorTheme.danger
+  case .info: HarnessMonitorTheme.secondaryInk
   }
 }
 
