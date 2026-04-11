@@ -87,30 +87,6 @@ public final class HarnessMonitorStore {
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
-  public var lastAction: String {
-    get {
-      toast.activeFeedback.first { $0.severity == .success }?.message ?? ""
-    }
-    set {
-      if newValue.isEmpty {
-        toast.dismissAllMatching(severity: .success)
-      } else {
-        toast.presentSuccess(newValue)
-      }
-    }
-  }
-  public var lastError: String? {
-    get {
-      toast.activeFeedback.first { $0.severity == .failure }?.message
-    }
-    set {
-      if let newValue, !newValue.isEmpty {
-        toast.presentFailure(newValue)
-      } else {
-        toast.dismissAllMatching(severity: .failure)
-      }
-    }
-  }
 
   public var persistenceError: String? {
     didSet {
@@ -209,14 +185,6 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
-  public var lastActionDismissDelay: Duration {
-    get { toast.successDismissDelay }
-    set {
-      toast.successDismissDelay = newValue
-      toast.failureDismissDelay = newValue
-    }
-  }
-
   public convenience init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
@@ -323,6 +291,7 @@ public final class HarnessMonitorStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+      presentFailureFeedback(error.localizedDescription)
       startManifestWatcher()
       await restorePersistedSessionState()
     }
@@ -352,6 +321,7 @@ public final class HarnessMonitorStore {
         (error as? DaemonControlError)?.errorDescription
         ?? "External daemon not running. Start it with `harness daemon dev` in a terminal."
       markConnectionOffline(message)
+      presentFailureFeedback(message)
       await restorePersistedSessionState()
       // External mode: keep the manifest watcher running while offline so
       // the first valid manifest write auto-reconnects without a user action.
@@ -466,6 +436,7 @@ public final class HarnessMonitorStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+      presentFailureFeedback(error.localizedDescription)
       startManifestWatcher()
       await restorePersistedSessionState()
     }
@@ -483,7 +454,7 @@ public final class HarnessMonitorStore {
       markConnectionOffline("Daemon stopped")
       await refreshDaemonStatus()
       await restorePersistedSessionState()
-      showLastAction("Stop daemon")
+      presentSuccessFeedback("Stop daemon")
     } catch {
       presentFailureFeedback(error.localizedDescription)
     }
@@ -496,7 +467,7 @@ public final class HarnessMonitorStore {
     do {
       _ = try await daemonController.installLaunchAgent()
       await refreshDaemonStatus()
-      showLastAction("Install launch agent")
+      presentSuccessFeedback("Install launch agent")
     } catch {
       presentFailureFeedback(error.localizedDescription)
     }
@@ -509,7 +480,7 @@ public final class HarnessMonitorStore {
     do {
       _ = try await daemonController.removeLaunchAgent()
       await refreshDaemonStatus()
-      showLastAction("Remove launch agent")
+      presentSuccessFeedback("Remove launch agent")
     } catch {
       presentFailureFeedback(error.localizedDescription)
     }
@@ -560,7 +531,7 @@ public final class HarnessMonitorStore {
   }
 
   public func prepareForTermination() async {
-    clearLastAction()
+    toast.dismissAll()
     stopAllStreams()
     stopManifestWatcher()
 
@@ -603,49 +574,26 @@ public final class HarnessMonitorStore {
     await refresh(using: client, preserveSelection: true)
   }
 
-  public func configureUITestBehavior(lastActionDismissDelay: Duration) {
-    toast.successDismissDelay = lastActionDismissDelay
-    toast.failureDismissDelay = lastActionDismissDelay
-  }
-
-  public func showLastAction(_ action: String) {
-    lastAction = action
-    guard !action.isEmpty else {
-      dismissFeedback(severity: .success)
-      return
-    }
-    dismissFeedback(severity: .success)
-    toast.presentSuccess(action)
-  }
-
-  public func clearLastAction() {
-    lastAction = ""
-    dismissFeedback(severity: .success)
+  public func configureUITestBehavior(
+    successFeedbackDismissDelay: Duration,
+    failureFeedbackDismissDelay: Duration
+  ) {
+    toast.successDismissDelay = successFeedbackDismissDelay
+    toast.failureDismissDelay = failureFeedbackDismissDelay
   }
 
   @discardableResult
   public func presentSuccessFeedback(_ message: String) -> UUID {
-    lastAction = message
-    return toast.presentSuccess(message)
+    toast.presentSuccess(message)
   }
 
   @discardableResult
   public func presentFailureFeedback(_ message: String) -> UUID {
-    lastError = message
-    return toast.presentFailure(message)
+    toast.presentFailure(message)
   }
 
   public func dismissFeedback(id: UUID) {
     toast.dismiss(id: id)
-  }
-
-  private func dismissFeedback(severity: ActionFeedback.Severity) {
-    let matchingIDs = toast.activeFeedback.compactMap { feedback in
-      feedback.severity == severity ? feedback.id : nil
-    }
-    for id in matchingIDs {
-      toast.dismiss(id: id)
-    }
   }
 
   func stopGlobalStream() {

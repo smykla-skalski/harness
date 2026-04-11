@@ -61,7 +61,7 @@ struct HarnessMonitorStoreSheetTests {
     store.presentSendSignalSheet(agentID: "leader-claude")
 
     #expect(store.presentedSheet == nil)
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
   }
 
   @Test("presentSendSignalSheet does nothing without a selected session")

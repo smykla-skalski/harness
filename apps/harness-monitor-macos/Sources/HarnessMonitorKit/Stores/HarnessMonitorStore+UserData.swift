@@ -312,7 +312,7 @@ extension HarnessMonitorStore {
       underlyingError: underlyingError
     )
     persistenceError = message
-    lastError = message
+    presentFailureFeedback(message)
     bookmarkedSessionIds = []
   }
 
@@ -320,12 +320,13 @@ extension HarnessMonitorStore {
     for action: String
   ) -> ModelContext? {
     guard let modelContext, persistenceError == nil else {
-      lastError =
+      presentFailureFeedback(
         persistenceError
-        ?? persistenceFailureMessage(
-          action: action,
-          underlyingError: nil
-        )
+          ?? persistenceFailureMessage(
+            action: action,
+            underlyingError: nil
+          )
+      )
       return nil
     }
     return modelContext

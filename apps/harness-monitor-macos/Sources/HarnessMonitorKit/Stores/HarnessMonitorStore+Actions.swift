@@ -389,7 +389,7 @@ extension HarnessMonitorStore {
       applySessionSummaryUpdate(measuredMutation.value.session)
       synchronizeActionActor()
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
-      showLastAction(actionName)
+      presentSuccessFeedback(actionName)
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)

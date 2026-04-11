@@ -372,11 +372,7 @@ struct PreferencesGeneralSection: View {
         Text("Overview")
       }
 
-      PreferencesStatusSection(
-        startedAt: startedAt,
-        lastError: store.lastError,
-        lastAction: store.lastAction
-      )
+      PreferencesStatusSection(startedAt: startedAt)
     }
     .preferencesDetailFormStyle()
     .confirmationDialog(

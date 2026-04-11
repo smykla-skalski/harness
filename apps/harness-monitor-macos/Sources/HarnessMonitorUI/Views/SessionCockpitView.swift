@@ -7,7 +7,6 @@ struct SessionCockpitView: View {
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
   let isExtensionsLoading: Bool
-  let lastAction: String
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -71,7 +70,6 @@ struct SessionCockpitView: View {
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     isSessionReadOnly: false,
-    isExtensionsLoading: false,
-    lastAction: "Observe action queued"
+    isExtensionsLoading: false
   )
 }

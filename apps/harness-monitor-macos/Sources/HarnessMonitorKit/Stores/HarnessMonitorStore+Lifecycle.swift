@@ -73,7 +73,9 @@ extension HarnessMonitorStore {
           fallbackWorktreeCount: measuredProjects.value.reduce(0) { $0 + $1.worktrees.count },
           fallbackSessionCount: measuredSessions.value.count
         )
-        daemonLogLevel = measuredDiagnostics.value.health?.logLevel
+        daemonLogLevel =
+          measuredDiagnostics.value.health?.logLevel
+          ?? HarnessMonitorLogger.defaultDaemonLogLevel
       }
       recordRequestSuccess(
         latencyMs: measuredDiagnostics.latencyMs,
