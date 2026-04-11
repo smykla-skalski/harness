@@ -70,30 +70,39 @@ private struct SessionCockpitSignalCard: View {
     reduceMotion ? nil : .easeOut(duration: 0.15)
   }
 
+  private var firstMessageLine: String {
+    let message = signal.signal.payload.message
+    if let newlineIndex = message.firstIndex(where: \.isNewline) {
+      return String(message[..<newlineIndex])
+    }
+    return message
+  }
+
   var body: some View {
     ZStack(alignment: .topTrailing) {
       Button {
         store.inspect(signalID: signal.signal.signalId)
       } label: {
-        HStack(alignment: .top) {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.sectionSpacing) {
             Text(signal.signal.command)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-            HarnessMonitorMarkdownText(
-              signal.signal.payload.message,
-              font: .subheadline,
-              rendering: .plainPreview,
-              lineLimit: 3
-            )
-          }
-          Spacer()
-          VStack(alignment: .trailing, spacing: HarnessMonitorTheme.itemSpacing) {
+              .frame(maxWidth: .infinity, alignment: .leading)
             Text(effectiveStatus.title)
               .scaledFont(.caption.bold())
               .foregroundStyle(signalStatusColor(for: effectiveStatus))
+          }
+          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.sectionSpacing) {
+            HarnessMonitorMarkdownText(
+              firstMessageLine,
+              font: .subheadline,
+              rendering: .plainPreview,
+              lineLimit: 1
+            )
             Text(formatTimestamp(signal.signal.createdAt, configuration: dateTimeConfiguration))
               .scaledFont(.caption.monospaced())
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .fixedSize(horizontal: true, vertical: false)
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
