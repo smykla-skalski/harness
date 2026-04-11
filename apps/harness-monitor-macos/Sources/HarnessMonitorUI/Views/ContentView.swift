@@ -120,6 +120,18 @@ public struct ContentView: View {
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .navigationTitle(windowTitle)
+    .toolbar {
+      ContentNavigationToolbarItems(
+        store: store,
+        toolbarUI: contentToolbar
+      )
+      ContentCenterpieceToolbarItems(
+        store: store,
+        toolbarUI: contentToolbar,
+        displayMode: toolbarCenterpieceDisplayMode,
+        availableDetailWidth: toolbarLayoutWidth
+      )
+    }
     .task {
       guard !hasAppliedInitialInspectorVisibility else {
         return
@@ -183,14 +195,6 @@ public struct ContentView: View {
       ContentSceneRestorationBridge(
         store: store,
         shellUI: contentShell
-      )
-    }
-    .background {
-      ContentWindowToolbarBridge(
-        store: store,
-        toolbarUI: contentToolbar,
-        displayMode: toolbarCenterpieceDisplayMode,
-        availableDetailWidth: toolbarLayoutWidth
       )
     }
     .modifier(
@@ -397,28 +401,5 @@ private struct ContentSceneRestorationBridge: View {
     }
     hasSeededSceneRestoration = true
     store.primeSessionSelection(restoredSessionID)
-  }
-}
-
-private struct ContentWindowToolbarBridge: View {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let displayMode: ToolbarCenterpieceDisplayMode
-  let availableDetailWidth: CGFloat
-
-  var body: some View {
-    Color.clear
-      .toolbar {
-        ContentNavigationToolbarItems(
-          store: store,
-          toolbarUI: toolbarUI
-        )
-        ContentCenterpieceToolbarItems(
-          store: store,
-          toolbarUI: toolbarUI,
-          displayMode: displayMode,
-          availableDetailWidth: availableDetailWidth
-        )
-      }
   }
 }

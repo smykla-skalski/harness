@@ -110,6 +110,28 @@ struct SidebarView: View {
     .safeAreaInset(edge: .bottom, spacing: 0) {
       SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
     }
+    .toolbar {
+      if filterToolbarVisibilityProgress > 0.02 {
+        ToolbarItem(placement: .primaryAction) {
+          SidebarToolbarFilterMenu(
+            store: store,
+            sessionFilter: controls.sessionFilter,
+            sessionFocusFilter: controls.sessionFocusFilter,
+            sessionSortOrder: controls.sessionSortOrder,
+            hasActiveFilters: hasActiveSidebarFilters
+          )
+          .opacity(filterToolbarVisibilityProgress)
+          .scaleEffect(
+            x: 0.94 + (0.06 * filterToolbarVisibilityProgress),
+            y: 0.94 + (0.06 * filterToolbarVisibilityProgress),
+            anchor: .trailing
+          )
+          .allowsHitTesting(filterToolbarVisibilityProgress > 0.85)
+          .accessibilityHidden(filterToolbarVisibilityProgress < 0.15)
+          .animation(.easeInOut(duration: 0.12), value: filterToolbarVisibilityProgress)
+        }
+      }
+    }
     .onSubmit(of: .search) {
       store.flushPendingSearchRebuild()
       if sidebarUI.isPersistenceAvailable {
@@ -137,16 +159,6 @@ struct SidebarView: View {
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
-    .background {
-      SidebarToolbarBridge(
-        store: store,
-        sessionFilter: controls.sessionFilter,
-        sessionFocusFilter: controls.sessionFocusFilter,
-        sessionSortOrder: controls.sessionSortOrder,
-        hasActiveFilters: hasActiveSidebarFilters,
-        visibilityProgress: filterToolbarVisibilityProgress
-      )
-    }
     .overlay {
       if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
         AccessibilityTextMarker(
@@ -195,41 +207,6 @@ struct SidebarView: View {
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
     }
-  }
-}
-
-private struct SidebarToolbarBridge: View {
-  let store: HarnessMonitorStore
-  let sessionFilter: HarnessMonitorStore.SessionFilter
-  let sessionFocusFilter: SessionFocusFilter
-  let sessionSortOrder: SessionSortOrder
-  let hasActiveFilters: Bool
-  let visibilityProgress: Double
-
-  var body: some View {
-    Color.clear
-      .toolbar {
-        if visibilityProgress > 0.02 {
-          ToolbarItem(placement: .primaryAction) {
-            SidebarToolbarFilterMenu(
-              store: store,
-              sessionFilter: sessionFilter,
-              sessionFocusFilter: sessionFocusFilter,
-              sessionSortOrder: sessionSortOrder,
-              hasActiveFilters: hasActiveFilters
-            )
-            .opacity(visibilityProgress)
-            .scaleEffect(
-              x: 0.94 + (0.06 * visibilityProgress),
-              y: 0.94 + (0.06 * visibilityProgress),
-              anchor: .trailing
-            )
-            .allowsHitTesting(visibilityProgress > 0.85)
-            .accessibilityHidden(visibilityProgress < 0.15)
-            .animation(.easeInOut(duration: 0.12), value: visibilityProgress)
-          }
-        }
-      }
   }
 }
 
