@@ -709,20 +709,14 @@ struct AgentTuiSheetView: View {
       Text(agentTuiBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(agentTuiBridgeCommand)
-        .scaledFont(.body.monospaced())
-        .textSelection(.enabled)
-        .padding(HarnessMonitorTheme.spacingSM)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-      Button("Copy command") {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(agentTuiBridgeCommand, forType: .string)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      CopyableCommandBox(
+        command: agentTuiBridgeCommand,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiCopyCommandButton
+      )
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRecoveryBanner)
   }
 
@@ -841,4 +835,48 @@ struct AgentTuiSheetView: View {
   private func revealTranscript(_ tui: AgentTuiSnapshot) {
     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: tui.transcriptPath)])
   }
+}
+
+struct CopyableCommandBox: View {
+  let command: String
+  let accessibilityIdentifier: String
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(command)
+        .scaledFont(.body.monospaced())
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Button {
+        HarnessMonitorClipboard.copy(command)
+      } label: {
+        Image(systemName: "doc.on.clipboard")
+          .imageScale(.medium)
+      }
+      .buttonStyle(.borderless)
+      .help("Copy command")
+      .accessibilityLabel("Copy command")
+      .accessibilityIdentifier(accessibilityIdentifier)
+    }
+    .padding(HarnessMonitorTheme.spacingSM)
+    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+  }
+}
+
+#Preview("CopyableCommandBox - short") {
+  CopyableCommandBox(
+    command: "harness bridge start",
+    accessibilityIdentifier: "preview-short"
+  )
+  .padding()
+  .frame(width: 600)
+}
+
+#Preview("CopyableCommandBox - long") {
+  CopyableCommandBox(
+    command: "harness bridge start --capability agent-tui --capability codex",
+    accessibilityIdentifier: "preview-long"
+  )
+  .padding()
+  .frame(width: 600)
 }
