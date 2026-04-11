@@ -231,15 +231,12 @@ private struct TaskDragPreview: View {
   let taskID: String
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      TaskDragGestureIcon(size: 14)
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Image(systemName: "list.bullet.clipboard")
+        .imageScale(.small)
         .foregroundStyle(HarnessMonitorTheme.accent)
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Assign task")
-          .scaledFont(.caption.weight(.bold))
-        Text(taskID)
-          .scaledFont(.caption2.monospaced())
-      }
+      Text(taskID)
+        .scaledFont(.caption2.monospaced())
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
