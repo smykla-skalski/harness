@@ -118,7 +118,7 @@ impl BridgeStatusReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiBridgeStartSpec {
+pub struct AgentTuiStartSpec {
     pub session_id: String,
     pub agent_id: String,
     pub tui_id: String,
@@ -562,7 +562,7 @@ impl BridgeServer {
     fn handle_agent_tui(&self, action: &str, payload: Value) -> Result<BridgeResponse, CliError> {
         match action {
             "start" => {
-                let spec: AgentTuiBridgeStartSpec = parse_bridge_payload(payload)?;
+                let spec: AgentTuiStartSpec = parse_bridge_payload(payload)?;
                 let snapshot = self.start_agent_tui(spec)?;
                 BridgeResponse::ok_payload(&snapshot)
             }
@@ -597,7 +597,7 @@ impl BridgeServer {
         }
     }
 
-    fn start_agent_tui(&self, spec: AgentTuiBridgeStartSpec) -> Result<AgentTuiSnapshot, CliError> {
+    fn start_agent_tui(&self, spec: AgentTuiStartSpec) -> Result<AgentTuiSnapshot, CliError> {
         if !self
             .capabilities()?
             .contains_key(BRIDGE_CAPABILITY_AGENT_TUI)
@@ -909,10 +909,7 @@ impl BridgeClient {
     /// # Errors
     /// Returns [`CliError`] when the bridge rejects the request or the payload
     /// cannot be encoded or decoded.
-    pub fn agent_tui_start(
-        &self,
-        spec: &AgentTuiBridgeStartSpec,
-    ) -> Result<AgentTuiSnapshot, CliError> {
+    pub fn agent_tui_start(&self, spec: &AgentTuiStartSpec) -> Result<AgentTuiSnapshot, CliError> {
         self.typed_capability_request(BridgeCapability::AgentTui, "start", spec)
     }
 

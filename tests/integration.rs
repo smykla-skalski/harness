@@ -2,9 +2,9 @@
 // Declares all submodules under tests/integration/.
 
 mod integration {
-    mod agent_tui_bridge;
     mod architecture;
-    mod codex_bridge;
+    mod bridge_agent_tui;
+    mod bridge_codex;
     mod daemon_comparison;
     mod daemon_control;
     mod daemon_perf;
