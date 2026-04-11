@@ -6,6 +6,7 @@ use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use harness::session::service as session_service;
 use harness::session::types::{SessionRole, TaskSeverity};
 use harness::workspace::utc_now;
+use harness_testkit::with_isolated_harness_env;
 
 /// Seed two projects with sessions, agents, tasks, and a daemon manifest.
 fn seed_workspace(tmp: &std::path::Path) {
@@ -107,96 +108,91 @@ fn to_normalized_json<T: serde::Serialize>(value: &T) -> serde_json::Value {
     json
 }
 
+fn with_comparison_test_env<T>(
+    base: &std::path::Path,
+    session_id: &str,
+    action: impl FnOnce() -> T,
+) -> T {
+    with_isolated_harness_env(base, || {
+        temp_env::with_var("CLAUDE_SESSION_ID", Some(session_id), action)
+    })
+}
+
 #[ignore]
 #[test]
 fn file_and_db_reads_produce_identical_output() {
     let tmp = tempdir().expect("tempdir");
-    let xdg = tmp.path().to_str().expect("utf8").to_string();
-
-    temp_env::with_vars(
-        [
-            ("XDG_DATA_HOME", Some(xdg.as_str())),
-            ("CLAUDE_SESSION_ID", Some("comparison-session")),
-        ],
-        || seed_workspace(tmp.path()),
-    );
+    with_comparison_test_env(tmp.path(), "comparison-session", || {
+        seed_workspace(tmp.path())
+    });
 
     let db_path = tmp.path().join("harness/daemon/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
-    temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
-        db.import_from_files()
-    })
-    .expect("import");
+    with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
 
-    temp_env::with_vars(
-        [
-            ("XDG_DATA_HOME", Some(xdg.as_str())),
-            ("CLAUDE_SESSION_ID", Some("comparison-session")),
-        ],
-        || {
-            let manifest = state::load_manifest().expect("manifest").expect("present");
+    with_comparison_test_env(tmp.path(), "comparison-session", || {
+        let manifest = state::load_manifest().expect("manifest").expect("present");
 
-            // --- list_projects ---
-            let file_projects = service::list_projects(None).expect("file projects");
-            let db_projects = service::list_projects(Some(&db)).expect("db projects");
-            assert_eq!(
-                to_normalized_json(&file_projects),
-                to_normalized_json(&db_projects),
-                "list_projects diverged"
-            );
+        // --- list_projects ---
+        let file_projects = service::list_projects(None).expect("file projects");
+        let db_projects = service::list_projects(Some(&db)).expect("db projects");
+        assert_eq!(
+            to_normalized_json(&file_projects),
+            to_normalized_json(&db_projects),
+            "list_projects diverged"
+        );
 
-            // --- list_sessions ---
-            let file_sessions = service::list_sessions(true, None).expect("file sessions");
-            let db_sessions = service::list_sessions(true, Some(&db)).expect("db sessions");
-            assert_eq!(
-                to_normalized_json(&file_sessions),
-                to_normalized_json(&db_sessions),
-                "list_sessions diverged"
-            );
+        // --- list_sessions ---
+        let file_sessions = service::list_sessions(true, None).expect("file sessions");
+        let db_sessions = service::list_sessions(true, Some(&db)).expect("db sessions");
+        assert_eq!(
+            to_normalized_json(&file_sessions),
+            to_normalized_json(&db_sessions),
+            "list_sessions diverged"
+        );
 
-            // --- health_response ---
-            let file_health = service::health_response(&manifest, None).expect("file health");
-            let db_health = service::health_response(&manifest, Some(&db)).expect("db health");
-            // Compare counts only (endpoint/version/uptime are identical).
-            assert_eq!(
-                file_health.project_count, db_health.project_count,
-                "health project_count diverged"
-            );
-            assert_eq!(
-                file_health.session_count, db_health.session_count,
-                "health session_count diverged"
-            );
+        // --- health_response ---
+        let file_health = service::health_response(&manifest, None).expect("file health");
+        let db_health = service::health_response(&manifest, Some(&db)).expect("db health");
+        // Compare counts only (endpoint/version/uptime are identical).
+        assert_eq!(
+            file_health.project_count, db_health.project_count,
+            "health project_count diverged"
+        );
+        assert_eq!(
+            file_health.session_count, db_health.session_count,
+            "health session_count diverged"
+        );
 
-            // --- session_detail ---
-            let file_detail = service::session_detail("cmp1", None).expect("file detail");
-            let db_detail = service::session_detail("cmp1", Some(&db)).expect("db detail");
-            let file_json = to_normalized_json(&file_detail);
-            let db_json = to_normalized_json(&db_detail);
-            // Compare key fields (full JSON may differ in ordering of
-            // signals/activity which are loaded differently).
-            assert_eq!(
-                file_json["session_id"], db_json["session_id"],
-                "detail session_id diverged"
-            );
-            assert_eq!(
-                file_json["agents"], db_json["agents"],
-                "detail agents diverged"
-            );
-            assert_eq!(
-                file_json["tasks"], db_json["tasks"],
-                "detail tasks diverged"
-            );
+        // --- session_detail ---
+        let file_detail = service::session_detail("cmp1", None).expect("file detail");
+        let db_detail = service::session_detail("cmp1", Some(&db)).expect("db detail");
+        let file_json = to_normalized_json(&file_detail);
+        let db_json = to_normalized_json(&db_detail);
+        // Compare key fields (full JSON may differ in ordering of
+        // signals/activity which are loaded differently).
+        assert_eq!(
+            file_json["session_id"], db_json["session_id"],
+            "detail session_id diverged"
+        );
+        assert_eq!(
+            file_json["agents"], db_json["agents"],
+            "detail agents diverged"
+        );
+        assert_eq!(
+            file_json["tasks"], db_json["tasks"],
+            "detail tasks diverged"
+        );
 
-            // --- session_timeline ---
-            let file_timeline = service::session_timeline("cmp1", None).expect("file timeline");
-            let db_timeline = service::session_timeline("cmp1", Some(&db)).expect("db timeline");
-            assert_eq!(
-                file_timeline.len(),
-                db_timeline.len(),
-                "timeline entry count diverged: file={} db={}",
-                file_timeline.len(),
-                db_timeline.len()
-            );
-        },
-    );
+        // --- session_timeline ---
+        let file_timeline = service::session_timeline("cmp1", None).expect("file timeline");
+        let db_timeline = service::session_timeline("cmp1", Some(&db)).expect("db timeline");
+        assert_eq!(
+            file_timeline.len(),
+            db_timeline.len(),
+            "timeline entry count diverged: file={} db={}",
+            file_timeline.len(),
+            db_timeline.len()
+        );
+    });
 }

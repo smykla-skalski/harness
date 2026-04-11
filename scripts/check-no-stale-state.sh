@@ -5,14 +5,15 @@
 set -euo pipefail
 
 readonly RESET_HINT="run 'mise run clean:stale' to reset"
+readonly HARNESS_DEBUG_PROCESS_PATTERN='target/(debug|dev/[^/]+/debug)/harness (daemon|bridge)'
 
 stale=()
 
-# 1. Orphan target/debug harness daemon or bridge processes (leak vector for
-#    perf audits that crashed mid-run before cleanup_host_processes fired).
-orphans="$(pgrep -f 'target/debug/harness (daemon|bridge)' 2>/dev/null || true)"
+# 1. Orphan local debug harness daemon or bridge processes (leak vector for
+#    perf audits or integration tests that crashed mid-run before cleanup ran).
+orphans="$(pgrep -f "$HARNESS_DEBUG_PROCESS_PATTERN" 2>/dev/null || true)"
 if [[ -n "$orphans" ]]; then
-  stale+=("orphan target/debug/harness processes: $(echo "$orphans" | tr '\n' ' ')")
+  stale+=("orphan local debug harness processes: $(echo "$orphans" | tr '\n' ' ')")
 fi
 
 # 2. Stale /tmp bridge sockets. The sandboxed daemon now uses a Group
