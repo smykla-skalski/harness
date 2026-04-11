@@ -440,6 +440,28 @@ extension HarnessMonitorStore {
     self.daemonStatus = daemonStatus.updating(hostBridge: status.hostBridgeManifest)
   }
 
+  /// Apply a lightweight in-place manifest update triggered by the
+  /// `ManifestWatcher` file-system event. Refreshes `daemonStatus` with the
+  /// new `hostBridge` snapshot and clears any transient
+  /// `hostBridgeCapabilityIssues` picked up from earlier 501/503 responses,
+  /// so stale "unavailable" flags do not shadow a freshly-healthy bridge.
+  /// Preserves launch agent, project counts, diagnostics, and every other
+  /// daemon status field.
+  ///
+  /// No-op when `daemonStatus` is nil (bootstrap has not finished) - the
+  /// initial `daemonStatus` assignment will carry the latest manifest
+  /// anyway via `refreshDaemonStatus`. The `ManifestWatcher` already logs
+  /// the revision transition via `HarnessMonitorLogger.lifecycle.info`, so
+  /// this method deliberately does not emit a connection event and keeps
+  /// the store's visible timeline uncluttered.
+  func applyManifestRevision(_ manifest: DaemonManifest) {
+    guard let current = daemonStatus else {
+      return
+    }
+    daemonStatus = current.updating(hostBridge: manifest.hostBridge)
+    clearTransientHostBridgeIssues()
+  }
+
   private func mutateHostBridgeCapability(
     using client: any HarnessMonitorClientProtocol,
     capability: String,
