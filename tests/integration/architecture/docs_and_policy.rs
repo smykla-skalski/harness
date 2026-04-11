@@ -185,7 +185,9 @@ fn repo_version_surfaces_stay_in_sync() {
         "Cargo.lock harness package entry should match Cargo.toml version {version}"
     );
     assert!(
-        cargo_lock.contains(&format!("name = \"harness-testkit\"\nversion = \"{version}\"")),
+        cargo_lock.contains(&format!(
+            "name = \"harness-testkit\"\nversion = \"{version}\""
+        )),
         "Cargo.lock harness-testkit package entry should match Cargo.toml version {version}"
     );
     assert!(
@@ -222,7 +224,10 @@ fn repo_version_surfaces_stay_in_sync() {
 #[test]
 fn monitor_and_daemon_logging_defaults_stay_verbose() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let app_info = read_repo_file(root, "apps/harness-monitor-macos/Resources/HarnessMonitor-Info.plist");
+    let app_info = read_repo_file(
+        root,
+        "apps/harness-monitor-macos/Resources/HarnessMonitor-Info.plist",
+    );
     let launch_agent = read_repo_file(
         root,
         "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
