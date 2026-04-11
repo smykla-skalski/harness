@@ -276,6 +276,30 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
   }
 
+  @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
+  func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .enabled,
+      warmUpError: DaemonControlError.daemonDidNotStart
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    if case .offline = store.connectionState {
+      // expected
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+    #expect(store.manifestWatcher != nil)
+    #expect(
+      store.connectionEvents.contains { event in
+        event.detail.contains("Managed daemon did not become healthy; refreshing the bundled launch agent")
+      }
+    )
+  }
+
   @Test("startDaemon registers the launch agent when notRegistered then connects")
   func startDaemonRegistersWhenNotRegisteredThenConnects() async {
     let daemon = RecordingDaemonController(launchAgentInstalled: false)
@@ -344,6 +368,25 @@ struct HarnessMonitorStoreLifecycleCoreTests {
 
     #expect(store.connectionState == .online)
     #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
+  }
+
+  @Test("startDaemon keeps a manifest watcher armed after managed warm-up failure")
+  func startDaemonStartsManifestWatcherAfterManagedWarmUpFailure() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .enabled,
+      warmUpError: DaemonControlError.daemonDidNotStart
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.startDaemon()
+
+    if case .offline = store.connectionState {
+      // expected
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+    #expect(store.manifestWatcher != nil)
   }
 
   @Test("Prepare for termination cancels background work and shuts down the client")

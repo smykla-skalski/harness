@@ -323,6 +323,7 @@ public final class HarnessMonitorStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+      startManifestWatcher()
       await restorePersistedSessionState()
     }
   }
@@ -465,6 +466,7 @@ public final class HarnessMonitorStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+      startManifestWatcher()
       await restorePersistedSessionState()
     }
   }
