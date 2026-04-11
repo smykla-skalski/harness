@@ -3,7 +3,6 @@ use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::agents::storage::project_context_root_from_session_path;
@@ -11,6 +10,7 @@ use crate::app::command_context::resolve_project_dir;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::observe::session;
 use crate::observe::types::ObserverState;
 use crate::workspace::{project_context_dir, utc_now};
@@ -65,32 +65,16 @@ fn lock_path(project_context_root: &Path, observe_id: &str) -> PathBuf {
         .join(format!("observe-{observe_id}.lock"))
 }
 
-fn open_lock_file(path: &Path) -> Result<File, CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
-    }
-    OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|error| io_err(&error))
-}
-
 fn with_lock<T>(
     project_context_root: &Path,
     observe_id: &str,
     action: impl FnOnce() -> Result<T, CliError>,
 ) -> Result<T, CliError> {
-    let file = open_lock_file(&lock_path(project_context_root, observe_id))?;
-    file.lock_exclusive().map_err(|error| io_err(&error))?;
-    let result = action();
-    let unlock = file.unlock().map_err(|error| io_err(&error));
-    match (result, unlock) {
-        (Ok(value), Ok(())) => Ok(value),
-        (Err(error), Ok(()) | Err(_)) | (Ok(_), Err(error)) => Err(error),
-    }
+    with_exclusive_flock(
+        &lock_path(project_context_root, observe_id),
+        FlockErrorContext::new("observer storage"),
+        action,
+    )
 }
 
 pub(crate) fn load_observer_state(

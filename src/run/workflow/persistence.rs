@@ -2,11 +2,9 @@ use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::kernel::skills::dirs as skill_dirs;
 use crate::run::audit::append_runner_state_audit;
-use fs_err as fs;
-use fs2::FileExt;
-use std::fs::{File, OpenOptions};
 
 use super::types::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
@@ -26,59 +24,15 @@ fn runner_lock_path(run_dir: &Path) -> PathBuf {
     path.with_file_name(format!("{file_name}.lock"))
 }
 
-fn open_runner_lock_file(run_dir: &Path) -> Result<File, CliError> {
-    let lock_path = runner_lock_path(run_dir);
-    if let Some(parent) = lock_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!(
-                "failed to create runner lock directory {}: {error}",
-                parent.display()
-            ))
-            .into()
-        })?;
-    }
-
-    OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(&lock_path)
-        .map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!(
-                "failed to open runner lock {}: {error}",
-                lock_path.display()
-            ))
-            .into()
-        })
-}
-
 fn with_runner_lock<R>(
     run_dir: &Path,
     action: impl FnOnce() -> Result<R, CliError>,
 ) -> Result<R, CliError> {
-    let lock_file = open_runner_lock_file(run_dir)?;
-    lock_file.lock_exclusive().map_err(|error| -> CliError {
-        CliErrorKind::workflow_io(format!(
-            "failed to acquire runner lock {}: {error}",
-            runner_lock_path(run_dir).display()
-        ))
-        .into()
-    })?;
-
-    let result = action();
-    let unlock_result = lock_file.unlock().map_err(|error| -> CliError {
-        CliErrorKind::workflow_io(format!(
-            "failed to release runner lock {}: {error}",
-            runner_lock_path(run_dir).display()
-        ))
-        .into()
-    });
-
-    match (result, unlock_result) {
-        (Ok(value), Ok(())) => Ok(value),
-        (Err(error), Ok(()) | Err(_)) | (Ok(_), Err(error)) => Err(error),
-    }
+    with_exclusive_flock(
+        &runner_lock_path(run_dir),
+        FlockErrorContext::new("runner persistence"),
+        action,
+    )
 }
 
 fn load_runner_state_file(path: &Path) -> Result<Option<RunnerWorkflowState>, CliError> {

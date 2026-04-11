@@ -1,17 +1,21 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
-use std::io::{self, Write as _};
+use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
+pub use crate::infra::persistence::flock::FlockGuard;
+use crate::infra::persistence::flock::{
+    FlockErrorContext, TryAcquireFlockError, flock_is_held_at as shared_flock_is_held_at,
+    try_acquire_exclusive_flock,
+};
 use crate::workspace::{dirs_home, harness_data_root, host_home_dir, utc_now};
 
 const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
@@ -132,19 +136,6 @@ pub struct DaemonDiagnostics {
     pub last_event: Option<DaemonAuditEvent>,
 }
 
-/// An RAII guard that holds an exclusive `flock` on a file for the current
-/// process lifetime. Dropping the guard releases the lock.
-#[derive(Debug)]
-pub struct FlockGuard {
-    file: fs::File,
-}
-
-impl Drop for FlockGuard {
-    fn drop(&mut self) {
-        let _ = self.file.unlock();
-    }
-}
-
 /// Type alias so external callers that already name [`DaemonLockGuard`] keep
 /// compiling without any changes.
 pub type DaemonLockGuard = FlockGuard;
@@ -249,19 +240,12 @@ pub(crate) fn acquire_flock_exclusive(
     path: &Path,
     label: &'static str,
 ) -> Result<FlockGuard, CliError> {
-    let file = fs::OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|error| CliErrorKind::workflow_io(format!("open {label} lock: {error}")))?;
-    match file.try_lock_exclusive() {
-        Ok(()) => Ok(FlockGuard { file }),
-        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+    match try_acquire_exclusive_flock(path, FlockErrorContext::new(label)) {
+        Ok(guard) => Ok(guard),
+        Err(TryAcquireFlockError::Busy) => {
             Err(CliErrorKind::workflow_io(format!("{label} already running")).into())
         }
-        Err(error) => Err(CliErrorKind::workflow_io(format!("lock {label}: {error}")).into()),
+        Err(TryAcquireFlockError::Io(error)) => Err(error),
     }
 }
 
@@ -273,17 +257,7 @@ pub(crate) fn acquire_flock_exclusive(
 /// and stale files.
 #[must_use]
 pub(crate) fn flock_is_held_at(path: &Path) -> bool {
-    let Ok(file) = fs::OpenOptions::new().read(true).write(true).open(path) else {
-        return false;
-    };
-    match file.try_lock_exclusive() {
-        Ok(()) => {
-            let _ = file.unlock();
-            false
-        }
-        Err(error) if error.kind() == io::ErrorKind::WouldBlock => true,
-        Err(_) => false,
-    }
+    shared_flock_is_held_at(path)
 }
 
 /// Acquire the daemon singleton lock for the current process lifetime.
@@ -524,6 +498,7 @@ fn latest_event() -> Result<Option<DaemonAuditEvent>, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fs2::FileExt;
     use tempfile::tempdir;
 
     #[test]
