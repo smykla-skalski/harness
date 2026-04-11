@@ -295,6 +295,63 @@ struct HarnessMonitorStoreExternalDaemonTests {
     }
     #expect(fired, "ManifestWatcher did not fire after manifest write")
   }
+
+  @Test("Manifest watcher fires when startedAt changes even if the endpoint stays the same")
+  func manifestWatcherFiresWhenStartedAtChanges() async throws {
+    let tempRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
+    let daemonDir = tempRoot
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("daemon", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: daemonDir,
+      withIntermediateDirectories: true
+    )
+    defer {
+      try? FileManager.default.removeItem(at: tempRoot)
+    }
+
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path,
+      ]
+    )
+
+    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    let initialPayload =
+      #"{"endpoint":"http://127.0.0.1:8765","started_at":"2026-04-11T12:00:00Z"}"#
+    try initialPayload.write(to: manifestURL, atomically: true, encoding: .utf8)
+
+    let counter = FireCounter()
+    let watcher = ManifestWatcher(
+      environment: environment,
+      currentEndpoint: "http://127.0.0.1:8765",
+      currentStartedAt: "2026-04-11T12:00:00Z"
+    ) {
+      counter.bump()
+    }
+    watcher.start()
+    defer { watcher.stop() }
+
+    try await Task.sleep(for: .milliseconds(150))
+
+    let tmpURL = daemonDir.appendingPathComponent("manifest.json.tmp")
+    let updatedPayload =
+      #"{"endpoint":"http://127.0.0.1:8765","started_at":"2026-04-11T12:05:00Z"}"#
+    try updatedPayload.write(to: tmpURL, atomically: true, encoding: .utf8)
+    try FileManager.default.removeItem(at: manifestURL)
+    try FileManager.default.moveItem(at: tmpURL, to: manifestURL)
+
+    var fired = false
+    for _ in 0..<20 {
+      if counter.value > 0 {
+        fired = true
+        break
+      }
+      try await Task.sleep(for: .milliseconds(100))
+    }
+    #expect(fired, "ManifestWatcher did not fire after startedAt changed")
+  }
 }
 
 private final class FireCounter: @unchecked Sendable {

@@ -331,16 +331,22 @@ extension HarnessMonitorStore {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let currentEndpoint: String
+    let currentStartedAt: String?
     if let data = FileManager.default.contents(atPath: manifestURL.path),
       let manifest = try? decoder.decode(DaemonManifest.self, from: data)
     {
       currentEndpoint = manifest.endpoint
+      currentStartedAt = manifest.startedAt
     } else {
       // Manifest missing or undecodable; start with an empty sentinel so the
       // first valid manifest write triggers reconnect.
       currentEndpoint = ""
+      currentStartedAt = nil
     }
-    let watcher = ManifestWatcher(currentEndpoint: currentEndpoint) { [weak self] in
+    let watcher = ManifestWatcher(
+      currentEndpoint: currentEndpoint,
+      currentStartedAt: currentStartedAt
+    ) { [weak self] in
       Task { @MainActor [weak self] in
         guard let self else { return }
         self.appendConnectionEvent(

@@ -34,6 +34,12 @@ public enum HarnessMonitorPaths {
       return URL(fileURLWithPath: value, isDirectory: true)
     }
 
+    if DaemonOwnership(environment: environment) == .external {
+      return environment.homeDirectory
+        .appendingPathComponent("Library", isDirectory: true)
+        .appendingPathComponent("Application Support", isDirectory: true)
+    }
+
     if let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines),
       !value.isEmpty

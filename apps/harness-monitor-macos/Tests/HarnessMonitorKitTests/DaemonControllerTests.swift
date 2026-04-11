@@ -5,6 +5,102 @@ import Testing
 
 @Suite("Daemon controller service management")
 struct DaemonControllerTests {
+  @Test("awaitManifestWarmUp returns stale manifest immediately for external daemon when pid is dead")
+  func awaitManifestWarmUpReturnsExternalStaleManifestImmediately() async throws {
+    try await withTempDaemonFixture(pid: 999_999) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .external,
+        endpointProbe: { _ in false }
+      )
+
+      do {
+        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
+        Issue.record("Expected externalDaemonManifestStale")
+      } catch let error as DaemonControlError {
+        guard case .externalDaemonManifestStale(let manifestPath) = error else {
+          Issue.record("Expected externalDaemonManifestStale, got \(error)")
+          return
+        }
+        #expect(manifestPath == HarnessMonitorPaths.manifestURL(using: environment).path)
+      } catch {
+        Issue.record("Expected DaemonControlError, got \(error)")
+      }
+    }
+  }
+
+  @Test("awaitManifestWarmUp returns daemonDidNotStart immediately for managed daemon when pid is dead")
+  func awaitManifestWarmUpReturnsManagedStaleManifestImmediately() async throws {
+    try await withTempDaemonFixture(pid: 999_999) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        endpointProbe: { _ in false }
+      )
+
+      await #expect(throws: DaemonControlError.daemonDidNotStart) {
+        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
+      }
+    }
+  }
+
+  @Test("awaitManifestWarmUp reports external offline when no manifest appears")
+  func awaitManifestWarmUpReportsExternalOfflineWhenManifestMissing() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("daemon-controller-tests-\(UUID().uuidString)", isDirectory: true)
+    let daemonHome = root.appendingPathComponent("data-home", isDirectory: true)
+    try FileManager.default.createDirectory(at: daemonHome, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+    let controller = DaemonController(
+      environment: environment,
+      launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+      ownership: .external
+    )
+
+    do {
+      _ = try await controller.awaitManifestWarmUp(timeout: .milliseconds(50))
+      Issue.record("Expected externalDaemonOffline")
+    } catch let error as DaemonControlError {
+      guard case .externalDaemonOffline(let manifestPath) = error else {
+        Issue.record("Expected externalDaemonOffline, got \(error)")
+        return
+      }
+      #expect(manifestPath == HarnessMonitorPaths.manifestURL(using: environment).path)
+    } catch {
+      Issue.record("Expected DaemonControlError, got \(error)")
+    }
+  }
+
+  @Test("awaitManifestWarmUp reports manifestMissing when no managed manifest appears")
+  func awaitManifestWarmUpReportsManagedManifestMissing() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("daemon-controller-tests-\(UUID().uuidString)", isDirectory: true)
+    let daemonHome = root.appendingPathComponent("data-home", isDirectory: true)
+    try FileManager.default.createDirectory(at: daemonHome, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+    let controller = DaemonController(
+      environment: environment,
+      launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+      ownership: .managed
+    )
+
+    await #expect(throws: DaemonControlError.manifestMissing) {
+      _ = try await controller.awaitManifestWarmUp(timeout: .milliseconds(50))
+    }
+  }
+
   @Test("Installing launch agent registers the bundled service")
   func installingLaunchAgentRegistersBundledService() async throws {
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
@@ -106,6 +202,44 @@ struct DaemonControllerTests {
     #expect(offlineSnapshot.installed == false)
     #expect(offlineSnapshot.loaded == false)
   }
+}
+
+private func withTempDaemonFixture(
+  pid: UInt32,
+  perform: (HarnessMonitorEnvironment) async throws -> Void
+) async throws {
+  let root = FileManager.default.temporaryDirectory
+    .appendingPathComponent("daemon-controller-tests-\(UUID().uuidString)", isDirectory: true)
+  let daemonHome = root.appendingPathComponent("data-home", isDirectory: true)
+  let daemonRoot = daemonHome
+    .appendingPathComponent("harness", isDirectory: true)
+    .appendingPathComponent("daemon", isDirectory: true)
+  try FileManager.default.createDirectory(at: daemonRoot, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+
+  let tokenPath = daemonRoot.appendingPathComponent("auth-token")
+  try "test-token".write(to: tokenPath, atomically: true, encoding: .utf8)
+
+  let manifest = DaemonManifest(
+    version: "19.4.1",
+    pid: Int(pid),
+    endpoint: "http://127.0.0.1:65534",
+    startedAt: "2026-04-11T12:00:00Z",
+    tokenPath: tokenPath.path,
+    sandboxed: true,
+    hostBridge: HostBridgeManifest()
+  )
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+  encoder.keyEncodingStrategy = .convertToSnakeCase
+  let manifestData = try encoder.encode(manifest)
+  try manifestData.write(to: daemonRoot.appendingPathComponent("manifest.json"))
+
+  let environment = HarnessMonitorEnvironment(
+    values: [HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path],
+    homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+  )
+  try await perform(environment)
 }
 
 private final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {
