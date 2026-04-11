@@ -30,6 +30,65 @@ struct DaemonManifestDecodingTests {
     #expect(manifest.tokenPath == "/tmp/token")
     #expect(manifest.sandboxed == false)
     #expect(manifest.hostBridge == HostBridgeManifest())
+    #expect(manifest.revision == 0)
+    #expect(manifest.updatedAt == nil)
+  }
+
+  @Test("Current manifest decodes revision and updated_at")
+  func currentManifestDecodesRevisionAndUpdatedAt() throws {
+    let json = """
+      {
+        "version": "19.5.2",
+        "pid": 1,
+        "endpoint": "http://127.0.0.1:0",
+        "started_at": "2026-04-11T15:00:00Z",
+        "token_path": "/tmp/token",
+        "sandboxed": true,
+        "host_bridge": {
+          "running": true,
+          "socket_path": "/tmp/bridge.sock",
+          "capabilities": {}
+        },
+        "revision": 7,
+        "updated_at": "2026-04-11T15:30:00Z"
+      }
+      """
+
+    let data = Data(json.utf8)
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+    let manifest = try decoder.decode(DaemonManifest.self, from: data)
+
+    #expect(manifest.revision == 7)
+    #expect(manifest.updatedAt == "2026-04-11T15:30:00Z")
+  }
+
+  @Test("Revision round-trips through encode + decode")
+  func revisionRoundTripsThroughEncodeDecode() throws {
+    let original = DaemonManifest(
+      version: "19.5.2",
+      pid: 1,
+      endpoint: "http://127.0.0.1:0",
+      startedAt: "2026-04-11T15:00:00Z",
+      tokenPath: "/tmp/token",
+      sandboxed: true,
+      hostBridge: HostBridgeManifest(running: true),
+      revision: 42,
+      updatedAt: "2026-04-11T15:30:00Z"
+    )
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let data = try encoder.encode(original)
+
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let decoded = try decoder.decode(DaemonManifest.self, from: data)
+
+    #expect(decoded == original)
+    #expect(decoded.revision == 42)
+    #expect(decoded.updatedAt == "2026-04-11T15:30:00Z")
   }
 
   @Test("Legacy sandbox manifest decodes bridge fallback fields")
