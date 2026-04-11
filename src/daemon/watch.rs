@@ -503,23 +503,17 @@ mod tests {
     use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
     use crate::session::service as session_service;
     use crate::session::types::{SessionRole, TaskSeverity};
+    use harness_testkit::with_isolated_harness_env;
 
     fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
         let tmp = tempdir().expect("tempdir");
-        temp_env::with_vars(
-            [
-                (
-                    "XDG_DATA_HOME",
-                    Some(tmp.path().to_str().expect("xdg path")),
-                ),
-                ("CLAUDE_SESSION_ID", Some("leader-session")),
-            ],
-            || {
+        with_isolated_harness_env(tmp.path(), || {
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
                 let project = tmp.path().join("project");
                 fs::create_dir_all(&project).expect("create project dir");
                 test_fn(&project);
-            },
-        );
+            });
+        });
     }
 
     fn append_project_ledger_entry(project_dir: &Path) {

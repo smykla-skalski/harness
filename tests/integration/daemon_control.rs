@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -7,10 +7,13 @@ use harness::daemon::agent_tui::{AgentTuiSnapshot, AgentTuiStatus};
 use harness::daemon::bridge::BridgeStatusReport;
 use harness::daemon::protocol::SessionMutationResponse;
 use harness::daemon::service::DaemonStatusReport;
+use harness::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 use harness::session::types::SessionState;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
+
+use super::helpers::ManagedChild;
 
 const DAEMON_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_WAIT_INTERVAL: Duration = Duration::from_millis(250);
@@ -313,6 +316,168 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
     assert!(
         stop_output.status.success(),
         "tui stop failed: {}",
+        output_text(&stop_output)
+    );
+    let stopped: AgentTuiSnapshot =
+        serde_json::from_slice(&stop_output.stdout).expect("parse tui stop");
+    assert_eq!(stopped.status, AgentTuiStatus::Stopped);
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn cli_tui_commands_follow_running_app_group_daemon_root() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mut daemon = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args([
+                "daemon",
+                "serve",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "0",
+                "--sandboxed",
+            ])
+            .env("HARNESS_HOST_HOME", &home)
+            .env("HOME", &home)
+            .env("XDG_DATA_HOME", &xdg)
+            .env("HARNESS_APP_GROUP_ID", HARNESS_MONITOR_APP_GROUP_ID)
+            .env("HARNESS_SANDBOXED", "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null()),
+    )
+    .expect("spawn app-group daemon");
+
+    let _manifest = wait_for_app_group_daemon_ready(&home);
+    let status_output = run_harness(&home, &xdg, &["daemon", "status"]);
+    assert!(
+        status_output.status.success(),
+        "daemon status failed: {}",
+        output_text(&status_output)
+    );
+    let status: DaemonStatusReport =
+        serde_json::from_slice(&status_output.stdout).expect("parse daemon status");
+    assert!(
+        status.manifest.is_some(),
+        "daemon status should discover the running app-group daemon"
+    );
+
+    let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let (endpoint, token) = current_app_group_daemon_endpoint_and_token(&home);
+    let (session_status, session_body) = post_json(
+        &endpoint,
+        &token,
+        "/v1/sessions",
+        json!({
+            "title": "app group tui",
+            "context": "prove cli tui commands follow the running app-group daemon",
+            "runtime": "codex",
+            "session_id": "app-group-cli-tui",
+            "project_dir": project_arg,
+        }),
+    );
+    assert_eq!(
+        session_status, 200,
+        "unexpected session status: {session_body}"
+    );
+
+    let start_output = run_harness_with_timeout(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "tui",
+            "start",
+            "app-group-cli-tui",
+            "--runtime",
+            "codex",
+            "--role",
+            "worker",
+            "--name",
+            "Shell TUI",
+            "--arg=sh",
+            "--arg=-c",
+            "--arg=cat",
+        ],
+        COMMAND_WAIT_TIMEOUT,
+    );
+    assert!(
+        start_output.status.success(),
+        "cli tui start failed: {}",
+        output_text(&start_output)
+    );
+    let started: AgentTuiSnapshot =
+        serde_json::from_slice(&start_output.stdout).expect("parse tui start");
+    assert_eq!(started.status, AgentTuiStatus::Running);
+
+    let text_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "tui",
+            "input",
+            started.tui_id.as_str(),
+            "--text",
+            "bridge ok",
+        ],
+    );
+    assert!(
+        text_output.status.success(),
+        "cli tui text failed: {}",
+        output_text(&text_output)
+    );
+
+    let enter_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "tui",
+            "input",
+            started.tui_id.as_str(),
+            "--key",
+            "enter",
+        ],
+    );
+    assert!(
+        enter_output.status.success(),
+        "cli tui enter failed: {}",
+        output_text(&enter_output)
+    );
+    let echoed: AgentTuiSnapshot =
+        serde_json::from_slice(&enter_output.stdout).expect("parse tui input");
+    assert!(echoed.screen.text.contains("bridge ok"));
+
+    let stop_output = run_harness(
+        &home,
+        &xdg,
+        &["session", "tui", "stop", started.tui_id.as_str()],
+    );
+    assert!(
+        stop_output.status.success(),
+        "cli tui stop failed: {}",
         output_text(&stop_output)
     );
     let stopped: AgentTuiSnapshot =
@@ -642,42 +807,44 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     wait_for_child_exit(&mut daemon);
 }
 
-fn spawn_daemon_serve(home: &Path, xdg: &Path) -> Child {
+fn spawn_daemon_serve(home: &Path, xdg: &Path) -> ManagedChild {
     spawn_daemon_serve_with_args(home, xdg, &[])
 }
 
-fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) -> Child {
+fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) -> ManagedChild {
     let mut args = vec!["daemon", "serve", "--host", "127.0.0.1", "--port", "0"];
     args.extend(extra_args);
-    Command::new(harness_binary())
-        .args(&args)
-        .env("HARNESS_HOST_HOME", home)
-        .env("HOME", home)
-        .env("HARNESS_HOST_HOME", home)
-        .env("XDG_DATA_HOME", xdg)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn daemon serve")
-}
-
-fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> Child {
-    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
-    loop {
-        let mut args = vec!["bridge", "start"];
-        args.extend(extra_args);
-        let mut child = Command::new(harness_binary())
+    ManagedChild::spawn(
+        Command::new(harness_binary())
             .args(&args)
             .env("HARNESS_HOST_HOME", home)
             .env("HOME", home)
             .env("HARNESS_HOST_HOME", home)
             .env("XDG_DATA_HOME", xdg)
             .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("spawn agent tui bridge");
+            .stdout(Stdio::null())
+            .stderr(Stdio::null()),
+    )
+    .expect("spawn daemon serve")
+}
+
+fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> ManagedChild {
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        let mut args = vec!["bridge", "start"];
+        args.extend(extra_args);
+        let mut child = ManagedChild::spawn(
+            Command::new(harness_binary())
+                .args(&args)
+                .env("HARNESS_HOST_HOME", home)
+                .env("HOME", home)
+                .env("HARNESS_HOST_HOME", home)
+                .env("XDG_DATA_HOME", xdg)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+        )
+        .expect("spawn agent tui bridge");
 
         let startup_deadline = Instant::now() + Duration::from_secs(1);
         loop {
@@ -774,6 +941,27 @@ fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusReport {
     }
 }
 
+fn wait_for_app_group_daemon_ready(home: &Path) -> Value {
+    let root = app_group_daemon_root(home);
+    let manifest_path = root.join("manifest.json");
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        if let Ok(data) = std::fs::read_to_string(&manifest_path)
+            && let Ok(manifest) = serde_json::from_str::<Value>(&data)
+            && let Some(endpoint) = manifest.get("endpoint").and_then(Value::as_str)
+            && endpoint_is_healthy(endpoint)
+        {
+            return manifest;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "app-group daemon did not become healthy before timeout at {}",
+            manifest_path.display()
+        );
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
+}
+
 fn wait_for_daemon_stopped(home: &Path, xdg: &Path) {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
@@ -795,7 +983,7 @@ fn wait_for_daemon_stopped(home: &Path, xdg: &Path) {
     }
 }
 
-fn wait_for_child_exit(child: &mut Child) {
+fn wait_for_child_exit(child: &mut ManagedChild) {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
         if child.try_wait().expect("poll child").is_some() {
@@ -904,6 +1092,31 @@ fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Valu
             Err(error) => panic!("daemon post: {error:?}"),
         }
     }
+}
+
+fn current_app_group_daemon_endpoint_and_token(home: &Path) -> (String, String) {
+    let root = app_group_daemon_root(home);
+    let manifest: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("manifest.json")).expect("read app-group manifest"),
+    )
+    .expect("parse app-group manifest");
+    let endpoint = manifest["endpoint"]
+        .as_str()
+        .expect("manifest endpoint")
+        .to_string();
+    let token = std::fs::read_to_string(root.join("auth-token"))
+        .expect("read app-group token")
+        .trim()
+        .to_string();
+    (endpoint, token)
+}
+
+fn app_group_daemon_root(home: &Path) -> PathBuf {
+    home.join("Library")
+        .join("Group Containers")
+        .join(HARNESS_MONITOR_APP_GROUP_ID)
+        .join("harness")
+        .join("daemon")
 }
 
 fn read_daemon_token(token_path: &str) -> String {

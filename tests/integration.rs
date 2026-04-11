@@ -12,6 +12,7 @@ mod integration {
     mod daemon_perf;
     mod daemon_sandbox_mode;
     pub mod helpers;
+    mod install_workflow;
 
     mod cluster;
     mod commands;

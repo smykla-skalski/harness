@@ -8,7 +8,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio, id as process_id};
+use std::process::{Child, Command, ExitStatus, Stdio, id as process_id};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
@@ -46,6 +46,8 @@ pub const CODEX_BRIDGE_PORT_ENV: &str = "HARNESS_CODEX_WS_PORT";
 
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(5);
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const DETACHED_START_TIMEOUT: Duration = Duration::from_secs(5);
+const DETACHED_START_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(200);
 const DEFAULT_BRIDGE_SOCKET_NAME: &str = "bridge.sock";
 const FALLBACK_BRIDGE_SOCKET_PREFIX: &str = "h-bridge-";
@@ -2316,14 +2318,81 @@ fn start_detached(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     let mut command = Command::new(&harness);
     write_bridge_config(&config.persisted)?;
     command.arg("bridge").arg("start");
-    let child = command
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(stdout)
         .stderr(stderr)
         .spawn()
         .map_err(|error| CliErrorKind::workflow_io(format!("spawn bridge: {error}")))?;
+    wait_for_detached_bridge_start(&mut child, config, &stdout_path, &stderr_path)?;
     println!("bridge started in background (pid {})", child.id());
     Ok(0)
+}
+
+fn wait_for_detached_bridge_start(
+    child: &mut Child,
+    config: &ResolvedBridgeConfig,
+    stdout_path: &Path,
+    stderr_path: &Path,
+) -> Result<(), CliError> {
+    let deadline = Instant::now() + DETACHED_START_TIMEOUT;
+    let expected_socket = config.socket_path.display().to_string();
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| CliErrorKind::workflow_io(format!("poll bridge start: {error}")))?
+        {
+            return Err(detached_start_failure(status, stdout_path, stderr_path));
+        }
+
+        if let Some(running) = resolve_running_bridge(LivenessMode::HostAuthoritative)?
+            && running.state.pid == child.id()
+            && running.report.running
+            && running.report.socket_path.as_deref() == Some(expected_socket.as_str())
+        {
+            return Ok(());
+        }
+
+        if Instant::now() >= deadline {
+            let stdout_hint = log_excerpt(stdout_path);
+            let stderr_hint = log_excerpt(stderr_path);
+            return Err(CliErrorKind::workflow_io(format!(
+                "bridge start timed out before publishing live state for {} (stdout log: {}; stderr log: {}; stdout tail: {}; stderr tail: {})",
+                expected_socket,
+                stdout_path.display(),
+                stderr_path.display(),
+                stdout_hint,
+                stderr_hint
+            ))
+            .into());
+        }
+
+        thread::sleep(DETACHED_START_POLL_INTERVAL);
+    }
+}
+
+fn detached_start_failure(status: ExitStatus, stdout_path: &Path, stderr_path: &Path) -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "bridge background child exited early with status {status} (stdout log: {}; stderr log: {}; stdout tail: {}; stderr tail: {})",
+        stdout_path.display(),
+        stderr_path.display(),
+        log_excerpt(stdout_path),
+        log_excerpt(stderr_path)
+    ))
+    .into()
+}
+
+fn log_excerpt(path: &Path) -> String {
+    let Ok(contents) = fs::read_to_string(path) else {
+        return "unavailable".to_string();
+    };
+    let trimmed = contents.trim();
+    if trimmed.is_empty() {
+        return "empty".to_string();
+    }
+    let lines: Vec<&str> = trimmed.lines().collect();
+    let start = lines.len().saturating_sub(4);
+    lines[start..].join(" | ")
 }
 
 fn wait_until_dead(pid: u32, grace: Duration) -> Result<(), CliError> {

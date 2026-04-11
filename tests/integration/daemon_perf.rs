@@ -15,8 +15,19 @@ use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use harness::daemon::websocket::ReplayBuffer;
 use harness::session::service as session_service;
 use harness::session::types::{SessionRole, TaskSeverity};
+use harness_testkit::with_isolated_harness_env;
 
 const SAMPLE_COUNT: usize = 10;
+
+fn with_perf_test_env<T>(
+    base: &std::path::Path,
+    session_id: &str,
+    action: impl FnOnce() -> T,
+) -> T {
+    with_isolated_harness_env(base, || {
+        temp_env::with_var("CLAUDE_SESSION_ID", Some(session_id), action)
+    })
+}
 
 #[derive(Serialize)]
 struct PerfResult {
@@ -187,22 +198,14 @@ fn seed_workspace(tmp: &std::path::Path) {
 #[tokio::test]
 async fn daemon_http_endpoint_performance_budgets() {
     let tmp = tempdir().expect("tempdir");
-    let xdg = tmp.path().to_str().expect("utf8").to_string();
 
-    temp_env::with_vars(
-        [
-            ("XDG_DATA_HOME", Some(xdg.as_str())),
-            ("CLAUDE_SESSION_ID", Some("perf-test-session")),
-        ],
-        || seed_workspace(tmp.path()),
-    );
+    with_perf_test_env(tmp.path(), "perf-test-session", || {
+        seed_workspace(tmp.path())
+    });
 
     let db_path = tmp.path().join("harness/daemon/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
-    temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
-        db.import_from_files()
-    })
-    .expect("import");
+    with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
 
     let daemon = start_test_daemon(Some(db)).await;
     let client = Client::new();
@@ -261,41 +264,25 @@ async fn daemon_http_endpoint_performance_budgets() {
 #[test]
 fn daemon_status_report_within_budget() {
     let tmp = tempdir().expect("tempdir");
-    let xdg = tmp.path().to_str().expect("utf8").to_string();
 
-    temp_env::with_vars(
-        [
-            ("XDG_DATA_HOME", Some(xdg.as_str())),
-            ("CLAUDE_SESSION_ID", Some("status-perf-session")),
-        ],
-        || {
-            state::ensure_daemon_dirs().expect("dirs");
-            let project = tmp.path().join("project");
-            fs_err::create_dir_all(&project).expect("create project");
-            std::process::Command::new("git")
-                .arg("-C")
-                .arg(&project)
-                .args(["init"])
-                .status()
-                .expect("git init");
-            session_service::start_session(
-                "status-perf",
-                "",
-                &project,
-                Some("claude"),
-                Some("sp1"),
-            )
+    with_perf_test_env(tmp.path(), "status-perf-session", || {
+        state::ensure_daemon_dirs().expect("dirs");
+        let project = tmp.path().join("project");
+        fs_err::create_dir_all(&project).expect("create project");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&project)
+            .args(["init"])
+            .status()
+            .expect("git init");
+        session_service::start_session("status-perf", "", &project, Some("claude"), Some("sp1"))
             .expect("start session");
-        },
-    );
+    });
 
     // Import into DB so status_report uses SQLite path.
     let db_path = tmp.path().join("harness/daemon/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
-    temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
-        db.import_from_files()
-    })
-    .expect("import");
+    with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
     drop(db);
 
     let target_ms = 100.0;
@@ -303,10 +290,7 @@ fn daemon_status_report_within_budget() {
 
     for _ in 0..SAMPLE_COUNT {
         let start = Instant::now();
-        temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
-            service::status_report()
-        })
-        .expect("status report");
+        with_isolated_harness_env(tmp.path(), || service::status_report()).expect("status report");
         samples.push(start.elapsed().as_secs_f64() * 1000.0);
     }
 

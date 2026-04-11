@@ -23,6 +23,8 @@ use std::time::{Duration, Instant};
 use fs2::FileExt;
 use tempfile::tempdir;
 
+use super::helpers::ManagedChild;
+
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const HARNESS_MONITOR_APP_GROUP_ID: &str = "Q498EB36N4.io.harnessmonitor";
@@ -59,29 +61,30 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
 
     let mock_codex = create_mock_codex(home);
 
-    let mut bridge = Command::new(harness_binary())
-        .args([
-            "bridge",
-            "start",
-            "--capability",
-            "codex",
-            "--codex-port",
-            "14520",
-            "--codex-path",
-        ])
-        .arg(&mock_codex)
-        .env("XDG_DATA_HOME", &xdg)
-        .env("HOME", home)
-        .env("HARNESS_HOST_HOME", home)
-        .env("RUST_LOG", "harness=info")
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_DAEMON_DATA_HOME")
-        .env_remove("HARNESS_SANDBOXED")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn bridge");
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args([
+                "bridge",
+                "start",
+                "--capability",
+                "codex",
+                "--codex-port",
+                "14520",
+                "--codex-path",
+            ])
+            .arg(&mock_codex)
+            .env("XDG_DATA_HOME", &xdg)
+            .env("HOME", home)
+            .env("HARNESS_HOST_HOME", home)
+            .env("RUST_LOG", "harness=info")
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_DAEMON_DATA_HOME")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
 
     let adopted_state_path = group_daemon_root.join("bridge.json");
     let xdg_state_path = xdg.join("harness").join("daemon").join("bridge.json");

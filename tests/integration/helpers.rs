@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 use std::borrow::Borrow;
+use std::process::{Child, Command as ProcessCommand, ExitStatus, Output};
 use std::sync::Mutex;
 
 use harness::app::cli::{self, Command, CreateCommand, RunCommand, SetupCommand};
@@ -30,6 +31,77 @@ pub use harness_testkit::*;
 /// environment. Per-module locks are insufficient because Rust runs tests from
 /// different modules on the same thread pool.
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+pub struct ManagedChild {
+    child: Option<Child>,
+}
+
+impl ManagedChild {
+    pub fn new(child: Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    pub fn spawn(command: &mut ProcessCommand) -> std::io::Result<Self> {
+        command.spawn().map(Self::new)
+    }
+
+    pub fn id(&self) -> u32 {
+        self.child
+            .as_ref()
+            .expect("managed child is no longer available")
+            .id()
+    }
+
+    pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        self.child
+            .as_mut()
+            .expect("managed child is no longer available")
+            .try_wait()
+    }
+
+    pub fn kill(&mut self) -> std::io::Result<()> {
+        self.child
+            .as_mut()
+            .expect("managed child is no longer available")
+            .kill()
+    }
+
+    pub fn wait(&mut self) -> std::io::Result<ExitStatus> {
+        self.child
+            .as_mut()
+            .expect("managed child is no longer available")
+            .wait()
+    }
+
+    pub fn wait_with_output(mut self) -> std::io::Result<Output> {
+        self.child
+            .take()
+            .expect("managed child is no longer available")
+            .wait_with_output()
+    }
+
+    pub fn inner_mut(&mut self) -> &mut Child {
+        self.child
+            .as_mut()
+            .expect("managed child is no longer available")
+    }
+}
+
+impl Drop for ManagedChild {
+    fn drop(&mut self) {
+        let Some(child) = self.child.as_mut() else {
+            return;
+        };
+        match child.try_wait() {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            Err(_) => {}
+        }
+    }
+}
 
 pub fn run_command(command: impl Borrow<Command>) -> Result<i32, CliError> {
     temp_env::with_var("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"), || {

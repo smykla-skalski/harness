@@ -6,11 +6,13 @@
 
 pub mod builders;
 pub mod contracts;
+pub mod env;
 pub mod fake_binary;
 pub mod fake_toolchain;
 
 // Re-export everything from builders for convenience.
 pub use builders::*;
+pub use env::with_isolated_harness_env;
 pub use fake_toolchain::FakeToolchain;
 
 /// Build an `assert_cmd::Command` for the harness binary.

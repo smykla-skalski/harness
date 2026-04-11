@@ -407,6 +407,7 @@ mod tests {
     use std::path::Path;
 
     use fs_err as fs;
+    use harness_testkit::with_isolated_harness_env;
     use serde_json::json;
     use tempfile::tempdir;
 
@@ -418,20 +419,13 @@ mod tests {
 
     fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
         let tmp = tempdir().expect("tempdir");
-        temp_env::with_vars(
-            [
-                (
-                    "XDG_DATA_HOME",
-                    Some(tmp.path().to_str().expect("xdg data path")),
-                ),
-                ("CLAUDE_SESSION_ID", Some("leader-session")),
-            ],
-            || {
+        with_isolated_harness_env(tmp.path(), || {
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
                 let project = tmp.path().join("project");
                 fs::create_dir_all(&project).expect("create project dir");
                 test_fn(&project);
-            },
-        );
+            });
+        });
     }
 
     #[test]
