@@ -1,6 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private final class SidebarSelectionTapBridge {
+  var pendingTapSelectionID: String?
+}
+
 struct SidebarView: View {
   let store: HarnessMonitorStore
   let controls: HarnessMonitorStore.SessionControlsSlice
@@ -16,7 +20,7 @@ struct SidebarView: View {
   @State private var collapsedCheckoutKeys: Set<String> = []
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
-  @State private var pendingTapSelectionID: String?
+  @State private var selectionTapBridge = SidebarSelectionTapBridge()
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
@@ -42,8 +46,8 @@ struct SidebarView: View {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
-        if let pendingTapSelectionID {
-          self.pendingTapSelectionID = nil
+        if let pendingTapSelectionID = selectionTapBridge.pendingTapSelectionID {
+          selectionTapBridge.pendingTapSelectionID = nil
           if pendingTapSelectionID == newValue {
             return
           }
@@ -92,7 +96,8 @@ struct SidebarView: View {
       projectionGroups: projection.groupedSessions,
       searchPresentation: searchResults.presentationState,
       searchList: searchResults.listState,
-      selectedSessionID: sidebarUI.selectedSessionID,
+      selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
+        .accessibilityMarkersEnabled ? sidebarUI.selectedSessionID : nil,
       bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
       dateTimeConfiguration: dateTimeConfiguration,
@@ -126,10 +131,10 @@ struct SidebarView: View {
 
   var body: some View {
     List(selection: sidebarSelection) {
-    SidebarSessionListContent(
-      renderState: sidebarListRenderState,
-      selectSession: { sessionID in
-          pendingTapSelectionID = sessionID
+      SidebarSessionListContent(
+        renderState: sidebarListRenderState,
+        selectSession: { sessionID in
+          selectionTapBridge.pendingTapSelectionID = sessionID
           store.selectSessionFromList(sessionID)
         },
         toggleBookmark: { sessionID, projectID in
