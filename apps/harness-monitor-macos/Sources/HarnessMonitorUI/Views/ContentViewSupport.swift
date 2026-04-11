@@ -220,17 +220,17 @@ struct ContentDetailColumn: View {
       }
       detailColumnWidth = nextWidth
     }
-    .onChange(of: selection.inspectorSelection) { _, newValue in
-      if newValue != .none, !showInspector {
-        showInspector = true
-      }
-    }
-    .background {
-      ContentDetailToolbarBridge(
+    .toolbar {
+      ContentPrimaryToolbarItems(
         store: store,
         toolbarUI: contentToolbar,
         showInspector: $showInspector
       )
+    }
+    .onChange(of: selection.inspectorSelection) { _, newValue in
+      if newValue != .none, !showInspector {
+        showInspector = true
+      }
     }
   }
 
@@ -255,23 +255,6 @@ struct ContentDetailColumn: View {
       }
       return .ignored
     }
-  }
-}
-
-private struct ContentDetailToolbarBridge: View {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  @Binding var showInspector: Bool
-
-  var body: some View {
-    Color.clear
-      .toolbar {
-        ContentPrimaryToolbarItems(
-          store: store,
-          toolbarUI: toolbarUI,
-          showInspector: $showInspector
-        )
-      }
   }
 }
 
