@@ -40,6 +40,16 @@ pub struct SetLogLevelRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostBridgeReconfigureRequest {
+    #[serde(default)]
+    pub enable: Vec<String>,
+    #[serde(default)]
+    pub disable: Vec<String>,
+    #[serde(default)]
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonDiagnosticsReport {
     pub health: Option<HealthResponse>,
     pub manifest: Option<DaemonManifest>,

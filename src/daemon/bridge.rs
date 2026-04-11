@@ -50,9 +50,11 @@ const FALLBACK_BRIDGE_SOCKET_PREFIX: &str = "h-bridge-";
 const FALLBACK_BRIDGE_SOCKET_SUFFIX: &str = ".sock";
 const UNIX_SOCKET_PATH_LIMIT: usize = if cfg!(target_os = "macos") { 103 } else { 107 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
 pub enum BridgeCapability {
     Codex,
+    #[serde(rename = "agent-tui")]
     #[value(name = "agent-tui")]
     AgentTui,
 }
@@ -71,6 +73,15 @@ impl BridgeCapability {
         match self {
             Self::Codex => "codex.host-bridge",
             Self::AgentTui => "agent-tui.host-bridge",
+        }
+    }
+
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            BRIDGE_CAPABILITY_CODEX => Some(Self::Codex),
+            BRIDGE_CAPABILITY_AGENT_TUI => Some(Self::AgentTui),
+            _ => None,
         }
     }
 }
@@ -117,6 +128,32 @@ impl BridgeStatusReport {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+struct PersistedBridgeConfig {
+    #[serde(default)]
+    capabilities: Vec<BridgeCapability>,
+    #[serde(default)]
+    socket_path: Option<PathBuf>,
+    #[serde(default)]
+    codex_port: Option<u16>,
+    #[serde(default)]
+    codex_path: Option<PathBuf>,
+}
+
+impl PersistedBridgeConfig {
+    #[must_use]
+    fn normalized(mut self) -> Self {
+        self.capabilities.sort();
+        self.capabilities.dedup();
+        self
+    }
+
+    #[must_use]
+    fn capabilities_set(&self) -> BTreeSet<BridgeCapability> {
+        self.capabilities.iter().copied().collect()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiStartSpec {
     pub session_id: String,
@@ -146,29 +183,9 @@ pub struct BridgeConfigArgs {
 }
 
 impl BridgeConfigArgs {
-    #[must_use]
-    fn selected_capabilities(&self) -> BTreeSet<BridgeCapability> {
-        if self.capabilities.is_empty() {
-            return compiled_capabilities();
-        }
-        self.capabilities.iter().copied().collect()
-    }
-
     fn resolve(&self) -> Result<ResolvedBridgeConfig, CliError> {
-        let capabilities = self.selected_capabilities();
-        let socket_path = self.socket_path.clone().unwrap_or_else(bridge_socket_path);
-        let codex_port = self.codex_port.unwrap_or(DEFAULT_CODEX_BRIDGE_PORT);
-        let codex_binary = if capabilities.contains(&BridgeCapability::Codex) {
-            Some(resolve_codex_binary(self.codex_path.as_deref())?)
-        } else {
-            None
-        };
-        Ok(ResolvedBridgeConfig {
-            capabilities,
-            socket_path,
-            codex_port,
-            codex_binary,
-        })
+        let persisted = read_bridge_config()?;
+        resolve_bridge_config(merged_persisted_config(self, persisted))
     }
 }
 
@@ -202,6 +219,22 @@ pub struct BridgeInstallLaunchAgentArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct BridgeReconfigureArgs {
+    /// Enable one capability without restarting the bridge.
+    #[arg(long = "enable")]
+    pub enable: Vec<BridgeCapability>,
+    /// Disable one capability without restarting the bridge.
+    #[arg(long = "disable")]
+    pub disable: Vec<BridgeCapability>,
+    /// Force-disable `agent-tui` by stopping active TUI sessions first.
+    #[arg(long)]
+    pub force: bool,
+    /// Print the updated bridge status as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct BridgeRemoveLaunchAgentArgs {
     /// Print confirmation as JSON.
     #[arg(long)]
@@ -217,6 +250,8 @@ pub enum BridgeCommand {
     Stop(BridgeStopArgs),
     /// Print the current bridge status.
     Status(BridgeStatusArgs),
+    /// Reconfigure the running bridge without restarting it.
+    Reconfigure(BridgeReconfigureArgs),
     /// Install a per-user `LaunchAgent` that starts the bridge at login.
     InstallLaunchAgent(BridgeInstallLaunchAgentArgs),
     /// Remove the bridge `LaunchAgent` and clean up persisted state.
@@ -229,6 +264,7 @@ impl Execute for BridgeCommand {
             Self::Start(args) => args.execute(context),
             Self::Stop(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
+            Self::Reconfigure(args) => args.execute(context),
             Self::InstallLaunchAgent(args) => args.execute(context),
             Self::RemoveLaunchAgent(args) => args.execute(context),
         }
@@ -289,10 +325,11 @@ impl Execute for BridgeInstallLaunchAgentArgs {
         ensure_host_context("bridge-install-launch-agent")?;
         cleanup_legacy_bridge_artifacts();
         let config = self.config.resolve()?;
+        write_bridge_config(&config.persisted)?;
         let harness_binary = current_exe().map_err(|error| {
             CliErrorKind::workflow_io(format!("resolve current harness binary: {error}"))
         })?;
-        let plist = render_launch_agent_plist(&harness_binary, &config);
+        let plist = render_launch_agent_plist(&harness_binary);
         let plist_path = launch_agent_plist_path()?;
         if let Some(parent) = plist_path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
@@ -305,6 +342,21 @@ impl Execute for BridgeInstallLaunchAgentArgs {
             bootstrap_agent(&plist_path)?;
         }
         println!("installed {}", plist_path.display());
+        Ok(0)
+    }
+}
+
+impl Execute for BridgeReconfigureArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        ensure_host_context("bridge-reconfigure")?;
+        cleanup_legacy_bridge_artifacts();
+        let request = self.request()?;
+        let report = BridgeClient::from_state_file()?.reconfigure(&request)?;
+        if self.json {
+            print_json(&report)?;
+        } else {
+            print_status_plain(&report);
+        }
         Ok(0)
     }
 }
@@ -342,8 +394,21 @@ impl Execute for BridgeRemoveLaunchAgentArgs {
     }
 }
 
+impl BridgeReconfigureArgs {
+    fn request(&self) -> Result<BridgeReconfigureSpec, CliError> {
+        let request = BridgeReconfigureSpec {
+            enable: self.enable.clone(),
+            disable: self.disable.clone(),
+            force: self.force,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct ResolvedBridgeConfig {
+    persisted: PersistedBridgeConfig,
     capabilities: BTreeSet<BridgeCapability>,
     socket_path: PathBuf,
     codex_port: u16,
@@ -406,6 +471,9 @@ struct BridgeEnvelope {
 enum BridgeRequest {
     Status,
     Shutdown,
+    Reconfigure {
+        request: BridgeReconfigureSpec,
+    },
     Capability {
         capability: String,
         action: String,
@@ -422,6 +490,8 @@ struct BridgeResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     payload: Option<Value>,
 }
 
@@ -433,6 +503,7 @@ impl BridgeResponse {
             ok: true,
             code: None,
             message: None,
+            details: None,
             payload: Some(payload),
         })
     }
@@ -442,6 +513,7 @@ impl BridgeResponse {
             ok: true,
             code: None,
             message: None,
+            details: None,
             payload: None,
         }
     }
@@ -450,7 +522,8 @@ impl BridgeResponse {
         Self {
             ok: false,
             code: Some(error.code().to_string()),
-            message: Some(error.to_string()),
+            message: Some(error.message()),
+            details: error.details().map(str::to_owned),
             payload: None,
         }
     }
@@ -462,12 +535,92 @@ struct BridgeCodexProcess {
     metadata: BridgeCodexMetadata,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BridgeReconfigureSpec {
+    #[serde(default)]
+    enable: Vec<BridgeCapability>,
+    #[serde(default)]
+    disable: Vec<BridgeCapability>,
+    #[serde(default)]
+    force: bool,
+}
+
+impl BridgeReconfigureSpec {
+    fn validate(&self) -> Result<(), CliError> {
+        if self.enable.is_empty() && self.disable.is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "bridge reconfigure requires at least one --enable or --disable flag",
+            )
+            .into());
+        }
+        let enable: BTreeSet<_> = self.enable.iter().copied().collect();
+        if enable.len() != self.enable.len() {
+            return Err(CliErrorKind::workflow_parse(
+                "bridge reconfigure listed the same capability more than once in --enable",
+            )
+            .into());
+        }
+        let disable: BTreeSet<_> = self.disable.iter().copied().collect();
+        if disable.len() != self.disable.len() {
+            return Err(CliErrorKind::workflow_parse(
+                "bridge reconfigure listed the same capability more than once in --disable",
+            )
+            .into());
+        }
+        if let Some(contradiction) = enable.intersection(&disable).next().copied() {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "bridge reconfigure cannot enable and disable '{}' in one request",
+                contradiction.name()
+            ))
+            .into());
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    fn enable_set(&self) -> BTreeSet<BridgeCapability> {
+        self.enable.iter().copied().collect()
+    }
+
+    #[must_use]
+    fn disable_set(&self) -> BTreeSet<BridgeCapability> {
+        self.disable.iter().copied().collect()
+    }
+
+    fn from_names(enable: &[String], disable: &[String], force: bool) -> Result<Self, CliError> {
+        let enable = enable
+            .iter()
+            .map(|name| {
+                BridgeCapability::from_name(name).ok_or_else(|| {
+                    CliErrorKind::workflow_parse(format!("unsupported bridge capability '{name}'"))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let disable = disable
+            .iter()
+            .map(|name| {
+                BridgeCapability::from_name(name).ok_or_else(|| {
+                    CliErrorKind::workflow_parse(format!("unsupported bridge capability '{name}'"))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let request = Self {
+            enable,
+            disable,
+            force,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+}
+
 struct BridgeServer {
     token: String,
     socket_path: PathBuf,
     pid: u32,
     started_at: String,
     token_path: String,
+    desired_config: Mutex<PersistedBridgeConfig>,
     capabilities: Mutex<BTreeMap<String, HostBridgeCapabilityManifest>>,
     active_tuis: Mutex<BTreeMap<String, BridgeActiveTui>>,
     codex: Mutex<Option<BridgeCodexProcess>>,
@@ -478,6 +631,7 @@ impl BridgeServer {
     fn new(
         token: String,
         socket_path: PathBuf,
+        desired_config: PersistedBridgeConfig,
         capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
     ) -> Self {
         Self {
@@ -486,6 +640,7 @@ impl BridgeServer {
             pid: process_id(),
             started_at: utc_now(),
             token_path: state::auth_token_path().display().to_string(),
+            desired_config: Mutex::new(desired_config),
             capabilities: Mutex::new(capabilities),
             active_tuis: Mutex::new(BTreeMap::new()),
             codex: Mutex::new(None),
@@ -507,7 +662,18 @@ impl BridgeServer {
         write_bridge_state(&self.state()?)
     }
 
-    fn handle(&self, envelope: BridgeEnvelope) -> BridgeResponse {
+    fn status_report(&self) -> Result<BridgeStatusReport, CliError> {
+        Ok(BridgeStatusReport {
+            running: true,
+            socket_path: Some(self.socket_path.display().to_string()),
+            pid: Some(self.pid),
+            started_at: Some(self.started_at.clone()),
+            uptime_seconds: uptime_from_started_at(&self.started_at),
+            capabilities: self.capabilities()?.clone(),
+        })
+    }
+
+    fn handle(self: &Arc<Self>, envelope: BridgeEnvelope) -> BridgeResponse {
         if envelope.token != self.token {
             let error = CliError::from(CliErrorKind::workflow_io("bridge token mismatch"));
             return BridgeResponse::error(&error);
@@ -518,19 +684,19 @@ impl BridgeServer {
         }
     }
 
-    fn handle_authorized(&self, request: BridgeRequest) -> Result<BridgeResponse, CliError> {
+    fn handle_authorized(
+        self: &Arc<Self>,
+        request: BridgeRequest,
+    ) -> Result<BridgeResponse, CliError> {
         match request {
-            BridgeRequest::Status => BridgeResponse::ok_payload(&BridgeStatusReport {
-                running: true,
-                socket_path: Some(self.socket_path.display().to_string()),
-                pid: Some(self.pid),
-                started_at: Some(self.started_at.clone()),
-                uptime_seconds: uptime_from_started_at(&self.started_at),
-                capabilities: self.capabilities()?.clone(),
-            }),
+            BridgeRequest::Status => BridgeResponse::ok_payload(&self.status_report()?),
             BridgeRequest::Shutdown => {
                 self.shutdown.store(true, Ordering::SeqCst);
                 Ok(BridgeResponse::empty_ok())
+            }
+            BridgeRequest::Reconfigure { request } => {
+                let report = self.reconfigure(&request)?;
+                BridgeResponse::ok_payload(&report)
             }
             BridgeRequest::Capability {
                 capability,
@@ -538,6 +704,67 @@ impl BridgeServer {
                 payload,
             } => self.handle_capability(&capability, &action, payload),
         }
+    }
+
+    fn reconfigure(
+        self: &Arc<Self>,
+        request: &BridgeReconfigureSpec,
+    ) -> Result<BridgeStatusReport, CliError> {
+        request.validate()?;
+
+        let enable = request.enable_set();
+        let disable = request.disable_set();
+
+        let current_desired = self.desired_config()?.clone();
+        let mut next_desired = current_desired.clone();
+        let mut next_capabilities = current_desired.capabilities_set();
+        for capability in &enable {
+            next_capabilities.insert(*capability);
+        }
+        for capability in &disable {
+            next_capabilities.remove(capability);
+        }
+        next_desired.capabilities = next_capabilities.into_iter().collect();
+
+        let resolved_next = resolve_bridge_config(next_desired.clone())?;
+        self.apply_capability_changes(&enable, &disable, request.force, &resolved_next)?;
+
+        *self.desired_config()? = next_desired.clone();
+        write_bridge_config(&next_desired)?;
+        Self::sync_launch_agent_if_installed()?;
+        self.status_report()
+    }
+
+    fn apply_capability_changes(
+        self: &Arc<Self>,
+        enable: &BTreeSet<BridgeCapability>,
+        disable: &BTreeSet<BridgeCapability>,
+        force: bool,
+        resolved_next: &ResolvedBridgeConfig,
+    ) -> Result<(), CliError> {
+        let current_enabled: BTreeSet<_> = self
+            .capabilities()?
+            .keys()
+            .filter_map(|name| BridgeCapability::from_name(name))
+            .collect();
+
+        for capability in disable {
+            if current_enabled.contains(capability) {
+                self.pre_disable_check(*capability, force)?;
+            }
+        }
+
+        for capability in enable {
+            if self.should_enable_capability(*capability, &current_enabled)? {
+                self.enable_capability(*capability, resolved_next)?;
+            }
+        }
+        for capability in disable {
+            if current_enabled.contains(capability) {
+                self.disable_capability(*capability, force)?;
+            }
+        }
+        Ok(())
     }
 
     fn handle_capability(
@@ -740,6 +967,125 @@ impl BridgeServer {
         self.persist_state()
     }
 
+    fn enable_capability(
+        self: &Arc<Self>,
+        capability: BridgeCapability,
+        config: &ResolvedBridgeConfig,
+    ) -> Result<(), CliError> {
+        match capability {
+            BridgeCapability::Codex => self.enable_codex(config),
+            BridgeCapability::AgentTui => self.enable_agent_tui(),
+        }
+    }
+
+    fn enable_agent_tui(&self) -> Result<(), CliError> {
+        self.update_agent_tui_metadata()
+    }
+
+    fn enable_codex(self: &Arc<Self>, config: &ResolvedBridgeConfig) -> Result<(), CliError> {
+        let binary = config.codex_binary.as_ref().ok_or_else(|| {
+            CliErrorKind::workflow_io("codex capability requires a resolved codex binary")
+        })?;
+        let _ = self.disable_codex();
+        let process = spawn_codex_process(binary, config.codex_port)?;
+        self.set_codex_process(process)?;
+        spawn_codex_monitor(Arc::clone(self));
+        Ok(())
+    }
+
+    fn pre_disable_check(&self, capability: BridgeCapability, force: bool) -> Result<(), CliError> {
+        match capability {
+            BridgeCapability::Codex => Ok(()),
+            BridgeCapability::AgentTui => self.ensure_agent_tui_can_disable(force),
+        }
+    }
+
+    fn disable_capability(
+        &self,
+        capability: BridgeCapability,
+        force: bool,
+    ) -> Result<(), CliError> {
+        match capability {
+            BridgeCapability::Codex => self.disable_codex(),
+            BridgeCapability::AgentTui => self.disable_agent_tui(force),
+        }
+    }
+
+    fn disable_codex(&self) -> Result<(), CliError> {
+        if let Ok(mut codex) = self.codex.lock()
+            && let Some(process) = codex.as_mut()
+        {
+            let _ = process.child.kill();
+            let _ = process.child.wait();
+            codex.take();
+        }
+        self.capabilities()?.remove(BRIDGE_CAPABILITY_CODEX);
+        self.persist_state()
+    }
+
+    fn disable_agent_tui(&self, force: bool) -> Result<(), CliError> {
+        self.ensure_agent_tui_can_disable(force)?;
+        if force {
+            let tui_ids: Vec<String> = self.active_tuis()?.keys().cloned().collect();
+            for tui_id in tui_ids {
+                let _ = self.stop_agent_tui(&tui_id)?;
+            }
+        }
+        self.capabilities()?.remove(BRIDGE_CAPABILITY_AGENT_TUI);
+        self.persist_state()
+    }
+
+    fn ensure_agent_tui_can_disable(&self, force: bool) -> Result<(), CliError> {
+        let active_sessions = self.active_tuis()?.len();
+        if active_sessions > 0 && !force {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "agent-tui capability has {active_sessions} active session(s); rerun with --force to stop them first"
+            ))
+            .into());
+        }
+        Ok(())
+    }
+
+    fn should_enable_capability(
+        &self,
+        capability: BridgeCapability,
+        current_enabled: &BTreeSet<BridgeCapability>,
+    ) -> Result<bool, CliError> {
+        if !current_enabled.contains(&capability) {
+            return Ok(true);
+        }
+        match capability {
+            BridgeCapability::Codex => self.codex_requires_restart(),
+            BridgeCapability::AgentTui => Ok(false),
+        }
+    }
+
+    fn codex_requires_restart(&self) -> Result<bool, CliError> {
+        if self
+            .capabilities()?
+            .get(BRIDGE_CAPABILITY_CODEX)
+            .is_some_and(|manifest| !manifest.healthy)
+        {
+            return Ok(true);
+        }
+        let mut codex = self.codex()?;
+        let Some(process) = codex.as_mut() else {
+            return Ok(true);
+        };
+        Ok(process.child.try_wait()?.is_some())
+    }
+
+    fn sync_launch_agent_if_installed() -> Result<(), CliError> {
+        let plist_path = launch_agent_plist_path()?;
+        if !plist_path.is_file() {
+            return Ok(());
+        }
+        let harness_binary = current_exe().map_err(|error| {
+            CliErrorKind::workflow_io(format!("resolve current harness binary: {error}"))
+        })?;
+        write_text(&plist_path, &render_launch_agent_plist(&harness_binary))
+    }
+
     fn shutdown_requested(&self) -> bool {
         self.shutdown.load(Ordering::SeqCst)
     }
@@ -779,6 +1125,13 @@ impl BridgeServer {
             CliErrorKind::workflow_io(format!("bridge codex lock poisoned: {error}")).into()
         })
     }
+
+    fn desired_config(&self) -> Result<MutexGuard<'_, PersistedBridgeConfig>, CliError> {
+        self.desired_config.lock().map_err(|error| {
+            CliErrorKind::workflow_io(format!("bridge desired config lock poisoned: {error}"))
+                .into()
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -794,9 +1147,8 @@ impl BridgeClient {
     /// Returns [`CliError`] when the bridge is unavailable or the auth token
     /// cannot be loaded.
     pub fn from_state_file() -> Result<Self, CliError> {
-        let state = load_running_bridge_state()?.ok_or_else(|| {
-            CliErrorKind::sandbox_feature_disabled(BridgeCapability::AgentTui.sandbox_feature())
-        })?;
+        let state = load_running_bridge_state()?
+            .ok_or_else(|| CliErrorKind::workflow_io("bridge is not running"))?;
         let token = fs::read_to_string(&state.token_path)
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!(
@@ -904,6 +1256,19 @@ impl BridgeClient {
         Err(bridge_response_error(response))
     }
 
+    fn reconfigure(&self, request: &BridgeReconfigureSpec) -> Result<BridgeStatusReport, CliError> {
+        let response = self.send(BridgeRequest::Reconfigure {
+            request: request.clone(),
+        })?;
+        if !response.ok {
+            return Err(bridge_response_error(response));
+        }
+        let payload = response
+            .payload
+            .ok_or_else(|| CliErrorKind::workflow_io("bridge response omitted payload"))?;
+        parse_bridge_payload(payload)
+    }
+
     /// Start one bridge-managed agent TUI session.
     ///
     /// # Errors
@@ -1007,6 +1372,11 @@ pub fn bridge_state_path() -> PathBuf {
 }
 
 #[must_use]
+pub fn bridge_config_path() -> PathBuf {
+    state::daemon_root().join("bridge-config.json")
+}
+
+#[must_use]
 pub fn bridge_socket_path() -> PathBuf {
     bridge_socket_path_for_root(&state::daemon_root())
 }
@@ -1042,9 +1412,22 @@ pub fn read_bridge_state() -> Result<Option<BridgeState>, CliError> {
     read_json_typed(&bridge_state_path()).map(Some)
 }
 
+fn read_bridge_config() -> Result<Option<PersistedBridgeConfig>, CliError> {
+    if !bridge_config_path().is_file() {
+        return Ok(None);
+    }
+    read_json_typed(&bridge_config_path())
+        .map(|config: PersistedBridgeConfig| Some(config.normalized()))
+}
+
 fn write_bridge_state(state: &BridgeState) -> Result<(), CliError> {
     state::ensure_daemon_dirs()?;
     write_json_pretty(&bridge_state_path(), state)
+}
+
+fn write_bridge_config(config: &PersistedBridgeConfig) -> Result<(), CliError> {
+    state::ensure_daemon_dirs()?;
+    write_json_pretty(&bridge_config_path(), &config.clone().normalized())
 }
 
 fn clear_bridge_state() -> Result<(), CliError> {
@@ -1192,6 +1575,20 @@ pub fn stop_bridge() -> Result<BridgeStatusReport, CliError> {
         uptime_seconds: uptime_from_started_at(&state.started_at),
         capabilities: state.capabilities,
     })
+}
+
+/// Apply a capability reconfiguration to the running bridge.
+///
+/// # Errors
+/// Returns [`CliError`] when the reconfiguration request is invalid, the
+/// running bridge state cannot be loaded, or the bridge rejects the request.
+pub fn reconfigure_bridge(
+    enable: &[String],
+    disable: &[String],
+    force: bool,
+) -> Result<BridgeStatusReport, CliError> {
+    let request = BridgeReconfigureSpec::from_names(enable, disable, force)?;
+    BridgeClient::from_state_file()?.reconfigure(&request)
 }
 
 /// Spawn the daemon manifest watcher that republishes bridge state changes.
@@ -1383,14 +1780,12 @@ fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     let server = Arc::new(BridgeServer::new(
         token,
         config.socket_path.clone(),
+        config.persisted.clone(),
         capabilities,
     ));
-    if config.capabilities.contains(&BridgeCapability::Codex)
-        && let Some(codex_binary) = config.codex_binary.as_ref()
-    {
-        let process = spawn_codex_process(codex_binary, config.codex_port)?;
-        server.set_codex_process(process)?;
-        spawn_codex_monitor(Arc::clone(&server));
+    write_bridge_config(&config.persisted)?;
+    if config.capabilities.contains(&BridgeCapability::Codex) {
+        server.enable_codex(config)?;
     }
     server.persist_state()?;
 
@@ -1500,7 +1895,7 @@ fn initial_capabilities(
     capabilities
 }
 
-fn handle_stream(server: &BridgeServer, stream: UnixStream) -> Result<(), CliError> {
+fn handle_stream(server: &Arc<BridgeServer>, stream: UnixStream) -> Result<(), CliError> {
     let mut line = String::new();
     BufReader::new(
         stream
@@ -1544,19 +1939,8 @@ fn start_detached(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
         CliErrorKind::workflow_io(format!("create {}: {error}", stderr_path.display()))
     })?;
     let mut command = Command::new(&harness);
+    write_bridge_config(&config.persisted)?;
     command.arg("bridge").arg("start");
-    for capability in &config.capabilities {
-        command.arg("--capability").arg(capability.name());
-    }
-    command.arg("--socket-path").arg(&config.socket_path);
-    if config.capabilities.contains(&BridgeCapability::Codex) {
-        command
-            .arg("--codex-port")
-            .arg(config.codex_port.to_string());
-        if let Some(codex_binary) = config.codex_binary.as_ref() {
-            command.arg("--codex-path").arg(codex_binary);
-        }
-    }
     let child = command
         .stdin(Stdio::null())
         .stdout(stdout)
@@ -1607,14 +1991,38 @@ fn send_sigterm(pid: u32) -> Result<(), CliError> {
 }
 
 fn bridge_response_error(response: BridgeResponse) -> CliError {
-    CliErrorKind::workflow_io(format!(
-        "bridge error {}: {}",
-        response.code.unwrap_or_else(|| "UNKNOWN".to_string()),
-        response
-            .message
-            .unwrap_or_else(|| "unknown bridge error".to_string())
-    ))
-    .into()
+    let code = response.code.unwrap_or_else(|| "UNKNOWN".to_string());
+    let message = response
+        .message
+        .unwrap_or_else(|| "unknown bridge error".to_string());
+    let detail = bridge_response_detail(&message);
+    let error = match code.as_str() {
+        "SANDBOX001" => CliError::from(CliErrorKind::sandbox_feature_disabled(detail)),
+        "CODEX001" => CliError::from(CliErrorKind::codex_server_unavailable(detail)),
+        "WORKFLOW_PARSE" => CliError::from(CliErrorKind::workflow_parse(message)),
+        "WORKFLOW_SERIALIZE" => CliError::from(CliErrorKind::workflow_serialize(detail)),
+        "WORKFLOW_VERSION" => CliError::from(CliErrorKind::workflow_version(detail)),
+        "WORKFLOW_CONCURRENT" => CliError::from(CliErrorKind::concurrent_modification(detail)),
+        "KSRCLI090" => CliError::from(CliErrorKind::session_not_active(detail)),
+        "KSRCLI091" => CliError::from(CliErrorKind::session_permission_denied(detail)),
+        "KSRCLI092" => CliError::from(CliErrorKind::session_agent_conflict(detail)),
+        "WORKFLOW_IO" => CliError::from(CliErrorKind::workflow_io(message)),
+        _ => CliError::from(CliErrorKind::workflow_io(format!(
+            "bridge error {code}: {message}"
+        ))),
+    };
+    if let Some(details) = response.details {
+        error.with_details(details)
+    } else {
+        error
+    }
+}
+
+fn bridge_response_detail(message: &str) -> String {
+    message.split_once(": ").map_or_else(
+        || message.trim().to_string(),
+        |(_, detail)| detail.trim().to_string(),
+    )
 }
 
 fn parse_bridge_payload<T: DeserializeOwned>(payload: Value) -> Result<T, CliError> {
@@ -1745,26 +2153,12 @@ fn launch_agent_plist_path() -> Result<PathBuf, CliError> {
         .join(format!("{BRIDGE_LAUNCH_AGENT_LABEL}.plist")))
 }
 
-fn render_launch_agent_plist(harness_binary: &Path, config: &ResolvedBridgeConfig) -> String {
-    let mut args = vec![
+fn render_launch_agent_plist(harness_binary: &Path) -> String {
+    let args = [
         format!("<string>{}</string>", harness_binary.display()),
         "<string>bridge</string>".to_string(),
         "<string>start</string>".to_string(),
     ];
-    for capability in &config.capabilities {
-        args.push("<string>--capability</string>".to_string());
-        args.push(format!("<string>{}</string>", capability.name()));
-    }
-    args.push("<string>--socket-path</string>".to_string());
-    args.push(format!("<string>{}</string>", config.socket_path.display()));
-    if config.capabilities.contains(&BridgeCapability::Codex) {
-        args.push("<string>--codex-port</string>".to_string());
-        args.push(format!("<string>{}</string>", config.codex_port));
-        if let Some(binary) = config.codex_binary.as_ref() {
-            args.push("<string>--codex-path</string>".to_string());
-            args.push(format!("<string>{}</string>", binary.display()));
-        }
-    }
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1801,6 +2195,49 @@ fn render_launch_agent_plist(harness_binary: &Path, config: &ResolvedBridgeConfi
         stdout = state::daemon_root().join("bridge.stdout.log").display(),
         stderr = state::daemon_root().join("bridge.stderr.log").display(),
     )
+}
+
+fn merged_persisted_config(
+    explicit: &BridgeConfigArgs,
+    persisted: Option<PersistedBridgeConfig>,
+) -> PersistedBridgeConfig {
+    let persisted = persisted.unwrap_or_else(|| PersistedBridgeConfig {
+        capabilities: compiled_capabilities().into_iter().collect(),
+        ..PersistedBridgeConfig::default()
+    });
+    PersistedBridgeConfig {
+        capabilities: if explicit.capabilities.is_empty() {
+            persisted.capabilities
+        } else {
+            explicit.capabilities.clone()
+        },
+        socket_path: explicit.socket_path.clone().or(persisted.socket_path),
+        codex_port: explicit.codex_port.or(persisted.codex_port),
+        codex_path: explicit.codex_path.clone().or(persisted.codex_path),
+    }
+    .normalized()
+}
+
+fn resolve_bridge_config(config: PersistedBridgeConfig) -> Result<ResolvedBridgeConfig, CliError> {
+    let persisted = config.normalized();
+    let capabilities = persisted.capabilities_set();
+    let socket_path = persisted
+        .socket_path
+        .clone()
+        .unwrap_or_else(bridge_socket_path);
+    let codex_port = persisted.codex_port.unwrap_or(DEFAULT_CODEX_BRIDGE_PORT);
+    let codex_binary = if capabilities.contains(&BridgeCapability::Codex) {
+        Some(resolve_codex_binary(persisted.codex_path.as_deref())?)
+    } else {
+        None
+    };
+    Ok(ResolvedBridgeConfig {
+        persisted,
+        capabilities,
+        socket_path,
+        codex_port,
+        codex_binary,
+    })
 }
 
 fn best_effort_bootout(label: &str) {
@@ -1890,26 +2327,41 @@ mod tests {
 
     #[test]
     fn config_defaults_to_all_capabilities() {
-        let args = BridgeConfigArgs {
-            capabilities: Vec::new(),
-            socket_path: None,
-            codex_port: None,
-            codex_path: None,
-        };
-        let selected = args.selected_capabilities();
-        assert_eq!(selected, compiled_capabilities());
+        let merged = merged_persisted_config(
+            &BridgeConfigArgs {
+                capabilities: Vec::new(),
+                socket_path: None,
+                codex_port: None,
+                codex_path: None,
+            },
+            None,
+        );
+        assert_eq!(merged.capabilities_set(), compiled_capabilities());
     }
 
     #[test]
-    fn config_honors_explicit_capability_subset() {
-        let args = BridgeConfigArgs {
-            capabilities: vec![BridgeCapability::AgentTui],
-            socket_path: None,
-            codex_port: None,
-            codex_path: None,
-        };
-        let selected = args.selected_capabilities();
-        assert_eq!(selected, BTreeSet::from([BridgeCapability::AgentTui]),);
+    fn config_honors_explicit_capability_subset_and_persisted_defaults() {
+        let merged = merged_persisted_config(
+            &BridgeConfigArgs {
+                capabilities: vec![BridgeCapability::AgentTui],
+                socket_path: None,
+                codex_port: None,
+                codex_path: None,
+            },
+            Some(PersistedBridgeConfig {
+                capabilities: vec![BridgeCapability::Codex],
+                socket_path: Some(PathBuf::from("/tmp/custom.sock")),
+                codex_port: Some(14567),
+                codex_path: Some(PathBuf::from("/tmp/mock-codex")),
+            }),
+        );
+        assert_eq!(
+            merged.capabilities_set(),
+            BTreeSet::from([BridgeCapability::AgentTui])
+        );
+        assert_eq!(merged.socket_path, Some(PathBuf::from("/tmp/custom.sock")));
+        assert_eq!(merged.codex_port, Some(14567));
+        assert_eq!(merged.codex_path, Some(PathBuf::from("/tmp/mock-codex")));
     }
 
     #[test]
@@ -1942,6 +2394,76 @@ mod tests {
             let loaded = read_bridge_state().expect("read").expect("state");
             assert_eq!(loaded, state);
         });
+    }
+
+    #[test]
+    fn write_then_read_roundtrips_bridge_config() {
+        with_temp_daemon_root(|| {
+            let config = PersistedBridgeConfig {
+                capabilities: vec![BridgeCapability::AgentTui],
+                socket_path: Some(PathBuf::from("/tmp/bridge.sock")),
+                codex_port: Some(14500),
+                codex_path: Some(PathBuf::from("/tmp/mock-codex")),
+            };
+            write_bridge_config(&config).expect("write");
+            let loaded = read_bridge_config().expect("read").expect("config");
+            assert_eq!(loaded, config);
+        });
+    }
+
+    #[test]
+    fn reconfigure_spec_rejects_duplicate_and_conflicting_capabilities() {
+        let duplicate = BridgeReconfigureSpec {
+            enable: vec![BridgeCapability::Codex, BridgeCapability::Codex],
+            disable: Vec::new(),
+            force: false,
+        };
+        assert_eq!(
+            duplicate.validate().expect_err("duplicate enable").code(),
+            "WORKFLOW_PARSE"
+        );
+
+        let conflicting = BridgeReconfigureSpec {
+            enable: vec![BridgeCapability::Codex],
+            disable: vec![BridgeCapability::Codex],
+            force: false,
+        };
+        assert_eq!(
+            conflicting.validate().expect_err("conflict").code(),
+            "WORKFLOW_PARSE"
+        );
+    }
+
+    #[test]
+    fn reconfigure_names_reject_unknown_capability() {
+        let error = BridgeReconfigureSpec::from_names(
+            &[String::from("codex")],
+            &[String::from("unknown")],
+            false,
+        )
+        .expect_err("unknown capability");
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+    }
+
+    #[test]
+    fn bridge_response_error_preserves_session_agent_conflict_code() {
+        let error = bridge_response_error(BridgeResponse {
+            ok: false,
+            code: Some("KSRCLI092".to_string()),
+            message: Some(
+                "session agent conflict: agent-tui capability has 1 active session(s); rerun with --force to stop them first"
+                    .to_string(),
+            ),
+            details: None,
+            payload: None,
+        });
+
+        assert_eq!(error.code(), "KSRCLI092");
+        assert!(
+            error
+                .message()
+                .contains("agent-tui capability has 1 active session(s)")
+        );
     }
 
     #[test]

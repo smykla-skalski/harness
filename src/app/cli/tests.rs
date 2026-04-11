@@ -644,6 +644,33 @@ fn parse_bridge_start_with_explicit_capabilities() {
 }
 
 #[test]
+fn parse_bridge_reconfigure_enable_and_disable() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "bridge",
+        "reconfigure",
+        "--enable",
+        "codex",
+        "--disable",
+        "agent-tui",
+        "--force",
+        "--json",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Bridge {
+            command: BridgeCommand::Reconfigure(args),
+        } => {
+            assert_eq!(args.enable, vec![BridgeCapability::Codex]);
+            assert_eq!(args.disable, vec![BridgeCapability::AgentTui]);
+            assert!(args.force);
+            assert!(args.json);
+        }
+        _ => panic!("expected bridge reconfigure command"),
+    }
+}
+
+#[test]
 fn parse_agents_prompt_submit() {
     let cli = Cli::try_parse_from([
         "harness",
