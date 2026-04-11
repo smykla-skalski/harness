@@ -43,9 +43,11 @@ extension HarnessMonitorStore {
     selection.onChanged = { [weak self] change in
       switch change {
       case .selectedSessionID:
+        // The content chrome depends on loaded detail or summary metadata, not
+        // the session ID alone. Skipping it here avoids an extra shell-wide
+        // invalidation during the initial cockpit-open transition.
         self?.scheduleUISync([
           .contentShell,
-          .contentChrome,
           .contentSession,
           .sidebar,
           .inspector,
