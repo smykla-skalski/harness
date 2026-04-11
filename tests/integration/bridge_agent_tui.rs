@@ -1,11 +1,20 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use harness::daemon::agent_tui::{AgentTuiLaunchProfile, AgentTuiSize};
+use harness::daemon::agent_tui::{
+    AgentTuiLaunchProfile, AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot,
+    AgentTuiStartRequest, AgentTuiStatus,
+};
 use harness::daemon::bridge::{AgentTuiStartSpec, BridgeClient, BridgeState, BridgeStatusReport};
+use harness::daemon::db::DaemonDb;
+use harness::daemon::protocol::{SessionStartRequest, StreamEvent};
+use harness::daemon::service as daemon_service;
+use harness::session::types::SessionRole;
 use tempfile::tempdir;
+use tokio::sync::broadcast;
 
 use super::helpers::ManagedChild;
 
@@ -259,6 +268,144 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
     let report: BridgeStatusReport =
         serde_json::from_slice(&forced_output.stdout).expect("parse status");
     assert!(!report.capabilities.contains_key("agent-tui"));
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "cleanup stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+}
+
+#[test]
+fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&project).expect("create project");
+
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["bridge", "start", "--capability", "agent-tui"])
+            .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+            .env("XDG_DATA_HOME", tmp.path())
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
+
+    let _state = wait_for_bridge_state(tmp.path());
+
+    temp_env::with_vars(
+        [
+            (
+                "HARNESS_DAEMON_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "HARNESS_HOST_HOME",
+                Some(host_home.to_str().expect("utf8 host home")),
+            ),
+            ("HOME", Some(host_home.to_str().expect("utf8 host home"))),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("HARNESS_SANDBOXED", Some("1")),
+        ],
+        || {
+            let db_path = tmp.path().join("daemon.sqlite3");
+            let db = DaemonDb::open(&db_path).expect("open daemon db");
+            let session_state = daemon_service::start_session_direct(
+                &SessionStartRequest {
+                    title: "sandboxed tui live refresh".into(),
+                    context: "sandboxed tui".into(),
+                    runtime: "codex".into(),
+                    session_id: Some("sess-sandbox-tui".into()),
+                    project_dir: project.to_string_lossy().into_owned(),
+                },
+                Some(&db),
+            )
+            .expect("start session");
+            let session_id = session_state.session_id.clone();
+
+            let db_slot = Arc::new(OnceLock::new());
+            db_slot.set(Arc::new(Mutex::new(db))).expect("install db");
+            let (sender, mut receiver) = broadcast::channel::<StreamEvent>(64);
+            let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), true);
+
+            let snapshot = manager
+                .start(
+                    &session_id,
+                    &AgentTuiStartRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: Some("Sandboxed live refresh".into()),
+                        prompt: None,
+                        project_dir: Some(project.to_string_lossy().into_owned()),
+                        argv: vec![
+                            "sh".into(),
+                            "-c".into(),
+                            "printf 'agent-ready\\n'; sleep 2".into(),
+                        ],
+                        rows: 5,
+                        cols: 40,
+                    },
+                )
+                .expect("start sandboxed tui via bridge");
+            assert_eq!(snapshot.status, AgentTuiStatus::Running);
+
+            let started = receiver.try_recv().expect("started event must be queued");
+            assert_eq!(started.event, "agent_tui_started");
+
+            let mut updated: Option<AgentTuiSnapshot> = None;
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while Instant::now() < deadline && updated.is_none() {
+                match receiver.try_recv() {
+                    Ok(event) => {
+                        if event.event != "agent_tui_updated" {
+                            continue;
+                        }
+                        let event_snapshot: AgentTuiSnapshot =
+                            serde_json::from_value(event.payload.clone())
+                                .expect("decode updated snapshot");
+                        if event_snapshot.tui_id == snapshot.tui_id
+                            && event_snapshot.screen.text.contains("agent-ready")
+                        {
+                            updated = Some(event_snapshot);
+                        }
+                    }
+                    Err(broadcast::error::TryRecvError::Empty) => {
+                        thread::sleep(Duration::from_millis(20));
+                    }
+                    Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::TryRecvError::Closed) => {
+                        panic!("broadcast channel closed before receiving live refresh event");
+                    }
+                }
+            }
+
+            let updated = updated.expect(
+                "sandboxed daemon should publish an agent_tui_updated event whose screen text contains the PTY output",
+            );
+            assert_eq!(updated.tui_id, snapshot.tui_id);
+            assert!(updated.screen.text.contains("agent-ready"));
+            assert!(
+                updated.status == AgentTuiStatus::Running
+                    || updated.status == AgentTuiStatus::Exited
+            );
+
+            let _ = manager.stop(&snapshot.tui_id);
+        },
+    );
 
     let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
     assert!(
