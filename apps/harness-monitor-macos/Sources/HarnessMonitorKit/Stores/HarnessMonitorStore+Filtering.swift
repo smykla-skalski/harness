@@ -6,8 +6,10 @@ extension HarnessMonitorStore {
   @Observable
   public final class SessionIndexSlice {
     public enum Change {
-      case data
+      case snapshot
       case projection
+      case summaryProjection(sessionID: String)
+      case summaryMetadata(sessionID: String)
     }
 
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
@@ -118,7 +120,7 @@ extension HarnessMonitorStore {
       catalog.projects = projects
       catalog.sessions = sessions
       suppressRefresh = false
-      rebuildCatalogAndProjection()
+      rebuildCatalogAndProjection(change: .snapshot)
       return true
     }
 
@@ -139,14 +141,14 @@ extension HarnessMonitorStore {
         switch summaryChangeImpact(from: existing, to: summary) {
         case .catalog:
           cancelPendingSearchRebuild()
-          rebuildCatalogAndProjection()
+          rebuildCatalogAndProjection(change: .snapshot)
         case .projection:
           cancelPendingSearchRebuild()
           patchCatalog(existingSummary: existing, updatedSummary: summary)
-          rebuildProjection(change: .data)
+          rebuildProjection(change: .summaryProjection(sessionID: summary.sessionId))
         case .summaryOnly:
           patchCatalog(existingSummary: existing, updatedSummary: summary)
-          onChanged?(.data)
+          onChanged?(.summaryMetadata(sessionID: summary.sessionId))
         }
         return true
       }
@@ -157,7 +159,7 @@ extension HarnessMonitorStore {
       catalog.sessions = updated
       suppressRefresh = false
       cancelPendingSearchRebuild()
-      rebuildCatalogAndProjection()
+      rebuildCatalogAndProjection(change: .snapshot)
       return true
     }
 
@@ -189,7 +191,7 @@ extension HarnessMonitorStore {
       catalog.projects = projects
       catalog.sessions = sessions
       suppressRefresh = false
-      rebuildCatalogAndProjection()
+      rebuildCatalogAndProjection(change: .snapshot)
     }
 
     private func updateSearchText(_ newValue: String) {
@@ -257,9 +259,9 @@ extension HarnessMonitorStore {
       searchRebuildTask = nil
     }
 
-    private func rebuildCatalogAndProjection() {
+    private func rebuildCatalogAndProjection(change: Change) {
       rebuildCatalog()
-      rebuildProjection(change: .data)
+      rebuildProjection(change: change)
     }
 
     private func rebuildCatalog() {
