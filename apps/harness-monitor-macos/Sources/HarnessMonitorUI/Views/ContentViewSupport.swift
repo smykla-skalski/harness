@@ -145,17 +145,18 @@ struct ContentToolbarAccessibilityMarker: View {
 }
 
 struct ContentCornerOverlayModifier: ViewModifier {
-  let shellUI: HarnessMonitorStore.ContentShellSlice
+  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
+  let sessionUI: HarnessMonitorStore.ContentSessionSlice
   let cornerAnimationContent: () -> AnyView
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
 
   private var isPresented: Bool {
     cornerAnimationEnabled
-      || shellUI.isSelectionLoading
-      || shellUI.isExtensionsLoading
-      || shellUI.isRefreshing
-      || shellUI.connectionState == .connecting
+      || sessionUI.isSelectionLoading
+      || sessionUI.isExtensionsLoading
+      || toolbarUI.isRefreshing
+      || toolbarUI.connectionState == .connecting
   }
 
   func body(content: Content) -> some View {
@@ -242,7 +243,6 @@ struct ContentDetailColumn: View {
         summary: contentSession.selectedSessionSummary,
         timeline: contentSessionDetail.timeline,
         isSessionReadOnly: contentSession.isSessionReadOnly,
-        isSessionActionInFlight: contentSession.isSessionActionInFlight,
         isExtensionsLoading: contentSession.isExtensionsLoading,
         lastAction: contentSession.lastAction
       )

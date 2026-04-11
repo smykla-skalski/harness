@@ -10,11 +10,12 @@ struct InspectorCreateTaskConsole: View {
 
   var body: some View {
     InspectorCreateTaskSection(
+      store: store,
+      sessionID: store.selectedSessionID ?? "",
       createTitle: $createTitle,
       createContext: $createContext,
       createSeverity: $createSeverity,
       isSessionReadOnly: store.isSessionReadOnly,
-      isSessionActionInFlight: store.isSessionActionInFlight,
       submitCreateTask: submitCreateTask
     )
   }
@@ -45,6 +46,7 @@ struct InspectorCreateTaskConsole: View {
 
 struct InspectorTaskMutationConsole: View {
   let store: HarnessMonitorStore
+  let sessionID: String
   let selectedTask: WorkItem
   let tasks: [WorkItem]
   let agents: [AgentRegistration]
@@ -59,11 +61,13 @@ struct InspectorTaskMutationConsole: View {
 
   init(
     store: HarnessMonitorStore,
+    sessionID: String,
     selectedTask: WorkItem,
     tasks: [WorkItem],
     agents: [AgentRegistration]
   ) {
     self.store = store
+    self.sessionID = sessionID
     self.selectedTask = selectedTask
     self.tasks = tasks
     self.agents = agents
@@ -86,6 +90,8 @@ struct InspectorTaskMutationConsole: View {
 
   var body: some View {
     InspectorTaskActionsSection(
+      store: store,
+      sessionID: sessionID,
       task: selectedTask,
       tasks: tasks,
       agents: agents,
@@ -97,7 +103,6 @@ struct InspectorTaskMutationConsole: View {
       checkpointSummary: $checkpointSummary,
       checkpointProgress: $checkpointProgress,
       isSessionReadOnly: store.isSessionReadOnly,
-      isSessionActionInFlight: store.isSessionActionInFlight,
       assignSelectedTask: submitAssignSelectedTask,
       updateQueuePolicy: submitUpdateQueuePolicy,
       updateSelectedTask: submitUpdateSelectedTask,
@@ -213,6 +218,7 @@ struct InspectorTaskMutationConsole: View {
 
 struct InspectorRoleMutationConsole: View {
   let store: HarnessMonitorStore
+  let sessionID: String
   let selectedAgent: AgentRegistration
   let leaderID: String?
 
@@ -225,11 +231,11 @@ struct InspectorRoleMutationConsole: View {
   var body: some View {
     InspectorRoleActionsSection(
       store: store,
+      sessionID: sessionID,
       agent: selectedAgent,
       leaderID: leaderID,
       role: $role,
       isSessionReadOnly: store.isSessionReadOnly,
-      isSessionActionInFlight: store.isSessionActionInFlight,
       changeSelectedRole: submitChangeSelectedRole
     )
     .task(id: stateKey) {
@@ -287,13 +293,13 @@ struct InspectorLeaderTransferConsole: View {
 
   var body: some View {
     InspectorLeaderTransferSection(
+      store: store,
       detail: detail,
       transferLeaderID: $transferLeaderID,
       transferReason: $transferReason,
       transferLeaderButtonTitle: transferLeaderButtonTitle,
       actionActorID: actionActorID,
       isSessionReadOnly: store.isSessionReadOnly,
-      isSessionActionInFlight: store.isSessionActionInFlight,
       submitTransferLeader: submitTransferLeader
     )
     .task(id: stateKey) {

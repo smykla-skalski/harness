@@ -3,7 +3,6 @@ import SwiftUI
 
 struct SessionActionDock: View {
   let detail: SessionDetail
-  let isSessionActionInFlight: Bool
   let inspectTask: (String) -> Void
   let inspectAgent: (String) -> Void
   let inspectObserver: () -> Void
@@ -30,18 +29,11 @@ struct SessionActionDock: View {
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
         Spacer()
-        VStack(alignment: .trailing, spacing: 4) {
-          if isSessionActionInFlight {
-            HarnessMonitorSpinner()
-              .transition(.opacity)
-          }
-          let taskWord = detail.tasks.count == 1 ? "task" : "tasks"
-          let agentWord = detail.agents.count == 1 ? "agent" : "agents"
-          Text("\(detail.tasks.count) \(taskWord) · \(detail.agents.count) \(agentWord)")
-            .scaledFont(.caption.monospacedDigit())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-        .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
+        let taskWord = detail.tasks.count == 1 ? "task" : "tasks"
+        let agentWord = detail.agents.count == 1 ? "agent" : "agents"
+        Text("\(detail.tasks.count) \(taskWord) · \(detail.agents.count) \(agentWord)")
+          .scaledFont(.caption.monospacedDigit())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
 
       ViewThatFits(in: .horizontal) {
@@ -178,7 +170,6 @@ extension View {
 #Preview("Action flow") {
   SessionActionDock(
     detail: PreviewFixtures.detail,
-    isSessionActionInFlight: false,
     inspectTask: { _ in },
     inspectAgent: { _ in },
     inspectObserver: {},

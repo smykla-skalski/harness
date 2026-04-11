@@ -6,7 +6,6 @@ struct SessionCockpitView: View {
   let detail: SessionDetail
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
   let isExtensionsLoading: Bool
   let lastAction: String
 
@@ -17,9 +16,9 @@ struct SessionCockpitView: View {
     ) {
       VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(
+          store: store,
           detail: detail,
           isSessionReadOnly: isSessionReadOnly,
-          isSessionActionInFlight: isSessionActionInFlight,
           observeSelectedSession: { Task { await store.observeSelectedSession() } },
           requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
           inspectObserver: store.inspectObserver
@@ -27,7 +26,6 @@ struct SessionCockpitView: View {
         SessionMetricGrid(metrics: detail.session.metrics)
         SessionActionDock(
           detail: detail,
-          isSessionActionInFlight: isSessionActionInFlight,
           inspectTask: store.inspect(taskID:),
           inspectAgent: store.inspect(agentID:),
           inspectObserver: store.inspectObserver,
@@ -73,7 +71,6 @@ struct SessionCockpitView: View {
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     isSessionReadOnly: false,
-    isSessionActionInFlight: false,
     isExtensionsLoading: false,
     lastAction: "Observe action queued"
   )
