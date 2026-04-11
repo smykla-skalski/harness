@@ -921,6 +921,8 @@ mod tests {
                 token_path: "/tmp/token".into(),
                 sandboxed: false,
                 host_bridge: super::super::state::HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
             },
             daemon_epoch: "epoch".into(),
             replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),

@@ -3,7 +3,8 @@ use std::env;
 use std::fs;
 use std::io::{self, Write as _};
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
@@ -16,9 +17,46 @@ use crate::workspace::{dirs_home, harness_data_root, host_home_dir, utc_now};
 const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
 const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
 const LEGACY_LAUNCH_AGENT_PLIST: &str = "io.harness.monitor.daemon.plist";
-const DAEMON_LOCK_FILE: &str = "daemon.lock";
-const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
-const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
+pub(crate) const DAEMON_LOCK_FILE: &str = "daemon.lock";
+pub(crate) const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
+pub(crate) const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
+
+/// Process-local override for [`daemon_root`]. Installed by
+/// [`set_daemon_root_override`] (typically from
+/// `crate::daemon::discovery::adopt_running_daemon_root`) and by tests that
+/// want to pin the root without racy env mutation.
+///
+/// The `Mutex` is `const`-constructible and the whole module is single-writer
+/// in practice (every writer goes through [`set_daemon_root_override`]), so
+/// the lock is contention-free at runtime. Using a mutex instead of
+/// [`std::env::set_var`] keeps us sound under the Rust 2024 multithreaded
+/// environment rules.
+static DAEMON_ROOT_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// Install a process-local override so every subsequent [`daemon_root`] call
+/// returns `path`. Passing `None` clears the override.
+///
+/// Intended for [`crate::daemon::discovery::adopt_running_daemon_root`] and
+/// for tests that need deterministic paths without mutating process env.
+///
+/// # Panics
+/// Panics only if the internal [`std::sync::Mutex`] is poisoned, which would
+/// indicate another thread panicked while holding the override lock. The
+/// module never holds the lock across any code that can panic, so this is a
+/// bug-only failure mode.
+pub fn set_daemon_root_override(path: Option<PathBuf>) {
+    *DAEMON_ROOT_OVERRIDE
+        .lock()
+        .expect("daemon root override mutex poisoned") = path;
+}
+
+#[must_use]
+fn daemon_root_override() -> Option<PathBuf> {
+    DAEMON_ROOT_OVERRIDE
+        .lock()
+        .expect("daemon root override mutex poisoned")
+        .clone()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HostBridgeCapabilityManifest {
@@ -62,6 +100,16 @@ pub struct DaemonManifest {
     pub sandboxed: bool,
     #[serde(default)]
     pub host_bridge: HostBridgeManifest,
+    /// Monotonic counter bumped by every [`write_manifest`] call. External
+    /// watchers (e.g. the Swift Monitor app) use this to detect in-place
+    /// updates such as `host_bridge` changes without requiring a full
+    /// reconnect. Legacy manifests decode as `0`.
+    #[serde(default)]
+    pub revision: u64,
+    /// UTC timestamp of the most recent [`write_manifest`] call. Empty on
+    /// legacy manifests written before this field existed.
+    #[serde(default)]
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +144,19 @@ impl Drop for DaemonLockGuard {
 
 #[must_use]
 pub fn daemon_root() -> PathBuf {
+    if let Some(override_root) = daemon_root_override() {
+        return override_root;
+    }
+    default_daemon_root()
+}
+
+/// Resolve what [`daemon_root`] would return ignoring any active override.
+///
+/// Used by discovery/adoption code paths that need to know the process's
+/// "natural" default daemon root before installing an override, and by the
+/// override itself when no override is active.
+#[must_use]
+pub fn default_daemon_root() -> PathBuf {
     if let Some(value) = context_scope_value(DAEMON_DATA_HOME_ENV) {
         return PathBuf::from(value).join("harness").join("daemon");
     }
@@ -206,15 +267,32 @@ pub fn acquire_singleton_lock() -> Result<DaemonLockGuard, CliError> {
 
 /// Probe whether the daemon singleton lock is held by another process.
 ///
-/// Returns `true` when another process holds the exclusive `flock` on
-/// `daemon.lock`, meaning the daemon is running. Returns `false` when
-/// the lock file is missing or the lock can be acquired (daemon is dead
-/// or was never started). The kernel releases `flock` on process death
-/// (even `SIGKILL`), so this is immune to PID reuse and stale manifests.
+/// Thin wrapper around [`daemon_lock_is_held_at`] that uses
+/// [`lock_path`]. See that function's docs for the invariant.
 #[must_use]
 pub fn daemon_lock_is_held() -> bool {
-    let path = lock_path();
-    let Ok(file) = fs::OpenOptions::new().read(true).write(true).open(&path) else {
+    daemon_lock_is_held_at(&lock_path())
+}
+
+/// Probe whether an arbitrary daemon lock file is currently held by a live
+/// process.
+///
+/// Returns `true` when another process holds the exclusive `flock` on
+/// `lock_path`, meaning the daemon owning that lock is running. Returns
+/// `false` when the lock file is missing or the lock can be acquired
+/// (daemon is dead or was never started). The kernel releases `flock` on
+/// process death (even `SIGKILL`), so this is immune to PID reuse and stale
+/// manifests.
+///
+/// Used by [`crate::daemon::discovery`] to scan candidate daemon roots
+/// without opening every possible manifest path.
+#[must_use]
+pub fn daemon_lock_is_held_at(lock_path: &Path) -> bool {
+    let Ok(file) = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(lock_path)
+    else {
         return false;
     };
     match file.try_lock_exclusive() {
@@ -258,13 +336,31 @@ pub fn load_running_manifest() -> Result<Option<DaemonManifest>, CliError> {
     Ok(None)
 }
 
-/// Persist the daemon manifest atomically.
+/// Persist the daemon manifest atomically, bumping [`DaemonManifest::revision`]
+/// and refreshing [`DaemonManifest::updated_at`] so external watchers can
+/// distinguish in-place updates from no-op rewrites.
+///
+/// Returns the manifest as it was written (with the new revision and
+/// timestamp) so callers that need to publish it downstream don't re-read
+/// from disk. Existing `let _ = write_manifest(&m)` call sites keep working
+/// unchanged.
+///
+/// Concurrency: writes are serialized by the daemon singleton lock (one
+/// writer at a time). Atomic tmp-file + rename guarantees observers never
+/// see a partial manifest.
 ///
 /// # Errors
 /// Returns `CliError` on filesystem failures.
-pub fn write_manifest(manifest: &DaemonManifest) -> Result<(), CliError> {
+pub fn write_manifest(manifest: &DaemonManifest) -> Result<DaemonManifest, CliError> {
     ensure_daemon_dirs()?;
-    write_json_pretty(&manifest_path(), manifest)
+    let previous_revision = load_manifest().ok().flatten().map_or(0, |m| m.revision);
+    let next = DaemonManifest {
+        revision: previous_revision.saturating_add(1),
+        updated_at: utc_now(),
+        ..manifest.clone()
+    };
+    write_json_pretty(&manifest_path(), &next)?;
+    Ok(next)
 }
 
 /// Remove the daemon manifest when it still belongs to `pid`.
@@ -501,6 +597,14 @@ mod tests {
             manifest.host_bridge == HostBridgeManifest::default(),
             "legacy manifests default host bridge to an empty snapshot"
         );
+        assert_eq!(
+            manifest.revision, 0,
+            "legacy manifests default revision to zero"
+        );
+        assert!(
+            manifest.updated_at.is_empty(),
+            "legacy manifests default updated_at to empty"
+        );
     }
 
     #[test]
@@ -520,11 +624,15 @@ mod tests {
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
                     host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
                 };
                 write_manifest(&manifest).expect("write");
                 let loaded = load_manifest().expect("load").expect("manifest");
                 assert_eq!(loaded.endpoint, manifest.endpoint);
                 assert_eq!(loaded.pid, 42);
+                assert_eq!(loaded.revision, 1, "first write bumps revision to 1");
+                assert!(!loaded.updated_at.is_empty(), "updated_at is populated");
             },
         );
     }
@@ -547,6 +655,8 @@ mod tests {
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
                     host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
                 })
                 .expect("manifest");
 
@@ -576,6 +686,8 @@ mod tests {
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
                     host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
                 })
                 .expect("manifest");
 
@@ -608,6 +720,8 @@ mod tests {
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
                     host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
                 })
                 .expect("manifest");
 
