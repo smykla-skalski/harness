@@ -258,11 +258,15 @@ public struct DaemonController: DaemonControlling {
           immediateError = DaemonControlError.externalDaemonManifestStale(
             manifestPath: manifestPath
           )
+          sawUnreachableManifest = true
+          break
         } else {
-          immediateError = DaemonControlError.daemonDidNotStart
+          lastError = DaemonControlError.daemonDidNotStart
+          HarnessMonitorLogger.lifecycle.trace(
+            "Warm-up waiting for managed daemon to rewrite stale manifest at \(manifestPath, privacy: .public)"
+          )
         }
         sawUnreachableManifest = true
-        break
       } catch {
         lastError = error
         HarnessMonitorLogger.lifecycle.trace(

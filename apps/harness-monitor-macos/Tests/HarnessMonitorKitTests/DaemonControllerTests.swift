@@ -30,19 +30,32 @@ struct DaemonControllerTests {
     }
   }
 
-  @Test("awaitManifestWarmUp returns daemonDidNotStart immediately for managed daemon when pid is dead")
-  func awaitManifestWarmUpReturnsManagedStaleManifestImmediately() async throws {
+  @Test("awaitManifestWarmUp waits for managed manifest rewrite when the stale endpoint is dead")
+  func awaitManifestWarmUpWaitsForManagedManifestRewrite() async throws {
     try await withTempDaemonFixture(pid: 999_999) { environment in
+      let client = PreviewHarnessClient()
       let controller = DaemonController(
         environment: environment,
         launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
         ownership: .managed,
-        endpointProbe: { _ in false }
+        sessionFactory: { _ in client },
+        endpointProbe: { endpoint in
+          endpoint.port == 65_533
+        }
       )
 
-      await #expect(throws: DaemonControlError.daemonDidNotStart) {
-        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
+      Task.detached {
+        try? await Task.sleep(for: .milliseconds(150))
+        try? rewriteTempDaemonFixtureManifest(
+          environment: environment,
+          pid: 1_234,
+          endpoint: "http://127.0.0.1:65533",
+          startedAt: "2026-04-11T12:01:00Z"
+        )
       }
+
+      let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+      #expect(bootstrappedClient as AnyObject === client as AnyObject)
     }
   }
 
@@ -240,6 +253,29 @@ private func withTempDaemonFixture(
     homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
   )
   try await perform(environment)
+}
+
+private func rewriteTempDaemonFixtureManifest(
+  environment: HarnessMonitorEnvironment,
+  pid: UInt32,
+  endpoint: String,
+  startedAt: String
+) throws {
+  let tokenPath = HarnessMonitorPaths.authTokenURL(using: environment)
+  let manifest = DaemonManifest(
+    version: "19.4.1",
+    pid: Int(pid),
+    endpoint: endpoint,
+    startedAt: startedAt,
+    tokenPath: tokenPath.path,
+    sandboxed: true,
+    hostBridge: HostBridgeManifest()
+  )
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+  encoder.keyEncodingStrategy = .convertToSnakeCase
+  let manifestData = try encoder.encode(manifest)
+  try manifestData.write(to: HarnessMonitorPaths.manifestURL(using: environment))
 }
 
 private final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {

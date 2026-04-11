@@ -34,16 +34,43 @@ struct HarnessMonitorPathsTests {
     )
   }
 
-  @Test("External daemon mode defaults to the CLI data root when no explicit data home is set")
-  func externalDaemonModeDefaultsToCLIDataRoot() {
+  @Test("External daemon mode defaults to the shared monitor data root when no explicit data home is set")
+  func externalDaemonModeDefaultsToSharedMonitorDataRoot() {
     let environment = HarnessMonitorEnvironment(
       values: [DaemonOwnership.environmentKey: "1"],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+    let expectedRoot: String
+    if let containerURL = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
+    ) {
+      expectedRoot = containerURL
+        .appendingPathComponent("harness", isDirectory: true)
+        .appendingPathComponent("daemon", isDirectory: true)
+        .path
+    } else {
+      expectedRoot = "/Users/example/Library/Application Support/harness/daemon"
+    }
+
+    #expect(
+      HarnessMonitorPaths.daemonRoot(using: environment).path
+        == expectedRoot
+    )
+  }
+
+  @Test("External daemon mode still prefers the app group when one is available")
+  func externalDaemonModePrefersAppGroup() {
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        DaemonOwnership.environmentKey: "1",
+        HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier,
+      ],
       homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
     )
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == "/Users/example/Library/Application Support/harness/daemon"
+        == "/Users/example/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/daemon"
     )
   }
 
