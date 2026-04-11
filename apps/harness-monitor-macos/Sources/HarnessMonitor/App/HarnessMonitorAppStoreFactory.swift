@@ -3,6 +3,14 @@ import SwiftData
 
 @MainActor
 enum HarnessMonitorAppStoreFactory {
+  private enum PreviewHostBridgeEnvironment {
+    static let capabilitiesKey = "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_CAPABILITIES"
+    static let reconfigureKey = "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RECONFIGURE"
+    static let runningKey = "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RUNNING"
+    static let socketPath = "/tmp/harness-preview-bridge.sock"
+    static let startedAt = "2026-04-11T10:00:00Z"
+  }
+
   private enum PreviewScenarioOverride: String {
     case dashboardLanding = "dashboard-landing"
     case dashboard
@@ -47,9 +55,11 @@ enum HarnessMonitorAppStoreFactory {
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) -> HarnessMonitorStore {
+    let previewHostBridgeOverride = previewHostBridgeOverride(environment: environment)
     if let previewScenario = PreviewScenarioOverride(environment: environment) {
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
+        hostBridgeOverride: previewHostBridgeOverride,
         modelContainer: modelContainer,
         persistenceError: persistenceError,
         voiceCapture: previewVoiceCapture(environment: environment)
@@ -71,7 +81,8 @@ enum HarnessMonitorAppStoreFactory {
     case .preview:
       return HarnessMonitorStore(
         daemonController: PreviewDaemonController(
-          previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"]
+          previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
+          hostBridgeOverride: previewHostBridgeOverride
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
@@ -79,7 +90,10 @@ enum HarnessMonitorAppStoreFactory {
       )
     case .empty:
       return HarnessMonitorStore(
-        daemonController: PreviewDaemonController(mode: .empty),
+        daemonController: PreviewDaemonController(
+          mode: .empty,
+          hostBridgeOverride: previewHostBridgeOverride
+        ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
         persistenceError: persistenceError
@@ -113,6 +127,85 @@ enum HarnessMonitorAppStoreFactory {
     default:
       return PreviewVoiceCaptureService(
         behavior: .failure(PreviewVoiceCaptureService.PreviewFailure(message: failure))
+      )
+    }
+  }
+
+  private static func previewHostBridgeOverride(
+    environment: HarnessMonitorEnvironment
+  ) -> PreviewHostBridgeOverride? {
+    let rawCapabilities = environment.values[PreviewHostBridgeEnvironment.capabilitiesKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let rawBehavior = environment.values[PreviewHostBridgeEnvironment.reconfigureKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    let rawRunning = environment.values[PreviewHostBridgeEnvironment.runningKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+
+    guard
+      rawCapabilities?.isEmpty == false
+        || rawBehavior?.isEmpty == false
+        || rawRunning?.isEmpty == false
+    else {
+      return nil
+    }
+
+    let running = switch rawRunning {
+    case "0", "false", "no":
+      false
+    default:
+      true
+    }
+
+    var capabilities: [String: HostBridgeCapabilityManifest] = [:]
+    if running, let rawCapabilities {
+      for capability in rawCapabilities.split(separator: ",") {
+        let name = capability.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+          continue
+        }
+        capabilities[name] = previewHostBridgeCapabilityManifest(for: name)
+      }
+    }
+
+    let behavior =
+      PreviewHostBridgeReconfigureBehavior(rawValue: rawBehavior ?? "unsupported") ?? .unsupported
+
+    return PreviewHostBridgeOverride(
+      bridgeStatus: BridgeStatusReport(
+        running: running,
+        socketPath: PreviewHostBridgeEnvironment.socketPath,
+        pid: 4242,
+        startedAt: PreviewHostBridgeEnvironment.startedAt,
+        uptimeSeconds: 600,
+        capabilities: capabilities
+      ),
+      reconfigureBehavior: behavior
+    )
+  }
+
+  private static func previewHostBridgeCapabilityManifest(
+    for capability: String
+  ) -> HostBridgeCapabilityManifest {
+    switch capability {
+    case "codex":
+      return HostBridgeCapabilityManifest(
+        healthy: true,
+        transport: "websocket",
+        endpoint: "ws://127.0.0.1:4545"
+      )
+    case "agent-tui":
+      return HostBridgeCapabilityManifest(
+        healthy: true,
+        transport: "unix",
+        endpoint: PreviewHostBridgeEnvironment.socketPath,
+        metadata: ["active_sessions": "0"]
+      )
+    default:
+      return HostBridgeCapabilityManifest(
+        healthy: true,
+        transport: "preview"
       )
     }
   }

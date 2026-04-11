@@ -1,5 +1,103 @@
 import Foundation
 
+actor PreviewHostBridgeState {
+  struct ManifestState: Sendable {
+    let sandboxed: Bool
+    let hostBridge: HostBridgeManifest
+  }
+
+  private var bridgeStatus: BridgeStatusReport?
+  private let reconfigureBehavior: PreviewHostBridgeReconfigureBehavior
+
+  init(override hostBridgeOverride: PreviewHostBridgeOverride?) {
+    bridgeStatus = hostBridgeOverride?.bridgeStatus
+    reconfigureBehavior = hostBridgeOverride?.reconfigureBehavior ?? .unsupported
+  }
+
+  func manifestState() -> ManifestState {
+    guard let bridgeStatus else {
+      return ManifestState(sandboxed: false, hostBridge: HostBridgeManifest())
+    }
+    return ManifestState(
+      sandboxed: true,
+      hostBridge: bridgeStatus.hostBridgeManifest
+    )
+  }
+
+  func reconfigure(request: HostBridgeReconfigureRequest) throws -> BridgeStatusReport {
+    guard var bridgeStatus else {
+      throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+    }
+
+    switch reconfigureBehavior {
+    case .unsupported:
+      throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+    case .missingRoute:
+      throw HarnessMonitorAPIError.server(code: 404, message: "Route not found.")
+    case .bridgeStopped:
+      throw HarnessMonitorAPIError.server(code: 400, message: "bridge is not running")
+    case .apply:
+      var capabilities = bridgeStatus.capabilities
+      for capability in request.enable {
+        capabilities[capability] = previewHostBridgeCapabilityManifest(
+          capability: capability,
+          existing: capabilities[capability]
+        )
+      }
+      for capability in request.disable {
+        capabilities.removeValue(forKey: capability)
+      }
+
+      bridgeStatus = BridgeStatusReport(
+        running: bridgeStatus.running,
+        socketPath: bridgeStatus.socketPath,
+        pid: bridgeStatus.pid,
+        startedAt: bridgeStatus.startedAt,
+        uptimeSeconds: bridgeStatus.uptimeSeconds,
+        capabilities: capabilities
+      )
+      self.bridgeStatus = bridgeStatus
+      return bridgeStatus
+    }
+  }
+
+  private func previewHostBridgeCapabilityManifest(
+    capability: String,
+    existing: HostBridgeCapabilityManifest?
+  ) -> HostBridgeCapabilityManifest {
+    if let existing {
+      return HostBridgeCapabilityManifest(
+        enabled: true,
+        healthy: true,
+        transport: existing.transport,
+        endpoint: existing.endpoint,
+        metadata: existing.metadata
+      )
+    }
+
+    switch capability {
+    case "codex":
+      return HostBridgeCapabilityManifest(
+        healthy: true,
+        transport: "websocket",
+        endpoint: "ws://127.0.0.1:4545"
+      )
+    case "agent-tui":
+      return HostBridgeCapabilityManifest(
+        healthy: true,
+        transport: "unix",
+        endpoint: "/tmp/harness-preview-bridge.sock",
+        metadata: ["active_sessions": "0"]
+      )
+    default:
+      return HostBridgeCapabilityManifest(
+        healthy: true,
+        transport: "preview"
+      )
+    }
+  }
+}
+
 public actor PreviewVoiceCaptureService: VoiceCaptureProviding {
   public enum Behavior: Sendable {
     case transcript(String)
@@ -333,22 +431,40 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   private let fixtures: Fixtures
   private let state: PreviewHarnessClientState
   private let isLaunchAgentInstalled: Bool
+  private let hostBridgeState: PreviewHostBridgeState
 
   var readySessionID: String? {
     fixtures.readySessionID
   }
 
-  public init(
+  public convenience init(
     fixtures: Fixtures,
     isLaunchAgentInstalled: Bool
+  ) {
+    self.init(
+      fixtures: fixtures,
+      isLaunchAgentInstalled: isLaunchAgentInstalled,
+      hostBridgeState: PreviewHostBridgeState(override: nil)
+    )
+  }
+
+  init(
+    fixtures: Fixtures,
+    isLaunchAgentInstalled: Bool,
+    hostBridgeState: PreviewHostBridgeState
   ) {
     self.fixtures = fixtures
     self.state = PreviewHarnessClientState(fixtures: fixtures)
     self.isLaunchAgentInstalled = isLaunchAgentInstalled
+    self.hostBridgeState = hostBridgeState
   }
 
   public convenience init() {
-    self.init(fixtures: .populated, isLaunchAgentInstalled: true)
+    self.init(
+      fixtures: .populated,
+      isLaunchAgentInstalled: true,
+      hostBridgeState: PreviewHostBridgeState(override: nil)
+    )
   }
 
   public func health() async throws -> HealthResponse {
@@ -356,12 +472,15 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
+    let manifestState = await hostBridgeState.manifestState()
     let manifest = DaemonManifest(
       version: fixtures.health.version,
       pid: fixtures.health.pid,
       endpoint: fixtures.health.endpoint,
       startedAt: fixtures.health.startedAt,
-      tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
+      tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
+      sandboxed: manifestState.sandboxed,
+      hostBridge: manifestState.hostBridge
     )
 
     let lastEvent: DaemonAuditEvent?
@@ -399,6 +518,12 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func stopDaemon() async throws -> DaemonControlResponse {
     DaemonControlResponse(status: "stopping")
+  }
+
+  public func reconfigureHostBridge(
+    request: HostBridgeReconfigureRequest
+  ) async throws -> BridgeStatusReport {
+    try await hostBridgeState.reconfigure(request: request)
   }
 
   public func projects() async throws -> [ProjectSummary] {

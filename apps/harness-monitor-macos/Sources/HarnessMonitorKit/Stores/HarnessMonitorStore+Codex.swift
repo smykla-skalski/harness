@@ -16,38 +16,12 @@ extension HarnessMonitorStore {
     defer { isDaemonActionInFlight = false }
     lastError = nil
 
-    do {
-      let measuredStatus = try await Self.measureOperation {
-        try await client.reconfigureHostBridge(
-          request: HostBridgeReconfigureRequest(
-            enable: enabled ? [capability] : [],
-            disable: enabled ? [] : [capability],
-            force: force
-          )
-        )
-      }
-      recordRequestSuccess()
-      clearHostBridgeIssue(for: capability)
-      applyHostBridgeStatus(measuredStatus.value)
-      if capability == "agent-tui" && !enabled {
-        selectedAgentTuis = []
-        selectedAgentTui = nil
-      }
-      showLastAction(hostBridgeActionLabel(for: capability, enabled: enabled))
-      return .success
-    } catch let apiError as HarnessMonitorAPIError {
-      if case .server(let code, let message) = apiError, code == 409 {
-        return .requiresForce(message)
-      }
-      if case .server(let code, _) = apiError, code == 501 || code == 503 {
-        markHostBridgeIssue(for: capability, statusCode: code)
-      }
-      lastError = apiError.localizedDescription
-      return .failed
-    } catch {
-      lastError = error.localizedDescription
-      return .failed
-    }
+    return await mutateHostBridgeCapability(
+      using: client,
+      capability: capability,
+      enabled: enabled,
+      force: force
+    )
   }
 
   @discardableResult
@@ -469,6 +443,170 @@ extension HarnessMonitorStore {
       return
     }
     self.daemonStatus = daemonStatus.updating(hostBridge: status.hostBridgeManifest)
+  }
+
+  private func mutateHostBridgeCapability(
+    using client: any HarnessMonitorClientProtocol,
+    capability: String,
+    enabled: Bool,
+    force: Bool
+  ) async -> HostBridgeCapabilityMutationResult {
+    do {
+      let measuredStatus = try await measureHostBridgeCapabilityMutation(
+        using: client,
+        capability: capability,
+        enabled: enabled,
+        force: force
+      )
+      applyHostBridgeCapabilityMutationSuccess(
+        capability: capability,
+        enabled: enabled,
+        status: measuredStatus.value
+      )
+      return .success
+    } catch let apiError as HarnessMonitorAPIError {
+      if case .server(let code, let message) = apiError, code == 409 {
+        return .requiresForce(message)
+      }
+      if case .server(let code, _) = apiError, code == 404 {
+        return await recoverMissingHostBridgeReconfigureRoute(
+          capability: capability,
+          enabled: enabled,
+          force: force
+        )
+      }
+      if case .server(let code, let message) = apiError,
+        code == 400,
+        message.localizedCaseInsensitiveContains("bridge is not running")
+      {
+        applyStoppedHostBridgeState()
+        let friendlyMessage = "The shared host bridge is not running. Start it and try again."
+        appendConnectionEvent(kind: .error, detail: friendlyMessage)
+        lastError = friendlyMessage
+        return .failed
+      }
+      if case .server(let code, _) = apiError, code == 501 || code == 503 {
+        markHostBridgeIssue(for: capability, statusCode: code)
+      }
+      lastError = apiError.localizedDescription
+      return .failed
+    } catch {
+      lastError = error.localizedDescription
+      return .failed
+    }
+  }
+
+  private func measureHostBridgeCapabilityMutation(
+    using client: any HarnessMonitorClientProtocol,
+    capability: String,
+    enabled: Bool,
+    force: Bool
+  ) async throws -> MeasuredOperation<BridgeStatusReport> {
+    try await Self.measureOperation {
+      try await client.reconfigureHostBridge(
+        request: HostBridgeReconfigureRequest(
+          enable: enabled ? [capability] : [],
+          disable: enabled ? [] : [capability],
+          force: force
+        )
+      )
+    }
+  }
+
+  private func applyHostBridgeCapabilityMutationSuccess(
+    capability: String,
+    enabled: Bool,
+    status: BridgeStatusReport
+  ) {
+    recordRequestSuccess()
+    clearHostBridgeIssue(for: capability)
+    applyHostBridgeStatus(status)
+    if capability == "agent-tui" && !enabled {
+      selectedAgentTuis = []
+      selectedAgentTui = nil
+    }
+    showLastAction(hostBridgeActionLabel(for: capability, enabled: enabled))
+  }
+
+  private func applyStoppedHostBridgeState() {
+    clearTransientHostBridgeIssues()
+    if let daemonStatus {
+      self.daemonStatus = daemonStatus.updating(hostBridge: HostBridgeManifest())
+    }
+  }
+
+  private func recoverMissingHostBridgeReconfigureRoute(
+    capability: String,
+    enabled: Bool,
+    force: Bool
+  ) async -> HostBridgeCapabilityMutationResult {
+    switch daemonOwnership {
+    case .external:
+      let message =
+        "Connected daemon does not support live host bridge reconfiguration yet. "
+        + "Restart `harness daemon dev` and try again."
+      appendConnectionEvent(kind: .error, detail: message)
+      lastError = message
+      return .failed
+    case .managed:
+      appendConnectionEvent(
+        kind: .reconnecting,
+        detail: "Restarting the managed daemon to pick up host bridge reconfigure support"
+      )
+      do {
+        let recoveredClient = try await restartManagedDaemonForHostBridgeReconfigure()
+        let measuredStatus = try await measureHostBridgeCapabilityMutation(
+          using: recoveredClient,
+          capability: capability,
+          enabled: enabled,
+          force: force
+        )
+        applyHostBridgeCapabilityMutationSuccess(
+          capability: capability,
+          enabled: enabled,
+          status: measuredStatus.value
+        )
+        return .success
+      } catch {
+        lastError = error.localizedDescription
+        return .failed
+      }
+    }
+  }
+
+  private func restartManagedDaemonForHostBridgeReconfigure() async throws
+    -> any HarnessMonitorClientProtocol
+  {
+    stopAllStreams()
+    let staleClient = client
+    client = nil
+    if let staleClient {
+      await staleClient.shutdown()
+    }
+
+    _ = try await daemonController.stopDaemon()
+    let registrationState = try await daemonController.registerLaunchAgent()
+    switch registrationState {
+    case .enabled:
+      break
+    case .requiresApproval:
+      throw DaemonControlError.commandFailed(
+        "Launch agent needs approval in System Settings > General > Login Items."
+      )
+    case .notRegistered, .notFound:
+      throw DaemonControlError.commandFailed("Launch agent registration did not complete.")
+    }
+
+    let refreshedClient = try await daemonController.awaitManifestWarmUp(
+      timeout: bootstrapWarmUpTimeout
+    )
+    await connect(using: refreshedClient)
+    guard connectionState == .online else {
+      throw DaemonControlError.commandFailed(
+        lastError ?? "The harness daemon did not become healthy before the timeout."
+      )
+    }
+    return refreshedClient
   }
 
   private func hostBridgeActionLabel(for capability: String, enabled: Bool) -> String {
