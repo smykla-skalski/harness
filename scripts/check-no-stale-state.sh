@@ -25,15 +25,12 @@ if (( ${#tmp_sockets[@]} > 0 )); then
   stale+=("stale /tmp bridge sockets: ${tmp_sockets[*]}")
 fi
 
-# 3. Non-approved Xcode DerivedData HarnessMonitor bundles. The repo allows
-#    only tmp/xcode-derived and tmp/perf/harness-monitor-instruments/xcode-derived
-#    (see apps/harness-monitor-macos/CLAUDE.md). Anything else is stale.
-shopt -s nullglob
-stray_derived=("$HOME/Library/Developer/Xcode/DerivedData/HarnessMonitor-"*)
-shopt -u nullglob
-if (( ${#stray_derived[@]} > 0 )); then
-  stale+=("non-approved DerivedData bundles: ${stray_derived[*]}")
-fi
+# Xcode UI silently recreates its default DerivedData HarnessMonitor bundle
+# as part of indexing whenever the project is open, so checking that path
+# here would fail on every CLI run that follows an IDE session. CLI builds
+# always pass `-derivedDataPath` explicitly, so the Xcode UI cache is not a
+# workflow hazard. `mise run clean:stale` still scrubs it on demand, and
+# `Scripts/generate-project.sh` still scrubs it on every project regen.
 
 if (( ${#stale[@]} > 0 )); then
   {
