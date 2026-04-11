@@ -47,6 +47,7 @@ STAGED_HOST_LAUNCHER_PATH=""
 AUDIT_DAEMON_BUNDLE_MODE="unknown"
 AUDIT_DAEMON_CARGO_TARGET_DIR=""
 AUDIT_BUILD_ARCH=""
+RETAINED_RUN_SIZE_BUDGET_KIB=10240
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -83,6 +84,8 @@ Options:
                          resolved against the current directory first, then the common repo root.
   --scenarios <value>    Scenario selection. Default: all
   --keep-traces          Keep raw .trace bundles after metrics extraction. Default: discard raw traces.
+                         By default, persisted runs retain only manifest, summary, comparison,
+                         metrics, and scenario logs so long-term history stays disk-light.
   --discard-traces       Explicitly discard raw .trace bundles after metrics extraction.
 EOF
 }
@@ -448,7 +451,72 @@ prune_run_artifacts() {
     /bin/rm -rf "$traces_root"
   fi
 
+  prune_unretained_run_files "$keep_traces"
+  assert_retained_run_size_budget "$keep_traces"
+
   find "$run_dir" -depth -type d -empty -delete 2>/dev/null || true
+}
+
+retain_run_file() {
+  local relpath="$1"
+  local keep_traces="$2"
+
+  case "$relpath" in
+    manifest.json|summary.json|summary.csv|captures.tsv|comparison.json|comparison.md)
+      return 0
+      ;;
+    comparison-*/comparison.json|comparison-*/comparison.md)
+      return 0
+      ;;
+    logs/*.log)
+      return 0
+      ;;
+    metrics/*/swiftui.json|metrics/*/allocations.json|metrics/*/top-offenders.json)
+      return 0
+      ;;
+    traces/*)
+      [[ "$keep_traces" -eq 1 ]]
+      return
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+prune_unretained_run_files() {
+  local keep_traces="$1"
+  local path relpath
+
+  while IFS= read -r -d '' path; do
+    relpath="${path#"$run_dir"/}"
+    if retain_run_file "$relpath" "$keep_traces"; then
+      continue
+    fi
+    /bin/rm -f "$path"
+  done < <(find "$run_dir" -type f -print0)
+}
+
+assert_retained_run_size_budget() {
+  local keep_traces="$1"
+  local retained_run_size_kib=""
+
+  if [[ "$keep_traces" -eq 1 ]]; then
+    return
+  fi
+
+  retained_run_size_kib="$(du -sk "$run_dir" | awk '{print $1}')"
+  if [[ -z "$retained_run_size_kib" ]]; then
+    return
+  fi
+
+  if (( retained_run_size_kib > RETAINED_RUN_SIZE_BUDGET_KIB )); then
+    printf 'Retained audit run exceeded the %s KiB size budget (%s KiB): %s\n' \
+      "$RETAINED_RUN_SIZE_BUDGET_KIB" \
+      "$retained_run_size_kib" \
+      "$run_dir" >&2
+    exit 1
+  fi
 }
 
 acquire_audit_lock() {
