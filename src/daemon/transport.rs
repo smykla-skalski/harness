@@ -13,6 +13,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 
+use super::discovery::{self, AdoptionOutcome};
 use super::launchd;
 use super::protocol::DaemonControlResponse;
 use super::service::{self, DaemonServeConfig};
@@ -24,6 +25,37 @@ const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(2);
 
 static DAEMON_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "explicit outcome-specific logging keeps daemon root adoption auditable"
+)]
+fn adopt_daemon_root_for_transport_command(command: &'static str) {
+    match discovery::adopt_running_daemon_root() {
+        AdoptionOutcome::AlreadyCoherent { root } => {
+            tracing::debug!(
+                command,
+                root = %root.display(),
+                "daemon: root already coherent"
+            );
+        }
+        AdoptionOutcome::Adopted { from, to } => {
+            tracing::info!(
+                command,
+                from = %from.display(),
+                to = %to.display(),
+                "daemon: adopted running daemon root"
+            );
+        }
+        AdoptionOutcome::NoRunningDaemon { default_root } => {
+            tracing::debug!(
+                command,
+                default_root = %default_root.display(),
+                "daemon: no running daemon found during root adoption"
+            );
+        }
+    }
+}
 
 /// Local daemon commands used by the macOS Harness app.
 #[derive(Debug, Clone, Subcommand)]
@@ -56,6 +88,7 @@ impl Execute for DaemonCommand {
             Self::Serve(args) => args.execute(context),
             Self::Dev(args) => args.execute(context),
             Self::Status => {
+                adopt_daemon_root_for_transport_command("daemon-status");
                 let report = service::status_report()?;
                 print_json(&report)?;
                 Ok(0)
@@ -63,6 +96,7 @@ impl Execute for DaemonCommand {
             Self::Stop(args) => args.execute(context),
             Self::Restart(args) => args.execute(context),
             Self::Doctor => {
+                adopt_daemon_root_for_transport_command("daemon-doctor");
                 let db_path = state::daemon_root().join("harness.db");
                 let db = super::db::DaemonDb::open(&db_path).ok();
                 let report = service::diagnostics_report(db.as_ref())?;
@@ -85,6 +119,7 @@ pub struct DaemonStopArgs {
 
 impl Execute for DaemonStopArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_transport_command("daemon-stop");
         let response = stop_daemon()?;
         print_daemon_control_response(&response, self.json)?;
         Ok(0)
@@ -100,6 +135,7 @@ pub struct DaemonRestartArgs {
 
 impl Execute for DaemonRestartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_transport_command("daemon-restart");
         let binary = current_exe().map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(
                 "resolve current harness binary: {error}"
@@ -731,6 +767,7 @@ pub struct DaemonSnapshotArgs {
 
 impl Execute for DaemonSnapshotArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_transport_command("daemon-snapshot");
         let detail = snapshot::session_detail(&self.session)?;
         if self.json {
             print_json(&detail)?;

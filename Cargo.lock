@@ -1401,7 +1401,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "19.7.8"
+version = "19.7.9"
 dependencies = [
  "assert_cmd",
  "async-stream",
@@ -1457,7 +1457,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "19.7.8"
+version = "19.7.9"
 dependencies = [
  "assert_cmd",
  "harness",

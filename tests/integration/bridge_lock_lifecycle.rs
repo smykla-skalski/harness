@@ -18,6 +18,8 @@ use std::time::{Duration, Instant};
 use harness::daemon::bridge::{self, BridgeState};
 use harness::daemon::state::HostBridgeCapabilityManifest;
 
+use super::helpers::ManagedChild;
+
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -231,18 +233,19 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
     // be fooled by a real Monitor daemon running on the developer machine.
     let host_home = host_home.to_str().expect("utf8 host home").to_string();
 
-    let mut first_bridge = Command::new(harness_binary())
-        .args(["bridge", "start", "--capability", "agent-tui"])
-        .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
-        .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_SANDBOXED")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn first bridge");
+    let mut first_bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["bridge", "start", "--capability", "agent-tui"])
+            .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn first bridge");
 
     let daemon_root = tmp.path().join("harness").join("daemon");
     let lock_path = daemon_root.join("bridge.lock");

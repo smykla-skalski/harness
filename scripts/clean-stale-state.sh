@@ -11,6 +11,7 @@ readonly GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$APP_GROUP_ID/harn
 readonly APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/harness/daemon"
 readonly MONITOR_APP_PATTERN='/Harness Monitor[.]app/Contents/MacOS/Harness Monitor'
 readonly LAUNCHD_LABEL="io.harnessmonitor.daemon"
+readonly HARNESS_DEBUG_PROCESS_PATTERN='target/(debug|dev/[^/]+/debug)/harness (daemon|bridge)'
 
 quit_monitor_app() {
   if ! pgrep -f "$MONITOR_APP_PATTERN" >/dev/null 2>&1; then
@@ -40,13 +41,13 @@ stop_launchd_daemon() {
 }
 
 kill_orphan_harness_processes() {
-  if ! pgrep -f 'target/debug/harness (daemon|bridge)' >/dev/null 2>&1; then
+  if ! pgrep -f "$HARNESS_DEBUG_PROCESS_PATTERN" >/dev/null 2>&1; then
     return
   fi
-  echo "killing orphan target/debug/harness processes..."
-  pkill -TERM -f 'target/debug/harness (daemon|bridge)' 2>/dev/null || true
+  echo "killing orphan local debug harness processes..."
+  pkill -TERM -f "$HARNESS_DEBUG_PROCESS_PATTERN" 2>/dev/null || true
   sleep 1
-  pkill -KILL -f 'target/debug/harness (daemon|bridge)' 2>/dev/null || true
+  pkill -KILL -f "$HARNESS_DEBUG_PROCESS_PATTERN" 2>/dev/null || true
 }
 
 remove_tmp_bridge_sockets() {

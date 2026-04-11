@@ -344,6 +344,7 @@ fn create_work_items_for_issues(
 #[cfg(test)]
 mod tests {
     use fs_err as fs;
+    use harness_testkit::with_isolated_harness_env;
 
     use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueCode, MessageRole};
     use crate::session::types::SessionRole;
@@ -353,20 +354,13 @@ mod tests {
 
     fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
         let tmp = tempfile::tempdir().expect("tempdir");
-        temp_env::with_vars(
-            [
-                (
-                    "XDG_DATA_HOME",
-                    Some(tmp.path().to_str().expect("xdg path")),
-                ),
-                ("CLAUDE_SESSION_ID", Some("leader-session")),
-            ],
-            || {
+        with_isolated_harness_env(tmp.path(), || {
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
                 let project = tmp.path().join("project");
                 fs::create_dir_all(&project).expect("create project dir");
                 test_fn(&project);
-            },
-        );
+            });
+        });
     }
 
     fn write_agent_log_lines(

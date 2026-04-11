@@ -7,6 +7,8 @@ use harness::daemon::agent_tui::{AgentTuiLaunchProfile, AgentTuiSize};
 use harness::daemon::bridge::{AgentTuiStartSpec, BridgeClient, BridgeState, BridgeStatusReport};
 use tempfile::tempdir;
 
+use super::helpers::ManagedChild;
+
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -48,19 +50,20 @@ fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
 
-    let mut bridge = Command::new(harness_binary())
-        .args(["bridge", "start", "--capability", "agent-tui"])
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_SANDBOXED")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn bridge");
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["bridge", "start", "--capability", "agent-tui"])
+            .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+            .env("XDG_DATA_HOME", tmp.path())
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
 
     let state = wait_for_bridge_state(tmp.path());
     assert!(state.pid > 0);
@@ -137,6 +140,22 @@ fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
         "socket path should fit unix-domain limits: {}",
         state.socket_path
     );
+    let status_output = run_bridge_with_data_home(&data_home, &["bridge", "status"]);
+    assert!(
+        status_output.status.success(),
+        "status: {}",
+        output_text(&status_output)
+    );
+    let report: BridgeStatusReport =
+        serde_json::from_slice(&status_output.stdout).expect("parse daemon bridge status");
+    assert!(
+        report.running,
+        "daemon start should return only after the bridge is live"
+    );
+    assert_eq!(
+        report.socket_path.as_deref(),
+        Some(state.socket_path.as_str())
+    );
 
     let stop_output = run_bridge_with_data_home(&data_home, &["bridge", "stop"]);
     assert!(
@@ -157,19 +176,20 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
     let project = tmp.path().join("project");
     std::fs::create_dir_all(&project).expect("create project");
 
-    let mut bridge = Command::new(harness_binary())
-        .args(["bridge", "start", "--capability", "agent-tui"])
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_SANDBOXED")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn bridge");
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["bridge", "start", "--capability", "agent-tui"])
+            .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+            .env("XDG_DATA_HOME", tmp.path())
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
 
     let _state = wait_for_bridge_state(tmp.path());
     temp_env::with_vars(
@@ -267,7 +287,7 @@ fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
     }
 }
 
-fn wait_for_bridge_exit(bridge: &mut std::process::Child) {
+fn wait_for_bridge_exit(bridge: &mut ManagedChild) {
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
         if bridge.try_wait().expect("poll bridge").is_some() {

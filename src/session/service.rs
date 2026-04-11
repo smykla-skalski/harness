@@ -952,7 +952,7 @@ pub fn resolve_session_agent_for_runtime_session(
     runtime_session_id: &str,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
     if let Some(client) = DaemonClient::try_connect() {
-        return resolve_runtime_session_via_daemon(client, runtime_name, runtime_session_id);
+        return resolve_runtime_session_via_daemon(&client, runtime_name, runtime_session_id);
     }
 
     let active_session_ids: Vec<_> = storage::load_active_registry_for(project_dir)
@@ -2955,22 +2955,16 @@ fn generate_signal_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harness_testkit::with_isolated_harness_env;
 
     fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
         let tmp = tempfile::tempdir().expect("tempdir");
-        temp_env::with_vars(
-            [
-                (
-                    "XDG_DATA_HOME",
-                    Some(tmp.path().to_str().expect("utf8 path")),
-                ),
-                ("CLAUDE_SESSION_ID", Some("test-service")),
-            ],
-            || {
+        with_isolated_harness_env(tmp.path(), || {
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("test-service"), || {
                 let project = tmp.path().join("project");
                 test_fn(&project);
-            },
-        );
+            });
+        });
     }
 
     #[test]
