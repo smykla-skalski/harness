@@ -238,6 +238,43 @@ purge_release_products() {
     "$SHIPPING_APP_PATH.dSYM"
 }
 
+bundle_matches_provenance() {
+  local bundle_path="$1"
+  local expected_commit="$2"
+  local expected_dirty="$3"
+  local expected_workspace_fingerprint="$4"
+
+  if [[ ! -d "$bundle_path" ]]; then
+    return 1
+  fi
+
+  [[ "$(bundle_provenance_value "$bundle_path" "$BUILD_COMMIT_KEY")" == "$expected_commit" ]] \
+    && [[ "$(bundle_provenance_value "$bundle_path" "$BUILD_DIRTY_KEY")" == "$expected_dirty" ]] \
+    && [[ "$(bundle_provenance_value "$bundle_path" "$BUILD_WORKSPACE_FINGERPRINT_KEY")" == "$expected_workspace_fingerprint" ]]
+}
+
+release_products_are_current() {
+  if [[ ! -x "$HOST_BINARY_PATH" ]]; then
+    return 1
+  fi
+
+  if ! bundle_matches_provenance "$HOST_APP_PATH" "$git_commit" "$git_dirty" "$workspace_fingerprint"; then
+    return 1
+  fi
+
+  if [[ "$BUILD_SHIPPING" == "1" ]]; then
+    if [[ ! -x "$SHIPPING_APP_PATH/Contents/MacOS/Harness Monitor" ]]; then
+      return 1
+    fi
+
+    if ! bundle_matches_provenance "$SHIPPING_APP_PATH" "$git_commit" "$git_dirty" "$workspace_fingerprint"; then
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
 cleanup_host_processes() {
   local pids
   pids="$(
@@ -636,11 +673,10 @@ if [[ -n "$(git status --short)" ]]; then
   git_dirty="true"
 fi
 workspace_fingerprint="$(workspace_tree_fingerprint)"
-build_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+build_started_at_utc=""
 audit_commit_env="$AUDIT_COMMIT_ENV_KEY=$git_commit"
 audit_dirty_env="$AUDIT_DIRTY_ENV_KEY=$git_dirty"
 audit_workspace_fingerprint_env="$AUDIT_WORKSPACE_FINGERPRINT_ENV_KEY=$workspace_fingerprint"
-audit_build_started_at_utc_env="$AUDIT_BUILD_STARTED_AT_UTC_ENV_KEY=$build_started_at_utc"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 label_slug="${label//[^A-Za-z0-9._-]/-}"
@@ -678,9 +714,24 @@ else
   else
     printf 'Using incremental audit builds. Set HARNESS_MONITOR_AUDIT_FORCE_CLEAN=1 to force a clean rebuild.\n'
   fi
-  build_release_targets
+
+  if [[ "$FORCE_CLEAN" != "1" ]] && release_products_are_current; then
+    build_started_at_utc="$(bundle_provenance_value "$HOST_APP_PATH" "$BUILD_STARTED_AT_UTC_KEY")"
+    if [[ -z "$build_started_at_utc" ]]; then
+      build_started_at_utc="$(binary_mtime_utc "$HOST_BINARY_PATH")"
+    fi
+    printf 'Reusing current Release host build at %s\n' "$HOST_BINARY_PATH"
+  else
+    build_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    build_release_targets
+  fi
 fi
 assert_audit_source_unchanged "Release build"
+
+if [[ -z "$build_started_at_utc" ]]; then
+  build_started_at_utc="$(binary_mtime_utc "$HOST_BINARY_PATH")"
+fi
+audit_build_started_at_utc_env="$AUDIT_BUILD_STARTED_AT_UTC_ENV_KEY=$build_started_at_utc"
 
 if [[ ! -x "$HOST_BINARY_PATH" ]]; then
   printf 'Expected UI-test host binary not found at %s\n' "$HOST_BINARY_PATH" >&2
