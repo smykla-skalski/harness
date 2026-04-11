@@ -97,10 +97,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let sessionRow = previewSessionTrigger(in: app)
     let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
-    let clearFiltersButton = element(
-      in: app,
-      identifier: Accessibility.sidebarClearFiltersButton
-    )
+    let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
+    let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
     let observeButton = button(in: app, title: "Observe")
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
     let createTaskButton = button(in: app, title: "Create Task")
@@ -113,6 +111,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(createTaskButton.waitForExistence(timeout: Self.actionTimeout))
@@ -127,20 +127,17 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     tapElement(in: app, identifier: Accessibility.sidebarSearchField)
     app.typeText("offline cockpit\n")
-    XCTAssertTrue(clearFiltersButton.waitForExistence(timeout: Self.actionTimeout))
-    tapElement(in: app, identifier: Accessibility.sidebarClearFiltersButton)
-
-    let recentSearchChip = button(in: app, title: "offline cockpit")
-    let clearSearchHistoryButton = element(
-      in: app,
-      identifier: Accessibility.sidebarClearSearchHistoryButton
-    )
-    XCTAssertTrue(recentSearchChip.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(clearSearchHistoryButton.waitForExistence(timeout: Self.actionTimeout))
-    tapElement(in: app, identifier: Accessibility.sidebarClearSearchHistoryButton)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        !recentSearchChip.exists && !clearSearchHistoryButton.exists
+      waitUntil(timeout: Self.fastActionTimeout) {
+        filterState.label.contains("search=offline cockpit")
+      }
+    )
+    tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
+    tapButton(in: app, title: "Clear Filters")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) {
+        filterState.label.contains("search=") && !filterState.label.contains("search=offline cockpit")
       }
     )
 
