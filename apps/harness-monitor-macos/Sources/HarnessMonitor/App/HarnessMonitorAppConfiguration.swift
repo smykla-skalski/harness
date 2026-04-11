@@ -7,6 +7,8 @@ struct HarnessMonitorAppConfiguration {
   private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
+  private static let toastDismissOverrideKey = "HARNESS_MONITOR_TEST_TOAST_DISMISS_MS"
+  private static let toastSeedKey = "HARNESS_MONITOR_TEST_SEED_TOASTS"
 
   let container: ModelContainer?
   let store: HarnessMonitorStore
@@ -85,9 +87,10 @@ struct HarnessMonitorAppConfiguration {
     )
 
     if isUITesting {
+      let toastDismissDelay = resolvedToastDismissDelay(environment: resolvedEnvironment)
       store.configureUITestBehavior(
-        successFeedbackDismissDelay: .seconds(1),
-        failureFeedbackDismissDelay: .seconds(1)
+        successFeedbackDismissDelay: toastDismissDelay,
+        failureFeedbackDismissDelay: toastDismissDelay
       )
       applyUITestDefaults(
         environment: resolvedEnvironment,
@@ -99,6 +102,7 @@ struct HarnessMonitorAppConfiguration {
           showInspector: initialShowInspector
         )
       )
+      seedTestToasts(environment: resolvedEnvironment, store: store)
     }
 
     return Self(
@@ -223,6 +227,40 @@ struct HarnessMonitorAppConfiguration {
       forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
     )
     applyVoiceUITestDefaults(environment: environment)
+  }
+
+  private static func resolvedToastDismissDelay(
+    environment: HarnessMonitorEnvironment
+  ) -> Duration {
+    guard
+      let rawValue = environment.values[toastDismissOverrideKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !rawValue.isEmpty,
+      let milliseconds = Int(rawValue),
+      milliseconds > 0
+    else {
+      return .seconds(1)
+    }
+    return .milliseconds(milliseconds)
+  }
+
+  @MainActor
+  private static func seedTestToasts(
+    environment: HarnessMonitorEnvironment,
+    store: HarnessMonitorStore
+  ) {
+    guard
+      let rawValue = environment.values[toastSeedKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !rawValue.isEmpty
+    else {
+      return
+    }
+    for component in rawValue.split(separator: ",") {
+      let message = component.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !message.isEmpty else { continue }
+      store.presentSuccessFeedback(message)
+    }
   }
 
   private static func uiTestBoolOverride(from rawValue: String?) -> Bool? {
