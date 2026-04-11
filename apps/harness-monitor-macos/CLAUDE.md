@@ -58,49 +58,23 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
 
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/`. Each run produces `manifest.json`, `summary.json`, `summary.csv`, per-scenario metrics, and optional comparison reports.
 
-## SwiftUI rules
+## UX and SwiftUI rules
 
-Glob-scoped rules in `apps/harness-monitor-macos/.claude/rules/` enforce patterns learned from three review passes. They auto-activate when editing `apps/harness-monitor-macos/Sources/**/*.swift`:
+Rule content lives in skills under `.claude/skills/` (lazy-loaded on demand, not at session start):
 
-- `swiftui-state-management.md` - @Bindable vs let, @State privacy, no closure properties, owned state over @Binding+closure combos, @Binding only for mutation
-- `swiftui-view-structure.md` - structs over free functions, stable ForEach identity, no identity-breaking modifier branches, @ViewBuilder usage, no wrapper containers, accessibility probe patterns, dead code
-- `swiftui-selection-identity.md` - Picker/tag selection validity, dynamic option clamping, session-bound state reset, inspector actor fallback order
-- `swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping, no geometry feedback loops, no multi-slice computed properties in body
-- `swiftui-startup-focus.md` - persisted startup state, FocusedValue churn, restoration seeding, inspector/search presentation safety
-- `swiftui-button-styling.md` - no .plain, ButtonStyle over ViewModifier, no redundant .contentShape, native glass styles
-- `swiftui-idle-cpu.md` - no repeatForever on always-visible views, cached formatters, no gratuitous periodic animations
-- `swiftui-drag-drop.md` - unconditional draggable, drop rejection must set store.lastError, exhaustive DragSession.Phase, single dragPhase snapshot
+- `swiftui-design-rules` - accessibility (VoiceOver, Dynamic Type, contrast, target sizes), visual design (typography, 8pt spacing, color, dark mode, motion timing), interaction patterns (feedback, loading states, destructive actions, forms), and performance targets (60fps, launch time, scroll, memory)
+- `swiftui-api-patterns` - state wrappers (@State/@Binding/@Observable/@Bindable), view composition, ForEach identity, modifier branches, Picker/selection identity, button styles (.glass/.glassProminent, no .plain, AccentColor), drag-and-drop (.draggable/.dropDestination, DragSession.Phase), navigation, lists, animations, layout, keyboard/focus, window management, commands
+- `swiftui-performance-macos` - no object creation in view body, cached @MainActor formatters, no .repeatForever on always-visible views, no geometry feedback loops, no persisted state in .inspector/.searchable on first frame, OSSignposter contract (io.harnessmonitor/perf), perf test env vars, isolated worktree requirements for instruments audits
+- `swiftui-platform-rules` - macOS conventions (menu bar, windows, toolbar, sidebar, settings, dock, keyboard shortcuts), iOS conventions (tab bar, safe areas, gestures), and XCUITest reliability patterns (.firstMatch, animation suppression, single-launch tests, dragUp scroll helper)
 
-## UX rules
+Invoke the relevant skill when writing or reviewing Swift code in this directory. The skills collectively replace the former `apps/harness-monitor-macos/.claude/rules/` and root `.claude/rules/` files.
 
-Enforceable UX requirements are split between app-scoped rules (in `apps/harness-monitor-macos/.claude/rules/`) and repo-wide rules (in root `.claude/rules/`). These are hard requirements - not optional guidelines.
+Research backing these rules lives under `apps/harness-monitor-macos/docs/research/`:
 
-App-scoped (in `apps/harness-monitor-macos/.claude/rules/`):
+- `docs/research/ux/` - 10 numbered research docs covering HIG principles, interaction patterns, visual design, accessibility, SwiftUI best practices, psychology, performance, error handling, data display, and onboarding
+- `docs/research/xcuitest-speed.md` - XCUITest reliability and speed investigation
 
-| Rule file | Scope | Covers |
-|---|---|---|
-| `ux-platform-macos.md` | `apps/harness-monitor-macos/**/*.swift` | Menu bar, windows, toolbar, settings, dock, keyboard shortcuts |
-| `swiftui-state-management.md` | `apps/harness-monitor-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
-| `swiftui-view-structure.md` | `apps/harness-monitor-macos/Sources/**` | View composition, ForEach identity, modifier branches |
-| `swiftui-selection-identity.md` | `apps/harness-monitor-macos/Sources/**` | Picker/tag validity, dynamic selection clamping, session-bound state reset |
-| `swiftui-performance.md` | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping, geometry feedback loops, multi-slice body reads |
-| `swiftui-startup-focus.md` | `apps/harness-monitor-macos/Sources/**` | Persisted startup presentation, FocusedValue churn, restoration and geometry writeback safety |
-| `swiftui-idle-cpu.md` | `apps/harness-monitor-macos/Sources/**` | No repeatForever on idle views, cached formatters, no periodic animations |
-| `swiftui-drag-drop.md` | `apps/harness-monitor-macos/Sources/**` | Unconditional draggable, drop rejection feedback, exhaustive DragSession.Phase, one dragPhase snapshot, Button+style for click+drag cards |
-| `xcuitest-speed.md` | `apps/harness-monitor-macos/Tests/**` | Animation suppression, .firstMatch, coordinate taps, single-launch tests, scroll patterns |
-| `perf-instrumentation.md` | `apps/harness-monitor-macos/**` | Signpost subsystem/category, scenario checklist, perf test env vars, KEEP_ANIMATIONS |
-
-Repo-wide (in root `.claude/rules/`), also apply to this app:
-
-| Rule file | Scope | Covers |
-|---|---|---|
-| `ux-accessibility.md` | `**/*.swift` | VoiceOver, Dynamic Type, contrast, keyboard nav, Reduce Motion, target sizes |
-| `ux-visual-design.md` | `**/*.swift` | Typography, color, spacing (8pt grid), dark mode, icons, motion timing |
-| `ux-interaction.md` | `**/*.swift` | Feedback, errors, loading states, destructive actions, forms, data display |
-| `ux-swiftui.md` | `**/*.swift` | State management, navigation, performance, animations, anti-patterns |
-| `ux-performance.md` | `**/*.swift` | Response times, 60fps, launch time, scroll, memory, network UI, auto-save |
-
-Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines) and `tmp/investigations/xcuitest-speed/`. Consult for rationale or edge cases.
+Consult these for rationale and edge cases when a skill's rule text isn't enough.
 
 ## Daemon modes
 
