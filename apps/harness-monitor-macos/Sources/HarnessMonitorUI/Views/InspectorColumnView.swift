@@ -23,14 +23,14 @@ struct InspectorColumnView: View {
       topScrollEdgeEffect: .hard
     ) {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
-        inspectorPrimaryContent
-
-        if let actionContext = inspectorUI.actionContext {
-          InspectorActionSections(
-            store: store,
-            context: actionContext
-          )
-        }
+        InspectorPrimaryContentBridge(
+          store: store,
+          inspectorUI: inspectorUI
+        )
+        InspectorActionSectionsBridge(
+          store: store,
+          inspectorUI: inspectorUI
+        )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -40,8 +40,14 @@ struct InspectorColumnView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorRoot)
   }
+}
 
-  @ViewBuilder private var inspectorPrimaryContent: some View {
+private struct InspectorPrimaryContentBridge: View {
+  let store: HarnessMonitorStore
+  let inspectorUI: HarnessMonitorStore.InspectorUISlice
+
+  @ViewBuilder
+  var body: some View {
     switch inspectorUI.primaryContent {
     case .empty:
       InspectorPrimaryEmptyState()
@@ -79,6 +85,21 @@ struct InspectorColumnView: View {
     case .observer(let observer):
       ObserverInspectorCard(observer: observer)
         .transition(.opacity.animation(.easeOut(duration: 0.08)))
+    }
+  }
+}
+
+private struct InspectorActionSectionsBridge: View {
+  let store: HarnessMonitorStore
+  let inspectorUI: HarnessMonitorStore.InspectorUISlice
+
+  @ViewBuilder
+  var body: some View {
+    if let actionContext = inspectorUI.actionContext {
+      InspectorActionSections(
+        store: store,
+        context: actionContext
+      )
     }
   }
 }
