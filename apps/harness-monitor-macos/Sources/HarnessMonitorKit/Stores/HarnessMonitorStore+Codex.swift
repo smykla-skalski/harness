@@ -254,7 +254,11 @@ extension HarnessMonitorStore {
     let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    return await mutateAgentTui(using: client, actionName: "Agent TUI started") {
+    return await mutateAgentTui(
+      using: client,
+      actionName: "Agent TUI started",
+      selectUpdatedSnapshot: true
+    ) {
       try await client.startAgentTui(
         sessionID: sessionID,
         request: AgentTuiStartRequest(
@@ -395,6 +399,7 @@ extension HarnessMonitorStore {
   private func mutateAgentTui(
     using client: any HarnessMonitorClientProtocol,
     actionName: String? = nil,
+    selectUpdatedSnapshot: Bool = false,
     mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot
   ) async -> Bool {
     do {
@@ -404,6 +409,9 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       clearHostBridgeIssue(for: "agent-tui")
       applyAgentTui(measuredTui.value)
+      if selectUpdatedSnapshot {
+        selectAgentTui(tuiID: measuredTui.value.tuiId)
+      }
       scheduleAgentTuiActionRefresh(using: client, baseline: measuredTui.value)
       if let actionName {
         presentSuccessFeedback(actionName)

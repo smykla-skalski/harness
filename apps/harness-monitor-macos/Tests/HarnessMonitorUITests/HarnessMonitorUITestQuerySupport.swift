@@ -167,6 +167,29 @@ extension HarnessMonitorUITestCase {
       return element(in: app, identifier: identifier)
     }
 
+    let mainWindow = mainWindow(in: app)
+    let roles: [XCUIElement.ElementType] = [
+      .textField,
+      .textView,
+      .comboBox,
+    ]
+
+    for role in roles {
+      let windowMatch = mainWindow.descendants(matching: role)
+        .matching(identifier: identifier)
+        .firstMatch
+      if windowMatch.exists {
+        return windowMatch
+      }
+
+      let appMatch = app.descendants(matching: role)
+        .matching(identifier: identifier)
+        .firstMatch
+      if appMatch.exists {
+        return appMatch
+      }
+    }
+
     let textField = app.textFields.matching(identifier: identifier).firstMatch
     if textField.exists {
       return textField
@@ -175,6 +198,11 @@ extension HarnessMonitorUITestCase {
     let textView = app.textViews.matching(identifier: identifier).firstMatch
     if textView.exists {
       return textView
+    }
+
+    let genericMatch = element(in: app, identifier: identifier)
+    if genericMatch.exists {
+      return genericMatch
     }
 
     return app.descendants(matching: .textField).matching(identifier: identifier).firstMatch
