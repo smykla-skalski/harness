@@ -142,7 +142,7 @@ duration_for() {
 }
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root)"
-DERIVED_DATA_PATH="$COMMON_REPO_ROOT/tmp/xcode-derived"
+DERIVED_DATA_PATH="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/xcode-derived"
 AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
 HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Testing.app"
 HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
