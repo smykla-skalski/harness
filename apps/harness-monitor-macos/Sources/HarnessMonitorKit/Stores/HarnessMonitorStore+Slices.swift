@@ -81,6 +81,7 @@ extension HarnessMonitorStore {
       case selectionLoading
       case extensionsLoading
       case sessionAction
+      case inFlightActionID
     }
 
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
@@ -130,6 +131,12 @@ extension HarnessMonitorStore {
       didSet {
         guard oldValue != isSessionActionInFlight else { return }
         onChanged?(.sessionAction)
+      }
+    }
+    public var inFlightActionID: String? {
+      didSet {
+        guard oldValue != inFlightActionID else { return }
+        onChanged?(.inFlightActionID)
       }
     }
 
@@ -261,9 +268,6 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var windowTitle = "Dashboard"
     public var connectionState: ConnectionState = .idle
-    public var isRefreshing = false
-    public var isSelectionLoading = false
-    public var isExtensionsLoading = false
     public var lastAction = ""
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
@@ -322,9 +326,6 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var windowTitle = "Dashboard"
     public var connectionState: ConnectionState = .idle
-    public var isRefreshing = false
-    public var isSelectionLoading = false
-    public var isExtensionsLoading = false
     public var lastAction = ""
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
@@ -340,15 +341,6 @@ extension HarnessMonitorStore {
       }
       if connectionState != state.connectionState {
         connectionState = state.connectionState
-      }
-      if isRefreshing != state.isRefreshing {
-        isRefreshing = state.isRefreshing
-      }
-      if isSelectionLoading != state.isSelectionLoading {
-        isSelectionLoading = state.isSelectionLoading
-      }
-      if isExtensionsLoading != state.isExtensionsLoading {
-        isExtensionsLoading = state.isExtensionsLoading
       }
       if lastAction != state.lastAction {
         lastAction = state.lastAction

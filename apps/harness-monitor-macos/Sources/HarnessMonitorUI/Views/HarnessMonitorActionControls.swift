@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HarnessMonitorActionButton: View {
-  typealias Action = @MainActor () -> Void
+  typealias Action = @MainActor @Sendable () -> Void
   typealias Variant = HarnessMonitorAsyncActionButton.Variant
 
   let title: String
@@ -47,7 +47,7 @@ struct HarnessMonitorActionButton: View {
 }
 
 struct HarnessMonitorAsyncActionButton: View {
-  typealias Action = @MainActor () async -> Void
+  typealias Action = @MainActor @Sendable () async -> Void
 
   enum Variant: Equatable {
     case prominent

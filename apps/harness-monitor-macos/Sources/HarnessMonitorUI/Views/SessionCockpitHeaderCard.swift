@@ -2,9 +2,9 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionCockpitHeaderCard: View {
+  let store: HarnessMonitorStore
   let detail: SessionDetail
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
   let observeSelectedSession: () -> Void
   let requestEndSessionConfirmation: () -> Void
   let inspectObserver: () -> Void
@@ -62,25 +62,30 @@ struct SessionCockpitHeaderCard: View {
   }
 
   private var observeButton: some View {
-    Button("Observe", action: observeSelectedSession)
-      .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
-      .harnessActionButtonStyle(
-        variant: .prominent,
-        tint: nil
-      )
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isSessionActionInFlight || isSessionReadOnly)
-      .help(isSessionReadOnly ? "Unavailable while the daemon is offline." : "")
+    HarnessInlineActionButton(
+      title: "Observe",
+      actionID: .observeSession(sessionID: detail.session.sessionId),
+      store: store,
+      variant: .prominent,
+      tint: nil,
+      isExternallyDisabled: isSessionReadOnly,
+      help: isSessionReadOnly ? "Unavailable while the daemon is offline." : "",
+      action: { observeSelectedSession() }
+    )
   }
 
   private var endSessionButton: some View {
-    Button("End Session", action: requestEndSessionConfirmation)
-      .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isSessionActionInFlight || isSessionReadOnly)
-      .help(isSessionReadOnly ? "Unavailable while the daemon is offline." : "")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.endSessionButton)
+    HarnessInlineActionButton(
+      title: "End Session",
+      actionID: .endSession(sessionID: detail.session.sessionId),
+      store: store,
+      variant: .bordered,
+      tint: .secondary,
+      isExternallyDisabled: isSessionReadOnly,
+      accessibilityIdentifier: HarnessMonitorAccessibility.endSessionButton,
+      help: isSessionReadOnly ? "Unavailable while the daemon is offline." : "",
+      action: { requestEndSessionConfirmation() }
+    )
   }
 
   private func observerSummary(_ observer: ObserverSummary) -> some View {
@@ -188,9 +193,9 @@ private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
 
 #Preview("Cockpit header") {
   SessionCockpitHeaderCard(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     detail: PreviewFixtures.detail,
     isSessionReadOnly: false,
-    isSessionActionInFlight: false,
     observeSelectedSession: {},
     requestEndSessionConfirmation: {},
     inspectObserver: {}

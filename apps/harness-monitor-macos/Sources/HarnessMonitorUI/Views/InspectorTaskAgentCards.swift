@@ -198,25 +198,33 @@ struct AgentInspectorCard: View {
         TextField("Action Hint", text: $signalActionHint)
           .harnessNativeFormControl()
           .submitLabel(.send)
-        Button("Send Signal") {
-          Task {
-            await store.sendSignal(
-              agentID: agent.agentId,
-              command: signalCommand,
-              message: signalMessage,
-              actionHint: signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? nil : signalActionHint
-            )
+        HarnessInlineActionButton(
+          title: "Send Signal",
+          actionID: .sendSignal(
+            sessionID: store.selectedSessionID ?? "",
+            agentID: agent.agentId
+          ),
+          store: store,
+          variant: .prominent,
+          tint: nil,
+          isExternallyDisabled:
+            signalCommand.isEmpty || signalMessage.isEmpty
+            || store.isSessionReadOnly,
+          accessibilityIdentifier: HarnessMonitorAccessibility.signalSendButton,
+          action: {
+            Task {
+              await store.sendSignal(
+                agentID: agent.agentId,
+                command: signalCommand,
+                message: signalMessage,
+                actionHint: signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                  ? nil : signalActionHint
+              )
+            }
           }
-        }
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(
-          signalCommand.isEmpty || signalMessage.isEmpty || store.isSessionActionInFlight
-            || store.isSessionReadOnly
         )
-        .accessibilityIdentifier(HarnessMonitorAccessibility.signalSendButton)
       }
-      .disabled(store.isSessionReadOnly || store.isSessionActionInFlight)
+      .disabled(store.isSessionReadOnly)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(
