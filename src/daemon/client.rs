@@ -490,8 +490,16 @@ mod tests {
     #[test]
     fn try_connect_returns_none_when_no_daemon() {
         let tmp = tempfile::tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
+        std::fs::create_dir_all(&home).expect("create home");
         temp_env::with_vars(
-            [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8")))],
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8"))),
+                ("HOME", Some(home.to_str().expect("utf8 home"))),
+                ("HARNESS_HOST_HOME", Some(home.to_str().expect("utf8 home"))),
+                ("HARNESS_APP_GROUP_ID", None),
+                ("HARNESS_DAEMON_DATA_HOME", None),
+            ],
             || {
                 let client = try_build_client();
                 assert!(client.is_none());
