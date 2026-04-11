@@ -224,8 +224,6 @@ extension HarnessMonitorStore {
     public let selectedActionActorID: String
     public let isSessionReadOnly: Bool
     public let isSessionActionInFlight: Bool
-    public let lastAction: String
-    public let lastError: String?
 
     public init(
       detail: SessionDetail,
@@ -236,9 +234,7 @@ extension HarnessMonitorStore {
       actionActorOptions: [AgentRegistration],
       selectedActionActorID: String,
       isSessionReadOnly: Bool,
-      isSessionActionInFlight: Bool,
-      lastAction: String,
-      lastError: String?
+      isSessionActionInFlight: Bool
     ) {
       self.detail = detail
       self.selectedTask = selectedTask
@@ -249,8 +245,6 @@ extension HarnessMonitorStore {
       self.selectedActionActorID = selectedActionActorID
       self.isSessionReadOnly = isSessionReadOnly
       self.isSessionActionInFlight = isSessionActionInFlight
-      self.lastAction = lastAction
-      self.lastError = lastError
     }
 
     public init?(
@@ -259,9 +253,7 @@ extension HarnessMonitorStore {
       isPersistenceAvailable: Bool,
       selectedActionActorID: String,
       isSessionReadOnly: Bool,
-      isSessionActionInFlight: Bool,
-      lastAction: String,
-      lastError: String?
+      isSessionActionInFlight: Bool
     ) {
       guard let detail else {
         return nil
@@ -300,9 +292,7 @@ extension HarnessMonitorStore {
         ),
         selectedActionActorID: selectedActionActorID,
         isSessionReadOnly: isSessionReadOnly,
-        isSessionActionInFlight: isSessionActionInFlight,
-        lastAction: lastAction,
-        lastError: lastError
+        isSessionActionInFlight: isSessionActionInFlight
       )
     }
 

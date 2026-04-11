@@ -48,14 +48,14 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
-  @Test("Content shell window title ignores last action churn")
-  func contentShellWindowTitleIgnoresLastActionChurn() async {
+  @Test("Content shell window title ignores toast feedback churn")
+  func contentShellWindowTitleIgnoresToastFeedbackChurn() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
       { store.contentUI.shell.windowTitle },
       after: {
-        store.lastAction = "Refresh complete"
+        store.presentSuccessFeedback("Refresh complete")
       }
     )
 
@@ -163,15 +163,15 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange)
   }
 
-  @Test("Inspector primary content ignores action status churn")
-  func inspectorPrimaryContentIgnoresActionStatusChurn() async {
+  @Test("Inspector primary content ignores toast feedback churn")
+  func inspectorPrimaryContentIgnoresToastFeedbackChurn() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
     let didChange = await didInvalidate(
       { store.inspectorUI.primaryContent },
       after: {
-        store.lastAction = "Task created"
+        store.presentSuccessFeedback("Task created")
       }
     )
 

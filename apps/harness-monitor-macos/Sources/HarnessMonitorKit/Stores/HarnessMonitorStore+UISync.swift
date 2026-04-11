@@ -186,7 +186,6 @@ extension HarnessMonitorStore {
         windowTitle: selectedDetail != nil || selectedSessionSummary != nil
           ? "Cockpit" : "Dashboard",
         connectionState: connectionState,
-        lastAction: lastAction,
         pendingConfirmation: pendingConfirmation,
         presentedSheet: presentedSheet
       )
@@ -248,7 +247,6 @@ extension HarnessMonitorStore {
         isSessionActionInFlight: isSessionActionInFlight,
         isSelectionLoading: isSelectionLoading,
         isExtensionsLoading: isExtensionsLoading,
-        lastAction: lastAction,
         isTaskDragActive: contentUI.session.isTaskDragActive
       )
     )
@@ -303,9 +301,7 @@ extension HarnessMonitorStore {
       isPersistenceAvailable: isPersistenceAvailable,
       selectedActionActorID: resolvedActionActor() ?? "",
       isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
-      lastAction: lastAction,
-      lastError: lastError
+      isSessionActionInFlight: isSessionActionInFlight
     )
     inspectorUI.apply(
       InspectorUIState(
@@ -313,8 +309,6 @@ extension HarnessMonitorStore {
         selectedActionActorID: resolvedActionActor() ?? "",
         isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight,
-        lastAction: lastAction,
-        lastError: lastError,
         primaryContent: resolvedPrimaryContent,
         actionContext: resolvedActionContext
       )
@@ -325,17 +319,6 @@ extension HarnessMonitorStore {
     sessionCount: Int
   ) -> [StatusMessageState] {
     var messages: [StatusMessageState] = []
-
-    if !lastAction.isEmpty {
-      messages.append(
-        .init(
-          id: "last-action",
-          text: lastAction,
-          systemImage: "checkmark.circle.fill",
-          tone: .success
-        )
-      )
-    }
 
     switch connectionState {
     case .connecting:

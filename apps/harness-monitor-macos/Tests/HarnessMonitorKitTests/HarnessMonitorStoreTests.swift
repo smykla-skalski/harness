@@ -172,7 +172,7 @@ struct HarnessMonitorStoreTests {
     #expect(store.daemonStatus?.launchAgent.loaded == true)
     #expect(store.daemonStatus?.launchAgent.pid == 4_242)
     #expect(store.daemonStatus?.diagnostics.lastEvent?.message == "launch agent installed")
-    #expect(store.lastAction == "Install launch agent")
+    #expect(store.currentSuccessFeedbackMessage == "Install launch agent")
   }
 
   @Test("Removing the launch agent refreshes daemon diagnostics")
@@ -189,20 +189,23 @@ struct HarnessMonitorStoreTests {
     #expect(store.daemonStatus?.launchAgent.loaded == false)
     #expect(store.daemonStatus?.launchAgent.pid == nil)
     #expect(store.daemonStatus?.diagnostics.lastEvent?.message == "launch agent removed")
-    #expect(store.lastAction == "Remove launch agent")
+    #expect(store.currentSuccessFeedbackMessage == "Remove launch agent")
   }
 
-  @Test("Last action auto-dismisses from the store")
-  func lastActionAutoDismissesFromTheStore() async {
+  @Test("Success feedback auto-dismisses from the store")
+  func successFeedbackAutoDismissesFromTheStore() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    store.lastActionDismissDelay = .milliseconds(10)
+    store.configureUITestBehavior(
+      successFeedbackDismissDelay: .milliseconds(10),
+      failureFeedbackDismissDelay: .milliseconds(10)
+    )
 
-    store.showLastAction("Install launch agent")
-    #expect(store.lastAction == "Install launch agent")
+    store.presentSuccessFeedback("Install launch agent")
+    #expect(store.currentSuccessFeedbackMessage == "Install launch agent")
 
     try? await Task.sleep(for: .milliseconds(40))
 
-    #expect(store.lastAction.isEmpty)
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
   @Test("Reconnect refreshes health and status")
@@ -260,7 +263,7 @@ struct HarnessMonitorStoreTests {
       store.connectionState
         == .offline(DaemonControlError.harnessBinaryNotFound.localizedDescription)
     )
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
     #expect(store.health == nil)
   }
 
@@ -274,7 +277,7 @@ struct HarnessMonitorStoreTests {
 
     await store.createTask(title: "broken", context: nil, severity: .high)
 
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
     #expect(store.isBusy == false)
   }
 
@@ -287,7 +290,7 @@ struct HarnessMonitorStoreTests {
 
     await store.refresh()
 
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
   }
 
   @Test("Manual refresh completes even when transport ping would stall")
@@ -331,7 +334,7 @@ struct HarnessMonitorStoreTests {
     await store.installLaunchAgent()
 
     #expect(
-      store.lastError == DaemonControlError.commandFailed("install failed").localizedDescription
+      store.currentFailureFeedbackMessage == DaemonControlError.commandFailed("install failed").localizedDescription
     )
     #expect(store.isBusy == false)
   }
@@ -346,7 +349,7 @@ struct HarnessMonitorStoreTests {
     await store.removeLaunchAgent()
 
     #expect(
-      store.lastError == DaemonControlError.commandFailed("remove failed").localizedDescription
+      store.currentFailureFeedbackMessage == DaemonControlError.commandFailed("remove failed").localizedDescription
     )
     #expect(store.isBusy == false)
   }

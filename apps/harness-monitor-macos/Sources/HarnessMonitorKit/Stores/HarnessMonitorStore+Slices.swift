@@ -268,7 +268,6 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var windowTitle = "Dashboard"
     public var connectionState: ConnectionState = .idle
-    public var lastAction = ""
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
   }
@@ -285,7 +284,6 @@ extension HarnessMonitorStore {
     public var isSessionActionInFlight = false
     public var isSelectionLoading = false
     public var isExtensionsLoading = false
-    public var lastAction = ""
     public var isTaskDragActive = false
   }
 
@@ -314,8 +312,6 @@ extension HarnessMonitorStore {
     public var selectedActionActorID = ""
     public var isSessionReadOnly = true
     public var isSessionActionInFlight = false
-    public var lastAction = ""
-    public var lastError: String?
     public var primaryContent: InspectorPrimaryContentState = .empty
     public var actionContext: InspectorActionContext?
   }
@@ -326,7 +322,6 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var windowTitle = "Dashboard"
     public var connectionState: ConnectionState = .idle
-    public var lastAction = ""
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
 
@@ -341,9 +336,6 @@ extension HarnessMonitorStore {
       }
       if connectionState != state.connectionState {
         connectionState = state.connectionState
-      }
-      if lastAction != state.lastAction {
-        lastAction = state.lastAction
       }
       if pendingConfirmation != state.pendingConfirmation {
         pendingConfirmation = state.pendingConfirmation
@@ -400,7 +392,6 @@ extension HarnessMonitorStore {
     public var isSessionActionInFlight = false
     public var isSelectionLoading = false
     public var isExtensionsLoading = false
-    public var lastAction = ""
     public var isTaskDragActive = false
 
     public init() {}
@@ -420,9 +411,6 @@ extension HarnessMonitorStore {
       }
       if isExtensionsLoading != state.isExtensionsLoading {
         isExtensionsLoading = state.isExtensionsLoading
-      }
-      if lastAction != state.lastAction {
-        lastAction = state.lastAction
       }
       if isTaskDragActive != state.isTaskDragActive {
         isTaskDragActive = state.isTaskDragActive
@@ -511,8 +499,6 @@ extension HarnessMonitorStore {
     public var selectedActionActorID = ""
     public var isSessionReadOnly = true
     public var isSessionActionInFlight = false
-    public var lastAction = ""
-    public var lastError: String?
     public var primaryContent: InspectorPrimaryContentState = .empty
     public var actionContext: InspectorActionContext?
 
@@ -530,12 +516,6 @@ extension HarnessMonitorStore {
       }
       if isSessionActionInFlight != state.isSessionActionInFlight {
         isSessionActionInFlight = state.isSessionActionInFlight
-      }
-      if lastAction != state.lastAction {
-        lastAction = state.lastAction
-      }
-      if lastError != state.lastError {
-        lastError = state.lastError
       }
       if primaryContent != state.primaryContent {
         primaryContent = state.primaryContent

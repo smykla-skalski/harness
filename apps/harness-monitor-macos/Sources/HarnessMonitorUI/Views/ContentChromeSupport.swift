@@ -273,10 +273,6 @@ struct ContentAnnouncementsModifier: ViewModifier {
         guard let message = message(for: newState) else { return }
         AccessibilityNotification.Announcement(message).post()
       }
-      .onChange(of: shellUI.lastAction) { _, action in
-        guard !action.isEmpty else { return }
-        AccessibilityNotification.Announcement(action).post()
-      }
   }
 
   private func message(for state: HarnessMonitorStore.ConnectionState) -> String? {
