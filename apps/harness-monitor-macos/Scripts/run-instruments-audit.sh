@@ -152,6 +152,12 @@ HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Test
 HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
 SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
 
+if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
+  AUDIT_DAEMON_BUNDLE_MODE="skipped"
+else
+  AUDIT_DAEMON_BUNDLE_MODE="shared-cargo-target"
+fi
+
 build_release_targets() {
   local daemon_bundle_env=()
   local common_build_env=(
@@ -163,10 +169,8 @@ build_release_targets() {
     "COMPILER_INDEX_STORE_ENABLE=NO"
   )
   if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
-    AUDIT_DAEMON_BUNDLE_MODE="skipped"
     daemon_bundle_env=("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1")
   else
-    AUDIT_DAEMON_BUNDLE_MODE="shared-cargo-target"
     mkdir -p "$AUDIT_DAEMON_CARGO_TARGET_DIR"
     daemon_bundle_env=("CARGO_TARGET_DIR=$AUDIT_DAEMON_CARGO_TARGET_DIR")
   fi
