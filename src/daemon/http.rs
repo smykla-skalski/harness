@@ -17,12 +17,12 @@ use crate::errors::{CliError, CliErrorKind};
 use super::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use super::protocol::{
     AgentRemoveRequest, CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest,
-    LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
-    SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
-    SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest,
+    HostBridgeReconfigureRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
+    SessionEndRequest, SessionJoinRequest, SessionMutationResponse, SessionStartRequest,
+    SetLogLevelRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
+    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -87,6 +87,7 @@ fn core_routes() -> Router<DaemonHttpState> {
         .route("/v1/health", get(get_health))
         .route("/v1/diagnostics", get(get_diagnostics))
         .route("/v1/daemon/stop", post(post_stop_daemon))
+        .route("/v1/bridge/reconfigure", post(post_bridge_reconfigure))
         .route(
             "/v1/daemon/log-level",
             get(get_log_level).put(put_log_level),
@@ -259,6 +260,25 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
         &request_id,
         start,
         service::request_shutdown(),
+    )
+}
+
+async fn post_bridge_reconfigure(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<HostBridgeReconfigureRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/bridge/reconfigure",
+        &request_id,
+        start,
+        super::bridge::reconfigure_bridge(&request.enable, &request.disable, request.force),
     )
 }
 
@@ -1209,6 +1229,17 @@ fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
             )
                 .into_response()
         }
+        Err(error) if error.code() == "KSRCLI092" => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "error": {
+                    "code": error.code(),
+                    "message": error.message(),
+                    "details": error.details(),
+                }
+            })),
+        )
+            .into_response(),
         Err(error) => (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
@@ -1236,6 +1267,7 @@ fn timed_json<T: serde::Serialize>(
         Ok(_) => 200,
         Err(error) if error.code() == "SANDBOX001" => 501,
         Err(error) if error.code() == "CODEX001" => 503,
+        Err(error) if error.code() == "KSRCLI092" => 409,
         Err(_) => 400,
     };
     log_request(method, path, status, duration_ms, request_id);
@@ -1334,5 +1366,14 @@ mod tests {
 
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert!(body["error"]["code"].as_str().is_some());
+    }
+
+    #[tokio::test]
+    async fn map_json_maps_session_agent_conflict_to_409() {
+        let error = CliErrorKind::session_agent_conflict("agent-tui still active").into();
+        let (status, body) = response_body(Err(error)).await;
+
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], "KSRCLI092");
     }
 }

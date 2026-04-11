@@ -3,7 +3,8 @@ use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use harness::daemon::bridge::{BridgeState, BridgeStatusReport};
+use harness::daemon::agent_tui::{AgentTuiLaunchProfile, AgentTuiSize};
+use harness::daemon::bridge::{AgentTuiStartSpec, BridgeClient, BridgeState, BridgeStatusReport};
 use tempfile::tempdir;
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -143,6 +144,98 @@ fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
     );
 }
 
+#[test]
+fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions() {
+    let tmp = tempdir().expect("tempdir");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&project).expect("create project");
+
+    let mut bridge = Command::new(harness_binary())
+        .args(["bridge", "start", "--capability", "agent-tui"])
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn bridge");
+
+    let _state = wait_for_bridge_state(tmp.path());
+    temp_env::with_vars(
+        [
+            (
+                "HARNESS_DAEMON_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("HARNESS_SANDBOXED", None),
+        ],
+        || {
+            let client = BridgeClient::from_state_file().expect("bridge client");
+            let snapshot = client
+                .agent_tui_start(&AgentTuiStartSpec {
+                    session_id: "session-1".to_string(),
+                    agent_id: "agent-1".to_string(),
+                    tui_id: "agent-tui-1".to_string(),
+                    profile: AgentTuiLaunchProfile::from_argv(
+                        "codex",
+                        vec!["sh".to_string(), "-c".to_string(), "cat".to_string()],
+                    )
+                    .expect("launch profile"),
+                    project_dir: project.clone(),
+                    transcript_path: tmp.path().join("transcript.log"),
+                    size: AgentTuiSize { rows: 24, cols: 80 },
+                    prompt: None,
+                })
+                .expect("start agent tui");
+            assert_eq!(snapshot.tui_id, "agent-tui-1");
+        },
+    );
+
+    let output = run_bridge(&tmp, &["bridge", "reconfigure", "--disable", "agent-tui"]);
+    assert!(
+        !output.status.success(),
+        "disable should fail without force: {}",
+        output_text(&output)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("KSRCLI092") || stderr.contains("--force"));
+
+    let forced_output = run_bridge(
+        &tmp,
+        &[
+            "bridge",
+            "reconfigure",
+            "--disable",
+            "agent-tui",
+            "--force",
+            "--json",
+        ],
+    );
+    assert!(
+        forced_output.status.success(),
+        "forced disable: {}",
+        output_text(&forced_output)
+    );
+    let report: BridgeStatusReport =
+        serde_json::from_slice(&forced_output.stdout).expect("parse status");
+    assert!(!report.capabilities.contains_key("agent-tui"));
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "cleanup stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+}
+
 fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
     let state_path = data_home.join("harness/daemon/bridge.json");
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
@@ -156,6 +249,20 @@ fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
             Instant::now() < deadline,
             "bridge state file did not appear at {}",
             state_path.display()
+        );
+        thread::sleep(BRIDGE_POLL_INTERVAL);
+    }
+}
+
+fn wait_for_bridge_exit(bridge: &mut std::process::Child) {
+    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
+    loop {
+        if bridge.try_wait().expect("poll bridge").is_some() {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "bridge process did not exit before timeout"
         );
         thread::sleep(BRIDGE_POLL_INTERVAL);
     }
