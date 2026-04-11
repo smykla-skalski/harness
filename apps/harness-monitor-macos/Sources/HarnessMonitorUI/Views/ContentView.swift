@@ -185,11 +185,6 @@ public struct ContentView: View {
         selection: store.selection
       )
     }
-    .modifier(
-      OptionalToolbarBaselineOverlayModifier(
-        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
-      )
-    )
     .suppressToolbarBaselineSeparator()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .modifier(
@@ -218,7 +213,6 @@ public struct ContentView: View {
       sidebarUI: store.sidebarUI,
       sidebarVisible: columnVisibility != .detailOnly
     )
-    .toolbarBaselineFrame(.sidebar)
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }
 

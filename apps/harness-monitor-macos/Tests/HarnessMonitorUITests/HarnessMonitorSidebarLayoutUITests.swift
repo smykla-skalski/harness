@@ -7,14 +7,30 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
   func testSidebarContentStartsBelowToolbarChrome() throws {
     let app = launch(mode: "preview")
     let window = mainWindow(in: app)
+    let toolbar = window.toolbars.firstMatch
+    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
 
     XCTAssertTrue(waitForElement(window, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(toolbar, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(sidebarContent, timeout: Self.fastActionTimeout))
 
-    let toolbarOffset = sidebarContent.frame.minY - window.frame.minY
-    XCTAssertGreaterThan(toolbarOffset, 40)
-    XCTAssertLessThan(toolbarOffset, 84)
+    XCTAssertGreaterThanOrEqual(
+      sidebarContent.frame.minY,
+      toolbar.frame.maxY - 4,
+      "Sidebar content should not overlap the window toolbar chrome"
+    )
+    XCTAssertGreaterThanOrEqual(
+      sidebarContent.frame.minY,
+      searchField.frame.maxY - 4,
+      "Sidebar content should start below the search field lane"
+    )
+    XCTAssertLessThanOrEqual(
+      sidebarContent.frame.minY,
+      searchField.frame.maxY + 20,
+      "Sidebar content should remain visually attached to the search field lane"
+    )
   }
 
   func testMainWindowUsesNativeToolbarChromeWithoutCustomBaselineDivider() throws {
