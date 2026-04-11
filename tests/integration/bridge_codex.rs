@@ -44,11 +44,14 @@ fn bridge_stop_is_idempotent_when_not_running() {
 #[test]
 fn bridge_start_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let output = Command::new(harness_binary())
         .args(["bridge", "start", "--capability", "codex"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .output()
         .expect("run harness");
     assert!(!output.status.success());
@@ -63,6 +66,7 @@ fn bridge_start_refuses_when_sandboxed() {
 #[test]
 fn bridge_start_with_mock_codex_publishes_codex_capability() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
 
     let mut bridge = Command::new(harness_binary())
@@ -78,7 +82,8 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
         .arg(&mock_codex)
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -87,7 +92,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
         .spawn()
         .expect("spawn bridge");
 
-    let state = wait_for_bridge_state(tmp.path());
+    let state = wait_for_bridge_state_with_capabilities(tmp.path(), &["codex"]);
     let codex = state.capabilities.get("codex").expect("codex capability");
     assert_eq!(codex.transport, "websocket");
     assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14500"));
@@ -133,6 +138,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
 #[test]
 fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
 
     let mut bridge = Command::new(harness_binary())
@@ -140,7 +146,8 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
         .arg(&mock_codex)
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -149,7 +156,7 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
         .spawn()
         .expect("spawn bridge");
 
-    let state = wait_for_bridge_state(tmp.path());
+    let state = wait_for_bridge_state_with_capabilities(tmp.path(), &["codex", "agent-tui"]);
     assert!(state.capabilities.contains_key("codex"));
     assert!(state.capabilities.contains_key("agent-tui"));
 
@@ -187,6 +194,7 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
 #[test]
 fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
 
     let mut bridge = Command::new(harness_binary())
@@ -202,7 +210,8 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
         .arg(&mock_codex)
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -211,7 +220,7 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
         .spawn()
         .expect("spawn bridge");
 
-    let initial_state = wait_for_bridge_state(tmp.path());
+    let initial_state = wait_for_bridge_state_with_capabilities(tmp.path(), &["agent-tui"]);
     let output = run_bridge(
         &tmp,
         &["bridge", "reconfigure", "--enable", "codex", "--json"],
@@ -244,6 +253,7 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
 #[test]
 fn bridge_reconfigure_persists_capabilities_across_restart() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
 
     let mut bridge = Command::new(harness_binary())
@@ -251,7 +261,8 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
         .arg(&mock_codex)
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -260,7 +271,8 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
         .spawn()
         .expect("spawn bridge");
 
-    let _initial_state = wait_for_bridge_state(tmp.path());
+    let _initial_state =
+        wait_for_bridge_state_with_capabilities(tmp.path(), &["codex", "agent-tui"]);
     let output = run_bridge(
         &tmp,
         &["bridge", "reconfigure", "--disable", "codex", "--json"],
@@ -286,7 +298,8 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
         .args(["bridge", "start"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -295,7 +308,7 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
         .spawn()
         .expect("spawn restarted bridge");
 
-    let restarted_state = wait_for_bridge_state(tmp.path());
+    let restarted_state = wait_for_bridge_state_with_capabilities(tmp.path(), &["agent-tui"]);
     assert!(restarted_state.capabilities.contains_key("agent-tui"));
     assert!(!restarted_state.capabilities.contains_key("codex"));
 
@@ -311,11 +324,14 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
 #[test]
 fn bridge_install_launch_agent_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let output = Command::new(harness_binary())
         .args(["bridge", "install-launch-agent", "--capability", "codex"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .output()
         .expect("run harness");
     assert!(!output.status.success());
@@ -330,11 +346,13 @@ fn bridge_install_launch_agent_refuses_when_sandboxed() {
 #[test]
 fn bridge_remove_launch_agent_is_idempotent() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let output = Command::new(harness_binary())
         .args(["bridge", "remove-launch-agent"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .output()
         .expect("run harness");
     assert!(output.status.success(), "remove: {}", output_text(&output));
@@ -383,6 +401,26 @@ fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
     }
 }
 
+fn wait_for_bridge_state_with_capabilities(data_home: &Path, capabilities: &[&str]) -> BridgeState {
+    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
+    loop {
+        let state = wait_for_bridge_state(data_home);
+        if capabilities
+            .iter()
+            .all(|capability| state.capabilities.contains_key(*capability))
+        {
+            return state;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "bridge state did not expose capabilities {:?} before timeout; actual capabilities: {:?}",
+            capabilities,
+            state.capabilities.keys().collect::<Vec<_>>()
+        );
+        thread::sleep(BRIDGE_POLL_INTERVAL);
+    }
+}
+
 fn wait_for_bridge_exit(bridge: &mut std::process::Child) {
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
@@ -398,15 +436,23 @@ fn wait_for_bridge_exit(bridge: &mut std::process::Child) {
 }
 
 fn run_bridge(tmp: &tempfile::TempDir, args: &[&str]) -> Output {
+    let host_home = ensure_host_home(tmp.path());
     Command::new(harness_binary())
         .args(args)
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()
         .expect("run harness")
+}
+
+fn ensure_host_home(data_home: &Path) -> PathBuf {
+    let host_home = data_home.join("host-home");
+    std::fs::create_dir_all(&host_home).expect("create host home");
+    host_home
 }
 
 fn harness_binary() -> PathBuf {
