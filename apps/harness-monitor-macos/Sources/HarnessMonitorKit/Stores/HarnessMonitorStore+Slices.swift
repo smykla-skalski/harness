@@ -269,8 +269,6 @@ extension HarnessMonitorStore {
   }
 
   public struct ContentShellState: Equatable {
-    public var selectedSessionID: String?
-    public var windowTitle = "Dashboard"
     public var connectionState: ConnectionState = .idle
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
@@ -323,8 +321,6 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class ContentShellSlice {
-    public var selectedSessionID: String?
-    public var windowTitle = "Dashboard"
     public var connectionState: ConnectionState = .idle
     public var pendingConfirmation: PendingConfirmation?
     public var presentedSheet: PresentedSheet?
@@ -332,12 +328,6 @@ extension HarnessMonitorStore {
     public init() {}
 
     internal func apply(_ state: ContentShellState) {
-      if selectedSessionID != state.selectedSessionID {
-        selectedSessionID = state.selectedSessionID
-      }
-      if windowTitle != state.windowTitle {
-        windowTitle = state.windowTitle
-      }
       if connectionState != state.connectionState {
         connectionState = state.connectionState
       }
