@@ -140,39 +140,29 @@ struct AgentTaskDropFeedbackOverlay: View {
 
   private var strokeStyle: StrokeStyle {
     if feedback.isActionable {
-      return StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+      return StrokeStyle(lineWidth: 1)
     }
-    return StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [6, 4])
+    return StrokeStyle(lineWidth: 1, dash: [6, 4])
   }
 
   var body: some View {
-    ZStack {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(feedback.tint.opacity(feedback.isActionable ? 0.14 : 0.08))
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(feedback.tint, style: strokeStyle)
-      VStack(spacing: HarnessMonitorTheme.spacingXS) {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Image(systemName: feedback.systemImage)
-            .imageScale(.small)
-          Text(feedback.title)
-            .scaledFont(.caption.weight(.bold))
-        }
-        .lineLimit(2)
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Image(systemName: feedback.systemImage)
+        .imageScale(.small)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(feedback.title)
+          .scaledFont(.caption.weight(.bold))
         Text(feedback.detail)
           .scaledFont(.caption2.weight(.semibold))
-          .lineLimit(2)
       }
-      .multilineTextAlignment(.center)
-      .foregroundStyle(feedback.tint)
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .harnessDragFeedbackPillSurface(tint: feedback.tint)
-      .overlay {
-        Capsule()
-          .stroke(feedback.tint.opacity(0.3), lineWidth: 1)
-      }
-      .padding(HarnessMonitorTheme.spacingMD)
+    }
+    .foregroundStyle(feedback.tint)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .harnessDragFeedbackSurface(cornerRadius: 8, tint: feedback.tint)
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(feedback.tint.opacity(0.5), style: strokeStyle)
     }
     .allowsHitTesting(false)
     .accessibilityElement(children: .ignore)
