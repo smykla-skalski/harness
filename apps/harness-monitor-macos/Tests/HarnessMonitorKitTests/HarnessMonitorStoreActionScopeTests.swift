@@ -115,6 +115,47 @@ struct HarnessMonitorStoreActionScopeTests {
     #expect(store.inFlightActionID == key)
   }
 
+  @Test("Concurrent mutateSelectedSession serialize via inFlightActionID")
+  func concurrentMutateSelectedSessionSerializes() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let sessionID = PreviewFixtures.summary.sessionId
+    await store.selectSession(sessionID)
+
+    let key1 = InspectorActionID.createTask(sessionID: sessionID).key
+    let key2 = InspectorActionID.assignTask(sessionID: sessionID, taskID: "t1").key
+
+    async let r1: Bool = store.mutateSelectedSession(
+      actionName: "Create task", actionID: key1,
+      using: client, sessionID: sessionID,
+      mutation: {
+        try await Task.sleep(for: .milliseconds(20))
+        return PreviewFixtures.detail
+      }
+    )
+    async let r2: Bool = store.mutateSelectedSession(
+      actionName: "Assign task", actionID: key2,
+      using: client, sessionID: sessionID,
+      mutation: {
+        try await Task.sleep(for: .milliseconds(10))
+        return PreviewFixtures.detail
+      }
+    )
+    _ = await (r1, r2)
+    #expect(store.inFlightActionID == nil)
+  }
+
+  @Test("Mutating inFlightActionID does not invalidate timeline observers")
+  func mutatingInFlightDoesNotInvalidateTimeline() async {
+    let store = await makeBootstrappedStore()
+    let invalidations = await invalidationCount({ store.timeline.count }) {
+      await MainActor.run {
+        store.inFlightActionID = "sess-1/createTask"
+      }
+    }
+    #expect(invalidations == 0)
+  }
+
   @Test("Mutating inFlightActionID does not invalidate observers of unrelated slices")
   func mutatingInFlightDoesNotInvalidateUnrelated() async {
     let store = await makeBootstrappedStore()
