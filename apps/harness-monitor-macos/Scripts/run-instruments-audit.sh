@@ -999,3 +999,5 @@ printf 'Summary: %s\n' "$run_dir/summary.json"
 if [[ -n "$compare_to" ]]; then
   printf 'Comparison: %s\n' "$run_dir/comparison.md"
 fi
+printf '\n'
+python3 "$SCRIPT_DIR/summarize-instruments-run.py" --run-dir "$run_dir"
