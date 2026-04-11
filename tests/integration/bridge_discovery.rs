@@ -16,11 +16,12 @@
 #![cfg(target_os = "macos")]
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use fs2::FileExt;
+use harness::daemon::bridge::BridgeState;
 use tempfile::tempdir;
 
 use super::helpers::ManagedChild;
@@ -90,21 +91,36 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
     let xdg_state_path = xdg.join("harness").join("daemon").join("bridge.json");
 
     let bridge_result = wait_for_state_at(&adopted_state_path);
+    let adopted_state = std::fs::read_to_string(&adopted_state_path)
+        .ok()
+        .map(|raw| serde_json::from_str::<BridgeState>(&raw).expect("parse adopted bridge state"));
 
-    // Regardless of outcome, clean up the bridge subprocess before panicking.
-    let _ = bridge.kill();
-    let _ = bridge.wait();
+    // Shut the bridge down through its own control plane so the adopted
+    // short socket path is unlinked instead of being stranded under `/tmp`.
+    let stop_output = run_bridge(home, &xdg, &["bridge", "stop"]);
+    let stop_text = output_text(&stop_output);
+    let stop_ok = stop_output.status.success();
+    let bridge_exit = wait_for_bridge_exit(&mut bridge);
     // Release our flock last so the assertions see the state as it was
     // while the subprocess was scanning.
     drop(lock_file);
 
     bridge_result.expect("bridge state file did not appear at adopted root");
+    assert!(stop_ok, "bridge stop failed: {stop_text}");
+    bridge_exit.expect("bridge process did not exit after stop");
 
     assert!(
         !xdg_state_path.exists(),
         "bridge state must NOT land at XDG default ({}) when discovery adopts the group container",
         xdg_state_path.display()
     );
+    if let Some(state) = adopted_state {
+        assert!(
+            !PathBuf::from(&state.socket_path).exists(),
+            "bridge socket should be removed after stop: {}",
+            state.socket_path
+        );
+    }
 }
 
 fn wait_for_state_at(state_path: &Path) -> Result<(), String> {
@@ -146,6 +162,49 @@ fn create_mock_codex(base: &Path) -> PathBuf {
     script
 }
 
+fn run_bridge(home: &Path, xdg: &Path, args: &[&str]) -> Output {
+    Command::new(harness_binary())
+        .args(args)
+        .env("XDG_DATA_HOME", xdg)
+        .env("HOME", home)
+        .env("HARNESS_HOST_HOME", home)
+        .env("RUST_LOG", "harness=info")
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_DAEMON_DATA_HOME")
+        .env_remove("HARNESS_SANDBOXED")
+        .output()
+        .expect("run harness")
+}
+
 fn harness_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness")
+}
+
+fn wait_for_bridge_exit(bridge: &mut ManagedChild) -> Result<(), String> {
+    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
+    loop {
+        if bridge
+            .try_wait()
+            .map_err(|error| error.to_string())?
+            .is_some()
+        {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err("bridge process did not exit before timeout".to_string());
+        }
+        thread::sleep(BRIDGE_POLL_INTERVAL);
+    }
+}
+
+fn output_text(output: &Output) -> String {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.trim().is_empty() {
+        stdout.into_owned()
+    } else if stdout.trim().is_empty() {
+        stderr.into_owned()
+    } else {
+        format!("{stdout}\n{stderr}")
+    }
 }

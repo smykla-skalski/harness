@@ -145,6 +145,7 @@ fn daemon_only_session_status_and_end_work_after_list() {
     init_git_repo(&project);
 
     let mut daemon = spawn_daemon_serve(&home, &xdg);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
     let project_arg = project.to_str().expect("utf8 project");
     let started = start_session_via_http(
         &home,
