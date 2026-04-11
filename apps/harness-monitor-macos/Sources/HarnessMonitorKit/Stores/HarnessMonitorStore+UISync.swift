@@ -113,29 +113,35 @@ extension HarnessMonitorStore {
       openWorkCount: sessionIndex.totalOpenWorkCount,
       blockedCount: sessionIndex.totalBlockedCount
     )
+    let sessionDragActive = contentSession.isTaskDragActive
 
-    assign(selection.selectedSessionID, to: \.selectedSessionID, on: contentShell)
-    assign(
-      selectedDetail != nil || selectedSessionSummary != nil ? "Cockpit" : "Dashboard",
-      to: \.windowTitle,
-      on: contentShell
+    contentShell.apply(
+      ContentShellState(
+        selectedSessionID: selection.selectedSessionID,
+        windowTitle: selectedDetail != nil || selectedSessionSummary != nil
+          ? "Cockpit" : "Dashboard",
+        connectionState: connectionState,
+        isRefreshing: isRefreshing,
+        isSelectionLoading: isSelectionLoading,
+        isExtensionsLoading: isExtensionsLoading,
+        lastAction: lastAction,
+        pendingConfirmation: pendingConfirmation,
+        presentedSheet: presentedSheet
+      )
     )
-    assign(connectionState, to: \.connectionState, on: contentShell)
-    assign(isRefreshing, to: \.isRefreshing, on: contentShell)
-    assign(isSelectionLoading, to: \.isSelectionLoading, on: contentShell)
-    assign(isExtensionsLoading, to: \.isExtensionsLoading, on: contentShell)
-    assign(lastAction, to: \.lastAction, on: contentShell)
-    assign(pendingConfirmation, to: \.pendingConfirmation, on: contentShell)
-    assign(presentedSheet, to: \.presentedSheet, on: contentShell)
 
-    assign(persistenceError, to: \.persistenceError, on: contentChrome)
-    assign(sessionDataAvailability, to: \.sessionDataAvailability, on: contentChrome)
-    assign(
-      selectedDetail?.session.status ?? selectedSessionSummary?.status,
-      to: \.sessionStatus,
-      on: contentChrome
+    contentChrome.apply(
+      ContentChromeState(
+        persistenceError: persistenceError,
+        sessionDataAvailability: sessionDataAvailability,
+        sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
+      )
     )
-    assign(toolbarMetrics, to: \.toolbarMetrics, on: contentToolbar)
+    assign(
+      toolbarMetrics,
+      to: \.toolbarMetrics,
+      on: contentToolbar
+    )
     assign(
       resolveStatusMessages(sessionCount: toolbarMetrics.sessionCount),
       to: \.statusMessages,
@@ -149,47 +155,53 @@ extension HarnessMonitorStore {
     assign(connectionState, to: \.connectionState, on: contentToolbar)
     assign(isBusy, to: \.isBusy, on: contentToolbar)
 
-    assign(selectedDetail, to: \.selectedSessionDetail, on: contentSessionDetail)
-    assign(selectedSessionSummary, to: \.selectedSessionSummary, on: contentSession)
-    assign(selection.timeline, to: \.timeline, on: contentSessionDetail)
-    assign(isSessionReadOnly, to: \.isSessionReadOnly, on: contentSession)
-    assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: contentSession)
-    assign(isSelectionLoading, to: \.isSelectionLoading, on: contentSession)
-    assign(isExtensionsLoading, to: \.isExtensionsLoading, on: contentSession)
-    assign(lastAction, to: \.lastAction, on: contentSession)
-
-    assign(
-      daemonStatus?.launchAgent.installed == true,
-      to: \.isLaunchAgentInstalled,
-      on: contentDashboard
+    contentSessionDetail.apply(
+      ContentSessionDetailState(
+        selectedSessionDetail: selectedDetail,
+        timeline: selection.timeline
+      )
     )
-    assign(isBusy, to: \.isBusy, on: contentDashboard)
-    assign(connectionState, to: \.connectionState, on: contentDashboard)
-    assign(isRefreshing, to: \.isRefreshing, on: contentDashboard)
+    contentSession.apply(
+      ContentSessionState(
+        selectedSessionSummary: selectedSessionSummary,
+        isSessionReadOnly: isSessionReadOnly,
+        isSessionActionInFlight: isSessionActionInFlight,
+        isSelectionLoading: isSelectionLoading,
+        isExtensionsLoading: isExtensionsLoading,
+        lastAction: lastAction,
+        isTaskDragActive: sessionDragActive
+      )
+    )
+
+    contentDashboard.apply(
+      ContentDashboardState(
+        connectionState: connectionState,
+        isBusy: isBusy,
+        isRefreshing: isRefreshing,
+        isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true
+      )
+    )
   }
 
   private func syncSidebarUI() {
-    assign(connectionMetrics, to: \.connectionMetrics, on: sidebarUI)
-    assign(selection.selectedSessionID, to: \.selectedSessionID, on: sidebarUI)
-    assign(isPersistenceAvailable, to: \.isPersistenceAvailable, on: sidebarUI)
-    assign(userData.bookmarkedSessionIds, to: \.bookmarkedSessionIds, on: sidebarUI)
+    sidebarUI.apply(
+      SidebarUIState(
+        connectionMetrics: connectionMetrics,
+        selectedSessionID: selection.selectedSessionID,
+        isPersistenceAvailable: isPersistenceAvailable,
+        bookmarkedSessionIds: userData.bookmarkedSessionIds,
+        searchFocusRequest: sidebarUI.searchFocusRequest
+      )
+    )
   }
 
   private func syncInspectorUI() {
-    assign(isPersistenceAvailable, to: \.isPersistenceAvailable, on: inspectorUI)
-    assign(resolvedActionActor() ?? "", to: \.selectedActionActorID, on: inspectorUI)
-    assign(isSessionReadOnly, to: \.isSessionReadOnly, on: inspectorUI)
-    assign(isSessionActionInFlight, to: \.isSessionActionInFlight, on: inspectorUI)
-    assign(lastAction, to: \.lastAction, on: inspectorUI)
-    assign(lastError, to: \.lastError, on: inspectorUI)
-
     let resolvedPrimaryContent = InspectorPrimaryContentState(
       selectedSession: selection.matchedSelectedSession,
       selectedSessionSummary: contentUI.session.selectedSessionSummary,
       inspectorSelection: selection.inspectorSelection,
       isPersistenceAvailable: isPersistenceAvailable
     )
-    assign(resolvedPrimaryContent, to: \.primaryContent, on: inspectorUI)
 
     let resolvedActionContext = InspectorActionContext(
       detail: selection.matchedSelectedSession,
@@ -201,7 +213,18 @@ extension HarnessMonitorStore {
       lastAction: lastAction,
       lastError: lastError
     )
-    assign(resolvedActionContext, to: \.actionContext, on: inspectorUI)
+    inspectorUI.apply(
+      InspectorUIState(
+        isPersistenceAvailable: isPersistenceAvailable,
+        selectedActionActorID: resolvedActionActor() ?? "",
+        isSessionReadOnly: isSessionReadOnly,
+        isSessionActionInFlight: isSessionActionInFlight,
+        lastAction: lastAction,
+        lastError: lastError,
+        primaryContent: resolvedPrimaryContent,
+        actionContext: resolvedActionContext
+      )
+    )
   }
 
   private func resolveStatusMessages(

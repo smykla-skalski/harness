@@ -59,10 +59,6 @@ struct SidebarView: View {
     }
   }
 
-  func scaledSidebarFont(_ font: Font) -> Font {
-    HarnessMonitorTextSize.scaledFont(font, by: fontScale)
-  }
-
   private var sidebarSelection: Binding<String?> {
     Binding(
       get: { renderedSidebarSelectionID },
@@ -106,8 +102,19 @@ struct SidebarView: View {
       || controls.sessionSortOrder != .recentActivity
   }
 
-  private var usesFlatSearchResults: Bool {
-    searchResults.isSearchActive
+  private var sidebarListRenderState: SidebarSessionListRenderState {
+    SidebarSessionListRenderState(
+      projectionGroups: projection.groupedSessions,
+      searchPresentation: searchResults.presentationState,
+      searchList: searchResults.listState,
+      selectedSessionID: sidebarUI.selectedSessionID,
+      bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
+      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+      dateTimeConfiguration: dateTimeConfiguration,
+      fontScale: fontScale,
+      collapsedProjectIDs: collapsedProjectIDs,
+      collapsedCheckoutKeys: collapsedCheckoutKeys
+    )
   }
 
   private var sidebarFilterStateValue: String {
@@ -134,9 +141,17 @@ struct SidebarView: View {
   }
 
   var body: some View {
-    List(selection: sidebarSelection) {
-      sidebarContent
-    }
+    SidebarSessionListContent(
+      renderState: sidebarListRenderState,
+      selection: sidebarSelection,
+      selectSession: { store.selectSessionFromList($0) },
+      toggleBookmark: { sessionID, projectID in
+        store.toggleBookmark(sessionId: sessionID, projectId: projectID)
+      },
+      setProjectCollapsed: setProjectCollapsed,
+      setCheckoutCollapsed: setCheckoutCollapsed
+    )
+    .equatable()
     .listStyle(.sidebar)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .searchable(
@@ -214,45 +229,6 @@ struct SidebarView: View {
           text: sidebarFilterStateValue
         )
       }
-    }
-  }
-
-  @ViewBuilder private var sidebarContent: some View {
-    switch searchResults.emptyState {
-    case .noSessions:
-      SidebarEmptyState(
-        title: "No sessions indexed yet",
-        systemImage: "tray",
-        message: "Start the daemon or refresh after launching a harness session."
-      )
-    case .noMatches:
-      SidebarEmptyState(
-        title: "No sessions match",
-        systemImage: "magnifyingglass",
-        message: "Try a broader search or clear filters."
-      )
-    case .sessionsAvailable:
-      if usesFlatSearchResults {
-        flatSearchResults
-          .accessibilityElement(children: .contain)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
-      } else if let firstGroup = projection.groupedSessions.first {
-        projectSection(for: firstGroup)
-          .accessibilityElement(children: .contain)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
-
-        ForEach(Array(projection.groupedSessions.dropFirst())) { group in
-          projectSection(for: group)
-        }
-      }
-    }
-  }
-
-  @ViewBuilder private var flatSearchResults: some View {
-    ForEach(searchResults.visibleSessions, id: \.sessionId) { session in
-      sessionRow(session)
     }
   }
 

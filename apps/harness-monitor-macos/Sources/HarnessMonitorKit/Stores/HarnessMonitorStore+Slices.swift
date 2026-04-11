@@ -217,16 +217,32 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class SessionSearchResultsSlice {
-    public internal(set) var state = SessionSearchResultsState()
+    public internal(set) var presentationState = SessionSearchPresentationState()
+    public internal(set) var listState = SessionSearchResultsListState()
+    public internal(set) var filteredSessionCount = 0
+    public internal(set) var totalSessionCount = 0
 
-    public var isSearchActive: Bool { state.isSearchActive }
-    public var filteredSessionCount: Int { state.filteredSessionCount }
-    public var totalSessionCount: Int { state.totalSessionCount }
-    public var visibleSessionIDs: [String] { state.visibleSessionIDs }
-    public var visibleSessions: [SessionSummary] { state.visibleSessions }
-    public var emptyState: SidebarEmptyState { state.emptyState }
+    public var isSearchActive: Bool { presentationState.isSearchActive }
+    public var visibleSessionIDs: [String] { listState.visibleSessionIDs }
+    public var visibleSessions: [SessionSummary] { listState.visibleSessions }
+    public var emptyState: SidebarEmptyState { presentationState.emptyState }
 
     public init() {}
+
+    internal func apply(_ state: SessionSearchResultsState) {
+      if presentationState != state.presentation {
+        presentationState = state.presentation
+      }
+      if listState != state.list {
+        listState = state.list
+      }
+      if filteredSessionCount != state.filteredSessionCount {
+        filteredSessionCount = state.filteredSessionCount
+      }
+      if totalSessionCount != state.totalSessionCount {
+        totalSessionCount = state.totalSessionCount
+      }
+    }
   }
 
   @MainActor
@@ -239,6 +255,65 @@ extension HarnessMonitorStore {
     public let dashboard = ContentDashboardSlice()
 
     public init() {}
+  }
+
+  public struct ContentShellState: Equatable {
+    public var selectedSessionID: String?
+    public var windowTitle = "Dashboard"
+    public var connectionState: ConnectionState = .idle
+    public var isRefreshing = false
+    public var isSelectionLoading = false
+    public var isExtensionsLoading = false
+    public var lastAction = ""
+    public var pendingConfirmation: PendingConfirmation?
+    public var presentedSheet: PresentedSheet?
+  }
+
+  public struct ContentChromeState: Equatable {
+    public var persistenceError: String?
+    public var sessionDataAvailability: SessionDataAvailability = .live
+    public var sessionStatus: SessionStatus?
+  }
+
+  public struct ContentSessionState: Equatable {
+    public var selectedSessionSummary: SessionSummary?
+    public var isSessionReadOnly = true
+    public var isSessionActionInFlight = false
+    public var isSelectionLoading = false
+    public var isExtensionsLoading = false
+    public var lastAction = ""
+    public var isTaskDragActive = false
+  }
+
+  public struct ContentSessionDetailState: Equatable {
+    public var selectedSessionDetail: SessionDetail?
+    public var timeline: [TimelineEntry] = []
+  }
+
+  public struct ContentDashboardState: Equatable {
+    public var connectionState: ConnectionState = .idle
+    public var isBusy = false
+    public var isRefreshing = false
+    public var isLaunchAgentInstalled = false
+  }
+
+  public struct SidebarUIState: Equatable {
+    public var connectionMetrics: ConnectionMetrics = .initial
+    public var selectedSessionID: String?
+    public var isPersistenceAvailable = false
+    public var bookmarkedSessionIds: Set<String> = []
+    public var searchFocusRequest = 0
+  }
+
+  public struct InspectorUIState: Equatable {
+    public var isPersistenceAvailable = false
+    public var selectedActionActorID = ""
+    public var isSessionReadOnly = true
+    public var isSessionActionInFlight = false
+    public var lastAction = ""
+    public var lastError: String?
+    public var primaryContent: InspectorPrimaryContentState = .empty
+    public var actionContext: InspectorActionContext?
   }
 
   @MainActor
@@ -255,6 +330,36 @@ extension HarnessMonitorStore {
     public var presentedSheet: PresentedSheet?
 
     public init() {}
+
+    internal func apply(_ state: ContentShellState) {
+      if selectedSessionID != state.selectedSessionID {
+        selectedSessionID = state.selectedSessionID
+      }
+      if windowTitle != state.windowTitle {
+        windowTitle = state.windowTitle
+      }
+      if connectionState != state.connectionState {
+        connectionState = state.connectionState
+      }
+      if isRefreshing != state.isRefreshing {
+        isRefreshing = state.isRefreshing
+      }
+      if isSelectionLoading != state.isSelectionLoading {
+        isSelectionLoading = state.isSelectionLoading
+      }
+      if isExtensionsLoading != state.isExtensionsLoading {
+        isExtensionsLoading = state.isExtensionsLoading
+      }
+      if lastAction != state.lastAction {
+        lastAction = state.lastAction
+      }
+      if pendingConfirmation != state.pendingConfirmation {
+        pendingConfirmation = state.pendingConfirmation
+      }
+      if presentedSheet != state.presentedSheet {
+        presentedSheet = state.presentedSheet
+      }
+    }
   }
 
   @MainActor
@@ -281,6 +386,18 @@ extension HarnessMonitorStore {
     public var sessionStatus: SessionStatus?
 
     public init() {}
+
+    internal func apply(_ state: ContentChromeState) {
+      if persistenceError != state.persistenceError {
+        persistenceError = state.persistenceError
+      }
+      if sessionDataAvailability != state.sessionDataAvailability {
+        sessionDataAvailability = state.sessionDataAvailability
+      }
+      if sessionStatus != state.sessionStatus {
+        sessionStatus = state.sessionStatus
+      }
+    }
   }
 
   @MainActor
@@ -295,6 +412,30 @@ extension HarnessMonitorStore {
     public var isTaskDragActive = false
 
     public init() {}
+
+    internal func apply(_ state: ContentSessionState) {
+      if selectedSessionSummary != state.selectedSessionSummary {
+        selectedSessionSummary = state.selectedSessionSummary
+      }
+      if isSessionReadOnly != state.isSessionReadOnly {
+        isSessionReadOnly = state.isSessionReadOnly
+      }
+      if isSessionActionInFlight != state.isSessionActionInFlight {
+        isSessionActionInFlight = state.isSessionActionInFlight
+      }
+      if isSelectionLoading != state.isSelectionLoading {
+        isSelectionLoading = state.isSelectionLoading
+      }
+      if isExtensionsLoading != state.isExtensionsLoading {
+        isExtensionsLoading = state.isExtensionsLoading
+      }
+      if lastAction != state.lastAction {
+        lastAction = state.lastAction
+      }
+      if isTaskDragActive != state.isTaskDragActive {
+        isTaskDragActive = state.isTaskDragActive
+      }
+    }
   }
 
   @MainActor
@@ -304,6 +445,15 @@ extension HarnessMonitorStore {
     public var timeline: [TimelineEntry] = []
 
     public init() {}
+
+    internal func apply(_ state: ContentSessionDetailState) {
+      if selectedSessionDetail != state.selectedSessionDetail {
+        selectedSessionDetail = state.selectedSessionDetail
+      }
+      if timeline != state.timeline {
+        timeline = state.timeline
+      }
+    }
   }
 
   @MainActor
@@ -315,6 +465,21 @@ extension HarnessMonitorStore {
     public var isLaunchAgentInstalled = false
 
     public init() {}
+
+    internal func apply(_ state: ContentDashboardState) {
+      if connectionState != state.connectionState {
+        connectionState = state.connectionState
+      }
+      if isBusy != state.isBusy {
+        isBusy = state.isBusy
+      }
+      if isRefreshing != state.isRefreshing {
+        isRefreshing = state.isRefreshing
+      }
+      if isLaunchAgentInstalled != state.isLaunchAgentInstalled {
+        isLaunchAgentInstalled = state.isLaunchAgentInstalled
+      }
+    }
   }
 
   @MainActor
@@ -325,6 +490,26 @@ extension HarnessMonitorStore {
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
     public var searchFocusRequest = 0
+
+    public init() {}
+
+    internal func apply(_ state: SidebarUIState) {
+      if connectionMetrics != state.connectionMetrics {
+        connectionMetrics = state.connectionMetrics
+      }
+      if selectedSessionID != state.selectedSessionID {
+        selectedSessionID = state.selectedSessionID
+      }
+      if isPersistenceAvailable != state.isPersistenceAvailable {
+        isPersistenceAvailable = state.isPersistenceAvailable
+      }
+      if bookmarkedSessionIds != state.bookmarkedSessionIds {
+        bookmarkedSessionIds = state.bookmarkedSessionIds
+      }
+      if searchFocusRequest != state.searchFocusRequest {
+        searchFocusRequest = state.searchFocusRequest
+      }
+    }
   }
 
   @MainActor
@@ -338,5 +523,34 @@ extension HarnessMonitorStore {
     public var lastError: String?
     public var primaryContent: InspectorPrimaryContentState = .empty
     public var actionContext: InspectorActionContext?
+
+    public init() {}
+
+    internal func apply(_ state: InspectorUIState) {
+      if isPersistenceAvailable != state.isPersistenceAvailable {
+        isPersistenceAvailable = state.isPersistenceAvailable
+      }
+      if selectedActionActorID != state.selectedActionActorID {
+        selectedActionActorID = state.selectedActionActorID
+      }
+      if isSessionReadOnly != state.isSessionReadOnly {
+        isSessionReadOnly = state.isSessionReadOnly
+      }
+      if isSessionActionInFlight != state.isSessionActionInFlight {
+        isSessionActionInFlight = state.isSessionActionInFlight
+      }
+      if lastAction != state.lastAction {
+        lastAction = state.lastAction
+      }
+      if lastError != state.lastError {
+        lastError = state.lastError
+      }
+      if primaryContent != state.primaryContent {
+        primaryContent = state.primaryContent
+      }
+      if actionContext != state.actionContext {
+        actionContext = state.actionContext
+      }
+    }
   }
 }
