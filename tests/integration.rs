@@ -5,6 +5,7 @@ mod integration {
     mod architecture;
     mod bridge_agent_tui;
     mod bridge_codex;
+    mod bridge_discovery;
     mod daemon_comparison;
     mod daemon_control;
     mod daemon_perf;
