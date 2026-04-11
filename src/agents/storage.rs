@@ -3,7 +3,6 @@ use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use fs2::FileExt;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -12,6 +11,7 @@ use crate::hooks::adapters::HookAgent;
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::{harness_data_root, project_context_dir, utc_now};
 
 use super::types::{AgentLedgerEvent, AgentSessionRegistry};
@@ -55,32 +55,16 @@ fn agent_name(agent: HookAgent) -> &'static str {
     }
 }
 
-fn open_lock_file(path: &Path) -> Result<File, CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
-    }
-    OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|error| io_err(&error))
-}
-
 fn with_lock<T>(
     project_dir: &Path,
     name: &str,
     action: impl FnOnce() -> Result<T, CliError>,
 ) -> Result<T, CliError> {
-    let file = open_lock_file(&lock_path(project_dir, name))?;
-    file.lock_exclusive().map_err(|error| io_err(&error))?;
-    let result = action();
-    let unlock = file.unlock().map_err(|error| io_err(&error));
-    match (result, unlock) {
-        (Ok(value), Ok(())) => Ok(value),
-        (Err(error), Ok(()) | Err(_)) | (Ok(_), Err(error)) => Err(error),
-    }
+    with_exclusive_flock(
+        &lock_path(project_dir, name),
+        FlockErrorContext::new("agent storage"),
+        action,
+    )
 }
 
 pub(crate) fn current_session_id(
