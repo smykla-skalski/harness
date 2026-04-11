@@ -20,7 +20,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::{project_context_dir, utc_now};
 
-use super::bridge::{AgentTuiBridgeStartSpec, BridgeCapability, BridgeClient};
+use super::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
 use super::db::DaemonDb;
 use super::protocol::{SessionJoinRequest, StreamEvent};
 
@@ -580,7 +580,7 @@ impl AgentTuiManagerHandle {
         drop(db_guard);
 
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
-        let snapshot = bridge.agent_tui_start(&AgentTuiBridgeStartSpec {
+        let snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
             session_id: session_id.to_string(),
             agent_id,
             tui_id,
