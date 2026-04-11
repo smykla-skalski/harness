@@ -1,6 +1,14 @@
 [tools]
 rust = "nightly"
 
+[tasks."check:stale"]
+description = "Fail fast if the dev environment has stale processes, /tmp bridge sockets, or non-approved DerivedData HarnessMonitor bundles"
+run = "./scripts/check-no-stale-state.sh"
+
+[tasks."clean:stale"]
+description = "Reset a polluted dev environment (quits Monitor, stops launchd daemon, kills orphan target/debug harness processes, wipes /tmp bridge sockets, stale bridge state, and non-approved DerivedData bundles)"
+run = "./scripts/clean-stale-state.sh"
+
 [tasks."version:show"]
 description = "Print the canonical harness package version"
 run = "./scripts/version.sh show"
@@ -19,10 +27,12 @@ run = "./scripts/cargo-local.sh test --lib"
 
 [tasks."test:integration"]
 description = "Run integration tests (fast only, single-threaded for env safety)"
+depends = ["check:stale"]
 run = "./scripts/cargo-local.sh test --test integration -- --test-threads=1"
 
 [tasks."test:slow"]
 description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
+depends = ["check:stale"]
 run = "./scripts/cargo-local.sh test --test integration -- --ignored --test-threads=1"
 
 [tasks.test]
@@ -31,6 +41,7 @@ depends = ["test:unit", "test:integration"]
 
 [tasks.check]
 description = "Type-check without building"
+depends = ["check:stale"]
 run = ["./scripts/version.sh check", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib"]
 
 [tasks."lint:fix"]
@@ -54,8 +65,10 @@ run = "apps/harness-monitor-macos/Scripts/generate-project.sh"
 
 [tasks."harness-monitor:macos:lint"]
 description = "Run the strict Swift format and build-tool-plugin quality gates for the Harness Monitor macOS app"
+depends = ["check:stale"]
 run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
 [tasks."harness-monitor:macos:test"]
 description = "Generate, lint, and test the Harness Monitor macOS app"
+depends = ["check:stale"]
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
