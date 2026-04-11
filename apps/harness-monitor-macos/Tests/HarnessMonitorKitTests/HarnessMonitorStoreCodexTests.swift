@@ -1,3 +1,4 @@
+import Darwin
 import Testing
 
 @testable import HarnessMonitorKit
@@ -8,7 +9,8 @@ struct HarnessMonitorStoreCodexTests {
   @Test("Start Codex run sends request and selects returned run")
   func startCodexRunSendsRequestAndSelectsReturnedRun() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
 
     let started = await store.startCodexRun(
       prompt: "Investigate the failing suite.",
@@ -44,7 +46,8 @@ struct HarnessMonitorStoreCodexTests {
       pendingApprovals: [approval]
     )
     client.configureCodexRuns([run], for: PreviewFixtures.summary.sessionId)
-    let store = await selectedStore(client: client)
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
 
     let resolved = await store.resolveCodexApproval(
       runID: run.runId,
@@ -70,7 +73,8 @@ struct HarnessMonitorStoreCodexTests {
   @Test("Codex stream update refreshes selected run")
   func codexStreamUpdateRefreshesSelectedRun() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
     let run = client.codexRunFixture(status: .completed, finalMessage: "Done.")
 
     store.applySessionPushEvent(
@@ -327,7 +331,24 @@ struct HarnessMonitorStoreHostBridgeTests {
       )
     )
 
-    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge start --capability codex")
+    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
+  }
+
+  @Test("Host bridge start command falls back to bridge start when the bridge is absent")
+  func hostBridgeStartCommandFallsBackToStartWhenBridgeIsAbsent() async {
+    let store = await makeBootstrappedStore()
+
+    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge start")
+    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
+  }
+
+  @Test("Preview store inherits forced bridge issues from process environment")
+  func previewStoreInheritsForcedBridgeIssuesFromEnvironment() async {
+    setenv("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES", "agent-tui,codex", 1)
+    defer { unsetenv("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES") }
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+    #expect(store.hostBridgeCapabilityIssues["agent-tui"] == .excluded)
+    #expect(store.hostBridgeCapabilityIssues["codex"] == .excluded)
   }
 
   @Test("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES seeds excluded state for listed capabilities")
@@ -376,7 +397,158 @@ struct HarnessMonitorStoreHostBridgeTests {
     store.markHostBridgeIssue(for: "agent-tui", statusCode: 501)
 
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
-    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start --capability agent-tui")
+    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge reconfigure --enable agent-tui")
+  }
+
+  @Test("Host bridge enable updates manifest and clears excluded issue")
+  func setHostBridgeCapabilityEnableUpdatesManifest() async {
+    let client = RecordingHarnessClient()
+    client.configureHostBridgeStatusReport(
+      BridgeStatusReport(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        pid: 4321,
+        startedAt: "2026-04-11T10:00:00Z",
+        uptimeSeconds: 15,
+        capabilities: [
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          ),
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          ),
+        ]
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          )
+        ]
+      )
+    )
+    store.hostBridgeCapabilityIssues["codex"] = .excluded
+
+    let result = await store.setHostBridgeCapability("codex", enabled: true)
+
+    #expect(result == .success)
+    #expect(
+      client.recordedCalls()
+        == [.reconfigureHostBridge(enable: ["codex"], disable: [], force: false)]
+    )
+    #expect(store.hostBridgeCapabilityIssues["codex"] == nil)
+    #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
+    #expect(store.daemonStatus?.manifest?.hostBridge.capabilities["codex"]?.endpoint == "ws://127.0.0.1:4500")
+    #expect(store.lastAction == "Enabled Codex host bridge")
+  }
+
+  @Test("Host bridge disable agent-tui requires force while sessions are active")
+  func setHostBridgeCapabilityDisableRequiresForce() async {
+    let client = RecordingHarnessClient()
+    client.configureHostBridgeReconfigureError(
+      HarnessMonitorAPIError.server(
+        code: 409,
+        message: "agent-tui capability has 1 active session(s); rerun with --force to stop them first"
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock",
+            metadata: ["active_sessions": "1"]
+          )
+        ]
+      )
+    )
+
+    let result = await store.setHostBridgeCapability("agent-tui", enabled: false)
+
+    #expect(
+      result
+        == .requiresForce(
+          "agent-tui capability has 1 active session(s); rerun with --force to stop them first"
+        )
+    )
+    #expect(
+      client.recordedCalls()
+        == [.reconfigureHostBridge(enable: [], disable: ["agent-tui"], force: false)]
+    )
+    #expect(store.lastError == nil)
+    #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .ready)
+  }
+
+  @Test("Forced agent-tui disable removes capability and clears local sessions")
+  func setHostBridgeCapabilityDisableForceUpdatesManifest() async {
+    let client = RecordingHarnessClient()
+    let runningTui = client.agentTuiFixture()
+    client.configureAgentTuis([runningTui], for: PreviewFixtures.summary.sessionId)
+    client.configureHostBridgeStatusReport(
+      BridgeStatusReport(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        pid: 4321,
+        startedAt: "2026-04-11T10:00:00Z",
+        uptimeSeconds: 15,
+        capabilities: [
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          )
+        ]
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock",
+            metadata: ["active_sessions": "1"]
+          ),
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          ),
+        ]
+      )
+    )
+    await store.refreshSelectedAgentTuis()
+
+    let result = await store.setHostBridgeCapability("agent-tui", enabled: false, force: true)
+
+    #expect(result == .success)
+    #expect(
+      client.recordedCalls()
+        == [.reconfigureHostBridge(enable: [], disable: ["agent-tui"], force: true)]
+    )
+    #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
+    #expect(store.selectedAgentTuis.isEmpty)
+    #expect(store.selectedAgentTui == nil)
+    #expect(store.lastAction == "Disabled Agent TUI host bridge")
   }
 
   private func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {

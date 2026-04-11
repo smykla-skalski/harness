@@ -101,6 +101,12 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func reconfigureHostBridge(
+    request: HostBridgeReconfigureRequest
+  ) async throws -> BridgeStatusReport {
+    try await httpFallbackClient.reconfigureHostBridge(request: request)
+  }
+
   public func projects() async throws -> [ProjectSummary] {
     let value = try await send(method: "projects")
     return try decode(value)

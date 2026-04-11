@@ -59,6 +59,12 @@ public final class HarnessMonitorStore {
     case excluded
   }
 
+  public enum HostBridgeCapabilityMutationResult: Equatable {
+    case success
+    case requiresForce(String)
+    case failed
+  }
+
   public enum PresentedSheet: Identifiable, Equatable {
     case codexFlow
     case agentTui
@@ -637,8 +643,8 @@ public final class HarnessMonitorStore {
 
   public func hostBridgeStartCommand(for capability: String) -> String {
     let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
-    if hostBridge.running && hostBridge.capabilities[capability] == nil {
-      return "harness bridge start --capability \(capability)"
+    if hostBridge.running {
+      return "harness bridge reconfigure --enable \(capability)"
     }
     return "harness bridge start"
   }

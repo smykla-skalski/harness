@@ -30,6 +30,14 @@ struct CodexFlowSheetView: View {
     store.hostBridgeStartCommand(for: "codex")
   }
 
+  private var hostBridge: HostBridgeManifest {
+    store.daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+  }
+
+  private var codexBridgeCapabilityPresent: Bool {
+    hostBridge.capabilities["codex"] != nil
+  }
+
   private var canSubmit: Bool {
     !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
   }
@@ -315,6 +323,15 @@ struct CodexFlowSheetView: View {
       Text(codexBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if codexBridgeState == .excluded && hostBridge.running {
+        Button("Enable now") {
+          Task {
+            _ = await store.setHostBridgeCapability("codex", enabled: true)
+          }
+        }
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .disabled(store.isDaemonActionInFlight || isSubmitting)
+      }
       CopyableCommandBox(
         command: codexBridgeCommand,
         accessibilityIdentifier: HarnessMonitorAccessibility.codexFlowCopyCommandButton
@@ -340,9 +357,13 @@ struct CodexFlowSheetView: View {
   private var codexBridgeMessage: String {
     switch codexBridgeState {
     case .excluded:
-      "The shared host bridge is running without the Codex capability. Restart it with Codex enabled:"
+      "The shared host bridge is running without the Codex capability. Enable it now or run this in a terminal:"
     case .unavailable:
-      "Harness Monitor runs sandboxed and cannot start Codex directly. Run this in a terminal:"
+      if hostBridge.running && codexBridgeCapabilityPresent {
+        "The shared host bridge is running, but the Codex capability is unavailable. Re-enable it or run this in a terminal:"
+      } else {
+        "Harness Monitor runs sandboxed and cannot start Codex directly. Run this in a terminal:"
+      }
     case .ready:
       ""
     }
@@ -398,6 +419,14 @@ struct AgentTuiSheetView: View {
 
   private var agentTuiBridgeCommand: String {
     store.hostBridgeStartCommand(for: "agent-tui")
+  }
+
+  private var hostBridge: HostBridgeManifest {
+    store.daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+  }
+
+  private var agentTuiBridgeCapabilityPresent: Bool {
+    hostBridge.capabilities["agent-tui"] != nil
   }
 
   private var selectedTuiBinding: Binding<String> {
@@ -703,6 +732,15 @@ struct AgentTuiSheetView: View {
       Text(agentTuiBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if agentTuiBridgeState == .excluded && hostBridge.running {
+        Button("Enable now") {
+          Task {
+            _ = await store.setHostBridgeCapability("agent-tui", enabled: true)
+          }
+        }
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .disabled(store.isDaemonActionInFlight || isSubmitting)
+      }
       CopyableCommandBox(
         command: agentTuiBridgeCommand,
         accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiCopyCommandButton
@@ -728,9 +766,13 @@ struct AgentTuiSheetView: View {
   private var agentTuiBridgeMessage: String {
     switch agentTuiBridgeState {
     case .excluded:
-      "The shared host bridge is running without terminal control enabled. Restart it with agent-tui enabled:"
+      "The shared host bridge is running without terminal control enabled. Enable it now or run this in a terminal:"
     case .unavailable:
-      "Harness Monitor runs sandboxed and needs the host bridge to start or steer terminal-backed agents. Run this in a terminal:"
+      if hostBridge.running && agentTuiBridgeCapabilityPresent {
+        "The shared host bridge is running, but terminal control is unavailable. Re-enable it or run this in a terminal:"
+      } else {
+        "Harness Monitor runs sandboxed and needs the host bridge to start or steer terminal-backed agents. Run this in a terminal:"
+      }
     case .ready:
       ""
     }

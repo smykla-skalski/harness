@@ -139,4 +139,96 @@ struct DaemonModelsTests {
     #expect(diagnostics.databaseSizeBytes == 0)
     #expect(diagnostics.lastEvent?.message == "daemon listening on http://127.0.0.1:63438")
   }
+
+  @Test("Bridge status report projects to the manifest shape used by the store")
+  func bridgeStatusReportProjectsToHostBridgeManifest() {
+    let report = BridgeStatusReport(
+      running: true,
+      socketPath: "/tmp/bridge.sock",
+      pid: 4_242,
+      startedAt: "2026-04-11T14:00:00Z",
+      uptimeSeconds: 32,
+      capabilities: [
+        "codex": HostBridgeCapabilityManifest(
+          healthy: true,
+          transport: "websocket",
+          endpoint: "ws://127.0.0.1:4500",
+          metadata: ["port": "4500"]
+        )
+      ]
+    )
+
+    #expect(
+      report.hostBridgeManifest
+        == HostBridgeManifest(
+          running: true,
+          socketPath: "/tmp/bridge.sock",
+          capabilities: [
+            "codex": HostBridgeCapabilityManifest(
+              healthy: true,
+              transport: "websocket",
+              endpoint: "ws://127.0.0.1:4500",
+              metadata: ["port": "4500"]
+            )
+          ]
+        )
+    )
+  }
+
+  @Test("Updating daemon status swaps only the host bridge manifest")
+  func daemonStatusUpdatingHostBridgePreservesOtherFields() {
+    let original = DaemonStatusReport(
+      manifest: DaemonManifest(
+        version: "19.1.0",
+        pid: 4_242,
+        endpoint: "http://127.0.0.1:8888",
+        startedAt: "2026-04-11T13:00:00Z",
+        tokenPath: "/tmp/token",
+        sandboxed: true,
+        hostBridge: HostBridgeManifest()
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: true,
+        loaded: true,
+        label: "io.harness.daemon",
+        path: "/tmp/io.harness.daemon.plist"
+      ),
+      projectCount: 3,
+      worktreeCount: 4,
+      sessionCount: 5,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/tmp/daemon",
+        manifestPath: "/tmp/daemon/manifest.json",
+        authTokenPath: "/tmp/daemon/token",
+        authTokenPresent: true,
+        eventsPath: "/tmp/daemon/events.jsonl",
+        databasePath: "/tmp/daemon/harness.db",
+        databaseSizeBytes: 123,
+        lastEvent: nil
+      )
+    )
+
+    let updated = original.updating(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          )
+        ]
+      )
+    )
+
+    #expect(updated.projectCount == 3)
+    #expect(updated.worktreeCount == 4)
+    #expect(updated.sessionCount == 5)
+    #expect(updated.launchAgent == original.launchAgent)
+    #expect(updated.diagnostics == original.diagnostics)
+    #expect(updated.manifest?.hostBridge.running == true)
+    #expect(updated.manifest?.hostBridge.socketPath == "/tmp/bridge.sock")
+    #expect(updated.manifest?.hostBridge.capabilities["agent-tui"]?.transport == "unix")
+  }
 }

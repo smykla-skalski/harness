@@ -8,6 +8,9 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func shutdown() async
   func diagnostics() async throws -> DaemonDiagnosticsReport
   func stopDaemon() async throws -> DaemonControlResponse
+  func reconfigureHostBridge(
+    request: HostBridgeReconfigureRequest
+  ) async throws -> BridgeStatusReport
   func projects() async throws -> [ProjectSummary]
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
@@ -127,6 +130,12 @@ extension HarnessMonitorClientProtocol {
   }
 
   public func shutdown() async {}
+
+  public func reconfigureHostBridge(
+    request _: HostBridgeReconfigureRequest
+  ) async throws -> BridgeStatusReport {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+  }
 
   public func sessionDetail(id: String) async throws -> SessionDetail {
     try await sessionDetail(id: id, scope: nil)

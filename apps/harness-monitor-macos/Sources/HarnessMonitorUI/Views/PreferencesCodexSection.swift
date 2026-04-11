@@ -3,6 +3,8 @@ import SwiftUI
 
 struct PreferencesHostBridgeSection: View {
   let store: HarnessMonitorStore
+  @State private var pendingForcedDisableCapability: String?
+  @State private var pendingForcedDisableMessage = ""
 
   private var manifest: DaemonManifest? {
     store.daemonStatus?.manifest
@@ -12,8 +14,9 @@ struct PreferencesHostBridgeSection: View {
     manifest?.hostBridge ?? HostBridgeManifest()
   }
 
-  private var capabilities: [(String, HostBridgeCapabilityManifest)] {
-    hostBridge.capabilities.sorted { $0.key < $1.key }
+  private var capabilityNames: [String] {
+    let builtIns = ["codex", "agent-tui"]
+    return Array(Set(builtIns).union(hostBridge.capabilities.keys)).sorted()
   }
 
   var body: some View {
@@ -42,14 +45,8 @@ struct PreferencesHostBridgeSection: View {
       }
 
       Section("Capabilities") {
-        if capabilities.isEmpty {
-          Text("No capabilities enabled")
-            .scaledFont(.subheadline)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        } else {
-          ForEach(capabilities, id: \.0) { name, capability in
-            capabilityRow(name: name, capability: capability)
-          }
+        ForEach(capabilityNames, id: \.self) { name in
+          capabilityRow(name: name)
         }
       }
 
@@ -65,33 +62,154 @@ struct PreferencesHostBridgeSection: View {
       }
     }
     .preferencesDetailFormStyle()
+    .confirmationDialog(
+      "Disable agent-tui capability?",
+      isPresented: forceDisableConfirmationPresented,
+      titleVisibility: .visible
+    ) {
+      Button("Disable and stop sessions", role: .destructive) {
+        guard let capability = pendingForcedDisableCapability else {
+          return
+        }
+        pendingForcedDisableCapability = nil
+        pendingForcedDisableMessage = ""
+        Task {
+          _ = await store.setHostBridgeCapability(capability, enabled: false, force: true)
+        }
+      }
+      Button("Cancel", role: .cancel) {
+        pendingForcedDisableCapability = nil
+        pendingForcedDisableMessage = ""
+      }
+    } message: {
+      Text(pendingForcedDisableMessage)
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesCodexSection)
   }
 
   @ViewBuilder
-  private func capabilityRow(name: String, capability: HostBridgeCapabilityManifest) -> some View {
+  private func capabilityRow(name: String) -> some View {
+    let capability = hostBridge.capabilities[name]
+    let state = store.hostBridgeCapabilityState(for: name)
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack {
-        Text(name)
+        Text(capabilityTitle(name))
           .scaledFont(.headline)
         Spacer()
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
           Circle()
-            .fill(capability.healthy ? .green : .orange)
+            .fill(capabilityColor(state))
             .frame(width: 8, height: 8)
-          Text(capability.healthy ? "Healthy" : "Unavailable")
+          Text(capabilityStatusLabel(state))
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
       }
-      Text(capability.transport)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if let endpoint = capability.endpoint {
-        Text(endpoint)
-          .scaledFont(.body.monospaced())
-          .textSelection(.enabled)
+      if let capability {
+        Text(capability.transport)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        if let endpoint = capability.endpoint {
+          Text(endpoint)
+            .scaledFont(.body.monospaced())
+            .textSelection(.enabled)
+        }
+      } else {
+        Text("Available to enable through the shared host bridge.")
+          .scaledFont(.subheadline)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
+      if hostBridge.running {
+        HStack {
+          Spacer()
+          Button(capabilityActionLabel(capability: capability, state: state)) {
+            performCapabilityAction(name: name, capability: capability, state: state)
+          }
+          .harnessActionButtonStyle(
+            variant: state == .ready ? .bordered : .prominent,
+            tint: state == .ready ? .secondary : nil
+          )
+          .disabled(store.isDaemonActionInFlight)
+        }
+      }
+    }
+  }
+
+  private var forceDisableConfirmationPresented: Binding<Bool> {
+    Binding(
+      get: { pendingForcedDisableCapability != nil },
+      set: { isPresented in
+        if !isPresented {
+          pendingForcedDisableCapability = nil
+          pendingForcedDisableMessage = ""
+        }
+      }
+    )
+  }
+
+  private func performCapabilityAction(
+    name: String,
+    capability: HostBridgeCapabilityManifest?,
+    state: HarnessMonitorStore.HostBridgeCapabilityState
+  ) {
+    let shouldEnable = capability == nil || state != .ready
+    Task {
+      let result = await store.setHostBridgeCapability(name, enabled: shouldEnable)
+      guard case .requiresForce(let message) = result, name == "agent-tui", !shouldEnable else {
+        return
+      }
+      pendingForcedDisableCapability = name
+      pendingForcedDisableMessage = message
+    }
+  }
+
+  private func capabilityActionLabel(
+    capability: HostBridgeCapabilityManifest?,
+    state: HarnessMonitorStore.HostBridgeCapabilityState
+  ) -> String {
+    if capability == nil {
+      return "Enable"
+    }
+    if state == .ready {
+      return "Disable"
+    }
+    return "Restart"
+  }
+
+  private func capabilityTitle(_ name: String) -> String {
+    switch name {
+    case "agent-tui":
+      "Agent TUI"
+    case "codex":
+      "Codex"
+    default:
+      name.replacingOccurrences(of: "-", with: " ").capitalized
+    }
+  }
+
+  private func capabilityStatusLabel(
+    _ state: HarnessMonitorStore.HostBridgeCapabilityState
+  ) -> String {
+    switch state {
+    case .ready:
+      "Healthy"
+    case .excluded:
+      "Excluded"
+    case .unavailable:
+      "Unavailable"
+    }
+  }
+
+  private func capabilityColor(
+    _ state: HarnessMonitorStore.HostBridgeCapabilityState
+  ) -> Color {
+    switch state {
+    case .ready:
+      .green
+    case .excluded:
+      .secondary
+    case .unavailable:
+      .orange
     }
   }
 }
@@ -135,8 +253,7 @@ private struct HostBridgeCommandsView: View {
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
         Button("Copy") {
-          NSPasteboard.general.clearContents()
-          NSPasteboard.general.setString(command, forType: .string)
+          HarnessMonitorClipboard.copy(command)
         }
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
         .accessibilityIdentifier(accessibilityID)

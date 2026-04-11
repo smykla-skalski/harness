@@ -146,6 +146,22 @@ public struct SignalCancelRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct HostBridgeReconfigureRequest: Codable, Equatable, Sendable {
+  public let enable: [String]
+  public let disable: [String]
+  public let force: Bool
+
+  public init(
+    enable: [String] = [],
+    disable: [String] = [],
+    force: Bool = false
+  ) {
+    self.enable = enable
+    self.disable = disable
+    self.force = force
+  }
+}
+
 public struct ErrorEnvelope: Codable, Equatable, Sendable {
   public struct ErrorDetail: Codable, Equatable, Sendable {
     public let code: String
