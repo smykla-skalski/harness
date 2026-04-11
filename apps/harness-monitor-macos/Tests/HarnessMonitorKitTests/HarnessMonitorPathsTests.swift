@@ -34,6 +34,19 @@ struct HarnessMonitorPathsTests {
     )
   }
 
+  @Test("External daemon mode defaults to the CLI data root when no explicit data home is set")
+  func externalDaemonModeDefaultsToCLIDataRoot() {
+    let environment = HarnessMonitorEnvironment(
+      values: [DaemonOwnership.environmentKey: "1"],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+
+    #expect(
+      HarnessMonitorPaths.daemonRoot(using: environment).path
+        == "/Users/example/Library/Application Support/harness/daemon"
+    )
+  }
+
   @Test("Uses app group environment fallback")
   func usesAppGroupEnvironmentFallback() {
     let environment = HarnessMonitorEnvironment(

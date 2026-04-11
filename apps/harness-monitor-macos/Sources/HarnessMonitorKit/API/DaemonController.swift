@@ -114,6 +114,7 @@ public struct DaemonController: DaemonControlling {
   private let transportPreference: TransportPreference
   private let launchAgentManager: any DaemonLaunchAgentManaging
   private let ownership: DaemonOwnership
+  private let endpointProbe: @Sendable (URL) async -> Bool
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -124,13 +125,17 @@ public struct DaemonController: DaemonControlling {
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
         HarnessMonitorAPIClient(connection: $0)
-      }
+      },
+    endpointProbe: @escaping @Sendable (URL) async -> Bool = {
+      await Self.defaultEndpointProbe($0)
+    }
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
     self.launchAgentManager = launchAgentManager
     self.ownership = ownership
     self.sessionFactory = sessionFactory
+    self.endpointProbe = endpointProbe
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -216,20 +221,35 @@ public struct DaemonController: DaemonControlling {
     let deadline = ContinuousClock.now + timeout
     var lastError: (any Error)?
     var sawUnreachableManifest = false
+    var immediateError: (any Error)?
     while ContinuousClock.now < deadline {
       do {
-        let connection = try loadConnection()
-        if await endpointIsListening(connection.endpoint) {
+        let manifest = try loadManifest()
+        let token = try loadToken(path: manifest.tokenPath)
+        let connection = HarnessMonitorConnection(
+          endpoint: try endpointURL(from: manifest.endpoint),
+          token: token
+        )
+        if await endpointProbe(connection.endpoint) {
           return try await bootstrap(connection: connection)
         }
-        // Manifest decoded but nothing is bound on its endpoint. Could be a
-        // restart in progress (managed) or a daemon killed without cleanup
-        // (external). Track so the final error message reflects reality.
+        let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+        if ownership == .external {
+          immediateError = DaemonControlError.externalDaemonManifestStale(
+            manifestPath: manifestPath
+          )
+        } else {
+          immediateError = DaemonControlError.daemonDidNotStart
+        }
         sawUnreachableManifest = true
+        break
       } catch {
         lastError = error
       }
       try await Task.sleep(for: .milliseconds(250))
+    }
+    if let immediateError {
+      throw immediateError
     }
     if let client = try? await bootstrapClient() {
       return client
@@ -247,7 +267,7 @@ public struct DaemonController: DaemonControlling {
     throw lastError ?? DaemonControlError.daemonDidNotStart
   }
 
-  private func endpointIsListening(_ endpoint: URL) async -> Bool {
+  public static func defaultEndpointProbe(_ endpoint: URL) async -> Bool {
     guard let host = endpoint.host, let port = endpoint.port else {
       return true
     }
@@ -412,4 +432,3 @@ extension DaemonStatusReport {
     )
   }
 }
-
