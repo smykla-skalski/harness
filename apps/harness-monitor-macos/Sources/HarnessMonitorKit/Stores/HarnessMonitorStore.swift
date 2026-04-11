@@ -48,6 +48,17 @@ public final class HarnessMonitorStore {
     case removeAgent(sessionID: String, agentID: String, actorID: String)
   }
 
+  public enum HostBridgeCapabilityIssue: Equatable {
+    case unavailable
+    case excluded
+  }
+
+  public enum HostBridgeCapabilityState: Equatable {
+    case ready
+    case unavailable
+    case excluded
+  }
+
   public enum PresentedSheet: Identifiable, Equatable {
     case codexFlow
     case agentTui
@@ -100,8 +111,7 @@ public final class HarnessMonitorStore {
       scheduleUISync([.content])
     }
   }
-  public var codexUnavailable = false
-  public var agentTuiUnavailable = false
+  public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
       guard oldValue != selectedCodexRuns else { return }
@@ -460,8 +470,7 @@ public final class HarnessMonitorStore {
       if let oldClient {
         await oldClient.shutdown()
       }
-      codexUnavailable = false
-      agentTuiUnavailable = false
+      hostBridgeCapabilityIssues = [:]
       hasBootstrapped = true
       await bootstrap()
 
@@ -570,5 +579,68 @@ public final class HarnessMonitorStore {
     cancelSessionPushFallback()
     sessionSnapshotHydrationTask?.cancel()
     sessionSnapshotHydrationTask = nil
+  }
+
+  public func hostBridgeCapabilityState(for capability: String) -> HostBridgeCapabilityState {
+    if let issue = hostBridgeCapabilityIssues[capability] {
+      switch issue {
+      case .unavailable:
+        return .unavailable
+      case .excluded:
+        return .excluded
+      }
+    }
+
+    guard daemonStatus?.manifest?.sandboxed == true else {
+      return .ready
+    }
+
+    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    guard hostBridge.running else {
+      return .unavailable
+    }
+    guard let capabilityState = hostBridge.capabilities[capability] else {
+      return .excluded
+    }
+    return capabilityState.healthy ? .ready : .unavailable
+  }
+
+  public func hostBridgeStartCommand(for capability: String) -> String {
+    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    if hostBridge.running && hostBridge.capabilities[capability] == nil {
+      return "harness bridge start --capability \(capability)"
+    }
+    return "harness bridge start"
+  }
+
+  public func clearHostBridgeIssue(for capability: String) {
+    guard hostBridgeCapabilityIssues[capability] != nil else {
+      return
+    }
+    hostBridgeCapabilityIssues.removeValue(forKey: capability)
+  }
+
+  public func markHostBridgeIssue(for capability: String, statusCode: Int) {
+    switch statusCode {
+    case 501:
+      let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+      if hostBridge.running && hostBridge.capabilities[capability] == nil {
+        hostBridgeCapabilityIssues[capability] = .excluded
+      } else {
+        hostBridgeCapabilityIssues[capability] = .unavailable
+      }
+    case 503:
+      hostBridgeCapabilityIssues[capability] = .unavailable
+    default:
+      break
+    }
+  }
+
+  public var codexUnavailable: Bool {
+    hostBridgeCapabilityState(for: "codex") != .ready
+  }
+
+  public var agentTuiUnavailable: Bool {
+    hostBridgeCapabilityState(for: "agent-tui") != .ready
   }
 }

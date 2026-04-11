@@ -41,13 +41,13 @@ extension HarnessMonitorStore {
         )
       }
       recordRequestSuccess()
-      codexUnavailable = false
+      clearHostBridgeIssue(for: "codex")
       applyCodexRun(measuredRun.value)
       showLastAction("Codex run started")
       return true
     } catch let apiError as HarnessMonitorAPIError {
-      if case .server(let code, _) = apiError, code == 503 {
-        codexUnavailable = true
+      if case .server(let code, _) = apiError, code == 501 || code == 503 {
+        markHostBridgeIssue(for: "codex", statusCode: code)
       }
       lastError = apiError.localizedDescription
       return false
@@ -163,9 +163,16 @@ extension HarnessMonitorStore {
         try await mutation()
       }
       recordRequestSuccess()
+      clearHostBridgeIssue(for: "codex")
       applyCodexRun(measuredRun.value)
       showLastAction(actionName)
       return true
+    } catch let apiError as HarnessMonitorAPIError {
+      if case .server(let code, _) = apiError {
+        markHostBridgeIssue(for: "codex", statusCode: code)
+      }
+      lastError = apiError.localizedDescription
+      return false
     } catch {
       lastError = error.localizedDescription
       return false
@@ -293,7 +300,7 @@ extension HarnessMonitorStore {
   }
 
   func resetSelectedAgentTuis() {
-    agentTuiUnavailable = false
+    clearHostBridgeIssue(for: "agent-tui")
     guard !selectedAgentTuis.isEmpty || selectedAgentTui != nil else {
       return
     }
@@ -306,7 +313,7 @@ extension HarnessMonitorStore {
       return
     }
 
-    agentTuiUnavailable = false
+    clearHostBridgeIssue(for: "agent-tui")
     let tuis = upsertingAgentTui(tui, into: selectedAgentTuis)
     selectedAgentTuis = tuis
     if selectedAgentTui?.tuiId == tui.tuiId || selectedAgentTui == nil {
@@ -326,7 +333,7 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else {
         return true
       }
-      agentTuiUnavailable = false
+      clearHostBridgeIssue(for: "agent-tui")
       selectedAgentTuis = measuredTuis.value.tuis
       selectedAgentTui = preferredAgentTui(from: measuredTuis.value.tuis)
       return true
@@ -362,7 +369,7 @@ extension HarnessMonitorStore {
         try await mutation()
       }
       recordRequestSuccess()
-      agentTuiUnavailable = false
+      clearHostBridgeIssue(for: "agent-tui")
       applyAgentTui(measuredTui.value)
       if let actionName {
         showLastAction(actionName)
@@ -384,7 +391,7 @@ extension HarnessMonitorStore {
       case .server(let code, _) = apiError,
       code == 501
     {
-      agentTuiUnavailable = true
+      markHostBridgeIssue(for: "agent-tui", statusCode: code)
     }
     lastError = error.localizedDescription
     return false

@@ -385,6 +385,20 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
       return .server(code: statusCode, message: envelope.error.message)
     }
 
+    if let envelope = try? decoder.decode(FlatErrorEnvelope.self, from: data) {
+      var parts = [envelope.error]
+      if let feature = envelope.feature, !feature.isEmpty {
+        parts.append(feature)
+      }
+      if let endpoint = envelope.endpoint, !endpoint.isEmpty {
+        parts.append(endpoint)
+      }
+      if let hint = envelope.hint, !hint.isEmpty {
+        parts.append(hint)
+      }
+      return .server(code: statusCode, message: parts.joined(separator: " - "))
+    }
+
     let message = String(data: data, encoding: .utf8) ?? "Unknown daemon error"
     return .server(code: statusCode, message: message)
   }
@@ -402,4 +416,11 @@ private struct AnyEncodable: Encodable {
   func encode(to encoder: Encoder) throws {
     try encodeClosure(encoder)
   }
+}
+
+private struct FlatErrorEnvelope: Decodable {
+  let error: String
+  let feature: String?
+  let endpoint: String?
+  let hint: String?
 }

@@ -47,7 +47,7 @@ public struct PreferencesView: View {
             refreshDiagnostics: { await store.refreshDiagnostics() }
           )
         case .codex:
-          PreferencesCodexSection(store: store)
+          PreferencesHostBridgeSection(store: store)
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:
