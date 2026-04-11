@@ -18,6 +18,7 @@ The repo `mise` tasks route Rust compilation through [`scripts/cargo-local.sh`](
 
 - If `sccache` is installed, the wrapper enables it automatically through `RUSTC_WRAPPER`.
 - Build jobs default to a conservative local cap instead of saturating every CPU. Agent sessions use an even lower default so multiple workers can compile in parallel without swamping the host. Override with `HARNESS_CARGO_JOBS=<n>` or `CARGO_BUILD_JOBS=<n>`.
+- Concurrent wrapper invocations automatically reduce their default job budgets based on the number of active local Rust builds, so a second or third agent does not assume it owns the whole machine.
 - Agent sessions get isolated target directories under `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use `target/dev/local`.
 - Full release installs still sign and install the binary locally, but now respect `CARGO_TARGET_DIR` so the build and install steps stay aligned.
 

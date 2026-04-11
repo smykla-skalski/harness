@@ -3,6 +3,9 @@ set -euo pipefail
 unalias -a 2>/dev/null || true
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+lease_dir="$ROOT/target/.cargo-local/leases"
+lease_path=""
+active_build_count=1
 
 first_nonempty_env() {
   local var_name value
@@ -18,6 +21,40 @@ first_nonempty_env() {
 
 sanitize_segment() {
   printf '%s' "$1" | tr -cs '[:alnum:]._-' '-'
+}
+
+cleanup_stale_leases() {
+  local lease_file pid
+
+  mkdir -p "$lease_dir"
+
+  for lease_file in "$lease_dir"/*; do
+    if [[ ! -f "$lease_file" ]]; then
+      continue
+    fi
+
+    pid="$(cat "$lease_file" 2>/dev/null || true)"
+    if [[ ! "$pid" =~ ^[0-9]+$ ]] || ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$lease_file"
+    fi
+  done
+}
+
+register_build_lease() {
+  cleanup_stale_leases
+  lease_path="$lease_dir/$(sanitize_segment "${session_id:-local}")-$$"
+  printf '%s\n' "$$" >"$lease_path"
+  cleanup_stale_leases
+  active_build_count="$(find "$lease_dir" -type f | wc -l | tr -d ' ')"
+  if [[ ! "$active_build_count" =~ ^[0-9]+$ ]] || (( active_build_count < 1 )); then
+    active_build_count=1
+  fi
+}
+
+release_build_lease() {
+  if [[ -n "$lease_path" ]]; then
+    rm -f "$lease_path"
+  fi
 }
 
 detect_cpu_count() {
@@ -43,32 +80,42 @@ detect_cpu_count() {
 }
 
 default_jobs() {
-  local cpu_count
+  local cpu_count base_jobs
   cpu_count="$(detect_cpu_count)"
 
   # Agent sessions need a lower cap so parallel workers do not drown the host.
   if [[ -n "$session_id" ]]; then
     if (( cpu_count <= 4 )); then
-      printf '1\n'
+      base_jobs=1
     elif (( cpu_count <= 8 )); then
-      printf '2\n'
+      base_jobs=2
     elif (( cpu_count <= 12 )); then
-      printf '3\n'
+      base_jobs=3
     else
-      printf '4\n'
+      base_jobs=4
     fi
   else
     # Keep the machine responsive by default instead of saturating all cores.
     if (( cpu_count <= 4 )); then
-      printf '2\n'
+      base_jobs=2
     elif (( cpu_count <= 8 )); then
-      printf '3\n'
+      base_jobs=3
     elif (( cpu_count <= 12 )); then
-      printf '4\n'
+      base_jobs=4
     else
-      printf '6\n'
+      base_jobs=6
     fi
   fi
+
+  if (( active_build_count > 1 )); then
+    base_jobs=$(((base_jobs + active_build_count - 1) / active_build_count))
+  fi
+
+  if (( base_jobs < 1 )); then
+    base_jobs=1
+  fi
+
+  printf '%s\n' "$base_jobs"
 }
 
 session_id="$(first_nonempty_env \
@@ -78,6 +125,9 @@ session_id="$(first_nonempty_env \
   GEMINI_SESSION_ID \
   COPILOT_SESSION_ID \
   OPENCODE_SESSION_ID || true)"
+
+register_build_lease
+trap release_build_lease EXIT
 
 target_segment="local"
 if [[ -n "$session_id" ]]; then
@@ -95,6 +145,7 @@ fi
 if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
+  printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then
     printf 'SESSION_MODE=agent\n'
   else
@@ -107,6 +158,9 @@ if [[ "${1:-}" == "--print-env" ]]; then
     printf 'CACHE_MODE=none\n'
   fi
   printf 'SESSION_ID=%s\n' "${session_id:-}"
+  if [[ -n "${HARNESS_CARGO_LEASE_HOLD_SECONDS:-}" ]]; then
+    sleep "${HARNESS_CARGO_LEASE_HOLD_SECONDS}"
+  fi
   exit 0
 fi
 
