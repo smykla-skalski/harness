@@ -18,6 +18,7 @@ const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
 const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
 const LEGACY_LAUNCH_AGENT_PLIST: &str = "io.harness.monitor.daemon.plist";
 pub(crate) const DAEMON_LOCK_FILE: &str = "daemon.lock";
+pub(crate) const BRIDGE_LOCK_FILE: &str = "bridge.lock";
 pub(crate) const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
 pub(crate) const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
 
