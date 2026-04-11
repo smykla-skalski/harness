@@ -104,7 +104,10 @@ pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
             .join(HARNESS_MONITOR_APP_GROUP_ID)
             .join("harness")
             .join("daemon");
-        if !candidates.iter().any(|candidate| candidate.root == group_root) {
+        if !candidates
+            .iter()
+            .any(|candidate| candidate.root == group_root)
+        {
             candidates.push(DaemonLocation {
                 root: group_root,
                 kind: DaemonLocationKind::AppGroupContainer {
@@ -115,7 +118,10 @@ pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
     }
 
     let xdg_root = harness_data_root().join("daemon");
-    if !candidates.iter().any(|candidate| candidate.root == xdg_root) {
+    if !candidates
+        .iter()
+        .any(|candidate| candidate.root == xdg_root)
+    {
         candidates.push(DaemonLocation {
             root: xdg_root,
             kind: DaemonLocationKind::XdgDataHome,
@@ -242,10 +248,7 @@ mod tests {
                     "XDG_DATA_HOME",
                     Some(tmp.path().to_str().expect("utf8 path")),
                 ),
-                (
-                    "HOME",
-                    Some(tmp.path().to_str().expect("utf8 path")),
-                ),
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
                 (
                     "HARNESS_HOST_HOME",
                     Some(tmp.path().to_str().expect("utf8 path")),
@@ -288,10 +291,7 @@ mod tests {
                     "XDG_DATA_HOME",
                     Some(tmp.path().to_str().expect("utf8 path")),
                 ),
-                (
-                    "HOME",
-                    Some(tmp.path().to_str().expect("utf8 path")),
-                ),
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
                 (
                     "HARNESS_HOST_HOME",
                     Some(tmp.path().to_str().expect("utf8 path")),
@@ -327,10 +327,7 @@ mod tests {
                     "XDG_DATA_HOME",
                     Some(tmp.path().to_str().expect("utf8 path")),
                 ),
-                (
-                    "HOME",
-                    Some(tmp.path().to_str().expect("utf8 path")),
-                ),
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
                 (
                     "HARNESS_HOST_HOME",
                     Some(tmp.path().to_str().expect("utf8 path")),
@@ -390,10 +387,7 @@ mod tests {
             [
                 ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
                 ("HARNESS_APP_GROUP_ID", None),
-                (
-                    "XDG_DATA_HOME",
-                    Some(home.to_str().expect("utf8 path")),
-                ),
+                ("XDG_DATA_HOME", Some(home.to_str().expect("utf8 path"))),
                 ("HOME", Some(home.to_str().expect("utf8 path"))),
                 ("HARNESS_HOST_HOME", Some(home.to_str().expect("utf8 path"))),
             ],

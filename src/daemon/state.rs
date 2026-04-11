@@ -131,16 +131,22 @@ pub struct DaemonDiagnostics {
     pub last_event: Option<DaemonAuditEvent>,
 }
 
+/// An RAII guard that holds an exclusive `flock` on a file for the current
+/// process lifetime. Dropping the guard releases the lock.
 #[derive(Debug)]
-pub struct DaemonLockGuard {
+pub struct FlockGuard {
     file: fs::File,
 }
 
-impl Drop for DaemonLockGuard {
+impl Drop for FlockGuard {
     fn drop(&mut self) {
         let _ = self.file.unlock();
     }
 }
+
+/// Type alias so external callers that already name [`DaemonLockGuard`] keep
+/// compiling without any changes.
+pub type DaemonLockGuard = FlockGuard;
 
 #[must_use]
 pub fn daemon_root() -> PathBuf {
@@ -230,6 +236,55 @@ pub fn ensure_daemon_dirs() -> Result<(), CliError> {
     Ok(())
 }
 
+/// Acquire an exclusive `flock` on any file, creating it when absent.
+///
+/// `label` appears in the error message so callers get domain-specific output
+/// without each one re-implementing the `try_lock_exclusive` match arms.
+///
+/// # Errors
+/// Returns `CliError` when the lock is already held or the file cannot be
+/// opened.
+pub(crate) fn acquire_flock_exclusive(
+    path: &Path,
+    label: &'static str,
+) -> Result<FlockGuard, CliError> {
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|error| CliErrorKind::workflow_io(format!("open {label} lock: {error}")))?;
+    match file.try_lock_exclusive() {
+        Ok(()) => Ok(FlockGuard { file }),
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+            Err(CliErrorKind::workflow_io(format!("{label} already running")).into())
+        }
+        Err(error) => Err(CliErrorKind::workflow_io(format!("lock {label}: {error}")).into()),
+    }
+}
+
+/// Probe whether the file at `path` is currently held by an exclusive `flock`.
+///
+/// Returns `true` when another process holds the lock; returns `false` when the
+/// file is missing, unlocked, or the probe itself fails. The kernel releases
+/// `flock` on process death (even `SIGKILL`), so this is immune to PID reuse
+/// and stale files.
+#[must_use]
+pub(crate) fn flock_is_held_at(path: &Path) -> bool {
+    let Ok(file) = fs::OpenOptions::new().read(true).write(true).open(path) else {
+        return false;
+    };
+    match file.try_lock_exclusive() {
+        Ok(()) => {
+            let _ = file.unlock();
+            false
+        }
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => true,
+        Err(_) => false,
+    }
+}
+
 /// Acquire the daemon singleton lock for the current process lifetime.
 ///
 /// # Errors
@@ -237,32 +292,18 @@ pub fn ensure_daemon_dirs() -> Result<(), CliError> {
 /// file cannot be opened.
 pub fn acquire_singleton_lock() -> Result<DaemonLockGuard, CliError> {
     ensure_daemon_dirs()?;
-    let path = lock_path();
-    let file = fs::OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(&path)
-        .map_err(|error| CliErrorKind::workflow_io(format!("open daemon lock: {error}")))?;
-    match file.try_lock_exclusive() {
-        Ok(()) => Ok(DaemonLockGuard { file }),
-        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-            let detail = load_manifest()?.map_or_else(
-                || "daemon already running".to_string(),
-                |manifest| {
-                    format!(
-                        "daemon already running (pid {}, endpoint {})",
-                        manifest.pid, manifest.endpoint
-                    )
-                },
-            );
-            Err(CliErrorKind::workflow_io(detail).into())
-        }
-        Err(error) => {
-            Err(CliErrorKind::workflow_io(format!("lock daemon singleton: {error}")).into())
-        }
-    }
+    acquire_flock_exclusive(&lock_path(), "daemon").map_err(|_| {
+        let detail = load_manifest().ok().flatten().map_or_else(
+            || "daemon already running".to_string(),
+            |manifest| {
+                format!(
+                    "daemon already running (pid {}, endpoint {})",
+                    manifest.pid, manifest.endpoint
+                )
+            },
+        );
+        CliErrorKind::workflow_io(detail).into()
+    })
 }
 
 /// Probe whether the daemon singleton lock is held by another process.
@@ -286,23 +327,10 @@ pub fn daemon_lock_is_held() -> bool {
 ///
 /// Used by [`crate::daemon::discovery`] to scan candidate daemon roots
 /// without opening every possible manifest path.
+#[inline]
 #[must_use]
 pub fn daemon_lock_is_held_at(lock_path: &Path) -> bool {
-    let Ok(file) = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(lock_path)
-    else {
-        return false;
-    };
-    match file.try_lock_exclusive() {
-        Ok(()) => {
-            let _ = file.unlock();
-            false
-        }
-        Err(error) if error.kind() == io::ErrorKind::WouldBlock => true,
-        Err(_) => false,
-    }
+    flock_is_held_at(lock_path)
 }
 
 /// Load the persisted daemon manifest, if present.
@@ -940,5 +968,50 @@ mod tests {
         // Keep `holder` alive until here; dropping it releases the flock.
         drop(holder);
         assert!(!daemon_lock_is_held_at(&path));
+    }
+
+    // --- flock_is_held_at tests (regression guards for the thin-wrapper refactor) ---
+
+    #[test]
+    fn flock_is_held_at_returns_false_for_missing_file() {
+        let tmp = tempdir().expect("tempdir");
+        assert!(!flock_is_held_at(&tmp.path().join("no-such.lock")));
+    }
+
+    #[test]
+    fn flock_is_held_at_returns_false_for_unlocked_file() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("test.lock");
+        fs::write(&path, "").expect("create");
+        assert!(!flock_is_held_at(&path));
+    }
+
+    #[test]
+    fn flock_is_held_at_returns_true_while_another_holder_is_alive() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("test.lock");
+        let holder = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .expect("open");
+        holder.try_lock_exclusive().expect("flock");
+        assert!(flock_is_held_at(&path));
+        drop(holder);
+        assert!(!flock_is_held_at(&path));
+    }
+
+    #[test]
+    fn acquire_flock_exclusive_fails_with_label_in_error_when_already_held() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("test.lock");
+        let _guard = acquire_flock_exclusive(&path, "bridge").expect("first acquire");
+        let error = acquire_flock_exclusive(&path, "bridge").expect_err("second should fail");
+        assert!(
+            error.to_string().contains("bridge"),
+            "error should mention the label: {error}"
+        );
     }
 }
