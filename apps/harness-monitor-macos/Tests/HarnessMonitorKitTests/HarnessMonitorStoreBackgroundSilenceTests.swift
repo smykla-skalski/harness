@@ -10,7 +10,6 @@ struct HarnessMonitorStoreBackgroundSilenceTests {
   func streamReconnectAttemptIsSilent() async {
     let store = await makeBootstrappedStore()
     store.toast.dismissAll()
-    store.lastError = nil
 
     let error = HarnessMonitorAPIError.server(code: 502, message: "bad gateway")
     store.recordReconnectAttempt(
@@ -20,7 +19,7 @@ struct HarnessMonitorStoreBackgroundSilenceTests {
     )
 
     #expect(store.toast.activeFeedback.isEmpty)
-    #expect(store.lastError == nil)
+    #expect(store.currentFailureFeedbackMessage == nil)
   }
 
   @Test("Push fallback timeline failure does not push a feedback toast")
@@ -32,7 +31,6 @@ struct HarnessMonitorStoreBackgroundSilenceTests {
     )
     let store = await makeBootstrappedStore(client: client)
     store.toast.dismissAll()
-    store.lastError = nil
 
     await store.performPushFallbackTimelineRefresh(
       using: client,
@@ -40,7 +38,7 @@ struct HarnessMonitorStoreBackgroundSilenceTests {
     )
 
     #expect(store.toast.activeFeedback.isEmpty)
-    #expect(store.lastError == nil)
+    #expect(store.currentFailureFeedbackMessage == nil)
   }
 
   @Test("Session hydration failure does not push a feedback toast")
@@ -53,11 +51,10 @@ struct HarnessMonitorStoreBackgroundSilenceTests {
     )
     let store = await makeBootstrappedStore(client: client)
     store.toast.dismissAll()
-    store.lastError = nil
 
     await store.selectSession(unknownSessionID)
 
     #expect(store.toast.activeFeedback.isEmpty)
-    #expect(store.lastError == nil)
+    #expect(store.currentFailureFeedbackMessage == nil)
   }
 }

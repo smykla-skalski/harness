@@ -66,7 +66,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
       store.connectionState
         == .offline(DaemonControlError.daemonDidNotStart.localizedDescription)
     )
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
     #expect(store.isDaemonActionInFlight == false)
   }
 
@@ -394,12 +394,12 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     await store.selectSession(PreviewFixtures.summary.sessionId)
-    store.showLastAction("Refresh")
+    store.presentSuccessFeedback("Refresh")
 
     #expect(store.globalStreamTask != nil)
     #expect(store.sessionStreamTask != nil)
     #expect(store.connectionProbeTask != nil)
-    #expect(store.lastAction == "Refresh")
+    #expect(store.currentSuccessFeedbackMessage == "Refresh")
 
     await store.prepareForTermination()
 
@@ -407,7 +407,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.globalStreamTask == nil)
     #expect(store.sessionStreamTask == nil)
     #expect(store.connectionProbeTask == nil)
-    #expect(store.lastAction.isEmpty)
+    #expect(store.currentSuccessFeedbackMessage == nil)
     #expect(client.shutdownCallCount() == 1)
   }
 }

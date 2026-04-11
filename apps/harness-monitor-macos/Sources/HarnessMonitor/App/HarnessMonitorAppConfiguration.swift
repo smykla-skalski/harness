@@ -85,7 +85,10 @@ struct HarnessMonitorAppConfiguration {
     )
 
     if isUITesting {
-      store.configureUITestBehavior(lastActionDismissDelay: .seconds(1))
+      store.configureUITestBehavior(
+        successFeedbackDismissDelay: .seconds(1),
+        failureFeedbackDismissDelay: .seconds(1)
+      )
       applyUITestDefaults(
         environment: resolvedEnvironment,
         overrides: UITestOverrides(

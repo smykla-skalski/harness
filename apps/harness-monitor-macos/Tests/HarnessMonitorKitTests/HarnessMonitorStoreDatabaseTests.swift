@@ -176,7 +176,7 @@ struct HarnessMonitorStoreDatabaseTests {
 
     let success = await store.clearSessionCache()
     #expect(!success)
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
   }
 
   // MARK: - Clear user data
@@ -230,7 +230,7 @@ struct HarnessMonitorStoreDatabaseTests {
 
     let success = store.clearAllUserData()
     #expect(!success)
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
   }
 
   // MARK: - Clear all data

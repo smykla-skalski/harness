@@ -36,7 +36,7 @@ extension HarnessMonitorStore {
         )
       )
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return nil
     }
   }
@@ -57,7 +57,7 @@ extension HarnessMonitorStore {
       )
       return true
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }
@@ -78,7 +78,7 @@ extension HarnessMonitorStore {
       )
       return true
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }
@@ -104,7 +104,7 @@ extension HarnessMonitorStore {
       )
       return true
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }

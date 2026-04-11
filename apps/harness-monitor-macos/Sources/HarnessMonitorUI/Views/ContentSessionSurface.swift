@@ -7,7 +7,6 @@ struct SessionContentState: Equatable {
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
   let isExtensionsLoading: Bool
-  let lastAction: String
 }
 
 struct SessionContentContainer: View {
@@ -56,8 +55,7 @@ struct SessionContentContainer: View {
           detail: cockpitDetail,
           timeline: activeTimeline,
           isSessionReadOnly: state.isSessionReadOnly,
-          isExtensionsLoading: state.isExtensionsLoading,
-          lastAction: state.lastAction
+          isExtensionsLoading: state.isExtensionsLoading
         )
       case .loading(let summary):
         SessionCockpitLoadingSurface(summary: summary)
@@ -116,8 +114,7 @@ private struct SessionCockpitLoadingSurface: View {
       summary: nil,
       timeline: [],
       isSessionReadOnly: false,
-      isExtensionsLoading: false,
-      lastAction: ""
+      isExtensionsLoading: false
     )
   )
   .frame(width: 980, height: 720)
@@ -134,8 +131,7 @@ private struct SessionCockpitLoadingSurface: View {
       summary: store.selectedSessionSummary,
       timeline: store.timeline,
       isSessionReadOnly: false,
-      isExtensionsLoading: false,
-      lastAction: ""
+      isExtensionsLoading: false
     )
   )
   .frame(width: 980, height: 720)

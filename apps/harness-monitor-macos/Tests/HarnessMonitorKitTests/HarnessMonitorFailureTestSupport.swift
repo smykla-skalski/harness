@@ -249,6 +249,17 @@ func makeBootstrappedStore(
 }
 
 @MainActor
+extension HarnessMonitorStore {
+  var currentSuccessFeedbackMessage: String? {
+    toast.activeFeedback.first { $0.severity == .success }?.message
+  }
+
+  var currentFailureFeedbackMessage: String? {
+    toast.activeFeedback.first { $0.severity == .failure }?.message
+  }
+}
+
+@MainActor
 func didInvalidate<TrackedValue>(
   _ trackedValue: @escaping () -> TrackedValue,
   after mutation: () async -> Void

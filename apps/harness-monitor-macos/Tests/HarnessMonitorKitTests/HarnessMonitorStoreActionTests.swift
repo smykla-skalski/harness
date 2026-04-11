@@ -30,7 +30,7 @@ struct HarnessMonitorStoreActionTests {
         ]
     )
     #expect(store.selectedSession?.tasks.last?.title == "Ship the cockpit action surface")
-    #expect(store.lastAction == "Create task")
+    #expect(store.currentSuccessFeedbackMessage == "Create task")
   }
 
   @Test("Assign task sends request and refreshes the selected session")
@@ -60,7 +60,7 @@ struct HarnessMonitorStoreActionTests {
         $0.taskId == PreviewFixtures.tasks[0].taskId
       })?.assignedTo == PreviewFixtures.agents[1].agentId
     )
-    #expect(store.lastAction == "Assign task")
+    #expect(store.currentSuccessFeedbackMessage == "Assign task")
   }
 
   @Test("Drop task sends target request and refreshes the selected session")
@@ -91,7 +91,7 @@ struct HarnessMonitorStoreActionTests {
         $0.taskId == PreviewFixtures.tasks[0].taskId
       })?.assignedTo == PreviewFixtures.agents[1].agentId
     )
-    #expect(store.lastAction == "Drop task")
+    #expect(store.currentSuccessFeedbackMessage == "Drop task")
   }
 
   @Test("Update task queue policy sends request and refreshes the selected session")
@@ -121,7 +121,7 @@ struct HarnessMonitorStoreActionTests {
         $0.taskId == PreviewFixtures.tasks[0].taskId
       })?.queuePolicy == .reassignWhenFree
     )
-    #expect(store.lastAction == "Update task queue")
+    #expect(store.currentSuccessFeedbackMessage == "Update task queue")
   }
 
   @Test("Update task status sends request and refreshes the selected session")
@@ -153,7 +153,7 @@ struct HarnessMonitorStoreActionTests {
         $0.taskId == PreviewFixtures.tasks[0].taskId
       })?.status == .done
     )
-    #expect(store.lastAction == "Update task")
+    #expect(store.currentSuccessFeedbackMessage == "Update task")
   }
 
   @Test("Checkpoint task sends request and refreshes the selected session")
@@ -185,7 +185,7 @@ struct HarnessMonitorStoreActionTests {
         $0.taskId == PreviewFixtures.tasks[0].taskId
       })?.checkpointSummary?.progress == 88
     )
-    #expect(store.lastAction == "Save checkpoint")
+    #expect(store.currentSuccessFeedbackMessage == "Save checkpoint")
   }
 
   @Test("Change role sends request and refreshes the selected session")
@@ -215,7 +215,7 @@ struct HarnessMonitorStoreActionTests {
         $0.agentId == PreviewFixtures.agents[1].agentId
       })?.role == .reviewer
     )
-    #expect(store.lastAction == "Change role")
+    #expect(store.currentSuccessFeedbackMessage == "Change role")
   }
 
   @Test("Transfer leader sends request and refreshes the selected session")
@@ -241,7 +241,7 @@ struct HarnessMonitorStoreActionTests {
         ]
     )
     #expect(store.selectedSession?.session.leaderId == PreviewFixtures.agents[1].agentId)
-    #expect(store.lastAction == "Transfer leader")
+    #expect(store.currentSuccessFeedbackMessage == "Transfer leader")
   }
 
   @Test("Remove agent sends request and refreshes the selected session")
@@ -266,7 +266,7 @@ struct HarnessMonitorStoreActionTests {
         $0.agentId == PreviewFixtures.agents[1].agentId
       }) ?? true
     #expect(agentStillPresent == false)
-    #expect(store.lastAction == "Remove agent")
+    #expect(store.currentSuccessFeedbackMessage == "Remove agent")
   }
 
   @Test("Observe selected session tracks the last action")
@@ -285,7 +285,7 @@ struct HarnessMonitorStoreActionTests {
           )
         ]
     )
-    #expect(store.lastAction == "Observe session")
+    #expect(store.currentSuccessFeedbackMessage == "Observe session")
   }
 
   @Test("Mutation fallback refetches only the timeline")
@@ -337,7 +337,7 @@ struct HarnessMonitorStoreActionTests {
         ]
     )
     #expect(store.selectedSession?.session.status == .ended)
-    #expect(store.lastAction == "End session")
+    #expect(store.currentSuccessFeedbackMessage == "End session")
   }
 
   @Test("Offline session actions fail in read-only mode without sending daemon mutations")
@@ -354,7 +354,7 @@ struct HarnessMonitorStoreActionTests {
 
     #expect(created == false)
     #expect(client.recordedCalls().isEmpty)
-    #expect(store.lastError?.contains("read-only mode") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("read-only mode") == true)
 
     store.requestEndSelectedSessionConfirmation()
     #expect(store.pendingConfirmation == nil)

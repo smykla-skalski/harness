@@ -64,7 +64,7 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       clearHostBridgeIssue(for: "codex")
       applyCodexRun(measuredRun.value)
-      showLastAction("Codex run started")
+      presentSuccessFeedback("Codex run started")
       return true
     } catch let apiError as HarnessMonitorAPIError {
       if case .server(let code, _) = apiError, code == 501 || code == 503 {
@@ -185,7 +185,7 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       clearHostBridgeIssue(for: "codex")
       applyCodexRun(measuredRun.value)
-      showLastAction(actionName)
+      presentSuccessFeedback(actionName)
       return true
     } catch let apiError as HarnessMonitorAPIError {
       if case .server(let code, _) = apiError {
@@ -390,7 +390,7 @@ extension HarnessMonitorStore {
       clearHostBridgeIssue(for: "agent-tui")
       applyAgentTui(measuredTui.value)
       if let actionName {
-        showLastAction(actionName)
+        presentSuccessFeedback(actionName)
       }
       return true
     } catch {
@@ -520,7 +520,7 @@ extension HarnessMonitorStore {
       selectedAgentTuis = []
       selectedAgentTui = nil
     }
-    showLastAction(hostBridgeActionLabel(for: capability, enabled: enabled))
+    presentSuccessFeedback(hostBridgeActionLabel(for: capability, enabled: enabled))
   }
 
   private func applyStoppedHostBridgeState() {

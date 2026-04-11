@@ -18,7 +18,7 @@ struct HarnessMonitorStoreDropRejectionTests {
       target: .agent(agentId: "agent-1")
     )
 
-    #expect(store.lastError != nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
     #expect(store.isBusy == false)
   }
 
@@ -28,6 +28,6 @@ struct HarnessMonitorStoreDropRejectionTests {
 
     store.reportDropRejection("Cannot assign task: observer cannot take tasks.")
 
-    #expect(store.lastError == "Cannot assign task: observer cannot take tasks.")
+    #expect(store.currentFailureFeedbackMessage == "Cannot assign task: observer cannot take tasks.")
   }
 }

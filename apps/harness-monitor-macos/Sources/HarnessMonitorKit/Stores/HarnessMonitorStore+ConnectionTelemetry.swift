@@ -172,7 +172,6 @@ extension HarnessMonitorStore {
 
   func markConnectionOffline(_ message: String) {
     connectionState = .offline(message)
-    lastError = message
     stopConnectionProbe()
     connectionMetrics.connectedSince = nil
     connectionMetrics.latencyMs = nil

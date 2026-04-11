@@ -110,9 +110,11 @@ extension HarnessMonitorStore {
   @discardableResult
   public func clearSessionCache() async -> Bool {
     guard let cacheService, persistenceError == nil else {
-      lastError = persistenceFailureMessage(
-        action: "Session cache could not be cleared.",
-        underlyingError: nil
+      presentFailureFeedback(
+        persistenceFailureMessage(
+          action: "Session cache could not be cleared.",
+          underlyingError: nil
+        )
       )
       return false
     }
@@ -121,9 +123,9 @@ extension HarnessMonitorStore {
     if success {
       persistedSessionCount = 0
       lastPersistedSnapshotAt = nil
-      showLastAction("Session cache cleared")
+      presentSuccessFeedback("Session cache cleared")
     } else {
-      lastError = "Failed to clear session cache."
+      presentFailureFeedback("Failed to clear session cache.")
     }
     return success
   }
@@ -145,7 +147,7 @@ extension HarnessMonitorStore {
       try deleteAllRecords(ProjectFilterPreference.self, in: modelContext)
       try modelContext.save()
       bookmarkedSessionIds = []
-      showLastAction("User data cleared")
+      presentSuccessFeedback("User data cleared")
       return true
     } catch {
       modelContext.rollback()
@@ -162,7 +164,7 @@ extension HarnessMonitorStore {
     let cacheCleared = await clearSessionCache()
     let userDataCleared = clearAllUserData()
     if cacheCleared && userDataCleared {
-      showLastAction("All database data cleared")
+      presentSuccessFeedback("All database data cleared")
     }
     return cacheCleared && userDataCleared
   }

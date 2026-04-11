@@ -33,7 +33,7 @@ struct HarnessMonitorStoreCodexTests {
     )
     #expect(store.selectedCodexRun?.prompt == "Investigate the failing suite.")
     #expect(store.selectedCodexRun?.mode == .workspaceWrite)
-    #expect(store.lastAction == "Codex run started")
+    #expect(store.currentSuccessFeedbackMessage == "Codex run started")
   }
 
   @Test("Codex approval resolution clears pending approval")
@@ -100,7 +100,7 @@ struct HarnessMonitorStoreCodexTests {
 
     #expect(started == false)
     #expect(client.recordedCalls().isEmpty)
-    #expect(store.lastError?.contains("read-only mode") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("read-only mode") == true)
   }
 
   @Test("Start Codex run sets codexUnavailable when sandboxed daemon returns 503")
@@ -116,7 +116,7 @@ struct HarnessMonitorStoreCodexTests {
 
     #expect(started == false)
     #expect(store.codexUnavailable == true)
-    #expect(store.lastError?.contains("codex-unavailable") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 
   @Test("Start Codex run keeps host bridge ready when daemon is not sandboxed")
@@ -131,7 +131,7 @@ struct HarnessMonitorStoreCodexTests {
 
     #expect(started == false)
     #expect(store.codexUnavailable == false)
-    #expect(store.lastError?.contains("codex-unavailable") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 
   @Test("Successful Codex run clears codexUnavailable flag")
@@ -199,7 +199,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     )
     #expect(store.selectedAgentTui?.runtime == "copilot")
     #expect(store.selectedAgentTui?.size == AgentTuiSize(rows: 30, cols: 110))
-    #expect(store.lastAction == "Agent TUI started")
+    #expect(store.currentSuccessFeedbackMessage == "Agent TUI started")
   }
 
   @Test("Agent TUI input updates the selected screen snapshot")
@@ -257,7 +257,7 @@ struct HarnessMonitorStoreAgentTuiTests {
 
     #expect(started == false)
     #expect(client.recordedCalls().isEmpty)
-    #expect(store.lastError?.contains("read-only mode") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("read-only mode") == true)
   }
 
   @Test("Start agent TUI sets unavailable flag when sandboxed daemon returns 501")
@@ -279,7 +279,7 @@ struct HarnessMonitorStoreAgentTuiTests {
 
     #expect(started == false)
     #expect(store.agentTuiUnavailable == true)
-    #expect(store.lastError?.contains("bridge unavailable") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("bridge unavailable") == true)
   }
 
   @Test("Start agent TUI keeps host bridge ready when daemon is not sandboxed")
@@ -300,7 +300,7 @@ struct HarnessMonitorStoreAgentTuiTests {
 
     #expect(started == false)
     #expect(store.agentTuiUnavailable == false)
-    #expect(store.lastError?.contains("bridge unavailable") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("bridge unavailable") == true)
   }
 
   @Test("Successful agent TUI start clears unavailable flag")
@@ -498,7 +498,7 @@ struct HarnessMonitorStoreHostBridgeTests {
     #expect(store.hostBridgeCapabilityIssues["codex"] == nil)
     #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
     #expect(store.daemonStatus?.manifest?.hostBridge.capabilities["codex"]?.endpoint == "ws://127.0.0.1:4500")
-    #expect(store.lastAction == "Enabled Codex host bridge")
+    #expect(store.currentSuccessFeedbackMessage == "Enabled Codex host bridge")
   }
 
   @Test("Managed host bridge reconfigure recovers from legacy daemon 404 by restarting once")
@@ -559,7 +559,7 @@ struct HarnessMonitorStoreHostBridgeTests {
     )
     #expect(await daemon.recordedOperations() == ["warm-up", "stop", "register", "warm-up"])
     #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
-    #expect(store.lastAction == "Enabled Codex host bridge")
+    #expect(store.currentSuccessFeedbackMessage == "Enabled Codex host bridge")
   }
 
   @Test("Host bridge disable agent-tui requires force while sessions are active")
@@ -599,7 +599,7 @@ struct HarnessMonitorStoreHostBridgeTests {
       client.recordedCalls()
         == [.reconfigureHostBridge(enable: [], disable: ["agent-tui"], force: false)]
     )
-    #expect(store.lastError == nil)
+    #expect(store.currentFailureFeedbackMessage == nil)
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .ready)
   }
 
@@ -623,7 +623,7 @@ struct HarnessMonitorStoreHostBridgeTests {
     let result = await store.setHostBridgeCapability("agent-tui", enabled: true)
 
     #expect(result == .failed)
-    #expect(store.lastError?.contains("Restart `harness daemon dev` and try again.") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("Restart `harness daemon dev` and try again.") == true)
     #expect(await daemon.recordedOperations() == ["warm-up"])
   }
 
@@ -646,7 +646,7 @@ struct HarnessMonitorStoreHostBridgeTests {
     let result = await store.setHostBridgeCapability("agent-tui", enabled: true)
 
     #expect(result == .failed)
-    #expect(store.lastError == "The shared host bridge is not running. Start it and try again.")
+    #expect(store.currentFailureFeedbackMessage == "The shared host bridge is not running. Start it and try again.")
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .unavailable)
     #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
     #expect(store.daemonStatus?.manifest?.hostBridge.running == false)
@@ -706,7 +706,7 @@ struct HarnessMonitorStoreHostBridgeTests {
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
     #expect(store.selectedAgentTuis.isEmpty)
     #expect(store.selectedAgentTui == nil)
-    #expect(store.lastAction == "Disabled Agent TUI host bridge")
+    #expect(store.currentSuccessFeedbackMessage == "Disabled Agent TUI host bridge")
   }
 
 }

@@ -147,6 +147,6 @@ struct PersistenceUserDataIntegrationTests {
     #expect(store.recordSearch("cockpit") == false)
     #expect(store.clearSearchHistory() == false)
     #expect(store.isBookmarked(sessionId: "sess-bm") == false)
-    #expect(store.lastError == "Local persistence is unavailable.")
+    #expect(store.currentFailureFeedbackMessage == "Local persistence is unavailable.")
   }
 }

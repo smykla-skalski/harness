@@ -243,8 +243,7 @@ struct ContentDetailColumn: View {
         summary: contentSession.selectedSessionSummary,
         timeline: contentSessionDetail.timeline,
         isSessionReadOnly: contentSession.isSessionReadOnly,
-        isExtensionsLoading: contentSession.isExtensionsLoading,
-        lastAction: contentSession.lastAction
+        isExtensionsLoading: contentSession.isExtensionsLoading
       )
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)

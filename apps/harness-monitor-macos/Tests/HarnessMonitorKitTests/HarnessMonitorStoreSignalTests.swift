@@ -38,7 +38,7 @@ struct HarnessMonitorStoreSignalTests {
     #expect(
       store.selectedSession?.signals.last?.signal.payload.actionHint == "task:review"
     )
-    #expect(store.lastAction == "Send signal")
+    #expect(store.currentSuccessFeedbackMessage == "Send signal")
   }
 
   @Test("Cancel signal forwards to daemon and records rejection")
@@ -70,7 +70,7 @@ struct HarnessMonitorStoreSignalTests {
         )
       )
     )
-    #expect(store.lastAction == "Cancel signal")
+    #expect(store.currentSuccessFeedbackMessage == "Cancel signal")
     let cancelled = store.selectedSession?.signals.first { $0.signal.signalId == signalID }
     #expect(cancelled?.status == .rejected)
     #expect(cancelled?.acknowledgment?.result == .rejected)
@@ -97,7 +97,7 @@ struct HarnessMonitorStoreSignalTests {
       return false
     }
     #expect(sendCalls.count == 2)
-    #expect(store.lastAction == "Send signal")
+    #expect(store.currentSuccessFeedbackMessage == "Send signal")
   }
 
   private func selectedStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {

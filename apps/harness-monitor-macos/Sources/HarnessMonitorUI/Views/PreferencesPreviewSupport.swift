@@ -23,8 +23,7 @@ enum PreferencesPreviewSupport {
   static func makeStore(
     scenario: HarnessMonitorPreviewStoreFactory.Scenario = .cockpitLoaded,
     events: [DaemonAuditEvent] = Self.recentEvents,
-    lastAction: String = "Diagnostics refreshed from preview fixtures.",
-    lastError: String? = nil
+    previewFeedback: PreviewFeedback? = nil
   ) -> HarnessMonitorStore {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: scenario)
     let workspaceDiagnostics = makeWorkspaceDiagnostics(
@@ -46,9 +45,20 @@ enum PreferencesPreviewSupport {
       workspace: workspaceDiagnostics,
       recentEvents: events
     )
-    store.lastAction = lastAction
-    store.lastError = lastError
+    if let previewFeedback {
+      switch previewFeedback {
+      case .success(let message):
+        store.presentSuccessFeedback(message)
+      case .failure(let message):
+        store.presentFailureFeedback(message)
+      }
+    }
     return store
+  }
+
+  enum PreviewFeedback {
+    case success(String)
+    case failure(String)
   }
 
 }

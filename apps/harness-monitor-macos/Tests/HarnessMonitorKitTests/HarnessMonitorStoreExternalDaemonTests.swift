@@ -20,7 +20,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
     await store.bootstrap()
 
     #expect(store.connectionState == .online)
-    #expect(store.lastError == nil)
+    #expect(store.currentFailureFeedbackMessage == nil)
   }
 
   @Test("External bootstrap reports external offline error with manifest path")

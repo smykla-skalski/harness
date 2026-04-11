@@ -71,7 +71,7 @@ import SwiftUI
     section: .diagnostics,
     themeMode: $themeMode,
     store: PreferencesPreviewSupport.makeStore(
-      lastError: "Failed to read launchd state from the preview daemon."
+      previewFeedback: .failure("Failed to read launchd state from the preview daemon.")
     )
   )
 }
