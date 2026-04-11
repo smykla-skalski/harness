@@ -16,6 +16,7 @@ struct SidebarView: View {
   @State private var collapsedCheckoutKeys: Set<String> = []
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
+  @State private var pendingTapSelectionID: String?
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
@@ -41,6 +42,12 @@ struct SidebarView: View {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
+        if let pendingTapSelectionID {
+          self.pendingTapSelectionID = nil
+          if pendingTapSelectionID == newValue {
+            return
+          }
+        }
         if newValue == nil, sidebarUI.selectedSessionID != nil {
           return
         }
@@ -121,7 +128,10 @@ struct SidebarView: View {
     List(selection: sidebarSelection) {
       SidebarSessionListContent(
         renderState: sidebarListRenderState,
-        selectSession: { store.selectSessionFromList($0) },
+        selectSession: { sessionID in
+          pendingTapSelectionID = sessionID
+          store.selectSessionFromList(sessionID)
+        },
         toggleBookmark: { sessionID, projectID in
           store.toggleBookmark(sessionId: sessionID, projectId: projectID)
         },
