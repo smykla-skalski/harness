@@ -29,6 +29,32 @@ final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
       "Inline copy command button should exist inside the agent-tui recovery banner"
     )
   }
+
+  func testCodexInlineCopyButtonExists() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": "codex"]
+    )
+
+    openCodexFlowSheet(in: app)
+
+    let sheet = element(in: app, identifier: Accessibility.codexFlowSheet)
+    XCTAssertTrue(
+      sheet.waitForExistence(timeout: Self.actionTimeout),
+      "Codex Flow sheet should appear after tapping the dock button"
+    )
+
+    let banner = element(in: app, identifier: Accessibility.codexFlowRecoveryBanner)
+    XCTAssertTrue(
+      banner.waitForExistence(timeout: Self.actionTimeout),
+      "Codex recovery banner should appear when bridge excludes codex"
+    )
+
+    let copyButton = button(in: app, identifier: Accessibility.codexFlowCopyCommandButton)
+    XCTAssertTrue(
+      copyButton.waitForExistence(timeout: Self.actionTimeout),
+      "Inline copy command button should exist inside the codex recovery banner"
+    )
+  }
 }
 
 extension CodexFlowBannerUITests {
@@ -44,18 +70,30 @@ extension CodexFlowBannerUITests {
   }
 
   fileprivate func openAgentTuiSheet(in app: XCUIApplication) {
+    tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
+  }
+
+  fileprivate func openCodexFlowSheet(in app: XCUIApplication) {
+    tapDockButton(in: app, identifier: Accessibility.codexFlowButton, label: "codex-flow")
+  }
+
+  private func tapDockButton(
+    in app: XCUIApplication,
+    identifier: String,
+    label: String
+  ) {
     app.activate()
-    let trigger = button(in: app, identifier: Accessibility.agentTuiButton)
+    let trigger = button(in: app, identifier: identifier)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { trigger.exists && !trigger.frame.isEmpty },
-      "Agent TUI action button should be visible in cockpit preview"
+      "\(label) dock button should be visible in cockpit preview"
     )
     if trigger.isHittable {
       trigger.tap()
     } else if let coordinate = centerCoordinate(in: app, for: trigger) {
       coordinate.tap()
     } else {
-      XCTFail("Cannot resolve coordinate for agent-tui button")
+      XCTFail("Cannot resolve coordinate for \(label) dock button")
     }
   }
 }
