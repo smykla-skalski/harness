@@ -3,29 +3,28 @@ use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use harness::daemon::codex_bridge::{CodexBridgeState, CodexBridgeStatusReport};
+use harness::daemon::bridge::{BridgeState, BridgeStatusReport};
 use tempfile::tempdir;
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[test]
-fn codex_bridge_status_reports_not_running_when_clean() {
+fn bridge_status_reports_not_running_when_clean() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["codex-bridge", "status"]);
+    let output = run_bridge(&tmp, &["bridge", "status"]);
     assert!(output.status.success(), "status: {}", output_text(&output));
 
-    let report: CodexBridgeStatusReport =
-        serde_json::from_slice(&output.stdout).expect("parse status");
+    let report: BridgeStatusReport = serde_json::from_slice(&output.stdout).expect("parse status");
     assert!(!report.running);
-    assert!(report.endpoint.is_none());
-    assert!(report.pid.is_none());
+    assert!(report.socket_path.is_none());
+    assert!(report.capabilities.is_empty());
 }
 
 #[test]
-fn codex_bridge_status_plain_prints_not_running() {
+fn bridge_status_plain_prints_not_running() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["codex-bridge", "status", "--plain"]);
+    let output = run_bridge(&tmp, &["bridge", "status", "--plain"]);
     assert!(output.status.success(), "status: {}", output_text(&output));
 
     let text = String::from_utf8_lossy(&output.stdout);
@@ -33,9 +32,9 @@ fn codex_bridge_status_plain_prints_not_running() {
 }
 
 #[test]
-fn codex_bridge_stop_is_idempotent_when_not_running() {
+fn bridge_stop_is_idempotent_when_not_running() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["codex-bridge", "stop"]);
+    let output = run_bridge(&tmp, &["bridge", "stop"]);
     assert!(output.status.success(), "stop: {}", output_text(&output));
 
     let text = String::from_utf8_lossy(&output.stdout);
@@ -43,10 +42,10 @@ fn codex_bridge_stop_is_idempotent_when_not_running() {
 }
 
 #[test]
-fn codex_bridge_start_refuses_when_sandboxed() {
+fn bridge_start_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let output = Command::new(harness_binary())
-        .args(["codex-bridge", "start"])
+        .args(["bridge", "start", "--capability", "codex"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
@@ -62,12 +61,20 @@ fn codex_bridge_start_refuses_when_sandboxed() {
 }
 
 #[test]
-fn codex_bridge_start_with_mock_codex_publishes_state() {
+fn bridge_start_with_mock_codex_publishes_codex_capability() {
     let tmp = tempdir().expect("tempdir");
     let mock_codex = create_mock_codex(tmp.path());
 
     let mut bridge = Command::new(harness_binary())
-        .args(["codex-bridge", "start", "--port", "14500", "--codex-path"])
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            "14500",
+            "--codex-path",
+        ])
         .arg(&mock_codex)
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
@@ -80,30 +87,34 @@ fn codex_bridge_start_with_mock_codex_publishes_state() {
         .expect("spawn bridge");
 
     let state = wait_for_bridge_state(tmp.path());
-    assert_eq!(state.port, 14500);
-    assert!(state.endpoint.contains("14500"));
-    assert!(state.pid > 0);
+    let codex = state.capabilities.get("codex").expect("codex capability");
+    assert_eq!(codex.transport, "websocket");
+    assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14500"));
+    assert_eq!(
+        codex.metadata.get("port").map(String::as_str),
+        Some("14500")
+    );
 
-    let status_output = run_bridge(&tmp, &["codex-bridge", "status"]);
+    let status_output = run_bridge(&tmp, &["bridge", "status"]);
     assert!(
         status_output.status.success(),
         "status: {}",
         output_text(&status_output)
     );
-    let report: CodexBridgeStatusReport =
-        serde_json::from_slice(&status_output.stdout).expect("parse status");
+    let report: BridgeStatusReport = serde_json::from_slice(&status_output.stdout).expect("parse");
     assert!(report.running);
-    assert_eq!(report.port, Some(14500));
+    assert!(report.capabilities.contains_key("codex"));
+    assert!(!report.capabilities.contains_key("agent-tui"));
 
-    let stop_output = run_bridge(&tmp, &["codex-bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
         output_text(&stop_output)
     );
 
-    let endpoint_path = tmp.path().join("harness/daemon/codex-endpoint.json");
-    assert!(!endpoint_path.exists(), "state file should be cleaned up");
+    let state_path = tmp.path().join("harness/daemon/bridge.json");
+    assert!(!state_path.exists(), "state file should be cleaned up");
 
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
@@ -119,10 +130,63 @@ fn codex_bridge_start_with_mock_codex_publishes_state() {
 }
 
 #[test]
-fn codex_bridge_install_launch_agent_refuses_when_sandboxed() {
+fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
+    let tmp = tempdir().expect("tempdir");
+    let mock_codex = create_mock_codex(tmp.path());
+
+    let mut bridge = Command::new(harness_binary())
+        .args(["bridge", "start", "--codex-port", "14501", "--codex-path"])
+        .arg(&mock_codex)
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn bridge");
+
+    let state = wait_for_bridge_state(tmp.path());
+    assert!(state.capabilities.contains_key("codex"));
+    assert!(state.capabilities.contains_key("agent-tui"));
+
+    let status_output = run_bridge(&tmp, &["bridge", "status"]);
+    assert!(
+        status_output.status.success(),
+        "status: {}",
+        output_text(&status_output)
+    );
+    let report: BridgeStatusReport = serde_json::from_slice(&status_output.stdout).expect("parse");
+    assert!(report.running);
+    assert!(report.capabilities.contains_key("codex"));
+    assert!(report.capabilities.contains_key("agent-tui"));
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "stop: {}",
+        output_text(&stop_output)
+    );
+
+    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
+    loop {
+        if bridge.try_wait().expect("poll bridge").is_some() {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "bridge process did not exit after stop"
+        );
+        thread::sleep(BRIDGE_POLL_INTERVAL);
+    }
+}
+
+#[test]
+fn bridge_install_launch_agent_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let output = Command::new(harness_binary())
-        .args(["codex-bridge", "install-launch-agent"])
+        .args(["bridge", "install-launch-agent", "--capability", "codex"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
@@ -138,10 +202,10 @@ fn codex_bridge_install_launch_agent_refuses_when_sandboxed() {
 }
 
 #[test]
-fn codex_bridge_remove_launch_agent_is_idempotent() {
+fn bridge_remove_launch_agent_is_idempotent() {
     let tmp = tempdir().expect("tempdir");
     let output = Command::new(harness_binary())
-        .args(["codex-bridge", "remove-launch-agent"])
+        .args(["bridge", "remove-launch-agent"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HOME", tmp.path())
@@ -175,19 +239,19 @@ fn create_mock_codex(base: &Path) -> PathBuf {
     script
 }
 
-fn wait_for_bridge_state(data_home: &Path) -> CodexBridgeState {
-    let endpoint_path = data_home.join("harness/daemon/codex-endpoint.json");
+fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
+    let state_path = data_home.join("harness/daemon/bridge.json");
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
-        if let Ok(data) = std::fs::read_to_string(&endpoint_path) {
-            if let Ok(state) = serde_json::from_str::<CodexBridgeState>(&data) {
-                return state;
-            }
+        if let Ok(data) = std::fs::read_to_string(&state_path)
+            && let Ok(state) = serde_json::from_str::<BridgeState>(&data)
+        {
+            return state;
         }
         assert!(
             Instant::now() < deadline,
             "bridge state file did not appear at {}",
-            endpoint_path.display()
+            state_path.display()
         );
         thread::sleep(BRIDGE_POLL_INTERVAL);
     }

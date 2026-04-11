@@ -20,7 +20,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::{project_context_dir, utc_now};
 
-use super::agent_tui_bridge::{AgentTuiBridgeClient, AgentTuiBridgeStartSpec};
+use super::bridge::{AgentTuiBridgeStartSpec, BridgeCapability, BridgeClient};
 use super::db::DaemonDb;
 use super::protocol::{SessionJoinRequest, StreamEvent};
 
@@ -556,7 +556,7 @@ impl AgentTuiManagerHandle {
         let size = request.size()?;
         let tui_id = format!("agent-tui-{}", Uuid::new_v4());
         let marker_capability = format!("agent-tui:{tui_id}");
-        let bridge = AgentTuiBridgeClient::from_state_file()?;
+        let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
         let db = self.db()?;
         let db_guard = lock_db(&db)?;
         let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
@@ -580,7 +580,7 @@ impl AgentTuiManagerHandle {
         drop(db_guard);
 
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
-        let snapshot = bridge.start(&AgentTuiBridgeStartSpec {
+        let snapshot = bridge.agent_tui_start(&AgentTuiBridgeStartSpec {
             session_id: session_id.to_string(),
             agent_id,
             tui_id,
@@ -611,7 +611,8 @@ impl AgentTuiManagerHandle {
     pub fn get(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.load_snapshot(tui_id)?;
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let snapshot = AgentTuiBridgeClient::from_state_file()?.get(tui_id)?;
+            let snapshot =
+                BridgeClient::for_capability(BridgeCapability::AgentTui)?.agent_tui_get(tui_id)?;
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
@@ -628,7 +629,8 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiInputRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = AgentTuiBridgeClient::from_state_file()?.input(tui_id, request)?;
+            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_input(tui_id, request)?;
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
@@ -647,7 +649,8 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiResizeRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = AgentTuiBridgeClient::from_state_file()?.resize(tui_id, request)?;
+            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_resize(tui_id, request)?;
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
@@ -663,7 +666,8 @@ impl AgentTuiManagerHandle {
     pub fn stop(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.load_snapshot(tui_id)?;
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let stopped = AgentTuiBridgeClient::from_state_file()?.stop(tui_id)?;
+            let stopped =
+                BridgeClient::for_capability(BridgeCapability::AgentTui)?.agent_tui_stop(tui_id)?;
             self.save_and_broadcast("agent_tui_stopped", &stopped)?;
             return Ok(stopped);
         }
