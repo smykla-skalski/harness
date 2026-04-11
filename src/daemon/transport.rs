@@ -983,6 +983,8 @@ mod tests {
             token_path: "/tmp/auth-token".to_string(),
             sandboxed: false,
             host_bridge: state::HostBridgeManifest::default(),
+            revision: 0,
+            updated_at: String::new(),
         }
     }
 
