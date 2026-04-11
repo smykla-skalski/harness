@@ -86,6 +86,7 @@ public final class HarnessMonitorStore {
   public let contentUI: ContentUISlice
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
+  public let toast: ToastSlice
 
   public var lastAction = "" {
     didSet {
@@ -97,6 +98,12 @@ public final class HarnessMonitorStore {
     didSet {
       guard oldValue != lastError else { return }
       scheduleUISync([.inspector])
+      // Temporary bridge for the toast migration: route legacy writes through
+      // the new feedback channel so the inspector and toast layer stay in sync
+      // until commit 3 deletes `lastError` entirely.
+      if let lastError, !lastError.isEmpty {
+        toast.presentFailure(lastError)
+      }
     }
   }
   public var persistenceError: String? {
@@ -234,6 +241,7 @@ public final class HarnessMonitorStore {
     self.contentUI = ContentUISlice()
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
+    self.toast = ToastSlice()
     self.daemonController = daemonController
     self.daemonOwnership = daemonOwnership
     self.fileViewer = fileViewer
@@ -557,6 +565,8 @@ public final class HarnessMonitorStore {
       return
     }
 
+    toast.presentSuccess(action)
+
     let delay = lastActionDismissDelay
     lastActionDismissTask = Task { @MainActor [weak self] in
       try? await Task.sleep(for: delay)
@@ -572,6 +582,20 @@ public final class HarnessMonitorStore {
     lastActionDismissTask?.cancel()
     lastActionDismissTask = nil
     lastAction = ""
+  }
+
+  @discardableResult
+  public func presentSuccessFeedback(_ message: String) -> UUID {
+    toast.presentSuccess(message)
+  }
+
+  @discardableResult
+  public func presentFailureFeedback(_ message: String) -> UUID {
+    toast.presentFailure(message)
+  }
+
+  public func dismissFeedback(id: UUID) {
+    toast.dismiss(id: id)
   }
   func stopGlobalStream() {
     globalStreamTask?.cancel()
