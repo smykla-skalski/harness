@@ -223,8 +223,16 @@ struct SessionAgentSummaryCard: View {
       }
     }
     .contentShape(.rect)
-    .dropDestination(for: TaskDragPayload.self, action: handleTaskDrop) { targeted in
-      isDropTargeted = targeted
+    .background {
+      TaskDropDestinationBridge(
+        canAccept: taskDropAction.feedback.isActionable,
+        onTargetingChange: { targeted in
+          isDropTargeted = targeted
+        },
+        onDrop: { payloads in
+          handleTaskDrop(payloads, .zero)
+        }
+      )
     }
     .animation(.easeInOut(duration: 0.12), value: isDropTargeted)
     .animation(.easeInOut(duration: 0.2), value: showPulseBorder)
