@@ -69,14 +69,14 @@ ALLOCATIONS_SCENARIOS=(
 usage() {
   cat <<'EOF'
 Usage:
-  run-instruments-audit.sh --label <name> [--compare-to <run-dir-or-summary.json>] [--scenarios all|comma,list] [--discard-traces]
+  run-instruments-audit.sh --label <name> [--compare-to <run-dir-or-summary.json>] [--scenarios all|comma,list] [--keep-traces]
 
 Options:
   --label <name>         Required run label.
   --compare-to <path>    Optional baseline run directory or summary.json.
   --scenarios <value>    Scenario selection. Default: all
-  --keep-traces          Keep raw .trace bundles. Default behavior.
-  --discard-traces       Delete raw .trace bundles after export and summary generation.
+  --keep-traces          Keep raw .trace bundles after metrics extraction. Default: discard raw traces.
+  --discard-traces       Explicitly discard raw .trace bundles after metrics extraction.
 EOF
 }
 
@@ -314,6 +314,22 @@ release_audit_lock() {
   rmdir "$AUDIT_LOCK_DIR" 2>/dev/null || true
 }
 
+prune_run_artifacts() {
+  local keep_traces="$1"
+
+  /bin/rm -rf \
+    "$run_dir/exports" \
+    "$run_dir/launch-host" \
+    "$run_dir/app-data" \
+    "$run_dir/xctrace-tmp"
+
+  if [[ "$keep_traces" -eq 0 ]]; then
+    /bin/rm -rf "$traces_root"
+  fi
+
+  find "$run_dir" -depth -type d -empty -delete 2>/dev/null || true
+}
+
 acquire_audit_lock() {
   local run_id="$1"
   local run_label="$2"
@@ -495,7 +511,7 @@ assert_audit_source_unchanged() {
 label=""
 compare_to=""
 scenario_selection="all"
-keep_traces=1
+keep_traces=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -975,6 +991,8 @@ for trace in Path(sys.argv[1]).rglob("*.trace"):
     shutil.rmtree(trace, ignore_errors=True)
 PY
 fi
+
+prune_run_artifacts "$keep_traces"
 
 printf '\nArtifacts written to %s\n' "$run_dir"
 printf 'Summary: %s\n' "$run_dir/summary.json"
