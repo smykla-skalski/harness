@@ -2,7 +2,7 @@
 
 This directory contains 10 research documents covering every aspect of building apps with great UX for macOS and iOS. Total: ~4,900 lines of actionable, measurable rules.
 
-The intent is to distill these into enforceable rules in `.claude/rules/` for our macOS and future iOS apps.
+These docs are the rationale layer. The enforceable rules distilled from them live in skills under `.claude/skills/swiftui-design-rules`, `swiftui-api-patterns`, `swiftui-performance-macos`, and `swiftui-platform-rules`.
 
 ## Documents
 
