@@ -87,41 +87,35 @@ public final class HarnessMonitorStore {
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
-
   public var lastAction = "" {
     didSet {
       guard oldValue != lastAction else { return }
-      scheduleUISync([.content, .inspector])
+      scheduleUISync([.contentShell, .contentToolbar, .contentSession, .inspector])
     }
   }
   public var lastError: String? {
     didSet {
       guard oldValue != lastError else { return }
       scheduleUISync([.inspector])
-      // Temporary bridge for the toast migration: route legacy writes through
-      // the new feedback channel so the inspector and toast layer stay in sync
-      // until commit 3 deletes `lastError` entirely.
-      if let lastError, !lastError.isEmpty {
-        toast.presentFailure(lastError)
-      }
     }
   }
+
   public var persistenceError: String? {
     didSet {
       guard oldValue != persistenceError else { return }
-      scheduleUISync([.content, .sidebar, .inspector])
+      scheduleUISync([.contentChrome])
     }
   }
   public var presentedSheet: PresentedSheet? {
     didSet {
       guard oldValue != presentedSheet else { return }
-      scheduleUISync([.content])
+      scheduleUISync([.contentShell])
     }
   }
   public var pendingConfirmation: PendingConfirmation? {
     didSet {
       guard oldValue != pendingConfirmation else { return }
-      scheduleUISync([.content])
+      scheduleUISync([.contentShell])
     }
   }
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
@@ -129,25 +123,21 @@ public final class HarnessMonitorStore {
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
       guard oldValue != selectedCodexRuns else { return }
-      scheduleUISync([.content])
     }
   }
   public var selectedCodexRun: CodexRunSnapshot? {
     didSet {
       guard oldValue != selectedCodexRun else { return }
-      scheduleUISync([.content])
     }
   }
   public var selectedAgentTuis: [AgentTuiSnapshot] = [] {
     didSet {
       guard oldValue != selectedAgentTuis else { return }
-      scheduleUISync([.content])
     }
   }
   public var selectedAgentTui: AgentTuiSnapshot? {
     didSet {
       guard oldValue != selectedAgentTui else { return }
-      scheduleUISync([.content])
     }
   }
   public var showConfirmation: Bool {
@@ -158,23 +148,22 @@ public final class HarnessMonitorStore {
     didSet {
       guard oldValue != sleepPreventionEnabled else { return }
       sleepAssertion.update(hasActiveSessions: sleepPreventionEnabled)
-      scheduleUISync([.content])
+      scheduleUISync([.contentToolbar])
     }
   }
   public var navigationBackStack: [String?] = [] {
     didSet {
       guard oldValue != navigationBackStack else { return }
-      scheduleUISync([.content])
+      scheduleUISync([.contentToolbar])
     }
   }
   public var navigationForwardStack: [String?] = [] {
     didSet {
       guard oldValue != navigationForwardStack else { return }
-      scheduleUISync([.content])
+      scheduleUISync([.contentToolbar])
     }
   }
   var connectionProbeInterval: Duration = .seconds(10)
-  var lastActionDismissDelay: Duration = .seconds(4)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
 
   let daemonController: any DaemonControlling
@@ -204,10 +193,17 @@ public final class HarnessMonitorStore {
   private var isBootstrapping = false
   private var isReconnecting = false
   private var reconnectRequestedDuringReconnect = false
-  private var lastActionDismissTask: Task<Void, Never>?
   private let sleepAssertion = SleepAssertion()
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
+  @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
+  public var lastActionDismissDelay: Duration {
+    get { toast.successDismissDelay }
+    set {
+      toast.successDismissDelay = newValue
+      toast.failureDismissDelay = newValue
+    }
+  }
 
   public convenience init(
     daemonController: any DaemonControlling,
@@ -281,7 +277,6 @@ public final class HarnessMonitorStore {
 
   public func bootstrap() async {
     connectionState = .connecting
-    lastError = nil
 
     isBootstrapping = true
     defer { isBootstrapping = false }
@@ -312,9 +307,7 @@ public final class HarnessMonitorStore {
     }
 
     do {
-      let client = try await daemonController.awaitManifestWarmUp(
-        timeout: bootstrapWarmUpTimeout
-      )
+      let client = try await awaitManagedDaemonWarmUpWithRecovery()
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
@@ -355,6 +348,52 @@ public final class HarnessMonitorStore {
 
   public func focusSidebarSearch() {
     sidebarUI.searchFocusRequest += 1
+  }
+
+  private func awaitManagedDaemonWarmUpWithRecovery() async throws
+    -> any HarnessMonitorClientProtocol
+  {
+    do {
+      return try await daemonController.awaitManifestWarmUp(
+        timeout: bootstrapWarmUpTimeout
+      )
+    } catch {
+      guard shouldRefreshManagedLaunchAgent(after: error) else {
+        throw error
+      }
+      appendConnectionEvent(
+        kind: .reconnecting,
+        detail: "Managed daemon did not become healthy; refreshing the bundled launch agent"
+      )
+      _ = try await daemonController.removeLaunchAgent()
+      let registrationState = try await daemonController.registerLaunchAgent()
+      switch registrationState {
+      case .enabled:
+        break
+      case .requiresApproval:
+        throw DaemonControlError.commandFailed(
+          "Launch agent needs approval in System Settings > General > Login Items."
+        )
+      case .notRegistered, .notFound:
+        throw DaemonControlError.commandFailed("Launch agent registration did not complete.")
+      }
+      return try await daemonController.awaitManifestWarmUp(
+        timeout: bootstrapWarmUpTimeout
+      )
+    }
+  }
+
+  private func shouldRefreshManagedLaunchAgent(after error: any Error) -> Bool {
+    guard let daemonError = error as? DaemonControlError else {
+      return false
+    }
+    switch daemonError {
+    case .daemonDidNotStart, .daemonOffline, .manifestMissing, .manifestUnreadable:
+      return true
+    case .harnessBinaryNotFound, .externalDaemonOffline, .externalDaemonManifestStale,
+      .commandFailed:
+      return false
+    }
   }
 
   private func applyLaunchAgentOfflineState(reason: String) async {
@@ -410,9 +449,7 @@ public final class HarnessMonitorStore {
     }
 
     do {
-      let client = try await daemonController.awaitManifestWarmUp(
-        timeout: bootstrapWarmUpTimeout
-      )
+      let client = try await awaitManagedDaemonWarmUpWithRecovery()
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
@@ -434,7 +471,7 @@ public final class HarnessMonitorStore {
       await restorePersistedSessionState()
       showLastAction("Stop daemon")
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -447,7 +484,7 @@ public final class HarnessMonitorStore {
       await refreshDaemonStatus()
       showLastAction("Install launch agent")
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -460,7 +497,7 @@ public final class HarnessMonitorStore {
       await refreshDaemonStatus()
       showLastAction("Remove launch agent")
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -468,7 +505,7 @@ public final class HarnessMonitorStore {
     do {
       daemonStatus = try await daemonController.daemonStatus()
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -540,7 +577,7 @@ public final class HarnessMonitorStore {
       daemonStatus = DaemonStatusReport(diagnosticsReport: measuredDiagnostics.value)
       recordRequestSuccess()
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -553,50 +590,52 @@ public final class HarnessMonitorStore {
   }
 
   public func configureUITestBehavior(lastActionDismissDelay: Duration) {
-    self.lastActionDismissDelay = lastActionDismissDelay
+    toast.successDismissDelay = lastActionDismissDelay
+    toast.failureDismissDelay = lastActionDismissDelay
   }
 
   public func showLastAction(_ action: String) {
-    lastActionDismissTask?.cancel()
     lastAction = action
-
     guard !action.isEmpty else {
-      lastActionDismissTask = nil
+      dismissFeedback(severity: .success)
       return
     }
-
+    dismissFeedback(severity: .success)
     toast.presentSuccess(action)
-
-    let delay = lastActionDismissDelay
-    lastActionDismissTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: delay)
-      guard let self, !Task.isCancelled, self.lastAction == action else {
-        return
-      }
-      self.lastAction = ""
-      self.lastActionDismissTask = nil
-    }
   }
 
   public func clearLastAction() {
-    lastActionDismissTask?.cancel()
-    lastActionDismissTask = nil
     lastAction = ""
+    dismissFeedback(severity: .success)
   }
 
   @discardableResult
   public func presentSuccessFeedback(_ message: String) -> UUID {
-    toast.presentSuccess(message)
+    lastAction = message
+    return toast.presentSuccess(message)
   }
 
   @discardableResult
   public func presentFailureFeedback(_ message: String) -> UUID {
-    toast.presentFailure(message)
+    lastError = message
+    return toast.activeFeedback.first { feedback in
+      feedback.severity == .failure && feedback.message == message
+    }?.id ?? UUID()
   }
 
   public func dismissFeedback(id: UUID) {
     toast.dismiss(id: id)
   }
+
+  private func dismissFeedback(severity: ActionFeedback.Severity) {
+    let matchingIDs = toast.activeFeedback.compactMap { feedback in
+      feedback.severity == severity ? feedback.id : nil
+    }
+    for id in matchingIDs {
+      toast.dismiss(id: id)
+    }
+  }
+
   func stopGlobalStream() {
     globalStreamTask?.cancel()
     globalStreamTask = nil

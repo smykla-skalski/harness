@@ -342,6 +342,107 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(store.recentSessions.first == updated)
   }
 
+  @Test("Projection-affecting summary updates only resync the toolbar when no session is selected")
+  func projectionSummaryUpdateOnlyResyncsToolbarWhenSelectionIsEmpty() {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    store.debugResetUISyncCounts()
+
+    guard let active = store.sessionIndex.sessionSummary(for: "active") else {
+      Issue.record("Missing active fixture session")
+      return
+    }
+
+    let updated = SessionSummary(
+      projectId: active.projectId,
+      projectName: active.projectName,
+      projectDir: active.projectDir,
+      contextRoot: active.contextRoot,
+      checkoutId: active.checkoutId,
+      checkoutRoot: active.checkoutRoot,
+      isWorktree: active.isWorktree,
+      worktreeName: active.worktreeName,
+      sessionId: active.sessionId,
+      title: active.title,
+      context: active.context,
+      status: active.status,
+      createdAt: active.createdAt,
+      updatedAt: active.updatedAt,
+      lastActivityAt: active.lastActivityAt,
+      leaderId: active.leaderId,
+      observeId: active.observeId,
+      pendingLeaderTransfer: active.pendingLeaderTransfer,
+      metrics: SessionMetrics(
+        agentCount: active.metrics.agentCount,
+        activeAgentCount: active.metrics.activeAgentCount,
+        openTaskCount: 4,
+        inProgressTaskCount: active.metrics.inProgressTaskCount,
+        blockedTaskCount: active.metrics.blockedTaskCount,
+        completedTaskCount: active.metrics.completedTaskCount
+      )
+    )
+
+    let didChange = store.sessionIndex.applySessionSummary(updated)
+
+    #expect(didChange)
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
+    #expect(store.debugUISyncCount(for: .contentDashboard) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
+  @Test("Summary-only updates skip all content resync when the selected session is elsewhere")
+  func summaryOnlyUpdateSkipsContentResyncForUnselectedSession() {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    store.debugResetUISyncCounts()
+
+    guard let paused = store.sessionIndex.sessionSummary(for: "paused") else {
+      Issue.record("Missing paused fixture session")
+      return
+    }
+
+    let updated = SessionSummary(
+      projectId: paused.projectId,
+      projectName: paused.projectName,
+      projectDir: paused.projectDir,
+      contextRoot: paused.contextRoot,
+      checkoutId: paused.checkoutId,
+      checkoutRoot: paused.checkoutRoot,
+      isWorktree: paused.isWorktree,
+      worktreeName: paused.worktreeName,
+      sessionId: paused.sessionId,
+      title: paused.title,
+      context: paused.context,
+      status: paused.status,
+      createdAt: paused.createdAt,
+      updatedAt: paused.updatedAt,
+      lastActivityAt: paused.lastActivityAt,
+      leaderId: paused.leaderId,
+      observeId: paused.observeId,
+      pendingLeaderTransfer: PendingLeaderTransfer(
+        requestedBy: "tester",
+        currentLeaderId: paused.leaderId ?? "leader",
+        newLeaderId: "leader-next",
+        requestedAt: "2026-04-11T10:00:00Z",
+        reason: "handoff"
+      ),
+      metrics: paused.metrics
+    )
+
+    let didChange = store.sessionIndex.applySessionSummary(updated)
+
+    #expect(didChange)
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 0)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
+    #expect(store.debugUISyncCount(for: .contentDashboard) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
   @Test("Recent sessions stay sorted by activity outside the visible filter")
   func recentSessionsStaySortedByActivityOutsideVisibleFilter() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
