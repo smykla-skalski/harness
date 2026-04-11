@@ -163,6 +163,20 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange)
   }
 
+  @Test("Priming session selection does not resync content chrome before detail loads")
+  func primingSessionSelectionSkipsContentChromeResync() async {
+    let store = await makeBootstrappedStore()
+    store.debugResetUISyncCounts()
+
+    store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+
+    #expect(store.debugUISyncCount(for: .contentShell) == 1)
+    #expect(store.debugUISyncCount(for: .contentSession) == 1)
+    #expect(store.debugUISyncCount(for: .sidebar) == 1)
+    #expect(store.debugUISyncCount(for: .inspector) == 1)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+  }
+
   @Test("Inspector primary content ignores toast feedback churn")
   func inspectorPrimaryContentIgnoresToastFeedbackChurn() async {
     let store = await makeBootstrappedStore()
