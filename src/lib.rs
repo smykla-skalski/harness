@@ -69,7 +69,10 @@ mod logging_tests {
 
     #[test]
     fn default_log_filter_uses_trace() {
-        assert_eq!(default_log_filter().to_string(), DEFAULT_LOG_FILTER_DIRECTIVE);
+        assert_eq!(
+            default_log_filter().to_string(),
+            DEFAULT_LOG_FILTER_DIRECTIVE
+        );
     }
 
     #[test]
