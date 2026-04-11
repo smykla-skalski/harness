@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -26,10 +27,30 @@ use super::protocol::{SessionJoinRequest, StreamEvent};
 
 const DEFAULT_ROWS: u16 = 30;
 const DEFAULT_COLS: u16 = 120;
+const LIVE_REFRESH_INTERVAL: Duration = Duration::from_millis(100);
 #[cfg(test)]
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 
 type Shared<T> = Arc<Mutex<T>>;
+
+#[derive(Clone)]
+struct ActiveAgentTui {
+    process: Option<Arc<AgentTuiProcess>>,
+    stop_flag: Arc<AtomicBool>,
+}
+
+impl ActiveAgentTui {
+    fn new(process: Option<Arc<AgentTuiProcess>>) -> Self {
+        Self {
+            process,
+            stop_flag: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn stop(&self) {
+        self.stop_flag.store(true, Ordering::Relaxed);
+    }
+}
 
 /// Terminal dimensions used when spawning or resizing an agent TUI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -451,7 +472,7 @@ pub struct AgentTuiManagerHandle {
 struct AgentTuiManagerState {
     sender: broadcast::Sender<StreamEvent>,
     db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    active: Mutex<BTreeMap<String, Arc<AgentTuiProcess>>>,
+    active: Mutex<BTreeMap<String, ActiveAgentTui>>,
     sandboxed: bool,
 }
 
@@ -541,9 +562,15 @@ impl AgentTuiManagerHandle {
         }
 
         let process = Arc::new(process);
-        self.active()?.insert(tui_id.clone(), Arc::clone(&process));
         let snapshot = snapshot_from_process(&snapshot_context, &process, AgentTuiStatus::Running)?;
-        self.save_and_broadcast("agent_tui_started", &snapshot)?;
+        let active = ActiveAgentTui::new(Some(Arc::clone(&process)));
+        let stop_flag = Arc::clone(&active.stop_flag);
+        self.active()?.insert(tui_id.clone(), active);
+        if let Err(error) = self.save_and_broadcast("agent_tui_started", &snapshot) {
+            let _ = self.remove_active(&tui_id)?;
+            return Err(error);
+        }
+        self.spawn_live_refresh(tui_id, stop_flag);
         Ok(snapshot)
     }
 
@@ -590,7 +617,14 @@ impl AgentTuiManagerHandle {
             size,
             prompt: request.prompt.clone(),
         })?;
-        self.save_and_broadcast("agent_tui_started", &snapshot)?;
+        let active = ActiveAgentTui::new(None);
+        let stop_flag = Arc::clone(&active.stop_flag);
+        self.active()?.insert(snapshot.tui_id.clone(), active);
+        if let Err(error) = self.save_and_broadcast("agent_tui_started", &snapshot) {
+            let _ = self.remove_active(&snapshot.tui_id)?;
+            return Err(error);
+        }
+        self.spawn_live_refresh(snapshot.tui_id.clone(), stop_flag);
         Ok(snapshot)
     }
 
@@ -609,14 +643,10 @@ impl AgentTuiManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when DB access fails or the TUI is missing.
     pub fn get(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
-        let snapshot = self.load_snapshot(tui_id)?;
-        if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let snapshot =
-                BridgeClient::for_capability(BridgeCapability::AgentTui)?.agent_tui_get(tui_id)?;
-            self.save_and_broadcast("agent_tui_updated", &snapshot)?;
-            return Ok(snapshot);
-        }
-        self.refresh_snapshot(snapshot)
+        let previous = self.load_snapshot(tui_id)?;
+        let refreshed = self.refresh_live_snapshot(previous.clone())?;
+        self.persist_refreshed_snapshot(&previous, &refreshed)?;
+        Ok(refreshed)
     }
 
     /// Send keyboard-like input into an active TUI.
@@ -668,6 +698,7 @@ impl AgentTuiManagerHandle {
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
             let stopped =
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?.agent_tui_stop(tui_id)?;
+            let _ = self.remove_active(tui_id)?;
             self.save_and_broadcast("agent_tui_stopped", &stopped)?;
             return Ok(stopped);
         }
@@ -707,18 +738,26 @@ impl AgentTuiManagerHandle {
             .ok_or_else(|| CliErrorKind::workflow_io("daemon database is not ready").into())
     }
 
-    fn active(&self) -> Result<MutexGuard<'_, BTreeMap<String, Arc<AgentTuiProcess>>>, CliError> {
+    fn active(&self) -> Result<MutexGuard<'_, BTreeMap<String, ActiveAgentTui>>, CliError> {
         lock(&self.state.active, "agent TUI active process map")
     }
 
     fn active_process(&self, tui_id: &str) -> Result<Arc<AgentTuiProcess>, CliError> {
-        self.active()?.get(tui_id).cloned().ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' is not active")).into()
-        })
+        self.active()?
+            .get(tui_id)
+            .and_then(|active| active.process.clone())
+            .ok_or_else(|| {
+                CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' is not active"))
+                    .into()
+            })
     }
 
     fn remove_active(&self, tui_id: &str) -> Result<Option<Arc<AgentTuiProcess>>, CliError> {
-        Ok(self.active()?.remove(tui_id))
+        let removed = self.active()?.remove(tui_id);
+        if let Some(active) = &removed {
+            active.stop();
+        }
+        Ok(removed.and_then(|active| active.process))
     }
 
     fn load_snapshot(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
@@ -728,11 +767,26 @@ impl AgentTuiManagerHandle {
         })
     }
 
-    fn refresh_snapshot(
+    fn refresh_live_snapshot(
+        &self,
+        snapshot: AgentTuiSnapshot,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
+            return BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_get(&snapshot.tui_id);
+        }
+        self.refresh_local_snapshot(snapshot)
+    }
+
+    fn refresh_local_snapshot(
         &self,
         mut snapshot: AgentTuiSnapshot,
     ) -> Result<AgentTuiSnapshot, CliError> {
-        let Some(process) = self.active()?.get(&snapshot.tui_id).cloned() else {
+        let Some(process) = self
+            .active()?
+            .get(&snapshot.tui_id)
+            .and_then(|active| active.process.clone())
+        else {
             return Ok(snapshot);
         };
 
@@ -747,8 +801,75 @@ impl AgentTuiManagerHandle {
         snapshot.size = snapshot.screen.size();
         snapshot.updated_at = utc_now();
         write_transcript(Path::new(&snapshot.transcript_path), &process.transcript()?)?;
-        self.save_and_broadcast("agent_tui_updated", &snapshot)?;
         Ok(snapshot)
+    }
+
+    fn persist_refreshed_snapshot(
+        &self,
+        previous: &AgentTuiSnapshot,
+        refreshed: &AgentTuiSnapshot,
+    ) -> Result<(), CliError> {
+        if !Self::snapshot_changed(previous, refreshed) {
+            return Ok(());
+        }
+        self.save_and_broadcast("agent_tui_updated", refreshed)
+    }
+
+    fn snapshot_changed(previous: &AgentTuiSnapshot, refreshed: &AgentTuiSnapshot) -> bool {
+        previous.status != refreshed.status
+            || previous.size != refreshed.size
+            || previous.screen != refreshed.screen
+            || previous.exit_code != refreshed.exit_code
+            || previous.signal != refreshed.signal
+            || previous.error != refreshed.error
+    }
+
+    fn spawn_live_refresh(&self, tui_id: String, stop_flag: Arc<AtomicBool>) {
+        let manager = self.clone();
+        let _ = thread::spawn(move || {
+            manager.run_live_refresh_loop(&tui_id, &stop_flag);
+        });
+    }
+
+    fn run_live_refresh_loop(&self, tui_id: &str, stop_flag: &AtomicBool) {
+        while Self::wait_for_live_refresh_tick(stop_flag) && self.handle_live_refresh_step(tui_id) {
+        }
+
+        let _ = self.remove_active(tui_id);
+    }
+
+    fn wait_for_live_refresh_tick(stop_flag: &AtomicBool) -> bool {
+        if stop_flag.load(Ordering::Relaxed) {
+            return false;
+        }
+        thread::sleep(LIVE_REFRESH_INTERVAL);
+        !stop_flag.load(Ordering::Relaxed)
+    }
+
+    fn handle_live_refresh_step(&self, tui_id: &str) -> bool {
+        self.live_refresh_step(tui_id).unwrap_or_else(|error| {
+            Self::warn_live_refresh_failure(tui_id, &error);
+            false
+        })
+    }
+
+    fn live_refresh_step(&self, tui_id: &str) -> Result<bool, CliError> {
+        let previous = self.load_snapshot(tui_id)?;
+        if previous.status != AgentTuiStatus::Running {
+            return Ok(false);
+        }
+
+        let refreshed = self.refresh_live_snapshot(previous.clone())?;
+        self.persist_refreshed_snapshot(&previous, &refreshed)?;
+        Ok(refreshed.status == AgentTuiStatus::Running)
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion in a leaf logging helper"
+    )]
+    fn warn_live_refresh_failure(tui_id: &str, error: &CliError) {
+        tracing::warn!(tui_id = %tui_id, %error, "agent TUI live refresh failed");
     }
 
     fn save_and_broadcast(
@@ -1199,9 +1320,9 @@ mod tests {
 
     use super::{
         AgentTuiBackend, AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiLaunchProfile,
-        AgentTuiManagerHandle, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSpawnSpec,
-        AgentTuiStartRequest, AgentTuiStatus, DEFAULT_WAIT_TIMEOUT, PortablePtyAgentTuiBackend,
-        TerminalScreenParser,
+        AgentTuiManagerHandle, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,
+        AgentTuiSpawnSpec, AgentTuiStartRequest, AgentTuiStatus, DEFAULT_WAIT_TIMEOUT,
+        PortablePtyAgentTuiBackend, TerminalScreenParser,
     };
 
     #[test]
@@ -1525,6 +1646,89 @@ mod tests {
         assert_eq!(stopped.status, AgentTuiStatus::Stopped);
         let transcript = fs_err::read(&stopped.transcript_path).expect("read transcript file");
         assert!(String::from_utf8_lossy(&transcript).contains("hello from manager"));
+    }
+
+    #[test]
+    fn manager_publishes_terminal_output_without_manual_refresh() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-live-refresh".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-live-refresh".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "live refresh tui test",
+            "managed tui",
+            "sess-tui-live-refresh",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, mut receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = manager
+            .start(
+                "sess-tui-live-refresh",
+                &AgentTuiStartRequest {
+                    runtime: "claude".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec![],
+                    name: Some("Delayed output".into()),
+                    prompt: None,
+                    project_dir: None,
+                    argv: vec![
+                        "sh".into(),
+                        "-c".into(),
+                        "sleep 0.2; printf 'agent-ready\\n'; sleep 0.2".into(),
+                    ],
+                    rows: 5,
+                    cols: 40,
+                },
+            )
+            .expect("start manager TUI");
+
+        let started_event = receiver.try_recv().expect("started event");
+        assert_eq!(started_event.event, "agent_tui_started");
+
+        let mut updated_snapshot = None;
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            while let Ok(event) = receiver.try_recv() {
+                if event.event != "agent_tui_updated" {
+                    continue;
+                }
+                let event_snapshot: AgentTuiSnapshot =
+                    serde_json::from_value(event.payload).expect("decode snapshot");
+                if event_snapshot.tui_id == snapshot.tui_id
+                    && event_snapshot.screen.text.contains("agent-ready")
+                {
+                    updated_snapshot = Some(event_snapshot);
+                    return true;
+                }
+            }
+            false
+        });
+
+        let updated_snapshot = updated_snapshot.expect("updated snapshot");
+        assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
+        assert!(updated_snapshot.screen.text.contains("agent-ready"));
     }
 
     #[test]
