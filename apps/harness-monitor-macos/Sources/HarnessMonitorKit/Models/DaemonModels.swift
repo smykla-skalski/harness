@@ -79,6 +79,14 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
   public let tokenPath: String
   public let sandboxed: Bool
   public let hostBridge: HostBridgeManifest
+  /// Monotonic counter bumped by the daemon on every manifest write. The
+  /// Swift `ManifestWatcher` uses it to detect in-place updates (e.g.
+  /// `hostBridge` transitions) so it can refresh the store without a full
+  /// reconnect. Legacy manifests without the field decode as 0.
+  public let revision: UInt64
+  /// UTC timestamp of the most recent daemon-side manifest write. Legacy
+  /// manifests without the field decode as nil.
+  public let updatedAt: String?
 
   public init(
     version: String,
@@ -87,7 +95,9 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     startedAt: String,
     tokenPath: String,
     sandboxed: Bool = false,
-    hostBridge: HostBridgeManifest = .init()
+    hostBridge: HostBridgeManifest = .init(),
+    revision: UInt64 = 0,
+    updatedAt: String? = nil
   ) {
     self.version = version
     self.pid = pid
@@ -96,11 +106,14 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     self.tokenPath = tokenPath
     self.sandboxed = sandboxed
     self.hostBridge = hostBridge
+    self.revision = revision
+    self.updatedAt = updatedAt
   }
 
   enum CodingKeys: String, CodingKey {
     case version, pid, endpoint, startedAt, tokenPath
     case sandboxed, hostBridge, codexTransport, codexEndpoint
+    case revision, updatedAt
   }
 
   public init(from decoder: Decoder) throws {
@@ -109,6 +122,8 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     let hostBridge =
       try container.decodeIfPresent(HostBridgeManifest.self, forKey: .hostBridge)
       ?? Self.legacyHostBridge(from: container)
+    let revision = try container.decodeIfPresent(UInt64.self, forKey: .revision) ?? 0
+    let updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
     self.init(
       version: try container.decode(String.self, forKey: .version),
       pid: try container.decode(Int.self, forKey: .pid),
@@ -116,7 +131,9 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
       startedAt: try container.decode(String.self, forKey: .startedAt),
       tokenPath: try container.decode(String.self, forKey: .tokenPath),
       sandboxed: sandboxed,
-      hostBridge: hostBridge
+      hostBridge: hostBridge,
+      revision: revision,
+      updatedAt: updatedAt
     )
   }
 
@@ -150,6 +167,8 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     try container.encode(tokenPath, forKey: .tokenPath)
     try container.encode(sandboxed, forKey: .sandboxed)
     try container.encode(hostBridge, forKey: .hostBridge)
+    try container.encode(revision, forKey: .revision)
+    try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
   }
 }
 
@@ -162,7 +181,9 @@ extension DaemonManifest {
       startedAt: startedAt,
       tokenPath: tokenPath,
       sandboxed: sandboxed,
-      hostBridge: hostBridge
+      hostBridge: hostBridge,
+      revision: revision,
+      updatedAt: updatedAt
     )
   }
 }
