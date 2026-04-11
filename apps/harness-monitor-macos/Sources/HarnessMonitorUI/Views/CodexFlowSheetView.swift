@@ -315,20 +315,14 @@ struct CodexFlowSheetView: View {
       Text(codexBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(codexBridgeCommand)
-        .scaledFont(.body.monospaced())
-        .textSelection(.enabled)
-        .padding(HarnessMonitorTheme.spacingSM)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-      Button("Copy command") {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(codexBridgeCommand, forType: .string)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      CopyableCommandBox(
+        command: codexBridgeCommand,
+        accessibilityIdentifier: HarnessMonitorAccessibility.codexFlowCopyCommandButton
+      )
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowRecoveryBanner)
   }
 
