@@ -44,6 +44,15 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .idle)
   }
 
+  @Test("Bootstrap adopts trace as the default daemon log level")
+  func bootstrapAdoptsTraceAsDefaultDaemonLogLevel() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    await store.bootstrap()
+
+    #expect(store.daemonLogLevel == HarnessMonitorLogger.defaultDaemonLogLevel)
+  }
+
   @Test("Start daemon failure sets offline state and error")
   func startDaemonFailureSetsOfflineStateAndError() async {
     let daemon = FailingDaemonController(

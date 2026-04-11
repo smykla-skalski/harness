@@ -1,7 +1,6 @@
 use std::io;
 use std::process::ExitCode;
 
-use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::time::ChronoUtc;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::reload;
@@ -10,8 +9,7 @@ use harness::app::cli;
 use harness::errors;
 
 fn main() -> ExitCode {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("harness=info"));
+    let filter = harness::resolved_log_filter_from_env();
     let (filter_layer, handle) = reload::Layer::new(filter);
     harness::set_log_filter_handle(handle);
 
