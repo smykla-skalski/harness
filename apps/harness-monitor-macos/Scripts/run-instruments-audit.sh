@@ -37,6 +37,7 @@ BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
 AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
 AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
+SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-1}"
 STAGED_HOST_APP_PATH=""
 STAGED_HOST_BINARY_PATH=""
 STAGED_HOST_BUNDLE_ID=""
@@ -130,6 +131,11 @@ duration_for() {
 }
 
 build_release_targets() {
+  local daemon_bundle_env=()
+  if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
+    daemon_bundle_env=("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1")
+  fi
+
   purge_release_products
 
   xcodebuild \
@@ -156,6 +162,7 @@ build_release_targets() {
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     build \
+    "${daemon_bundle_env[@]}" \
     "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
     "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
     "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT=$workspace_fingerprint" \
@@ -169,6 +176,7 @@ build_release_targets() {
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     build \
+    "${daemon_bundle_env[@]}" \
     "HARNESS_MONITOR_BUILD_GIT_COMMIT=$git_commit" \
     "HARNESS_MONITOR_BUILD_GIT_DIRTY=$git_dirty" \
     "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT=$workspace_fingerprint" \
@@ -608,6 +616,9 @@ cleanup_host_processes
 if [[ "$SKIP_BUILD" == "1" ]]; then
   printf 'Skipping Release build step because HARNESS_MONITOR_AUDIT_SKIP_BUILD=1.\n'
 else
+  if [[ "$SKIP_DAEMON_BUNDLE" == "1" ]]; then
+    printf 'Skipping daemon helper rebundle during audit builds. Set HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE=0 to force the full bundle step.\n'
+  fi
   build_release_targets
 fi
 assert_audit_source_unchanged "Release build"
