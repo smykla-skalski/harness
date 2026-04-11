@@ -73,14 +73,27 @@ extension HarnessMonitorUITestCase {
         app.activate()
       }
 
-      let target = button(in: app, title: title)
-      if waitForElement(target, timeout: Self.fastPollInterval) {
-        if target.isHittable {
-          target.tap()
+      let buttonTarget = button(in: app, title: title)
+      if waitForElement(buttonTarget, timeout: Self.fastPollInterval) {
+        if buttonTarget.isHittable {
+          buttonTarget.tap()
           return
         }
 
-        if let coordinate = centerCoordinate(in: app, for: target) {
+        if let coordinate = centerCoordinate(in: app, for: buttonTarget) {
+          coordinate.tap()
+          return
+        }
+      }
+
+      let presentedTarget = element(in: app, title: title)
+      if waitForElement(presentedTarget, timeout: Self.fastPollInterval) {
+        if presentedTarget.isHittable {
+          presentedTarget.tap()
+          return
+        }
+
+        if let coordinate = centerCoordinate(in: app, for: presentedTarget) {
           coordinate.tap()
           return
         }
