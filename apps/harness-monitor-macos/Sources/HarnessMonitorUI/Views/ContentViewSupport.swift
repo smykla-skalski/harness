@@ -201,7 +201,8 @@ struct ContentDetailColumn: View {
         ContentDetailChrome(
           persistenceError: contentChrome.persistenceError,
           sessionDataAvailability: contentChrome.sessionDataAvailability,
-          sessionStatus: contentChrome.sessionStatus
+          sessionStatus: contentChrome.sessionStatus,
+          toast: store.toast
         ) {
           sessionContent
         }

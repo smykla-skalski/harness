@@ -87,16 +87,28 @@ public final class HarnessMonitorStore {
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
-  public var lastAction = "" {
-    didSet {
-      guard oldValue != lastAction else { return }
-      scheduleUISync([.contentShell, .contentToolbar, .contentSession, .inspector])
+  public var lastAction: String {
+    get {
+      toast.activeFeedback.first { $0.severity == .success }?.message ?? ""
+    }
+    set {
+      if newValue.isEmpty {
+        toast.dismissAllMatching(severity: .success)
+      } else {
+        toast.presentSuccess(newValue)
+      }
     }
   }
   public var lastError: String? {
-    didSet {
-      guard oldValue != lastError else { return }
-      scheduleUISync([.inspector])
+    get {
+      toast.activeFeedback.first { $0.severity == .failure }?.message
+    }
+    set {
+      if let newValue, !newValue.isEmpty {
+        toast.presentFailure(newValue)
+      } else {
+        toast.dismissAllMatching(severity: .failure)
+      }
     }
   }
 
@@ -618,9 +630,7 @@ public final class HarnessMonitorStore {
   @discardableResult
   public func presentFailureFeedback(_ message: String) -> UUID {
     lastError = message
-    return toast.activeFeedback.first { feedback in
-      feedback.severity == .failure && feedback.message == message
-    }?.id ?? UUID()
+    return toast.presentFailure(message)
   }
 
   public func dismissFeedback(id: UUID) {

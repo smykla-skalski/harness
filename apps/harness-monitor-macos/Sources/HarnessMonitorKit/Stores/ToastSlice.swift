@@ -14,7 +14,11 @@ public final class LiveContinuousClockSource: ContinuousClockSource, @unchecked 
 @MainActor
 @Observable
 public final class ToastSlice {
-  public private(set) var activeFeedback: [ActionFeedback] = []
+  public private(set) var activeFeedback: [ActionFeedback] = [] {
+    didSet {
+      onChanged?()
+    }
+  }
   public var maxVisible: Int = 3
   public var successDismissDelay: Duration = .seconds(4)
   public var failureDismissDelay: Duration = .seconds(8)
@@ -25,6 +29,7 @@ public final class ToastSlice {
   @ObservationIgnored private var pauseObservationTask: Task<Void, Never>?
   @ObservationIgnored private var resumeObservationTask: Task<Void, Never>?
   @ObservationIgnored private let clock: any ContinuousClockSource
+  @ObservationIgnored public var onChanged: (() -> Void)?
 
   public init(clock: any ContinuousClockSource = LiveContinuousClockSource()) {
     self.clock = clock
@@ -102,6 +107,13 @@ public final class ToastSlice {
     dismissTasks.removeAll()
     targetInstants.removeAll()
     activeFeedback.removeAll()
+  }
+
+  public func dismissAllMatching(severity: ActionFeedback.Severity) {
+    let matching = activeFeedback.filter { $0.severity == severity }
+    for feedback in matching {
+      dismiss(id: feedback.id)
+    }
   }
 
   public func pauseTimers() {
