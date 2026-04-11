@@ -26,7 +26,7 @@ extension HarnessMonitorUITestCase {
     case .runningForeground, .runningBackground:
       app.terminate()
       XCTAssertTrue(
-        waitUntil(timeout: Self.actionTimeout) {
+        waitUntil(timeout: Self.fastActionTimeout) {
           app.state == .notRunning
         }
       )
@@ -38,13 +38,13 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
     while Date.now < deadline {
       app.activate()
 
       let button = button(in: app, identifier: identifier)
-      if button.exists || button.waitForExistence(timeout: 0.1) {
+      if button.exists || button.waitForExistence(timeout: Self.fastPollInterval) {
         if button.isHittable {
           button.tap()
           return
@@ -56,20 +56,20 @@ extension HarnessMonitorUITestCase {
         }
       }
 
-      RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     }
 
     XCTFail("Failed to tap button \(identifier)")
   }
 
   func tapButton(in app: XCUIApplication, title: String) {
-    let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
     while Date.now < deadline {
       app.activate()
 
       let target = button(in: app, title: title)
-      if target.exists || target.waitForExistence(timeout: 0.1) {
+      if target.exists || target.waitForExistence(timeout: Self.fastPollInterval) {
         if target.isHittable {
           target.tap()
           return
@@ -81,20 +81,20 @@ extension HarnessMonitorUITestCase {
         }
       }
 
-      RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     }
 
     XCTFail("Failed to tap button titled \(title)")
   }
 
   func tapElement(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
     while Date.now < deadline {
       app.activate()
 
       let target = element(in: app, identifier: identifier)
-      if target.exists || target.waitForExistence(timeout: 0.1) {
+      if target.exists || target.waitForExistence(timeout: Self.fastPollInterval) {
         if target.isHittable {
           target.tap()
           return
@@ -106,7 +106,7 @@ extension HarnessMonitorUITestCase {
         }
       }
 
-      RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     }
 
     XCTFail("Failed to tap element \(identifier)")
@@ -146,7 +146,7 @@ extension HarnessMonitorUITestCase {
 
   func waitUntil(
     timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout,
-    pollInterval: TimeInterval = 0.1,
+    pollInterval: TimeInterval = HarnessMonitorUITestCase.fastPollInterval,
     condition: @escaping () -> Bool
   ) -> Bool {
     if condition() {
@@ -172,7 +172,7 @@ extension HarnessMonitorUITestCase {
     for element: XCUIElement
   ) -> XCUICoordinate? {
     let window = window(in: app, containing: element)
-    guard window.waitForExistence(timeout: 0.5) else {
+    guard window.waitForExistence(timeout: 0.2) else {
       return nil
     }
     let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))

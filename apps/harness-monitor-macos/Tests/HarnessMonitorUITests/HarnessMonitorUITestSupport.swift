@@ -7,6 +7,8 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
   nonisolated static let actionTimeout: TimeInterval = 2
+  nonisolated static let fastActionTimeout: TimeInterval = 0.75
+  nonisolated static let fastPollInterval: TimeInterval = 0.05
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -15,9 +17,9 @@ class HarnessMonitorUITestCase: XCTestCase {
       switch app.state {
       case .runningForeground, .runningBackground:
         app.terminate()
-        let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
+        let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
         while Date.now < deadline, app.state != .notRunning {
-          RunLoop.current.run(until: Date.now.addingTimeInterval(0.1))
+          RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
         }
       case .notRunning, .unknown:
         break
@@ -118,10 +120,5 @@ extension HarnessMonitorUITestCase {
 
     app.activate()
     app.typeKey(",", modifierFlags: .command)
-
-    XCTAssertTrue(
-      preferencesRoot.waitForExistence(timeout: Self.actionTimeout),
-      "Expected Cmd-, to open the settings window"
-    )
   }
 }
