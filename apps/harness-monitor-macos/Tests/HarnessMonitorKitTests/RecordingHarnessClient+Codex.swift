@@ -129,6 +129,9 @@ extension RecordingHarnessClient {
   }
 
   func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    if let tui = dequeueConfiguredAgentTuiReadSnapshot(id: tuiID) {
+      return tui
+    }
     if let tui = configuredAgentTui(id: tuiID) {
       return tui
     }
@@ -173,6 +176,9 @@ extension RecordingHarnessClient {
     calls.append(.sendAgentTuiInput(tuiID: tuiID, input: request.input))
     guard let tui = configuredAgentTui(id: tuiID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    if let updated = dequeueConfiguredAgentTuiInputResponse(id: tuiID) {
+      return updated
     }
     let updatedScreenText: String =
       switch request.input {
