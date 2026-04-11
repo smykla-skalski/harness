@@ -596,20 +596,26 @@ public final class HarnessMonitorStore {
   }
 
   public func hostBridgeCapabilityState(for capability: String) -> HostBridgeCapabilityState {
-    if let issue = hostBridgeCapabilityIssues[capability] {
-      switch issue {
-      case .unavailable:
-        return .unavailable
-      case .excluded:
-        return .excluded
-      }
-    }
-
     guard daemonStatus?.manifest?.sandboxed == true else {
       return .ready
     }
 
     let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    if let issue = hostBridgeCapabilityIssues[capability] {
+      switch issue {
+      case .unavailable:
+        return .unavailable
+      case .excluded:
+        guard hostBridge.running else {
+          return .unavailable
+        }
+        if let capabilityState = hostBridge.capabilities[capability] {
+          return capabilityState.healthy ? .ready : .unavailable
+        }
+        return .excluded
+      }
+    }
+
     guard hostBridge.running else {
       return .unavailable
     }
@@ -657,6 +663,12 @@ public final class HarnessMonitorStore {
       return
     }
     hostBridgeCapabilityIssues.removeValue(forKey: capability)
+  }
+
+  func clearTransientHostBridgeIssues() {
+    hostBridgeCapabilityIssues = hostBridgeCapabilityIssues.filter {
+      forcedHostBridgeCapabilities.contains($0.key)
+    }
   }
 
   public func markHostBridgeIssue(for capability: String, statusCode: Int) {

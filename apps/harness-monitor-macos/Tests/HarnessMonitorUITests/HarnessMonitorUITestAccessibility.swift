@@ -28,6 +28,7 @@ enum HarnessMonitorUITestAccessibility {
   static let previewProjectHeader = "harness.sidebar.project-header.project-6ccf8d0a"
   static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"
   static let previewCheckoutHeader = "harness.sidebar.worktree-header.project-6ccf8d0a"
+  static let previewCheckoutHeaderFrame = "harness.sidebar.worktree-header.project-6ccf8d0a.frame"
   static let previewSessionRow = "harness.sidebar.session.sess-harness"
   static let previewSessionRowFrame = "harness.sidebar.session.sess-harness.frame"
   static let previewSessionRowSelectionFrame =
@@ -191,11 +192,14 @@ enum HarnessMonitorUITestAccessibility {
   static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
   static let agentTuiButton = "harness.session.agent-tui"
   static let agentTuiSheet = "harness.sheet.agent-tui"
+  static let agentTuiStartButton = "harness.sheet.agent-tui.start"
   static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
+  static let agentTuiEnableBridgeButton = "harness.sheet.agent-tui.enable-bridge"
   static let agentTuiCopyCommandButton = "harness.sheet.agent-tui.copy-command"
   static let codexFlowButton = "harness.session.codex-flow"
   static let codexFlowSheet = "harness.sheet.codex-flow"
   static let codexFlowRecoveryBanner = "harness.sheet.codex-flow.recovery-banner"
+  static let codexFlowEnableBridgeButton = "harness.sheet.codex-flow.enable-bridge"
   static let codexFlowCopyCommandButton = "harness.sheet.codex-flow.copy-command"
 
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {

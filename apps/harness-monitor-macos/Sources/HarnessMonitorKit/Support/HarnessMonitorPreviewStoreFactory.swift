@@ -1,6 +1,30 @@
 import Foundation
 import SwiftData
 
+public enum PreviewHostBridgeReconfigureBehavior: String, Sendable {
+  case unsupported
+  case apply
+  case bridgeStopped = "bridge-stopped"
+  case missingRoute = "missing-route"
+}
+
+public struct PreviewHostBridgeOverride: Sendable {
+  public let bridgeStatus: BridgeStatusReport
+  public let reconfigureBehavior: PreviewHostBridgeReconfigureBehavior
+
+  public init(
+    bridgeStatus: BridgeStatusReport,
+    reconfigureBehavior: PreviewHostBridgeReconfigureBehavior
+  ) {
+    self.bridgeStatus = bridgeStatus
+    self.reconfigureBehavior = reconfigureBehavior
+  }
+
+  public var hostBridgeManifest: HostBridgeManifest {
+    bridgeStatus.hostBridgeManifest
+  }
+}
+
 @MainActor
 public enum HarnessMonitorPreviewStoreFactory {
   public static let previewContainer: ModelContainer = {
@@ -23,20 +47,27 @@ public enum HarnessMonitorPreviewStoreFactory {
 
   public static func makeStore(
     for scenario: Scenario,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     voiceCapture: any VoiceCaptureProviding = PreviewVoiceCaptureService()
   ) -> HarnessMonitorStore {
     let configuration = configuration(for: scenario)
     let store = HarnessMonitorStore(
-      daemonController: PreviewDaemonController(mode: configuration.mode),
+      daemonController: PreviewDaemonController(
+        mode: configuration.mode,
+        hostBridgeOverride: hostBridgeOverride
+      ),
       voiceCapture: voiceCapture,
       modelContainer: modelContainer,
       persistenceError: persistenceError
     )
     store.connectionState = configuration.connectionState
     store.health = configuration.fixtures.health
-    store.daemonStatus = configuration.statusReport
+    store.daemonStatus = makeStatusReport(
+      fixtures: configuration.fixtures,
+      hostBridgeOverride: hostBridgeOverride
+    )
     store.connectionMetrics = configuration.connectionMetrics
     store.connectionEvents = configuration.connectionEvents
     store.sessionIndex.replaceSnapshot(
@@ -241,13 +272,17 @@ extension HarnessMonitorPreviewStoreFactory {
     mode: PreviewDaemonController.Mode,
     fixtures: PreviewHarnessClient.Fixtures,
     metrics: ConnectionMetrics,
-    selection: PreviewSelectionState
+    selection: PreviewSelectionState,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil
   ) -> PreviewStoreConfiguration {
     PreviewStoreConfiguration(
       mode: mode,
       fixtures: fixtures,
       connectionState: .online,
-      statusReport: makeStatusReport(fixtures: fixtures),
+      statusReport: makeStatusReport(
+        fixtures: fixtures,
+        hostBridgeOverride: hostBridgeOverride
+      ),
       connectionMetrics: metrics,
       connectionEvents: makeConnectionEvents(using: metrics),
       bookmarkedSessionIDs: selection.bookmarkedSessionIDs,
@@ -265,13 +300,17 @@ extension HarnessMonitorPreviewStoreFactory {
     mode: PreviewDaemonController.Mode,
     fixtures: PreviewHarnessClient.Fixtures,
     selection: PreviewSelectionState,
-    persistence: PreviewPersistenceState
+    persistence: PreviewPersistenceState,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil
   ) -> PreviewStoreConfiguration {
     PreviewStoreConfiguration(
       mode: mode,
       fixtures: fixtures,
       connectionState: .offline(DaemonControlError.daemonOffline.localizedDescription),
-      statusReport: makeStatusReport(fixtures: fixtures),
+      statusReport: makeStatusReport(
+        fixtures: fixtures,
+        hostBridgeOverride: hostBridgeOverride
+      ),
       connectionMetrics: .initial,
       connectionEvents: [],
       bookmarkedSessionIDs: selection.bookmarkedSessionIDs,
@@ -290,16 +329,20 @@ extension HarnessMonitorPreviewStoreFactory {
   }
 
   fileprivate static func makeStatusReport(
-    fixtures: PreviewHarnessClient.Fixtures
+    fixtures: PreviewHarnessClient.Fixtures,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil
   ) -> DaemonStatusReport {
     let hasSessions = !fixtures.sessions.isEmpty
+    let hostBridgeManifest = hostBridgeOverride?.hostBridgeManifest ?? HostBridgeManifest()
     return DaemonStatusReport(
       manifest: DaemonManifest(
         version: fixtures.health.version,
         pid: fixtures.health.pid,
         endpoint: fixtures.health.endpoint,
         startedAt: fixtures.health.startedAt,
-        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
+        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
+        sandboxed: hostBridgeOverride != nil,
+        hostBridge: hostBridgeManifest
       ),
       launchAgent: LaunchAgentStatus(
         installed: hasSessions,

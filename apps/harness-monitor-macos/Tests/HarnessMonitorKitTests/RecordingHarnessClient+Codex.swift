@@ -7,9 +7,6 @@ extension RecordingHarnessClient {
     request: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport {
     try await sleepIfNeeded(configuredMutationDelay())
-    if let error = configuredHostBridgeReconfigureError() {
-      throw error
-    }
     calls.append(
       .reconfigureHostBridge(
         enable: request.enable,
@@ -17,6 +14,9 @@ extension RecordingHarnessClient {
         force: request.force
       )
     )
+    if let error = configuredHostBridgeReconfigureError() {
+      throw error
+    }
     return configuredHostBridgeStatusReport()
   }
 
