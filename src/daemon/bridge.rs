@@ -130,6 +130,18 @@ impl BridgeStatusReport {
     }
 }
 
+#[must_use]
+fn status_report_from_state(state: &BridgeState) -> BridgeStatusReport {
+    BridgeStatusReport {
+        running: true,
+        socket_path: Some(state.socket_path.clone()),
+        pid: Some(state.pid),
+        started_at: Some(state.started_at.clone()),
+        uptime_seconds: uptime_from_started_at(&state.started_at),
+        capabilities: state.capabilities.clone(),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 struct PersistedBridgeConfig {
     #[serde(default)]
@@ -1185,14 +1197,11 @@ pub struct BridgeClient {
 }
 
 impl BridgeClient {
-    /// Build a bridge client from the persisted running bridge state.
+    /// Build a bridge client directly from one persisted bridge state record.
     ///
     /// # Errors
-    /// Returns [`CliError`] when the bridge is unavailable or the auth token
-    /// cannot be loaded.
-    pub fn from_state_file() -> Result<Self, CliError> {
-        let state = load_running_bridge_state(LivenessMode::HostAuthoritative)?
-            .ok_or_else(|| CliErrorKind::workflow_io("bridge is not running"))?;
+    /// Returns [`CliError`] when the bridge auth token cannot be loaded.
+    pub fn from_state(state: &BridgeState) -> Result<Self, CliError> {
         let token = fs::read_to_string(&state.token_path)
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!(
@@ -1203,9 +1212,21 @@ impl BridgeClient {
             .trim()
             .to_string();
         Ok(Self {
-            socket_path: PathBuf::from(state.socket_path),
+            socket_path: PathBuf::from(&state.socket_path),
             token,
         })
+    }
+
+    /// Build a bridge client from the persisted running bridge state.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the bridge is unavailable or the auth token
+    /// cannot be loaded.
+    pub fn from_state_file() -> Result<Self, CliError> {
+        let state = resolve_running_bridge(LivenessMode::HostAuthoritative)?
+            .map(|running| running.state)
+            .ok_or_else(|| CliErrorKind::workflow_io("bridge is not running"))?;
+        Self::from_state(&state)
     }
 
     /// Build a bridge client for one required capability.
@@ -1214,26 +1235,14 @@ impl BridgeClient {
     /// Returns [`CliError`] when the bridge is unavailable, the capability is
     /// not enabled, or the auth token cannot be loaded.
     pub fn for_capability(capability: BridgeCapability) -> Result<Self, CliError> {
-        let state = load_running_bridge_state(LivenessMode::HostAuthoritative)?
+        let running = resolve_running_bridge(LivenessMode::HostAuthoritative)?
             .ok_or_else(|| CliErrorKind::sandbox_feature_disabled(capability.sandbox_feature()))?;
-        if !state.capabilities.contains_key(capability.name()) {
+        if !running.report.capabilities.contains_key(capability.name()) {
             return Err(
                 CliErrorKind::sandbox_feature_disabled(capability.sandbox_feature()).into(),
             );
         }
-        let token = fs::read_to_string(&state.token_path)
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!(
-                    "read bridge token {}: {error}",
-                    state.token_path
-                ))
-            })?
-            .trim()
-            .to_string();
-        Ok(Self {
-            socket_path: PathBuf::from(state.socket_path),
-            token,
-        })
+        Self::from_state(&running.state)
     }
 
     fn send(&self, request: BridgeRequest) -> Result<BridgeResponse, CliError> {
@@ -1298,6 +1307,22 @@ impl BridgeClient {
             return Ok(());
         }
         Err(bridge_response_error(response))
+    }
+
+    /// Ask the running bridge for its current status report.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the request fails or the bridge returns an
+    /// error response.
+    pub fn status(&self) -> Result<BridgeStatusReport, CliError> {
+        let response = self.send(BridgeRequest::Status)?;
+        if !response.ok {
+            return Err(bridge_response_error(response));
+        }
+        let payload = response
+            .payload
+            .ok_or_else(|| CliErrorKind::workflow_io("bridge response omitted payload"))?;
+        parse_bridge_payload(payload)
     }
 
     fn reconfigure(&self, request: &BridgeReconfigureSpec) -> Result<BridgeStatusReport, CliError> {
@@ -1577,14 +1602,118 @@ fn clear_bridge_state() -> Result<(), CliError> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LivenessMode {
     /// Host-CLI path. The caller owns the state file; `flock` is the primary
-    /// signal, `pid_alive` is a best-effort fallback for backward-compatibility
-    /// with pre-19.7.0 bridge CLIs that did not publish `bridge.lock`.
+    /// signal, a live RPC from the persisted socket/token pair is the
+    /// secondary proof, and `pid_alive` is the last-resort fallback for
+    /// backward-compatibility with pre-19.7.0 bridge CLIs that did not publish
+    /// `bridge.lock`.
     HostAuthoritative,
     /// Daemon/consumer path. The caller **does not** own the state file.
-    /// Only `flock` is consulted; `pid_alive` is never called (the daemon may
-    /// be sandboxed and cannot reliably signal an unsandboxed pid), and stale
-    /// state is **never deleted**.
+    /// `flock` and a live RPC are accepted as liveness proof; `pid_alive` is
+    /// never called (the daemon may be sandboxed and cannot reliably signal an
+    /// unsandboxed pid), and stale state is **never deleted**.
     LockOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BridgeProof {
+    Lock,
+    Rpc,
+    Pid,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedRunningBridge {
+    state: BridgeState,
+    report: BridgeStatusReport,
+    proof: BridgeProof,
+    client: Option<BridgeClient>,
+}
+
+fn resolve_running_bridge_from_lock(
+    state: &BridgeState,
+    client: Option<BridgeClient>,
+) -> Option<ResolvedRunningBridge> {
+    if !bridge_lock_is_held() {
+        return None;
+    }
+    Some(ResolvedRunningBridge {
+        report: status_report_from_state(state),
+        state: state.clone(),
+        proof: BridgeProof::Lock,
+        client,
+    })
+}
+
+fn resolve_running_bridge_from_rpc(
+    state: &BridgeState,
+    client: Option<BridgeClient>,
+) -> Option<ResolvedRunningBridge> {
+    let client = client?;
+    let report = client.status().ok()?;
+    if !report.running {
+        return None;
+    }
+    Some(ResolvedRunningBridge {
+        state: state.clone(),
+        report,
+        proof: BridgeProof::Rpc,
+        client: Some(client),
+    })
+}
+
+#[must_use]
+fn should_use_pid_fallback(mode: LivenessMode) -> bool {
+    matches!(mode, LivenessMode::HostAuthoritative) && !super::service::sandboxed_from_env()
+}
+
+fn resolve_running_bridge_from_pid(
+    mode: LivenessMode,
+    state: &BridgeState,
+    client: Option<BridgeClient>,
+) -> Option<ResolvedRunningBridge> {
+    if !should_use_pid_fallback(mode) || !pid_alive(state.pid) {
+        return None;
+    }
+    Some(ResolvedRunningBridge {
+        report: status_report_from_state(state),
+        state: state.clone(),
+        proof: BridgeProof::Pid,
+        client,
+    })
+}
+
+fn missing_lock_only_bridge_message(
+    mode: LivenessMode,
+    running: Option<&ResolvedRunningBridge>,
+) -> Option<&'static str> {
+    if running.is_none() && matches!(mode, LivenessMode::LockOnly) {
+        return Some(
+            "bridge watcher: bridge lock/RPC proof unavailable, treating bridge as not running (bridge.json preserved)",
+        );
+    }
+    None
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in a leaf logging helper"
+)]
+fn log_bridge_resolution_debug(message: &'static str) {
+    tracing::debug!("{message}");
+}
+
+fn resolve_running_bridge(mode: LivenessMode) -> Result<Option<ResolvedRunningBridge>, CliError> {
+    let Some(state) = read_bridge_state()? else {
+        return Ok(None);
+    };
+    let client = BridgeClient::from_state(&state).ok();
+    let running = resolve_running_bridge_from_lock(&state, client.clone())
+        .or_else(|| resolve_running_bridge_from_rpc(&state, client.clone()))
+        .or_else(|| resolve_running_bridge_from_pid(mode, &state, client));
+    if let Some(message) = missing_lock_only_bridge_message(mode, running.as_ref()) {
+        log_bridge_resolution_debug(message);
+    }
+    Ok(running)
 }
 
 /// Load the bridge state only when liveness can be confirmed.
@@ -1593,36 +1722,15 @@ pub enum LivenessMode {
 /// function is purely read-only: it never deletes `bridge.json` regardless of
 /// what it finds. Cleanup is the producer's responsibility.
 ///
-/// On the [`LivenessMode::HostAuthoritative`] path the function falls back to
-/// `pid_alive` for backward compatibility with pre-19.7.0 bridge CLIs that do
-/// not publish `bridge.lock`.
+/// On the [`LivenessMode::HostAuthoritative`] path the function first accepts a
+/// live RPC from the persisted socket/token pair, then falls back to
+/// `pid_alive` only when the current process is unsandboxed and the bridge
+/// still looks like a legacy no-lock instance.
 ///
 /// # Errors
 /// Returns [`CliError`] when the state cannot be read.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "three liveness branches are distinct checks; splitting hides the decision logic"
-)]
 pub fn load_running_bridge_state(mode: LivenessMode) -> Result<Option<BridgeState>, CliError> {
-    let Some(state) = read_bridge_state()? else {
-        return Ok(None);
-    };
-    if bridge_lock_is_held() {
-        return Ok(Some(state));
-    }
-    if matches!(mode, LivenessMode::HostAuthoritative) && pid_alive(state.pid) {
-        return Ok(Some(state));
-    }
-    // Consumer path: never delete state we do not own. The daemon watcher is a
-    // read-only observer of bridge.json; host-CLI callers own cleanup through
-    // stop_bridge, which explicitly unlinks the state file after the RPC
-    // shutdown handshake.
-    if matches!(mode, LivenessMode::LockOnly) {
-        tracing::debug!(
-            "bridge watcher: bridge.lock not held, treating bridge as not running (bridge.json preserved)"
-        );
-    }
-    Ok(None)
+    Ok(resolve_running_bridge(mode)?.map(|running| running.state))
 }
 
 /// Build the daemon manifest view of the unified host bridge.
@@ -1630,13 +1738,13 @@ pub fn load_running_bridge_state(mode: LivenessMode) -> Result<Option<BridgeStat
 /// # Errors
 /// Returns [`CliError`] when the persisted bridge state cannot be read.
 pub fn host_bridge_manifest() -> Result<HostBridgeManifest, CliError> {
-    let Some(state) = load_running_bridge_state(LivenessMode::LockOnly)? else {
+    let Some(running) = resolve_running_bridge(LivenessMode::LockOnly)? else {
         return Ok(HostBridgeManifest::default());
     };
     Ok(HostBridgeManifest {
         running: true,
-        socket_path: Some(state.socket_path),
-        capabilities: state.capabilities,
+        socket_path: running.report.socket_path,
+        capabilities: running.report.capabilities,
     })
 }
 
@@ -1645,10 +1753,14 @@ pub fn host_bridge_manifest() -> Result<HostBridgeManifest, CliError> {
 /// # Errors
 /// Returns [`CliError`] when the bridge state cannot be read.
 pub fn running_codex_capability() -> Result<Option<HostBridgeCapabilityManifest>, CliError> {
-    let Some(state) = load_running_bridge_state(LivenessMode::LockOnly)? else {
+    let Some(running) = resolve_running_bridge(LivenessMode::LockOnly)? else {
         return Ok(None);
     };
-    Ok(state.capabilities.get(BRIDGE_CAPABILITY_CODEX).cloned())
+    Ok(running
+        .report
+        .capabilities
+        .get(BRIDGE_CAPABILITY_CODEX)
+        .cloned())
 }
 
 /// Return the live `codex` WebSocket endpoint, if present.
@@ -1697,17 +1809,63 @@ fn pid_is_zombie(pid: u32) -> bool {
 /// # Errors
 /// Returns [`CliError`] when the bridge state cannot be read.
 pub fn status_report() -> Result<BridgeStatusReport, CliError> {
-    let Some(state) = load_running_bridge_state(LivenessMode::HostAuthoritative)? else {
+    let Some(running) = resolve_running_bridge(LivenessMode::HostAuthoritative)? else {
         return Ok(BridgeStatusReport::not_running());
     };
-    Ok(BridgeStatusReport {
-        running: true,
-        socket_path: Some(state.socket_path),
-        pid: Some(state.pid),
-        started_at: Some(state.started_at.clone()),
-        uptime_seconds: uptime_from_started_at(&state.started_at),
-        capabilities: state.capabilities,
-    })
+    Ok(running.report)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShutdownRequestOutcome {
+    Sent,
+    MissingClient,
+    SendFailed,
+}
+
+fn send_bridge_shutdown_request(client: Option<&BridgeClient>) -> ShutdownRequestOutcome {
+    match client {
+        Some(client) if client.shutdown().is_ok() => ShutdownRequestOutcome::Sent,
+        Some(_) => ShutdownRequestOutcome::SendFailed,
+        None => ShutdownRequestOutcome::MissingClient,
+    }
+}
+
+fn bridge_shutdown_warning(outcome: ShutdownRequestOutcome) -> Option<&'static str> {
+    match outcome {
+        ShutdownRequestOutcome::Sent => None,
+        ShutdownRequestOutcome::MissingClient => {
+            Some("bridge stop: missing bridge client, skipping graceful shutdown request")
+        }
+        ShutdownRequestOutcome::SendFailed => Some("bridge stop: graceful shutdown request failed"),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in a leaf logging helper"
+)]
+fn log_bridge_shutdown_warning(message: &'static str) {
+    tracing::warn!("{message}");
+}
+
+fn request_bridge_shutdown(running: &ResolvedRunningBridge) {
+    if let Some(message) =
+        bridge_shutdown_warning(send_bridge_shutdown_request(running.client.as_ref()))
+    {
+        log_bridge_shutdown_warning(message);
+    }
+}
+
+#[must_use]
+fn stopped_bridge_report(running: &ResolvedRunningBridge) -> BridgeStatusReport {
+    BridgeStatusReport {
+        running: false,
+        socket_path: Some(running.state.socket_path.clone()),
+        pid: Some(running.state.pid),
+        started_at: Some(running.state.started_at.clone()),
+        uptime_seconds: uptime_from_started_at(&running.state.started_at),
+        capabilities: running.report.capabilities.clone(),
+    }
 }
 
 /// Stop the running bridge and clean up its persisted state.
@@ -1716,38 +1874,14 @@ pub fn status_report() -> Result<BridgeStatusReport, CliError> {
 /// Returns [`CliError`] when the bridge cannot be contacted or its state files
 /// cannot be removed.
 pub fn stop_bridge() -> Result<BridgeStatusReport, CliError> {
-    let Some(state) = read_bridge_state()? else {
+    let Some(running) = resolve_running_bridge(LivenessMode::HostAuthoritative)? else {
         clear_bridge_state()?;
         return Ok(BridgeStatusReport::not_running());
     };
-    // Prefer the flock-based check so stop_bridge works from inside a sandbox
-    // where /bin/kill -0 may be unreliable.
-    if bridge_lock_is_held() || pid_alive(state.pid) {
-        let token = fs::read_to_string(&state.token_path)
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!(
-                    "read bridge token {}: {error}",
-                    state.token_path
-                ))
-            })?
-            .trim()
-            .to_string();
-        let client = BridgeClient {
-            socket_path: PathBuf::from(&state.socket_path),
-            token,
-        };
-        let _ = client.shutdown();
-        wait_until_dead(state.pid, STOP_GRACE_PERIOD)?;
-    }
+    request_bridge_shutdown(&running);
+    wait_until_bridge_dead(&running, STOP_GRACE_PERIOD)?;
     clear_bridge_state()?;
-    Ok(BridgeStatusReport {
-        running: false,
-        socket_path: Some(state.socket_path),
-        pid: Some(state.pid),
-        started_at: Some(state.started_at.clone()),
-        uptime_seconds: uptime_from_started_at(&state.started_at),
-        capabilities: state.capabilities,
-    })
+    Ok(stopped_bridge_report(&running))
 }
 
 /// Apply a capability reconfiguration to the running bridge.
@@ -1908,14 +2042,19 @@ fn watch_bridge_root(
 }
 
 fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bool, CliError> {
-    let Some(state) = load_running_bridge_state(LivenessMode::HostAuthoritative)? else {
+    let Some(running) = resolve_running_bridge(LivenessMode::HostAuthoritative)? else {
         return Ok(false);
     };
-    if state.socket_path != config.socket_path.display().to_string() {
+    if running.report.socket_path.as_deref() != Some(config.socket_path.to_string_lossy().as_ref())
+    {
         return Ok(false);
     }
-    let running_capabilities: BTreeSet<&str> =
-        state.capabilities.keys().map(String::as_str).collect();
+    let running_capabilities: BTreeSet<&str> = running
+        .report
+        .capabilities
+        .keys()
+        .map(String::as_str)
+        .collect();
     let requested_capabilities: BTreeSet<&str> = config
         .capabilities
         .iter()
@@ -1925,7 +2064,7 @@ fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bool, CliErro
         return Ok(false);
     }
     if let Some(codex_binary) = config.codex_binary.as_ref()
-        && let Some(codex) = state.capabilities.get(BRIDGE_CAPABILITY_CODEX)
+        && let Some(codex) = running.report.capabilities.get(BRIDGE_CAPABILITY_CODEX)
     {
         let port_matches = codex
             .metadata
@@ -2200,6 +2339,85 @@ fn wait_until_dead(pid: u32, grace: Duration) -> Result<(), CliError> {
         grace.as_secs()
     ))
     .into())
+}
+
+fn wait_until<F>(grace: Duration, mut predicate: F) -> bool
+where
+    F: FnMut() -> bool,
+{
+    let start = Instant::now();
+    while start.elapsed() < grace {
+        if predicate() {
+            return true;
+        }
+        thread::sleep(STOP_POLL_INTERVAL);
+    }
+    false
+}
+
+fn wait_until_bridge_lock_released(grace: Duration) -> bool {
+    wait_until(grace, || !bridge_lock_is_held())
+}
+
+fn wait_until_bridge_rpc_unavailable(client: &BridgeClient, grace: Duration) -> bool {
+    wait_until(grace, || client.status().is_err())
+}
+
+fn force_stop_via_signal_if_possible(
+    running: &ResolvedRunningBridge,
+    grace: Duration,
+    wait_for_stop: impl Fn() -> bool,
+) -> Result<bool, CliError> {
+    if super::service::sandboxed_from_env() || !pid_alive(running.state.pid) {
+        return Ok(false);
+    }
+    send_sigterm(running.state.pid)?;
+    Ok(wait_for_stop() || wait_until_pid_dead(running.state.pid, grace))
+}
+
+fn wait_until_bridge_dead(
+    running: &ResolvedRunningBridge,
+    grace: Duration,
+) -> Result<(), CliError> {
+    match running.proof {
+        BridgeProof::Lock => {
+            if wait_until_bridge_lock_released(grace) {
+                return Ok(());
+            }
+            if force_stop_via_signal_if_possible(running, grace, || {
+                wait_until_bridge_lock_released(grace)
+            })? {
+                return Ok(());
+            }
+            Err(CliErrorKind::workflow_io(format!(
+                "bridge stop: bridge.lock still held after {}s",
+                grace.as_secs()
+            ))
+            .into())
+        }
+        BridgeProof::Rpc => {
+            let Some(client) = running.client.as_ref() else {
+                return Err(CliErrorKind::workflow_io(
+                    "bridge stop: live RPC proof missing client",
+                )
+                .into());
+            };
+            if wait_until_bridge_rpc_unavailable(client, grace) {
+                return Ok(());
+            }
+            if force_stop_via_signal_if_possible(running, grace, || {
+                wait_until_bridge_rpc_unavailable(client, grace)
+            })? {
+                return Ok(());
+            }
+            Err(CliErrorKind::workflow_io(format!(
+                "bridge stop: bridge RPC still responding after {}s",
+                grace.as_secs()
+            ))
+            .into())
+        }
+        BridgeProof::Pid => wait_until_dead(running.state.pid, grace),
+    }
 }
 
 fn wait_until_pid_dead(pid: u32, grace: Duration) -> bool {
@@ -2536,6 +2754,11 @@ fn cleanup_legacy_bridge_artifacts() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::net::UnixListener as StdUnixListener;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Instant;
+
     use fs2::FileExt;
     use tempfile::tempdir;
 
@@ -3011,6 +3234,144 @@ mod tests {
         file
     }
 
+    fn legacy_codex_capabilities() -> BTreeMap<String, HostBridgeCapabilityManifest> {
+        BTreeMap::from([(
+            BRIDGE_CAPABILITY_CODEX.to_string(),
+            HostBridgeCapabilityManifest {
+                enabled: true,
+                healthy: true,
+                transport: "websocket".to_string(),
+                endpoint: Some("ws://127.0.0.1:4500".to_string()),
+                metadata: BTreeMap::from([("port".to_string(), "4500".to_string())]),
+            },
+        )])
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum LegacyShutdownBehavior {
+        ExitAfter(Duration),
+        Ignore,
+    }
+
+    #[derive(Debug)]
+    struct LegacyBridgeServer {
+        socket_path: PathBuf,
+        token: String,
+        terminate: Arc<AtomicBool>,
+        join: Option<thread::JoinHandle<()>>,
+    }
+
+    impl LegacyBridgeServer {
+        fn start(
+            capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
+            shutdown_behavior: LegacyShutdownBehavior,
+        ) -> Self {
+            state::ensure_daemon_dirs().expect("dirs");
+            let socket_path = state::daemon_root().join("legacy-bridge-test.sock");
+            let token_path = state::daemon_root().join("legacy-bridge-token");
+            let token = "legacy-bridge-token".to_string();
+            let terminate = Arc::new(AtomicBool::new(false));
+            let _ = remove_if_exists(&socket_path);
+            fs::write(&token_path, &token).expect("write token");
+            write_bridge_state(&BridgeState {
+                socket_path: socket_path.display().to_string(),
+                pid: 999_999_999,
+                started_at: "2026-04-11T17:00:00Z".to_string(),
+                token_path: token_path.display().to_string(),
+                capabilities: capabilities.clone(),
+            })
+            .expect("write bridge state");
+
+            let listener = StdUnixListener::bind(&socket_path).expect("bind legacy bridge socket");
+            let report = BridgeStatusReport {
+                running: true,
+                socket_path: Some(socket_path.display().to_string()),
+                pid: Some(999_999_999),
+                started_at: Some("2026-04-11T17:00:00Z".to_string()),
+                uptime_seconds: Some(1),
+                capabilities,
+            };
+            let thread_socket_path = socket_path.clone();
+            let thread_token = token.clone();
+            let thread_terminate = Arc::clone(&terminate);
+            let join = thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let Ok(mut stream) = stream else {
+                        break;
+                    };
+                    let mut line = String::new();
+                    BufReader::new(stream.try_clone().expect("clone stream"))
+                        .read_line(&mut line)
+                        .expect("read request");
+                    let envelope: BridgeEnvelope =
+                        serde_json::from_str(&line).expect("parse bridge envelope");
+                    let request = envelope.request.clone();
+                    let response = if envelope.token != thread_token {
+                        BridgeResponse::error(&CliError::from(CliErrorKind::workflow_io(
+                            "bridge token mismatch",
+                        )))
+                    } else {
+                        match request {
+                            BridgeRequest::Status => {
+                                BridgeResponse::ok_payload(&report).expect("status response")
+                            }
+                            BridgeRequest::Shutdown => BridgeResponse::empty_ok(),
+                            _ => BridgeResponse::error(&CliError::from(
+                                CliErrorKind::workflow_parse("unsupported legacy test request"),
+                            )),
+                        }
+                    };
+                    let payload = serde_json::to_string(&response).expect("serialize response");
+                    stream
+                        .write_all(payload.as_bytes())
+                        .expect("write response");
+                    stream.write_all(b"\n").expect("write newline");
+                    stream.flush().expect("flush response");
+
+                    if thread_terminate.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    if matches!(request, BridgeRequest::Shutdown) {
+                        match shutdown_behavior {
+                            LegacyShutdownBehavior::ExitAfter(delay) => {
+                                thread::sleep(delay);
+                                break;
+                            }
+                            LegacyShutdownBehavior::Ignore => {}
+                        }
+                    }
+                }
+                let _ = std::fs::remove_file(&thread_socket_path);
+            });
+
+            Self {
+                socket_path,
+                token,
+                terminate,
+                join: Some(join),
+            }
+        }
+
+        fn wake(&self) {
+            let _ = BridgeClient {
+                socket_path: self.socket_path.clone(),
+                token: self.token.clone(),
+            }
+            .status();
+        }
+    }
+
+    impl Drop for LegacyBridgeServer {
+        fn drop(&mut self) {
+            self.terminate.store(true, Ordering::SeqCst);
+            self.wake();
+            if let Some(join) = self.join.take() {
+                let _ = join.join();
+            }
+            let _ = std::fs::remove_file(&self.socket_path);
+        }
+    }
+
     #[test]
     fn load_running_bridge_state_returns_none_when_no_state_file() {
         with_temp_daemon_root(|| {
@@ -3033,6 +3394,26 @@ mod tests {
             write_fake_bridge_state(99999999);
             let _flock = hold_bridge_lock();
             // Both modes return Some when the flock is held.
+            assert!(
+                load_running_bridge_state(LivenessMode::LockOnly)
+                    .expect("lock-only")
+                    .is_some()
+            );
+            assert!(
+                load_running_bridge_state(LivenessMode::HostAuthoritative)
+                    .expect("host-auth")
+                    .is_some()
+            );
+        });
+    }
+
+    #[test]
+    fn load_running_bridge_state_returns_state_when_bridge_rpc_succeeds_without_lock() {
+        with_temp_daemon_root(|| {
+            let _server = LegacyBridgeServer::start(
+                BTreeMap::new(),
+                LegacyShutdownBehavior::ExitAfter(Duration::ZERO),
+            );
             assert!(
                 load_running_bridge_state(LivenessMode::LockOnly)
                     .expect("lock-only")
@@ -3118,6 +3499,93 @@ mod tests {
                     .is_some(),
                 "backward-compat: HostAuthoritative must return state when only pid is alive"
             );
+        });
+    }
+
+    #[test]
+    fn host_bridge_manifest_uses_rpc_for_legacy_bridge_without_lock() {
+        with_temp_daemon_root(|| {
+            let _server = LegacyBridgeServer::start(
+                legacy_codex_capabilities(),
+                LegacyShutdownBehavior::ExitAfter(Duration::ZERO),
+            );
+            let manifest = host_bridge_manifest().expect("manifest");
+            assert!(manifest.running);
+            assert_eq!(
+                manifest
+                    .capabilities
+                    .get(BRIDGE_CAPABILITY_CODEX)
+                    .and_then(|capability| capability.endpoint.as_deref()),
+                Some("ws://127.0.0.1:4500")
+            );
+        });
+    }
+
+    #[test]
+    fn status_report_uses_rpc_when_sandboxed_legacy_bridge_is_live() {
+        with_temp_daemon_root(|| {
+            let _server = LegacyBridgeServer::start(
+                BTreeMap::new(),
+                LegacyShutdownBehavior::ExitAfter(Duration::ZERO),
+            );
+            temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+                let report = status_report().expect("status");
+                assert!(report.running);
+                assert_eq!(report.pid, Some(999_999_999));
+            });
+        });
+    }
+
+    #[test]
+    fn bridge_client_for_capability_accepts_live_legacy_bridge_without_lock() {
+        with_temp_daemon_root(|| {
+            let _server = LegacyBridgeServer::start(
+                legacy_codex_capabilities(),
+                LegacyShutdownBehavior::ExitAfter(Duration::ZERO),
+            );
+            let client =
+                BridgeClient::for_capability(BridgeCapability::Codex).expect("codex client");
+            let report = client.status().expect("status");
+            assert!(report.running);
+            assert!(report.capabilities.contains_key(BRIDGE_CAPABILITY_CODEX));
+        });
+    }
+
+    #[test]
+    fn wait_until_bridge_dead_returns_error_when_rpc_proof_stays_live_in_sandbox() {
+        with_temp_daemon_root(|| {
+            let _server =
+                LegacyBridgeServer::start(BTreeMap::new(), LegacyShutdownBehavior::Ignore);
+            temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+                let running = resolve_running_bridge(LivenessMode::HostAuthoritative)
+                    .expect("resolve running bridge")
+                    .expect("running bridge");
+                assert_eq!(running.proof, BridgeProof::Rpc);
+                let error = wait_until_bridge_dead(&running, Duration::from_millis(150))
+                    .expect_err("rpc proof should remain live");
+                assert!(error.to_string().contains("still responding"));
+            });
+        });
+    }
+
+    #[test]
+    fn stop_bridge_waits_for_rpc_proof_to_disappear_before_clearing_state() {
+        with_temp_daemon_root(|| {
+            let _server = LegacyBridgeServer::start(
+                legacy_codex_capabilities(),
+                LegacyShutdownBehavior::ExitAfter(Duration::from_millis(250)),
+            );
+            let started = Instant::now();
+            let report = stop_bridge().expect("stop bridge");
+            assert!(
+                started.elapsed() >= Duration::from_millis(200),
+                "stop_bridge should wait until the RPC proof disappears"
+            );
+            assert!(
+                !bridge_state_path().exists(),
+                "bridge state should be cleared"
+            );
+            assert!(!report.running);
         });
     }
 
