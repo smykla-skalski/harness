@@ -188,6 +188,17 @@ struct PreferencesGeneralSection: View {
     "harness daemon dev"
   }
 
+  private var externalDaemonManifestPath: String {
+    HarnessMonitorPaths.manifestURL().path
+  }
+
+  private var externalDaemonProcessSummary: String? {
+    guard let manifest = store.daemonStatus?.manifest else {
+      return nil
+    }
+    return "pid \(manifest.pid) · \(manifest.endpoint)"
+  }
+
   @ViewBuilder
   private var daemonModeRow: some View {
     LabeledContent("Daemon mode") {
@@ -201,6 +212,29 @@ struct PreferencesGeneralSection: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Daemon Mode"))
+    if store.daemonOwnership == .external {
+      LabeledContent("Dev manifest") {
+        Text(externalDaemonManifestPath)
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+          .multilineTextAlignment(.trailing)
+      }
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.preferencesMetricCard("Dev Manifest")
+      )
+      if let summary = externalDaemonProcessSummary {
+        LabeledContent("Dev daemon") {
+          Text(summary)
+            .scaledFont(.caption)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+        }
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.preferencesMetricCard("Dev Daemon")
+        )
+      }
+    }
   }
 
   private static let logLevels = ["trace", "debug", "info", "warn", "error"]
