@@ -38,6 +38,39 @@ public struct HostBridgeManifest: Codable, Equatable, Sendable {
   }
 }
 
+public struct BridgeStatusReport: Codable, Equatable, Sendable {
+  public let running: Bool
+  public let socketPath: String?
+  public let pid: Int?
+  public let startedAt: String?
+  public let uptimeSeconds: Int?
+  public let capabilities: [String: HostBridgeCapabilityManifest]
+
+  public init(
+    running: Bool,
+    socketPath: String? = nil,
+    pid: Int? = nil,
+    startedAt: String? = nil,
+    uptimeSeconds: Int? = nil,
+    capabilities: [String: HostBridgeCapabilityManifest] = [:]
+  ) {
+    self.running = running
+    self.socketPath = socketPath
+    self.pid = pid
+    self.startedAt = startedAt
+    self.uptimeSeconds = uptimeSeconds
+    self.capabilities = capabilities
+  }
+
+  public var hostBridgeManifest: HostBridgeManifest {
+    HostBridgeManifest(
+      running: running,
+      socketPath: socketPath,
+      capabilities: capabilities
+    )
+  }
+}
+
 public struct DaemonManifest: Codable, Equatable, Sendable {
   public let version: String
   public let pid: Int
@@ -117,6 +150,20 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     try container.encode(tokenPath, forKey: .tokenPath)
     try container.encode(sandboxed, forKey: .sandboxed)
     try container.encode(hostBridge, forKey: .hostBridge)
+  }
+}
+
+extension DaemonManifest {
+  public func updating(hostBridge: HostBridgeManifest) -> DaemonManifest {
+    DaemonManifest(
+      version: version,
+      pid: pid,
+      endpoint: endpoint,
+      startedAt: startedAt,
+      tokenPath: tokenPath,
+      sandboxed: sandboxed,
+      hostBridge: hostBridge
+    )
   }
 }
 
@@ -359,6 +406,17 @@ extension DaemonStatusReport {
       worktreeCount: diagnosticsReport.health?.worktreeCount ?? fallbackWorktreeCount ?? 0,
       sessionCount: diagnosticsReport.health?.sessionCount ?? fallbackSessionCount ?? 0,
       diagnostics: diagnosticsReport.workspace
+    )
+  }
+
+  public func updating(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
+    DaemonStatusReport(
+      manifest: manifest?.updating(hostBridge: hostBridge),
+      launchAgent: launchAgent,
+      projectCount: projectCount,
+      worktreeCount: worktreeCount,
+      sessionCount: sessionCount,
+      diagnostics: diagnostics
     )
   }
 }

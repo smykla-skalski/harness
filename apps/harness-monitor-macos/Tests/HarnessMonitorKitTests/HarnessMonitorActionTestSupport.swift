@@ -21,6 +21,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       progress: Int,
       actor: String
     )
+    case reconfigureHostBridge(enable: [String], disable: [String], force: Bool)
     case createTask(
       sessionID: String,
       title: String,
@@ -127,6 +128,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   private var _codexStartError: (any Error)?
   private var _agentTuiStartError: (any Error)?
+  private var _hostBridgeReconfigureError: (any Error)?
+  private var _hostBridgeStatusReport = BridgeStatusReport(running: false)
   private var _globalStreamEvents: [DaemonPushEvent] = []
   private var _globalStreamError: (any Error)?
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
@@ -304,12 +307,28 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     lock.withLock { _agentTuiStartError = error }
   }
 
+  func configureHostBridgeReconfigureError(_ error: (any Error)?) {
+    lock.withLock { _hostBridgeReconfigureError = error }
+  }
+
+  func configureHostBridgeStatusReport(_ report: BridgeStatusReport) {
+    lock.withLock { _hostBridgeStatusReport = report }
+  }
+
   func configuredCodexStartError() -> (any Error)? {
     lock.withLock { _codexStartError }
   }
 
   func configuredAgentTuiStartError() -> (any Error)? {
     lock.withLock { _agentTuiStartError }
+  }
+
+  func configuredHostBridgeReconfigureError() -> (any Error)? {
+    lock.withLock { _hostBridgeReconfigureError }
+  }
+
+  func configuredHostBridgeStatusReport() -> BridgeStatusReport {
+    lock.withLock { _hostBridgeStatusReport }
   }
 
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }

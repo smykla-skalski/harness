@@ -2,6 +2,55 @@ import Foundation
 
 extension HarnessMonitorStore {
   @discardableResult
+  public func setHostBridgeCapability(
+    _ capability: String,
+    enabled: Bool,
+    force: Bool = false
+  ) async -> HostBridgeCapabilityMutationResult {
+    guard let client else {
+      lastError = "Daemon unavailable."
+      return .failed
+    }
+
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+    lastError = nil
+
+    do {
+      let measuredStatus = try await Self.measureOperation {
+        try await client.reconfigureHostBridge(
+          request: HostBridgeReconfigureRequest(
+            enable: enabled ? [capability] : [],
+            disable: enabled ? [] : [capability],
+            force: force
+          )
+        )
+      }
+      recordRequestSuccess()
+      clearHostBridgeIssue(for: capability)
+      applyHostBridgeStatus(measuredStatus.value)
+      if capability == "agent-tui" && !enabled {
+        selectedAgentTuis = []
+        selectedAgentTui = nil
+      }
+      showLastAction(hostBridgeActionLabel(for: capability, enabled: enabled))
+      return .success
+    } catch let apiError as HarnessMonitorAPIError {
+      if case .server(let code, let message) = apiError, code == 409 {
+        return .requiresForce(message)
+      }
+      if case .server(let code, _) = apiError, code == 501 || code == 503 {
+        markHostBridgeIssue(for: capability, statusCode: code)
+      }
+      lastError = apiError.localizedDescription
+      return .failed
+    } catch {
+      lastError = error.localizedDescription
+      return .failed
+    }
+  }
+
+  @discardableResult
   public func refreshSelectedCodexRuns() async -> Bool {
     guard let client, let sessionID = selectedSessionID else { return false }
     return await refreshCodexRuns(using: client, sessionID: sessionID)
@@ -413,5 +462,25 @@ extension HarnessMonitorStore {
     var updatedTuis = tuis.filter { $0.tuiId != tui.tuiId }
     updatedTuis.insert(tui, at: 0)
     return updatedTuis
+  }
+
+  private func applyHostBridgeStatus(_ status: BridgeStatusReport) {
+    guard let daemonStatus else {
+      return
+    }
+    self.daemonStatus = daemonStatus.updating(hostBridge: status.hostBridgeManifest)
+  }
+
+  private func hostBridgeActionLabel(for capability: String, enabled: Bool) -> String {
+    let capabilityName =
+      switch capability {
+      case "agent-tui":
+        "Agent TUI"
+      case "codex":
+        "Codex"
+      default:
+        capability.replacingOccurrences(of: "-", with: " ").capitalized
+      }
+    return enabled ? "Enabled \(capabilityName) host bridge" : "Disabled \(capabilityName) host bridge"
   }
 }
