@@ -4,14 +4,13 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use fs2::FileExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::fs::{self, File, OpenOptions};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 
 /// Error for invalid state transitions.
 #[derive(Debug, thiserror::Error)]
@@ -234,59 +233,15 @@ where
         self.path.with_file_name(format!("{file_name}.lock"))
     }
 
-    fn open_lock_file(&self) -> Result<File, CliError> {
-        let lock_path = self.lock_path();
-        if let Some(parent) = lock_path.parent() {
-            fs::create_dir_all(parent).map_err(|error| -> CliError {
-                CliErrorKind::workflow_io(format!(
-                    "failed to create lock directory {}: {error}",
-                    parent.display()
-                ))
-                .into()
-            })?;
-        }
-
-        OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&lock_path)
-            .map_err(|error| -> CliError {
-                CliErrorKind::workflow_io(format!(
-                    "failed to open workflow lock {}: {error}",
-                    lock_path.display()
-                ))
-                .into()
-            })
+    fn lock_context() -> FlockErrorContext {
+        FlockErrorContext::new("workflow persistence")
     }
 
     fn with_exclusive_lock<R>(
         &self,
         action: impl FnOnce() -> Result<R, CliError>,
     ) -> Result<R, CliError> {
-        let lock_file = self.open_lock_file()?;
-        lock_file.lock_exclusive().map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!(
-                "failed to acquire workflow lock {}: {error}",
-                self.lock_path().display()
-            ))
-            .into()
-        })?;
-
-        let result = action();
-        let unlock_result = lock_file.unlock().map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!(
-                "failed to release workflow lock {}: {error}",
-                self.lock_path().display()
-            ))
-            .into()
-        });
-
-        match (result, unlock_result) {
-            (Ok(value), Ok(())) => Ok(value),
-            (Err(error), Ok(()) | Err(_)) | (Ok(_), Err(error)) => Err(error),
-        }
+        with_exclusive_flock(&self.lock_path(), Self::lock_context(), action)
     }
 }
 

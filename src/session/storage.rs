@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::fs::{File, FileType, OpenOptions};
+use std::fs::{FileType, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 
 use fs_err as fs;
-use fs2::FileExt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, validate_safe_segment, write_json_pretty};
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::{
     GitCheckoutIdentity, project_context_dir, resolve_git_checkout_identity, utc_now,
@@ -74,32 +74,16 @@ fn lock_path(project_dir: &Path, name: &str) -> PathBuf {
         .join(format!("{name}.lock"))
 }
 
-fn open_lock_file(path: &Path) -> Result<File, CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
-    }
-    OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|error| io_err(&error))
-}
-
 fn with_lock<T>(
     project_dir: &Path,
     name: &str,
     action: impl FnOnce() -> Result<T, CliError>,
 ) -> Result<T, CliError> {
-    let file = open_lock_file(&lock_path(project_dir, name))?;
-    file.lock_exclusive().map_err(|error| io_err(&error))?;
-    let result = action();
-    let unlock = file.unlock().map_err(|error| io_err(&error));
-    match (result, unlock) {
-        (Ok(value), Ok(())) => Ok(value),
-        (Err(error), _) | (Ok(_), Err(error)) => Err(error),
-    }
+    with_exclusive_flock(
+        &lock_path(project_dir, name),
+        FlockErrorContext::new("session storage"),
+        action,
+    )
 }
 
 fn io_err(error: &dyn fmt::Display) -> CliError {
