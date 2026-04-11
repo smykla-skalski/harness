@@ -875,6 +875,41 @@ mod tests {
     }
 
     #[test]
+    fn write_manifest_sets_updated_at_to_non_empty_string() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let base = DaemonManifest {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    pid: 555,
+                    endpoint: "http://127.0.0.1:0".into(),
+                    started_at: "2026-04-11T16:00:00Z".into(),
+                    token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
+                };
+                let written = write_manifest(&base).expect("write");
+                assert!(
+                    !written.updated_at.is_empty(),
+                    "write_manifest must stamp updated_at with the current UTC time"
+                );
+                // Looks like an ISO-ish timestamp, not arbitrary garbage.
+                assert!(
+                    written.updated_at.contains('T'),
+                    "updated_at should be ISO-ish: {}",
+                    written.updated_at
+                );
+            },
+        );
+    }
+
+    #[test]
     fn daemon_lock_is_held_at_returns_false_for_missing_lock_file() {
         let tmp = tempdir().expect("tempdir");
         let missing = tmp.path().join("daemon.lock");
