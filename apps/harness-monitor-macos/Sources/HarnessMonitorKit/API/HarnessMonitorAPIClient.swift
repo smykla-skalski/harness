@@ -42,6 +42,12 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/daemon/stop", body: EmptyBody())
   }
 
+  public func reconfigureHostBridge(
+    request: HostBridgeReconfigureRequest
+  ) async throws -> BridgeStatusReport {
+    try await post("/v1/bridge/reconfigure", body: request)
+  }
+
   public func projects() async throws -> [ProjectSummary] {
     try await get("/v1/projects")
   }

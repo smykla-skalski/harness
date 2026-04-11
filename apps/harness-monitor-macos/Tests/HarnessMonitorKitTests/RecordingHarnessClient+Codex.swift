@@ -3,6 +3,23 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  func reconfigureHostBridge(
+    request: HostBridgeReconfigureRequest
+  ) async throws -> BridgeStatusReport {
+    try await sleepIfNeeded(configuredMutationDelay())
+    if let error = configuredHostBridgeReconfigureError() {
+      throw error
+    }
+    calls.append(
+      .reconfigureHostBridge(
+        enable: request.enable,
+        disable: request.disable,
+        force: request.force
+      )
+    )
+    return configuredHostBridgeStatusReport()
+  }
+
   func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
     CodexRunListResponse(runs: configuredCodexRuns(for: sessionID))
   }
