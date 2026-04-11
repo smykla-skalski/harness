@@ -4,6 +4,20 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
+  func testAgentTuiSheetUsesWidePresentationFrame() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiSheet(in: app)
+
+    let sheet = element(in: app, identifier: Accessibility.agentTuiSheet)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        sheet.exists && sheet.frame.width >= 840
+      },
+      "Agent TUI sheet should stay wide enough to show a useful terminal viewport"
+    )
+  }
+
   func testAgentTuiEnableNowRemovesRecoveryBannerAfterSuccessfulReconfigure() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [

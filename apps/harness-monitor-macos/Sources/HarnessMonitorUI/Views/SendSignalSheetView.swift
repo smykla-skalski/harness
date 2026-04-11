@@ -37,7 +37,6 @@ struct SendSignalSheetView: View {
       Divider()
       footer
     }
-    .frame(minWidth: 420, idealWidth: 500, minHeight: 300)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sendSignalSheet)
   }

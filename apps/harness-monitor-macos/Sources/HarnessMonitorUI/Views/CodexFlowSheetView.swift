@@ -72,7 +72,6 @@ struct CodexFlowSheetView: View {
       Divider()
       footer
     }
-    .frame(minWidth: 520, idealWidth: 620, minHeight: 520)
     .task { await store.refreshSelectedCodexRuns() }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowSheet)
@@ -483,7 +482,6 @@ struct AgentTuiSheetView: View {
       Divider()
       footer
     }
-    .frame(minWidth: 640, idealWidth: 760, minHeight: 620)
     .task {
       await store.refreshSelectedAgentTuis()
       syncTerminalSize()
