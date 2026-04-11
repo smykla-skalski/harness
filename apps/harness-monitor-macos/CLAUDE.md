@@ -10,7 +10,11 @@ Validation expectations (run from repo root):
 
 - `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation build`
 - `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation test -skip-testing:HarnessMonitorUITests`
-- All xcodebuild invocations must use `-derivedDataPath tmp/xcode-derived` so build artifacts land in a single, known location inside `tmp/`. Never create variant-named directories like `tmp/xcode-derived-foo` - one directory, reused across builds.
+- All xcodebuild invocations must use one of two approved `-derivedDataPath` values:
+  - `tmp/xcode-derived` for quality gates, tests, and general dev builds
+  - `tmp/perf/harness-monitor-instruments/xcode-derived` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
+
+  Any other location is stale by definition, including Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*`. `mise run clean:stale` wipes the stale locations; `Scripts/generate-project.sh` scrubs them on every project regen so an Xcode UI build cannot reintroduce them silently.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
 - Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.
