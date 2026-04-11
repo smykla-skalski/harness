@@ -1,4 +1,5 @@
 use std::sync::OnceLock;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::de::DeserializeOwned;
@@ -22,6 +23,8 @@ use super::state;
 use crate::session::types::SessionState;
 
 const HEALTH_TIMEOUT: Duration = Duration::from_millis(500);
+const API_READY_TIMEOUT: Duration = Duration::from_secs(2);
+const API_READY_INTERVAL: Duration = Duration::from_millis(100);
 const MUTATION_TIMEOUT: Duration = Duration::from_secs(5);
 
 static CACHED_CLIENT: OnceLock<Option<DaemonClient>> = OnceLock::new();
@@ -287,7 +290,9 @@ fn try_build_client() -> Option<DaemonClient> {
         http,
     };
 
-    if check_daemon_health(&client, &manifest.endpoint) {
+    if check_daemon_health(&client, &manifest.endpoint)
+        && wait_for_authenticated_api(&client, API_READY_TIMEOUT)
+    {
         Some(client)
     } else {
         None
@@ -316,6 +321,38 @@ fn log_health_result(endpoint: &str, health_ms: u64, ok: bool) {
     } else {
         log_health_failed(endpoint, health_ms);
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "deadline-based warmup loop keeps daemon connection readiness explicit"
+)]
+fn wait_for_authenticated_api(client: &DaemonClient, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if authenticated_api_ready(client) {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            tracing::debug!(endpoint = client.endpoint, "daemon session API not ready");
+            return false;
+        }
+        thread::sleep(API_READY_INTERVAL);
+    }
+}
+
+fn authenticated_api_ready(client: &DaemonClient) -> bool {
+    let url = format!("{}/v1/sessions", client.endpoint);
+    RUNTIME.block_on(async {
+        client
+            .http
+            .get(&url)
+            .bearer_auth(&client.token)
+            .timeout(HEALTH_TIMEOUT)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+    })
 }
 
 #[expect(
@@ -431,6 +468,14 @@ fn parse_error_response(body: &str, status: u16) -> CliError {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::thread;
+
+    use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
+
     use super::*;
 
     #[test]
@@ -456,5 +501,186 @@ mod tests {
     fn parse_error_response_handles_plain_text() {
         let error = parse_error_response("not json", 500);
         assert!(error.to_string().contains("500"));
+    }
+
+    #[test]
+    fn wait_for_authenticated_api_retries_until_sessions_endpoint_succeeds() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+        let saw_auth = Arc::new(AtomicBool::new(false));
+        let session_calls = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let saw_auth = Arc::clone(&saw_auth);
+            let session_calls = Arc::clone(&session_calls);
+            thread::spawn(move || {
+                for _ in 0..2 {
+                    let (mut stream, _) = listener.accept().expect("accept");
+                    let request = read_http_request(&mut stream);
+                    if request
+                        .to_ascii_lowercase()
+                        .contains("authorization: bearer test-token")
+                    {
+                        saw_auth.store(true, Ordering::SeqCst);
+                    }
+                    let call_index = session_calls.fetch_add(1, Ordering::SeqCst);
+                    if call_index == 0 {
+                        write_http_response(
+                            &mut stream,
+                            "503 Service Unavailable",
+                            "application/json",
+                            "{\"error\":\"warming up\"}",
+                        );
+                    } else {
+                        write_http_response(&mut stream, "200 OK", "application/json", "[]");
+                    }
+                }
+            })
+        };
+
+        let client = DaemonClient {
+            endpoint,
+            token: "test-token".to_string(),
+            http: reqwest::Client::new(),
+        };
+        assert!(wait_for_authenticated_api(
+            &client,
+            Duration::from_millis(250)
+        ));
+        assert!(saw_auth.load(Ordering::SeqCst));
+        assert_eq!(session_calls.load(Ordering::SeqCst), 2);
+        server.join().expect("server");
+    }
+
+    #[test]
+    fn wait_for_authenticated_api_returns_false_when_sessions_endpoint_never_recovers() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+        let session_calls = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let session_calls = Arc::clone(&session_calls);
+            thread::spawn(move || {
+                for _ in 0..3 {
+                    let (mut stream, _) = listener.accept().expect("accept");
+                    let _request = read_http_request(&mut stream);
+                    session_calls.fetch_add(1, Ordering::SeqCst);
+                    write_http_response(
+                        &mut stream,
+                        "503 Service Unavailable",
+                        "application/json",
+                        "{\"error\":\"still warming up\"}",
+                    );
+                }
+            })
+        };
+
+        let client = DaemonClient {
+            endpoint,
+            token: "test-token".to_string(),
+            http: reqwest::Client::new(),
+        };
+        assert!(!wait_for_authenticated_api(
+            &client,
+            Duration::from_millis(250)
+        ));
+        assert!(session_calls.load(Ordering::SeqCst) >= 2);
+        server.join().expect("server");
+    }
+
+    #[test]
+    fn try_build_client_requires_authenticated_api_readiness() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let xdg = tmp.path().join("xdg");
+        let xdg_str = xdg.to_str().expect("utf8 xdg").to_string();
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+
+        let server = thread::spawn(move || {
+            for request_index in 0..3 {
+                let (mut stream, _) = listener.accept().expect("accept");
+                let request = read_http_request(&mut stream);
+                if request.starts_with("GET /v1/health ") {
+                    write_http_response(&mut stream, "200 OK", "text/plain", "ok");
+                    continue;
+                }
+                assert!(request.starts_with("GET /v1/sessions "));
+                let request_lower = request.to_ascii_lowercase();
+                assert!(
+                    request_lower.contains("authorization: bearer test-token"),
+                    "missing bearer auth: {request}"
+                );
+                let body = if request_index == 1 {
+                    "{\"error\":\"warming up\"}"
+                } else {
+                    "[]"
+                };
+                let status = if request_index == 1 {
+                    "503 Service Unavailable"
+                } else {
+                    "200 OK"
+                };
+                write_http_response(&mut stream, status, "application/json", body);
+            }
+        });
+
+        temp_env::with_vars([("XDG_DATA_HOME", Some(xdg_str.as_str()))], || {
+            std::fs::create_dir_all(&xdg).expect("create xdg");
+            let token_path = state::auth_token_path();
+            std::fs::create_dir_all(token_path.parent().expect("token parent"))
+                .expect("create daemon dir");
+            std::fs::write(&token_path, "test-token").expect("write token");
+
+            let manifest = DaemonManifest {
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                pid: std::process::id(),
+                endpoint: endpoint.clone(),
+                started_at: "2026-04-11T00:00:00Z".to_string(),
+                token_path: token_path.display().to_string(),
+                sandboxed: false,
+                host_bridge: HostBridgeManifest::default(),
+            };
+            state::write_manifest(&manifest).expect("write manifest");
+
+            let client = try_build_client();
+            assert!(client.is_some(), "authenticated session API should warm up");
+        });
+
+        server.join().expect("server");
+    }
+
+    fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .expect("read timeout");
+        let mut buffer = Vec::new();
+        loop {
+            let mut chunk = [0_u8; 1024];
+            let read = stream.read(&mut chunk).expect("read request");
+            if read == 0 {
+                break;
+            }
+            buffer.extend_from_slice(&chunk[..read]);
+            if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+                break;
+            }
+        }
+        String::from_utf8(buffer).expect("utf8 request")
+    }
+
+    fn write_http_response(
+        stream: &mut std::net::TcpStream,
+        status: &str,
+        content_type: &str,
+        body: &str,
+    ) {
+        let response = format!(
+            "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write response");
+        stream.flush().expect("flush response");
     }
 }

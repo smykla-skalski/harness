@@ -16,6 +16,8 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 use crate::errors::{CliError, CliErrorKind};
 
+use super::bridge;
+
 /// Default WebSocket endpoint for a user-launched Codex app-server when the
 /// daemon runs under the macOS App Sandbox and cannot spawn child processes.
 pub const DEFAULT_CODEX_WS_ENDPOINT: &str = "ws://127.0.0.1:4500";
@@ -70,9 +72,8 @@ impl CodexTransportKind {
 }
 
 /// Resolve the transport kind for a given daemon sandbox mode, consulting
-/// (in order) an explicit `HARNESS_CODEX_WS_URL`, the codex-bridge endpoint
-/// file published by `harness codex-bridge start`, and finally the sandbox
-/// default.
+/// (in order) an explicit `HARNESS_CODEX_WS_URL`, the unified host bridge
+/// state file, and finally the sandbox default.
 ///
 /// * Sandboxed daemons always use WebSocket (they cannot spawn children).
 ///   The endpoint falls back to [`DEFAULT_CODEX_WS_ENDPOINT`] when nothing
@@ -109,11 +110,10 @@ pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 fn bridge_endpoint_from_state_file() -> Option<String> {
-    match super::codex_bridge::read_bridge_state() {
-        Ok(Some(state)) => Some(state.endpoint),
-        Ok(None) => None,
+    match bridge::codex_websocket_endpoint() {
+        Ok(endpoint) => endpoint,
         Err(error) => {
-            tracing::warn!(%error, "failed to read codex-bridge state file; falling back to defaults");
+            tracing::warn!(%error, "failed to read bridge state file; falling back to defaults");
             None
         }
     }
@@ -362,9 +362,12 @@ mod tests {
         CodexTransport, CodexTransportKind, DEFAULT_CODEX_WS_ENDPOINT, StdioCodexTransport,
         WebSocketCodexTransport, codex_transport_from_env,
     };
-    use crate::daemon::codex_bridge::{CodexBridgeState, write_bridge_state};
+    use crate::daemon::bridge::{BridgeState, bridge_state_path};
+    use crate::daemon::state::HostBridgeCapabilityManifest;
+    use crate::infra::io::write_json_pretty;
     use futures_util::sink::SinkExt;
     use futures_util::stream::StreamExt;
+    use std::collections::BTreeMap;
     use tempfile::tempdir;
     use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::TcpListener;
@@ -385,6 +388,29 @@ mod tests {
             ],
             f,
         );
+    }
+
+    fn write_bridge_state_for_test(endpoint: &str) {
+        write_json_pretty(
+            &bridge_state_path(),
+            &BridgeState {
+                socket_path: "/tmp/bridge.sock".to_string(),
+                pid: std::process::id(),
+                started_at: "2026-04-10T00:00:00Z".to_string(),
+                token_path: "/tmp/auth-token".to_string(),
+                capabilities: BTreeMap::from([(
+                    "codex".to_string(),
+                    HostBridgeCapabilityManifest {
+                        enabled: true,
+                        healthy: true,
+                        transport: "websocket".to_string(),
+                        endpoint: Some(endpoint.to_string()),
+                        metadata: BTreeMap::from([("port".to_string(), "4500".to_string())]),
+                    },
+                )]),
+            },
+        )
+        .expect("write bridge state");
     }
 
     #[test]
@@ -421,14 +447,7 @@ mod tests {
             ],
             || {
                 // Publish a bridge state too; env override must still win.
-                write_bridge_state(&CodexBridgeState {
-                    endpoint: "ws://127.0.0.1:9999".to_string(),
-                    pid: 1,
-                    started_at: "2026-04-10T00:00:00Z".to_string(),
-                    port: 9999,
-                    codex_version: None,
-                })
-                .expect("write bridge state");
+                write_bridge_state_for_test("ws://127.0.0.1:9999");
 
                 assert_eq!(
                     codex_transport_from_env(true),
@@ -443,14 +462,7 @@ mod tests {
     #[test]
     fn codex_transport_from_env_uses_bridge_state_when_no_override() {
         with_isolated_env(|| {
-            write_bridge_state(&CodexBridgeState {
-                endpoint: "ws://127.0.0.1:4501".to_string(),
-                pid: 1,
-                started_at: "2026-04-10T00:00:00Z".to_string(),
-                port: 4501,
-                codex_version: None,
-            })
-            .expect("write bridge state");
+            write_bridge_state_for_test("ws://127.0.0.1:4501");
 
             assert_eq!(
                 codex_transport_from_env(false),
@@ -464,18 +476,11 @@ mod tests {
     #[test]
     fn codex_transport_from_env_bridge_state_unblocks_unsandboxed_ws() {
         with_isolated_env(|| {
-            write_bridge_state(&CodexBridgeState {
-                endpoint: "ws://127.0.0.1:4500".to_string(),
-                pid: 1,
-                started_at: "2026-04-10T00:00:00Z".to_string(),
-                port: 4500,
-                codex_version: None,
-            })
-            .expect("write bridge state");
+            write_bridge_state_for_test("ws://127.0.0.1:4500");
 
             // Unsandboxed: normally defaults to stdio, but the presence of a
             // bridge state file means the operator has explicitly signed up
-            // for websocket transport via `harness codex-bridge start`.
+            // for websocket transport via `harness bridge start`.
             assert_eq!(
                 codex_transport_from_env(false),
                 CodexTransportKind::WebSocket {

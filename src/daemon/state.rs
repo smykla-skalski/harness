@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::io::{self, Write as _};
@@ -19,6 +20,33 @@ const DAEMON_LOCK_FILE: &str = "daemon.lock";
 const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
 const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct HostBridgeCapabilityManifest {
+    #[serde(default = "default_host_bridge_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub healthy: bool,
+    pub transport: String,
+    #[serde(default)]
+    pub endpoint: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+fn default_host_bridge_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct HostBridgeManifest {
+    #[serde(default)]
+    pub running: bool,
+    #[serde(default)]
+    pub socket_path: Option<String>,
+    #[serde(default)]
+    pub capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonManifest {
     pub version: String,
@@ -32,19 +60,8 @@ pub struct DaemonManifest {
     /// `false` so they can be deserialized without migration.
     #[serde(default)]
     pub sandboxed: bool,
-    /// Transport name for the codex bridge. Currently `"stdio"` by
-    /// default; WebSocket support is staged behind this field so the
-    /// client can pick a transport without a schema break.
-    #[serde(default = "default_codex_transport")]
-    pub codex_transport: String,
-    /// Optional WebSocket endpoint the codex bridge exposes. `None`
-    /// when the daemon has no bridge or is running stdio-only.
     #[serde(default)]
-    pub codex_endpoint: Option<String>,
-}
-
-fn default_codex_transport() -> String {
-    "stdio".to_string()
+    pub host_bridge: HostBridgeManifest,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -480,13 +497,9 @@ mod tests {
             !manifest.sandboxed,
             "legacy manifests default to unsandboxed"
         );
-        assert_eq!(
-            manifest.codex_transport, "stdio",
-            "legacy manifests default codex transport to stdio"
-        );
         assert!(
-            manifest.codex_endpoint.is_none(),
-            "legacy manifests default codex endpoint to None"
+            manifest.host_bridge == HostBridgeManifest::default(),
+            "legacy manifests default host bridge to an empty snapshot"
         );
     }
 
@@ -506,8 +519,7 @@ mod tests {
                     started_at: "2026-03-28T12:00:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
-                    codex_transport: default_codex_transport(),
-                    codex_endpoint: None,
+                    host_bridge: HostBridgeManifest::default(),
                 };
                 write_manifest(&manifest).expect("write");
                 let loaded = load_manifest().expect("load").expect("manifest");
@@ -534,8 +546,7 @@ mod tests {
                     started_at: "2026-04-04T07:00:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
-                    codex_transport: default_codex_transport(),
-                    codex_endpoint: None,
+                    host_bridge: HostBridgeManifest::default(),
                 })
                 .expect("manifest");
 
@@ -564,8 +575,7 @@ mod tests {
                     started_at: "2026-04-04T07:05:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
-                    codex_transport: default_codex_transport(),
-                    codex_endpoint: None,
+                    host_bridge: HostBridgeManifest::default(),
                 })
                 .expect("manifest");
 
@@ -597,8 +607,7 @@ mod tests {
                     started_at: "2026-04-10T07:05:00Z".into(),
                     token_path: auth_token_path().display().to_string(),
                     sandboxed: false,
-                    codex_transport: default_codex_transport(),
-                    codex_endpoint: None,
+                    host_bridge: HostBridgeManifest::default(),
                 })
                 .expect("manifest");
 

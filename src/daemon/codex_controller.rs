@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::env::var;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
@@ -11,6 +12,7 @@ use uuid::Uuid;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::bridge;
 use super::codex_transport::{self, CodexTransport, CodexTransportKind};
 use super::db::DaemonDb;
 use super::protocol::{
@@ -54,7 +56,7 @@ impl CodexControllerHandle {
     ///
     /// `sandboxed` is the daemon's sandbox-mode flag. Transport selection is
     /// re-evaluated on every [`Self::current_transport_kind`] call so runs
-    /// pick up a bridge endpoint the moment `harness codex-bridge start`
+    /// pick up a bridge endpoint the moment `harness bridge start`
     /// publishes it, without having to restart the daemon.
     #[must_use]
     pub fn new(
@@ -73,8 +75,8 @@ impl CodexControllerHandle {
     }
 
     /// Resolve the transport to use for a new run right now. Consults the
-    /// env, any running codex-bridge, and the sandbox default in that order
-    /// (see [`codex_transport::codex_transport_from_env`]).
+    /// env, any running unified host bridge, and the sandbox default in that
+    /// order (see [`codex_transport::codex_transport_from_env`]).
     #[must_use]
     pub fn current_transport_kind(&self) -> CodexTransportKind {
         codex_transport::codex_transport_from_env(self.state.sandboxed)
@@ -86,6 +88,20 @@ impl CodexControllerHandle {
     /// surfaces 503 in the POST response rather than failing asynchronously
     /// in the worker.
     fn preflight_websocket_probe(&self) -> Result<(), CliError> {
+        if self.state.sandboxed && var("HARNESS_CODEX_WS_URL").ok().is_none() {
+            let Some(capability) = bridge::running_codex_capability()? else {
+                return Err(CliErrorKind::sandbox_feature_disabled(
+                    bridge::BridgeCapability::Codex.sandbox_feature(),
+                )
+                .into());
+            };
+            if !capability.healthy {
+                let endpoint = capability
+                    .endpoint
+                    .unwrap_or_else(|| codex_transport::DEFAULT_CODEX_WS_ENDPOINT.to_string());
+                return Err(CliErrorKind::codex_server_unavailable(endpoint).into());
+            }
+        }
         let transport = self.current_transport_kind();
         let Some(endpoint) = transport.endpoint() else {
             return Ok(());

@@ -1,5 +1,6 @@
 use super::*;
 use crate::agents::transport::AgentPromptSubmitArgs;
+use crate::daemon::bridge::BridgeCapability;
 use crate::daemon::transport::DaemonCommand;
 use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
@@ -589,6 +590,56 @@ fn parse_daemon_restart_json() {
             command: DaemonCommand::Restart(args),
         } => assert!(args.json),
         _ => panic!("expected daemon restart command"),
+    }
+}
+
+#[test]
+fn parse_bridge_start_defaults_to_all_capabilities() {
+    let cli = Cli::try_parse_from(["harness", "bridge", "start"]).unwrap();
+    match cli.command {
+        Command::Bridge {
+            command: BridgeCommand::Start(args),
+        } => {
+            assert!(args.config.capabilities.is_empty());
+            assert!(!args.daemon);
+        }
+        _ => panic!("expected bridge start command"),
+    }
+}
+
+#[test]
+fn parse_bridge_start_with_explicit_capabilities() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "bridge",
+        "start",
+        "--daemon",
+        "--capability",
+        "codex",
+        "--capability",
+        "agent-tui",
+        "--codex-port",
+        "14500",
+        "--codex-path",
+        "/tmp/mock-codex",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Bridge {
+            command: BridgeCommand::Start(args),
+        } => {
+            assert!(args.daemon);
+            assert_eq!(
+                args.config.capabilities,
+                vec![BridgeCapability::Codex, BridgeCapability::AgentTui]
+            );
+            assert_eq!(args.config.codex_port, Some(14500));
+            assert_eq!(
+                args.config.codex_path.as_deref(),
+                Some(Path::new("/tmp/mock-codex"))
+            );
+        }
+        _ => panic!("expected bridge start command"),
     }
 }
 

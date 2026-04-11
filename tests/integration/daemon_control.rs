@@ -4,9 +4,10 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use harness::daemon::agent_tui::{AgentTuiSnapshot, AgentTuiStatus};
-use harness::daemon::agent_tui_bridge::AgentTuiBridgeStatusReport;
+use harness::daemon::bridge::BridgeStatusReport;
 use harness::daemon::service::DaemonStatusReport;
 use harness::session::types::SessionState;
+use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 
@@ -239,8 +240,8 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
 
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _status = wait_for_daemon_ready(&home, &xdg);
-    let mut bridge = spawn_agent_tui_bridge(&home, &xdg);
-    let _bridge_status = wait_for_bridge_ready(&home, &xdg);
+    let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
 
     let project_arg = project.to_str().expect("utf8 project");
     let session_output = run_harness(
@@ -352,7 +353,115 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
         serde_json::from_slice(&stop_output.stdout).expect("parse tui stop");
     assert_eq!(stopped.status, AgentTuiStatus::Stopped);
 
-    let bridge_stop_output = run_harness(&home, &xdg, &["agent-tui-bridge", "stop"]);
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn sandboxed_codex_run_returns_501_when_bridge_excludes_codex() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let status = wait_for_daemon_ready(&home, &xdg);
+    let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let session = start_session(&home, &xdg, project_arg, "sandboxed-codex-excluded");
+    let manifest = status.manifest.as_ref().expect("daemon manifest");
+    let endpoint = manifest.endpoint.clone();
+    let token = read_daemon_token(&manifest.token_path);
+
+    let (http_status, body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/sessions/{}/codex-runs", session.session_id),
+        json!({
+            "prompt": "verify excluded codex capability",
+            "mode": "report",
+        }),
+    );
+    assert_eq!(http_status, 501, "unexpected body: {body}");
+    assert_eq!(body["error"], "sandbox-disabled");
+    assert_eq!(body["feature"], "codex.host-bridge");
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mock_codex = create_mock_codex(tmp.path());
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let status = wait_for_daemon_ready(&home, &xdg);
+    let mut bridge = spawn_bridge(
+        &home,
+        &xdg,
+        &[
+            "--capability",
+            "codex",
+            "--codex-port",
+            "14511",
+            "--codex-path",
+            mock_codex.to_str().expect("utf8 codex path"),
+        ],
+    );
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let session = start_session(&home, &xdg, project_arg, "sandboxed-agent-tui-excluded");
+    let manifest = status.manifest.as_ref().expect("daemon manifest");
+    let endpoint = manifest.endpoint.clone();
+    let token = read_daemon_token(&manifest.token_path);
+
+    let (http_status, body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        json!({
+            "runtime": "codex",
+            "name": "Excluded TUI",
+            "prompt": "verify excluded agent-tui capability",
+            "argv": ["sh", "-c", "cat"],
+            "rows": 24,
+            "cols": 80,
+        }),
+    );
+    assert_eq!(http_status, 501, "unexpected body: {body}");
+    assert_eq!(body["error"], "sandbox-disabled");
+    assert_eq!(body["feature"], "agent-tui.host-bridge");
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
     assert!(
         bridge_stop_output.status.success(),
         "bridge stop failed: {}",
@@ -382,9 +491,11 @@ fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) ->
         .expect("spawn daemon serve")
 }
 
-fn spawn_agent_tui_bridge(home: &Path, xdg: &Path) -> Child {
+fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> Child {
+    let mut args = vec!["bridge", "start"];
+    args.extend(extra_args);
     Command::new(harness_binary())
-        .args(["agent-tui-bridge", "start"])
+        .args(&args)
         .env("HOME", home)
         .env("XDG_DATA_HOME", xdg)
         .stdin(Stdio::null())
@@ -500,14 +611,22 @@ fn wait_for_child_exit(child: &mut Child) {
     }
 }
 
-fn wait_for_bridge_ready(home: &Path, xdg: &Path) -> AgentTuiBridgeStatusReport {
+fn wait_for_bridge_capabilities(
+    home: &Path,
+    xdg: &Path,
+    required_capabilities: &[&str],
+) -> BridgeStatusReport {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let output = run_harness(home, xdg, &["agent-tui-bridge", "status"]);
+        let output = run_harness(home, xdg, &["bridge", "status"]);
         if output.status.success() {
-            let report: AgentTuiBridgeStatusReport =
+            let report: BridgeStatusReport =
                 serde_json::from_slice(&output.stdout).expect("parse bridge status");
-            if report.running {
+            if report.running
+                && required_capabilities
+                    .iter()
+                    .all(|capability| report.capabilities.contains_key(*capability))
+            {
                 return report;
             }
         }
@@ -543,6 +662,84 @@ fn endpoint_is_healthy(endpoint: &str) -> bool {
             .await
             .is_ok_and(|response| response.status().is_success())
     })
+}
+
+fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Value) {
+    let url = format!(
+        "{}/{}",
+        endpoint.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    );
+    let token = token.to_string();
+    Runtime::new().expect("runtime").block_on(async move {
+        let response = reqwest::Client::new()
+            .post(&url)
+            .bearer_auth(token)
+            .json(&body)
+            .timeout(DAEMON_HTTP_TIMEOUT)
+            .send()
+            .await
+            .expect("daemon post");
+        let status = response.status().as_u16();
+        let json = response.json::<Value>().await.expect("json body");
+        (status, json)
+    })
+}
+
+fn read_daemon_token(token_path: &str) -> String {
+    std::fs::read_to_string(token_path)
+        .expect("read daemon token")
+        .trim()
+        .to_string()
+}
+
+fn start_session(home: &Path, xdg: &Path, project_arg: &str, session_id: &str) -> SessionState {
+    let start_output = run_harness(
+        home,
+        xdg,
+        &[
+            "session",
+            "start",
+            "--title",
+            "bridge exclusion coverage",
+            "--context",
+            "verify sandboxed host bridge exclusions",
+            "--runtime",
+            "codex",
+            "--session-id",
+            session_id,
+            "--project-dir",
+            project_arg,
+        ],
+    );
+    assert!(
+        start_output.status.success(),
+        "session start failed: {}",
+        output_text(&start_output)
+    );
+    serde_json::from_slice(&start_output.stdout).expect("parse session start")
+}
+
+fn create_mock_codex(base: &Path) -> PathBuf {
+    let script = base.join("mock-codex");
+    std::fs::write(
+        &script,
+        concat!(
+            "#!/bin/sh\n",
+            "if [ \"$1\" = \"--version\" ]; then\n",
+            "  echo 'mock-codex 0.0.1'\n",
+            "  exit 0\n",
+            "fi\n",
+            "sleep 300\n",
+        ),
+    )
+    .expect("write mock codex");
+    std::fs::set_permissions(
+        &script,
+        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
+    )
+    .expect("chmod mock codex");
+    script
 }
 
 fn harness_binary() -> PathBuf {

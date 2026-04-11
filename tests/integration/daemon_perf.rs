@@ -11,7 +11,7 @@ use harness::daemon::db::DaemonDb;
 use harness::daemon::http::{DaemonHttpState, serve};
 use harness::daemon::protocol::StreamEvent;
 use harness::daemon::service;
-use harness::daemon::state::{self, DaemonManifest};
+use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use harness::daemon::websocket::ReplayBuffer;
 use harness::session::service as session_service;
 use harness::session::types::{SessionRole, TaskSeverity};
@@ -60,8 +60,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         started_at: harness::workspace::utc_now(),
         token_path: String::new(),
         sandboxed: false,
-        codex_transport: "stdio".to_string(),
-        codex_endpoint: None,
+        host_bridge: HostBridgeManifest::default(),
     };
 
     let db_slot = Arc::new(OnceLock::new());

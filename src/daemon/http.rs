@@ -1204,7 +1204,7 @@ fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
                 Json(serde_json::json!({
                     "error": "codex-unavailable",
                     "endpoint": endpoint,
-                    "hint": "run: codex app-server --listen ws://127.0.0.1:4500",
+                    "hint": "run: harness bridge start",
                 })),
             )
                 .into_response()
@@ -1314,10 +1314,7 @@ mod tests {
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(body["error"], "codex-unavailable");
         assert_eq!(body["endpoint"], "ws://127.0.0.1:4500");
-        assert_eq!(
-            body["hint"],
-            "run: codex app-server --listen ws://127.0.0.1:4500"
-        );
+        assert_eq!(body["hint"], "run: harness bridge start");
     }
 
     #[tokio::test]

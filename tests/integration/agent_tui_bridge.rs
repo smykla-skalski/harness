@@ -1,52 +1,30 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use harness::daemon::agent_tui_bridge::{AgentTuiBridgeState, AgentTuiBridgeStatusReport};
+use harness::daemon::bridge::{BridgeState, BridgeStatusReport};
 use tempfile::tempdir;
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[test]
-fn agent_tui_bridge_status_reports_not_running_when_clean() {
+fn bridge_status_reports_not_running_when_clean() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["agent-tui-bridge", "status"]);
+    let output = run_bridge(&tmp, &["bridge", "status"]);
     assert!(output.status.success(), "status: {}", output_text(&output));
 
-    let report: AgentTuiBridgeStatusReport =
-        serde_json::from_slice(&output.stdout).expect("parse status");
+    let report: BridgeStatusReport = serde_json::from_slice(&output.stdout).expect("parse");
     assert!(!report.running);
     assert!(report.socket_path.is_none());
-    assert!(report.pid.is_none());
 }
 
 #[test]
-fn agent_tui_bridge_status_plain_prints_not_running() {
-    let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["agent-tui-bridge", "status", "--plain"]);
-    assert!(output.status.success(), "status: {}", output_text(&output));
-
-    let text = String::from_utf8_lossy(&output.stdout);
-    assert!(text.contains("not running"), "unexpected: {text}");
-}
-
-#[test]
-fn agent_tui_bridge_stop_is_idempotent_when_not_running() {
-    let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["agent-tui-bridge", "stop"]);
-    assert!(output.status.success(), "stop: {}", output_text(&output));
-
-    let text = String::from_utf8_lossy(&output.stdout);
-    assert!(text.contains("not running"), "unexpected: {text}");
-}
-
-#[test]
-fn agent_tui_bridge_start_refuses_when_sandboxed() {
+fn bridge_start_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let output = Command::new(harness_binary())
-        .args(["agent-tui-bridge", "start"])
+        .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
@@ -62,65 +40,11 @@ fn agent_tui_bridge_start_refuses_when_sandboxed() {
 }
 
 #[test]
-fn agent_tui_bridge_install_launch_agent_refuses_when_sandboxed() {
-    let tmp = tempdir().expect("tempdir");
-    let output = Command::new(harness_binary())
-        .args(["agent-tui-bridge", "install-launch-agent"])
-        .env("HARNESS_SANDBOXED", "1")
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .output()
-        .expect("run harness");
-    assert!(!output.status.success());
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("SANDBOX001") || stderr.contains("sandbox"),
-        "expected sandbox error: {stderr}"
-    );
-}
-
-#[test]
-fn agent_tui_bridge_remove_launch_agent_refuses_when_sandboxed() {
-    let tmp = tempdir().expect("tempdir");
-    let output = Command::new(harness_binary())
-        .args(["agent-tui-bridge", "remove-launch-agent"])
-        .env("HARNESS_SANDBOXED", "1")
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .output()
-        .expect("run harness");
-    assert!(!output.status.success());
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("SANDBOX001") || stderr.contains("sandbox"),
-        "expected sandbox error: {stderr}"
-    );
-}
-
-#[test]
-fn agent_tui_bridge_remove_launch_agent_is_idempotent() {
-    let tmp = tempdir().expect("tempdir");
-    let output = Command::new(harness_binary())
-        .args(["agent-tui-bridge", "remove-launch-agent"])
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .env("HOME", tmp.path())
-        .output()
-        .expect("run harness");
-    assert!(output.status.success(), "remove: {}", output_text(&output));
-
-    let text = String::from_utf8_lossy(&output.stdout);
-    assert!(text.contains("not installed"), "unexpected output: {text}");
-}
-
-#[test]
-fn agent_tui_bridge_start_publishes_state_and_stops_cleanly() {
+fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
     let tmp = tempdir().expect("tempdir");
 
     let mut bridge = Command::new(harness_binary())
-        .args(["agent-tui-bridge", "start"])
+        .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env_remove("HARNESS_APP_GROUP_ID")
@@ -134,32 +58,42 @@ fn agent_tui_bridge_start_publishes_state_and_stops_cleanly() {
     let state = wait_for_bridge_state(tmp.path());
     assert!(state.pid > 0);
     assert!(
-        state
-            .socket_path
-            .ends_with("harness/daemon/agent-tui-bridge.sock"),
+        state.socket_path.ends_with("harness/daemon/bridge.sock"),
         "unexpected socket path: {}",
         state.socket_path
     );
+    let capability = state
+        .capabilities
+        .get("agent-tui")
+        .expect("agent-tui capability");
+    assert_eq!(capability.transport, "unix");
+    assert_eq!(
+        capability
+            .metadata
+            .get("active_sessions")
+            .map(String::as_str),
+        Some("0")
+    );
 
-    let status_output = run_bridge(&tmp, &["agent-tui-bridge", "status"]);
+    let status_output = run_bridge(&tmp, &["bridge", "status"]);
     assert!(
         status_output.status.success(),
         "status: {}",
         output_text(&status_output)
     );
-    let report: AgentTuiBridgeStatusReport =
-        serde_json::from_slice(&status_output.stdout).expect("parse status");
+    let report: BridgeStatusReport = serde_json::from_slice(&status_output.stdout).expect("parse");
     assert!(report.running);
-    assert_eq!(report.pid, Some(state.pid));
+    assert!(report.capabilities.contains_key("agent-tui"));
+    assert!(!report.capabilities.contains_key("codex"));
 
-    let stop_output = run_bridge(&tmp, &["agent-tui-bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
         output_text(&stop_output)
     );
 
-    let state_path = tmp.path().join("harness/daemon/agent-tui-bridge.json");
+    let state_path = tmp.path().join("harness/daemon/bridge.json");
     assert!(!state_path.exists(), "state file should be cleaned up");
 
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
@@ -176,14 +110,17 @@ fn agent_tui_bridge_start_publishes_state_and_stops_cleanly() {
 }
 
 #[test]
-fn agent_tui_bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
+fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
     let tmp = tempdir().expect("tempdir");
     let data_home = tmp.path().join(
         "deep/nesting/that/makes/the/default/daemon/socket/path/too/long/for/macos/unix/domain/sockets",
     );
     std::fs::create_dir_all(&data_home).expect("create data home");
 
-    let output = run_bridge_with_data_home(&data_home, &["agent-tui-bridge", "start", "--daemon"]);
+    let output = run_bridge_with_data_home(
+        &data_home,
+        &["bridge", "start", "--daemon", "--capability", "agent-tui"],
+    );
     assert!(output.status.success(), "start: {}", output_text(&output));
 
     let state = wait_for_bridge_state(&data_home);
@@ -194,17 +131,7 @@ fn agent_tui_bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
         state.socket_path
     );
 
-    let status_output = run_bridge_with_data_home(&data_home, &["agent-tui-bridge", "status"]);
-    assert!(
-        status_output.status.success(),
-        "status: {}",
-        output_text(&status_output)
-    );
-    let report: AgentTuiBridgeStatusReport =
-        serde_json::from_slice(&status_output.stdout).expect("parse status");
-    assert!(report.running);
-
-    let stop_output = run_bridge_with_data_home(&data_home, &["agent-tui-bridge", "stop"]);
+    let stop_output = run_bridge_with_data_home(&data_home, &["bridge", "stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -216,14 +143,14 @@ fn agent_tui_bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
     );
 }
 
-fn wait_for_bridge_state(data_home: &std::path::Path) -> AgentTuiBridgeState {
-    let state_path = data_home.join("harness/daemon/agent-tui-bridge.json");
+fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
+    let state_path = data_home.join("harness/daemon/bridge.json");
     let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
     loop {
-        if let Ok(data) = std::fs::read_to_string(&state_path) {
-            if let Ok(state) = serde_json::from_str::<AgentTuiBridgeState>(&data) {
-                return state;
-            }
+        if let Ok(data) = std::fs::read_to_string(&state_path)
+            && let Ok(state) = serde_json::from_str::<BridgeState>(&data)
+        {
+            return state;
         }
         assert!(
             Instant::now() < deadline,
@@ -238,7 +165,7 @@ fn run_bridge(tmp: &tempfile::TempDir, args: &[&str]) -> Output {
     run_bridge_with_data_home(tmp.path(), args)
 }
 
-fn run_bridge_with_data_home(data_home: &std::path::Path, args: &[&str]) -> Output {
+fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Output {
     Command::new(harness_binary())
         .args(args)
         .env("HARNESS_DAEMON_DATA_HOME", data_home)

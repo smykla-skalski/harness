@@ -21,7 +21,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
 
-use super::codex_bridge;
+use super::bridge;
 use super::codex_controller::CodexControllerHandle;
 use super::codex_transport::{self, CodexTransportKind};
 use super::http::{self, DaemonHttpState};
@@ -162,8 +162,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         started_at: utc_now(),
         token_path: state::auth_token_path().display().to_string(),
         sandboxed: config.sandboxed,
-        codex_transport: config.codex_transport.manifest_label().to_string(),
-        codex_endpoint: config.codex_transport.endpoint().map(ToString::to_string),
+        host_bridge: bridge::host_bridge_manifest()?,
     };
     state::write_manifest(&manifest)?;
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
@@ -185,7 +184,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
     let agent_tui_manager =
         super::agent_tui::AgentTuiManagerHandle::new(sender.clone(), db.clone(), config.sandboxed);
-    let _bridge_watcher = codex_bridge::spawn_bridge_endpoint_watcher(config.sandboxed);
+    let _bridge_watcher = bridge::spawn_manifest_watcher();
 
     let app_state = DaemonHttpState {
         token,
@@ -1991,8 +1990,7 @@ mod tests {
                     started_at: "2026-03-28T12:00:00Z".into(),
                     token_path: state::auth_token_path().display().to_string(),
                     sandboxed: false,
-                    codex_transport: "stdio".to_string(),
-                    codex_endpoint: None,
+                    host_bridge: super::state::HostBridgeManifest::default(),
                 };
                 state::write_manifest(&manifest).expect("manifest");
                 state::append_event("info", "daemon booted").expect("append event");

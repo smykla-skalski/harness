@@ -982,8 +982,7 @@ mod tests {
             started_at: "2026-04-04T00:00:00Z".to_string(),
             token_path: "/tmp/auth-token".to_string(),
             sandboxed: false,
-            codex_transport: "stdio".to_string(),
-            codex_endpoint: None,
+            host_bridge: state::HostBridgeManifest::default(),
         }
     }
 
