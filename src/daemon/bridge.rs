@@ -1491,10 +1491,43 @@ fn unix_socket_path_fits(path: &Path) -> bool {
 
 fn fallback_bridge_socket_path(daemon_root: &Path) -> PathBuf {
     let digest = hex::encode(Sha256::digest(daemon_root.as_os_str().as_bytes()));
+
+    // When the daemon lives inside a macOS Group Container, the standard
+    // `/tmp` fallback is blocked by the App Sandbox. Place the fallback
+    // socket at the group container root instead, which every process
+    // holding the matching `application-groups` entitlement can reach.
+    // Shorten the hash suffix progressively so the combined path still
+    // fits the 103-byte AF_UNIX `sun_path` limit even for longer homes.
+    if let Some(group_container) = group_container_root(daemon_root) {
+        for hash_len in [16usize, 12, 8, 4] {
+            let file_name = format!("h-{}.sock", &digest[..hash_len]);
+            let socket_path = group_container.join(file_name);
+            if unix_socket_path_fits(&socket_path) {
+                return socket_path;
+            }
+        }
+    }
+
     PathBuf::from("/tmp").join(format!(
         "{FALLBACK_BRIDGE_SOCKET_PREFIX}{}{FALLBACK_BRIDGE_SOCKET_SUFFIX}",
         &digest[..16]
     ))
+}
+
+/// Returns `~/Library/Group Containers/{group}` when `daemon_root` is nested
+/// inside a macOS Group Container, or `None` otherwise.
+fn group_container_root(daemon_root: &Path) -> Option<PathBuf> {
+    let components: Vec<_> = daemon_root.components().collect();
+    for (idx, window) in components.windows(3).enumerate() {
+        if window[0].as_os_str() == "Library" && window[1].as_os_str() == "Group Containers" {
+            let mut path = PathBuf::new();
+            for component in &components[..=idx + 2] {
+                path.push(component.as_os_str());
+            }
+            return Some(path);
+        }
+    }
+    None
 }
 
 /// Load the persisted bridge state if it exists.
@@ -2708,6 +2741,77 @@ mod tests {
         let path = bridge_socket_path_for_root(&long_root);
         assert!(path.starts_with("/tmp"));
         assert!(unix_socket_path_fits(&path));
+    }
+
+    #[test]
+    fn bridge_socket_fallback_uses_group_container_when_nested() {
+        // Fully synthetic daemon root that mirrors the sandboxed shape
+        // `{prefix}/Library/Group Containers/{group}/harness/daemon`.
+        // Chosen so that `{daemon_root}/bridge.sock` exceeds the 103-byte
+        // AF_UNIX `sun_path` limit (forcing the fallback to run) while the
+        // group container root still has enough headroom for a shortened
+        // hash suffix, independent of the host running the test.
+        let group_container = PathBuf::from(
+            "/private/sandbox-test-user/Library/Group Containers/Q498EB36N4.io.harnessmonitor",
+        );
+        let daemon_root = group_container.join("harness/daemon");
+
+        let preferred = daemon_root.join(DEFAULT_BRIDGE_SOCKET_NAME);
+        assert!(
+            !unix_socket_path_fits(&preferred),
+            "regression guard: preferred path must exceed the 103-byte limit so the fallback runs ({} bytes)",
+            preferred.as_os_str().len(),
+        );
+
+        let path = bridge_socket_path_for_root(&daemon_root);
+        assert!(
+            unix_socket_path_fits(&path),
+            "fallback path must fit within UNIX_SOCKET_PATH_LIMIT: {} ({} bytes)",
+            path.display(),
+            path.as_os_str().len(),
+        );
+        assert!(
+            path.starts_with(&group_container),
+            "fallback must land inside the group container, got {}",
+            path.display()
+        );
+        assert!(
+            !path.starts_with("/tmp"),
+            "sandboxed daemons cannot reach /tmp; fallback must avoid it, got {}",
+            path.display()
+        );
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("fallback socket file name");
+        assert!(
+            file_name.starts_with("h-") && file_name.ends_with(FALLBACK_BRIDGE_SOCKET_SUFFIX),
+            "unexpected fallback file name: {file_name}"
+        );
+    }
+
+    #[test]
+    fn group_container_root_detects_nested_path() {
+        let daemon_root = PathBuf::from(
+            "/Users/example/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/daemon",
+        );
+        assert_eq!(
+            group_container_root(&daemon_root),
+            Some(PathBuf::from(
+                "/Users/example/Library/Group Containers/Q498EB36N4.io.harnessmonitor"
+            ))
+        );
+    }
+
+    #[test]
+    fn group_container_root_returns_none_outside_container() {
+        assert!(
+            group_container_root(&PathBuf::from(
+                "/Users/example/Library/Application Support/harness/daemon"
+            ))
+            .is_none()
+        );
+        assert!(group_container_root(&PathBuf::from("/tmp/harness/daemon")).is_none());
     }
 
     // --- bridge.lock unit tests ---
