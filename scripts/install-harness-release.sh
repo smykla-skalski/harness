@@ -6,6 +6,8 @@ binary_dir="${HOME}/.local/bin"
 binary_path="${binary_dir}/harness"
 tmp_path="${binary_path}.new"
 signing_identity="Developer ID Application: Bartlomiej Smykla (Q498EB36N4)"
+target_dir="${CARGO_TARGET_DIR:-target}"
+build_binary="${target_dir}/release/harness"
 
 trap 'command rm -f "${tmp_path}"' EXIT
 
@@ -28,7 +30,7 @@ cleanup_cli_launch_agent() {
 
 command mkdir -p "${binary_dir}"
 command rm -f "${tmp_path}"
-command cp target/release/harness "${tmp_path}"
+command cp "${build_binary}" "${tmp_path}"
 command chmod 755 "${tmp_path}"
 command codesign --force --options=runtime -s "${signing_identity}" "${tmp_path}"
 command chmod 555 "${tmp_path}"
@@ -36,7 +38,7 @@ command mv -f "${tmp_path}" "${binary_path}"
 
 cleanup_cli_launch_agent
 
-expected_version="$(target/release/harness --version | command awk '{print $2}')"
+expected_version="$("${build_binary}" --version | command awk '{print $2}')"
 installed_version="$("${binary_path}" --version | command awk '{print $2}')"
 if [[ "${installed_version}" != "${expected_version}" ]]; then
   printf 'installed harness version %s != expected %s\n' "${installed_version}" "${expected_version}" >&2

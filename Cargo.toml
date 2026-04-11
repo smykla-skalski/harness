@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "19.7.3"
+version = "19.7.4"
 edition = "2024"
 rust-version = "1.94"
 
@@ -69,6 +69,12 @@ kuma = []
 helm = []
 k3d = []
 compose = []
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

@@ -12,6 +12,35 @@ mise run install
 
 Builds a release binary and installs `harness` to `~/.local/bin`. Requires Rust 1.94+.
 
+## Fast Local Rust Workflow
+
+The repo `mise` tasks route Rust compilation through [`scripts/cargo-local.sh`](scripts/cargo-local.sh). The wrapper keeps local development responsive and avoids multi-agent target-dir lock contention.
+
+- If `sccache` is installed, the wrapper enables it automatically through `RUSTC_WRAPPER`.
+- Build jobs default to a conservative local cap instead of saturating every CPU. Agent sessions use an even lower default so multiple workers can compile in parallel without swamping the host. Override with `HARNESS_CARGO_JOBS=<n>` or `CARGO_BUILD_JOBS=<n>`.
+- Agent sessions get isolated target directories under `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use `target/dev/local`.
+- Full release installs still sign and install the binary locally, but now respect `CARGO_TARGET_DIR` so the build and install steps stay aligned.
+
+Without `sccache`, isolated target directories trade lock contention for duplicate compilation across agents. Install `sccache` if you want multi-agent sessions to reuse most compile work instead of rebuilding the same crates in parallel.
+
+Inspect the current wrapper settings with:
+
+```bash
+mise run cargo:env
+```
+
+For the best local experience, install `sccache` once:
+
+```bash
+brew install sccache
+```
+
+When you need full debug symbols for LLDB instead of faster incremental builds, temporarily override:
+
+```bash
+CARGO_PROFILE_DEV_DEBUG=2 CARGO_PROFILE_TEST_DEBUG=2 mise run test:unit
+```
+
 ## Commands
 
 ### setup - environment and cluster preparation
