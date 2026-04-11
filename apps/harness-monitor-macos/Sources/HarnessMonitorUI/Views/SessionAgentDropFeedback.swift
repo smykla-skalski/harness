@@ -146,42 +146,44 @@ struct AgentTaskDropFeedbackOverlay: View {
   }
 
   var body: some View {
-    ZStack {
-      Color.clear
-        .harnessDragFeedbackSurface(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-          tint: feedback.tint
-        )
-      Circle()
-        .fill(feedback.tint.opacity(0.32))
-        .frame(width: 160, height: 160)
-        .blur(radius: 28)
-      VStack(spacing: HarnessMonitorTheme.spacingXS) {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Image(systemName: feedback.systemImage)
-            .imageScale(.small)
-          Text(feedback.title)
-            .scaledFont(.caption.weight(.bold))
-        }
-        .lineLimit(2)
-        Text(feedback.detail)
-          .scaledFont(.caption2.weight(.semibold))
-          .lineLimit(2)
+    Color.clear
+      .harnessDragFeedbackSurface(
+        cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+        tint: feedback.tint
+      )
+      .overlay {
+        Circle()
+          .fill(feedback.tint.opacity(0.32))
+          .frame(width: 160, height: 160)
+          .blur(radius: 28)
       }
-      .multilineTextAlignment(.center)
-      .foregroundStyle(feedback.tint)
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    }
-    .clipShape(
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(feedback.tint, style: strokeStyle)
-    }
-    .allowsHitTesting(false)
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(feedback.title)
-    .accessibilityValue(feedback.detail)
+      .overlay {
+        VStack(spacing: HarnessMonitorTheme.spacingXS) {
+          HStack(spacing: HarnessMonitorTheme.spacingXS) {
+            Image(systemName: feedback.systemImage)
+              .imageScale(.small)
+            Text(feedback.title)
+              .scaledFont(.caption.weight(.bold))
+          }
+          .lineLimit(2)
+          Text(feedback.detail)
+            .scaledFont(.caption2.weight(.semibold))
+            .lineLimit(2)
+        }
+        .multilineTextAlignment(.center)
+        .foregroundStyle(feedback.tint)
+        .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      }
+      .clipShape(
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .strokeBorder(feedback.tint, style: strokeStyle)
+      }
+      .allowsHitTesting(false)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(feedback.title)
+      .accessibilityValue(feedback.detail)
   }
 }
