@@ -6,6 +6,7 @@ mod integration {
     mod bridge_agent_tui;
     mod bridge_codex;
     mod bridge_discovery;
+    mod bridge_lock_lifecycle;
     mod daemon_comparison;
     mod daemon_control;
     mod daemon_perf;
