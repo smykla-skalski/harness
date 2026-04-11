@@ -42,36 +42,6 @@ struct SidebarView: View {
     self.sidebarVisible = sidebarVisible
   }
 
-  private var sidebarSelection: Binding<String?> {
-    Binding(
-      get: { renderedSidebarSelectionID },
-      set: { newValue in
-        if let pendingTapSelectionID = selectionTapBridge.pendingTapSelectionID {
-          selectionTapBridge.pendingTapSelectionID = nil
-          if pendingTapSelectionID == newValue {
-            return
-          }
-        }
-        if newValue == nil, sidebarUI.selectedSessionID != nil {
-          return
-        }
-        guard sidebarUI.selectedSessionID != newValue else {
-          return
-        }
-        store.selectSessionFromList(newValue)
-      }
-    )
-  }
-
-  private var renderedSidebarSelectionID: String? {
-    guard let selectedSessionID = sidebarUI.selectedSessionID,
-      searchResults.visibleSessionIDs.contains(selectedSessionID)
-    else {
-      return nil
-    }
-    return selectedSessionID
-  }
-
   private var sidebarSearchText: Binding<String> {
     Binding(
       get: { controls.searchText },
@@ -89,21 +59,6 @@ struct SidebarView: View {
       || controls.sessionFilter != .all
       || controls.sessionFocusFilter != .all
       || controls.sessionSortOrder != .recentActivity
-  }
-
-  private var sidebarListRenderState: SidebarSessionListRenderState {
-    SidebarSessionListRenderState(
-      projectionGroups: projection.groupedSessions,
-      searchPresentation: searchResults.presentationState,
-      searchList: searchResults.listState,
-      selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
-        .accessibilityMarkersEnabled ? sidebarUI.selectedSessionID : nil,
-      bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
-      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
-      dateTimeConfiguration: dateTimeConfiguration,
-      fontScale: fontScale,
-      collapsedCheckoutKeys: collapsedCheckoutKeys
-    )
   }
 
   private var sidebarFilterStateValue: String {
@@ -130,19 +85,17 @@ struct SidebarView: View {
   }
 
   var body: some View {
-    List(selection: sidebarSelection) {
-      SidebarSessionListContent(
-        renderState: sidebarListRenderState,
-        selectSession: { sessionID in
-          selectionTapBridge.pendingTapSelectionID = sessionID
-          store.selectSessionFromList(sessionID)
-        },
-        toggleBookmark: { sessionID, projectID in
-          store.toggleBookmark(sessionId: sessionID, projectId: projectID)
-        },
-        setCheckoutCollapsed: setCheckoutCollapsed
-      )
-    }
+    SidebarSessionListColumn(
+      store: store,
+      projection: projection,
+      searchResults: searchResults,
+      sidebarUI: sidebarUI,
+      dateTimeConfiguration: dateTimeConfiguration,
+      fontScale: fontScale,
+      collapsedCheckoutKeys: collapsedCheckoutKeys,
+      selectionTapBridge: selectionTapBridge,
+      setCheckoutCollapsed: setCheckoutCollapsed
+    )
     .listStyle(.sidebar)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .searchable(
@@ -253,6 +206,79 @@ struct SidebarView: View {
     store.flushPendingSearchRebuild()
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
+    }
+  }
+}
+
+private struct SidebarSessionListColumn: View {
+  let store: HarnessMonitorStore
+  let projection: HarnessMonitorStore.SessionProjectionSlice
+  let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
+  let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+  let fontScale: CGFloat
+  let collapsedCheckoutKeys: Set<String>
+  let selectionTapBridge: SidebarSelectionTapBridge
+  let setCheckoutCollapsed: (String, Bool) -> Void
+
+  private var sidebarSelection: Binding<String?> {
+    Binding(
+      get: { renderedSidebarSelectionID },
+      set: { newValue in
+        if let pendingTapSelectionID = selectionTapBridge.pendingTapSelectionID {
+          selectionTapBridge.pendingTapSelectionID = nil
+          if pendingTapSelectionID == newValue {
+            return
+          }
+        }
+        if newValue == nil, sidebarUI.selectedSessionID != nil {
+          return
+        }
+        guard sidebarUI.selectedSessionID != newValue else {
+          return
+        }
+        store.selectSessionFromList(newValue)
+      }
+    )
+  }
+
+  private var renderedSidebarSelectionID: String? {
+    guard let selectedSessionID = sidebarUI.selectedSessionID,
+      searchResults.visibleSessionIDs.contains(selectedSessionID)
+    else {
+      return nil
+    }
+    return selectedSessionID
+  }
+
+  private var renderState: SidebarSessionListRenderState {
+    SidebarSessionListRenderState(
+      projectionGroups: projection.groupedSessions,
+      searchPresentation: searchResults.presentationState,
+      searchList: searchResults.listState,
+      selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
+        .accessibilityMarkersEnabled ? sidebarUI.selectedSessionID : nil,
+      bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
+      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+      dateTimeConfiguration: dateTimeConfiguration,
+      fontScale: fontScale,
+      collapsedCheckoutKeys: collapsedCheckoutKeys
+    )
+  }
+
+  var body: some View {
+    List(selection: sidebarSelection) {
+      SidebarSessionListContent(
+        renderState: renderState,
+        selectSession: { sessionID in
+          selectionTapBridge.pendingTapSelectionID = sessionID
+          store.selectSessionFromList(sessionID)
+        },
+        toggleBookmark: { sessionID, projectID in
+          store.toggleBookmark(sessionId: sessionID, projectId: projectID)
+        },
+        setCheckoutCollapsed: setCheckoutCollapsed
+      )
     }
   }
 }
