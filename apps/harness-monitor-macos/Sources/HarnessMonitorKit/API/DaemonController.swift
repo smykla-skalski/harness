@@ -74,6 +74,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case daemonOffline
   case daemonDidNotStart
   case externalDaemonOffline(manifestPath: String)
+  case externalDaemonManifestStale(manifestPath: String)
   case commandFailed(String)
 
   public var errorDescription: String? {
@@ -91,6 +92,9 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
     case .externalDaemonOffline(let manifestPath):
       "External daemon not running. Start it in a terminal: `harness daemon dev`. "
         + "Manifest expected at \(manifestPath)."
+    case .externalDaemonManifestStale(let manifestPath):
+      "Stale manifest detected at \(manifestPath). The external daemon exited "
+        + "without cleanup. Restart it with `harness daemon dev` in a terminal."
     case .commandFailed(let message):
       message
     }
@@ -230,10 +234,15 @@ public struct DaemonController: DaemonControlling {
     if let client = try? await bootstrapClient() {
       return client
     }
-    if ownership == .external, sawUnreachableManifest {
-      throw DaemonControlError.externalDaemonOffline(
-        manifestPath: HarnessMonitorPaths.manifestURL(using: environment).path
-      )
+    if ownership == .external {
+      let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+      if sawUnreachableManifest {
+        // Manifest existed throughout the warm-up but nothing bound to its
+        // endpoint. Classic crash-without-cleanup: SIGKILL'd dev daemon.
+        throw DaemonControlError.externalDaemonManifestStale(manifestPath: manifestPath)
+      }
+      // No manifest ever appeared; the dev daemon was never started.
+      throw DaemonControlError.externalDaemonOffline(manifestPath: manifestPath)
     }
     throw lastError ?? DaemonControlError.daemonDidNotStart
   }
@@ -276,6 +285,12 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func installLaunchAgent() async throws -> String {
+    if ownership == .external {
+      throw DaemonControlError.commandFailed(
+        "Install Launch Agent is disabled in external daemon mode. "
+          + "Stop the dev daemon or unset HARNESS_MONITOR_EXTERNAL_DAEMON to install."
+      )
+    }
     switch launchAgentManager.registrationState() {
     case .enabled:
       return "launch agent already installed"
@@ -296,6 +311,11 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func removeLaunchAgent() async throws -> String {
+    if ownership == .external {
+      throw DaemonControlError.commandFailed(
+        "Remove Launch Agent is disabled in external daemon mode."
+      )
+    }
     switch launchAgentManager.registrationState() {
     case .notRegistered, .notFound:
       return "launch agent not installed"
