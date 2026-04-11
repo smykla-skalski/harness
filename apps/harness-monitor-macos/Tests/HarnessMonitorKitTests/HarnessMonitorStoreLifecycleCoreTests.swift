@@ -169,7 +169,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
 
     await store.selectSession(selectedSummary.sessionId)
     #expect(store.sidebarUI.selectedSessionID == selectedSummary.sessionId)
-    #expect(store.contentUI.shell.selectedSessionID == selectedSummary.sessionId)
+    #expect(store.contentUI.session.selectedSessionSummary == selectedSummary)
 
     let replacementSummary = makeSession(
       .init(
@@ -196,7 +196,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.timeline.isEmpty)
     #expect(store.subscribedSessionIDs.isEmpty)
     #expect(store.sidebarUI.selectedSessionID == nil)
-    #expect(store.contentUI.shell.selectedSessionID == nil)
+    #expect(store.contentUI.session.selectedSessionSummary == nil)
   }
 
   @Test("Bootstrap with notRegistered agent marks offline and sets installed false")

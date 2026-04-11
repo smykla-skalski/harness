@@ -37,22 +37,11 @@ public struct ContentView: View {
   @State private var isLayoutAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
-  private var windowTitle: String {
-    contentShell.windowTitle
-  }
-
   private var appChromeAccessibilityValue: String {
     [
       "contentChrome=native",
       "interactiveRows=list",
       "controlGlass=native",
-    ].joined(separator: ", ")
-  }
-
-  private var toolbarChromeAccessibilityValue: String {
-    [
-      "toolbarTitle=native-window",
-      "windowTitle=\(windowTitle)",
     ].joined(separator: ", ")
   }
 
@@ -119,7 +108,6 @@ public struct ContentView: View {
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .navigationTitle(windowTitle)
     .toolbar {
       ContentNavigationToolbarItems(
         store: store,
@@ -166,9 +154,9 @@ public struct ContentView: View {
             identifier: HarnessMonitorAccessibility.appChromeState,
             text: appChromeAccessibilityValue
           )
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.toolbarChromeState,
-            text: toolbarChromeAccessibilityValue
+          ContentToolbarChromeAccessibilityMarker(
+            contentSession: contentSession,
+            contentSessionDetail: contentSessionDetail
           )
           if let auditBuildAccessibilityValue {
             AccessibilityTextMarker(
@@ -194,7 +182,7 @@ public struct ContentView: View {
     .background {
       ContentSceneRestorationBridge(
         store: store,
-        shellUI: contentShell
+        selection: store.selection
       )
     }
     .modifier(
@@ -247,6 +235,11 @@ public struct ContentView: View {
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       isLayoutAnimating: isLayoutAnimating,
       detailColumnWidth: $detailColumnWidth
+    )
+    .navigationTitle(
+      contentSessionDetail.selectedSessionDetail != nil
+        || contentSession.selectedSessionSummary != nil
+        ? "Cockpit" : "Dashboard"
     )
     .inspector(isPresented: $showInspector) {
       inspectorColumn
@@ -368,7 +361,7 @@ public struct ContentView: View {
 
 private struct ContentSceneRestorationBridge: View {
   let store: HarnessMonitorStore
-  let shellUI: HarnessMonitorStore.ContentShellSlice
+  let selection: HarnessMonitorStore.SelectionSlice
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
   @State private var hasSeededSceneRestoration = false
@@ -382,7 +375,7 @@ private struct ContentSceneRestorationBridge: View {
       .onChange(of: restoredSessionID) { _, newID in
         seedRestorationIfNeeded(from: newID)
       }
-      .onChange(of: shellUI.selectedSessionID) { _, newID in
+      .onChange(of: selection.selectedSessionID) { _, newID in
         if restoredSessionID != newID {
           restoredSessionID = newID
         }
@@ -396,10 +389,31 @@ private struct ContentSceneRestorationBridge: View {
     guard !hasSeededSceneRestoration else {
       return
     }
-    guard shellUI.selectedSessionID == nil, let restoredSessionID else {
+    guard selection.selectedSessionID == nil, let restoredSessionID else {
       return
     }
     hasSeededSceneRestoration = true
     store.primeSessionSelection(restoredSessionID)
+  }
+}
+
+private struct ContentToolbarChromeAccessibilityMarker: View {
+  let contentSession: HarnessMonitorStore.ContentSessionSlice
+  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
+
+  private var windowTitle: String {
+    contentSessionDetail.selectedSessionDetail != nil
+      || contentSession.selectedSessionSummary != nil
+      ? "Cockpit" : "Dashboard"
+  }
+
+  var body: some View {
+    AccessibilityTextMarker(
+      identifier: HarnessMonitorAccessibility.toolbarChromeState,
+      text: [
+        "toolbarTitle=native-window",
+        "windowTitle=\(windowTitle)",
+      ].joined(separator: ", ")
+    )
   }
 }

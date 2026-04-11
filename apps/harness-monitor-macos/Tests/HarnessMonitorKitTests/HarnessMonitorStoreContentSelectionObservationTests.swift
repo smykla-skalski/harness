@@ -35,7 +35,6 @@ struct HarnessMonitorContentSelectionTests {
     let didChange = await didInvalidate(
       {
         (
-          store.contentUI.shell.windowTitle,
           store.contentUI.toolbar.toolbarMetrics,
           store.contentUI.shell.connectionState
         )
@@ -48,12 +47,12 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
-  @Test("Content shell window title ignores toast feedback churn")
-  func contentShellWindowTitleIgnoresToastFeedbackChurn() async {
+  @Test("Content session summary ignores toast feedback churn")
+  func contentSessionSummaryIgnoresToastFeedbackChurn() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      { store.contentUI.shell.windowTitle },
+      { store.contentUI.session.selectedSessionSummary },
       after: {
         store.presentSuccessFeedback("Refresh complete")
       }
@@ -163,34 +162,39 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
-  @Test("Content UI selection state tracks session selection changes")
-  func contentUISelectionStateTracksSessionSelectionChanges() async {
+  @Test("Content session summary tracks session selection changes")
+  func contentSessionSummaryTracksSessionSelectionChanges() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      { store.contentUI.shell.selectedSessionID },
+      { store.contentUI.session.selectedSessionSummary },
       after: {
         await store.selectSession(PreviewFixtures.summary.sessionId)
       }
     )
 
     #expect(didChange)
-    #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.contentUI.session.selectedSessionSummary == PreviewFixtures.summary)
   }
 
-  @Test("Priming session selection updates content shell selection state")
-  func primingSessionSelectionUpdatesContentShellSelectionState() async {
+  @Test("Priming session selection updates content session state")
+  func primingSessionSelectionUpdatesContentSessionState() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      { store.contentUI.shell.selectedSessionID },
+      {
+        (
+          store.contentUI.session.selectedSessionSummary,
+          store.contentUI.session.isSelectionLoading
+        )
+      },
       after: {
         store.primeSessionSelection(PreviewFixtures.summary.sessionId)
       }
     )
 
     #expect(didChange)
-    #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.contentUI.session.selectedSessionSummary == PreviewFixtures.summary)
     #expect(store.contentUI.session.isSelectionLoading)
   }
 
@@ -230,7 +234,7 @@ struct HarnessMonitorContentSelectionTests {
 
     store.primeSessionSelection(PreviewFixtures.summary.sessionId)
 
-    #expect(store.debugUISyncCount(for: .contentShell) == 1)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
     #expect(store.debugUISyncCount(for: .sidebar) == 1)
     #expect(store.debugUISyncCount(for: .inspector) == 1)
@@ -299,14 +303,14 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
   }
 
-  @Test("Selecting a session from the dashboard only syncs the root shell once")
-  func selectingSessionOnlySyncsRootShellOnce() async {
+  @Test("Selecting a session from the dashboard skips root shell sync")
+  func selectingSessionSkipsRootShellSync() async {
     let store = await makeBootstrappedStore()
     store.debugResetUISyncCounts()
 
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
-    #expect(store.debugUISyncCount(for: .contentShell) == 1)
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
   }
 
   @Test("Priming current session does not invalidate content or inspector slices")
@@ -317,7 +321,6 @@ struct HarnessMonitorContentSelectionTests {
     let contentChanged = await didInvalidate(
       {
         (
-          store.contentUI.shell.selectedSessionID,
           store.contentUI.session.selectedSessionSummary,
           store.contentUI.session.isSelectionLoading,
           store.contentUI.toolbar.canNavigateBack,

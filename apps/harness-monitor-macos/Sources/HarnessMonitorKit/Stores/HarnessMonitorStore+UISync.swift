@@ -58,11 +58,7 @@ extension HarnessMonitorStore {
     selection.onChanged = { [weak self] change in
       switch change {
       case .selectedSessionID:
-        // The content chrome depends on loaded detail or summary metadata, not
-        // the session ID alone. Skipping it here avoids an extra shell-wide
-        // invalidation during the initial cockpit-open transition.
         self?.scheduleUISync([
-          .contentShell,
           .contentSession,
           .sidebar,
           .inspector,
@@ -192,16 +188,8 @@ extension HarnessMonitorStore {
   }
 
   private func syncContentShellUI() {
-    let selectedDetail = selection.matchedSelectedSession
-    let selectedSessionSummary = sessionIndex.sessionSummary(
-      for: selection.selectedSessionID
-    )
-
     contentUI.shell.apply(
       ContentShellState(
-        selectedSessionID: selection.selectedSessionID,
-        windowTitle: selectedDetail != nil || selectedSessionSummary != nil
-          ? "Cockpit" : "Dashboard",
         connectionState: connectionState,
         pendingConfirmation: pendingConfirmation,
         presentedSheet: presentedSheet
