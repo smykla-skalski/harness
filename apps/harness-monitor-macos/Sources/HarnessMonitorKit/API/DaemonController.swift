@@ -139,7 +139,9 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
-    HarnessMonitorLogger.lifecycle.debug("Bootstrapping daemon client")
+    HarnessMonitorLogger.lifecycle.trace(
+      "Bootstrapping daemon client for \(String(describing: ownership), privacy: .public) daemon mode"
+    )
     let connection = try loadConnection()
     return try await bootstrap(connection: connection)
   }
@@ -156,11 +158,17 @@ public struct DaemonController: DaemonControlling {
   private func bootstrap(
     connection: HarnessMonitorConnection
   ) async throws -> any HarnessMonitorClientProtocol {
+    HarnessMonitorLogger.lifecycle.trace(
+      "Probing daemon health over HTTP at \(connection.endpoint.absoluteString, privacy: .public)"
+    )
     let httpClient = sessionFactory(connection)
     _ = try await httpClient.health()
 
     if transportPreference != .http {
       if let wsClient = try? await bootstrapWebSocket(connection: connection) {
+        HarnessMonitorLogger.lifecycle.trace(
+          "Upgraded daemon transport to WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
+        )
         return wsClient
       }
       if transportPreference == .webSocket {
@@ -218,6 +226,9 @@ public struct DaemonController: DaemonControlling {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
+    HarnessMonitorLogger.lifecycle.trace(
+      "Waiting up to \(String(describing: timeout), privacy: .public) for daemon manifest warm-up"
+    )
     let deadline = ContinuousClock.now + timeout
     var lastError: (any Error)?
     var sawUnreachableManifest = false
@@ -230,10 +241,19 @@ public struct DaemonController: DaemonControlling {
           endpoint: try endpointURL(from: manifest.endpoint),
           token: token
         )
+        HarnessMonitorLogger.lifecycle.trace(
+          "Warm-up observed manifest pid=\(manifest.pid, privacy: .public) endpoint=\(connection.endpoint.absoluteString, privacy: .public)"
+        )
         if await endpointProbe(connection.endpoint) {
+          HarnessMonitorLogger.lifecycle.trace(
+            "Warm-up confirmed live daemon endpoint \(connection.endpoint.absoluteString, privacy: .public)"
+          )
           return try await bootstrap(connection: connection)
         }
         let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+        HarnessMonitorLogger.lifecycle.error(
+          "Warm-up found stale daemon manifest at \(manifestPath, privacy: .public) for endpoint \(connection.endpoint.absoluteString, privacy: .public)"
+        )
         if ownership == .external {
           immediateError = DaemonControlError.externalDaemonManifestStale(
             manifestPath: manifestPath
@@ -245,6 +265,9 @@ public struct DaemonController: DaemonControlling {
         break
       } catch {
         lastError = error
+        HarnessMonitorLogger.lifecycle.trace(
+          "Warm-up retry after \(error.localizedDescription, privacy: .public)"
+        )
       }
       try await Task.sleep(for: .milliseconds(250))
     }
@@ -355,13 +378,21 @@ public struct DaemonController: DaemonControlling {
       throw DaemonControlError.manifestUnreadable
     }
 
-    return try makeDecoder().decode(DaemonManifest.self, from: data)
+    let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
+    HarnessMonitorLogger.lifecycle.trace(
+      "Loaded daemon manifest from \(manifestURL.path, privacy: .public) for pid \(manifest.pid, privacy: .public)"
+    )
+    return manifest
   }
 
   private func loadToken(path: String) throws -> String {
     let tokenURL = URL(fileURLWithPath: path)
-    return try String(contentsOf: tokenURL, encoding: .utf8)
+    let token = try String(contentsOf: tokenURL, encoding: .utf8)
       .trimmingCharacters(in: .whitespacesAndNewlines)
+    HarnessMonitorLogger.lifecycle.trace(
+      "Loaded daemon auth token from \(tokenURL.path, privacy: .public)"
+    )
+    return token
   }
 
   private func endpointURL(from value: String) throws -> URL {

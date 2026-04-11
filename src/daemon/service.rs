@@ -436,7 +436,7 @@ const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error"];
 
 fn current_log_level() -> String {
     crate::log_filter_handle().map_or_else(
-        || "info".to_string(),
+        || crate::DEFAULT_LOG_LEVEL.to_string(),
         |handle| {
             handle
                 .with_current(|filter| {
@@ -446,9 +446,9 @@ fn current_log_level() -> String {
                             return (*level).to_string();
                         }
                     }
-                    "info".to_string()
+                    crate::DEFAULT_LOG_LEVEL.to_string()
                 })
-                .unwrap_or_else(|_| "info".to_string())
+                .unwrap_or_else(|_| crate::DEFAULT_LOG_LEVEL.to_string())
         },
     )
 }
@@ -462,7 +462,7 @@ pub fn get_log_level() -> Result<LogLevelResponse, CliError> {
         .ok_or_else(|| CliErrorKind::workflow_io("log filter handle unavailable"))?;
     let filter = handle
         .with_current(ToString::to_string)
-        .unwrap_or_else(|_| "harness=info".to_string());
+        .unwrap_or_else(|_| crate::DEFAULT_LOG_FILTER_DIRECTIVE.to_string());
     Ok(LogLevelResponse {
         level: current_log_level(),
         filter,
@@ -2891,5 +2891,10 @@ mod tests {
         temp_env::with_var("HARNESS_SANDBOXED", Option::<&str>::None, || {
             assert!(!sandboxed_from_env());
         });
+    }
+
+    #[test]
+    fn current_log_level_defaults_to_trace_when_handle_is_unavailable() {
+        assert_eq!(current_log_level(), crate::DEFAULT_LOG_LEVEL);
     }
 }

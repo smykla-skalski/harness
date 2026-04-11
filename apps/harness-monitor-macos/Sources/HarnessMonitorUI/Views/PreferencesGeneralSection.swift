@@ -241,7 +241,7 @@ struct PreferencesGeneralSection: View {
 
   private var daemonLogLevelBinding: Binding<String> {
     Binding(
-      get: { store.daemonLogLevel ?? "info" },
+      get: { store.daemonLogLevel ?? HarnessMonitorLogger.defaultDaemonLogLevel },
       set: { newValue in
         store.daemonLogLevel = newValue
         Task { await store.setDaemonLogLevel(newValue) }

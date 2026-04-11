@@ -36,6 +36,16 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>OSLogPreferences</key>
+	<dict>
+		<key>io.harnessmonitor</key>
+		<dict>
+			<key>Enable</key>
+			<string>Debug</string>
+			<key>Persist</key>
+			<string>Debug</string>
+		</dict>
+	</dict>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

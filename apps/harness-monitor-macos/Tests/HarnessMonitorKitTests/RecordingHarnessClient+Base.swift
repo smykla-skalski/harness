@@ -20,6 +20,7 @@ extension RecordingHarnessClient {
       pid: 111,
       endpoint: "http://127.0.0.1:9999",
       startedAt: "2026-03-28T14:00:00Z",
+      logLevel: HarnessMonitorLogger.defaultDaemonLogLevel,
       projectCount: 1,
       sessionCount: 1
     )
@@ -264,7 +265,10 @@ extension RecordingHarnessClient {
   }
 
   func logLevel() async throws -> LogLevelResponse {
-    LogLevelResponse(level: "info", filter: "harness=info")
+    LogLevelResponse(
+      level: HarnessMonitorLogger.defaultDaemonLogLevel,
+      filter: HarnessMonitorLogger.defaultDaemonFilter
+    )
   }
 
   func setLogLevel(_ level: String) async throws -> LogLevelResponse {
