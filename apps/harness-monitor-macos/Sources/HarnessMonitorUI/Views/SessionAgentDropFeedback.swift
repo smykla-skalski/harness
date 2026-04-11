@@ -140,29 +140,44 @@ struct AgentTaskDropFeedbackOverlay: View {
 
   private var strokeStyle: StrokeStyle {
     if feedback.isActionable {
-      return StrokeStyle(lineWidth: 1)
+      return StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
     }
-    return StrokeStyle(lineWidth: 1, dash: [6, 4])
+    return StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [6, 4])
   }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      Image(systemName: feedback.systemImage)
-        .imageScale(.small)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(feedback.title)
-          .scaledFont(.caption.weight(.bold))
+    ZStack {
+      Color.clear
+        .harnessDragFeedbackSurface(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          tint: feedback.tint
+        )
+      Circle()
+        .fill(feedback.tint.opacity(0.32))
+        .frame(width: 160, height: 160)
+        .blur(radius: 28)
+      VStack(spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Image(systemName: feedback.systemImage)
+            .imageScale(.small)
+          Text(feedback.title)
+            .scaledFont(.caption.weight(.bold))
+        }
+        .lineLimit(2)
         Text(feedback.detail)
           .scaledFont(.caption2.weight(.semibold))
+          .lineLimit(2)
       }
+      .multilineTextAlignment(.center)
+      .foregroundStyle(feedback.tint)
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     }
-    .foregroundStyle(feedback.tint)
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .harnessDragFeedbackSurface(cornerRadius: 8, tint: feedback.tint)
+    .clipShape(
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(feedback.tint.opacity(0.5), style: strokeStyle)
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .strokeBorder(feedback.tint, style: strokeStyle)
     }
     .allowsHitTesting(false)
     .accessibilityElement(children: .ignore)
