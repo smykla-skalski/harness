@@ -330,6 +330,32 @@ struct HarnessMonitorStoreHostBridgeTests {
     #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge start --capability codex")
   }
 
+  @Test("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES seeds excluded state for listed capabilities")
+  func forceBridgeIssuesEnvSeedsExcludedState() {
+    let single = HarnessMonitorStore.parseForcedBridgeIssues(
+      from: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": "agent-tui"]
+    )
+    #expect(single == ["agent-tui": .excluded])
+
+    let multiple = HarnessMonitorStore.parseForcedBridgeIssues(
+      from: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": "agent-tui,codex"]
+    )
+    #expect(multiple == ["agent-tui": .excluded, "codex": .excluded])
+
+    let withWhitespace = HarnessMonitorStore.parseForcedBridgeIssues(
+      from: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": " agent-tui , codex "]
+    )
+    #expect(withWhitespace == ["agent-tui": .excluded, "codex": .excluded])
+
+    let emptyValue = HarnessMonitorStore.parseForcedBridgeIssues(
+      from: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": ""]
+    )
+    #expect(emptyValue.isEmpty)
+
+    let missing = HarnessMonitorStore.parseForcedBridgeIssues(from: [:])
+    #expect(missing.isEmpty)
+  }
+
   @Test("501 bridge issue marks excluded only when running bridge omits capability")
   func markHostBridgeIssueUsesExcludedForMissingCapability() async {
     let store = await makeBootstrappedStore()

@@ -244,6 +244,9 @@ public final class HarnessMonitorStore {
     {
       self.bootstrapWarmUpTimeout = .seconds(seconds)
     }
+    self.hostBridgeCapabilityIssues = Self.parseForcedBridgeIssues(
+      from: ProcessInfo.processInfo.environment
+    )
     bindUISlices()
     refreshBookmarkedSessionIds()
     syncAllUI()
@@ -603,6 +606,28 @@ public final class HarnessMonitorStore {
       return .excluded
     }
     return capabilityState.healthy ? .ready : .unavailable
+  }
+
+  public static func parseForcedBridgeIssues(
+    from environment: [String: String]
+  ) -> [String: HostBridgeCapabilityIssue] {
+    guard
+      let rawValue = environment["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !rawValue.isEmpty
+    else {
+      return [:]
+    }
+
+    var issues: [String: HostBridgeCapabilityIssue] = [:]
+    for capability in rawValue.split(separator: ",") {
+      let trimmedCapability = capability.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmedCapability.isEmpty else {
+        continue
+      }
+      issues[trimmedCapability] = .excluded
+    }
+    return issues
   }
 
   public func hostBridgeStartCommand(for capability: String) -> String {
