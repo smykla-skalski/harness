@@ -173,6 +173,40 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       "Recovery panel should explain how to install or select usable speech assets"
     )
   }
+
+  func testSendSignalVoicePopoverAutoInsertsWhenConfigured() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        HarnessMonitorSettingsUITestKeys.voiceInsertionModeOverride: "autoInsert"
+      ]
+    )
+
+    openSendSignalSheet(in: app)
+
+    let voiceButton = button(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
+    XCTAssertTrue(voiceButton.waitForExistence(timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: voiceButton)
+
+    let popover = element(in: app, identifier: Accessibility.voiceInputPopover)
+    XCTAssertTrue(popover.waitForExistence(timeout: Self.actionTimeout))
+
+    let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
+    XCTAssertTrue(recordButton.waitForExistence(timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: recordButton)
+
+    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let value = messageField.value as? String
+        return value?.contains("Preview voice input for Harness Monitor") == true
+      },
+      "Auto-insert should write the captured transcript into the message field"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !popover.exists },
+      "Auto-insert should close the voice popover after inserting the transcript"
+    )
+  }
 }
 
 extension HarnessMonitorSheetUITests {

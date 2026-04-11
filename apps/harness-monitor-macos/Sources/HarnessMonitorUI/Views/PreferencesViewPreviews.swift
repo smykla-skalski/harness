@@ -37,6 +37,15 @@ import SwiftUI
   )
 }
 
+#Preview("Preferences Window - Voice") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  preferencesWindowPreview(
+    section: .voice,
+    themeMode: $themeMode
+  )
+}
+
 #Preview("Preferences Window - Database") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 

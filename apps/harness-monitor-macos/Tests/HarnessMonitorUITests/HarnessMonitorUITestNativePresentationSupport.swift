@@ -3,7 +3,7 @@ import XCTest
 extension HarnessMonitorUITestCase {
   func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
     let control = popUpButton(in: app, identifier: controlIdentifier)
-    XCTAssertTrue(control.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(control.waitForExistence(timeout: Self.fastActionTimeout))
 
     app.activate()
     if control.isHittable {
@@ -15,11 +15,16 @@ extension HarnessMonitorUITestCase {
       return
     }
 
-    let menuItem = app.descendants(matching: .menuItem).matching(
-      NSPredicate(format: "label == %@ OR title == %@", optionTitle, optionTitle)
-    ).firstMatch
-    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.actionTimeout))
-    menuItem.tap()
+    let menuItem = presentedMenuOption(in: app, title: optionTitle)
+    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.fastActionTimeout))
+
+    if menuItem.isHittable {
+      menuItem.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: menuItem) {
+      coordinate.tap()
+    } else {
+      XCTFail("Failed to select menu option \(optionTitle)")
+    }
   }
 
   func element(in app: XCUIApplication, title: String) -> XCUIElement {
@@ -69,6 +74,34 @@ extension HarnessMonitorUITestCase {
       app.dialogs.descendants(matching: .any).matching(predicate),
       app.descendants(matching: .menuItem).matching(predicate),
       app.descendants(matching: .button).matching(predicate),
+      app.descendants(matching: .any).matching(predicate),
+    ]
+
+    for query in candidateQueries {
+      let element = query.firstMatch
+      if element.exists {
+        return element
+      }
+    }
+
+    return candidateQueries.last!.firstMatch
+  }
+
+  private func presentedMenuOption(in app: XCUIApplication, title: String) -> XCUIElement {
+    let predicate = NSPredicate(
+      format: "label == %@ OR title == %@ OR identifier == %@",
+      title,
+      title,
+      title
+    )
+
+    let candidateQueries: [XCUIElementQuery] = [
+      app.menus.descendants(matching: .menuItem).matching(predicate),
+      app.menus.descendants(matching: .button).matching(predicate),
+      app.menus.descendants(matching: .staticText).matching(predicate),
+      app.descendants(matching: .menuItem).matching(predicate),
+      app.descendants(matching: .button).matching(predicate),
+      app.descendants(matching: .staticText).matching(predicate),
       app.descendants(matching: .any).matching(predicate),
     ]
 

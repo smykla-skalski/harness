@@ -37,6 +37,8 @@ public struct PreferencesView: View {
           PreferencesAppearanceSection(themeMode: $themeMode)
         case .notifications:
           PreferencesNotificationsSection(notifications: notifications)
+        case .voice:
+          PreferencesVoiceSection()
         case .connection:
           PreferencesConnectionSection(
             connectionState: store.connectionState,

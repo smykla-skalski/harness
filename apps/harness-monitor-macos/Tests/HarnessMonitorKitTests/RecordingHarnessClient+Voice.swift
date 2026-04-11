@@ -10,7 +10,11 @@ extension RecordingHarnessClient {
     calls.append(
       .startVoiceSession(
         sessionID: sessionID,
+        localeIdentifier: request.localeIdentifier,
         sinks: request.requestedSinks,
+        routeTarget: request.routeTarget,
+        requiresConfirmation: request.requiresConfirmation,
+        remoteProcessorURL: request.remoteProcessorUrl,
         actor: request.actor
       )
     )

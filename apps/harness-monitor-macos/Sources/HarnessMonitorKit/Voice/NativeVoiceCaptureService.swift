@@ -190,7 +190,9 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     configuration: VoiceCaptureConfiguration
   ) async throws -> (Locale, SpeechTranscriber, [any SpeechModule]) {
     var foundSupportedLocale = false
-    for candidate in localeCandidates(for: Locale(identifier: configuration.localeIdentifier)) {
+    for candidate in HarnessMonitorVoiceLocaleSupport.candidateLocales(
+      for: configuration.localeIdentifier
+    ) {
       guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: candidate) else {
         continue
       }
@@ -214,23 +216,6 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
       throw NativeVoiceCaptureError.speechAssetsUnavailable(configuration.localeIdentifier)
     }
     throw NativeVoiceCaptureError.unsupportedLocale(configuration.localeIdentifier)
-  }
-
-  private func localeCandidates(for requestedLocale: Locale) -> [Locale] {
-    var identifiers = [requestedLocale.identifier]
-    if let languageIdentifier = requestedLocale.language.languageCode?.identifier {
-      identifiers.append(languageIdentifier)
-    }
-    identifiers.append(Locale.current.identifier)
-    identifiers.append("en_US")
-
-    var seenIdentifiers: Set<String> = []
-    return identifiers.compactMap { identifier in
-      guard !identifier.isEmpty, seenIdentifiers.insert(identifier).inserted else {
-        return nil
-      }
-      return Locale(identifier: identifier)
-    }
   }
 
   private func prepareAssets(for modules: [any SpeechModule], locale: Locale) async throws {

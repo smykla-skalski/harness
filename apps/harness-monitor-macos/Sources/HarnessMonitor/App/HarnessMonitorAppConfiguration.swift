@@ -19,7 +19,7 @@ struct HarnessMonitorAppConfiguration {
 
   @MainActor
   static func resolve() -> Self {
-    UserDefaults.standard.register(defaults: [
+    var registrationDefaults: [String: Any] = [
       HarnessMonitorBackdropDefaults.modeKey: HarnessMonitorBackdropMode.none.rawValue,
       HarnessMonitorBackgroundDefaults.imageKey:
         HarnessMonitorBackgroundSelection.defaultSelection.storageValue,
@@ -32,7 +32,11 @@ struct HarnessMonitorAppConfiguration {
       "harnessMonitor.board.onboardingDismissed": false,
       "showInspector": true,
       "inspectorColumnWidth": 420.0,
-    ])
+    ]
+    registrationDefaults.merge(
+      HarnessMonitorVoicePreferences.registrationDefaults()
+    ) { _, newValue in newValue }
+    UserDefaults.standard.register(defaults: registrationDefaults)
 
     let environment = uiTestSafeEnvironment()
     let perfScenario = HarnessMonitorPerfScenario(environment: environment)
@@ -215,6 +219,7 @@ struct HarnessMonitorAppConfiguration {
       uiTestCustomTimeZone,
       forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
     )
+    applyVoiceUITestDefaults(environment: environment)
   }
 
   private static func uiTestBoolOverride(from rawValue: String?) -> Bool? {
@@ -230,6 +235,117 @@ struct HarnessMonitorAppConfiguration {
     default:
       return nil
     }
+  }
+
+  private static func applyVoiceUITestDefaults(environment: HarnessMonitorEnvironment) {
+    let localeIdentifier = voiceStringOverride(
+      environment.values[HarnessMonitorVoicePreferencesDefaults.uiTestLocaleIdentifierOverrideKey],
+      fallback: HarnessMonitorVoicePreferences.uiTestDefaultLocaleIdentifier
+    )
+    let transcriptInsertionMode =
+      HarnessMonitorVoiceTranscriptInsertionMode(
+        rawValue: environment.values[
+          HarnessMonitorVoicePreferencesDefaults.uiTestTranscriptInsertionModeOverrideKey
+        ] ?? ""
+      ) ?? .manualConfirm
+    let localDaemonSinkEnabled =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoicePreferencesDefaults.uiTestLocalDaemonSinkEnabledOverrideKey
+        ]
+      ) ?? true
+    let agentBridgeSinkEnabled =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoicePreferencesDefaults.uiTestAgentBridgeSinkEnabledOverrideKey
+        ]
+      ) ?? true
+    let remoteProcessorSinkEnabled =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoicePreferencesDefaults.uiTestRemoteProcessorSinkEnabledOverrideKey
+        ]
+      ) ?? false
+    let remoteProcessorURL = voiceStringOverride(
+      environment.values[
+        HarnessMonitorVoicePreferencesDefaults.uiTestRemoteProcessorURLOverrideKey
+      ],
+      fallback: ""
+    )
+    let deliversAudioChunks =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoicePreferencesDefaults.uiTestDeliversAudioChunksOverrideKey
+        ]
+      ) ?? true
+    let pendingAudioChunkLimit = HarnessMonitorVoicePreferences.normalizedPendingAudioChunkLimit(
+      uiTestIntOverride(
+        from: environment.values[
+          HarnessMonitorVoicePreferencesDefaults.uiTestPendingAudioChunkLimitOverrideKey
+        ]
+      ) ?? HarnessMonitorVoicePreferences.defaultPendingAudioChunkLimit
+    )
+    let pendingTranscriptSegmentLimit =
+      HarnessMonitorVoicePreferences.normalizedPendingTranscriptSegmentLimit(
+        uiTestIntOverride(
+          from: environment.values[
+            HarnessMonitorVoicePreferencesDefaults.uiTestPendingTranscriptSegmentLimitOverrideKey
+          ]
+        ) ?? HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
+      )
+
+    UserDefaults.standard.set(
+      localeIdentifier,
+      forKey: HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey
+    )
+    UserDefaults.standard.set(
+      localDaemonSinkEnabled,
+      forKey: HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey
+    )
+    UserDefaults.standard.set(
+      agentBridgeSinkEnabled,
+      forKey: HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey
+    )
+    UserDefaults.standard.set(
+      remoteProcessorSinkEnabled,
+      forKey: HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey
+    )
+    UserDefaults.standard.set(
+      remoteProcessorURL,
+      forKey: HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey
+    )
+    UserDefaults.standard.set(
+      transcriptInsertionMode.rawValue,
+      forKey: HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey
+    )
+    UserDefaults.standard.set(
+      deliversAudioChunks,
+      forKey: HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey
+    )
+    UserDefaults.standard.set(
+      pendingAudioChunkLimit,
+      forKey: HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey
+    )
+    UserDefaults.standard.set(
+      pendingTranscriptSegmentLimit,
+      forKey: HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey
+    )
+  }
+
+  private static func uiTestIntOverride(from rawValue: String?) -> Int? {
+    guard let rawValue else {
+      return nil
+    }
+    return Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines))
+  }
+
+  private static func voiceStringOverride(_ rawValue: String?, fallback: String) -> String {
+    guard let rawValue else {
+      return fallback
+    }
+
+    let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmedValue.isEmpty ? fallback : trimmedValue
   }
 }
 

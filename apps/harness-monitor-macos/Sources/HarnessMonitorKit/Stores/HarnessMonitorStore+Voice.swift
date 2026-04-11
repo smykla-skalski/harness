@@ -16,6 +16,7 @@ extension HarnessMonitorStore {
     requestedSinks: [VoiceProcessingSink],
     routeTarget: VoiceRouteTarget,
     remoteProcessorURL: URL?,
+    requiresConfirmation: Bool,
     actor: String = "harness-app"
   ) async -> VoiceSessionStartResponse? {
     guard guardSessionActionsAvailable() else { return nil }
@@ -30,6 +31,7 @@ extension HarnessMonitorStore {
           localeIdentifier: localeIdentifier,
           requestedSinks: requestedSinks,
           routeTarget: routeTarget,
+          requiresConfirmation: requiresConfirmation,
           remoteProcessorUrl: remoteProcessorURL?.absoluteString
         )
       )
