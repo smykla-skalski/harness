@@ -63,10 +63,15 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
 
     let tmp = tempdir().expect("tempdir");
     let daemon_data_home = tmp.path().to_str().expect("utf8").to_string();
+    // Redirect host home to the tempdir so the macOS group-container candidate
+    // in discovery points inside the tempdir (nonexistent) and adoption cannot
+    // be fooled by a real Monitor daemon running on the developer machine.
+    let host_home = daemon_data_home.clone();
 
     let mut first_bridge = Command::new(harness_binary())
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
+        .env("HARNESS_HOST_HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -108,6 +113,7 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
     let second_status = Command::new(harness_binary())
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
+        .env("HARNESS_HOST_HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -143,6 +149,9 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
 
     let tmp = tempdir().expect("tempdir");
     let daemon_data_home = tmp.path().to_str().expect("utf8").to_string();
+    // See the sibling test for rationale - isolate host_home so discovery
+    // cannot be fooled by a real Monitor daemon on the dev machine.
+    let host_home = daemon_data_home.clone();
 
     // Set up daemon root and write a synthetic bridge.json.
     let daemon_root = tmp.path().join("harness").join("daemon");
@@ -181,6 +190,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
     let status = Command::new(harness_binary())
         .args(["bridge", "status"])
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
+        .env("HARNESS_HOST_HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -203,6 +213,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
     let _status2 = Command::new(harness_binary())
         .args(["bridge", "status"])
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
+        .env("HARNESS_HOST_HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -211,11 +222,11 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
         .status()
         .expect("run harness bridge status after lock release");
 
-    // The host-CLI path (HostAuthoritative) may delete the file because pid 1
-    // is not the bridge owner (it's init/launchd). That is intentional
-    // host-path behaviour. What matters is the file was NOT deleted while the
-    // lock was held — proved by the first assertion above.
-    //
-    // What we guarantee is that the file was not deleted during the lock-held
-    // phase, which is the exact scenario that failed in v19.6.0.
+    // Even after the lock is released, load_running_bridge_state must not
+    // delete bridge.json. This locks in the stronger invariant: the loader
+    // never deletes producer state regardless of liveness outcome.
+    assert!(
+        bridge_json.exists(),
+        "bridge.json must survive a bridge status read after bridge.lock is released"
+    );
 }
