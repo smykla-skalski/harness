@@ -10,9 +10,9 @@ RUNS_ROOT="$REPO_ROOT/tmp/perf/harness-monitor-instruments/runs"
 SHIPPING_SCHEME="HarnessMonitor"
 HOST_SCHEME="HarnessMonitorUITestHost"
 HOST_BUNDLE_ID="io.harnessmonitor.app.ui-testing"
-HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Testing.app"
-HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
-SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
+HOST_APP_PATH=""
+HOST_BINARY_PATH=""
+SHIPPING_APP_PATH=""
 UI_TESTS_ENV="HARNESS_MONITOR_UI_TESTS=1"
 DAEMON_DATA_HOME_ENV_KEY="HARNESS_DAEMON_DATA_HOME"
 UI_ACCESSIBILITY_MARKERS_ENV="HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS=0"
@@ -144,6 +144,9 @@ duration_for() {
 COMMON_REPO_ROOT="$(resolve_common_repo_root)"
 DERIVED_DATA_PATH="$COMMON_REPO_ROOT/tmp/xcode-derived"
 AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
+HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Testing.app"
+HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
+SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
 
 build_release_targets() {
   local daemon_bundle_env=()
