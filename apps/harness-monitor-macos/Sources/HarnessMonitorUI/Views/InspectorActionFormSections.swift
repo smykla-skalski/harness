@@ -4,8 +4,6 @@ import SwiftUI
 struct InspectorActionStatusBanner: View {
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
-  let lastAction: String
-  let lastError: String?
   let actionActorOptions: [AgentRegistration]
   @Binding var actionActorID: String
 
@@ -18,16 +16,9 @@ struct InspectorActionStatusBanner: View {
         if isSessionActionInFlight {
           HarnessMonitorSpinner()
             .transition(.opacity)
-        } else if !lastAction.isEmpty {
-          Text(lastAction)
-            .scaledFont(.caption.bold())
-            .foregroundStyle(HarnessMonitorTheme.success)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.actionToast)
-            .transition(.opacity)
         }
       }
       .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
-      .animation(.spring(duration: 0.2), value: lastAction.isEmpty)
       Text(statusMessage)
         .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -43,13 +34,6 @@ struct InspectorActionStatusBanner: View {
         .labelsHidden()
         .accessibilityLabel("Act As")
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionActorPicker)
-      }
-      if let lastError, !lastError.isEmpty {
-        Text("Action failed: \(lastError)")
-          .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
-          .foregroundStyle(HarnessMonitorTheme.danger)
-          .lineLimit(3)
-          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }

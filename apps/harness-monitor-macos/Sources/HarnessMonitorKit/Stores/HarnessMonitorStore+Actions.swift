@@ -10,14 +10,14 @@ extension HarnessMonitorStore {
 
   func guardSessionActionsAvailable() -> Bool {
     guard !isSessionReadOnly else {
-      lastError = readOnlySessionAccessMessage
+      presentFailureFeedback(readOnlySessionAccessMessage)
       return false
     }
     return true
   }
 
   public func reportDropRejection(_ reason: String) {
-    lastError = reason
+    presentFailureFeedback(reason)
   }
 
   @discardableResult
@@ -283,7 +283,7 @@ extension HarnessMonitorStore {
 
   public func requestEndSelectedSessionConfirmation() {
     guard !isSessionReadOnly else {
-      lastError = readOnlySessionAccessMessage
+      presentFailureFeedback(readOnlySessionAccessMessage)
       return
     }
     guard let sessionID = selectedSessionID, let actorID = resolvedActionActor() else {
@@ -294,7 +294,7 @@ extension HarnessMonitorStore {
 
   public func requestRemoveAgentConfirmation(agentID: String) {
     guard !isSessionReadOnly else {
-      lastError = readOnlySessionAccessMessage
+      presentFailureFeedback(readOnlySessionAccessMessage)
       return
     }
     guard let sessionID = selectedSessionID, let actorID = resolvedActionActor() else {
@@ -315,7 +315,7 @@ extension HarnessMonitorStore {
       daemonLogLevel = response.level
     } catch {
       daemonLogLevel = previousLevel
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
     }
   }
 
@@ -326,7 +326,7 @@ extension HarnessMonitorStore {
   public func confirmPendingAction() async {
     guard !isSessionReadOnly else {
       pendingConfirmation = nil
-      lastError = readOnlySessionAccessMessage
+      presentFailureFeedback(readOnlySessionAccessMessage)
       return
     }
     guard let pendingConfirmation else {
@@ -358,7 +358,6 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     isSessionActionInFlight = true
     defer { isSessionActionInFlight = false }
-    lastError = nil
 
     do {
       let measuredMutation = try await Self.measureOperation {
@@ -375,7 +374,7 @@ extension HarnessMonitorStore {
       showLastAction(actionName)
       return true
     } catch {
-      lastError = error.localizedDescription
+      presentFailureFeedback(error.localizedDescription)
       return false
     }
   }

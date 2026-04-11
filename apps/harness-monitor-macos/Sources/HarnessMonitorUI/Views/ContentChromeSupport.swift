@@ -65,6 +65,7 @@ struct ContentDetailChrome<Content: View>: View {
   let persistenceError: String?
   let sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability
   let sessionStatus: SessionStatus?
+  let toast: ToastSlice
   @ViewBuilder let content: Content
 
   var body: some View {
@@ -84,7 +85,10 @@ struct ContentDetailChrome<Content: View>: View {
   }
 
   private var showsTopChrome: Bool {
-    persistenceError != nil || sessionDataAvailability != .live || sessionStatus != nil
+    persistenceError != nil
+      || sessionDataAvailability != .live
+      || sessionStatus != nil
+      || !toast.activeFeedback.isEmpty
   }
 
   private var isStale: Bool {
@@ -104,6 +108,9 @@ struct ContentDetailChrome<Content: View>: View {
       if let sessionStatus {
         SessionStatusBanner(status: sessionStatus, isStale: isStale)
         chromeDivider
+      }
+      if !toast.activeFeedback.isEmpty {
+        HarnessMonitorFeedbackToastView(toast: toast)
       }
     }
     .background(Color(nsColor: .windowBackgroundColor))

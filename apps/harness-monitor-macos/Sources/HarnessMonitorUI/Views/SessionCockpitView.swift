@@ -28,7 +28,6 @@ struct SessionCockpitView: View {
         SessionActionDock(
           detail: detail,
           isSessionActionInFlight: isSessionActionInFlight,
-          lastAction: lastAction,
           inspectTask: store.inspect(taskID:),
           inspectAgent: store.inspect(agentID:),
           inspectObserver: store.inspectObserver,
