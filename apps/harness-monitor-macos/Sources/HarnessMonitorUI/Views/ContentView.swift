@@ -4,7 +4,10 @@ import SwiftUI
 enum ContentToolbarLayoutWidth {
   static let minimumWidth: CGFloat = 320
   static let defaultWidth: CGFloat = 1_000
-  static let measurementQuantum: CGFloat = 16
+  // The toolbar only changes meaningfully at coarse width buckets. Snapping
+  // more aggressively avoids feeding detail-column layout jitter back into the
+  // split-view shell during cockpit transitions.
+  static let measurementQuantum: CGFloat = 32
 
   static func normalized(_ width: CGFloat) -> CGFloat {
     let clampedWidth = max(width, minimumWidth)
