@@ -118,24 +118,27 @@ extension HarnessMonitorUITestCase {
     within window: XCUIElement
   ) -> XCUIElement {
     let predicate = NSPredicate(format: "label == %@", title)
-    let sidebarMaxX = window.frame.minX + (window.frame.width * 0.4)
-    let candidates = app.descendants(matching: .any)
-      .matching(predicate)
-      .allElementsBoundByIndex
-      .filter { element in
-        let frame = element.frame
-        return
-          element.exists
-          && frame.width > 20
-          && frame.height > 20
-          && frame.width < window.frame.width * 0.4
-          && frame.height < 80
-          && frame.minY > window.frame.minY + 40
-          && frame.maxX <= sidebarMaxX
+
+    let roles: [XCUIElement.ElementType] = [
+      .button,
+      .radioButton,
+      .cell,
+    ]
+
+    for role in roles {
+      let windowMatch = window.descendants(matching: role)
+        .matching(predicate)
+        .firstMatch
+      if windowMatch.exists {
+        return windowMatch
       }
 
-    if let section = candidates.min(by: { $0.frame.minY < $1.frame.minY }) {
-      return section
+      let appMatch = app.descendants(matching: role)
+        .matching(predicate)
+        .firstMatch
+      if appMatch.exists {
+        return appMatch
+      }
     }
 
     return app.descendants(matching: .any)

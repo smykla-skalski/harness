@@ -8,6 +8,26 @@ struct HarnessVoiceInputButton: View {
   let routeTarget: () -> VoiceRouteTarget
   let accessibilityIdentifier: String
 
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey)
+  private var localeIdentifier = HarnessMonitorVoicePreferences.defaultLocaleIdentifier
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey)
+  private var localDaemonSinkEnabled = true
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey)
+  private var agentBridgeSinkEnabled = true
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey)
+  private var remoteProcessorSinkEnabled = false
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey)
+  private var remoteProcessorURLText = ""
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey)
+  private var transcriptInsertionModeRawValue =
+    HarnessMonitorVoiceTranscriptInsertionMode.manualConfirm.rawValue
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey)
+  private var deliversAudioChunks = true
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey)
+  private var pendingAudioChunkLimit = HarnessMonitorVoicePreferences.defaultPendingAudioChunkLimit
+  @AppStorage(HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey)
+  private var pendingTranscriptSegmentLimit =
+    HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
   @State private var isPopoverPresented = false
   @State private var isRecording = false
   @State private var statusText = "Ready"
@@ -18,14 +38,8 @@ struct HarnessVoiceInputButton: View {
   @State private var processingSessionTask: Task<VoiceSessionStartResponse?, Never>?
   @State private var pendingAudioChunks: [VoiceAudioChunk] = []
   @State private var pendingTranscriptSegments: [VoiceTranscriptSegment] = []
-  @State private var localDaemonSinkEnabled = true
-  @State private var agentBridgeSinkEnabled = true
-  @State private var remoteProcessorSinkEnabled = false
-  @State private var remoteProcessorText = ""
+  @State private var pendingAutoInsert = false
   @State private var failurePresentation: VoiceCaptureFailurePresentation?
-
-  private static let pendingAudioChunkLimit = 24
-  private static let pendingTranscriptSegmentLimit = 16
 
   private var completeTranscript: String {
     [finalTranscript, partialTranscript]
@@ -34,18 +48,18 @@ struct HarnessVoiceInputButton: View {
       .joined(separator: " ")
   }
 
-  private var selectedSinks: [VoiceProcessingSink] {
-    var sinks: [VoiceProcessingSink] = []
-    if localDaemonSinkEnabled {
-      sinks.append(.localDaemon)
-    }
-    if agentBridgeSinkEnabled {
-      sinks.append(.agentBridge)
-    }
-    if remoteProcessorSinkEnabled {
-      sinks.append(.remoteProcessor)
-    }
-    return sinks.isEmpty ? [.localDaemon] : sinks
+  private var voicePreferences: HarnessMonitorVoicePreferences {
+    HarnessMonitorVoicePreferences(
+      localeIdentifier: localeIdentifier,
+      localDaemonSinkEnabled: localDaemonSinkEnabled,
+      agentBridgeSinkEnabled: agentBridgeSinkEnabled,
+      remoteProcessorSinkEnabled: remoteProcessorSinkEnabled,
+      remoteProcessorURLText: remoteProcessorURLText,
+      transcriptInsertionModeRawValue: transcriptInsertionModeRawValue,
+      deliversAudioChunks: deliversAudioChunks,
+      pendingAudioChunkLimit: pendingAudioChunkLimit,
+      pendingTranscriptSegmentLimit: pendingTranscriptSegmentLimit
+    )
   }
 
   var body: some View {
@@ -118,7 +132,7 @@ struct HarnessVoiceInputButton: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
         .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputTranscript)
 
-      sinkControls
+      configurationSummary
 
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         captureControl
@@ -176,34 +190,20 @@ struct HarnessVoiceInputButton: View {
     isRecording ? "stop.fill" : "record.circle"
   }
 
-  private var sinkControls: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Processing")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Toggle("Local daemon", isOn: $localDaemonSinkEnabled)
-      Toggle("Agent bridge", isOn: $agentBridgeSinkEnabled)
-      Toggle("Remote processor", isOn: $remoteProcessorSinkEnabled)
-      if remoteProcessorSinkEnabled {
-        TextField("https://processor.example/voice", text: $remoteProcessorText)
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputRemoteURLField)
-      }
-    }
-    .disabled(isRecording)
-    .toggleStyle(.checkbox)
+  private var configurationSummary: some View {
+    VoicePopoverConfigurationSummary(preferences: voicePreferences)
   }
 
   private func startCapture() {
     guard !isRecording else { return }
     failurePresentation = nil
-    if remoteProcessorSinkEnabled, remoteProcessorURL() == nil {
-      statusText = "Remote processor URL must be HTTPS."
+    if remoteProcessorSinkEnabled, voicePreferences.remoteProcessorURL == nil {
+      statusText = "Remote processor endpoint must be HTTPS."
       failurePresentation = VoiceCaptureFailurePresentation(
         title: "Remote Processor Unavailable",
-        message: "Remote processor URL must be HTTPS.",
+        message: "Remote processor endpoint must be a full HTTPS URL.",
         recoverySuggestion:
-          "Turn off Remote processor or enter a full HTTPS URL for the voice processor, then try again."
+          "Open Preferences > Voice, turn off Remote processor or save a full HTTPS endpoint, then try again."
       )
       return
     }
@@ -212,22 +212,25 @@ struct HarnessVoiceInputButton: View {
     partialTranscript = ""
     statusText = "Preparing microphone"
     isRecording = true
+    pendingAutoInsert = voicePreferences.shouldAutoInsertTranscript
     captureTask?.cancel()
     processingSessionTask?.cancel()
     voiceSessionID = nil
     pendingAudioChunks.removeAll(keepingCapacity: true)
     pendingTranscriptSegments.removeAll(keepingCapacity: true)
 
-    let localeIdentifier = Locale.current.identifier
+    let voicePreferences = self.voicePreferences
+    let localeIdentifier = voicePreferences.effectiveLocaleIdentifier
     let routeTarget = routeTarget()
-    let sinks = selectedSinks
-    let remoteURL = remoteProcessorURL()
+    let sinks = voicePreferences.requestedSinks
+    let remoteURL = voicePreferences.remoteProcessorURL
     let processingSessionTask = Task { @MainActor in
       let response = await store.startVoiceProcessingSession(
         localeIdentifier: localeIdentifier,
         requestedSinks: sinks,
         routeTarget: routeTarget,
-        remoteProcessorURL: remoteURL
+        remoteProcessorURL: remoteURL,
+        requiresConfirmation: voicePreferences.transcriptInsertionMode.requiresConfirmation
       )
       guard !Task.isCancelled else { return response }
       voiceSessionID = response?.voiceSessionId
@@ -247,20 +250,23 @@ struct HarnessVoiceInputButton: View {
     captureTask = Task { @MainActor in
       do {
         for try await event in store.voiceCaptureStream(
-          configuration: VoiceCaptureConfiguration(
-            localeIdentifier: localeIdentifier,
-            deliversAudioChunks: !sinks.isEmpty
-          )
+          configuration: voicePreferences.captureConfiguration
         ) {
           await handle(event)
         }
+        if pendingAutoInsert, !completeTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          isRecording = false
+          insertTranscript()
+          return
+        }
         if isRecording {
-          statusText = "Stopped"
           isRecording = false
         }
+        statusText = "Stopped"
       } catch {
         statusText = "Voice capture failed"
         isRecording = false
+        pendingAutoInsert = false
         processingSessionTask.cancel()
         finishFailedVoiceSession()
         failurePresentation = VoiceCaptureFailurePresentation(error: error)
@@ -312,6 +318,7 @@ struct HarnessVoiceInputButton: View {
     captureTask = nil
     processingSessionTask = nil
     self.voiceSessionID = nil
+    pendingAutoInsert = false
     failurePresentation = nil
     pendingAudioChunks.removeAll(keepingCapacity: true)
     pendingTranscriptSegments.removeAll(keepingCapacity: true)
@@ -334,6 +341,9 @@ struct HarnessVoiceInputButton: View {
   private func insertTranscript() {
     let transcript = completeTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !transcript.isEmpty else { return }
+    let bufferedAudioChunks = pendingAudioChunks
+    let bufferedTranscriptSegments = pendingTranscriptSegments
+    let activeProcessingSessionTask = processingSessionTask
     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       text = transcript
     } else {
@@ -348,11 +358,29 @@ struct HarnessVoiceInputButton: View {
         )
       }
       self.voiceSessionID = nil
+    } else if let activeProcessingSessionTask {
+      Task { @MainActor in
+        guard let response = await activeProcessingSessionTask.value else { return }
+        for chunk in bufferedAudioChunks {
+          await store.appendVoiceAudioChunk(voiceSessionID: response.voiceSessionId, chunk: chunk)
+        }
+        for segment in bufferedTranscriptSegments {
+          await store.appendVoiceTranscript(
+            voiceSessionID: response.voiceSessionId,
+            segment: segment
+          )
+        }
+        await store.finishVoiceProcessingSession(
+          voiceSessionID: response.voiceSessionId,
+          reason: .completed,
+          confirmedText: transcript
+        )
+      }
     }
     captureTask?.cancel()
-    processingSessionTask?.cancel()
     captureTask = nil
     processingSessionTask = nil
+    pendingAutoInsert = false
     failurePresentation = nil
     pendingAudioChunks.removeAll(keepingCapacity: true)
     pendingTranscriptSegments.removeAll(keepingCapacity: true)
@@ -375,14 +403,14 @@ struct HarnessVoiceInputButton: View {
   }
 
   private func appendPendingAudioChunk(_ chunk: VoiceAudioChunk) {
-    if pendingAudioChunks.count >= Self.pendingAudioChunkLimit {
+    if pendingAudioChunks.count >= voicePreferences.pendingAudioChunkLimit {
       pendingAudioChunks.removeFirst()
     }
     pendingAudioChunks.append(chunk)
   }
 
   private func appendPendingTranscriptSegment(_ segment: VoiceTranscriptSegment) {
-    if pendingTranscriptSegments.count >= Self.pendingTranscriptSegmentLimit {
+    if pendingTranscriptSegments.count >= voicePreferences.pendingTranscriptSegmentLimit {
       pendingTranscriptSegments.removeFirst()
     }
     pendingTranscriptSegments.append(segment)
@@ -410,6 +438,7 @@ struct HarnessVoiceInputButton: View {
 
   private func closeFailure() {
     failurePresentation = nil
+    pendingAutoInsert = false
     isPopoverPresented = false
   }
 
@@ -421,15 +450,6 @@ struct HarnessVoiceInputButton: View {
     } else if !finalTranscript.hasSuffix(trimmedText) {
       finalTranscript += " \(trimmedText)"
     }
-  }
-
-  private func remoteProcessorURL() -> URL? {
-    guard remoteProcessorSinkEnabled else { return nil }
-    let trimmedText = remoteProcessorText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let url = URL(string: trimmedText), url.scheme == "https" else {
-      return nil
-    }
-    return url
   }
 
   private func title(for state: VoiceCaptureState) -> String {
@@ -449,6 +469,61 @@ struct HarnessVoiceInputButton: View {
     case .failed:
       "Voice capture failed"
     }
+  }
+}
+
+private struct VoicePopoverConfigurationSummary: View {
+  let preferences: HarnessMonitorVoicePreferences
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Defaults")
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+
+      VoicePopoverConfigurationRow(
+        title: "Language",
+        value: HarnessMonitorVoicePreferences.localeDisplayLabel(
+          for: preferences.effectiveLocaleIdentifier
+        )
+      )
+      VoicePopoverConfigurationRow(
+        title: "Processing",
+        value: preferences.requestedSinksSummary
+      )
+      VoicePopoverConfigurationRow(
+        title: "Insert",
+        value: preferences.transcriptInsertionMode.title
+      )
+
+      if preferences.remoteProcessorSinkEnabled {
+        VoicePopoverConfigurationRow(
+          title: "Remote",
+          value: preferences.remoteProcessorSummary
+        )
+      }
+
+      Text("Change defaults in Preferences > Voice.")
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(HarnessMonitorTheme.spacingSM)
+    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+  }
+}
+
+private struct VoicePopoverConfigurationRow: View {
+  let title: String
+  let value: String
+
+  var body: some View {
+    LabeledContent(title) {
+      Text(value)
+        .multilineTextAlignment(.trailing)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .scaledFont(.subheadline)
   }
 }
 
@@ -495,14 +570,14 @@ private struct VoiceCaptureFailurePresentation: Equatable {
         title: "Speech Assets Needed",
         message: message,
         recoverySuggestion:
-          "Open System Settings > Keyboard > Dictation, add or download a supported English dictation language such as English (US), then try recording again. macOS does not have an on-device speech asset ready for \(locale)."
+          "Open Preferences > Voice to confirm the selected locale, then open System Settings > Keyboard > Dictation and download that language or switch to a supported English locale such as English (US). macOS does not have an on-device speech asset ready for \(locale)."
       )
     case .unsupportedLocale(let locale):
       self.init(
         title: "Speech Language Unsupported",
         message: message,
         recoverySuggestion:
-          "Change the macOS language or dictation language to a Speech-supported locale such as English (US), then try recording again. Harness Monitor asked for \(locale)."
+          "Open Preferences > Voice and choose a Speech-supported locale such as English (US), then try recording again. Harness Monitor asked for \(locale)."
       )
     case .speechUnavailable:
       self.init(

@@ -4,6 +4,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case general
   case appearance
   case notifications
+  case voice
   case connection
   case codex
   case database
@@ -16,6 +17,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     case .general: "General"
     case .appearance: "Appearance"
     case .notifications: "Notifications"
+    case .voice: "Voice"
     case .connection: "Connection"
     case .codex: "Codex"
     case .database: "Database"
@@ -28,6 +30,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     case .general: "gearshape"
     case .appearance: "paintbrush"
     case .notifications: "bell.badge"
+    case .voice: "mic"
     case .connection: "bolt.horizontal.circle"
     case .codex: "terminal"
     case .database: "cylinder.split.1x2"

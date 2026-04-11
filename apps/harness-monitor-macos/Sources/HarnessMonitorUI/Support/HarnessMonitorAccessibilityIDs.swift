@@ -84,6 +84,22 @@ public enum HarnessMonitorAccessibility {
   static let preferencesTextSizePicker = "harness.preferences.text-size"
   static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
+  static let preferencesVoiceSection = "harness.preferences.voice"
+  static let preferencesVoiceLocaleField = "harness.preferences.voice.locale-field"
+  static let preferencesVoiceLocalePicker = "harness.preferences.voice.locale-picker"
+  static let preferencesVoiceLocalDaemonToggle = "harness.preferences.voice.local-daemon"
+  static let preferencesVoiceAgentBridgeToggle = "harness.preferences.voice.agent-bridge"
+  static let preferencesVoiceRemoteProcessorToggle =
+    "harness.preferences.voice.remote-processor"
+  static let preferencesVoiceRemoteProcessorURLField =
+    "harness.preferences.voice.remote-processor-url"
+  static let preferencesVoiceInsertionModePicker = "harness.preferences.voice.insertion-mode"
+  static let preferencesVoiceAudioChunksToggle = "harness.preferences.voice.audio-chunks"
+  static let preferencesVoicePendingAudioChunkLimitField =
+    "harness.preferences.voice.pending-audio-limit"
+  static let preferencesVoicePendingTranscriptLimitField =
+    "harness.preferences.voice.pending-transcript-limit"
+  static let preferencesVoiceStatus = "harness.preferences.voice.status"
   static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
   static let preferencesNotificationsPresetPicker = "harness.preferences.notifications.preset"
   static let preferencesNotificationsCategoryPicker = "harness.preferences.notifications.category"
@@ -137,6 +153,7 @@ public enum HarnessMonitorAccessibility {
   static let agentTuiStopButton = "harness.sheet.agent-tui.stop"
   static let agentTuiRevealTranscriptButton = "harness.sheet.agent-tui.transcript"
   static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
+  static let agentTuiCopyCommandButton = "harness.sheet.agent-tui.copy-command"
   static let codexFlowButton = "harness.session.codex-flow"
   static let codexFlowSheet = "harness.sheet.codex-flow"
   static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
@@ -159,6 +176,7 @@ public enum HarnessMonitorAccessibility {
   static let preferencesCodexCopyStartButton = "harness.preferences.codex.copy-start"
   static let preferencesCodexCopyInstallButton = "harness.preferences.codex.copy-install"
   static let codexFlowRecoveryBanner = "harness.sheet.codex-flow.recovery-banner"
+  static let codexFlowCopyCommandButton = "harness.sheet.codex-flow.copy-command"
   static let preferencesDatabaseStatistics = "harness.preferences.database.statistics"
   static let preferencesDatabaseOperations = "harness.preferences.database.operations"
   static let preferencesDatabaseHealth = "harness.preferences.database.health"

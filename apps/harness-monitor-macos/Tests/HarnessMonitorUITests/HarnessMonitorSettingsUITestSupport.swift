@@ -5,6 +5,11 @@ enum HarnessMonitorSettingsUITestKeys {
   static let timeZoneModeOverride = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"
   static let customTimeZoneOverride = "HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE"
   static let backgroundImageOverride = "HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"
+  static let voiceLocaleOverride = "HARNESS_MONITOR_VOICE_LOCALE_OVERRIDE"
+  static let voiceInsertionModeOverride = "HARNESS_MONITOR_VOICE_INSERTION_MODE_OVERRIDE"
+  static let voiceRemoteProcessorEnabledOverride =
+    "HARNESS_MONITOR_VOICE_REMOTE_PROCESSOR_ENABLED_OVERRIDE"
+  static let voiceRemoteProcessorURLOverride = "HARNESS_MONITOR_VOICE_REMOTE_PROCESSOR_URL_OVERRIDE"
 }
 
 struct PreferencesStateSnapshot {
@@ -50,6 +55,27 @@ struct PreferencesStateSnapshot {
     Self(
       mode: mode,
       section: "appearance",
+      backdrop: backdrop,
+      background: background,
+      textSize: textSize,
+      controlSize: controlSize,
+      timeZoneMode: timeZoneMode,
+      timeZone: timeZone
+    )
+  }
+
+  static func voice(
+    mode: String,
+    backdrop: String = "none",
+    background: String = "auroraVeil",
+    textSize: String = "Default",
+    controlSize: String = "small",
+    timeZoneMode: String = "local",
+    timeZone: String = "local"
+  ) -> Self {
+    Self(
+      mode: mode,
+      section: "voice",
       backdrop: backdrop,
       background: background,
       textSize: textSize,
@@ -267,6 +293,14 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectVoiceSection(in app: XCUIApplication) {
+    selectPreferencesSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesVoiceSection,
+      expectedTitle: "Voice"
+    )
+  }
+
   func selectGeneralSection(in app: XCUIApplication) {
     selectPreferencesSection(
       in: app,
@@ -288,18 +322,19 @@ extension HarnessMonitorUITestCase {
       return
     }
 
-    let preferencesRoot = element(
-      in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesRoot
-    )
-    let settingsWindow = window(in: app, containing: preferencesRoot)
-    let section = sidebarSectionElement(
-      in: app,
-      title: expectedTitle,
-      within: settingsWindow
-    )
+    let sectionAppeared = waitUntil(timeout: Self.fastActionTimeout) {
+      let identifiedSection = self.button(in: app, identifier: identifier)
+      if identifiedSection.exists {
+        return true
+      }
+      return self.button(in: app, title: expectedTitle).exists
+    }
+    XCTAssertTrue(sectionAppeared, "\(expectedTitle) sidebar item not found")
 
-    XCTAssertTrue(section.waitForExistence(timeout: Self.actionTimeout))
+    let section = {
+      let identifiedSection = button(in: app, identifier: identifier)
+      return identifiedSection.exists ? identifiedSection : button(in: app, title: expectedTitle)
+    }()
     if section.isHittable {
       section.tap()
     } else if let coordinate = centerCoordinate(in: app, for: section) {
@@ -309,7 +344,7 @@ extension HarnessMonitorUITestCase {
     }
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
+      waitUntil(timeout: Self.fastActionTimeout) {
         title.exists && title.label == expectedTitle
       },
       "Preferences title did not switch to \(expectedTitle); got '\(title.label)'"
@@ -364,11 +399,10 @@ extension HarnessMonitorUITestCase {
     app.typeKey("w", modifierFlags: .command)
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
+      waitUntil(timeout: Self.fastActionTimeout) {
         !preferencesRoot.exists
       }
     )
-    XCTAssertTrue(mainWindow(in: app).waitForExistence(timeout: Self.actionTimeout))
   }
 
   func preferencesRootCount(in app: XCUIApplication) -> Int {

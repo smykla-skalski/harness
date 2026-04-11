@@ -6,8 +6,8 @@ import Testing
 @MainActor
 @Suite("Harness Monitor voice routing")
 struct HarnessMonitorStoreVoiceTests {
-  @Test("Voice session requests keep sinks explicit and session scoped")
-  func voiceSessionRequestsKeepSinksExplicitAndSessionScoped() async {
+  @Test("Voice session requests keep routing, locale, and confirmation explicit")
+  func voiceSessionRequestsKeepRoutingLocaleAndConfirmationExplicit() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
 
@@ -16,6 +16,7 @@ struct HarnessMonitorStoreVoiceTests {
       requestedSinks: [.localDaemon, .agentBridge],
       routeTarget: .codexPrompt,
       remoteProcessorURL: nil,
+      requiresConfirmation: true,
       actor: "leader-claude"
     )
 
@@ -25,7 +26,42 @@ struct HarnessMonitorStoreVoiceTests {
         == [
           .startVoiceSession(
             sessionID: PreviewFixtures.summary.sessionId,
+            localeIdentifier: "en_US",
             sinks: [.localDaemon, .agentBridge],
+            routeTarget: .codexPrompt,
+            requiresConfirmation: true,
+            remoteProcessorURL: nil,
+            actor: "leader-claude"
+          )
+        ]
+    )
+  }
+
+  @Test("Voice session requests keep remote processor endpoints explicit")
+  func voiceSessionRequestsKeepRemoteProcessorEndpointsExplicit() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+
+    let response = await store.startVoiceProcessingSession(
+      localeIdentifier: "pl_PL",
+      requestedSinks: [.remoteProcessor, .agentBridge],
+      routeTarget: .codexContext(runID: "run-123"),
+      remoteProcessorURL: URL(string: "https://processor.example/voice"),
+      requiresConfirmation: false,
+      actor: "leader-claude"
+    )
+
+    #expect(response?.voiceSessionId == "voice-session-1")
+    #expect(
+      client.recordedCalls()
+        == [
+          .startVoiceSession(
+            sessionID: PreviewFixtures.summary.sessionId,
+            localeIdentifier: "pl_PL",
+            sinks: [.remoteProcessor, .agentBridge],
+            routeTarget: .codexContext(runID: "run-123"),
+            requiresConfirmation: false,
+            remoteProcessorURL: "https://processor.example/voice",
             actor: "leader-claude"
           )
         ]
