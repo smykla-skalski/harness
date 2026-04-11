@@ -34,6 +34,7 @@ use super::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiSnapshotContext, AgentTuiStatus, send_initial_prompt,
     snapshot_from_process, spawn_agent_tui_process,
 };
+use super::discovery::{self, AdoptionOutcome};
 use super::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
 
 pub const BRIDGE_LAUNCH_AGENT_LABEL: &str = "io.harness.bridge";
@@ -271,9 +272,46 @@ impl Execute for BridgeCommand {
     }
 }
 
+/// Adopt the running daemon's root for the duration of this bridge
+/// subcommand so its state writes target whatever daemon is actually
+/// running (sandboxed managed, `harness daemon dev`, or a plain
+/// `daemon serve`), regardless of which env vars the calling terminal
+/// had set. See [`crate::daemon::discovery`] for the scan algorithm.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn adopt_daemon_root_for_bridge_command(command: &'static str) {
+    match discovery::adopt_running_daemon_root() {
+        AdoptionOutcome::AlreadyCoherent { root } => {
+            tracing::debug!(
+                command,
+                root = %root.display(),
+                "bridge: daemon root already coherent"
+            );
+        }
+        AdoptionOutcome::Adopted { from, to } => {
+            tracing::info!(
+                command,
+                from = %from.display(),
+                to = %to.display(),
+                "bridge: adopted running daemon root"
+            );
+        }
+        AdoptionOutcome::NoRunningDaemon { default_root } => {
+            tracing::warn!(
+                command,
+                default_root = %default_root.display(),
+                "bridge: no running daemon found; bridge state will land at the default root"
+            );
+        }
+    }
+}
+
 impl Execute for BridgeStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         ensure_host_context("bridge-start")?;
+        adopt_daemon_root_for_bridge_command("bridge-start");
         cleanup_legacy_bridge_artifacts();
         let config = self.config.resolve()?;
         if matches_running_config(&config)? {
@@ -297,6 +335,7 @@ impl Execute for BridgeStartArgs {
 
 impl Execute for BridgeStopArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_bridge_command("bridge-stop");
         cleanup_legacy_bridge_artifacts();
         let report = stop_bridge()?;
         if self.json {
@@ -310,6 +349,7 @@ impl Execute for BridgeStopArgs {
 
 impl Execute for BridgeStatusArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_bridge_command("bridge-status");
         let report = status_report()?;
         if self.plain {
             print_status_plain(&report);
@@ -323,6 +363,7 @@ impl Execute for BridgeStatusArgs {
 impl Execute for BridgeInstallLaunchAgentArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         ensure_host_context("bridge-install-launch-agent")?;
+        adopt_daemon_root_for_bridge_command("bridge-install-launch-agent");
         cleanup_legacy_bridge_artifacts();
         let config = self.config.resolve()?;
         write_bridge_config(&config.persisted)?;
@@ -349,6 +390,7 @@ impl Execute for BridgeInstallLaunchAgentArgs {
 impl Execute for BridgeReconfigureArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         ensure_host_context("bridge-reconfigure")?;
+        adopt_daemon_root_for_bridge_command("bridge-reconfigure");
         cleanup_legacy_bridge_artifacts();
         let request = self.request()?;
         let report = BridgeClient::from_state_file()?.reconfigure(&request)?;
@@ -364,6 +406,7 @@ impl Execute for BridgeReconfigureArgs {
 impl Execute for BridgeRemoveLaunchAgentArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         ensure_host_context("bridge-remove-launch-agent")?;
+        adopt_daemon_root_for_bridge_command("bridge-remove-launch-agent");
         cleanup_legacy_bridge_artifacts();
         let plist_path = launch_agent_plist_path()?;
         let existed = plist_path.is_file();
