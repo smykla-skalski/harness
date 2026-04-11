@@ -39,6 +39,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case dashboardLanding
     case dashboardLoaded
     case cockpitLoaded
+    case agentTuiOverflow
     case taskDropCockpit
     case offlineCached
     case sidebarOverflow
@@ -54,9 +55,18 @@ public enum HarnessMonitorPreviewStoreFactory {
     voiceCapture: any VoiceCaptureProviding = PreviewVoiceCaptureService()
   ) -> HarnessMonitorStore {
     let configuration = configuration(for: scenario)
+    let isDaemonRunning =
+      switch configuration.connectionState {
+      case .online:
+        true
+      case .idle, .connecting, .offline:
+        false
+      }
     let store = HarnessMonitorStore(
       daemonController: PreviewDaemonController(
-        mode: configuration.mode,
+        fixtures: configuration.fixtures,
+        isDaemonRunning: isDaemonRunning,
+        isLaunchAgentInstalled: !configuration.fixtures.sessions.isEmpty,
         hostBridgeOverride: hostBridgeOverride,
         actionDelay: actionDelay
       ),
@@ -81,6 +91,11 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.selectedSessionID = configuration.selectedSessionID
     store.selectedSession = configuration.selectedDetail
     store.timeline = configuration.timeline
+    if let selectedSessionID = configuration.selectedSessionID {
+      let initialAgentTuis = configuration.fixtures.agentTuisBySessionID[selectedSessionID] ?? []
+      store.selectedAgentTuis = initialAgentTuis
+      store.selectAgentTui(tuiID: initialAgentTuis.first?.tuiId)
+    }
     store.isSelectionLoading = false
     store.isShowingCachedData = configuration.isShowingCachedData
     store.persistedSessionCount = configuration.persistedSessionCount
@@ -136,6 +151,8 @@ extension HarnessMonitorPreviewStoreFactory {
       return dashboardConfiguration()
     case .cockpitLoaded:
       return cockpitConfiguration()
+    case .agentTuiOverflow:
+      return agentTuiOverflowConfiguration()
     case .taskDropCockpit:
       return taskDropConfiguration()
     case .offlineCached:
@@ -183,6 +200,35 @@ extension HarnessMonitorPreviewStoreFactory {
 
   fileprivate static func cockpitConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.populated
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
+    return liveConfiguration(
+      mode: .populated,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: PreviewFixtures.summary.sessionId,
+        selectedDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
+    )
+  }
+
+  fileprivate static func agentTuiOverflowConfiguration() -> PreviewStoreConfiguration {
+    let baseFixtures = PreviewHarnessClient.Fixtures.populated
+    let fixtures = PreviewHarnessClient.Fixtures(
+      health: baseFixtures.health,
+      projects: baseFixtures.projects,
+      sessions: baseFixtures.sessions,
+      detail: baseFixtures.detail,
+      timeline: baseFixtures.timeline,
+      readySessionID: baseFixtures.readySessionID,
+      detailsBySessionID: baseFixtures.detailsBySessionID,
+      coreDetailsBySessionID: baseFixtures.coreDetailsBySessionID,
+      timelinesBySessionID: baseFixtures.timelinesBySessionID,
+      agentTuisBySessionID: [PreviewFixtures.summary.sessionId: AgentTuiPreviewSupport.overflowMixed]
+    )
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
       mode: .populated,

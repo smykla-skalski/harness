@@ -201,7 +201,26 @@ enum HarnessMonitorUITestAccessibility {
   static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
   static let agentTuiButton = "harness.session.agent-tui"
   static let agentTuiSheet = "harness.sheet.agent-tui"
+  static let agentTuiState = "harness.sheet.agent-tui.state"
+  static let agentTuiTabStrip = "harness.sheet.agent-tui.tabs"
+  static let agentTuiTabStripState = "harness.sheet.agent-tui.tabs.state"
+  static let agentTuiCreateTab = "harness.sheet.agent-tui.tab.create"
+  static let agentTuiOverflowPicker = "harness.sheet.agent-tui.overflow"
+  static let agentTuiRuntimePicker = "harness.sheet.agent-tui.runtime"
+  static let agentTuiNameField = "harness.sheet.agent-tui.name"
+  static let agentTuiPromptField = "harness.sheet.agent-tui.prompt"
+  static let agentTuiLaunchPane = "harness.sheet.agent-tui.launch-pane"
+  static let agentTuiSessionPane = "harness.sheet.agent-tui.session-pane"
+  static let agentTuiViewport = "harness.sheet.agent-tui.viewport"
+  static let agentTuiInputField = "harness.sheet.agent-tui.input"
+  static let agentTuiInputModePicker = "harness.sheet.agent-tui.input-mode"
+  static let agentTuiRefreshButton = "harness.sheet.agent-tui.refresh"
+  static let agentTuiCloseButton = "harness.sheet.agent-tui.close"
   static let agentTuiStartButton = "harness.sheet.agent-tui.start"
+  static let agentTuiSendButton = "harness.sheet.agent-tui.send"
+  static let agentTuiResizeButton = "harness.sheet.agent-tui.resize"
+  static let agentTuiStopButton = "harness.sheet.agent-tui.stop"
+  static let agentTuiRevealTranscriptButton = "harness.sheet.agent-tui.transcript"
   static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
   static let agentTuiEnableBridgeButton = "harness.sheet.agent-tui.enable-bridge"
   static let agentTuiCopyCommandButton = "harness.sheet.agent-tui.copy-command"
@@ -229,6 +248,10 @@ enum HarnessMonitorUITestAccessibility {
 
   static func sessionAgentTaskDropFeedback(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID)).task-drop-feedback"
+  }
+
+  static func agentTuiTab(_ tuiID: String) -> String {
+    "harness.sheet.agent-tui.tab.\(slug(tuiID))"
   }
 
   private static func slug(_ value: String) -> String {

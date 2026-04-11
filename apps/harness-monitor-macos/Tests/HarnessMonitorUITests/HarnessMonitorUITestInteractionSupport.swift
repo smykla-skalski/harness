@@ -59,6 +59,27 @@ extension HarnessMonitorUITestCase {
         }
       }
 
+      let genericTarget = element(in: app, identifier: identifier)
+      if waitForElement(genericTarget, timeout: Self.fastPollInterval) {
+        if genericTarget.isHittable {
+          genericTarget.tap()
+          return
+        }
+
+        if let coordinate = centerCoordinate(in: app, for: genericTarget) {
+          coordinate.tap()
+          return
+        }
+      }
+
+      let frameMarker = element(in: app, identifier: "\(identifier).frame")
+      if waitForElement(frameMarker, timeout: Self.fastPollInterval),
+        let coordinate = centerCoordinate(in: app, for: frameMarker)
+      {
+        coordinate.tap()
+        return
+      }
+
       RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     }
 

@@ -30,7 +30,7 @@ settings:
     HARNESS_MONITOR_BUILD_GIT_COMMIT: local-dev
     HARNESS_MONITOR_BUILD_GIT_DIRTY: false
     HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT: local-dev
-    MARKETING_VERSION: 19.7.9
+    MARKETING_VERSION: 19.8.0
   configs:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
@@ -459,6 +459,7 @@ targets:
       - Tests/HarnessMonitorKitTests
     dependencies:
       - target: HarnessMonitorKit
+      - target: HarnessMonitorUI
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
