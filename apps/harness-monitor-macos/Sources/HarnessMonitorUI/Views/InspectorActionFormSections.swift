@@ -77,6 +77,7 @@ struct InspectorCreateTaskSection: View {
         .focused($focusedField, equals: .createTitle)
         .submitLabel(.next)
         .onSubmit { focusedField = .createContext }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.createTaskTitleField)
       TextField("Context", text: $createContext, axis: .vertical)
         .harnessNativeFormControl()
         .focused($focusedField, equals: .createContext)
@@ -97,6 +98,7 @@ struct InspectorCreateTaskSection: View {
         isExternallyDisabled:
           createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           || isSessionReadOnly,
+        accessibilityIdentifier: HarnessMonitorAccessibility.createTaskButton,
         action: { submitCreateTask() }
       )
     }
@@ -167,6 +169,7 @@ struct InspectorTaskActionsSection: View {
           variant: .prominent,
           tint: nil,
           isExternallyDisabled: isSessionReadOnly,
+          accessibilityIdentifier: HarnessMonitorAccessibility.assignTaskButton,
           action: { assignSelectedTask() }
         )
         HarnessInlineActionButton(
@@ -176,6 +179,7 @@ struct InspectorTaskActionsSection: View {
           variant: .bordered,
           tint: .secondary,
           isExternallyDisabled: isSessionReadOnly,
+          accessibilityIdentifier: HarnessMonitorAccessibility.updateTaskQueuePolicyButton,
           action: { updateQueuePolicy() }
         )
       }
@@ -187,6 +191,7 @@ struct InspectorTaskActionsSection: View {
           variant: .bordered,
           tint: .secondary,
           isExternallyDisabled: isSessionReadOnly,
+          accessibilityIdentifier: HarnessMonitorAccessibility.updateTaskStatusButton,
           action: { updateSelectedTask() }
         )
         TextField("Update note", text: $statusNote, axis: .vertical)
@@ -221,6 +226,7 @@ struct InspectorTaskActionsSection: View {
           variant: .prominent,
           tint: HarnessMonitorTheme.caution,
           isExternallyDisabled: isSessionReadOnly,
+          accessibilityIdentifier: HarnessMonitorAccessibility.checkpointTaskButton,
           action: { checkpointSelectedTask() }
         )
       }
@@ -270,6 +276,7 @@ struct InspectorRoleActionsSection: View {
           variant: .prominent,
           tint: nil,
           isExternallyDisabled: isSessionReadOnly,
+          accessibilityIdentifier: HarnessMonitorAccessibility.changeRoleButton,
           action: { changeSelectedRole() }
         )
       }

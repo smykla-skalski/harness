@@ -432,6 +432,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   private let state: PreviewHarnessClientState
   private let isLaunchAgentInstalled: Bool
   private let hostBridgeState: PreviewHostBridgeState
+  private let actionDelay: Duration?
 
   var readySessionID: String? {
     fixtures.readySessionID
@@ -444,27 +445,37 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     self.init(
       fixtures: fixtures,
       isLaunchAgentInstalled: isLaunchAgentInstalled,
-      hostBridgeState: PreviewHostBridgeState(override: nil)
+      hostBridgeState: PreviewHostBridgeState(override: nil),
+      actionDelay: nil
     )
   }
 
   init(
     fixtures: Fixtures,
     isLaunchAgentInstalled: Bool,
-    hostBridgeState: PreviewHostBridgeState
+    hostBridgeState: PreviewHostBridgeState,
+    actionDelay: Duration? = nil
   ) {
     self.fixtures = fixtures
     self.state = PreviewHarnessClientState(fixtures: fixtures)
     self.isLaunchAgentInstalled = isLaunchAgentInstalled
     self.hostBridgeState = hostBridgeState
+    self.actionDelay = actionDelay
   }
 
   public convenience init() {
     self.init(
       fixtures: .populated,
       isLaunchAgentInstalled: true,
-      hostBridgeState: PreviewHostBridgeState(override: nil)
+      hostBridgeState: PreviewHostBridgeState(override: nil),
+      actionDelay: nil
     )
+  }
+
+  private func performActionDelay() async throws {
+    if let actionDelay {
+      try await Task.sleep(for: actionDelay)
+    }
   }
 
   public func health() async throws -> HealthResponse {
@@ -552,7 +563,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     sessionID _: String,
     request _: TaskCreateRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func assignTask(
@@ -560,7 +572,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     taskID _: String,
     request _: TaskAssignRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func dropTask(
@@ -568,7 +581,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     taskID: String,
     request: TaskDropRequest
   ) async throws -> SessionDetail {
-    try await state.dropTask(sessionID: sessionID, taskID: taskID, request: request)
+    try await performActionDelay()
+    return try await state.dropTask(sessionID: sessionID, taskID: taskID, request: request)
   }
 
   public func updateTaskQueuePolicy(
@@ -576,7 +590,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     taskID _: String,
     request _: TaskQueuePolicyRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func updateTask(
@@ -584,7 +599,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     taskID _: String,
     request _: TaskUpdateRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func checkpointTask(
@@ -592,7 +608,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     taskID _: String,
     request _: TaskCheckpointRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func changeRole(
@@ -600,7 +617,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     agentID _: String,
     request _: RoleChangeRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func removeAgent(
@@ -608,42 +626,48 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     agentID _: String,
     request _: AgentRemoveRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func transferLeader(
     sessionID _: String,
     request _: LeaderTransferRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func endSession(
     sessionID _: String,
     request _: SessionEndRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func sendSignal(
     sessionID _: String,
     request _: SignalSendRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func cancelSignal(
     sessionID _: String,
     request _: SignalCancelRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func observeSession(
     sessionID _: String,
     request _: ObserveSessionRequest
   ) async throws -> SessionDetail {
-    try await sessionDetail(id: "")
+    try await performActionDelay()
+    return try await sessionDetail(id: "")
   }
 
   public func logLevel() async throws -> LogLevelResponse {

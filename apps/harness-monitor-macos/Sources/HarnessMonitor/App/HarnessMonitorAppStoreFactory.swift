@@ -50,16 +50,20 @@ enum HarnessMonitorAppStoreFactory {
     }
   }
 
+  private static let testActionDelayKey = "HARNESS_MONITOR_TEST_ACTION_DELAY_MS"
+
   static func makeStore(
     environment: HarnessMonitorEnvironment = .current,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) -> HarnessMonitorStore {
     let previewHostBridgeOverride = previewHostBridgeOverride(environment: environment)
+    let previewActionDelay = previewActionDelay(environment: environment)
     if let previewScenario = PreviewScenarioOverride(environment: environment) {
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
         hostBridgeOverride: previewHostBridgeOverride,
+        actionDelay: previewActionDelay,
         modelContainer: modelContainer,
         persistenceError: persistenceError,
         voiceCapture: previewVoiceCapture(environment: environment)
@@ -82,7 +86,8 @@ enum HarnessMonitorAppStoreFactory {
       return HarnessMonitorStore(
         daemonController: PreviewDaemonController(
           previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
-          hostBridgeOverride: previewHostBridgeOverride
+          hostBridgeOverride: previewHostBridgeOverride,
+          actionDelay: previewActionDelay
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
@@ -92,13 +97,29 @@ enum HarnessMonitorAppStoreFactory {
       return HarnessMonitorStore(
         daemonController: PreviewDaemonController(
           mode: .empty,
-          hostBridgeOverride: previewHostBridgeOverride
+          hostBridgeOverride: previewHostBridgeOverride,
+          actionDelay: previewActionDelay
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
         persistenceError: persistenceError
       )
     }
+  }
+
+  private static func previewActionDelay(
+    environment: HarnessMonitorEnvironment
+  ) -> Duration? {
+    guard
+      let rawValue = environment.values[testActionDelayKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !rawValue.isEmpty,
+      let milliseconds = Int(rawValue),
+      milliseconds > 0
+    else {
+      return nil
+    }
+    return .milliseconds(milliseconds)
   }
 
   private static func previewVoiceCapture(

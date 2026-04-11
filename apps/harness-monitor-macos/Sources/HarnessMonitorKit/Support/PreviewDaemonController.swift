@@ -14,12 +14,14 @@ public actor PreviewDaemonController: DaemonControlling {
 
   private let fixtures: PreviewHarnessClient.Fixtures
   private let hostBridgeState: PreviewHostBridgeState
+  private let actionDelay: Duration?
   private var isDaemonRunning: Bool
   private var isLaunchAgentInstalled: Bool
 
   public init(
     mode: Mode = .populated,
-    hostBridgeOverride: PreviewHostBridgeOverride? = nil
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil,
+    actionDelay: Duration? = nil
   ) {
     let fixtures =
       switch mode {
@@ -43,13 +45,15 @@ public actor PreviewDaemonController: DaemonControlling {
 
     self.fixtures = fixtures
     hostBridgeState = PreviewHostBridgeState(override: hostBridgeOverride)
+    self.actionDelay = actionDelay
     self.isDaemonRunning = mode != .empty
     self.isLaunchAgentInstalled = mode != .empty
   }
 
   public init(
     previewFixtureSetRawValue rawValue: String?,
-    hostBridgeOverride: PreviewHostBridgeOverride? = nil
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil,
+    actionDelay: Duration? = nil
   ) {
     let normalizedValue = rawValue?
       .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,7 +73,7 @@ public actor PreviewDaemonController: DaemonControlling {
       default:
         Mode.populated
       }
-    self.init(mode: mode, hostBridgeOverride: hostBridgeOverride)
+    self.init(mode: mode, hostBridgeOverride: hostBridgeOverride, actionDelay: actionDelay)
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -138,7 +142,8 @@ public actor PreviewDaemonController: DaemonControlling {
     PreviewHarnessClient(
       fixtures: fixtures,
       isLaunchAgentInstalled: isLaunchAgentInstalled,
-      hostBridgeState: hostBridgeState
+      hostBridgeState: hostBridgeState,
+      actionDelay: actionDelay
     )
   }
 
