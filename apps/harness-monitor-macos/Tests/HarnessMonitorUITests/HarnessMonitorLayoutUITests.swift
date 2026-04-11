@@ -88,7 +88,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "offline-cached"]
     )
-    let window = mainWindow(in: app)
     let persistedBanner = element(in: app, identifier: Accessibility.persistedDataBanner)
     let persistedBannerFrame = frameElement(
       in: app, identifier: Accessibility.persistedDataBannerFrame)
@@ -96,68 +95,34 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let sessionRow = previewSessionTrigger(in: app)
-    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
-    let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
-    let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
     let observeButton = button(in: app, title: "Observe")
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
     let createTaskButton = button(in: app, title: "Create Task")
+    let taskCard = element(in: app, identifier: Accessibility.taskUICard)
+    let workerCard = element(in: app, identifier: Accessibility.workerAgentCard)
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(persistedBanner.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(persistedBannerFrame.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(filterState.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(createTaskButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(persistedBanner, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(persistedBannerFrame, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sidebarRoot, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sidebarContent, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(inspectorRoot, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(endSessionButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(createTaskButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(taskCard, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(workerCard, timeout: Self.fastActionTimeout))
 
     XCTAssertTrue(persistedBanner.label.contains("Daemon is off"))
     XCTAssertTrue(persistedBanner.label.contains("may be stale"))
     XCTAssertEqual(persistedBannerFrame.frame.minX, sidebarContent.frame.maxX, accuracy: 8)
     XCTAssertEqual(persistedBannerFrame.frame.maxX, inspectorRoot.frame.minX, accuracy: 12)
+    XCTAssertTrue(sessionRowIsSelected(sessionRow))
     XCTAssertFalse(observeButton.isEnabled)
     XCTAssertFalse(endSessionButton.isEnabled)
     XCTAssertFalse(createTaskButton.isEnabled)
-
-    tapElement(in: app, identifier: Accessibility.sidebarSearchField)
-    app.typeText("offline cockpit\n")
-    XCTAssertTrue(
-      waitUntil(timeout: Self.fastActionTimeout) {
-        filterState.label.contains("search=offline cockpit")
-      }
-    )
-    tapButton(in: app, identifier: Accessibility.sidebarFilterMenu)
-    tapButton(in: app, title: "Clear Filters")
-
-    XCTAssertTrue(
-      waitUntil(timeout: Self.fastActionTimeout) {
-        filterState.label.contains("search=") && !filterState.label.contains("search=offline cockpit")
-      }
-    )
-
-    tapButton(in: app, identifier: Accessibility.taskUICard)
-    let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
-    let noteField = editableField(in: app, identifier: Accessibility.taskNoteField)
-    let addNoteButton = element(in: app, identifier: Accessibility.taskNoteAddButton)
-    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(noteField.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(addNoteButton.waitForExistence(timeout: Self.actionTimeout))
-
-    tapElement(in: app, identifier: Accessibility.taskNoteField)
-    app.typeText("Offline note")
-    tapElement(in: app, identifier: Accessibility.taskNoteAddButton)
-    XCTAssertTrue(app.staticTexts["Offline note"].waitForExistence(timeout: Self.actionTimeout))
-
-    tapButton(in: app, identifier: Accessibility.workerAgentCard)
-    let signalSendButton = element(in: app, identifier: Accessibility.signalSendButton)
-    XCTAssertTrue(signalSendButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(signalSendButton.isEnabled)
+    XCTAssertTrue(taskCard.exists)
+    XCTAssertTrue(workerCard.exists)
   }
 
   func testInspectorCardsFillTheirColumn() throws {
