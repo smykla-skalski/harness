@@ -153,8 +153,6 @@ struct ContentCornerOverlayModifier: ViewModifier {
 
   private var isPresented: Bool {
     cornerAnimationEnabled
-      || sessionUI.isSelectionLoading
-      || sessionUI.isExtensionsLoading
       || toolbarUI.isRefreshing
       || toolbarUI.connectionState == .connecting
   }
