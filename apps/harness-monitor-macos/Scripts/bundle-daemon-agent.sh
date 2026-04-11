@@ -69,7 +69,7 @@ if [ -z "$daemon_source" ]; then
   daemon_source="$target_dir/$profile_dir/harness"
   cargo_bin="$(find_cargo)"
   daemon_info_digest="$(/usr/bin/shasum -a 256 "$daemon_info_plist" | /usr/bin/awk '{print $1}')"
-  daemon_info_link_plist="${TARGET_TEMP_DIR:-$target_dir}/io.harnessmonitor.daemon.$daemon_info_digest.Info.plist"
+  daemon_info_link_plist="$target_dir/daemon-info/io.harnessmonitor.daemon.$daemon_info_digest.Info.plist"
   /bin/mkdir -p "$(dirname "$daemon_info_link_plist")"
   /bin/cp "$daemon_info_plist" "$daemon_info_link_plist"
   if [ -n "${MARKETING_VERSION:-}" ]; then
