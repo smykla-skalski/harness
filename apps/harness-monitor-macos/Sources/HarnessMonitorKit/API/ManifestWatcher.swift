@@ -14,18 +14,21 @@ final class ManifestWatcher: @unchecked Sendable {
   private let directoryPath: String
   private let manifestPath: String
   private var lastEndpoint: String
+  private var lastStartedAt: String?
   private let onChange: @Sendable () -> Void
   private let decoder: JSONDecoder
 
   init(
     environment: HarnessMonitorEnvironment = .current,
     currentEndpoint: String,
+    currentStartedAt: String? = nil,
     onChange: @escaping @Sendable () -> Void
   ) {
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
     self.directoryPath = manifestURL.deletingLastPathComponent().path
     self.manifestPath = manifestURL.path
     self.lastEndpoint = currentEndpoint
+    self.lastStartedAt = currentStartedAt
     self.onChange = onChange
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -75,16 +78,20 @@ final class ManifestWatcher: @unchecked Sendable {
     guard let manifest = try? decoder.decode(ManifestSnapshot.self, from: data) else {
       return
     }
-    guard manifest.endpoint != lastEndpoint else {
+    guard manifest.endpoint != lastEndpoint || manifest.startedAt != lastStartedAt else {
       return
     }
     let oldEndpoint = lastEndpoint
+    let oldStartedAt = lastStartedAt
     lastEndpoint = manifest.endpoint
+    lastStartedAt = manifest.startedAt
     HarnessMonitorLogger.lifecycle.info(
       """
-      ManifestWatcher: endpoint changed \
+      ManifestWatcher: manifest changed \
       from \(oldEndpoint, privacy: .public) \
-      to \(manifest.endpoint, privacy: .public)
+      (\(oldStartedAt ?? "unknown", privacy: .public)) \
+      to \(manifest.endpoint, privacy: .public) \
+      (\(manifest.startedAt ?? "unknown", privacy: .public))
       """
     )
     onChange()
@@ -93,4 +100,5 @@ final class ManifestWatcher: @unchecked Sendable {
 
 private struct ManifestSnapshot: Decodable {
   let endpoint: String
+  let startedAt: String?
 }
