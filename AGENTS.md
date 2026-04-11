@@ -86,16 +86,30 @@ Every feature change must evaluate semver and bump the version in the same chang
 - `minor` - backward-compatible new functionality such as a new command, flag, output field, hook capability, report surface, or materially expanded behavior
 - `patch` - backward-compatible bug fixes, internal refactors, diagnostics, performance work, or test/doc updates that do not add new capability and do not break an existing contract
 
-Manual bump surfaces for harness:
+Canonical version source for harness:
 
 - `Cargo.toml` - canonical crate/package version
-- `testkit/Cargo.toml` - keep the testkit crate aligned with the root package version
-- `.Codex/plugins/suite/.Codex-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
-- `src/commands/observe/output.rs` - bump the SARIF `driver.version` only; do not change the SARIF schema version `2.1.0` unless the SARIF spec itself changes
-- `Cargo.lock` - regenerate after the package-version changes
-- `src/bootstrap.rs` - update only versioned plugin fixtures and cache-path expectations in tests when they intentionally track the released version; this file consumes the plugin version but is not a canonical version source
 
-Related note: `src/cli.rs` uses Clap's derived `version`, so it follows the root `Cargo.toml` version automatically and should not get a manual version string.
+Automatic sync workflow:
+
+- bump the canonical version with `./scripts/version.sh set <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
+- `mise run version:check` verifies every derived version surface and runs as part of `mise run check`
+- `apps/harness-monitor-macos/Scripts/generate-project.sh` automatically syncs the monitor version metadata from the root package version before it invokes XcodeGen
+
+Derived surfaces maintained by `scripts/version.sh`:
+
+- `testkit/Cargo.toml`
+- `Cargo.lock` package entries for `harness` and `harness-testkit`
+- `apps/harness-monitor-macos/project.yml`
+- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj`
+- `apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist`
+
+Additional version notes:
+
+- `.Codex/plugins/suite/.Codex-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
+- `src/observe/output.rs` sources the SARIF `driver.version` from `env!("CARGO_PKG_VERSION")`; do not replace that with a manual version string
+- `src/bootstrap.rs` - update only versioned plugin fixtures and cache-path expectations in tests when they intentionally track the released version; this file consumes the plugin version but is not a canonical version source
+- `src/cli.rs` uses Clap's derived `version`, so it follows the root `Cargo.toml` version automatically and should not get a manual version string
 
 ## Logging
 
