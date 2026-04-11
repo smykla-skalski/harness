@@ -259,7 +259,20 @@ Perf tests take 8-12 seconds per scenario per iteration (3 iterations default). 
 
 Instrumentation/audit runs must not execute from a dirty shared worktree. They build, stage, launch, and trace app bundles, so parallel edits in the main checkout can make the run measure the wrong source revision or mix unrelated changes into the build.
 
-For every `Scripts/run-instruments-audit.sh` run that is intended to prove a performance fix:
+For every audit run that is intended to prove a performance fix, prefer the dedicated wrapper:
+
+```bash
+apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh \
+  --ref <sha-or-ref> \
+  --label <name> \
+  ...
+```
+
+It creates the temporary worktree, runs `mise trust`, delegates to
+`Scripts/run-instruments-audit.sh`, verifies `manifest.json` provenance, and
+removes the worktree on exit.
+
+If you need to reason about that behavior or change it, the required contract is:
 
 1. Create a temporary worktree from the exact commit or ref under test, preferably under a scratch directory, for example:
 
