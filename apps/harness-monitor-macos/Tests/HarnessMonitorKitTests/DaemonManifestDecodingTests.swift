@@ -29,11 +29,10 @@ struct DaemonManifestDecodingTests {
     #expect(manifest.startedAt == "2026-03-28T14:00:00Z")
     #expect(manifest.tokenPath == "/tmp/token")
     #expect(manifest.sandboxed == false)
-    #expect(manifest.codexTransport == "stdio")
-    #expect(manifest.codexEndpoint == nil)
+    #expect(manifest.hostBridge == HostBridgeManifest())
   }
 
-  @Test("Sandbox manifest decodes all fields")
+  @Test("Legacy sandbox manifest decodes bridge fallback fields")
   func sandboxManifestDecodesAllFields() throws {
     let json = """
       {
@@ -55,11 +54,61 @@ struct DaemonManifestDecodingTests {
     let manifest = try decoder.decode(DaemonManifest.self, from: data)
 
     #expect(manifest.sandboxed == true)
-    #expect(manifest.codexTransport == "websocket")
-    #expect(manifest.codexEndpoint == "ws://127.0.0.1:9999/v1/codex")
+    #expect(manifest.hostBridge.running == true)
+    #expect(manifest.hostBridge.capabilities["codex"]?.transport == "websocket")
+    #expect(manifest.hostBridge.capabilities["codex"]?.endpoint == "ws://127.0.0.1:9999/v1/codex")
   }
 
-  @Test("Sandbox fields round-trip through encode + decode")
+  @Test("Unified host bridge manifest decodes all fields")
+  func unifiedBridgeManifestDecodesAllFields() throws {
+    let json = """
+      {
+        "version": "19.0.0",
+        "pid": 4242,
+        "endpoint": "http://127.0.0.1:9999",
+        "started_at": "2026-04-11T14:00:00Z",
+        "token_path": "/tmp/token",
+        "sandboxed": true,
+        "host_bridge": {
+          "running": true,
+          "socket_path": "/tmp/bridge.sock",
+          "capabilities": {
+            "codex": {
+              "enabled": true,
+              "healthy": true,
+              "transport": "websocket",
+              "endpoint": "ws://127.0.0.1:4500",
+              "metadata": {
+                "port": "4500"
+              }
+            },
+            "agent-tui": {
+              "enabled": true,
+              "healthy": true,
+              "transport": "unix",
+              "endpoint": "/tmp/bridge.sock",
+              "metadata": {
+                "active_sessions": "1"
+              }
+            }
+          }
+        }
+      }
+      """
+
+    let data = Data(json.utf8)
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+    let manifest = try decoder.decode(DaemonManifest.self, from: data)
+
+    #expect(manifest.hostBridge.running == true)
+    #expect(manifest.hostBridge.socketPath == "/tmp/bridge.sock")
+    #expect(manifest.hostBridge.capabilities["codex"]?.metadata["port"] == "4500")
+    #expect(manifest.hostBridge.capabilities["agent-tui"]?.metadata["active_sessions"] == "1")
+  }
+
+  @Test("Host bridge fields round-trip through encode + decode")
   func sandboxFieldsRoundTrip() throws {
     let original = DaemonManifest(
       version: "14.5.0",
@@ -68,8 +117,18 @@ struct DaemonManifestDecodingTests {
       startedAt: "2026-03-28T14:00:00Z",
       tokenPath: "/tmp/token",
       sandboxed: true,
-      codexTransport: "websocket",
-      codexEndpoint: "ws://127.0.0.1:9999/v1/codex"
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:9999/v1/codex",
+            metadata: ["port": "9999"]
+          )
+        ]
+      )
     )
 
     let encoder = JSONEncoder()

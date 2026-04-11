@@ -22,6 +22,14 @@ struct CodexFlowSheetView: View {
     store.selectedCodexRun
   }
 
+  private var codexBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {
+    store.hostBridgeCapabilityState(for: "codex")
+  }
+
+  private var codexBridgeCommand: String {
+    store.hostBridgeStartCommand(for: "codex")
+  }
+
   private var canSubmit: Bool {
     !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
   }
@@ -301,13 +309,13 @@ struct CodexFlowSheetView: View {
 
   private var codexUnavailableBanner: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Label("Codex is not running", systemImage: "exclamationmark.triangle")
+      Label(codexBridgeTitle, systemImage: "exclamationmark.triangle")
         .scaledFont(.headline)
         .foregroundStyle(.orange)
-      Text("Harness Monitor runs sandboxed and cannot start Codex directly. Run this in a terminal:")
+      Text(codexBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text("harness codex-bridge start")
+      Text(codexBridgeCommand)
         .scaledFont(.body.monospaced())
         .textSelection(.enabled)
         .padding(HarnessMonitorTheme.spacingSM)
@@ -315,13 +323,35 @@ struct CodexFlowSheetView: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
       Button("Copy command") {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("harness codex-bridge start", forType: .string)
+        NSPasteboard.general.setString(codexBridgeCommand, forType: .string)
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowRecoveryBanner)
+  }
+
+  private var codexBridgeTitle: String {
+    switch codexBridgeState {
+    case .excluded:
+      "Codex is excluded from the host bridge"
+    case .unavailable:
+      "Codex host bridge is not running"
+    case .ready:
+      "Codex host bridge ready"
+    }
+  }
+
+  private var codexBridgeMessage: String {
+    switch codexBridgeState {
+    case .excluded:
+      "The shared host bridge is running without the Codex capability. Restart it with Codex enabled:"
+    case .unavailable:
+      "Harness Monitor runs sandboxed and cannot start Codex directly. Run this in a terminal:"
+    case .ready:
+      ""
+    }
   }
 }
 
@@ -366,6 +396,14 @@ struct AgentTuiSheetView: View {
 
   private var selectedTui: AgentTuiSnapshot? {
     store.selectedAgentTui
+  }
+
+  private var agentTuiBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {
+    store.hostBridgeCapabilityState(for: "agent-tui")
+  }
+
+  private var agentTuiBridgeCommand: String {
+    store.hostBridgeStartCommand(for: "agent-tui")
   }
 
   private var selectedTuiBinding: Binding<String> {
@@ -665,13 +703,13 @@ struct AgentTuiSheetView: View {
 
   private var agentTuiUnavailableBanner: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Label("Agent TUI bridge is not running", systemImage: "exclamationmark.triangle")
+      Label(agentTuiBridgeTitle, systemImage: "exclamationmark.triangle")
         .scaledFont(.headline)
         .foregroundStyle(.orange)
-      Text("Harness Monitor runs sandboxed and needs the host bridge to start or steer terminal-backed agents. Run this in a terminal:")
+      Text(agentTuiBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text("harness agent-tui-bridge start")
+      Text(agentTuiBridgeCommand)
         .scaledFont(.body.monospaced())
         .textSelection(.enabled)
         .padding(HarnessMonitorTheme.spacingSM)
@@ -679,13 +717,35 @@ struct AgentTuiSheetView: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
       Button("Copy command") {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("harness agent-tui-bridge start", forType: .string)
+        NSPasteboard.general.setString(agentTuiBridgeCommand, forType: .string)
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRecoveryBanner)
+  }
+
+  private var agentTuiBridgeTitle: String {
+    switch agentTuiBridgeState {
+    case .excluded:
+      "Agent TUI is excluded from the host bridge"
+    case .unavailable:
+      "Agent TUI host bridge is not running"
+    case .ready:
+      "Agent TUI host bridge ready"
+    }
+  }
+
+  private var agentTuiBridgeMessage: String {
+    switch agentTuiBridgeState {
+    case .excluded:
+      "The shared host bridge is running without terminal control enabled. Restart it with agent-tui enabled:"
+    case .unavailable:
+      "Harness Monitor runs sandboxed and needs the host bridge to start or steer terminal-backed agents. Run this in a terminal:"
+    case .ready:
+      ""
+    }
   }
 
   private func syncTerminalSize() {

@@ -1,5 +1,43 @@
 import Foundation
 
+public struct HostBridgeCapabilityManifest: Codable, Equatable, Sendable {
+  public let enabled: Bool
+  public let healthy: Bool
+  public let transport: String
+  public let endpoint: String?
+  public let metadata: [String: String]
+
+  public init(
+    enabled: Bool = true,
+    healthy: Bool,
+    transport: String,
+    endpoint: String? = nil,
+    metadata: [String: String] = [:]
+  ) {
+    self.enabled = enabled
+    self.healthy = healthy
+    self.transport = transport
+    self.endpoint = endpoint
+    self.metadata = metadata
+  }
+}
+
+public struct HostBridgeManifest: Codable, Equatable, Sendable {
+  public let running: Bool
+  public let socketPath: String?
+  public let capabilities: [String: HostBridgeCapabilityManifest]
+
+  public init(
+    running: Bool = false,
+    socketPath: String? = nil,
+    capabilities: [String: HostBridgeCapabilityManifest] = [:]
+  ) {
+    self.running = running
+    self.socketPath = socketPath
+    self.capabilities = capabilities
+  }
+}
+
 public struct DaemonManifest: Codable, Equatable, Sendable {
   public let version: String
   public let pid: Int
@@ -7,8 +45,7 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
   public let startedAt: String
   public let tokenPath: String
   public let sandboxed: Bool
-  public let codexTransport: String
-  public let codexEndpoint: String?
+  public let hostBridge: HostBridgeManifest
 
   public init(
     version: String,
@@ -17,8 +54,7 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     startedAt: String,
     tokenPath: String,
     sandboxed: Bool = false,
-    codexTransport: String = "stdio",
-    codexEndpoint: String? = nil
+    hostBridge: HostBridgeManifest = .init()
   ) {
     self.version = version
     self.pid = pid
@@ -26,28 +62,61 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     self.startedAt = startedAt
     self.tokenPath = tokenPath
     self.sandboxed = sandboxed
-    self.codexTransport = codexTransport
-    self.codexEndpoint = codexEndpoint
+    self.hostBridge = hostBridge
   }
 
   enum CodingKeys: String, CodingKey {
     case version, pid, endpoint, startedAt, tokenPath
-    case sandboxed, codexTransport, codexEndpoint
+    case sandboxed, hostBridge, codexTransport, codexEndpoint
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    let sandboxed = try container.decodeIfPresent(Bool.self, forKey: .sandboxed) ?? false
+    let hostBridge =
+      try container.decodeIfPresent(HostBridgeManifest.self, forKey: .hostBridge)
+      ?? Self.legacyHostBridge(from: container)
     self.init(
       version: try container.decode(String.self, forKey: .version),
       pid: try container.decode(Int.self, forKey: .pid),
       endpoint: try container.decode(String.self, forKey: .endpoint),
       startedAt: try container.decode(String.self, forKey: .startedAt),
       tokenPath: try container.decode(String.self, forKey: .tokenPath),
-      sandboxed: try container.decodeIfPresent(Bool.self, forKey: .sandboxed) ?? false,
-      codexTransport: try container.decodeIfPresent(String.self, forKey: .codexTransport)
-        ?? "stdio",
-      codexEndpoint: try container.decodeIfPresent(String.self, forKey: .codexEndpoint)
+      sandboxed: sandboxed,
+      hostBridge: hostBridge
     )
+  }
+
+  private static func legacyHostBridge(
+    from container: KeyedDecodingContainer<CodingKeys>
+  ) throws -> HostBridgeManifest {
+    let transport = try container.decodeIfPresent(String.self, forKey: .codexTransport) ?? "stdio"
+    let endpoint = try container.decodeIfPresent(String.self, forKey: .codexEndpoint)
+    guard transport == "websocket", let endpoint else {
+      return HostBridgeManifest()
+    }
+    return HostBridgeManifest(
+      running: true,
+      socketPath: nil,
+      capabilities: [
+        "codex": HostBridgeCapabilityManifest(
+          healthy: true,
+          transport: transport,
+          endpoint: endpoint
+        )
+      ]
+    )
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(version, forKey: .version)
+    try container.encode(pid, forKey: .pid)
+    try container.encode(endpoint, forKey: .endpoint)
+    try container.encode(startedAt, forKey: .startedAt)
+    try container.encode(tokenPath, forKey: .tokenPath)
+    try container.encode(sandboxed, forKey: .sandboxed)
+    try container.encode(hostBridge, forKey: .hostBridge)
   }
 }
 

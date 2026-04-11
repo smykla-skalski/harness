@@ -1,44 +1,36 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesCodexSection: View {
+struct PreferencesHostBridgeSection: View {
   let store: HarnessMonitorStore
 
   private var manifest: DaemonManifest? {
     store.daemonStatus?.manifest
   }
 
-  private var transportLabel: String {
-    manifest?.codexTransport ?? "unknown"
+  private var hostBridge: HostBridgeManifest {
+    manifest?.hostBridge ?? HostBridgeManifest()
   }
 
-  private var endpointLabel: String {
-    manifest?.codexEndpoint ?? "none"
-  }
-
-  private var isBridgeConnected: Bool {
-    manifest?.codexTransport == "websocket" && manifest?.codexEndpoint != nil
+  private var capabilities: [(String, HostBridgeCapabilityManifest)] {
+    hostBridge.capabilities.sorted { $0.key < $1.key }
   }
 
   var body: some View {
     Form {
-      Section("Bridge status") {
-        LabeledContent("Transport") {
-          Text(transportLabel)
-            .scaledFont(.body.monospaced())
-        }
-        LabeledContent("Endpoint") {
-          Text(endpointLabel)
-            .scaledFont(.body.monospaced())
-        }
+      Section("Host Bridge") {
         LabeledContent("Status") {
           HStack(spacing: HarnessMonitorTheme.spacingXS) {
             Circle()
-              .fill(isBridgeConnected ? .green : .secondary)
+              .fill(hostBridge.running ? .green : .secondary)
               .frame(width: 8, height: 8)
-            Text(isBridgeConnected ? "Connected" : "Not connected")
+            Text(hostBridge.running ? "Running" : "Not running")
               .scaledFont(.body)
           }
+        }
+        LabeledContent("Socket") {
+          Text(hostBridge.socketPath ?? "none")
+            .scaledFont(.body.monospaced())
         }
         if manifest?.sandboxed == true {
           LabeledContent("Sandbox") {
@@ -48,13 +40,26 @@ struct PreferencesCodexSection: View {
           }
         }
       }
+
+      Section("Capabilities") {
+        if capabilities.isEmpty {
+          Text("No capabilities enabled")
+            .scaledFont(.subheadline)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        } else {
+          ForEach(capabilities, id: \.0) { name, capability in
+            capabilityRow(name: name, capability: capability)
+          }
+        }
+      }
+
       Section {
-        CodexBridgeCommandsView()
+        HostBridgeCommandsView()
       } header: {
         Text("Setup")
       } footer: {
         Text(
-          "The sandboxed daemon connects to Codex over WebSocket. Run the bridge in a terminal to make Codex available."
+          "Sandboxed monitor features use the shared host bridge. Start it once to enable every compiled capability, or narrow it with repeated --capability flags."
         )
         .scaledFont(.caption)
       }
@@ -62,19 +67,44 @@ struct PreferencesCodexSection: View {
     .preferencesDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesCodexSection)
   }
+
+  @ViewBuilder
+  private func capabilityRow(name: String, capability: HostBridgeCapabilityManifest) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack {
+        Text(name)
+          .scaledFont(.headline)
+        Spacer()
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Circle()
+            .fill(capability.healthy ? .green : .orange)
+            .frame(width: 8, height: 8)
+          Text(capability.healthy ? "Healthy" : "Unavailable")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+      }
+      Text(capability.transport)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if let endpoint = capability.endpoint {
+        Text(endpoint)
+          .scaledFont(.body.monospaced())
+          .textSelection(.enabled)
+      }
+    }
+  }
 }
 
-private struct CodexBridgeCommandsView: View {
-  @State private var copied = false
-
-  private let startCommand = "harness codex-bridge start"
-  private let installCommand = "harness codex-bridge install-launch-agent"
+private struct HostBridgeCommandsView: View {
+  private let startCommand = "harness bridge start"
+  private let installCommand = "harness bridge install-launch-agent"
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       commandRow(
         title: "Start bridge",
-        description: "Run once in a terminal to start Codex",
+        description: "Run once in a terminal to enable host-side capabilities",
         command: startCommand,
         accessibilityID: HarnessMonitorAccessibility.preferencesCodexCopyStartButton
       )
@@ -115,9 +145,9 @@ private struct CodexBridgeCommandsView: View {
   }
 }
 
-#Preview("Preferences Codex Section") {
+#Preview("Preferences Host Bridge Section") {
   let store = PreferencesPreviewSupport.makeStore()
 
-  PreferencesCodexSection(store: store)
+  PreferencesHostBridgeSection(store: store)
     .frame(width: 720)
 }

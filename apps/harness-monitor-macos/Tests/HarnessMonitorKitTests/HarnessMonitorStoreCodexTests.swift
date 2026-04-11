@@ -118,7 +118,7 @@ struct HarnessMonitorStoreCodexTests {
   func successfulCodexRunClearsCodexUnavailable() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
-    store.codexUnavailable = true
+    store.hostBridgeCapabilityIssues["codex"] = .unavailable
 
     let started = await store.startCodexRun(prompt: "Patch it.", mode: .report)
 
@@ -265,7 +265,7 @@ struct HarnessMonitorStoreAgentTuiTests {
   func successfulAgentTuiStartClearsUnavailableFlag() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
-    store.agentTuiUnavailable = true
+    store.hostBridgeCapabilityIssues["agent-tui"] = .unavailable
 
     let started = await store.startAgentTui(
       runtime: .copilot,
@@ -283,5 +283,105 @@ struct HarnessMonitorStoreAgentTuiTests {
     let store = await makeBootstrappedStore(client: client)
     await store.selectSession(PreviewFixtures.summary.sessionId)
     return store
+  }
+}
+
+@MainActor
+@Suite("Harness Monitor host bridge state")
+struct HarnessMonitorStoreHostBridgeTests {
+  @Test("Host bridge capability state reports excluded when running bridge omits capability")
+  func hostBridgeCapabilityStateReportsExcludedCapability() async {
+    let store = await makeBootstrappedStore()
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          )
+        ]
+      )
+    )
+
+    #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
+    #expect(store.agentTuiUnavailable == true)
+  }
+
+  @Test("Host bridge start command narrows to missing capability when running bridge excludes it")
+  func hostBridgeStartCommandNarrowsToMissingCapability() async {
+    let store = await makeBootstrappedStore()
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          )
+        ]
+      )
+    )
+
+    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge start --capability codex")
+  }
+
+  @Test("501 bridge issue marks excluded only when running bridge omits capability")
+  func markHostBridgeIssueUsesExcludedForMissingCapability() async {
+    let store = await makeBootstrappedStore()
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          )
+        ]
+      )
+    )
+
+    store.markHostBridgeIssue(for: "agent-tui", statusCode: 501)
+
+    #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
+    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start --capability agent-tui")
+  }
+
+  private func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
+    DaemonStatusReport(
+      manifest: DaemonManifest(
+        version: "19.0.0",
+        pid: 111,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-04-11T09:00:00Z",
+        tokenPath: "/tmp/token",
+        sandboxed: true,
+        hostBridge: hostBridge
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: true,
+        loaded: true,
+        label: "io.harness.daemon",
+        path: "/tmp/io.harness.daemon.plist"
+      ),
+      projectCount: 1,
+      sessionCount: 1,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/tmp/harness/daemon",
+        manifestPath: "/tmp/harness/daemon/manifest.json",
+        authTokenPath: "/tmp/token",
+        authTokenPresent: true,
+        eventsPath: "/tmp/harness/daemon/events.jsonl",
+        databasePath: "/tmp/harness/daemon/harness.db",
+        databaseSizeBytes: 1_024,
+        lastEvent: nil
+      )
+    )
   }
 }
