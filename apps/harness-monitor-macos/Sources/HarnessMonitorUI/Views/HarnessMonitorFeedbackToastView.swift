@@ -31,7 +31,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: iconName)
         .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
         .foregroundStyle(tintColor)
@@ -46,17 +46,17 @@ private struct HarnessMonitorFeedbackToastRow: View {
         Image(systemName: "xmark.circle.fill")
           .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .frame(width: 24, height: 24)
+          .contentShape(.rect)
       }
-      .buttonStyle(.borderless)
+      .buttonStyle(.plain)
       .accessibilityLabel("Dismiss feedback")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastCloseButton)
       .keyboardShortcut(.cancelAction)
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .background(toastBackground)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(announcementLabel)
-    .accessibilityAddTraits(.isStaticText)
   }
 
   private var iconName: String {
