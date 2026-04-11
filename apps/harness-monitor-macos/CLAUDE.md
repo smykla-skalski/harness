@@ -14,7 +14,7 @@ Validation expectations (run from repo root):
   - `tmp/xcode-derived` for quality gates, tests, and general dev builds
   - `tmp/perf/harness-monitor-instruments/xcode-derived` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
 
-  Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale`. It is still scrubbed by `Scripts/generate-project.sh` on every project regen and by `mise run clean:stale`, so an IDE session that bundles a stale helper never outlives a refresh.
+  Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
 - Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.
