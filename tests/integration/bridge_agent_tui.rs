@@ -24,11 +24,14 @@ fn bridge_status_reports_not_running_when_clean() {
 #[test]
 fn bridge_start_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let output = Command::new(harness_binary())
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .output()
         .expect("run harness");
     assert!(!output.status.success());
@@ -43,12 +46,14 @@ fn bridge_start_refuses_when_sandboxed() {
 #[test]
 fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
 
     let mut bridge = Command::new(harness_binary())
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -148,6 +153,7 @@ fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
 #[test]
 fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions() {
     let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
     let project = tmp.path().join("project");
     std::fs::create_dir_all(&project).expect("create project");
 
@@ -155,7 +161,8 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
         .args(["bridge", "start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -177,7 +184,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
             ),
             (
                 "HARNESS_HOST_HOME",
-                Some(tmp.path().to_str().expect("utf8 daemon root")),
+                Some(host_home.to_str().expect("utf8 host home")),
             ),
             ("HARNESS_APP_GROUP_ID", None),
             ("HARNESS_SANDBOXED", None),
@@ -279,15 +286,23 @@ fn run_bridge(tmp: &tempfile::TempDir, args: &[&str]) -> Output {
 }
 
 fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Output {
+    let host_home = ensure_host_home(data_home);
     Command::new(harness_binary())
         .args(args)
         .env("HARNESS_DAEMON_DATA_HOME", data_home)
         .env("XDG_DATA_HOME", data_home)
-        .env("HARNESS_HOST_HOME", data_home)
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()
         .expect("run harness")
+}
+
+fn ensure_host_home(data_home: &Path) -> PathBuf {
+    let host_home = data_home.join("host-home");
+    std::fs::create_dir_all(&host_home).expect("create host home");
+    host_home
 }
 
 fn harness_binary() -> PathBuf {

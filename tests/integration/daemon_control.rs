@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use harness::daemon::agent_tui::{AgentTuiSnapshot, AgentTuiStatus};
 use harness::daemon::bridge::BridgeStatusReport;
+use harness::daemon::protocol::SessionMutationResponse;
 use harness::daemon::service::DaemonStatusReport;
 use harness::session::types::SessionState;
 use serde_json::{Value, json};
@@ -141,34 +142,15 @@ fn daemon_only_session_status_and_end_work_after_list() {
     init_git_repo(&project);
 
     let mut daemon = spawn_daemon_serve(&home, &xdg);
-    let _status = wait_for_daemon_ready(&home, &xdg);
-
     let project_arg = project.to_str().expect("utf8 project");
-    let start_output = run_harness(
+    let started = start_session_via_http(
         &home,
         &xdg,
-        &[
-            "session",
-            "start",
-            "--title",
-            "daemon-only integration",
-            "--context",
-            "verify daemon-backed session lookup after list",
-            "--runtime",
-            "codex",
-            "--session-id",
-            "daemon-only-session",
-            "--project-dir",
-            project_arg,
-        ],
+        project_arg,
+        "daemon-only-session",
+        "daemon-only integration",
+        "verify daemon-backed session lookup after list",
     );
-    assert!(
-        start_output.status.success(),
-        "session start failed: {}",
-        output_text(&start_output)
-    );
-    let started: SessionState =
-        serde_json::from_slice(&start_output.stdout).expect("parse session start");
 
     let list_output = run_harness(&home, &xdg, &["session", "list", "--json"]);
     assert!(
@@ -239,36 +221,20 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
     init_git_repo(&project);
 
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
-    let _status = wait_for_daemon_ready(&home, &xdg);
+    let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let project_arg = project.to_str().expect("utf8 project");
-    let session_output = run_harness(
+    let session = start_session_via_http(
         &home,
         &xdg,
-        &[
-            "session",
-            "start",
-            "--title",
-            "sandboxed agent tui",
-            "--context",
-            "verify sandboxed daemon can start bridged agent tui",
-            "--runtime",
-            "codex",
-            "--session-id",
-            "sandboxed-agent-tui-session",
-            "--project-dir",
-            project_arg,
-        ],
+        project_arg,
+        "sandboxed-agent-tui-session",
+        "sandboxed agent tui",
+        "verify sandboxed daemon can start bridged agent tui",
     );
-    assert!(
-        session_output.status.success(),
-        "session start failed: {}",
-        output_text(&session_output)
-    );
-    let session: SessionState =
-        serde_json::from_slice(&session_output.stdout).expect("parse session start");
 
     let start_output = run_harness_with_timeout(
         &home,
@@ -376,15 +342,21 @@ fn sandboxed_codex_run_returns_501_when_bridge_excludes_codex() {
     init_git_repo(&project);
 
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
-    let status = wait_for_daemon_ready(&home, &xdg);
+    let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let project_arg = project.to_str().expect("utf8 project");
-    let session = start_session(&home, &xdg, project_arg, "sandboxed-codex-excluded");
-    let manifest = status.manifest.as_ref().expect("daemon manifest");
-    let endpoint = manifest.endpoint.clone();
-    let token = read_daemon_token(&manifest.token_path);
+    let session = start_session_via_http(
+        &home,
+        &xdg,
+        project_arg,
+        "sandboxed-codex-excluded",
+        "bridge exclusion coverage",
+        "verify sandboxed host bridge exclusions",
+    );
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
     let (http_status, body) = post_json(
         &endpoint,
@@ -423,7 +395,7 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
 
     let mock_codex = create_mock_codex(tmp.path());
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
-    let status = wait_for_daemon_ready(&home, &xdg);
+    let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(
         &home,
         &xdg,
@@ -437,12 +409,18 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
         ],
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let project_arg = project.to_str().expect("utf8 project");
-    let session = start_session(&home, &xdg, project_arg, "sandboxed-agent-tui-excluded");
-    let manifest = status.manifest.as_ref().expect("daemon manifest");
-    let endpoint = manifest.endpoint.clone();
-    let token = read_daemon_token(&manifest.token_path);
+    let session = start_session_via_http(
+        &home,
+        &xdg,
+        project_arg,
+        "sandboxed-agent-tui-excluded",
+        "bridge exclusion coverage",
+        "verify sandboxed host bridge exclusions",
+    );
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
     let (http_status, body) = post_json(
         &endpoint,
@@ -485,7 +463,7 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
 
     let mock_codex = create_mock_codex(tmp.path());
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
-    let status = wait_for_daemon_ready(&home, &xdg);
+    let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(
         &home,
         &xdg,
@@ -499,12 +477,18 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
         ],
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let project_arg = project.to_str().expect("utf8 project");
-    let session = start_session(&home, &xdg, project_arg, "sandboxed-agent-tui-reconfigure");
-    let manifest = status.manifest.as_ref().expect("daemon manifest");
-    let endpoint = manifest.endpoint.clone();
-    let token = read_daemon_token(&manifest.token_path);
+    let session = start_session_via_http(
+        &home,
+        &xdg,
+        project_arg,
+        "sandboxed-agent-tui-reconfigure",
+        "bridge exclusion coverage",
+        "verify sandboxed host bridge exclusions",
+    );
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
     let (reconfigure_status, reconfigure_body) = post_json(
         &endpoint,
@@ -521,6 +505,7 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
     assert!(reconfigure_body["capabilities"]["codex"].is_object());
     assert!(reconfigure_body["capabilities"]["agent-tui"].is_object());
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex", "agent-tui"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let (http_status, body) = post_json(
         &endpoint,
@@ -563,20 +548,21 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     init_git_repo(&project);
 
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
-    let status = wait_for_daemon_ready(&home, &xdg);
+    let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let project_arg = project.to_str().expect("utf8 project");
-    let session = start_session(
+    let session = start_session_via_http(
         &home,
         &xdg,
         project_arg,
         "sandboxed-agent-tui-disable-force",
+        "bridge exclusion coverage",
+        "verify sandboxed host bridge exclusions",
     );
-    let manifest = status.manifest.as_ref().expect("daemon manifest");
-    let endpoint = manifest.endpoint.clone();
-    let token = read_daemon_token(&manifest.token_path);
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
     let (start_status, start_body) = post_json(
         &endpoint,
@@ -625,6 +611,7 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     assert_eq!(forced_status, 200, "unexpected body: {forced_body}");
     assert!(forced_body["capabilities"]["agent-tui"].is_null());
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &[]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
     let (restart_status, restart_body) = post_json(
         &endpoint,
@@ -664,6 +651,7 @@ fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) ->
     args.extend(extra_args);
     Command::new(harness_binary())
         .args(&args)
+        .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("HARNESS_HOST_HOME", home)
         .env("XDG_DATA_HOME", xdg)
@@ -675,23 +663,44 @@ fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) ->
 }
 
 fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> Child {
-    let mut args = vec!["bridge", "start"];
-    args.extend(extra_args);
-    Command::new(harness_binary())
-        .args(&args)
-        .env("HOME", home)
-        .env("HARNESS_HOST_HOME", home)
-        .env("XDG_DATA_HOME", xdg)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn agent tui bridge")
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        let mut args = vec!["bridge", "start"];
+        args.extend(extra_args);
+        let mut child = Command::new(harness_binary())
+            .args(&args)
+            .env("HARNESS_HOST_HOME", home)
+            .env("HOME", home)
+            .env("HARNESS_HOST_HOME", home)
+            .env("XDG_DATA_HOME", xdg)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn agent tui bridge");
+
+        let startup_deadline = Instant::now() + Duration::from_secs(1);
+        loop {
+            match child.try_wait().expect("poll bridge start") {
+                Some(_) => {
+                    let output = child.wait_with_output().expect("collect bridge output");
+                    if Instant::now() >= deadline {
+                        panic!("bridge start failed: {}", output_text(&output));
+                    }
+                    thread::sleep(DAEMON_WAIT_INTERVAL);
+                    break;
+                }
+                None if Instant::now() >= startup_deadline => return child,
+                None => thread::sleep(DAEMON_WAIT_INTERVAL),
+            }
+        }
+    }
 }
 
 fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
     Command::new(harness_binary())
         .args(args)
+        .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("HARNESS_HOST_HOME", home)
         .env("XDG_DATA_HOME", xdg)
@@ -702,6 +711,7 @@ fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
 fn run_harness_with_timeout(home: &Path, xdg: &Path, args: &[&str], timeout: Duration) -> Output {
     let mut child = Command::new(harness_binary())
         .args(args)
+        .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("HARNESS_HOST_HOME", home)
         .env("XDG_DATA_HOME", xdg)
@@ -746,10 +756,12 @@ fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusReport {
             Ok(status) => {
                 if let Some(manifest) = status.manifest.as_ref()
                     && endpoint_is_healthy(&manifest.endpoint)
+                    && session_api_is_ready(home, xdg)
                 {
                     return status;
                 }
-                "daemon status did not report a healthy manifest yet".to_string()
+                "daemon status did not report a healthy manifest with a ready session API yet"
+                    .to_string()
             }
             Err(error) => error,
         };
@@ -850,6 +862,11 @@ fn endpoint_is_healthy(endpoint: &str) -> bool {
     })
 }
 
+fn session_api_is_ready(home: &Path, xdg: &Path) -> bool {
+    let output = run_harness(home, xdg, &["session", "list", "--json"]);
+    output.status.success()
+}
+
 fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Value) {
     let url = format!(
         "{}/{}",
@@ -857,19 +874,36 @@ fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Valu
         path.trim_start_matches('/')
     );
     let token = token.to_string();
-    Runtime::new().expect("runtime").block_on(async move {
-        let response = reqwest::Client::new()
-            .post(&url)
-            .bearer_auth(token)
-            .json(&body)
-            .timeout(DAEMON_HTTP_TIMEOUT)
-            .send()
-            .await
-            .expect("daemon post");
-        let status = response.status().as_u16();
-        let json = response.json::<Value>().await.expect("json body");
-        (status, json)
-    })
+    let runtime = Runtime::new().expect("runtime");
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        let request_body = body.clone();
+        let client = reqwest::Client::new();
+        let response = runtime.block_on(async {
+            client
+                .post(&url)
+                .bearer_auth(token.clone())
+                .json(&request_body)
+                .timeout(DAEMON_HTTP_TIMEOUT)
+                .send()
+                .await
+        });
+        match response {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                let json =
+                    runtime.block_on(async { response.json::<Value>().await.expect("json body") });
+                return (status, json);
+            }
+            Err(error) if error.is_connect() || error.is_timeout() => {
+                if Instant::now() >= deadline {
+                    panic!("daemon post: {error:?}");
+                }
+                thread::sleep(DAEMON_WAIT_INTERVAL);
+            }
+            Err(error) => panic!("daemon post: {error:?}"),
+        }
+    }
 }
 
 fn read_daemon_token(token_path: &str) -> String {
@@ -879,31 +913,122 @@ fn read_daemon_token(token_path: &str) -> String {
         .to_string()
 }
 
-fn start_session(home: &Path, xdg: &Path, project_arg: &str, session_id: &str) -> SessionState {
-    let start_output = run_harness(
+fn start_session_via_http(
+    home: &Path,
+    xdg: &Path,
+    project_arg: &str,
+    session_id: &str,
+    title: &str,
+    context: &str,
+) -> SessionState {
+    let runtime = Runtime::new().expect("runtime");
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    let request_body = json!({
+        "title": title,
+        "context": context,
+        "runtime": "codex",
+        "session_id": session_id,
+        "project_dir": project_arg,
+    });
+
+    loop {
+        let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
+        let url = format!("{}/v1/sessions", endpoint.trim_end_matches('/'));
+        let client = reqwest::Client::new();
+        let response = runtime.block_on(async {
+            client
+                .post(&url)
+                .bearer_auth(&token)
+                .json(&request_body)
+                .timeout(DAEMON_HTTP_TIMEOUT)
+                .send()
+                .await
+        });
+
+        match response {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                let body =
+                    runtime.block_on(async { response.json::<Value>().await.expect("json body") });
+                if status == 200 {
+                    return serde_json::from_value::<SessionMutationResponse>(body)
+                        .expect("parse session start")
+                        .state;
+                }
+                if status == 409
+                    && let Some(state) = read_session_status(home, xdg, project_arg, session_id)
+                {
+                    return state;
+                }
+                panic!("unexpected body: {body}");
+            }
+            Err(error) if session_start_error_is_retryable(&error) => {
+                if let Some(state) = read_session_status(home, xdg, project_arg, session_id) {
+                    return state;
+                }
+                if Instant::now() >= deadline {
+                    panic!("daemon post: {error:?}");
+                }
+                thread::sleep(DAEMON_WAIT_INTERVAL);
+            }
+            Err(error) => panic!("daemon post: {error:?}"),
+        }
+    }
+}
+
+fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, String) {
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        match try_daemon_status(home, xdg) {
+            Ok(status) => {
+                if let Some(manifest) = status.manifest.as_ref() {
+                    return (
+                        manifest.endpoint.clone(),
+                        read_daemon_token(&manifest.token_path),
+                    );
+                }
+            }
+            Err(_) => {}
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "daemon manifest did not become available before timeout"
+        );
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
+}
+
+fn read_session_status(
+    home: &Path,
+    xdg: &Path,
+    project_arg: &str,
+    session_id: &str,
+) -> Option<SessionState> {
+    let output = run_harness(
         home,
         xdg,
         &[
             "session",
-            "start",
-            "--title",
-            "bridge exclusion coverage",
-            "--context",
-            "verify sandboxed host bridge exclusions",
-            "--runtime",
-            "codex",
-            "--session-id",
+            "status",
             session_id,
+            "--json",
             "--project-dir",
             project_arg,
         ],
     );
-    assert!(
-        start_output.status.success(),
-        "session start failed: {}",
-        output_text(&start_output)
-    );
-    serde_json::from_slice(&start_output.stdout).expect("parse session start")
+    output
+        .status
+        .success()
+        .then(|| serde_json::from_slice(&output.stdout).expect("parse session status"))
+}
+
+fn session_start_error_is_retryable(error: &reqwest::Error) -> bool {
+    if error.is_connect() || error.is_timeout() {
+        return true;
+    }
+
+    error.is_request()
 }
 
 fn create_mock_codex(base: &Path) -> PathBuf {
