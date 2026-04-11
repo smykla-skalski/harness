@@ -104,13 +104,13 @@ struct AgentTuiTabStrip: View {
   let selectCreateTab: () -> Void
   let selectSessionTab: (String) -> Void
 
-  @State private var availableWidth: CGFloat = 0
+  @State private var measuredWidth = 0
 
   private var tabLayout: AgentTuiTabLayout {
     AgentTuiTabLayout.make(
       recentSessionIDs: recentSessionIDs,
       selectedSessionID: selection.sessionID,
-      availableWidth: availableWidth
+      availableWidth: CGFloat(measuredWidth)
     )
   }
 
@@ -177,19 +177,21 @@ struct AgentTuiTabStrip: View {
     .background(.quaternary.opacity(0.35))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTabStrip)
-    .onGeometryChange(for: CGFloat.self) { geometryProxy in
-      geometryProxy.size.width
+    .onGeometryChange(for: Int.self) { geometryProxy in
+      Int(geometryProxy.size.width.rounded(.toNearestOrAwayFromZero))
     } action: { width in
-      availableWidth = width
+      measuredWidth = width
     }
     .overlay {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.agentTuiTabStripState,
-        text:
-          "width=\(Int(availableWidth.rounded()))"
-          + ", visible=\(tabLayout.visibleSessionIDs.joined(separator: "|"))"
-          + ", overflow=\(tabLayout.overflowSessionIDs.joined(separator: "|"))"
-      )
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.agentTuiTabStripState,
+          text:
+            "width=\(measuredWidth)"
+            + ", visible=\(tabLayout.visibleSessionIDs.joined(separator: "|"))"
+            + ", overflow=\(tabLayout.overflowSessionIDs.joined(separator: "|"))"
+        )
+      }
     }
   }
 

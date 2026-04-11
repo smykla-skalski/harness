@@ -46,13 +46,34 @@ struct AgentTuiSheetView: View {
     .enter, .tab, .escape, .backspace, .arrowUp, .arrowDown, .arrowLeft, .arrowRight,
   ]
 
+  private var sessionSnapshotsByID: [String: AgentTuiSnapshot] {
+    Dictionary(uniqueKeysWithValues: store.selectedAgentTuis.map { ($0.tuiId, $0) })
+  }
+
+  private var agentNamesByID: [String: String] {
+    Dictionary(
+      uniqueKeysWithValues: (store.selectedSession?.agents ?? []).map { agent in
+        (agent.agentId, agent.name)
+      }
+    )
+  }
+
+  private var sessionTitlesByID: [String: String] {
+    var titles: [String: String] = [:]
+    titles.reserveCapacity(store.selectedAgentTuis.count)
+
+    for tui in store.selectedAgentTuis {
+      titles[tui.tuiId] = resolvedTitle(for: tui)
+    }
+
+    return titles
+  }
+
   private var selectedSessionTui: AgentTuiSnapshot? {
     guard let selectedTuiID = selection.sessionID else {
       return nil
     }
-    return store.selectedAgentTuis.first { tui in
-      tui.tuiId == selectedTuiID
-    }
+    return sessionSnapshotsByID[selectedTuiID]
   }
 
   private var trimmedInput: String {
@@ -83,15 +104,20 @@ struct AgentTuiSheetView: View {
 
   private var orderedSessionIDs: [String] {
     let currentSessionIDs = Set(store.selectedAgentTuis.map(\.tuiId))
+    var seenSessionIDs: Set<String> = []
     var orderedIDs: [String] = []
     orderedIDs.reserveCapacity(currentSessionIDs.count)
 
     for sessionID in recentTuiIDs where currentSessionIDs.contains(sessionID) {
-      orderedIDs.append(sessionID)
+      if seenSessionIDs.insert(sessionID).inserted {
+        orderedIDs.append(sessionID)
+      }
     }
 
-    for tui in store.selectedAgentTuis where !orderedIDs.contains(tui.tuiId) {
-      orderedIDs.append(tui.tuiId)
+    for tui in store.selectedAgentTuis {
+      if seenSessionIDs.insert(tui.tuiId).inserted {
+        orderedIDs.append(tui.tuiId)
+      }
     }
 
     return orderedIDs
@@ -156,10 +182,12 @@ struct AgentTuiSheetView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
     .overlay {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.agentTuiState,
-        text: currentStateMarker
-      )
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.agentTuiState,
+          text: currentStateMarker
+        )
+      }
     }
   }
 
@@ -292,7 +320,7 @@ struct AgentTuiSheetView: View {
   private func terminalHeader(_ tui: AgentTuiSnapshot) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.sectionSpacing) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text(title(for: tui))
+        Text(resolvedTitle(for: tui))
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Text("\(tui.status.title) • \(tui.size.rows)x\(tui.size.cols)")
           .scaledFont(.caption.monospacedDigit())
@@ -583,11 +611,9 @@ struct AgentTuiSheetView: View {
     }
   }
 
-  private func title(for tui: AgentTuiSnapshot) -> String {
-    if let matchedAgent = store.selectedSession?.agents.first(where: { agent in
-      agent.agentId == tui.agentId
-    }) {
-      return matchedAgent.name
+  private func resolvedTitle(for tui: AgentTuiSnapshot) -> String {
+    if let matchedName = agentNamesByID[tui.agentId] {
+      return matchedName
     }
 
     if let runtime = AgentTuiRuntime(rawValue: tui.runtime) {
@@ -602,10 +628,7 @@ struct AgentTuiSheetView: View {
   }
 
   private func title(forSessionID sessionID: String) -> String {
-    guard let tui = store.selectedAgentTuis.first(where: { $0.tuiId == sessionID }) else {
-      return "Agent session"
-    }
-    return title(for: tui)
+    sessionTitlesByID[sessionID] ?? "Agent session"
   }
 
   private func selectCreateTab() {
