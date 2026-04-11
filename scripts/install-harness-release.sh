@@ -6,7 +6,29 @@ binary_dir="${HOME}/.local/bin"
 binary_path="${binary_dir}/harness"
 tmp_path="${binary_path}.new"
 signing_identity="Developer ID Application: Bartlomiej Smykla (Q498EB36N4)"
-target_dir="${CARGO_TARGET_DIR:-target}"
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+
+resolve_target_dir() {
+  if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
+    printf '%s\n' "${CARGO_TARGET_DIR}"
+    return 0
+  fi
+
+  local target_dir
+  target_dir="$(
+    "${ROOT}/scripts/cargo-local.sh" --print-env \
+      | command awk -F= '/^CARGO_TARGET_DIR=/{print $2}'
+  )"
+
+  if [[ -z "${target_dir}" ]]; then
+    printf 'failed to resolve CARGO_TARGET_DIR via scripts/cargo-local.sh --print-env\n' >&2
+    exit 1
+  fi
+
+  printf '%s\n' "${target_dir}"
+}
+
+target_dir="$(resolve_target_dir)"
 build_binary="${target_dir}/release/harness"
 
 trap 'command rm -f "${tmp_path}"' EXIT
@@ -29,6 +51,10 @@ cleanup_cli_launch_agent() {
 }
 
 command mkdir -p "${binary_dir}"
+if [[ ! -x "${build_binary}" ]]; then
+  printf 'expected release binary missing at %s\n' "${build_binary}" >&2
+  exit 1
+fi
 command rm -f "${tmp_path}"
 command cp "${build_binary}" "${tmp_path}"
 command chmod 755 "${tmp_path}"
