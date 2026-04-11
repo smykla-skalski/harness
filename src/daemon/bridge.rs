@@ -1957,6 +1957,11 @@ fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
             config.socket_path.display()
         ))
     })?;
+    // Arm a socket guard immediately after bind so that any subsequent error
+    // return, panic, or unexpected accept failure still unlinks the socket.
+    // The happy-path cleanup is handled by `clear_bridge_state()` below and
+    // disarms the guard so it does not double-unlink.
+    let mut socket_guard = BridgeSocketGuard::new(config.socket_path.clone());
     fs::set_permissions(&config.socket_path, Permissions::from_mode(0o600)).map_err(|error| {
         CliErrorKind::workflow_io(format!(
             "set bridge socket permissions {}: {error}",
@@ -1994,7 +1999,49 @@ fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     }
     server.cleanup();
     clear_bridge_state()?;
+    socket_guard.disarm();
     Ok(0)
+}
+
+/// RAII guard that unlinks the bridge unix socket file on drop, unless
+/// `disarm()` is called. Installed by `run_bridge_server` right after
+/// `bind()` so any error return, panic, or unexpected exit still cleans
+/// up the socket file (signal-delivered `SIGKILL` remains a leak vector
+/// and is handled by `mise run clean:stale`).
+struct BridgeSocketGuard {
+    path: PathBuf,
+    armed: bool,
+}
+
+impl BridgeSocketGuard {
+    fn new(path: PathBuf) -> Self {
+        Self { path, armed: true }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for BridgeSocketGuard {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score past the default threshold"
+    )]
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        if let Err(error) = fs::remove_file(&self.path)
+            && error.kind() != ErrorKind::NotFound
+        {
+            tracing::warn!(
+                path = %self.path.display(),
+                %error,
+                "failed to unlink bridge socket on drop"
+            );
+        }
+    }
 }
 
 fn spawn_codex_process(binary: &Path, port: u16) -> Result<BridgeCodexProcess, CliError> {
@@ -2730,6 +2777,56 @@ mod tests {
             assert_eq!(error.code(), "SANDBOX001");
             assert!(error.to_string().contains("codex.host-bridge"));
         });
+    }
+
+    #[test]
+    fn bridge_socket_guard_unlinks_on_drop() {
+        let tmp = tempdir().expect("tempdir");
+        let socket_path = tmp.path().join("fake.sock");
+        fs::write(&socket_path, b"").expect("seed fake socket");
+        assert!(socket_path.exists());
+
+        {
+            let _guard = BridgeSocketGuard::new(socket_path.clone());
+        }
+
+        assert!(
+            !socket_path.exists(),
+            "armed guard must unlink the socket file on drop"
+        );
+    }
+
+    #[test]
+    fn bridge_socket_guard_disarmed_preserves_file() {
+        let tmp = tempdir().expect("tempdir");
+        let socket_path = tmp.path().join("fake.sock");
+        fs::write(&socket_path, b"keep").expect("seed fake socket");
+
+        {
+            let mut guard = BridgeSocketGuard::new(socket_path.clone());
+            guard.disarm();
+        }
+
+        assert!(
+            socket_path.exists(),
+            "disarmed guard must leave the socket file in place"
+        );
+        assert_eq!(
+            fs::read(&socket_path).expect("read file"),
+            b"keep",
+            "file contents must be untouched"
+        );
+    }
+
+    #[test]
+    fn bridge_socket_guard_drop_is_idempotent_when_file_missing() {
+        let tmp = tempdir().expect("tempdir");
+        let socket_path = tmp.path().join("never-existed.sock");
+        assert!(!socket_path.exists());
+
+        // Dropping the armed guard for a non-existent path must not panic
+        // and must not emit a warn log (NotFound is intentionally silenced).
+        let _guard = BridgeSocketGuard::new(socket_path);
     }
 
     #[test]
