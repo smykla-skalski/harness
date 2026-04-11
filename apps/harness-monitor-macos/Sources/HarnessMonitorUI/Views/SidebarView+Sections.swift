@@ -1,8 +1,105 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension SidebarView {
-  func projectSection(
+struct SidebarSessionListRenderState: Equatable {
+  let projectionGroups: [HarnessMonitorStore.SessionGroup]
+  let searchPresentation: HarnessMonitorStore.SessionSearchPresentationState
+  let searchList: HarnessMonitorStore.SessionSearchResultsListState
+  let selectedSessionID: String?
+  let bookmarkedSessionIDs: Set<String>
+  let isPersistenceAvailable: Bool
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+  let fontScale: CGFloat
+  let collapsedProjectIDs: Set<String>
+  let collapsedCheckoutKeys: Set<String>
+
+  var emptyState: HarnessMonitorStore.SidebarEmptyState {
+    searchPresentation.emptyState
+  }
+
+  var usesFlatSearchResults: Bool {
+    searchPresentation.isSearchActive
+  }
+
+  func isProjectExpanded(_ projectID: String) -> Bool {
+    !collapsedProjectIDs.contains(projectID)
+  }
+
+  func isCheckoutExpanded(
+    projectID: String,
+    checkoutID: String
+  ) -> Bool {
+    !collapsedCheckoutKeys.contains(Self.checkoutStorageKey(projectID: projectID, checkoutID: checkoutID))
+  }
+
+  static func checkoutStorageKey(
+    projectID: String,
+    checkoutID: String
+  ) -> String {
+    "\(projectID)::\(checkoutID)"
+  }
+}
+
+struct SidebarSessionListContent: View, Equatable {
+  nonisolated(unsafe) let renderState: SidebarSessionListRenderState
+  let selection: Binding<String?>
+  let selectSession: (String?) -> Void
+  let toggleBookmark: (String, String) -> Void
+  let setProjectCollapsed: (String, Bool) -> Void
+  let setCheckoutCollapsed: (String, Bool) -> Void
+
+  var body: some View {
+    List(selection: selection) {
+      sidebarRows
+    }
+  }
+
+  @ViewBuilder
+  private var sidebarRows: some View {
+    switch renderState.emptyState {
+    case .noSessions:
+      SidebarEmptyState(
+        title: "No sessions indexed yet",
+        systemImage: "tray",
+        message: "Start the daemon or refresh after launching a harness session."
+      )
+    case .noMatches:
+      SidebarEmptyState(
+        title: "No sessions match",
+        systemImage: "magnifyingglass",
+        message: "Try a broader search or clear filters."
+      )
+    case .sessionsAvailable:
+      if renderState.usesFlatSearchResults {
+        flatSearchResults
+          .accessibilityElement(children: .contain)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
+      } else if let firstGroup = renderState.projectionGroups.first {
+        projectSection(for: firstGroup)
+          .accessibilityElement(children: .contain)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
+
+        ForEach(Array(renderState.projectionGroups.dropFirst())) { group in
+          projectSection(for: group)
+        }
+      }
+    }
+  }
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.renderState == rhs.renderState
+  }
+
+  @ViewBuilder
+  private var flatSearchResults: some View {
+    ForEach(renderState.searchList.visibleSessions, id: \.sessionId) { session in
+      sessionRow(session)
+    }
+  }
+
+  private func projectSection(
     for group: HarnessMonitorStore.SessionGroup
   ) -> some View {
     Section(isExpanded: projectExpansionBinding(for: group)) {
@@ -17,7 +114,7 @@ extension SidebarView {
     }
   }
 
-  func projectHeader(
+  private func projectHeader(
     for group: HarnessMonitorStore.SessionGroup
   ) -> some View {
     Text(verbatim: group.project.name)
@@ -33,7 +130,7 @@ extension SidebarView {
   }
 
   @ViewBuilder
-  func checkoutDisclosureRow(
+  private func checkoutDisclosureRow(
     for group: HarnessMonitorStore.CheckoutGroup,
     projectID: String
   ) -> some View {
@@ -54,7 +151,7 @@ extension SidebarView {
     }
   }
 
-  func checkoutHeader(
+  private func checkoutHeader(
     for group: HarnessMonitorStore.CheckoutGroup,
     isExpanded: Bool,
     toggle: @escaping () -> Void
@@ -70,18 +167,18 @@ extension SidebarView {
   }
 
   @ViewBuilder
-  func sessionRow(_ session: SessionSummary) -> some View {
+  private func sessionRow(_ session: SessionSummary) -> some View {
     let isSelectedForUITest =
       HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
-      && sidebarUI.selectedSessionID == session.sessionId
+      && renderState.selectedSessionID == session.sessionId
     let row = SidebarSessionListLinkRow(
       session: session,
-      isBookmarked: sidebarUI.bookmarkedSessionIds.contains(session.sessionId),
+      isBookmarked: renderState.bookmarkedSessionIDs.contains(session.sessionId),
       lastActivityText: formatTimestamp(
         session.lastActivityAt,
-        configuration: dateTimeConfiguration
+        configuration: renderState.dateTimeConfiguration
       ),
-      fontScale: fontScale
+      fontScale: renderState.fontScale
     )
     .equatable()
 
@@ -89,7 +186,7 @@ extension SidebarView {
       row
       .tag(session.sessionId as String?)
       .onTapGesture {
-        store.selectSessionFromList(session.sessionId)
+        selectSession(session.sessionId)
       }
       .accessibilityAddTraits(.isButton)
       .accessibilityLabel(sessionAccessibilityLabel(for: session))
@@ -100,7 +197,7 @@ extension SidebarView {
           : "interactive=button"
       )
 
-    if sidebarUI.isPersistenceAvailable {
+    if renderState.isPersistenceAvailable {
       baseRow
         .accessibilityFrameMarker(
           HarnessMonitorAccessibility.sessionRowFrame(session.sessionId)
@@ -110,19 +207,13 @@ extension SidebarView {
           when: isSelectedForUITest
         )
         .accessibilityAction(named: "Toggle Bookmark") {
-          store.toggleBookmark(
-            sessionId: session.sessionId,
-            projectId: session.projectId
-          )
+          toggleBookmark(session.sessionId, session.projectId)
         }
         .contextMenu {
           Button {
-            store.toggleBookmark(
-              sessionId: session.sessionId,
-              projectId: session.projectId
-            )
+            toggleBookmark(session.sessionId, session.projectId)
           } label: {
-            if sidebarUI.bookmarkedSessionIds.contains(session.sessionId) {
+            if renderState.bookmarkedSessionIDs.contains(session.sessionId) {
               Label("Remove Bookmark", systemImage: "bookmark.slash")
             } else {
               Label("Bookmark", systemImage: "bookmark")
@@ -153,39 +244,36 @@ extension SidebarView {
     }
   }
 
-  func projectExpansionBinding(
+  private func projectExpansionBinding(
     for group: HarnessMonitorStore.SessionGroup
   ) -> Binding<Bool> {
     let projectID = group.project.projectId
     return Binding(
-      get: { !collapsedProjectIDs.contains(projectID) },
+      get: { renderState.isProjectExpanded(projectID) },
       set: { isExpanded in
-        setProjectCollapsed(projectID: projectID, isCollapsed: !isExpanded)
+        setProjectCollapsed(projectID, !isExpanded)
       }
     )
   }
 
-  func checkoutExpansionBinding(
+  private func checkoutExpansionBinding(
     for group: HarnessMonitorStore.CheckoutGroup,
     projectID: String
   ) -> Binding<Bool> {
-    let checkoutKey = checkoutStorageKey(
+    let checkoutKey = SidebarSessionListRenderState.checkoutStorageKey(
       projectID: projectID,
       checkoutID: group.checkoutId
     )
     return Binding(
-      get: { !collapsedCheckoutKeys.contains(checkoutKey) },
+      get: { renderState.isCheckoutExpanded(projectID: projectID, checkoutID: group.checkoutId) },
       set: { isExpanded in
-        setCheckoutCollapsed(checkoutKey: checkoutKey, isCollapsed: !isExpanded)
+        setCheckoutCollapsed(checkoutKey, !isExpanded)
       }
     )
   }
 
-  func checkoutStorageKey(
-    projectID: String,
-    checkoutID: String
-  ) -> String {
-    "\(projectID)::\(checkoutID)"
+  private func scaledSidebarFont(_ font: Font) -> Font {
+    HarnessMonitorTextSize.scaledFont(font, by: renderState.fontScale)
   }
 }
 
