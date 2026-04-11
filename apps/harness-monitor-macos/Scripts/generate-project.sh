@@ -23,19 +23,6 @@ if [ -z "${XCODEGEN_BIN}" ]; then
   exit 1
 fi
 
-# Wipe any stale HarnessMonitor bundles Xcode UI may have written to its
-# default DerivedData location. The repo allows only tmp/xcode-derived and
-# tmp/perf/harness-monitor-instruments/xcode-derived; anything under
-# ~/Library/Developer/Xcode/DerivedData/HarnessMonitor-* is stale and gets
-# removed on every regen so an Xcode UI build cannot reintroduce it silently.
-shopt -s nullglob
-stray_derived=("$HOME/Library/Developer/Xcode/DerivedData/HarnessMonitor-"*)
-shopt -u nullglob
-if [ ${#stray_derived[@]} -gt 0 ]; then
-  echo "removing ${#stray_derived[@]} stale DerivedData HarnessMonitor bundle(s)..." >&2
-  rm -rf "${stray_derived[@]}"
-fi
-
 "$XCODEGEN_BIN" generate --spec "$ROOT/project.yml" --project "$ROOT"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"

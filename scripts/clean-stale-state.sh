@@ -2,7 +2,8 @@
 # One-shot reset for a polluted Harness dev environment.
 # Preserves user data: harness.db, auth-token, manifest.json, events.jsonl.
 # Wipes everything a stale dev run can leak: orphan processes, /tmp sockets,
-# bridge state files, and non-approved DerivedData HarnessMonitor bundles.
+# and bridge state files. Xcode UI's default DerivedData bundle is left alone
+# so regens and resets do not destroy its fetched SourcePackages cache.
 set -euo pipefail
 
 readonly APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
@@ -82,30 +83,10 @@ wipe_stale_bridge_state() {
   wipe_bridge_state_in_root "$APPLICATION_SUPPORT_ROOT"
 }
 
-remove_stray_derived_data() {
-  shopt -s nullglob
-  local stray=("$HOME/Library/Developer/Xcode/DerivedData/HarnessMonitor-"*)
-  shopt -u nullglob
-  if (( ${#stray[@]} == 0 )); then
-    return
-  fi
-  echo "removing ${#stray[@]} non-approved DerivedData HarnessMonitor bundle(s)..."
-  # Xcode/xctrace can race with the first rm ("Directory not empty"). Retry
-  # once after a short pause - by then any trailing Xcode writer has flushed.
-  local path
-  for path in "${stray[@]}"; do
-    if ! rm -rf "$path" 2>/dev/null; then
-      sleep 1
-      rm -rf "$path"
-    fi
-  done
-}
-
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
 remove_tmp_bridge_sockets
 wipe_stale_bridge_state
-remove_stray_derived_data
 
 echo "clean:stale complete"
