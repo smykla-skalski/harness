@@ -117,13 +117,20 @@ struct SendSignalSheetView: View {
       .keyboardShortcut(.cancelAction)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sendSignalSheetCancelButton)
       Spacer()
-      Button("Send Signal") {
-        submit()
-      }
+      HarnessInlineActionButton(
+        title: "Send Signal",
+        actionID: .sendSignal(
+          sessionID: store.selectedSessionID ?? "",
+          agentID: agentID
+        ),
+        store: store,
+        variant: .prominent,
+        tint: nil,
+        isExternallyDisabled: !canSubmit,
+        accessibilityIdentifier: HarnessMonitorAccessibility.sendSignalSheetSubmitButton,
+        action: submit
+      )
       .keyboardShortcut(.defaultAction)
-      .harnessActionButtonStyle(variant: .prominent, tint: nil)
-      .disabled(!canSubmit)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sendSignalSheetSubmitButton)
     }
     .padding(HarnessMonitorTheme.spacingLG)
   }

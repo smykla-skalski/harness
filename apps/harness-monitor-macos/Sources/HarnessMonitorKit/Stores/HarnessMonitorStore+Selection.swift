@@ -75,6 +75,14 @@ extension HarnessMonitorStore {
     }
   }
 
+  public var inFlightActionID: String? {
+    get { selection.inFlightActionID }
+    set {
+      guard selection.inFlightActionID != newValue else { return }
+      selection.inFlightActionID = newValue
+    }
+  }
+
   // MARK: - Navigation history
 
   public var canNavigateBack: Bool { !navigationBackStack.isEmpty }
@@ -136,6 +144,9 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       recordNavigation(to: sessionID)
       cancelSessionPushFallback()
+      if isChangingSelectedSession, inFlightActionID != nil {
+        inFlightActionID = nil
+      }
       selectedSessionID = sessionID
       inspectorSelection = .none
       isExtensionsLoading = false

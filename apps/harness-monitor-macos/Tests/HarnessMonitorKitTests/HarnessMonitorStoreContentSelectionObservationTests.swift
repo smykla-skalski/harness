@@ -131,7 +131,7 @@ struct HarnessMonitorContentSelectionTests {
 
     #expect(didChange)
     #expect(store.contentUI.shell.selectedSessionID == PreviewFixtures.summary.sessionId)
-    #expect(store.contentUI.shell.isSelectionLoading)
+    #expect(store.contentUI.session.isSelectionLoading)
   }
 
   @Test("Priming session selection updates sidebar selection state")
@@ -211,6 +211,28 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentChrome) == 1)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 1)
     #expect(store.debugUISyncCount(for: .inspector) == 1)
+  }
+
+  @Test("Completing a selection load does not resync the root shell")
+  func completingSelectionLoadSkipsShellResync() async {
+    let store = await makeBootstrappedStore()
+    store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+    store.debugResetUISyncCounts()
+
+    store.isSelectionLoading = false
+
+    #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 1)
+  }
+
+  @Test("Selecting a session from the dashboard only syncs the root shell once")
+  func selectingSessionOnlySyncsRootShellOnce() async {
+    let store = await makeBootstrappedStore()
+    store.debugResetUISyncCounts()
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(store.debugUISyncCount(for: .contentShell) == 1)
   }
 
   @Test("Priming current session does not invalidate content or inspector slices")

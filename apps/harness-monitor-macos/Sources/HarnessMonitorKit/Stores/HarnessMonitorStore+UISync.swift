@@ -61,7 +61,7 @@ extension HarnessMonitorStore {
       case .inspectorSelection, .actionActorID:
         self?.scheduleUISync([.inspector])
       case .selectionLoading, .extensionsLoading:
-        self?.scheduleUISync([.contentShell, .contentSession])
+        self?.scheduleUISync([.contentSession])
       case .sessionAction:
         self?.scheduleUISync([
           .contentToolbar,
@@ -69,6 +69,8 @@ extension HarnessMonitorStore {
           .contentDashboard,
           .inspector,
         ])
+      case .inFlightActionID:
+        self?.scheduleUISync([.inspector])
       }
     }
     userData.onChanged = { [weak self] in
@@ -184,9 +186,6 @@ extension HarnessMonitorStore {
         windowTitle: selectedDetail != nil || selectedSessionSummary != nil
           ? "Cockpit" : "Dashboard",
         connectionState: connectionState,
-        isRefreshing: isRefreshing,
-        isSelectionLoading: isSelectionLoading,
-        isExtensionsLoading: isExtensionsLoading,
         lastAction: lastAction,
         pendingConfirmation: pendingConfirmation,
         presentedSheet: presentedSheet

@@ -9,7 +9,6 @@ struct InspectorActionSections: View {
     VStack(alignment: .leading, spacing: 16) {
       InspectorActionStatusBanner(
         isSessionReadOnly: context.isSessionReadOnly,
-        isSessionActionInFlight: context.isSessionActionInFlight,
         actionActorOptions: context.actionActorOptions,
         actionActorID: Binding(
           get: { context.selectedActionActorID },
@@ -21,6 +20,7 @@ struct InspectorActionSections: View {
       if let selectedTask = context.selectedTask {
         InspectorTaskMutationConsole(
           store: store,
+          sessionID: context.detail.session.sessionId,
           selectedTask: selectedTask,
           tasks: context.detail.tasks,
           agents: context.detail.agents
@@ -39,6 +39,7 @@ struct InspectorActionSections: View {
 
         InspectorRoleMutationConsole(
           store: store,
+          sessionID: context.detail.session.sessionId,
           selectedAgent: selectedAgent,
           leaderID: context.detail.session.leaderId
         )

@@ -3,22 +3,14 @@ import SwiftUI
 
 struct InspectorActionStatusBanner: View {
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
   let actionActorOptions: [AgentRegistration]
   @Binding var actionActorID: String
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      HStack {
-        Label("Action Console", systemImage: "dial.high")
-          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        Spacer()
-        if isSessionActionInFlight {
-          HarnessMonitorSpinner()
-            .transition(.opacity)
-        }
-      }
-      .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
+      Label("Action Console", systemImage: "dial.high")
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+        .frame(maxWidth: .infinity, alignment: .leading)
       Text(statusMessage)
         .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -60,12 +52,13 @@ struct InspectorActionStatusBanner: View {
 }
 
 struct InspectorCreateTaskSection: View {
+  let store: HarnessMonitorStore
+  let sessionID: String
   @Binding var createTitle: String
   @Binding var createContext: String
   @Binding var createSeverity: TaskSeverity
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let submitCreateTask: () -> Void
+  let submitCreateTask: @MainActor @Sendable () -> Void
   @FocusState private var focusedField: ActionField?
 
   private enum ActionField: Hashable {
@@ -95,19 +88,25 @@ struct InspectorCreateTaskSection: View {
         }
       }
       .harnessNativeFormControl()
-      Button("Create Task", action: submitCreateTask)
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(
+      HarnessInlineActionButton(
+        title: "Create Task",
+        actionID: .createTask(sessionID: sessionID),
+        store: store,
+        variant: .prominent,
+        tint: nil,
+        isExternallyDisabled:
           createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || isSessionActionInFlight
-            || isSessionReadOnly
-        )
+          || isSessionReadOnly,
+        action: { submitCreateTask() }
+      )
     }
-    .disabled(isSessionReadOnly || isSessionActionInFlight)
+    .disabled(isSessionReadOnly)
   }
 }
 
 struct InspectorTaskActionsSection: View {
+  let store: HarnessMonitorStore
+  let sessionID: String
   let task: WorkItem
   let tasks: [WorkItem]
   let agents: [AgentRegistration]
@@ -119,11 +118,10 @@ struct InspectorTaskActionsSection: View {
   @Binding var checkpointSummary: String
   @Binding var checkpointProgress: Double
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let assignSelectedTask: () -> Void
-  let updateQueuePolicy: () -> Void
-  let updateSelectedTask: () -> Void
-  let checkpointSelectedTask: () -> Void
+  let assignSelectedTask: @MainActor @Sendable () -> Void
+  let updateQueuePolicy: @MainActor @Sendable () -> Void
+  let updateSelectedTask: @MainActor @Sendable () -> Void
+  let checkpointSelectedTask: @MainActor @Sendable () -> Void
   @FocusState private var focusedField: ActionField?
 
   private enum ActionField: Hashable {
@@ -162,17 +160,35 @@ struct InspectorTaskActionsSection: View {
       }
       .harnessNativeFormControl()
       HStack {
-        Button("Assign", action: assignSelectedTask)
-          .harnessActionButtonStyle(variant: .prominent, tint: nil)
-          .disabled(isSessionActionInFlight || isSessionReadOnly)
-        Button("Save Queue Policy", action: updateQueuePolicy)
-          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-          .disabled(isSessionActionInFlight || isSessionReadOnly)
+        HarnessInlineActionButton(
+          title: "Assign",
+          actionID: .assignTask(sessionID: sessionID, taskID: task.taskId),
+          store: store,
+          variant: .prominent,
+          tint: nil,
+          isExternallyDisabled: isSessionReadOnly,
+          action: { assignSelectedTask() }
+        )
+        HarnessInlineActionButton(
+          title: "Save Queue Policy",
+          actionID: .updateTaskQueuePolicy(sessionID: sessionID, taskID: task.taskId),
+          store: store,
+          variant: .bordered,
+          tint: .secondary,
+          isExternallyDisabled: isSessionReadOnly,
+          action: { updateQueuePolicy() }
+        )
       }
       HStack {
-        Button("Update Status", action: updateSelectedTask)
-          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-          .disabled(isSessionActionInFlight || isSessionReadOnly)
+        HarnessInlineActionButton(
+          title: "Update Status",
+          actionID: .updateTaskStatus(sessionID: sessionID, taskID: task.taskId),
+          store: store,
+          variant: .bordered,
+          tint: .secondary,
+          isExternallyDisabled: isSessionReadOnly,
+          action: { updateSelectedTask() }
+        )
         TextField("Update note", text: $statusNote, axis: .vertical)
           .harnessNativeFormControl()
           .focused($focusedField, equals: .statusNote)
@@ -198,9 +214,15 @@ struct InspectorTaskActionsSection: View {
           .scaledFont(.caption.bold())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Spacer()
-        Button("Save Checkpoint", action: checkpointSelectedTask)
-          .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.caution)
-          .disabled(isSessionActionInFlight || isSessionReadOnly)
+        HarnessInlineActionButton(
+          title: "Save Checkpoint",
+          actionID: .checkpointTask(sessionID: sessionID, taskID: task.taskId),
+          store: store,
+          variant: .prominent,
+          tint: HarnessMonitorTheme.caution,
+          isExternallyDisabled: isSessionReadOnly,
+          action: { checkpointSelectedTask() }
+        )
       }
 
       if let checkpoint = task.checkpointSummary {
@@ -209,18 +231,18 @@ struct InspectorTaskActionsSection: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
     }
-    .disabled(isSessionReadOnly || isSessionActionInFlight)
+    .disabled(isSessionReadOnly)
   }
 }
 
 struct InspectorRoleActionsSection: View {
   let store: HarnessMonitorStore
+  let sessionID: String
   let agent: AgentRegistration
   let leaderID: String?
   @Binding var role: SessionRole
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let changeSelectedRole: () -> Void
+  let changeSelectedRole: @MainActor @Sendable () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -241,31 +263,41 @@ struct InspectorRoleActionsSection: View {
           }
         }
         .harnessNativeFormControl()
-        Button("Change Role", action: changeSelectedRole)
-          .harnessActionButtonStyle(variant: .prominent, tint: nil)
-          .disabled(isSessionActionInFlight || isSessionReadOnly)
+        HarnessInlineActionButton(
+          title: "Change Role",
+          actionID: .changeRole(sessionID: sessionID, agentID: agent.agentId),
+          store: store,
+          variant: .prominent,
+          tint: nil,
+          isExternallyDisabled: isSessionReadOnly,
+          action: { changeSelectedRole() }
+        )
       }
-      Button("Remove Agent") {
-        store.requestRemoveAgentConfirmation(agentID: agent.agentId)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .red)
-      .disabled(agent.agentId == leaderID || isSessionActionInFlight || isSessionReadOnly)
-      .help(agent.agentId == leaderID ? "The session leader cannot be removed" : "")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.removeAgentButton)
+      HarnessInlineActionButton(
+        title: "Remove Agent",
+        actionID: .removeAgent(sessionID: sessionID, agentID: agent.agentId),
+        store: store,
+        variant: .bordered,
+        tint: .red,
+        isExternallyDisabled: agent.agentId == leaderID || isSessionReadOnly,
+        accessibilityIdentifier: HarnessMonitorAccessibility.removeAgentButton,
+        help: agent.agentId == leaderID ? "The session leader cannot be removed" : "",
+        action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
+      )
     }
-    .disabled(isSessionReadOnly || isSessionActionInFlight)
+    .disabled(isSessionReadOnly)
   }
 }
 
 struct InspectorLeaderTransferSection: View {
+  let store: HarnessMonitorStore
   let detail: SessionDetail
   @Binding var transferLeaderID: String
   @Binding var transferReason: String
   let transferLeaderButtonTitle: String
   let actionActorID: String
   let isSessionReadOnly: Bool
-  let isSessionActionInFlight: Bool
-  let submitTransferLeader: () -> Void
+  let submitTransferLeader: @MainActor @Sendable () -> Void
 
   private var isSingleAgent: Bool {
     detail.agents.count <= 1
@@ -312,20 +344,26 @@ struct InspectorLeaderTransferSection: View {
         .harnessNativeFormControl()
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)
-      Button(transferLeaderButtonTitle, action: submitTransferLeader)
-        .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.caution)
-        .disabled(
+      HarnessInlineActionButton(
+        title: transferLeaderButtonTitle,
+        actionID: .transferLeader(
+          sessionID: detail.session.sessionId,
+          newLeaderID: transferLeaderID
+        ),
+        store: store,
+        variant: .prominent,
+        tint: HarnessMonitorTheme.caution,
+        isExternallyDisabled:
           transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
-            || isSessionActionInFlight
-            || isSessionReadOnly
-        )
-        .help(
+          || isSessionReadOnly,
+        help:
           transferLeaderID == detail.session.leaderId
-            ? "Select a different agent to transfer leadership to" : ""
-        )
+          ? "Select a different agent to transfer leadership to" : "",
+        action: { submitTransferLeader() }
+      )
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferSection)
-    .disabled(isSingleAgent || isSessionReadOnly || isSessionActionInFlight)
+    .disabled(isSingleAgent || isSessionReadOnly)
     .opacity(isSingleAgent ? 0.4 : 1)
     .help(isSingleAgent ? "At least two agents are needed to transfer leadership" : "")
   }

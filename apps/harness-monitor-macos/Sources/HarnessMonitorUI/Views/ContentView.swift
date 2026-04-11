@@ -80,7 +80,6 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
   }
 
-
   public init(
     store: HarnessMonitorStore,
     cornerAnimationContent: (() -> AnyView)? = nil
@@ -101,7 +100,8 @@ public struct ContentView: View {
       baseContent
         .modifier(
           ContentCornerOverlayModifier(
-            shellUI: contentShell,
+            toolbarUI: contentToolbar,
+            sessionUI: contentSession,
             cornerAnimationContent: cornerAnimationContent
           )
         )

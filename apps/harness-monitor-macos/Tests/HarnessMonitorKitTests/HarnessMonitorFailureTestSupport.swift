@@ -20,6 +20,62 @@ private final class ObservationInvalidationFlag: @unchecked Sendable {
   }
 }
 
+private final class ObservationInvalidationCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var count = 0
+
+  func increment() {
+    lock.lock()
+    count += 1
+    lock.unlock()
+  }
+
+  func currentValue() -> Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return count
+  }
+}
+
+@MainActor
+private final class ObservationTrackingLoop<TrackedValue>: @unchecked Sendable {
+  private let trackedValue: () -> TrackedValue
+  private let counter = ObservationInvalidationCounter()
+  private var isTracking = true
+
+  init(trackedValue: @escaping () -> TrackedValue) {
+    self.trackedValue = trackedValue
+  }
+
+  func arm() {
+    guard isTracking else {
+      return
+    }
+    _ = withObservationTracking(
+      {
+        trackedValue()
+      },
+      onChange: { [weak self] in
+        MainActor.assumeIsolated {
+          guard let self else {
+            return
+          }
+          self.counter.increment()
+          self.arm()
+        }
+      }
+    )
+  }
+
+  func stop() {
+    isTracking = false
+  }
+
+  func currentCount() -> Int {
+    counter.currentValue()
+  }
+}
+
 actor FailingDaemonController: DaemonControlling {
   private let bootstrapError: (any Error)?
   private let actionError: (any Error)?
@@ -194,8 +250,31 @@ func makeBootstrappedStore(
 
 @MainActor
 func didInvalidate<TrackedValue>(
-  _ trackedValue: () -> TrackedValue,
+  _ trackedValue: @escaping () -> TrackedValue,
   after mutation: () async -> Void
+) async -> Bool {
+  await invalidationCount(trackedValue, after: mutation) > 0
+}
+
+@MainActor
+func invalidationCount<TrackedValue>(
+  _ trackedValue: @escaping () -> TrackedValue,
+  after mutation: () async -> Void
+) async -> Int {
+  let trackingLoop = ObservationTrackingLoop(trackedValue: trackedValue)
+  trackingLoop.arm()
+  await mutation()
+  await Task.yield()
+  await Task.yield()
+  trackingLoop.stop()
+
+  return trackingLoop.currentCount()
+}
+
+@MainActor
+func didInvalidate<TrackedValue>(
+  _ trackedValue: @escaping () -> TrackedValue,
+  after mutation: () -> Void
 ) async -> Bool {
   let flag = ObservationInvalidationFlag()
   _ = withObservationTracking(
@@ -206,7 +285,7 @@ func didInvalidate<TrackedValue>(
       flag.markInvalidated()
     }
   )
-  await mutation()
+  mutation()
   await Task.yield()
   await Task.yield()
   return flag.currentValue()

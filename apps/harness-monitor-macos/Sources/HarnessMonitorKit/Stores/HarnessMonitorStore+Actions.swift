@@ -32,6 +32,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Create task",
+      actionID: InspectorActionID.createTask(sessionID: sessionID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -59,6 +60,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Assign task",
+      actionID: InspectorActionID.assignTask(sessionID: sessionID, taskID: taskID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -83,6 +85,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Drop task",
+      actionID: InspectorActionID.dropTask(sessionID: sessionID, taskID: taskID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -110,6 +113,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Update task queue",
+      actionID: InspectorActionID.updateTaskQueuePolicy(sessionID: sessionID, taskID: taskID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -134,6 +138,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Update task",
+      actionID: InspectorActionID.updateTaskStatus(sessionID: sessionID, taskID: taskID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -158,6 +163,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Save checkpoint",
+      actionID: InspectorActionID.checkpointTask(sessionID: sessionID, taskID: taskID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -185,6 +191,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Change role",
+      actionID: InspectorActionID.changeRole(sessionID: sessionID, agentID: agentID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -207,6 +214,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Remove agent",
+      actionID: InspectorActionID.removeAgent(sessionID: sessionID, agentID: agentID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -230,6 +238,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Transfer leader",
+      actionID: InspectorActionID.transferLeader(sessionID: sessionID, newLeaderID: newLeaderID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -252,6 +261,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Observe session",
+      actionID: InspectorActionID.observeSession(sessionID: sessionID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -270,6 +280,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "End session",
+      actionID: InspectorActionID.endSession(sessionID: sessionID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -352,12 +363,19 @@ extension HarnessMonitorStore {
   @discardableResult
   func mutateSelectedSession(
     actionName: String,
+    actionID: String,
     using client: any HarnessMonitorClientProtocol,
     sessionID: String,
     mutation: @escaping @Sendable () async throws -> SessionDetail
   ) async -> Bool {
     isSessionActionInFlight = true
-    defer { isSessionActionInFlight = false }
+    inFlightActionID = actionID
+    defer {
+      isSessionActionInFlight = false
+      if inFlightActionID == actionID {
+        inFlightActionID = nil
+      }
+    }
 
     do {
       let measuredMutation = try await Self.measureOperation {

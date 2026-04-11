@@ -14,6 +14,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Send signal",
+      actionID: InspectorActionID.sendSignal(sessionID: sessionID, agentID: agentID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
@@ -42,6 +43,7 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Cancel signal",
+      actionID: InspectorActionID.cancelSignal(sessionID: sessionID, signalID: signalID).key,
       using: client,
       sessionID: sessionID,
       mutation: {
