@@ -36,6 +36,10 @@ BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
 RUNS_ROOT=""
 AUDIT_LOCK_DIR=""
 AUDIT_LOCK_INFO_PATH=""
+run_dir=""
+traces_root=""
+xctrace_tmp_root=""
+capture_records_file=""
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
 SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-0}"
 FORCE_CLEAN="${HARNESS_MONITOR_AUDIT_FORCE_CLEAN:-0}"
@@ -316,6 +320,9 @@ cleanup_host_processes() {
       | awk '
         /Harness Monitor UI Testing[.]app\/Contents\/MacOS\/Harness Monitor UI Testing/ { print $1; next }
         /launch-staged-host([[:space:]]|$)/ { print $1; next }
+        /target\/debug\/harness daemon serve/ { print $1; next }
+        /target\/debug\/harness bridge start/ { print $1; next }
+        /[\/]mock-codex([[:space:]]|$)/ { print $1; next }
       '
   )"
   if [[ -z "$pids" ]]; then
@@ -455,6 +462,17 @@ prune_run_artifacts() {
   assert_retained_run_size_budget "$keep_traces"
 
   find "$run_dir" -depth -type d -empty -delete 2>/dev/null || true
+}
+
+cleanup_audit_exit() {
+  local exit_code="$1"
+
+  cleanup_host_processes
+  if [[ -n "$run_dir" && -d "$run_dir" ]]; then
+    prune_run_artifacts "$keep_traces" >/dev/null 2>&1 || true
+  fi
+  release_audit_lock
+  return "$exit_code"
 }
 
 retain_run_file() {
@@ -791,7 +809,9 @@ run_dir="$RUNS_ROOT/${timestamp}-${label_slug}"
 traces_root="$run_dir/traces"
 xctrace_tmp_root="$run_dir/xctrace-tmp"
 acquire_audit_lock "$run_id" "$label" "$timestamp" "$run_dir"
-trap 'release_audit_lock' EXIT INT TERM
+trap 'cleanup_audit_exit $?' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 mkdir -p "$traces_root"
 mkdir -p "$xctrace_tmp_root"
 
