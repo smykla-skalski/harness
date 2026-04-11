@@ -30,9 +30,6 @@ public struct ContentView: View {
   private var persistedShowInspector = true
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
-  @SceneStorage("selectedSessionID")
-  private var restoredSessionID: String?
-  @State private var hasSeededSceneRestoration = false
   @State private var hasAppliedInitialInspectorVisibility = false
   @State private var hasCapturedInitialInspectorWidth = false
   @State private var showInspector = false
@@ -143,24 +140,6 @@ public struct ContentView: View {
       await Task.yield()
       showInspector = persistedShowInspector
     }
-    .onChange(of: restoredSessionID, initial: true) { _, newID in
-      guard !hasSeededSceneRestoration else {
-        return
-      }
-      guard contentShell.selectedSessionID == nil, let newID else {
-        return
-      }
-      hasSeededSceneRestoration = true
-      store.primeSessionSelection(newID)
-    }
-    .onChange(of: contentShell.selectedSessionID) { _, newID in
-      if restoredSessionID != newID {
-        restoredSessionID = newID
-      }
-      if newID != nil {
-        hasSeededSceneRestoration = true
-      }
-    }
     .onChange(of: persistedShowInspector) { _, newValue in
       guard hasAppliedInitialInspectorVisibility else {
         return
@@ -211,6 +190,12 @@ public struct ContentView: View {
           .padding(.top, HarnessMonitorTheme.spacingSM)
           .padding(.trailing, HarnessMonitorTheme.spacingLG)
       }
+    }
+    .background {
+      ContentSceneRestorationBridge(
+        store: store,
+        shellUI: contentShell
+      )
     }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
@@ -378,5 +363,43 @@ public struct ContentView: View {
       let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
     }
+  }
+}
+
+private struct ContentSceneRestorationBridge: View {
+  let store: HarnessMonitorStore
+  let shellUI: HarnessMonitorStore.ContentShellSlice
+  @SceneStorage("selectedSessionID")
+  private var restoredSessionID: String?
+  @State private var hasSeededSceneRestoration = false
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .onAppear {
+        seedRestorationIfNeeded(from: restoredSessionID)
+      }
+      .onChange(of: restoredSessionID) { _, newID in
+        seedRestorationIfNeeded(from: newID)
+      }
+      .onChange(of: shellUI.selectedSessionID) { _, newID in
+        if restoredSessionID != newID {
+          restoredSessionID = newID
+        }
+        if newID != nil {
+          hasSeededSceneRestoration = true
+        }
+      }
+  }
+
+  private func seedRestorationIfNeeded(from restoredSessionID: String?) {
+    guard !hasSeededSceneRestoration else {
+      return
+    }
+    guard shellUI.selectedSessionID == nil, let restoredSessionID else {
+      return
+    }
+    hasSeededSceneRestoration = true
+    store.primeSessionSelection(restoredSessionID)
   }
 }
