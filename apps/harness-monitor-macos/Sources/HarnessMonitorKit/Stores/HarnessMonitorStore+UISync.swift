@@ -2,7 +2,12 @@ import Foundation
 
 extension HarnessMonitorStore {
   enum UISyncArea: Hashable {
-    case content
+    case contentShell
+    case contentToolbar
+    case contentChrome
+    case contentSession
+    case contentSessionDetail
+    case contentDashboard
     case sidebar
     case inspector
   }
@@ -23,7 +28,14 @@ extension HarnessMonitorStore {
     connection.onChanged = { [weak self] change in
       switch change {
       case .shellState:
-        self?.scheduleUISync([.content, .sidebar, .inspector])
+        self?.scheduleUISync([
+          .contentShell,
+          .contentToolbar,
+          .contentChrome,
+          .contentSession,
+          .contentDashboard,
+          .inspector,
+        ])
       case .metrics:
         self?.scheduleUISync([.sidebar])
       }
@@ -31,17 +43,33 @@ extension HarnessMonitorStore {
     selection.onChanged = { [weak self] change in
       switch change {
       case .selectedSessionID:
-        self?.scheduleUISync([.content, .sidebar, .inspector])
+        self?.scheduleUISync([
+          .contentShell,
+          .contentChrome,
+          .contentSession,
+          .sidebar,
+          .inspector,
+        ])
       case .selectedSession:
-        self?.scheduleUISync([.content, .inspector])
+        self?.scheduleUISync([
+          .contentShell,
+          .contentChrome,
+          .contentSessionDetail,
+          .inspector,
+        ])
       case .timeline:
-        self?.scheduleUISync([.content])
+        self?.scheduleUISync([.contentSessionDetail])
       case .inspectorSelection, .actionActorID:
         self?.scheduleUISync([.inspector])
       case .selectionLoading, .extensionsLoading:
-        self?.scheduleUISync([.content])
+        self?.scheduleUISync([.contentShell, .contentSession])
       case .sessionAction:
-        self?.scheduleUISync([.content, .inspector])
+        self?.scheduleUISync([
+          .contentToolbar,
+          .contentSession,
+          .contentDashboard,
+          .inspector,
+        ])
       }
     }
     userData.onChanged = { [weak self] in
@@ -49,8 +77,24 @@ extension HarnessMonitorStore {
     }
     sessionIndex.onChanged = { [weak self] change in
       switch change {
-      case .data:
-        self?.scheduleUISync([.content])
+      case .snapshot:
+        self?.scheduleUISync([
+          .contentToolbar,
+          .contentChrome,
+          .contentSession,
+          .inspector,
+        ])
+      case .summaryProjection(let sessionID):
+        var areas: Set<UISyncArea> = [.contentToolbar]
+        if self?.selection.selectedSessionID == sessionID {
+          areas.formUnion([.contentChrome, .contentSession, .inspector])
+        }
+        self?.scheduleUISync(areas)
+      case .summaryMetadata(let sessionID):
+        guard self?.selection.selectedSessionID == sessionID else {
+          return
+        }
+        self?.scheduleUISync([.contentChrome, .contentSession, .inspector])
       case .projection:
         break
       }
@@ -69,7 +113,16 @@ extension HarnessMonitorStore {
   }
 
   func syncAllUI() {
-    syncUI([.content, .sidebar, .inspector])
+    syncUI([
+      .contentShell,
+      .contentToolbar,
+      .contentChrome,
+      .contentSession,
+      .contentSessionDetail,
+      .contentDashboard,
+      .sidebar,
+      .inspector,
+    ])
   }
 
   private func flushPendingUISync() {
@@ -83,8 +136,23 @@ extension HarnessMonitorStore {
   }
 
   private func syncUI(_ areas: Set<UISyncArea>) {
-    if areas.contains(.content) {
-      syncContentUI()
+    if areas.contains(.contentShell) {
+      syncContentShellUI()
+    }
+    if areas.contains(.contentToolbar) {
+      syncContentToolbarUI()
+    }
+    if areas.contains(.contentChrome) {
+      syncContentChromeUI()
+    }
+    if areas.contains(.contentSession) {
+      syncContentSessionUI()
+    }
+    if areas.contains(.contentSessionDetail) {
+      syncContentSessionDetailUI()
+    }
+    if areas.contains(.contentDashboard) {
+      syncContentDashboardUI()
     }
     if areas.contains(.sidebar) {
       syncSidebarUI()
@@ -92,30 +160,26 @@ extension HarnessMonitorStore {
     if areas.contains(.inspector) {
       syncInspectorUI()
     }
+    for area in areas {
+      debugUISyncCounts[area, default: 0] += 1
+    }
   }
 
-  private func syncContentUI() {
+  func debugUISyncCount(for area: UISyncArea) -> Int {
+    debugUISyncCounts[area, default: 0]
+  }
+
+  func debugResetUISyncCounts() {
+    debugUISyncCounts.removeAll(keepingCapacity: true)
+  }
+
+  private func syncContentShellUI() {
     let selectedDetail = selection.matchedSelectedSession
     let selectedSessionSummary = sessionIndex.sessionSummary(
       for: selection.selectedSessionID
     )
-    let contentShell = contentUI.shell
-    let contentToolbar = contentUI.toolbar
-    let contentChrome = contentUI.chrome
-    let contentSession = contentUI.session
-    let contentSessionDetail = contentUI.sessionDetail
-    let contentDashboard = contentUI.dashboard
-    let toolbarMetrics = ToolbarMetricsState(
-      projectCount: daemonStatus?.projectCount ?? sessionIndex.projects.count,
-      worktreeCount: daemonStatus?.worktreeCount
-        ?? sessionIndex.projects.reduce(0) { $0 + $1.worktrees.count },
-      sessionCount: daemonStatus?.sessionCount ?? sessionIndex.sessions.count,
-      openWorkCount: sessionIndex.totalOpenWorkCount,
-      blockedCount: sessionIndex.totalBlockedCount
-    )
-    let sessionDragActive = contentSession.isTaskDragActive
 
-    contentShell.apply(
+    contentUI.shell.apply(
       ContentShellState(
         selectedSessionID: selection.selectedSessionID,
         windowTitle: selectedDetail != nil || selectedSessionSummary != nil
@@ -129,39 +193,57 @@ extension HarnessMonitorStore {
         presentedSheet: presentedSheet
       )
     )
+  }
 
-    contentChrome.apply(
+  private func syncContentToolbarUI() {
+    let toolbarMetrics = ToolbarMetricsState(
+      projectCount: daemonStatus?.projectCount ?? sessionIndex.projects.count,
+      worktreeCount: daemonStatus?.worktreeCount
+        ?? sessionIndex.projects.reduce(0) { $0 + $1.worktrees.count },
+      sessionCount: daemonStatus?.sessionCount ?? sessionIndex.sessions.count,
+      openWorkCount: sessionIndex.totalOpenWorkCount,
+      blockedCount: sessionIndex.totalBlockedCount
+    )
+    assign(
+      toolbarMetrics,
+      to: \.toolbarMetrics,
+      on: contentUI.toolbar
+    )
+    assign(
+      resolveStatusMessages(sessionCount: toolbarMetrics.sessionCount),
+      to: \.statusMessages,
+      on: contentUI.toolbar
+    )
+    assign(resolveDaemonIndicatorState(), to: \.daemonIndicator, on: contentUI.toolbar)
+    assign(canNavigateBack, to: \.canNavigateBack, on: contentUI.toolbar)
+    assign(canNavigateForward, to: \.canNavigateForward, on: contentUI.toolbar)
+    assign(isRefreshing, to: \.isRefreshing, on: contentUI.toolbar)
+    assign(sleepPreventionEnabled, to: \.sleepPreventionEnabled, on: contentUI.toolbar)
+    assign(connectionState, to: \.connectionState, on: contentUI.toolbar)
+    assign(isBusy, to: \.isBusy, on: contentUI.toolbar)
+  }
+
+  private func syncContentChromeUI() {
+    let selectedDetail = selection.matchedSelectedSession
+    let selectedSessionSummary = sessionIndex.sessionSummary(
+      for: selection.selectedSessionID
+    )
+
+    contentUI.chrome.apply(
       ContentChromeState(
         persistenceError: persistenceError,
         sessionDataAvailability: sessionDataAvailability,
         sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
       )
     )
-    assign(
-      toolbarMetrics,
-      to: \.toolbarMetrics,
-      on: contentToolbar
-    )
-    assign(
-      resolveStatusMessages(sessionCount: toolbarMetrics.sessionCount),
-      to: \.statusMessages,
-      on: contentToolbar
-    )
-    assign(resolveDaemonIndicatorState(), to: \.daemonIndicator, on: contentToolbar)
-    assign(canNavigateBack, to: \.canNavigateBack, on: contentToolbar)
-    assign(canNavigateForward, to: \.canNavigateForward, on: contentToolbar)
-    assign(isRefreshing, to: \.isRefreshing, on: contentToolbar)
-    assign(sleepPreventionEnabled, to: \.sleepPreventionEnabled, on: contentToolbar)
-    assign(connectionState, to: \.connectionState, on: contentToolbar)
-    assign(isBusy, to: \.isBusy, on: contentToolbar)
+  }
 
-    contentSessionDetail.apply(
-      ContentSessionDetailState(
-        selectedSessionDetail: selectedDetail,
-        timeline: selection.timeline
-      )
+  private func syncContentSessionUI() {
+    let selectedSessionSummary = sessionIndex.sessionSummary(
+      for: selection.selectedSessionID
     )
-    contentSession.apply(
+
+    contentUI.session.apply(
       ContentSessionState(
         selectedSessionSummary: selectedSessionSummary,
         isSessionReadOnly: isSessionReadOnly,
@@ -169,11 +251,22 @@ extension HarnessMonitorStore {
         isSelectionLoading: isSelectionLoading,
         isExtensionsLoading: isExtensionsLoading,
         lastAction: lastAction,
-        isTaskDragActive: sessionDragActive
+        isTaskDragActive: contentUI.session.isTaskDragActive
       )
     )
+  }
 
-    contentDashboard.apply(
+  private func syncContentSessionDetailUI() {
+    contentUI.sessionDetail.apply(
+      ContentSessionDetailState(
+        selectedSessionDetail: selection.matchedSelectedSession,
+        timeline: selection.timeline
+      )
+    )
+  }
+
+  private func syncContentDashboardUI() {
+    contentUI.dashboard.apply(
       ContentDashboardState(
         connectionState: connectionState,
         isBusy: isBusy,
@@ -196,9 +289,12 @@ extension HarnessMonitorStore {
   }
 
   private func syncInspectorUI() {
+    let selectedSessionSummary = sessionIndex.sessionSummary(
+      for: selection.selectedSessionID
+    )
     let resolvedPrimaryContent = InspectorPrimaryContentState(
       selectedSession: selection.matchedSelectedSession,
-      selectedSessionSummary: contentUI.session.selectedSessionSummary,
+      selectedSessionSummary: selectedSessionSummary,
       inspectorSelection: selection.inspectorSelection,
       isPersistenceAvailable: isPersistenceAvailable
     )
