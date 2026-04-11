@@ -48,6 +48,7 @@ public enum HarnessMonitorPreviewStoreFactory {
   public static func makeStore(
     for scenario: Scenario,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,
+    actionDelay: Duration? = nil,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     voiceCapture: any VoiceCaptureProviding = PreviewVoiceCaptureService()
@@ -56,7 +57,8 @@ public enum HarnessMonitorPreviewStoreFactory {
     let store = HarnessMonitorStore(
       daemonController: PreviewDaemonController(
         mode: configuration.mode,
-        hostBridgeOverride: hostBridgeOverride
+        hostBridgeOverride: hostBridgeOverride,
+        actionDelay: actionDelay
       ),
       voiceCapture: voiceCapture,
       modelContainer: modelContainer,
