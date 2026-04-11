@@ -362,7 +362,7 @@ mod tests {
         CodexTransport, CodexTransportKind, DEFAULT_CODEX_WS_ENDPOINT, StdioCodexTransport,
         WebSocketCodexTransport, codex_transport_from_env,
     };
-    use crate::daemon::bridge::{BridgeState, bridge_state_path};
+    use crate::daemon::bridge::{BridgeState, acquire_bridge_lock_exclusive, bridge_state_path};
     use crate::daemon::state::HostBridgeCapabilityManifest;
     use crate::infra::io::write_json_pretty;
     use futures_util::sink::SinkExt;
@@ -463,6 +463,8 @@ mod tests {
     fn codex_transport_from_env_uses_bridge_state_when_no_override() {
         with_isolated_env(|| {
             write_bridge_state_for_test("ws://127.0.0.1:4501");
+            // Hold bridge.lock so LockOnly path sees the bridge as running.
+            let _lock = acquire_bridge_lock_exclusive().expect("bridge lock");
 
             assert_eq!(
                 codex_transport_from_env(false),
@@ -477,6 +479,8 @@ mod tests {
     fn codex_transport_from_env_bridge_state_unblocks_unsandboxed_ws() {
         with_isolated_env(|| {
             write_bridge_state_for_test("ws://127.0.0.1:4500");
+            // Hold bridge.lock so LockOnly path sees the bridge as running.
+            let _lock = acquire_bridge_lock_exclusive().expect("bridge lock");
 
             // Unsandboxed: normally defaults to stdio, but the presence of a
             // bridge state file means the operator has explicitly signed up
