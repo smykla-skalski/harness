@@ -22,6 +22,7 @@ struct CopyableCommandBox: View {
         Image(systemName: wasCopied ? "checkmark" : "doc.on.clipboard")
           .imageScale(.medium)
           .contentTransition(.symbolEffect(.replace))
+          .frame(width: 16, height: 16)
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
           .background(
