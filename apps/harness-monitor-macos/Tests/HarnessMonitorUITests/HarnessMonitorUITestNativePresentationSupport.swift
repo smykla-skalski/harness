@@ -8,11 +8,20 @@ extension HarnessMonitorUITestCase {
     app.activate()
     if control.isHittable {
       control.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: control) {
+    } else if !control.frame.isEmpty,
+      let coordinate = centerCoordinate(in: app, for: control)
+    {
       coordinate.tap()
     } else {
-      XCTFail("Failed to open pop-up button \(controlIdentifier)")
-      return
+      let frameMarker = frameElement(in: app, identifier: "\(controlIdentifier).frame")
+      if frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
+        let coordinate = centerCoordinate(in: app, for: frameMarker)
+      {
+        coordinate.tap()
+      } else {
+        XCTFail("Failed to open pop-up button \(controlIdentifier)")
+        return
+      }
     }
 
     let menuItem = presentedMenuOption(in: app, title: optionTitle)
@@ -20,10 +29,17 @@ extension HarnessMonitorUITestCase {
 
     if menuItem.isHittable {
       menuItem.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: menuItem) {
-      coordinate.tap()
     } else {
-      XCTFail("Failed to select menu option \(optionTitle)")
+      let frameMarker = frameElement(in: app, identifier: "\(optionTitle).frame")
+      if let coordinate = centerCoordinate(in: app, for: menuItem) {
+        coordinate.tap()
+      } else if frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
+        let coordinate = centerCoordinate(in: app, for: frameMarker)
+      {
+        coordinate.tap()
+      } else {
+        XCTFail("Failed to select menu option \(optionTitle)")
+      }
     }
   }
 
@@ -50,9 +66,16 @@ extension HarnessMonitorUITestCase {
     let descendantMatch = app.descendants(matching: .popUpButton)
       .matching(identifier: identifier)
       .firstMatch
-    return descendantMatch.exists
-      ? descendantMatch
-      : button(in: app, identifier: identifier)
+    if descendantMatch.exists {
+      return descendantMatch
+    }
+
+    let genericMatch = element(in: app, identifier: identifier)
+    if genericMatch.exists {
+      return genericMatch
+    }
+
+    return button(in: app, identifier: identifier)
   }
 
   private func nativePresentationElement(

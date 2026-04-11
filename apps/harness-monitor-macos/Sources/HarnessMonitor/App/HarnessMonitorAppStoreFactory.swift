@@ -15,6 +15,7 @@ enum HarnessMonitorAppStoreFactory {
     case dashboardLanding = "dashboard-landing"
     case dashboard
     case cockpit
+    case agentTuiOverflow = "agent-tui-overflow"
     case taskDrop = "task-drop"
     case offlineCached = "offline-cached"
     case overflow
@@ -38,6 +39,8 @@ enum HarnessMonitorAppStoreFactory {
         .dashboardLoaded
       case .cockpit:
         .cockpitLoaded
+      case .agentTuiOverflow:
+        .agentTuiOverflow
       case .taskDrop:
         .taskDropCockpit
       case .offlineCached:

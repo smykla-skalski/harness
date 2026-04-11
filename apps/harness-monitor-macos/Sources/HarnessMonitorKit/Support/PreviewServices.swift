@@ -192,6 +192,31 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     let detailsBySessionID: [String: SessionDetail]
     let coreDetailsBySessionID: [String: SessionDetail]
     let timelinesBySessionID: [String: [TimelineEntry]]
+    let agentTuisBySessionID: [String: [AgentTuiSnapshot]]
+
+    public init(
+      health: HealthResponse,
+      projects: [ProjectSummary],
+      sessions: [SessionSummary],
+      detail: SessionDetail?,
+      timeline: [TimelineEntry],
+      readySessionID: String?,
+      detailsBySessionID: [String: SessionDetail],
+      coreDetailsBySessionID: [String: SessionDetail],
+      timelinesBySessionID: [String: [TimelineEntry]],
+      agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
+    ) {
+      self.health = health
+      self.projects = projects
+      self.sessions = sessions
+      self.detail = detail
+      self.timeline = timeline
+      self.readySessionID = readySessionID
+      self.detailsBySessionID = detailsBySessionID
+      self.coreDetailsBySessionID = coreDetailsBySessionID
+      self.timelinesBySessionID = timelinesBySessionID
+      self.agentTuisBySessionID = agentTuisBySessionID
+    }
 
     public static let populated = Self(
       health: HealthResponse(
@@ -670,6 +695,55 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return try await sessionDetail(id: "")
   }
 
+  public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
+    AgentTuiListResponse(tuis: await state.agentTuis(sessionID: sessionID))
+  }
+
+  public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    guard let tui = await state.agentTui(tuiID: tuiID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    return tui
+  }
+
+  public func startAgentTui(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await performActionDelay()
+    return await state.startAgentTui(sessionID: sessionID, request: request)
+  }
+
+  public func sendAgentTuiInput(
+    tuiID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await performActionDelay()
+    guard let updatedTui = await state.sendAgentTuiInput(tuiID: tuiID, request: request) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    return updatedTui
+  }
+
+  public func resizeAgentTui(
+    tuiID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> AgentTuiSnapshot {
+    try await performActionDelay()
+    guard let updatedTui = await state.resizeAgentTui(tuiID: tuiID, request: request) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    return updatedTui
+  }
+
+  public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    try await performActionDelay()
+    guard let updatedTui = await state.stopAgentTui(tuiID: tuiID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+    }
+    return updatedTui
+  }
+
   public func logLevel() async throws -> LogLevelResponse {
     LogLevelResponse(
       level: HarnessMonitorLogger.defaultDaemonLogLevel,
@@ -689,6 +763,8 @@ private actor PreviewHarnessClientState {
   private var detailsBySessionID: [String: SessionDetail]
   private var coreDetailsBySessionID: [String: SessionDetail]
   private var timelinesBySessionID: [String: [TimelineEntry]]
+  private var agentTuisBySessionID: [String: [AgentTuiSnapshot]]
+  private var nextAgentTuiSequence: Int
   private let fallbackDetail: SessionDetail?
   private let fallbackTimeline: [TimelineEntry]
 
@@ -697,6 +773,11 @@ private actor PreviewHarnessClientState {
     self.detailsBySessionID = fixtures.detailsBySessionID
     self.coreDetailsBySessionID = fixtures.coreDetailsBySessionID
     self.timelinesBySessionID = fixtures.timelinesBySessionID
+    self.agentTuisBySessionID = fixtures.agentTuisBySessionID
+    self.nextAgentTuiSequence = max(
+      fixtures.agentTuisBySessionID.values.flatMap(\.self).count,
+      0
+    )
     self.fallbackDetail = fixtures.detail
     self.fallbackTimeline = fixtures.timeline
   }
@@ -719,6 +800,116 @@ private actor PreviewHarnessClientState {
 
   func timeline(for sessionID: String) -> [TimelineEntry] {
     timelinesBySessionID[sessionID] ?? fallbackTimeline
+  }
+
+  func agentTuis(sessionID: String) -> [AgentTuiSnapshot] {
+    agentTuisBySessionID[sessionID] ?? []
+  }
+
+  func agentTui(tuiID: String) -> AgentTuiSnapshot? {
+    agentTuisBySessionID.values
+      .flatMap(\.self)
+      .first { tui in
+        tui.tuiId == tuiID
+      }
+  }
+
+  func startAgentTui(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) -> AgentTuiSnapshot {
+    nextAgentTuiSequence += 1
+    let runtimeTitle = AgentTuiRuntime(rawValue: request.runtime)?.title ?? request.runtime.capitalized
+    let introText =
+      if let prompt = request.prompt, !prompt.isEmpty {
+        "\(runtimeTitle.lowercased())> \(prompt)"
+      } else {
+        "\(runtimeTitle.lowercased())> ready"
+      }
+
+    let snapshot = AgentTuiSnapshot(
+      tuiId: "preview-agent-tui-\(nextAgentTuiSequence)",
+      sessionId: sessionID,
+      agentId: "preview-agent-\(nextAgentTuiSequence)",
+      runtime: request.runtime,
+      status: .running,
+      argv: request.argv.isEmpty ? [request.runtime] : request.argv,
+      projectDir: request.projectDir ?? fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
+      size: AgentTuiSize(rows: request.rows, cols: request.cols),
+      screen: AgentTuiScreenSnapshot(
+        rows: request.rows,
+        cols: request.cols,
+        cursorRow: 1,
+        cursorCol: min(max(introText.count + 1, 1), request.cols),
+        text: introText
+      ),
+      transcriptPath: "/Users/example/Projects/harness/transcripts/preview-agent-tui-\(nextAgentTuiSequence).log",
+      exitCode: nil,
+      signal: nil,
+      error: nil,
+      createdAt: Self.mutationTimestamp,
+      updatedAt: Self.mutationTimestamp
+    )
+
+    var sessionTuis = agentTuisBySessionID[sessionID] ?? []
+    sessionTuis.insert(snapshot, at: 0)
+    agentTuisBySessionID[sessionID] = sessionTuis
+    return snapshot
+  }
+
+  func sendAgentTuiInput(
+    tuiID: String,
+    request: AgentTuiInputRequest
+  ) -> AgentTuiSnapshot? {
+    mutateAgentTui(tuiID: tuiID) { snapshot in
+      let updatedText: String =
+        switch request.input {
+        case .text(let text), .paste(let text):
+          [snapshot.screen.text, text].filter { !$0.isEmpty }.joined(separator: "\n")
+        case .key(let key):
+          [snapshot.screen.text, "[\(key.title)]"].filter { !$0.isEmpty }.joined(separator: "\n")
+        case .control(let key):
+          [snapshot.screen.text, "[Ctrl-\(String(key).uppercased())]"]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        case .rawBytesBase64:
+          [snapshot.screen.text, "[raw bytes]"].filter { !$0.isEmpty }.joined(separator: "\n")
+        }
+
+      return snapshot.replacing(
+        screen: snapshot.screen.replacing(
+          rows: snapshot.screen.rows,
+          cols: snapshot.screen.cols,
+          text: updatedText
+        )
+      )
+    }
+  }
+
+  func resizeAgentTui(
+    tuiID: String,
+    request: AgentTuiResizeRequest
+  ) -> AgentTuiSnapshot? {
+    mutateAgentTui(tuiID: tuiID) { snapshot in
+      snapshot.replacing(
+        size: AgentTuiSize(rows: request.rows, cols: request.cols),
+        screen: snapshot.screen.replacing(
+          rows: request.rows,
+          cols: request.cols,
+          text: snapshot.screen.text
+        )
+      )
+    }
+  }
+
+  func stopAgentTui(tuiID: String) -> AgentTuiSnapshot? {
+    mutateAgentTui(tuiID: tuiID) { snapshot in
+      snapshot.replacing(
+        status: .stopped,
+        exitCode: 0,
+        signal: nil
+      )
+    }
   }
 
   func dropTask(
@@ -786,6 +977,24 @@ private actor PreviewHarnessClientState {
     }
     return updatedDetail
   }
+
+  private func mutateAgentTui(
+    tuiID: String,
+    mutation: (AgentTuiSnapshot) -> AgentTuiSnapshot
+  ) -> AgentTuiSnapshot? {
+    for (sessionID, snapshots) in agentTuisBySessionID {
+      guard let index = snapshots.firstIndex(where: { $0.tuiId == tuiID }) else {
+        continue
+      }
+
+      var updatedSnapshots = snapshots
+      updatedSnapshots[index] = mutation(snapshots[index])
+      agentTuisBySessionID[sessionID] = updatedSnapshots
+      return updatedSnapshots[index]
+    }
+
+    return nil
+  }
 }
 
 private extension WorkItem {
@@ -814,6 +1023,56 @@ private extension WorkItem {
       blockedReason: nil,
       completedAt: completedAt,
       checkpointSummary: checkpointSummary
+    )
+  }
+}
+
+private extension AgentTuiSnapshot {
+  func replacing(
+    size: AgentTuiSize? = nil,
+    screen: AgentTuiScreenSnapshot? = nil,
+    status: AgentTuiStatus? = nil,
+    exitCode: UInt32? = nil,
+    signal: String? = nil
+  ) -> AgentTuiSnapshot {
+    AgentTuiSnapshot(
+      tuiId: tuiId,
+      sessionId: sessionId,
+      agentId: agentId,
+      runtime: runtime,
+      status: status ?? self.status,
+      argv: argv,
+      projectDir: projectDir,
+      size: size ?? self.size,
+      screen: screen ?? self.screen,
+      transcriptPath: transcriptPath,
+      exitCode: exitCode ?? self.exitCode,
+      signal: signal ?? self.signal,
+      error: error,
+      createdAt: createdAt,
+      updatedAt: PreviewHarnessClientState.mutationTimestamp
+    )
+  }
+}
+
+private extension AgentTuiScreenSnapshot {
+  func replacing(
+    rows: Int,
+    cols: Int,
+    text: String
+  ) -> AgentTuiScreenSnapshot {
+    let lastLineLength =
+      text
+      .split(separator: "\n", omittingEmptySubsequences: false)
+      .last?
+      .count ?? 0
+
+    return AgentTuiScreenSnapshot(
+      rows: rows,
+      cols: cols,
+      cursorRow: max(text.split(separator: "\n", omittingEmptySubsequences: false).count, 1),
+      cursorCol: min(max(lastLineLength + 1, 1), cols),
+      text: text
     )
   }
 }

@@ -50,6 +50,20 @@ public actor PreviewDaemonController: DaemonControlling {
     self.isLaunchAgentInstalled = mode != .empty
   }
 
+  init(
+    fixtures: PreviewHarnessClient.Fixtures,
+    isDaemonRunning: Bool = true,
+    isLaunchAgentInstalled: Bool = true,
+    hostBridgeOverride: PreviewHostBridgeOverride? = nil,
+    actionDelay: Duration? = nil
+  ) {
+    self.fixtures = fixtures
+    hostBridgeState = PreviewHostBridgeState(override: hostBridgeOverride)
+    self.actionDelay = actionDelay
+    self.isDaemonRunning = isDaemonRunning
+    self.isLaunchAgentInstalled = isLaunchAgentInstalled
+  }
+
   public init(
     previewFixtureSetRawValue rawValue: String?,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,

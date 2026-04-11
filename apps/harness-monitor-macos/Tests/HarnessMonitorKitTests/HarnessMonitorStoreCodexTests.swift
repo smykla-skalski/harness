@@ -202,6 +202,33 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.currentSuccessFeedbackMessage == "Agent TUI started")
   }
 
+  @Test("Starting another agent TUI promotes and selects the new snapshot")
+  func startAgentTuiPromotesNewSnapshotOverExistingSelection() async {
+    let client = RecordingHarnessClient()
+    let existing = client.agentTuiFixture(
+      tuiID: "agent-tui-existing",
+      runtime: AgentTuiRuntime.codex.rawValue,
+      screenText: "codex> reviewing"
+    )
+    client.configureAgentTuis([existing], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedStore(client: client)
+    store.selectAgentTui(tuiID: existing.tuiId)
+
+    let started = await store.startAgentTui(
+      runtime: .claude,
+      name: "Claude TUI",
+      prompt: "Inspect the active session.",
+      rows: 28,
+      cols: 100
+    )
+
+    #expect(started)
+    #expect(store.selectedAgentTui?.tuiId == "agent-tui-2")
+    #expect(store.selectedAgentTui?.runtime == AgentTuiRuntime.claude.rawValue)
+    #expect(store.selectedAgentTuis.first?.tuiId == "agent-tui-2")
+    #expect(store.selectedAgentTuis.contains { $0.tuiId == existing.tuiId })
+  }
+
   @Test("Agent TUI input updates the selected screen snapshot")
   func agentTuiInputUpdatesSelectedScreenSnapshot() async {
     let client = RecordingHarnessClient()
@@ -276,6 +303,23 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.tuiId == running.tuiId)
     #expect(store.selectedAgentTui?.status == .stopped)
     #expect(store.selectedAgentTui?.screen.text == "copilot> done")
+  }
+
+  @Test("Stopping agent TUI keeps the stopped snapshot selected")
+  func stopAgentTuiKeepsStoppedSnapshotSelected() async {
+    let client = RecordingHarnessClient()
+    let running = client.agentTuiFixture(screenText: "copilot> ready")
+    client.configureAgentTuis([running], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedStore(client: client)
+    store.selectAgentTui(tuiID: running.tuiId)
+
+    let stopped = await store.stopAgentTui(tuiID: running.tuiId)
+
+    #expect(stopped)
+    #expect(client.recordedCalls().contains(.stopAgentTui(tuiID: running.tuiId)))
+    #expect(store.selectedAgentTui?.tuiId == running.tuiId)
+    #expect(store.selectedAgentTui?.status == .stopped)
+    #expect(store.selectedAgentTuis.contains { $0.tuiId == running.tuiId && $0.status == .stopped })
   }
 
   @Test("Agent TUI actions stay read-only while daemon is offline")
