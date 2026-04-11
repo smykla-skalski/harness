@@ -142,6 +142,7 @@ duration_for() {
 }
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root)"
+DERIVED_DATA_PATH="$COMMON_REPO_ROOT/tmp/xcode-derived"
 AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
 
 build_release_targets() {
@@ -730,8 +731,11 @@ record_capture() {
   preview_scenario="$(preview_scenario_for "$scenario")"
   local template_dir="$traces_root/$template_slug"
   local daemon_data_home="$run_dir/app-data/$template_slug/$scenario"
+  local capture_log_dir="$run_dir/logs"
+  local capture_log_path="$capture_log_dir/${template_slug}-${scenario}.log"
   mkdir -p "$template_dir"
   mkdir -p "$daemon_data_home"
+  mkdir -p "$capture_log_dir"
   local trace_path="$template_dir/${scenario}.trace"
   local toc_path="$template_dir/${scenario}.toc.xml"
   local daemon_data_home_env="$DAEMON_DATA_HOME_ENV_KEY=$daemon_data_home"
@@ -760,7 +764,8 @@ record_capture() {
     --env "HARNESS_MONITOR_PREVIEW_SCENARIO=$preview_scenario" \
     --env "$WINDOW_WIDTH_ENV" \
     --env "$WINDOW_HEIGHT_ENV" \
-    --launch -- "$STAGED_HOST_LAUNCHER_PATH" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO"
+    --launch -- "$STAGED_HOST_LAUNCHER_PATH" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" \
+    >"$capture_log_path" 2>&1
   local record_status=$?
   set -e
 
@@ -769,7 +774,7 @@ record_capture() {
     exit 1
   fi
 
-  TMPDIR="$xctrace_tmp_root/" xcrun xctrace export --input "$trace_path" --toc >"$toc_path"
+  TMPDIR="$xctrace_tmp_root/" xcrun xctrace export --input "$trace_path" --toc >"$toc_path" 2>>"$capture_log_path"
   launched_process_path="$(trace_launched_process_path "$toc_path")"
   local end_reason
   end_reason="$(
@@ -787,6 +792,8 @@ PY
   if [[ "$record_status" -ne 0 && "$end_reason" != "Time limit reached" ]]; then
     printf 'xctrace record failed for %s / %s with exit %s and end reason "%s"\n' \
       "$template" "$scenario" "$record_status" "$end_reason" >&2
+    printf 'xctrace log: %s\n' "$capture_log_path" >&2
+    tail -n 40 "$capture_log_path" >&2 || true
     exit "$record_status"
   fi
 
