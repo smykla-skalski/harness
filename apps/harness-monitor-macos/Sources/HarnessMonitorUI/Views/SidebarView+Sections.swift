@@ -10,7 +10,6 @@ struct SidebarSessionListRenderState: Equatable {
   let isPersistenceAvailable: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
-  let collapsedProjectIDs: Set<String>
   let collapsedCheckoutKeys: Set<String>
 
   var emptyState: HarnessMonitorStore.SidebarEmptyState {
@@ -19,10 +18,6 @@ struct SidebarSessionListRenderState: Equatable {
 
   var usesFlatSearchResults: Bool {
     searchPresentation.isSearchActive
-  }
-
-  func isProjectExpanded(_ projectID: String) -> Bool {
-    !collapsedProjectIDs.contains(projectID)
   }
 
   func isCheckoutExpanded(
@@ -40,18 +35,14 @@ struct SidebarSessionListRenderState: Equatable {
   }
 }
 
-struct SidebarSessionListContent: View, Equatable {
+struct SidebarSessionListContent: View {
   nonisolated(unsafe) let renderState: SidebarSessionListRenderState
-  let selection: Binding<String?>
   let selectSession: (String?) -> Void
   let toggleBookmark: (String, String) -> Void
-  let setProjectCollapsed: (String, Bool) -> Void
   let setCheckoutCollapsed: (String, Bool) -> Void
 
   var body: some View {
-    List(selection: selection) {
-      sidebarRows
-    }
+    sidebarRows
   }
 
   @ViewBuilder
@@ -88,10 +79,6 @@ struct SidebarSessionListContent: View, Equatable {
     }
   }
 
-  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.renderState == rhs.renderState
-  }
-
   @ViewBuilder
   private var flatSearchResults: some View {
     ForEach(renderState.searchList.visibleSessions, id: \.sessionId) { session in
@@ -102,7 +89,7 @@ struct SidebarSessionListContent: View, Equatable {
   private func projectSection(
     for group: HarnessMonitorStore.SessionGroup
   ) -> some View {
-    Section(isExpanded: projectExpansionBinding(for: group)) {
+    Section {
       ForEach(group.checkoutGroups) { checkoutGroup in
         checkoutDisclosureRow(
           for: checkoutGroup,
@@ -117,10 +104,15 @@ struct SidebarSessionListContent: View, Equatable {
   private func projectHeader(
     for group: HarnessMonitorStore.SessionGroup
   ) -> some View {
-    Text(verbatim: group.project.name)
-      .font(scaledSidebarFont(.system(.headline, design: .rounded, weight: .semibold)))
-      .accessibilityAddTraits(.isHeader)
+    HStack(spacing: 0) {
+      Text(verbatim: group.project.name)
+        .font(scaledSidebarFont(.system(.headline, design: .rounded, weight: .semibold)))
+      Spacer(minLength: 0)
+    }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.isHeader)
+      .contentShape(Rectangle())
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.projectHeader(group.project.projectId)
       )
@@ -242,18 +234,6 @@ struct SidebarSessionListContent: View, Equatable {
           when: isSelectedForUITest
         )
     }
-  }
-
-  private func projectExpansionBinding(
-    for group: HarnessMonitorStore.SessionGroup
-  ) -> Binding<Bool> {
-    let projectID = group.project.projectId
-    return Binding(
-      get: { renderState.isProjectExpanded(projectID) },
-      set: { isExpanded in
-        setProjectCollapsed(projectID, !isExpanded)
-      }
-    )
   }
 
   private func checkoutExpansionBinding(
