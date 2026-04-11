@@ -6,7 +6,6 @@ APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 PROJECT_PATH="$APP_ROOT/HarnessMonitor.xcodeproj"
 DERIVED_DATA_PATH="$REPO_ROOT/tmp/xcode-derived"
-RUNS_ROOT="$REPO_ROOT/tmp/perf/harness-monitor-instruments/runs"
 SHIPPING_SCHEME="HarnessMonitor"
 HOST_SCHEME="HarnessMonitorUITestHost"
 HOST_BUNDLE_ID="io.harnessmonitor.app.ui-testing"
@@ -34,8 +33,9 @@ BUILD_DIRTY_KEY="HarnessMonitorBuildGitDirty"
 BUILD_WORKSPACE_FINGERPRINT_KEY="HarnessMonitorBuildWorkspaceFingerprint"
 BUILD_STARTED_AT_UTC_KEY="HarnessMonitorBuildStartedAtUTC"
 BUILD_PROVENANCE_RESOURCE="HarnessMonitorBuildProvenance.plist"
-AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
-AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
+RUNS_ROOT=""
+AUDIT_LOCK_DIR=""
+AUDIT_LOCK_INFO_PATH=""
 SKIP_BUILD="${HARNESS_MONITOR_AUDIT_SKIP_BUILD:-0}"
 SKIP_DAEMON_BUNDLE="${HARNESS_MONITOR_AUDIT_SKIP_DAEMON_BUNDLE:-0}"
 FORCE_CLEAN="${HARNESS_MONITOR_AUDIT_FORCE_CLEAN:-0}"
@@ -79,7 +79,8 @@ Usage:
 
 Options:
   --label <name>         Required run label.
-  --compare-to <path>    Optional baseline run directory or summary.json.
+  --compare-to <path>    Optional baseline run directory or summary.json. Relative paths are
+                         resolved against the current directory first, then the common repo root.
   --scenarios <value>    Scenario selection. Default: all
   --keep-traces          Keep raw .trace bundles after metrics extraction. Default: discard raw traces.
   --discard-traces       Explicitly discard raw .trace bundles after metrics extraction.
@@ -105,6 +106,29 @@ resolve_common_repo_root() {
     common_git_dir="$REPO_ROOT/$common_git_dir"
   fi
   CDPATH='' cd -- "$common_git_dir/.." && pwd
+}
+
+resolve_existing_path() {
+  local candidate="$1"
+  local resolved=""
+
+  if [[ -z "$candidate" ]]; then
+    return 1
+  fi
+
+  if [[ "$candidate" == /* ]]; then
+    resolved="$candidate"
+  elif [[ -e "$candidate" ]]; then
+    resolved="$(CDPATH='' cd -- "$(dirname -- "$candidate")" && pwd)/$(basename -- "$candidate")"
+  elif [[ -e "$COMMON_REPO_ROOT/$candidate" ]]; then
+    resolved="$COMMON_REPO_ROOT/$candidate"
+  elif [[ -e "$REPO_ROOT/$candidate" ]]; then
+    resolved="$REPO_ROOT/$candidate"
+  else
+    return 1
+  fi
+
+  printf '%s\n' "$resolved"
 }
 
 preview_scenario_for() {
@@ -145,6 +169,9 @@ duration_for() {
 }
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root)"
+RUNS_ROOT="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/runs"
+AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
+AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 DERIVED_DATA_PATH="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/xcode-derived"
 AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
 AUDIT_BUILD_ARCH="${HARNESS_MONITOR_AUDIT_BUILD_ARCH:-$(uname -m)}"
@@ -645,6 +672,13 @@ if [[ -z "$label" ]]; then
   printf '%s\n' "--label is required." >&2
   usage >&2
   exit 1
+fi
+
+if [[ -n "$compare_to" ]]; then
+  if ! compare_to="$(resolve_existing_path "$compare_to")"; then
+    printf 'Unable to resolve --compare-to path: %s\n' "$compare_to" >&2
+    exit 1
+  fi
 fi
 
 selected_scenarios=()
