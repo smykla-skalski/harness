@@ -780,4 +780,130 @@ mod tests {
             },
         );
     }
+
+    /// Teardown helper: clears the process-global daemon root override.
+    /// Every test that mutates the override MUST call this on exit, even
+    /// on assertion failure paths, because tests run single-threaded and
+    /// leaked overrides poison downstream tests.
+    fn reset_override_for_tests() {
+        set_daemon_root_override(None);
+    }
+
+    #[test]
+    fn daemon_root_override_takes_precedence_over_env() {
+        let tmp = tempdir().expect("tempdir");
+        let override_root = tmp.path().join("forced");
+        temp_env::with_vars(
+            [
+                ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
+                ("HARNESS_APP_GROUP_ID", None),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                reset_override_for_tests();
+                set_daemon_root_override(Some(override_root.clone()));
+                assert_eq!(daemon_root(), override_root);
+                // default_daemon_root() must ignore the override so discovery
+                // can still reason about "what would we pick without adoption".
+                assert_ne!(default_daemon_root(), override_root);
+                reset_override_for_tests();
+            },
+        );
+    }
+
+    #[test]
+    fn daemon_root_override_clears_when_set_to_none() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
+                ("HARNESS_APP_GROUP_ID", None),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                reset_override_for_tests();
+                set_daemon_root_override(Some(tmp.path().join("ignored")));
+                set_daemon_root_override(None);
+                assert_eq!(daemon_root(), default_daemon_root());
+                reset_override_for_tests();
+            },
+        );
+    }
+
+    #[test]
+    fn write_manifest_bumps_revision_monotonically() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let base = DaemonManifest {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    pid: 123,
+                    endpoint: "http://127.0.0.1:0".into(),
+                    started_at: "2026-04-11T00:00:00Z".into(),
+                    token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
+                };
+                let first = write_manifest(&base).expect("first write");
+                assert_eq!(first.revision, 1);
+                assert!(!first.updated_at.is_empty());
+
+                let second = write_manifest(&base).expect("second write");
+                assert_eq!(second.revision, 2);
+
+                let third = write_manifest(&base).expect("third write");
+                assert_eq!(third.revision, 3);
+
+                // Loading from disk returns the bumped values.
+                let loaded = load_manifest().expect("load").expect("manifest");
+                assert_eq!(loaded.revision, 3);
+                assert!(!loaded.updated_at.is_empty());
+            },
+        );
+    }
+
+    #[test]
+    fn daemon_lock_is_held_at_returns_false_for_missing_lock_file() {
+        let tmp = tempdir().expect("tempdir");
+        let missing = tmp.path().join("daemon.lock");
+        assert!(!daemon_lock_is_held_at(&missing));
+    }
+
+    #[test]
+    fn daemon_lock_is_held_at_returns_false_for_unlocked_file() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("daemon.lock");
+        fs::write(&path, "").expect("create empty lock file");
+        assert!(!daemon_lock_is_held_at(&path));
+    }
+
+    #[test]
+    fn daemon_lock_is_held_at_returns_true_for_actively_held_lock() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("daemon.lock");
+        let holder = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .expect("open lock");
+        holder.try_lock_exclusive().expect("take flock");
+        assert!(daemon_lock_is_held_at(&path));
+        // Keep `holder` alive until here; dropping it releases the flock.
+        drop(holder);
+        assert!(!daemon_lock_is_held_at(&path));
+    }
 }
