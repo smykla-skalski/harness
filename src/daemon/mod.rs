@@ -22,6 +22,7 @@ pub mod client;
 pub mod codex_controller;
 pub mod codex_transport;
 pub mod db;
+pub mod discovery;
 pub mod http;
 pub mod index;
 pub mod launchd;

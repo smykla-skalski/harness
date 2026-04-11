@@ -61,6 +61,8 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         token_path: String::new(),
         sandboxed: false,
         host_bridge: HostBridgeManifest::default(),
+        revision: 0,
+        updated_at: String::new(),
     };
 
     let db_slot = Arc::new(OnceLock::new());

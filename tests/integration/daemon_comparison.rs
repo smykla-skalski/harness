@@ -19,6 +19,8 @@ fn seed_workspace(tmp: &std::path::Path) {
         token_path: state::auth_token_path().display().to_string(),
         sandboxed: false,
         host_bridge: HostBridgeManifest::default(),
+        revision: 0,
+        updated_at: String::new(),
     };
     state::write_manifest(&manifest).expect("write manifest");
     state::append_event("info", "comparison test started").expect("event");
