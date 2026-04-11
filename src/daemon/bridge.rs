@@ -1191,7 +1191,7 @@ impl BridgeClient {
     /// Returns [`CliError`] when the bridge is unavailable or the auth token
     /// cannot be loaded.
     pub fn from_state_file() -> Result<Self, CliError> {
-        let state = load_running_bridge_state()?
+        let state = load_running_bridge_state(LivenessMode::HostAuthoritative)?
             .ok_or_else(|| CliErrorKind::workflow_io("bridge is not running"))?;
         let token = fs::read_to_string(&state.token_path)
             .map_err(|error| {
@@ -1214,7 +1214,7 @@ impl BridgeClient {
     /// Returns [`CliError`] when the bridge is unavailable, the capability is
     /// not enabled, or the auth token cannot be loaded.
     pub fn for_capability(capability: BridgeCapability) -> Result<Self, CliError> {
-        let state = load_running_bridge_state()?
+        let state = load_running_bridge_state(LivenessMode::HostAuthoritative)?
             .ok_or_else(|| CliErrorKind::sandbox_feature_disabled(capability.sandbox_feature()))?;
         if !state.capabilities.contains_key(capability.name()) {
             return Err(
@@ -1425,6 +1425,16 @@ pub(crate) fn bridge_lock_path() -> PathBuf {
     state::daemon_root().join(state::BRIDGE_LOCK_FILE)
 }
 
+/// Probe whether an exclusive `flock` on `bridge.lock` is currently held.
+///
+/// Returns `true` while `run_bridge_server` is actively running in the
+/// foreground child. Safe to call from the sandboxed daemon (no subprocess
+/// execution required).
+#[must_use]
+pub(crate) fn bridge_lock_is_held() -> bool {
+    state::flock_is_held_at(&bridge_lock_path())
+}
+
 /// RAII guard that holds the exclusive `bridge.lock` flock.
 ///
 /// Dropping the guard releases the lock so the kernel can clean up even on
@@ -1530,19 +1540,55 @@ fn clear_bridge_state() -> Result<(), CliError> {
     Ok(())
 }
 
-/// Load the bridge state only when the recorded PID is still alive.
+/// Who is asking whether the bridge is running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LivenessMode {
+    /// Host-CLI path. The caller owns the state file; `flock` is the primary
+    /// signal, `pid_alive` is a best-effort fallback for backward-compatibility
+    /// with pre-19.7.0 bridge CLIs that did not publish `bridge.lock`.
+    HostAuthoritative,
+    /// Daemon/consumer path. The caller **does not** own the state file.
+    /// Only `flock` is consulted; `pid_alive` is never called (the daemon may
+    /// be sandboxed and cannot reliably signal an unsandboxed pid), and stale
+    /// state is **never deleted**.
+    LockOnly,
+}
+
+/// Load the bridge state only when liveness can be confirmed.
+///
+/// On the [`LivenessMode::LockOnly`] path (sandboxed daemon consumer) the
+/// function is purely read-only: it never deletes `bridge.json` regardless of
+/// what it finds. Cleanup is the producer's responsibility.
+///
+/// On the [`LivenessMode::HostAuthoritative`] path the function falls back to
+/// `pid_alive` for backward compatibility with pre-19.7.0 bridge CLIs that do
+/// not publish `bridge.lock`.
 ///
 /// # Errors
-/// Returns [`CliError`] when the state cannot be read or stale files cannot be
-/// cleaned up.
-pub fn load_running_bridge_state() -> Result<Option<BridgeState>, CliError> {
+/// Returns [`CliError`] when the state cannot be read.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "three liveness branches are distinct checks; splitting hides the decision logic"
+)]
+pub fn load_running_bridge_state(mode: LivenessMode) -> Result<Option<BridgeState>, CliError> {
     let Some(state) = read_bridge_state()? else {
         return Ok(None);
     };
-    if pid_alive(state.pid) {
+    if bridge_lock_is_held() {
         return Ok(Some(state));
     }
-    clear_bridge_state()?;
+    if matches!(mode, LivenessMode::HostAuthoritative) && pid_alive(state.pid) {
+        return Ok(Some(state));
+    }
+    // Consumer path: never delete state we do not own. The daemon watcher is a
+    // read-only observer of bridge.json; host-CLI callers own cleanup through
+    // stop_bridge, which explicitly unlinks the state file after the RPC
+    // shutdown handshake.
+    if matches!(mode, LivenessMode::LockOnly) {
+        tracing::debug!(
+            "bridge watcher: bridge.lock not held, treating bridge as not running (bridge.json preserved)"
+        );
+    }
     Ok(None)
 }
 
@@ -1551,7 +1597,7 @@ pub fn load_running_bridge_state() -> Result<Option<BridgeState>, CliError> {
 /// # Errors
 /// Returns [`CliError`] when the persisted bridge state cannot be read.
 pub fn host_bridge_manifest() -> Result<HostBridgeManifest, CliError> {
-    let Some(state) = load_running_bridge_state()? else {
+    let Some(state) = load_running_bridge_state(LivenessMode::LockOnly)? else {
         return Ok(HostBridgeManifest::default());
     };
     Ok(HostBridgeManifest {
@@ -1566,7 +1612,7 @@ pub fn host_bridge_manifest() -> Result<HostBridgeManifest, CliError> {
 /// # Errors
 /// Returns [`CliError`] when the bridge state cannot be read.
 pub fn running_codex_capability() -> Result<Option<HostBridgeCapabilityManifest>, CliError> {
-    let Some(state) = load_running_bridge_state()? else {
+    let Some(state) = load_running_bridge_state(LivenessMode::LockOnly)? else {
         return Ok(None);
     };
     Ok(state.capabilities.get(BRIDGE_CAPABILITY_CODEX).cloned())
@@ -1618,7 +1664,7 @@ fn pid_is_zombie(pid: u32) -> bool {
 /// # Errors
 /// Returns [`CliError`] when the bridge state cannot be read.
 pub fn status_report() -> Result<BridgeStatusReport, CliError> {
-    let Some(state) = load_running_bridge_state()? else {
+    let Some(state) = load_running_bridge_state(LivenessMode::HostAuthoritative)? else {
         return Ok(BridgeStatusReport::not_running());
     };
     Ok(BridgeStatusReport {
@@ -1641,7 +1687,9 @@ pub fn stop_bridge() -> Result<BridgeStatusReport, CliError> {
         clear_bridge_state()?;
         return Ok(BridgeStatusReport::not_running());
     };
-    if pid_alive(state.pid) {
+    // Prefer the flock-based check so stop_bridge works from inside a sandbox
+    // where /bin/kill -0 may be unreliable.
+    if bridge_lock_is_held() || pid_alive(state.pid) {
         let token = fs::read_to_string(&state.token_path)
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!(
@@ -1761,26 +1809,33 @@ fn build_manifest_watcher(
     create_manifest_watcher(event_tx).and_then(|watcher| watch_bridge_root(watcher, daemon_root))
 }
 
-fn apply_bridge_state_to_manifest() {
-    let Some(mut manifest) = bridge_manifest_update() else {
-        return;
-    };
-    let Some(host_bridge) = bridge_host_manifest_update() else {
-        return;
-    };
-    if manifest.host_bridge == host_bridge {
-        return;
+/// Pure decision: given the current on-disk manifest return the manifest that
+/// should be published, or `None` if the host-bridge state is unchanged.
+///
+/// Extracted as a pure function so the "did the watcher correctly decide to
+/// publish an update?" branch can be unit-tested without standing up a real
+/// daemon.
+pub(crate) fn compute_bridge_manifest_update(
+    current: &state::DaemonManifest,
+) -> Option<state::DaemonManifest> {
+    let host_bridge = host_bridge_manifest().ok()?;
+    if current.host_bridge == host_bridge {
+        return None;
     }
-    manifest.host_bridge = host_bridge;
-    publish_bridge_manifest_update(&manifest);
+    Some(state::DaemonManifest {
+        host_bridge,
+        ..current.clone()
+    })
 }
 
-fn bridge_manifest_update() -> Option<state::DaemonManifest> {
-    state::load_manifest().ok().flatten()
-}
-
-fn bridge_host_manifest_update() -> Option<HostBridgeManifest> {
-    host_bridge_manifest().ok()
+fn apply_bridge_state_to_manifest() {
+    let Some(current) = state::load_manifest().ok().flatten() else {
+        return;
+    };
+    let Some(next) = compute_bridge_manifest_update(&current) else {
+        return;
+    };
+    publish_bridge_manifest_update(&next);
 }
 
 fn write_bridge_manifest_update(manifest: &state::DaemonManifest) -> Result<(), CliError> {
@@ -1820,7 +1875,7 @@ fn watch_bridge_root(
 }
 
 fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bool, CliError> {
-    let Some(state) = load_running_bridge_state()? else {
+    let Some(state) = load_running_bridge_state(LivenessMode::HostAuthoritative)? else {
         return Ok(false);
     };
     if state.socket_path != config.socket_path.display().to_string() {
@@ -2401,6 +2456,7 @@ fn cleanup_legacy_bridge_artifacts() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fs2::FileExt;
     use tempfile::tempdir;
 
     fn with_temp_daemon_root<F: FnOnce()>(f: F) {
@@ -2590,6 +2646,9 @@ mod tests {
                 )]),
             };
             write_bridge_state(&state).expect("write");
+            // host_bridge_manifest uses LockOnly; hold the lock so it sees the
+            // bridge as running (the previous behavior relied on pid_alive).
+            let _flock = hold_bridge_lock();
 
             let manifest = host_bridge_manifest().expect("manifest");
             assert!(manifest.running);
@@ -2717,6 +2776,201 @@ mod tests {
             std::fs::write(bridge_lock_path(), "").expect("create lock file");
             clear_bridge_state().expect("clear");
             assert!(!bridge_lock_path().exists(), "lock file should be removed");
+        });
+    }
+
+    // --- LivenessMode / load_running_bridge_state unit tests ---
+
+    fn write_fake_bridge_state(pid: u32) {
+        state::ensure_daemon_dirs().expect("dirs");
+        let bridge_state = BridgeState {
+            socket_path: "/tmp/fake-bridge.sock".to_string(),
+            pid,
+            started_at: "2026-04-11T17:00:00Z".to_string(),
+            token_path: "/tmp/fake-token".to_string(),
+            capabilities: BTreeMap::new(),
+        };
+        write_bridge_state(&bridge_state).expect("write bridge state");
+    }
+
+    /// Acquire an exclusive flock by hand and keep the file open so the flock
+    /// persists for the duration of the caller's scope. Mirrors the
+    /// `fake_running_daemon` pattern in discovery tests.
+    fn hold_bridge_lock() -> std::fs::File {
+        state::ensure_daemon_dirs().expect("dirs");
+        let path = bridge_lock_path();
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .expect("open bridge lock");
+        file.try_lock_exclusive().expect("flock bridge lock");
+        file
+    }
+
+    #[test]
+    fn load_running_bridge_state_returns_none_when_no_state_file() {
+        with_temp_daemon_root(|| {
+            assert!(
+                load_running_bridge_state(LivenessMode::LockOnly)
+                    .expect("load")
+                    .is_none()
+            );
+            assert!(
+                load_running_bridge_state(LivenessMode::HostAuthoritative)
+                    .expect("load")
+                    .is_none()
+            );
+        });
+    }
+
+    #[test]
+    fn load_running_bridge_state_returns_state_when_bridge_lock_held() {
+        with_temp_daemon_root(|| {
+            write_fake_bridge_state(99999999);
+            let _flock = hold_bridge_lock();
+            // Both modes return Some when the flock is held.
+            assert!(
+                load_running_bridge_state(LivenessMode::LockOnly)
+                    .expect("lock-only")
+                    .is_some()
+            );
+            assert!(
+                load_running_bridge_state(LivenessMode::HostAuthoritative)
+                    .expect("host-auth")
+                    .is_some()
+            );
+        });
+    }
+
+    #[test]
+    fn load_running_bridge_state_returns_none_when_neither_lock_nor_pid_live() {
+        with_temp_daemon_root(|| {
+            // pid 99999999 is definitely not alive.
+            write_fake_bridge_state(99999999);
+            assert!(
+                load_running_bridge_state(LivenessMode::LockOnly)
+                    .expect("lock-only")
+                    .is_none()
+            );
+            assert!(
+                load_running_bridge_state(LivenessMode::HostAuthoritative)
+                    .expect("host-auth")
+                    .is_none()
+            );
+        });
+    }
+
+    /// The critical regression test. The consumer path must never delete
+    /// bridge.json regardless of what it finds. This is the test that would
+    /// have caught the original v19.6.0 bug.
+    #[test]
+    fn load_running_bridge_state_does_not_delete_state_file() {
+        with_temp_daemon_root(|| {
+            write_fake_bridge_state(99999999);
+            let _ = load_running_bridge_state(LivenessMode::LockOnly).expect("lock-only");
+            assert!(
+                bridge_state_path().exists(),
+                "bridge.json must survive a LockOnly load with a dead pid"
+            );
+            let _ = load_running_bridge_state(LivenessMode::HostAuthoritative).expect("host-auth");
+            assert!(
+                bridge_state_path().exists(),
+                "bridge.json must survive a HostAuthoritative load with a dead pid"
+            );
+        });
+    }
+
+    #[test]
+    fn load_running_bridge_state_lock_only_ignores_pid_alive_fallback() {
+        with_temp_daemon_root(|| {
+            // Use the current process pid — guaranteed alive under /bin/kill -0.
+            write_fake_bridge_state(process_id());
+            // LockOnly must return None because no flock is held, even though
+            // the pid is alive.
+            assert!(
+                load_running_bridge_state(LivenessMode::LockOnly)
+                    .expect("lock-only")
+                    .is_none(),
+                "LockOnly must not fall back to pid_alive"
+            );
+            // HostAuthoritative must return Some via the pid fallback.
+            assert!(
+                load_running_bridge_state(LivenessMode::HostAuthoritative)
+                    .expect("host-auth")
+                    .is_some(),
+                "HostAuthoritative must fall back to pid_alive when no lock held"
+            );
+        });
+    }
+
+    #[test]
+    fn load_running_bridge_state_host_authoritative_returns_state_when_only_pid_alive() {
+        with_temp_daemon_root(|| {
+            // Simulates a pre-19.7.0 bridge: state file present, no bridge.lock.
+            write_fake_bridge_state(process_id());
+            assert!(
+                load_running_bridge_state(LivenessMode::HostAuthoritative)
+                    .expect("host-auth")
+                    .is_some(),
+                "backward-compat: HostAuthoritative must return state when only pid is alive"
+            );
+        });
+    }
+
+    #[test]
+    fn compute_bridge_manifest_update_returns_none_when_host_bridge_unchanged() {
+        with_temp_daemon_root(|| {
+            // No bridge running: host_bridge_manifest() returns default.
+            let current = state::DaemonManifest {
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                pid: process_id(),
+                endpoint: "http://127.0.0.1:7070".to_string(),
+                started_at: "2026-04-11T00:00:00Z".to_string(),
+                token_path: "/tmp/token".to_string(),
+                sandboxed: true,
+                host_bridge: HostBridgeManifest::default(),
+                revision: 1,
+                updated_at: "2026-04-11T00:00:00Z".to_string(),
+            };
+            // No bridge.json exists so host_bridge_manifest returns default.
+            // current.host_bridge is already default, so no update needed.
+            assert!(
+                compute_bridge_manifest_update(&current).is_none(),
+                "no update when host_bridge state is unchanged"
+            );
+        });
+    }
+
+    /// Direct regression test for the observed bug: watcher should publish a
+    /// running=true manifest update when bridge.lock is held, without needing
+    /// /bin/kill -0.
+    #[test]
+    fn compute_bridge_manifest_update_returns_some_when_lock_held_and_manifest_stale() {
+        with_temp_daemon_root(|| {
+            write_fake_bridge_state(99999999);
+            let _flock = hold_bridge_lock();
+
+            let current = state::DaemonManifest {
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                pid: process_id(),
+                endpoint: "http://127.0.0.1:7070".to_string(),
+                started_at: "2026-04-11T00:00:00Z".to_string(),
+                token_path: "/tmp/token".to_string(),
+                sandboxed: true,
+                // Manifest currently shows bridge as not running.
+                host_bridge: HostBridgeManifest::default(),
+                revision: 2,
+                updated_at: "2026-04-11T00:00:00Z".to_string(),
+            };
+            let updated = compute_bridge_manifest_update(&current)
+                .expect("update should be produced when lock held and manifest stale");
+            assert!(
+                updated.host_bridge.running,
+                "updated manifest should reflect running=true"
+            );
         });
     }
 }
