@@ -1,10 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private final class SidebarSelectionTapBridge {
-  var pendingTapSelectionID: String?
-}
-
 struct SidebarView: View {
   let store: HarnessMonitorStore
   let controls: HarnessMonitorStore.SessionControlsSlice
@@ -20,7 +16,7 @@ struct SidebarView: View {
   @State private var collapsedCheckoutKeys: Set<String> = []
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
-  @State private var selectionTapBridge = SidebarSelectionTapBridge()
+  @State private var pendingTapSelectionID: String?
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
@@ -46,8 +42,8 @@ struct SidebarView: View {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
-        if let pendingTapSelectionID = selectionTapBridge.pendingTapSelectionID {
-          selectionTapBridge.pendingTapSelectionID = nil
+        if let pendingTapSelectionID {
+          self.pendingTapSelectionID = nil
           if pendingTapSelectionID == newValue {
             return
           }
@@ -130,10 +126,10 @@ struct SidebarView: View {
 
   var body: some View {
     List(selection: sidebarSelection) {
-      SidebarSessionListContent(
-        renderState: sidebarListRenderState,
-        selectSession: { sessionID in
-          selectionTapBridge.pendingTapSelectionID = sessionID
+    SidebarSessionListContent(
+      renderState: sidebarListRenderState,
+      selectSession: { sessionID in
+          pendingTapSelectionID = sessionID
           store.selectSessionFromList(sessionID)
         },
         toggleBookmark: { sessionID, projectID in
