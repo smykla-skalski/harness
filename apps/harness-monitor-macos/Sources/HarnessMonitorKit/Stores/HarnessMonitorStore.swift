@@ -293,6 +293,19 @@ public final class HarnessMonitorStore {
   }
 
   private func bootstrapExternalDaemon() async {
+    // Conflict detection: warn if the SMAppService launch agent is still
+    // registered. The Rust singleton lock prevents data corruption, but the
+    // two daemons race for the manifest and the user sees confusing startup
+    // behavior. Surface a clear, non-blocking hint in the connection log.
+    let registrationState = await daemonController.launchAgentRegistrationState()
+    if registrationState == .enabled {
+      appendConnectionEvent(
+        kind: .error,
+        detail: "SMAppService launch agent is still registered. Remove it in "
+          + "System Settings > General > Login Items to avoid conflicts with "
+          + "`harness daemon dev`."
+      )
+    }
     do {
       let client = try await daemonController.awaitManifestWarmUp(
         timeout: bootstrapWarmUpTimeout
