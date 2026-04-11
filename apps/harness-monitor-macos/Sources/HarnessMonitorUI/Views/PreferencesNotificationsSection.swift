@@ -4,6 +4,7 @@ import SwiftUI
 struct PreferencesNotificationsSection: View {
   @Bindable var notifications: HarnessMonitorUserNotificationController
   @State private var selectedPreset: HarnessMonitorNotificationPreset = .basic
+  @State private var contentFieldWidth: CGFloat = 0
 
   var body: some View {
     Form {
@@ -107,34 +108,92 @@ struct PreferencesNotificationsSection: View {
 
   private var contentSection: some View {
     Section {
-      TextField("Title", text: $notifications.draft.title)
-        .textFieldStyle(.roundedBorder)
-      TextField("Subtitle", text: $notifications.draft.subtitle)
-        .textFieldStyle(.roundedBorder)
-      TextField("Body", text: $notifications.draft.body, axis: .vertical)
-        .lineLimit(2...4)
-        .textFieldStyle(.roundedBorder)
-      TextField("Thread", text: $notifications.draft.threadIdentifier)
-        .textFieldStyle(.roundedBorder)
-      TextField("Target Content", text: $notifications.draft.targetContentIdentifier)
-        .textFieldStyle(.roundedBorder)
-      TextField("Filter Criteria", text: $notifications.draft.filterCriteria)
-        .textFieldStyle(.roundedBorder)
-      TextField("Summary Argument", text: $notifications.draft.summaryArgument)
-        .textFieldStyle(.roundedBorder)
-      Stepper(
-        "Summary count: \(notifications.draft.summaryArgumentCount)",
-        value: $notifications.draft.summaryArgumentCount,
-        in: 1...12
-      )
+      LabeledContent("Title") {
+        TextField("", text: $notifications.draft.title)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+          .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+          } action: { width in
+            contentFieldWidth = width
+          }
+      }
+      LabeledContent("Subtitle") {
+        TextField("", text: $notifications.draft.subtitle)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+      }
+      LabeledContent("Body") {
+        TextField("", text: $notifications.draft.body, axis: .vertical)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+          .lineLimit(3...8)
+          .frame(width: contentFieldWidth > 0 ? contentFieldWidth : nil)
+      }
+      LabeledContent("Thread") {
+        TextField("", text: $notifications.draft.threadIdentifier)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+      }
+      LabeledContent("Target Content") {
+        TextField("", text: $notifications.draft.targetContentIdentifier)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+      }
+      LabeledContent("Filter Criteria") {
+        TextField("", text: $notifications.draft.filterCriteria)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+      }
+      LabeledContent("Summary Argument") {
+        TextField("", text: $notifications.draft.summaryArgument)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+      }
+      LabeledContent("Summary count") {
+        HStack(spacing: 0) {
+          TextField(
+            "",
+            value: $notifications.draft.summaryArgumentCount,
+            format: .number
+          )
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+          .multilineTextAlignment(.trailing)
+          .frame(width: 52)
+          Stepper(value: $notifications.draft.summaryArgumentCount, in: 1...12) {}
+            .labelsHidden()
+            .controlSize(.small)
+        }
+      }
       Toggle("Include userInfo", isOn: $notifications.draft.includesUserInfo)
       Toggle("Set badge", isOn: $notifications.draft.includesBadge)
       if notifications.draft.includesBadge {
-        Stepper(
-          "Badge number: \(notifications.draft.badgeNumber)",
-          value: $notifications.draft.badgeNumber,
-          in: 0...99
-        )
+        LabeledContent("Badge number") {
+          HStack(spacing: 0) {
+            TextField(
+              "",
+              value: $notifications.draft.badgeNumber,
+              format: .number
+            )
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .scaledFont(.subheadline)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 52)
+            Stepper(value: $notifications.draft.badgeNumber, in: 0...99) {}
+              .labelsHidden()
+              .controlSize(.small)
+          }
+        }
       }
     } header: {
       Text("Content")
