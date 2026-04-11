@@ -15,15 +15,15 @@ run = "./scripts/version.sh check"
 
 [tasks."test:unit"]
 description = "Run unit tests"
-run = "cargo test --lib"
+run = "./scripts/cargo-local.sh test --lib"
 
 [tasks."test:integration"]
 description = "Run integration tests (fast only, single-threaded for env safety)"
-run = "cargo test --test integration -- --test-threads=1"
+run = "./scripts/cargo-local.sh test --test integration -- --test-threads=1"
 
 [tasks."test:slow"]
 description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
-run = "cargo test --test integration -- --ignored --test-threads=1"
+run = "./scripts/cargo-local.sh test --test integration -- --ignored --test-threads=1"
 
 [tasks.test]
 description = "Run all fast tests"
@@ -31,18 +31,22 @@ depends = ["test:unit", "test:integration"]
 
 [tasks.check]
 description = "Type-check without building"
-run = ["./scripts/version.sh check", "cargo check", "cargo clippy --lib"]
+run = ["./scripts/version.sh check", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
-run = ["cargo fmt", "cargo clippy --fix --allow-dirty --allow-staged"]
+run = ["cargo fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
 description = "Build release binary, sign it, install to ~/.local/bin, and validate the installed binary"
 run = [
-  "cargo build --release",
+  "./scripts/cargo-local.sh build --release",
   "./scripts/install-harness-release.sh",
 ]
+
+[tasks."cargo:env"]
+description = "Print the local cargo wrapper environment used by mise tasks"
+run = "./scripts/cargo-local.sh --print-env"
 
 [tasks."harness-monitor:macos:generate"]
 description = "Generate the Harness Monitor macOS Xcode project"
