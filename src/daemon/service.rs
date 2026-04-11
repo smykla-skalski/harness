@@ -163,6 +163,10 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         token_path: state::auth_token_path().display().to_string(),
         sandboxed: config.sandboxed,
         host_bridge: bridge::host_bridge_manifest()?,
+        // write_manifest bumps revision/updated_at for us - these are
+        // just placeholders so the struct literal is well-typed.
+        revision: 0,
+        updated_at: String::new(),
     };
     state::write_manifest(&manifest)?;
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
@@ -1991,6 +1995,8 @@ mod tests {
                     token_path: state::auth_token_path().display().to_string(),
                     sandboxed: false,
                     host_bridge: super::state::HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
                 };
                 state::write_manifest(&manifest).expect("manifest");
                 state::append_event("info", "daemon booted").expect("append event");

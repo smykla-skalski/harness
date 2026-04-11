@@ -1692,7 +1692,7 @@ fn bridge_host_manifest_update() -> Option<HostBridgeManifest> {
 }
 
 fn write_bridge_manifest_update(manifest: &state::DaemonManifest) -> Result<(), CliError> {
-    state::write_manifest(manifest)
+    state::write_manifest(manifest).map(drop)
 }
 
 #[expect(

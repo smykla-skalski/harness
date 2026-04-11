@@ -639,6 +639,8 @@ mod tests {
                 token_path: token_path.display().to_string(),
                 sandboxed: false,
                 host_bridge: HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
             };
             state::write_manifest(&manifest).expect("write manifest");
 
