@@ -112,6 +112,7 @@ public final class HarnessMonitorStore {
     }
   }
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
+  @ObservationIgnored private var forcedHostBridgeCapabilities: Set<String> = []
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
       guard oldValue != selectedCodexRuns else { return }
@@ -244,9 +245,11 @@ public final class HarnessMonitorStore {
     {
       self.bootstrapWarmUpTimeout = .seconds(seconds)
     }
-    self.hostBridgeCapabilityIssues = Self.parseForcedBridgeIssues(
+    let seeded = Self.parseForcedBridgeIssues(
       from: ProcessInfo.processInfo.environment
     )
+    self.hostBridgeCapabilityIssues = seeded
+    self.forcedHostBridgeCapabilities = Set(seeded.keys)
     bindUISlices()
     refreshBookmarkedSessionIds()
     syncAllUI()
@@ -473,7 +476,9 @@ public final class HarnessMonitorStore {
       if let oldClient {
         await oldClient.shutdown()
       }
-      hostBridgeCapabilityIssues = [:]
+      hostBridgeCapabilityIssues = hostBridgeCapabilityIssues.filter {
+        forcedHostBridgeCapabilities.contains($0.key)
+      }
       hasBootstrapped = true
       await bootstrap()
 
@@ -640,6 +645,9 @@ public final class HarnessMonitorStore {
 
   public func clearHostBridgeIssue(for capability: String) {
     guard hostBridgeCapabilityIssues[capability] != nil else {
+      return
+    }
+    if forcedHostBridgeCapabilities.contains(capability) {
       return
     }
     hostBridgeCapabilityIssues.removeValue(forKey: capability)
