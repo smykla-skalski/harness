@@ -1,8 +1,9 @@
+import HarnessMonitorKit
 import SwiftUI
 
 struct AgentTuiSidebar: View {
   @Binding var selection: AgentTuiSheetSelection
-  let orderedSessionIDs: [String]
+  let agentTuis: [AgentTuiSnapshot]
   let sessionTitlesByID: [String: String]
   let refresh: () -> Void
   @Environment(\.fontScale) private var fontScale
@@ -18,6 +19,14 @@ struct AgentTuiSidebar: View {
     )
   }
 
+  private var activeTuis: [AgentTuiSnapshot] {
+    agentTuis.filter { $0.status.isActive }
+  }
+
+  private var inactiveTuis: [AgentTuiSnapshot] {
+    agentTuis.filter { !$0.status.isActive }
+  }
+
   var body: some View {
     List(selection: selectionBinding) {
       Label("Create", systemImage: "plus.rectangle")
@@ -26,14 +35,30 @@ struct AgentTuiSidebar: View {
         .tag(AgentTuiSheetSelection.create)
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
 
-      if !orderedSessionIDs.isEmpty {
-        Section("Sessions") {
-          ForEach(orderedSessionIDs, id: \.self) { sessionID in
-            Label(sessionTitlesByID[sessionID] ?? "Agent session", systemImage: "terminal")
-              .scaledFont(.body)
-              .padding(.vertical, rowPadding)
-              .tag(AgentTuiSheetSelection.session(sessionID))
-              .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(sessionID))
+      if !activeTuis.isEmpty {
+        Section("Active") {
+          ForEach(activeTuis) { tui in
+            AgentTuiSidebarRow(
+              snapshot: tui,
+              title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
+            )
+            .padding(.vertical, rowPadding)
+            .tag(AgentTuiSheetSelection.session(tui.tuiId))
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
+          }
+        }
+      }
+
+      if !inactiveTuis.isEmpty {
+        Section("Inactive") {
+          ForEach(inactiveTuis) { tui in
+            AgentTuiSidebarRow(
+              snapshot: tui,
+              title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
+            )
+            .padding(.vertical, rowPadding)
+            .tag(AgentTuiSheetSelection.session(tui.tuiId))
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
           }
         }
       }
