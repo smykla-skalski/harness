@@ -36,9 +36,6 @@ extension RecordingHarnessClient {
     request: CodexRunRequest
   ) async throws -> CodexRunSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    if let error = configuredCodexStartError() {
-      throw error
-    }
     calls.append(
       .startCodexRun(
         sessionID: sessionID,
@@ -48,6 +45,9 @@ extension RecordingHarnessClient {
         resumeThreadID: request.resumeThreadId
       )
     )
+    if let error = dequeueConfiguredCodexStartError() {
+      throw error
+    }
     let run = codexRunFixture(
       runID: "codex-run-\(configuredCodexRuns(for: sessionID).count + 1)",
       sessionID: sessionID,
