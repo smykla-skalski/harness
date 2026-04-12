@@ -21,6 +21,17 @@ struct HarnessMonitorStoreSheetTests {
     #expect(store.presentedSheet == .sendSignal(agentID: "leader-claude"))
   }
 
+  @Test("presentCodexFlowSheet stays disabled while the feature is WIP")
+  func presentCodexFlowSheetStaysDisabledWhileWIP() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.presentCodexFlowSheet()
+
+    #expect(store.presentedSheet == nil)
+    #expect(store.isCodexFlowAvailable == false)
+  }
+
   @Test("dismissSheet clears the sheet")
   func dismissSheetClearsSheet() async {
     let store = await makeBootstrappedStore()
