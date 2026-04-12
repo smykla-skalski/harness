@@ -13,7 +13,7 @@ struct AgentTuiSidebarRow: View {
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       Image(systemName: "terminal")
-        .imageScale(.small)
+        .imageScale(.large)
         .foregroundStyle(agentTuiStatusColor(for: snapshot.status))
         .accessibilityHidden(true)
 
