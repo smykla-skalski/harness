@@ -235,7 +235,6 @@ extension HarnessMonitorStore {
 
     public var isSearchActive: Bool { presentationState.isSearchActive }
     public var visibleSessionIDs: [String] { listState.visibleSessionIDs }
-    public var visibleSessions: [SessionSummary] { listState.visibleSessions }
     public var emptyState: SidebarEmptyState { presentationState.emptyState }
 
     public init() {}

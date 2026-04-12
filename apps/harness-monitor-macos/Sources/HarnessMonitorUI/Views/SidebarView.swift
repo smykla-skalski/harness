@@ -309,9 +309,10 @@ private struct SidebarSessionListColumn: View {
 
   private var renderState: SidebarSessionListRenderState {
     SidebarSessionListRenderState(
+      sessionCatalog: store.sessionIndex.catalog,
       projectionGroups: projection.groupedSessions,
       searchPresentation: searchResults.presentationState,
-      searchVisibleSessions: searchResults.visibleSessions,
+      searchVisibleSessionIDs: searchResults.visibleSessionIDs,
       selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
         .selectionMarkersEnabled ? sidebarUI.selectedSessionID : nil,
       bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,

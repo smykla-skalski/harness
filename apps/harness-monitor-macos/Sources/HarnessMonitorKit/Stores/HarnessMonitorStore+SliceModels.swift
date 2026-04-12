@@ -5,11 +5,10 @@ extension HarnessMonitorStore {
     public let checkoutId: String
     public let title: String
     public let isWorktree: Bool
-    public let sessions: [SessionSummary]
+    public let sessionIDs: [String]
 
     public var id: String { checkoutId }
-    public var sessionIDs: [String] { sessions.map(\.sessionId) }
-    public var sessionCount: Int { sessions.count }
+    public var sessionCount: Int { sessionIDs.count }
   }
 
   public struct SessionGroup: Identifiable, Equatable {
@@ -356,14 +355,11 @@ extension HarnessMonitorStore {
 
   public struct SessionSearchResultsListState: Equatable {
     public var visibleSessionIDs: [String] = []
-    public var visibleSessions: [SessionSummary] = []
 
     public init(
-      visibleSessionIDs: [String] = [],
-      visibleSessions: [SessionSummary] = []
+      visibleSessionIDs: [String] = []
     ) {
       self.visibleSessionIDs = visibleSessionIDs
-      self.visibleSessions = visibleSessions
     }
   }
 

@@ -376,7 +376,7 @@ extension HarnessMonitorStore {
   }
 
   public var visibleSessions: [SessionSummary] {
-    sessionIndex.searchResults.visibleSessions
+    visibleSessionIDs.compactMap { sessionIndex.sessionSummary(for: $0) }
   }
 
   public var recentSessions: [SessionSummary] {
