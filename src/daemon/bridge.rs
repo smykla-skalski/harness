@@ -925,7 +925,6 @@ impl BridgeServer {
         }
         let process = spawn_agent_tui_process(
             &spec.session_id,
-            &spec.agent_id,
             &spec.tui_id,
             spec.profile.clone(),
             &spec.project_dir,
