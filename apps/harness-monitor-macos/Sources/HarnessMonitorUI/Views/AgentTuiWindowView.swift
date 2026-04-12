@@ -459,26 +459,42 @@ public struct AgentTuiWindowView: View {
       Text("Keys")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      LazyVGrid(
-        columns: [GridItem(.adaptive(minimum: 90), spacing: HarnessMonitorTheme.itemSpacing)],
-        alignment: .leading,
-        spacing: HarnessMonitorTheme.itemSpacing
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.itemSpacing,
+        lineSpacing: HarnessMonitorTheme.itemSpacing
       ) {
         ForEach(commonKeys) { key in
-          Button(key.title) {
+          Button {
             sendKey(key, to: tui)
+          } label: {
+            Text(key.glyph)
+              .lineLimit(1)
+              .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+              .frame(minWidth: 44)
           }
           .harnessActionButtonStyle(variant: .bordered, tint: nil)
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
           .disabled(!tui.status.isActive || isSubmitting)
+          .accessibilityLabel(key.title)
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiKeyButton(key.rawValue))
+          .help(key.title)
         }
-        Button("Ctrl-C") {
+        Button {
           sendControl("c", to: tui)
+        } label: {
+          Text("⌃C")
+            .lineLimit(1)
+            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+            .frame(minWidth: 44)
         }
         .harnessActionButtonStyle(variant: .bordered, tint: nil)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         .disabled(!tui.status.isActive || isSubmitting)
+        .accessibilityLabel("Control-C")
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiKeyButton("ctrl-c"))
+        .help("Control-C")
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 

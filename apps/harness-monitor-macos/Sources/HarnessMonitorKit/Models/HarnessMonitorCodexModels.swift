@@ -218,6 +218,27 @@ public enum AgentTuiKey: String, Codable, CaseIterable, Identifiable, Sendable {
       "Left"
     }
   }
+
+  public var glyph: String {
+    switch self {
+    case .enter:
+      "↩"
+    case .escape:
+      "⎋"
+    case .tab:
+      "⇥"
+    case .backspace:
+      "⌫"
+    case .arrowUp:
+      "↑"
+    case .arrowDown:
+      "↓"
+    case .arrowRight:
+      "→"
+    case .arrowLeft:
+      "←"
+    }
+  }
 }
 
 public struct AgentTuiSize: Codable, Equatable, Sendable {
