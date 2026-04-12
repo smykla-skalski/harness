@@ -471,9 +471,11 @@ impl DaemonDb {
         self.conn
             .query_row(
                 "SELECT
-                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(repository_root, ''), project_dir, project_id)) FROM projects) AS project_count,
-                    (SELECT COUNT(*) FROM projects WHERE is_worktree = 1) AS worktree_count,
-                    (SELECT COUNT(*) FROM sessions) AS session_count",
+                    COUNT(DISTINCT COALESCE(NULLIF(p.repository_root, ''), p.project_dir, p.project_id)) AS project_count,
+                    COUNT(DISTINCT CASE WHEN p.is_worktree = 1 THEN p.checkout_id END) AS worktree_count,
+                    COUNT(DISTINCT s.session_id) AS session_count
+                 FROM sessions s
+                 JOIN projects p ON p.project_id = s.project_id",
                 [],
                 |row| {
                     Ok((
@@ -546,7 +548,7 @@ impl DaemonDb {
                     worktrees: Vec::new(),
                 });
 
-            if row.is_worktree {
+            if row.is_worktree && row.total_session_count > 0 {
                 entry.worktrees.push(WorktreeSummary {
                     checkout_id: row.checkout_id,
                     name: row.worktree_name.unwrap_or(row.checkout_name),
@@ -561,7 +563,10 @@ impl DaemonDb {
             entry.total_session_count += row.total_session_count;
         }
 
-        let mut summaries: Vec<_> = grouped.into_values().collect();
+        let mut summaries: Vec<_> = grouped
+            .into_values()
+            .filter(|summary| summary.total_session_count > 0)
+            .collect();
         for summary in &mut summaries {
             summary.worktrees.sort_by(|a, b| a.name.cmp(&b.name));
         }
@@ -3233,6 +3238,69 @@ mod tests {
             "/tmp/kuma/.claude/worktrees/feature-a"
         );
         assert_eq!(summary.worktrees[0].total_session_count, 1);
+    }
+
+    #[test]
+    fn project_summaries_omit_projects_and_worktrees_without_sessions() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let repository = sample_repository_project("/tmp/kuma");
+        let mut active_worktree =
+            sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-a");
+        let mut idle_worktree =
+            sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-b");
+        let mut idle_repository = sample_repository_project("/tmp/harness");
+        active_worktree.context_root = "/tmp/data/projects/worktree-feature-a".into();
+        idle_worktree.context_root = "/tmp/data/projects/worktree-feature-b".into();
+        idle_repository.context_root = "/tmp/data/projects/repository-harness".into();
+
+        db.sync_project(&repository).expect("sync repository");
+        db.sync_project(&active_worktree)
+            .expect("sync active worktree");
+        db.sync_project(&idle_worktree).expect("sync idle worktree");
+        db.sync_project(&idle_repository)
+            .expect("sync idle repository");
+        db.sync_session(
+            &active_worktree.project_id,
+            &sample_session_state_with_id("sess-worktree"),
+        )
+        .expect("sync worktree session");
+
+        let summaries = db.list_project_summaries().expect("project summaries");
+
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].name, "kuma");
+        assert_eq!(summaries[0].worktrees.len(), 1);
+        assert_eq!(summaries[0].worktrees[0].name, "feature-a");
+    }
+
+    #[test]
+    fn health_counts_omit_projects_and_worktrees_without_sessions() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let repository = sample_repository_project("/tmp/kuma");
+        let mut active_worktree =
+            sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-a");
+        let mut idle_worktree =
+            sample_worktree_project("/tmp/kuma", "/tmp/kuma/.claude/worktrees/feature-b");
+        let mut idle_repository = sample_repository_project("/tmp/harness");
+        active_worktree.context_root = "/tmp/data/projects/worktree-feature-a".into();
+        idle_worktree.context_root = "/tmp/data/projects/worktree-feature-b".into();
+        idle_repository.context_root = "/tmp/data/projects/repository-harness".into();
+
+        db.sync_project(&repository).expect("sync repository");
+        db.sync_project(&active_worktree)
+            .expect("sync active worktree");
+        db.sync_project(&idle_worktree).expect("sync idle worktree");
+        db.sync_project(&idle_repository)
+            .expect("sync idle repository");
+        db.sync_session(
+            &active_worktree.project_id,
+            &sample_session_state_with_id("sess-worktree"),
+        )
+        .expect("sync worktree session");
+
+        let counts = db.health_counts().expect("health counts");
+
+        assert_eq!(counts, (1, 1, 1));
     }
 
     #[test]

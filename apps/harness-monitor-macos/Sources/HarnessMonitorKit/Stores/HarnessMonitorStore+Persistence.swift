@@ -8,8 +8,8 @@ extension HarnessMonitorStore {
   ) async {
     guard let cacheService, persistenceError == nil else { return }
 
-    let insertedCount = await cacheService.cacheSessionList(sessions, projects: projects)
-    updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+    _ = await cacheService.cacheSessionList(sessions, projects: projects)
+    await refreshPersistedSessionMetadata()
   }
 
   func cacheSessionDetail(

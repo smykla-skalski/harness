@@ -164,6 +164,23 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     XCTAssertEqual(centerpieceState.label, "projects=1, sessions=1, openWork=2, blocked=1")
   }
 
+  func testToolbarCenterpieceUsesOnlySessionBackedProjectsAndWorktrees() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "toolbar-count-regression"]
+    )
+    let centerpieceState = element(in: app, identifier: Accessibility.toolbarCenterpieceState)
+    let sidebarState = element(in: app, identifier: Accessibility.sidebarSessionListState)
+
+    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(sidebarState.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertEqual(sidebarState.label, "projects=2, worktrees=2, sessions=3")
+    XCTAssertEqual(
+      centerpieceState.label,
+      "projects=2, worktrees=2, sessions=3, openWork=4, blocked=1"
+    )
+  }
+
   func testToolbarCenterpieceCompactsInsteadOfDisappearingInNarrowWindow() throws {
     let app = launch(
       mode: "preview",

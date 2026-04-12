@@ -45,6 +45,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case dashboardLanding
     case dashboardLoaded
     case cockpitLoaded
+    case toolbarCountRegression
     case agentTuiOverflow
     case taskDropCockpit
     case offlineCached
@@ -84,10 +85,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
     store.connectionState = configuration.connectionState
     store.health = configuration.fixtures.health
-    store.daemonStatus = makeStatusReport(
-      fixtures: configuration.fixtures,
-      hostBridgeOverride: hostBridgeOverride
-    )
+    store.daemonStatus = configuration.statusReport
     store.connectionMetrics = configuration.connectionMetrics
     store.connectionEvents = configuration.connectionEvents
     store.sessionIndex.replaceSnapshot(
@@ -102,7 +100,9 @@ public enum HarnessMonitorPreviewStoreFactory {
     if let selectedSessionID = configuration.selectedSessionID {
       let initialAgentTuis = configuration.fixtures.agentTuisBySessionID[selectedSessionID] ?? []
       let roleByAgent = Dictionary(
-        uniqueKeysWithValues: (configuration.selectedDetail?.agents ?? []).map { ($0.agentId, $0.role) }
+        uniqueKeysWithValues: (configuration.selectedDetail?.agents ?? []).map {
+          ($0.agentId, $0.role)
+        }
       )
       let sortedAgentTuis = AgentTuiListResponse(tuis: initialAgentTuis)
         .canonicallySorted(roleByAgent: roleByAgent)
@@ -165,6 +165,8 @@ extension HarnessMonitorPreviewStoreFactory {
       return dashboardConfiguration()
     case .cockpitLoaded:
       return cockpitConfiguration()
+    case .toolbarCountRegression:
+      return toolbarCountRegressionConfiguration()
     case .agentTuiOverflow:
       return agentTuiOverflowConfiguration()
     case .taskDropCockpit:
@@ -229,6 +231,32 @@ extension HarnessMonitorPreviewStoreFactory {
     )
   }
 
+  fileprivate static func toolbarCountRegressionConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.toolbarCountRegression
+    let metrics = makeConnectionMetrics(latencyMs: 18, messagesPerSecond: 5.4)
+    return PreviewStoreConfiguration(
+      mode: .populated,
+      fixtures: fixtures,
+      connectionState: .online,
+      statusReport: makeStatusReport(
+        fixtures: fixtures,
+        projectCountOverride: 42,
+        worktreeCountOverride: 5,
+        sessionCountOverride: 6
+      ),
+      connectionMetrics: metrics,
+      connectionEvents: makeConnectionEvents(using: metrics),
+      bookmarkedSessionIDs: [],
+      sessionFilter: .all,
+      selectedSessionID: nil,
+      selectedDetail: nil,
+      timeline: [],
+      isShowingCachedData: false,
+      persistedSessionCount: 0,
+      lastPersistedSnapshotAt: nil
+    )
+  }
+
   fileprivate static func agentTuiOverflowConfiguration() -> PreviewStoreConfiguration {
     let baseFixtures = PreviewHarnessClient.Fixtures.populated
     let fixtures = PreviewHarnessClient.Fixtures(
@@ -241,7 +269,9 @@ extension HarnessMonitorPreviewStoreFactory {
       detailsBySessionID: baseFixtures.detailsBySessionID,
       coreDetailsBySessionID: baseFixtures.coreDetailsBySessionID,
       timelinesBySessionID: baseFixtures.timelinesBySessionID,
-      agentTuisBySessionID: [PreviewFixtures.summary.sessionId: AgentTuiPreviewSupport.overflowMixed]
+      agentTuisBySessionID: [
+        PreviewFixtures.summary.sessionId: AgentTuiPreviewSupport.overflowMixed
+      ]
     )
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
@@ -392,6 +422,9 @@ extension HarnessMonitorPreviewStoreFactory {
 
   fileprivate static func makeStatusReport(
     fixtures: PreviewHarnessClient.Fixtures,
+    projectCountOverride: Int? = nil,
+    worktreeCountOverride: Int? = nil,
+    sessionCountOverride: Int? = nil,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil
   ) -> DaemonStatusReport {
     let hasSessions = !fixtures.sessions.isEmpty
@@ -417,8 +450,12 @@ extension HarnessMonitorPreviewStoreFactory {
         pid: hasSessions ? fixtures.health.pid : nil,
         lastExitStatus: hasSessions ? 0 : nil
       ),
-      projectCount: fixtures.projects.count,
-      sessionCount: fixtures.sessions.count,
+      projectCount: projectCountOverride ?? fixtures.projects.count,
+      worktreeCount: worktreeCountOverride
+        ?? fixtures.projects.reduce(0) { count, project in
+          count + project.worktrees.count
+        },
+      sessionCount: sessionCountOverride ?? fixtures.sessions.count,
       diagnostics: DaemonDiagnostics(
         daemonRoot: "/Users/example/Library/Application Support/harness/daemon",
         manifestPath: "/Users/example/Library/Application Support/harness/daemon/manifest.json",

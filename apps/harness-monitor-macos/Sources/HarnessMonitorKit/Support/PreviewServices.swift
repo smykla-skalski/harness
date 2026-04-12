@@ -126,7 +126,9 @@ public actor PreviewVoiceCaptureService: VoiceCaptureProviding {
     self.behavior = behavior ?? .transcript(Self.defaultTranscript)
   }
 
-  public nonisolated func capture(configuration _: VoiceCaptureConfiguration) -> VoiceCaptureEventStream {
+  public nonisolated func capture(configuration _: VoiceCaptureConfiguration)
+    -> VoiceCaptureEventStream
+  {
     VoiceCaptureEventStream { continuation in
       let task = Task {
         await self.start(continuation: continuation)
@@ -334,6 +336,176 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
         timelinesBySessionID: timelinesBySessionID
       )
     }()
+
+    public static let toolbarCountRegression = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 42,
+        worktreeCount: 5,
+        sessionCount: 6
+      ),
+      projects: [
+        ProjectSummary(
+          projectId: "project-toolbar-harness",
+          name: "harness",
+          projectDir: "/Users/example/Projects/harness",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/project-toolbar-harness",
+          activeSessionCount: 2,
+          totalSessionCount: 2,
+          worktrees: [
+            WorktreeSummary(
+              checkoutId: "checkout-toolbar-harness",
+              name: "session-title",
+              checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+              contextRoot:
+                "/Users/example/Library/Application Support/harness/projects/checkout-toolbar-harness",
+              activeSessionCount: 2,
+              totalSessionCount: 2
+            )
+          ]
+        ),
+        ProjectSummary(
+          projectId: "project-toolbar-kuma",
+          name: "kuma",
+          projectDir: "/Users/example/Projects/kuma",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/project-toolbar-kuma",
+          activeSessionCount: 1,
+          totalSessionCount: 1,
+          worktrees: [
+            WorktreeSummary(
+              checkoutId: "checkout-toolbar-kuma",
+              name: "fix-motb",
+              checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
+              contextRoot:
+                "/Users/example/Library/Application Support/harness/projects/checkout-toolbar-kuma",
+              activeSessionCount: 1,
+              totalSessionCount: 1
+            )
+          ]
+        ),
+        ProjectSummary(
+          projectId: "project-toolbar-orphan",
+          name: "scratch",
+          projectDir: "/Users/example/Projects/scratch",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/project-toolbar-orphan",
+          activeSessionCount: 0,
+          totalSessionCount: 0,
+          worktrees: [
+            WorktreeSummary(
+              checkoutId: "checkout-toolbar-orphan",
+              name: "old-worktree",
+              checkoutRoot: "/Users/example/Projects/scratch/.claude/worktrees/old-worktree",
+              contextRoot:
+                "/Users/example/Library/Application Support/harness/projects/checkout-toolbar-orphan",
+              activeSessionCount: 0,
+              totalSessionCount: 0
+            )
+          ]
+        ),
+      ],
+      sessions: [
+        SessionSummary(
+          projectId: "project-toolbar-harness",
+          projectName: "harness",
+          projectDir: "/Users/example/Projects/harness",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/project-toolbar-harness",
+          checkoutId: "checkout-toolbar-harness",
+          checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+          isWorktree: true,
+          worktreeName: "session-title",
+          sessionId: "sess-toolbar-harness-1",
+          title: "Toolbar count fix",
+          context: "Primary regression session",
+          status: .active,
+          createdAt: "2026-03-28T14:00:00Z",
+          updatedAt: "2026-03-28T14:18:00Z",
+          lastActivityAt: "2026-03-28T14:18:00Z",
+          leaderId: "leader-harness",
+          observeId: nil,
+          pendingLeaderTransfer: nil,
+          metrics: SessionMetrics(
+            agentCount: 2,
+            activeAgentCount: 2,
+            openTaskCount: 1,
+            inProgressTaskCount: 1,
+            blockedTaskCount: 0,
+            completedTaskCount: 2
+          )
+        ),
+        SessionSummary(
+          projectId: "project-toolbar-harness",
+          projectName: "harness",
+          projectDir: "/Users/example/Projects/harness",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/project-toolbar-harness",
+          checkoutId: "checkout-toolbar-harness",
+          checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+          isWorktree: true,
+          worktreeName: "session-title",
+          sessionId: "sess-toolbar-harness-2",
+          title: "Cache sweep validation",
+          context: "Secondary regression session",
+          status: .active,
+          createdAt: "2026-03-28T14:01:00Z",
+          updatedAt: "2026-03-28T14:19:00Z",
+          lastActivityAt: "2026-03-28T14:19:00Z",
+          leaderId: "leader-harness",
+          observeId: nil,
+          pendingLeaderTransfer: nil,
+          metrics: SessionMetrics(
+            agentCount: 2,
+            activeAgentCount: 1,
+            openTaskCount: 2,
+            inProgressTaskCount: 0,
+            blockedTaskCount: 1,
+            completedTaskCount: 1
+          )
+        ),
+        SessionSummary(
+          projectId: "project-toolbar-kuma",
+          projectName: "kuma",
+          projectDir: "/Users/example/Projects/kuma",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/project-toolbar-kuma",
+          checkoutId: "checkout-toolbar-kuma",
+          checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
+          isWorktree: true,
+          worktreeName: "fix-motb",
+          sessionId: "sess-toolbar-kuma-1",
+          title: "Kuma validation",
+          context: "Cross-project summary row",
+          status: .active,
+          createdAt: "2026-03-28T14:02:00Z",
+          updatedAt: "2026-03-28T14:20:00Z",
+          lastActivityAt: "2026-03-28T14:20:00Z",
+          leaderId: "leader-kuma",
+          observeId: nil,
+          pendingLeaderTransfer: nil,
+          metrics: SessionMetrics(
+            agentCount: 1,
+            activeAgentCount: 1,
+            openTaskCount: 1,
+            inProgressTaskCount: 0,
+            blockedTaskCount: 0,
+            completedTaskCount: 3
+          )
+        ),
+      ],
+      detail: nil,
+      timeline: [],
+      readySessionID: nil,
+      detailsBySessionID: [:],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [:]
+    )
 
     public static let signalRegression = Self(
       health: HealthResponse(
@@ -900,7 +1072,8 @@ private actor PreviewHarnessClientState {
     request: AgentTuiStartRequest
   ) -> AgentTuiSnapshot {
     nextAgentTuiSequence += 1
-    let runtimeTitle = AgentTuiRuntime(rawValue: request.runtime)?.title ?? request.runtime.capitalized
+    let runtimeTitle =
+      AgentTuiRuntime(rawValue: request.runtime)?.title ?? request.runtime.capitalized
     let introText =
       if let prompt = request.prompt, !prompt.isEmpty {
         "\(runtimeTitle.lowercased())> \(prompt)"
@@ -915,7 +1088,8 @@ private actor PreviewHarnessClientState {
       runtime: request.runtime,
       status: .running,
       argv: request.argv.isEmpty ? [request.runtime] : request.argv,
-      projectDir: request.projectDir ?? fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
+      projectDir: request.projectDir ?? fallbackDetail?.session.projectDir
+        ?? "/Users/example/Projects/harness",
       size: AgentTuiSize(rows: request.rows, cols: request.cols),
       screen: AgentTuiScreenSnapshot(
         rows: request.rows,
@@ -924,7 +1098,8 @@ private actor PreviewHarnessClientState {
         cursorCol: min(max(introText.count + 1, 1), request.cols),
         text: introText
       ),
-      transcriptPath: "/Users/example/Projects/harness/transcripts/preview-agent-tui-\(nextAgentTuiSequence).log",
+      transcriptPath:
+        "/Users/example/Projects/harness/transcripts/preview-agent-tui-\(nextAgentTuiSequence).log",
       exitCode: nil,
       signal: nil,
       error: nil,
@@ -1078,8 +1253,8 @@ private actor PreviewHarnessClientState {
   }
 }
 
-private extension WorkItem {
-  func replacingAssignment(
+extension WorkItem {
+  fileprivate func replacingAssignment(
     status: TaskStatus,
     assignedTo: String,
     queuePolicy: TaskQueuePolicy,
@@ -1108,8 +1283,8 @@ private extension WorkItem {
   }
 }
 
-private extension AgentTuiSnapshot {
-  func replacing(
+extension AgentTuiSnapshot {
+  fileprivate func replacing(
     size: AgentTuiSize? = nil,
     screen: AgentTuiScreenSnapshot? = nil,
     status: AgentTuiStatus? = nil,
@@ -1136,8 +1311,8 @@ private extension AgentTuiSnapshot {
   }
 }
 
-private extension AgentTuiScreenSnapshot {
-  func replacing(
+extension AgentTuiScreenSnapshot {
+  fileprivate func replacing(
     rows: Int,
     cols: Int,
     text: String
@@ -1158,8 +1333,8 @@ private extension AgentTuiScreenSnapshot {
   }
 }
 
-private extension AgentRegistration {
-  func replacingCurrentTask(_ taskID: String) -> AgentRegistration {
+extension AgentRegistration {
+  fileprivate func replacingCurrentTask(_ taskID: String) -> AgentRegistration {
     AgentRegistration(
       agentId: agentId,
       name: name,
@@ -1177,8 +1352,8 @@ private extension AgentRegistration {
   }
 }
 
-private extension SessionSummary {
-  func replacing(tasks: [WorkItem], agents: [AgentRegistration]) -> SessionSummary {
+extension SessionSummary {
+  fileprivate func replacing(tasks: [WorkItem], agents: [AgentRegistration]) -> SessionSummary {
     SessionSummary(
       projectId: projectId,
       projectName: projectName,
@@ -1203,8 +1378,8 @@ private extension SessionSummary {
   }
 }
 
-private extension SessionMetrics {
-  init(tasks: [WorkItem], agents: [AgentRegistration]) {
+extension SessionMetrics {
+  fileprivate init(tasks: [WorkItem], agents: [AgentRegistration]) {
     self.init(
       agentCount: agents.count,
       activeAgentCount: agents.filter { $0.status == .active }.count,

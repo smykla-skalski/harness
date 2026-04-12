@@ -325,6 +325,18 @@ extension HarnessMonitorStore.SessionIndexSlice {
 }
 
 extension HarnessMonitorStore {
+  public var indexedProjectCount: Int {
+    sessionIndex.indexedProjectCount
+  }
+
+  public var indexedWorktreeCount: Int {
+    sessionIndex.indexedWorktreeCount
+  }
+
+  public var indexedSessionCount: Int {
+    sessionIndex.indexedSessionCount
+  }
+
   public var projects: [ProjectSummary] {
     get { sessionIndex.projects }
     set { sessionIndex.projects = newValue }
@@ -426,6 +438,26 @@ extension HarnessMonitorStore {
     sessionFilter = .all
     sessionFocusFilter = .all
     flushPendingSearchRebuild()
+  }
+}
+
+extension HarnessMonitorStore.SessionIndexSlice {
+  var indexedProjectCount: Int {
+    projectCatalogs.lazy.filter { !$0.checkouts.isEmpty }.count
+  }
+
+  var indexedWorktreeCount: Int {
+    projectCatalogs.reduce(into: 0) { count, projectCatalog in
+      count += projectCatalog.checkouts.reduce(into: 0) { checkoutCount, checkout in
+        if checkout.isWorktree, !checkout.recentActivitySessionIDs.isEmpty {
+          checkoutCount += 1
+        }
+      }
+    }
+  }
+
+  var indexedSessionCount: Int {
+    sessions.count
   }
 }
 

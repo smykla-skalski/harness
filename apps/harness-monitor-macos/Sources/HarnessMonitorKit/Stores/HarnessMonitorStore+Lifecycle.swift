@@ -235,8 +235,8 @@ extension HarnessMonitorStore {
     }
     if didChange {
       scheduleCacheWrite { service in
-        let insertedCount = await service.cacheSessionList(sessions, projects: projects)
-        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+        _ = await service.cacheSessionList(sessions, projects: projects)
+        await self.refreshPersistedSessionMetadata()
       }
     }
 

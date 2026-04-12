@@ -90,6 +90,9 @@ fn worktree_summary(
         .get(&project.checkout_id)
         .copied()
         .unwrap_or((0, 0));
+    if total_session_count == 0 {
+        return None;
+    }
 
     Some(WorktreeSummary {
         checkout_id: project.checkout_id.clone(),
@@ -134,6 +137,7 @@ pub fn project_summaries() -> Result<Vec<ProjectSummary>, CliError> {
                 .sort_by(|left, right| left.name.cmp(&right.name));
             summary
         })
+        .filter(|summary| summary.total_session_count > 0)
         .collect();
     summaries.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(summaries)

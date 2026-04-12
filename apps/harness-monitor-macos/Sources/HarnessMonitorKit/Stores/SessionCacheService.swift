@@ -128,7 +128,18 @@ public actor SessionCacheService {
     let context = makeContext()
     let projectMap = buildProjectMap(context: context)
     let sessionMap = buildSessionMap(context: context)
+    let incomingProjectIDs = Set(projects.map(\.projectId))
+    let incomingSessionIDs = Set(sessions.map(\.sessionId))
     var insertedSessionCount = 0
+
+    for (sessionID, existing) in sessionMap where !incomingSessionIDs.contains(sessionID) {
+      context.delete(existing)
+    }
+
+    for (projectID, existing) in projectMap where !incomingProjectIDs.contains(projectID) {
+      context.delete(existing)
+    }
+
     for project in projects {
       if let existing = projectMap[project.projectId] {
         existing.update(from: project)

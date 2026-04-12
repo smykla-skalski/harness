@@ -334,7 +334,8 @@ struct HarnessMonitorStoreTests {
     await store.installLaunchAgent()
 
     #expect(
-      store.currentFailureFeedbackMessage == DaemonControlError.commandFailed("install failed").localizedDescription
+      store.currentFailureFeedbackMessage
+        == DaemonControlError.commandFailed("install failed").localizedDescription
     )
     #expect(store.isBusy == false)
   }
@@ -349,7 +350,8 @@ struct HarnessMonitorStoreTests {
     await store.removeLaunchAgent()
 
     #expect(
-      store.currentFailureFeedbackMessage == DaemonControlError.commandFailed("remove failed").localizedDescription
+      store.currentFailureFeedbackMessage
+        == DaemonControlError.commandFailed("remove failed").localizedDescription
     )
     #expect(store.isBusy == false)
   }
@@ -370,8 +372,8 @@ struct HarnessMonitorStoreTests {
     )
   }
 
-  @Test("Toolbar project count tracks session index when daemon status has orphaned rows")
-  func toolbarProjectCountTracksSessionIndexWhenDaemonStatusHasOrphanedRows() async {
+  @Test("Toolbar counts only session-backed projects and worktrees")
+  func toolbarCountsOnlySessionBackedProjectsAndWorktrees() async {
     let store = await makeBootstrappedStore()
 
     guard let status = store.daemonStatus else {
@@ -382,22 +384,158 @@ struct HarnessMonitorStoreTests {
       manifest: status.manifest,
       launchAgent: status.launchAgent,
       projectCount: 42,
-      sessionCount: status.sessionCount,
+      worktreeCount: 5,
+      sessionCount: 6,
       diagnostics: status.diagnostics
     )
 
-    let project1 = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let project1 = ProjectSummary(
+      projectId: "project-a",
+      name: "harness",
+      projectDir: "/Users/example/Projects/harness",
+      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-a",
+      activeSessionCount: 2,
+      totalSessionCount: 2,
+      worktrees: [
+        WorktreeSummary(
+          checkoutId: "checkout-a",
+          name: "session-title",
+          checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+          contextRoot: "/Users/example/Library/Application Support/harness/projects/checkout-a",
+          activeSessionCount: 2,
+          totalSessionCount: 2
+        )
+      ]
+    )
     let project2 = ProjectSummary(
       projectId: "project-b",
       name: "kuma",
       projectDir: "/Users/example/Projects/kuma",
       contextRoot: "/Users/example/Library/Application Support/harness/projects/project-b",
       activeSessionCount: 1,
-      totalSessionCount: 1
+      totalSessionCount: 1,
+      worktrees: [
+        WorktreeSummary(
+          checkoutId: "checkout-b",
+          name: "fix-motb",
+          checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
+          contextRoot: "/Users/example/Library/Application Support/harness/projects/checkout-b",
+          activeSessionCount: 1,
+          totalSessionCount: 1
+        )
+      ]
     )
-    store.applySessionIndexSnapshot(projects: [project1, project2], sessions: [])
+    let orphanProject = ProjectSummary(
+      projectId: "project-orphan",
+      name: "scratch",
+      projectDir: "/Users/example/Projects/scratch",
+      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-orphan",
+      activeSessionCount: 0,
+      totalSessionCount: 0,
+      worktrees: [
+        WorktreeSummary(
+          checkoutId: "checkout-orphan",
+          name: "old-worktree",
+          checkoutRoot: "/Users/example/Projects/scratch/.claude/worktrees/old-worktree",
+          contextRoot:
+            "/Users/example/Library/Application Support/harness/projects/checkout-orphan",
+          activeSessionCount: 0,
+          totalSessionCount: 0
+        )
+      ]
+    )
+    let session1 = SessionSummary(
+      projectId: project1.projectId,
+      projectName: project1.name,
+      projectDir: project1.projectDir,
+      contextRoot: project1.contextRoot,
+      checkoutId: "checkout-a",
+      checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+      isWorktree: true,
+      worktreeName: "session-title",
+      sessionId: "sess-a-1",
+      title: "Primary",
+      context: "Primary",
+      status: .active,
+      createdAt: "2026-03-28T14:00:00Z",
+      updatedAt: "2026-03-28T14:18:00Z",
+      lastActivityAt: "2026-03-28T14:18:00Z",
+      leaderId: "leader-a",
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 2,
+        activeAgentCount: 2,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+    let session2 = SessionSummary(
+      projectId: project1.projectId,
+      projectName: project1.name,
+      projectDir: project1.projectDir,
+      contextRoot: project1.contextRoot,
+      checkoutId: "checkout-a",
+      checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+      isWorktree: true,
+      worktreeName: "session-title",
+      sessionId: "sess-a-2",
+      title: "Secondary",
+      context: "Secondary",
+      status: .active,
+      createdAt: "2026-03-28T14:02:00Z",
+      updatedAt: "2026-03-28T14:20:00Z",
+      lastActivityAt: "2026-03-28T14:20:00Z",
+      leaderId: "leader-a",
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 2,
+        activeAgentCount: 1,
+        openTaskCount: 2,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 1,
+        completedTaskCount: 0
+      )
+    )
+    let session3 = SessionSummary(
+      projectId: project2.projectId,
+      projectName: project2.name,
+      projectDir: project2.projectDir,
+      contextRoot: project2.contextRoot,
+      checkoutId: "checkout-b",
+      checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
+      isWorktree: true,
+      worktreeName: "fix-motb",
+      sessionId: "sess-b-1",
+      title: "Kuma",
+      context: "Kuma",
+      status: .active,
+      createdAt: "2026-03-28T14:04:00Z",
+      updatedAt: "2026-03-28T14:22:00Z",
+      lastActivityAt: "2026-03-28T14:22:00Z",
+      leaderId: "leader-b",
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 1,
+        activeAgentCount: 1,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+    store.applySessionIndexSnapshot(
+      projects: [project1, project2, orphanProject],
+      sessions: [session1, session2, session3]
+    )
 
     #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
+    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 2)
+    #expect(store.contentUI.toolbar.toolbarMetrics.sessionCount == 3)
   }
 
   @Test("Confirm pending remove-agent action executes the mutation")
