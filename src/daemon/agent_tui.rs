@@ -115,6 +115,7 @@ impl AgentTuiLaunchProfile {
             "gemini" => "gemini",
             "opencode" => "opencode",
             "copilot" => "copilot",
+            "vibe" => "vibe",
             _ => {
                 return Err(CliErrorKind::workflow_parse(format!(
                     "unsupported agent TUI runtime '{runtime}'"
@@ -1333,6 +1334,7 @@ mod tests {
             ("gemini", "gemini"),
             ("opencode", "opencode"),
             ("copilot", "copilot"),
+            ("vibe", "vibe"),
         ];
 
         for (runtime, program) in cases {
