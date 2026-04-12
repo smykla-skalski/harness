@@ -3,7 +3,7 @@ import SwiftUI
 struct AgentTuiSidebar: View {
   @Binding var selection: AgentTuiSheetSelection
   let orderedSessionIDs: [String]
-  let titleForSessionID: (String) -> String
+  let sessionTitlesByID: [String: String]
   let refresh: () -> Void
   @Environment(\.fontScale) private var fontScale
 
@@ -29,7 +29,7 @@ struct AgentTuiSidebar: View {
       if !orderedSessionIDs.isEmpty {
         Section("Sessions") {
           ForEach(orderedSessionIDs, id: \.self) { sessionID in
-            Label(titleForSessionID(sessionID), systemImage: "terminal")
+            Label(sessionTitlesByID[sessionID] ?? "Agent session", systemImage: "terminal")
               .scaledFont(.body)
               .padding(.vertical, rowPadding)
               .tag(AgentTuiSheetSelection.session(sessionID))
