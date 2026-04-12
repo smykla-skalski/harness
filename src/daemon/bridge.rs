@@ -4,7 +4,7 @@ use std::fmt;
 use std::fs::File;
 use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -1019,6 +1019,10 @@ impl BridgeServer {
         self.persist_state()
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "state update plus tracing/event emission is intentionally linear"
+    )]
     fn set_codex_process(&self, process: BridgeCodexProcess) -> Result<(), CliError> {
         let endpoint = process.endpoint.clone();
         let port = process.metadata.port;
@@ -1043,7 +1047,7 @@ impl BridgeServer {
         self.persist_state()
     }
 
-    fn mark_codex_unhealthy(&self, last_exit_status: String) -> Result<(), CliError> {
+    fn mark_codex_unhealthy(&self, last_exit_status: &str) -> Result<(), CliError> {
         let mut capabilities = self.capabilities()?;
         let Some(codex) = capabilities.get_mut(BRIDGE_CAPABILITY_CODEX) else {
             return Ok(());
@@ -1057,7 +1061,7 @@ impl BridgeServer {
         codex.healthy = false;
         codex
             .metadata
-            .insert("last_exit_status".to_string(), last_exit_status.clone());
+            .insert("last_exit_status".to_string(), last_exit_status.to_string());
         drop(capabilities);
         tracing::warn!(
             %endpoint,
@@ -2259,6 +2263,10 @@ impl BridgeStateGuard {
 }
 
 impl Drop for BridgeStateGuard {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "drop path is tiny; tracing macro expansion trips the lint"
+    )]
     fn drop(&mut self) {
         if !self.armed {
             return;
@@ -2332,6 +2340,12 @@ fn kill_codex_process(child: &mut Child) {
     let _ = child.wait();
 }
 
+fn ensure_codex_port_available(port: u16) -> Result<(), String> {
+    TcpListener::bind(("127.0.0.1", port))
+        .map(drop)
+        .map_err(|error| format!("127.0.0.1:{port} is unavailable: {error}"))
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "startup/readiness loop is intentionally linear and log-heavy"
@@ -2340,9 +2354,10 @@ fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), 
     let endpoint = process.endpoint.clone();
     let port = process.metadata.port;
     let pid = process.child.id();
-    let readyz_url = codex_endpoint_address(&endpoint)
-        .map(|(_, address)| format!("http://{address}/readyz"))
-        .unwrap_or_else(|_| endpoint.clone());
+    let readyz_url = codex_endpoint_address(&endpoint).map_or_else(
+        |_| endpoint.clone(),
+        |(_, address)| format!("http://{address}/readyz"),
+    );
     let started_at = Instant::now();
     let mut warned = false;
 
@@ -2420,8 +2435,29 @@ fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), 
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "spawn/setup path keeps process metadata, readiness, and audit together"
+)]
 fn spawn_codex_process(binary: &Path, port: u16) -> Result<BridgeCodexProcess, CliError> {
     let listen_address = format!("ws://127.0.0.1:{port}");
+    if let Err(error) = ensure_codex_port_available(port) {
+        tracing::error!(
+            binary_path = %binary.display(),
+            endpoint = %listen_address,
+            port,
+            %error,
+            "codex app-server port unavailable before spawn"
+        );
+        state::append_event_best_effort(
+            "error",
+            &format!("codex host bridge failed before readiness on {listen_address}: {error}"),
+        );
+        return Err(CliErrorKind::workflow_io(format!(
+            "codex app-server port check failed on {listen_address}: {error}"
+        ))
+        .into());
+    }
     let child = Command::new(binary)
         .args(["app-server", "--listen", &listen_address])
         .stdin(Stdio::null())
@@ -2475,7 +2511,7 @@ fn spawn_codex_monitor(server: Arc<BridgeServer>) {
                     .map(|status| status.to_string())
             };
             if let Some(status) = result {
-                let _ = server.mark_codex_unhealthy(status);
+                let _ = server.mark_codex_unhealthy(&status);
                 return;
             }
             thread::sleep(Duration::from_millis(250));

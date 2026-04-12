@@ -638,6 +638,8 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
     init_git_repo(&project);
 
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(
@@ -647,7 +649,7 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
             "--capability",
             "codex",
             "--codex-port",
-            "14511",
+            &codex_port_text,
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
@@ -706,6 +708,8 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
     init_git_repo(&project);
 
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _initial_status = wait_for_daemon_ready(&home, &xdg);
     let mut bridge = spawn_bridge(
@@ -715,7 +719,7 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
             "--capability",
             "codex",
             "--codex-port",
-            "14512",
+            &codex_port_text,
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],

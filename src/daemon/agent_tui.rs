@@ -4,8 +4,10 @@
 )]
 
 use std::collections::BTreeMap;
+use std::env::{join_paths, split_paths, var_os};
 use std::ffi::OsString;
 use std::io::{ErrorKind, Read, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
@@ -19,7 +21,7 @@ use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionRole, SessionState};
-use crate::workspace::{project_context_dir, utc_now};
+use crate::workspace::{dirs_home, project_context_dir, utc_now};
 
 use super::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
 use super::db::DaemonDb;
@@ -1241,19 +1243,84 @@ fn failed_snapshot(
 }
 
 fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
-    let argv = spec
-        .profile
-        .argv
-        .iter()
-        .map(OsString::from)
-        .collect::<Vec<_>>();
+    let argv = resolved_command_argv(&spec.profile);
     let mut cmd = CommandBuilder::from_argv(argv);
     cmd.cwd(spec.project_dir.as_os_str());
     cmd.env("TERM", "xterm-256color");
+    if let Some(path) = agent_tui_spawn_path(&spec.profile.runtime) {
+        cmd.env("PATH", path);
+    }
     for (key, value) in &spec.env {
         cmd.env(key, value);
     }
     cmd
+}
+
+fn resolved_command_argv(profile: &AgentTuiLaunchProfile) -> Vec<OsString> {
+    let mut argv = profile.argv.iter().map(OsString::from).collect::<Vec<_>>();
+    let Some(program) = profile.argv.first() else {
+        return argv;
+    };
+    if let Some(resolved) = resolve_agent_tui_program(&profile.runtime, program) {
+        argv[0] = resolved.into_os_string();
+    }
+    argv
+}
+
+fn resolve_agent_tui_program(runtime: &str, program: &str) -> Option<PathBuf> {
+    let path = Path::new(program);
+    if path.is_absolute() || program.contains('/') {
+        return is_executable(path).then(|| path.to_path_buf());
+    }
+
+    agent_tui_search_dirs(runtime)
+        .into_iter()
+        .find_map(|directory| {
+            let candidate = directory.join(program);
+            is_executable(&candidate).then_some(candidate)
+        })
+}
+
+fn agent_tui_spawn_path(runtime: &str) -> Option<OsString> {
+    let dirs = agent_tui_search_dirs(runtime);
+    (!dirs.is_empty()).then(|| join_paths(dirs).expect("agent TUI PATH entries serialize"))
+}
+
+fn agent_tui_search_dirs(runtime: &str) -> Vec<PathBuf> {
+    let home = dirs_home();
+    let mut dirs = vec![home.join(".local").join("bin"), home.join("bin")];
+    match runtime {
+        "vibe" => {
+            dirs.push(
+                home.join(".local")
+                    .join("share")
+                    .join("uv")
+                    .join("tools")
+                    .join("mistral-vibe")
+                    .join("bin"),
+            );
+        }
+        "opencode" => dirs.push(home.join(".opencode").join("bin")),
+        _ => {}
+    }
+    if let Some(path_env) = var_os("PATH") {
+        for directory in split_paths(&path_env) {
+            push_unique_path(&mut dirs, directory);
+        }
+    }
+    dirs
+}
+
+fn push_unique_path(dirs: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if candidate.as_os_str().is_empty() || dirs.iter().any(|existing| existing == &candidate) {
+        return;
+    }
+    dirs.push(candidate);
+}
+
+fn is_executable(path: &Path) -> bool {
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
 }
 
 fn spawn_reader_thread(
@@ -1321,7 +1388,8 @@ fn decode_raw_bytes(data: &str) -> Result<Vec<u8>, CliError> {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
+    use std::os::unix::fs::PermissionsExt as _;
+    use std::path::{Path, PathBuf};
     use std::sync::{Arc, Mutex, OnceLock};
     use std::time::Duration;
 
@@ -1534,6 +1602,73 @@ mod tests {
         let screen = process.screen().expect("screen");
         assert_eq!(screen.rows, 9);
         assert_eq!(screen.cols, 33);
+    }
+
+    #[test]
+    fn portable_pty_backend_resolves_vibe_from_local_bin_when_missing_from_path() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
+        let vibe = home.join(".local").join("bin").join("vibe");
+        write_executable_script(&vibe, "#!/bin/sh\nprintf 'vibe-local-bin\\n'\n");
+
+        temp_env::with_vars(
+            [
+                ("HOME", Some(home.to_str().expect("utf8 home"))),
+                ("PATH", Some("/usr/bin:/bin")),
+            ],
+            || {
+                let process = spawn_runtime("vibe");
+                let status = process
+                    .wait_timeout(DEFAULT_WAIT_TIMEOUT)
+                    .expect("wait")
+                    .expect("status");
+                assert!(status.success());
+                assert!(
+                    process
+                        .screen()
+                        .expect("screen")
+                        .text
+                        .contains("vibe-local-bin")
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn portable_pty_backend_resolves_vibe_from_uv_tool_dir_without_local_bin_symlink() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
+        let vibe = home
+            .join(".local")
+            .join("share")
+            .join("uv")
+            .join("tools")
+            .join("mistral-vibe")
+            .join("bin")
+            .join("vibe");
+        write_executable_script(&vibe, "#!/bin/sh\nprintf 'vibe-uv-tool\\n'\n");
+
+        temp_env::with_vars(
+            [
+                ("HOME", Some(home.to_str().expect("utf8 home"))),
+                ("PATH", Some("/usr/bin:/bin")),
+            ],
+            || {
+                let process = spawn_runtime("vibe");
+                let status = process
+                    .wait_timeout(DEFAULT_WAIT_TIMEOUT)
+                    .expect("wait")
+                    .expect("status");
+                assert!(status.success());
+                assert!(
+                    process
+                        .screen()
+                        .expect("screen")
+                        .text
+                        .contains("vibe-uv-tool")
+                );
+            },
+        );
     }
 
     #[test]
@@ -1958,6 +2093,30 @@ mod tests {
         PortablePtyAgentTuiBackend
             .spawn(spec)
             .expect("spawn pty process")
+    }
+
+    fn spawn_runtime(runtime: &str) -> super::AgentTuiProcess {
+        let profile = AgentTuiLaunchProfile::for_runtime(runtime).expect("profile");
+        let spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("."),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        PortablePtyAgentTuiBackend
+            .spawn(spec)
+            .expect("spawn runtime")
+    }
+
+    fn write_executable_script(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs_err::create_dir_all(parent).expect("create script dir");
+        }
+        fs_err::write(path, contents).expect("write script");
+        let mut permissions = fs_err::metadata(path).expect("metadata").permissions();
+        permissions.set_mode(0o755);
+        fs_err::set_permissions(path, permissions).expect("chmod script");
     }
 
     fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) {

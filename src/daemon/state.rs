@@ -436,6 +436,10 @@ pub fn append_event(level: &str, message: &str) -> Result<(), CliError> {
 }
 
 /// Append a daemon-owned audit event and degrade to tracing on failure.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tiny fallback path only looks complex because of tracing macros"
+)]
 pub fn append_event_best_effort(level: &str, message: &str) {
     if let Err(error) = append_event(level, message) {
         tracing::warn!(
