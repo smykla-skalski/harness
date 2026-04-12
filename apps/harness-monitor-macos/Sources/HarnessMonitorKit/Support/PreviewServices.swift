@@ -193,6 +193,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     let coreDetailsBySessionID: [String: SessionDetail]
     let timelinesBySessionID: [String: [TimelineEntry]]
     let agentTuisBySessionID: [String: [AgentTuiSnapshot]]
+    let codexRunsBySessionID: [String: [CodexRunSnapshot]]
 
     public init(
       health: HealthResponse,
@@ -204,7 +205,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       detailsBySessionID: [String: SessionDetail],
       coreDetailsBySessionID: [String: SessionDetail],
       timelinesBySessionID: [String: [TimelineEntry]],
-      agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
+      agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:],
+      codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
     ) {
       self.health = health
       self.projects = projects
@@ -216,6 +218,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       self.coreDetailsBySessionID = coreDetailsBySessionID
       self.timelinesBySessionID = timelinesBySessionID
       self.agentTuisBySessionID = agentTuisBySessionID
+      self.codexRunsBySessionID = codexRunsBySessionID
     }
 
     public static let populated = Self(
@@ -458,6 +461,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   private let isLaunchAgentInstalled: Bool
   private let hostBridgeState: PreviewHostBridgeState
   private let actionDelay: Duration?
+  private let codexStartBehavior: PreviewCodexStartBehavior
 
   var readySessionID: String? {
     fixtures.readySessionID
@@ -471,7 +475,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       fixtures: fixtures,
       isLaunchAgentInstalled: isLaunchAgentInstalled,
       hostBridgeState: PreviewHostBridgeState(override: nil),
-      actionDelay: nil
+      actionDelay: nil,
+      codexStartBehavior: .unsupported
     )
   }
 
@@ -479,13 +484,15 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     fixtures: Fixtures,
     isLaunchAgentInstalled: Bool,
     hostBridgeState: PreviewHostBridgeState,
-    actionDelay: Duration? = nil
+    actionDelay: Duration? = nil,
+    codexStartBehavior: PreviewCodexStartBehavior = .unsupported
   ) {
     self.fixtures = fixtures
     self.state = PreviewHarnessClientState(fixtures: fixtures)
     self.isLaunchAgentInstalled = isLaunchAgentInstalled
     self.hostBridgeState = hostBridgeState
     self.actionDelay = actionDelay
+    self.codexStartBehavior = codexStartBehavior
   }
 
   public convenience init() {
@@ -493,7 +500,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       fixtures: .populated,
       isLaunchAgentInstalled: true,
       hostBridgeState: PreviewHostBridgeState(override: nil),
-      actionDelay: nil
+      actionDelay: nil,
+      codexStartBehavior: .unsupported
     )
   }
 
@@ -582,6 +590,32 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
     await state.timeline(for: sessionID)
+  }
+
+  public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
+    CodexRunListResponse(runs: await state.codexRuns(sessionID: sessionID))
+  }
+
+  public func codexRun(runID: String) async throws -> CodexRunSnapshot {
+    guard let run = await state.codexRun(runID: runID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+    }
+    return run
+  }
+
+  public func startCodexRun(
+    sessionID: String,
+    request: CodexRunRequest
+  ) async throws -> CodexRunSnapshot {
+    try await performActionDelay()
+    switch codexStartBehavior {
+    case .unsupported:
+      throw HarnessMonitorAPIError.server(code: 501, message: "Codex controller unavailable.")
+    case .success:
+      return await state.startCodexRun(sessionID: sessionID, request: request)
+    case .unavailableRunningBridge:
+      throw HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable")
+    }
   }
 
   public func createTask(
@@ -764,7 +798,9 @@ private actor PreviewHarnessClientState {
   private var coreDetailsBySessionID: [String: SessionDetail]
   private var timelinesBySessionID: [String: [TimelineEntry]]
   private var agentTuisBySessionID: [String: [AgentTuiSnapshot]]
+  private var codexRunsBySessionID: [String: [CodexRunSnapshot]]
   private var nextAgentTuiSequence: Int
+  private var nextCodexRunSequence: Int
   private let fallbackDetail: SessionDetail?
   private let fallbackTimeline: [TimelineEntry]
 
@@ -774,8 +810,13 @@ private actor PreviewHarnessClientState {
     self.coreDetailsBySessionID = fixtures.coreDetailsBySessionID
     self.timelinesBySessionID = fixtures.timelinesBySessionID
     self.agentTuisBySessionID = fixtures.agentTuisBySessionID
+    self.codexRunsBySessionID = fixtures.codexRunsBySessionID
     self.nextAgentTuiSequence = max(
       fixtures.agentTuisBySessionID.values.flatMap(\.self).count,
+      0
+    )
+    self.nextCodexRunSequence = max(
+      fixtures.codexRunsBySessionID.values.flatMap(\.self).count,
       0
     )
     self.fallbackDetail = fixtures.detail
@@ -800,6 +841,46 @@ private actor PreviewHarnessClientState {
 
   func timeline(for sessionID: String) -> [TimelineEntry] {
     timelinesBySessionID[sessionID] ?? fallbackTimeline
+  }
+
+  func codexRuns(sessionID: String) -> [CodexRunSnapshot] {
+    codexRunsBySessionID[sessionID] ?? []
+  }
+
+  func codexRun(runID: String) -> CodexRunSnapshot? {
+    codexRunsBySessionID.values
+      .flatMap(\.self)
+      .first { run in
+        run.runId == runID
+      }
+  }
+
+  func startCodexRun(
+    sessionID: String,
+    request: CodexRunRequest
+  ) -> CodexRunSnapshot {
+    nextCodexRunSequence += 1
+    let run = CodexRunSnapshot(
+      runId: "preview-codex-run-\(nextCodexRunSequence)",
+      sessionId: sessionID,
+      projectDir: fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
+      threadId: request.resumeThreadId,
+      turnId: nil,
+      mode: request.mode,
+      status: .queued,
+      prompt: request.prompt,
+      latestSummary: request.actor.map { "Queued by \($0)" } ?? "Queued by preview",
+      finalMessage: nil,
+      error: nil,
+      pendingApprovals: [],
+      createdAt: Self.mutationTimestamp,
+      updatedAt: Self.mutationTimestamp
+    )
+    var runs = codexRunsBySessionID[sessionID] ?? []
+    runs.removeAll { $0.runId == run.runId }
+    runs.insert(run, at: 0)
+    codexRunsBySessionID[sessionID] = runs
+    return run
   }
 
   func agentTuis(sessionID: String) -> [AgentTuiSnapshot] {

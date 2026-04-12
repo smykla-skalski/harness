@@ -4,6 +4,12 @@ extension HarnessMonitorStore {
   private static let agentTuiActionRefreshDelay = Duration.milliseconds(250)
   private static let agentTuiActionRefreshAttempts = 4
 
+  private enum CodexStartRecoveryOutcome {
+    case notAttempted
+    case succeeded
+    case failed
+  }
+
   @discardableResult
   public func setHostBridgeCapability(
     _ capability: String,
@@ -52,24 +58,35 @@ extension HarnessMonitorStore {
     isSessionActionInFlight = true
     defer { isSessionActionInFlight = false }
 
+    let request = CodexRunRequest(
+      actor: actor,
+      prompt: trimmedPrompt,
+      mode: mode,
+      resumeThreadId: resumeThreadId
+    )
+
     do {
-      let measuredRun = try await Self.measureOperation {
-        try await client.startCodexRun(
-          sessionID: sessionID,
-          request: CodexRunRequest(
-            actor: actor,
-            prompt: trimmedPrompt,
-            mode: mode,
-            resumeThreadId: resumeThreadId
-          )
-        )
-      }
-      recordRequestSuccess()
-      clearHostBridgeIssue(for: "codex")
-      applyCodexRun(measuredRun.value)
-      presentSuccessFeedback("Codex run started")
+      let measuredRun = try await measureCodexRunStart(
+        using: client,
+        sessionID: sessionID,
+        request: request
+      )
+      applyCodexRunStartSuccess(measuredRun.value)
       return true
     } catch let apiError as HarnessMonitorAPIError {
+      switch await recoverCodexStartAfterTransientBridgeFailure(
+        using: client,
+        sessionID: sessionID,
+        request: request,
+        error: apiError
+      ) {
+      case .succeeded:
+        return true
+      case .failed:
+        return false
+      case .notAttempted:
+        break
+      }
       if case .server(let code, _) = apiError, code == 501 || code == 503 {
         markHostBridgeIssue(for: "codex", statusCode: code)
       }
@@ -218,6 +235,92 @@ extension HarnessMonitorStore {
     var updatedRuns = runs.filter { $0.runId != run.runId }
     updatedRuns.insert(run, at: 0)
     return updatedRuns
+  }
+
+  private func measureCodexRunStart(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    request: CodexRunRequest
+  ) async throws -> MeasuredOperation<CodexRunSnapshot> {
+    try await Self.measureOperation {
+      try await client.startCodexRun(
+        sessionID: sessionID,
+        request: request
+      )
+    }
+  }
+
+  private func applyCodexRunStartSuccess(_ run: CodexRunSnapshot) {
+    recordRequestSuccess()
+    clearHostBridgeIssue(for: "codex")
+    applyCodexRun(run)
+    presentSuccessFeedback("Codex run started")
+  }
+
+  private func recoverCodexStartAfterTransientBridgeFailure(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    request: CodexRunRequest,
+    error: HarnessMonitorAPIError
+  ) async -> CodexStartRecoveryOutcome {
+    guard case .server(let code, _) = error, code == 503 else {
+      return .notAttempted
+    }
+    guard daemonStatus?.manifest?.sandboxed == true else {
+      return .notAttempted
+    }
+
+    await refreshDaemonStatus()
+    reconcileHostBridgeIssueFromManifest(for: "codex")
+
+    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    guard hostBridge.running, hostBridge.capabilities["codex"]?.healthy == true else {
+      markHostBridgeIssue(for: "codex", statusCode: code)
+      return .notAttempted
+    }
+
+    do {
+      let measuredRun = try await measureCodexRunStart(
+        using: client,
+        sessionID: sessionID,
+        request: request
+      )
+      applyCodexRunStartSuccess(measuredRun.value)
+      return .succeeded
+    } catch let retryError as HarnessMonitorAPIError {
+      if case .server(let retryCode, _) = retryError, retryCode == 501 || retryCode == 503 {
+        markHostBridgeIssue(for: "codex", statusCode: retryCode)
+      }
+      presentFailureFeedback(retryError.localizedDescription)
+      return .failed
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return .failed
+    }
+  }
+
+  private func reconcileHostBridgeIssueFromManifest(for capability: String) {
+    guard !forcedHostBridgeCapabilities.contains(capability) else {
+      return
+    }
+    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    guard daemonStatus?.manifest?.sandboxed == true else {
+      clearHostBridgeIssue(for: capability)
+      return
+    }
+    guard hostBridge.running else {
+      hostBridgeCapabilityIssues[capability] = .unavailable
+      return
+    }
+    guard let capabilityState = hostBridge.capabilities[capability] else {
+      hostBridgeCapabilityIssues[capability] = .excluded
+      return
+    }
+    if capabilityState.healthy {
+      clearHostBridgeIssue(for: capability)
+    } else {
+      hostBridgeCapabilityIssues[capability] = .unavailable
+    }
   }
 }
 

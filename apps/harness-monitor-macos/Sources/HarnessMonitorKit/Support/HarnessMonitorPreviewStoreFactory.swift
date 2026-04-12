@@ -25,6 +25,12 @@ public struct PreviewHostBridgeOverride: Sendable {
   }
 }
 
+public enum PreviewCodexStartBehavior: String, Sendable {
+  case unsupported
+  case success
+  case unavailableRunningBridge = "unavailable-running-bridge"
+}
+
 @MainActor
 public enum HarnessMonitorPreviewStoreFactory {
   public static let previewContainer: ModelContainer = {
@@ -49,6 +55,7 @@ public enum HarnessMonitorPreviewStoreFactory {
   public static func makeStore(
     for scenario: Scenario,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,
+    codexStartBehavior: PreviewCodexStartBehavior = .unsupported,
     actionDelay: Duration? = nil,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
@@ -68,7 +75,8 @@ public enum HarnessMonitorPreviewStoreFactory {
         isDaemonRunning: isDaemonRunning,
         isLaunchAgentInstalled: !configuration.fixtures.sessions.isEmpty,
         hostBridgeOverride: hostBridgeOverride,
-        actionDelay: actionDelay
+        actionDelay: actionDelay,
+        codexStartBehavior: codexStartBehavior
       ),
       voiceCapture: voiceCapture,
       modelContainer: modelContainer,

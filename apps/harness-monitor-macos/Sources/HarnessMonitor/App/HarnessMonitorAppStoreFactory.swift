@@ -7,6 +7,7 @@ enum HarnessMonitorAppStoreFactory {
     static let capabilitiesKey = "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_CAPABILITIES"
     static let reconfigureKey = "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RECONFIGURE"
     static let runningKey = "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RUNNING"
+    static let codexStartKey = "HARNESS_MONITOR_PREVIEW_CODEX_START"
     static let socketPath = "/tmp/harness-preview-bridge.sock"
     static let startedAt = "2026-04-11T10:00:00Z"
   }
@@ -61,11 +62,13 @@ enum HarnessMonitorAppStoreFactory {
     persistenceError: String? = nil
   ) -> HarnessMonitorStore {
     let previewHostBridgeOverride = previewHostBridgeOverride(environment: environment)
+    let previewCodexStartBehavior = previewCodexStartBehavior(environment: environment)
     let previewActionDelay = previewActionDelay(environment: environment)
     if let previewScenario = PreviewScenarioOverride(environment: environment) {
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
         hostBridgeOverride: previewHostBridgeOverride,
+        codexStartBehavior: previewCodexStartBehavior,
         actionDelay: previewActionDelay,
         modelContainer: modelContainer,
         persistenceError: persistenceError,
@@ -90,7 +93,8 @@ enum HarnessMonitorAppStoreFactory {
         daemonController: PreviewDaemonController(
           previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
           hostBridgeOverride: previewHostBridgeOverride,
-          actionDelay: previewActionDelay
+          actionDelay: previewActionDelay,
+          codexStartBehavior: previewCodexStartBehavior
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
@@ -101,7 +105,8 @@ enum HarnessMonitorAppStoreFactory {
         daemonController: PreviewDaemonController(
           mode: .empty,
           hostBridgeOverride: previewHostBridgeOverride,
-          actionDelay: previewActionDelay
+          actionDelay: previewActionDelay,
+          codexStartBehavior: previewCodexStartBehavior
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
@@ -207,6 +212,15 @@ enum HarnessMonitorAppStoreFactory {
       ),
       reconfigureBehavior: behavior
     )
+  }
+
+  private static func previewCodexStartBehavior(
+    environment: HarnessMonitorEnvironment
+  ) -> PreviewCodexStartBehavior {
+    let rawValue = environment.values[PreviewHostBridgeEnvironment.codexStartKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    return PreviewCodexStartBehavior(rawValue: rawValue ?? "") ?? .unsupported
   }
 
   private static func previewHostBridgeCapabilityManifest(
