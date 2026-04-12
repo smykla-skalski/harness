@@ -21,42 +21,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testEmptyModeCardsSpanTheirColumns() throws {
-    let app = launch(mode: "empty")
-    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
-    let onboardingCard = frameElement(in: app, identifier: Accessibility.onboardingCardFrame)
-    let recentSessionsCard = frameElement(
-      in: app, identifier: Accessibility.recentSessionsCardFrame)
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
-
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(onboardingCard.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
-
-    assertFillsColumn(
-      child: onboardingCard,
-      in: boardRoot,
-      expectedHorizontalInset: 24,
-      tolerance: 8
-    )
-    assertFillsColumn(
-      child: recentSessionsCard,
-      in: boardRoot,
-      expectedHorizontalInset: 24,
-      tolerance: 8
-    )
-    XCTAssertEqual(recentSessionsCard.frame.width, onboardingCard.frame.width, accuracy: 8)
-    assertFillsColumn(
-      child: inspectorEmptyState,
-      in: inspectorRoot,
-      expectedHorizontalInset: 18,
-      tolerance: 8
-    )
-  }
-
   func testDashboardUsesToolbarSummaryInsteadOfMetricCards() throws {
     let app = launch(
       mode: "preview",
@@ -287,30 +251,4 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     assertEqualHeights([leaderCard, workerCard], tolerance: 10)
   }
 
-  func testSidebarAndBoardActionButtonsStayCompact() throws {
-    let app = launch(mode: "empty")
-
-    let sidebarStart = frameElement(in: app, identifier: Accessibility.sidebarStartButtonFrame)
-    let sidebarInstall = frameElement(in: app, identifier: Accessibility.sidebarInstallButtonFrame)
-    let boardStart = frameElement(in: app, identifier: Accessibility.onboardingStartButtonFrame)
-    let boardInstall = frameElement(
-      in: app,
-      identifier: Accessibility.onboardingInstallButtonFrame
-    )
-    let boardRefresh = frameElement(
-      in: app,
-      identifier: Accessibility.onboardingRefreshButtonFrame
-    )
-
-    XCTAssertTrue(sidebarStart.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sidebarInstall.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(boardStart.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(boardInstall.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(boardRefresh.waitForExistence(timeout: Self.actionTimeout))
-
-    assertEqualHeights([boardStart, boardInstall, boardRefresh], tolerance: 10)
-    XCTAssertLessThan(sidebarStart.frame.height, 40)
-    XCTAssertLessThan(sidebarStart.frame.width, 40)
-    XCTAssertLessThan(boardStart.frame.height, 62)
-  }
 }
