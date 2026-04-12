@@ -11,7 +11,7 @@ struct AgentTuiSidebarRow: View {
   }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
+    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
         .fill(agentTuiStatusColor(for: snapshot.status))
         .frame(width: 4)
@@ -32,18 +32,19 @@ struct AgentTuiSidebarRow: View {
             size: 36
           )
           .opacity(0.12)
-          .offset(x: 12, y: 8)
+          .offset(x: 6, y: 4)
         } else {
           Image(systemName: "terminal")
             .font(.system(size: 28))
             .foregroundStyle(.secondary)
             .opacity(0.12)
-            .offset(x: 12, y: 8)
+            .offset(x: 6, y: 4)
         }
       }
       .accessibilityHidden(true)
       .allowsHitTesting(false)
     }
+    .clipped()
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
       "\(title), \(brandSymbol?.rawValue ?? snapshot.runtime), \(snapshot.status.title)"
