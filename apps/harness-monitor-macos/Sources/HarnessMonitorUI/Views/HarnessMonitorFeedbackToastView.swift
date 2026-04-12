@@ -5,7 +5,7 @@ struct HarnessMonitorFeedbackToastView: View {
   let toast: ToastSlice
 
   var body: some View {
-    VStack(spacing: HarnessMonitorTheme.spacingXS) {
+    VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
       ForEach(toast.activeFeedback) { feedback in
         HarnessMonitorFeedbackToastRow(feedback: feedback, toast: toast)
           .transition(
@@ -16,12 +16,15 @@ struct HarnessMonitorFeedbackToastView: View {
           )
       }
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .frame(maxWidth: .infinity, alignment: .top)
+    .frame(maxWidth: 420, alignment: .trailing)
     .animation(.spring(duration: 0.25, bounce: 0.18), value: toast.activeFeedback.map(\.id))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.actionToast)
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.actionToastFrame)
+    .accessibilityTestProbe(
+      HarnessMonitorAccessibility.actionToast,
+      value: "count=\(toast.activeFeedback.count)"
+    )
   }
 }
 
@@ -39,6 +42,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
       Text(feedback.message)
         .scaledFont(.system(.callout, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.ink)
+        .multilineTextAlignment(.leading)
         .frame(maxWidth: .infinity, alignment: .leading)
       Button {
         toast.dismiss(id: feedback.id)

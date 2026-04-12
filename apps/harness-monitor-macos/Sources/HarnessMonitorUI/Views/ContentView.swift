@@ -24,6 +24,7 @@ public struct ContentView: View {
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
+  private let toast: ToastSlice
   private let auditBuildState: AuditBuildDisplayState?
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage("showInspector")
@@ -70,6 +71,26 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
   }
 
+  private func handleEscapeKeyPress() -> KeyPress.Result {
+    if let feedbackID = toast.activeFeedback.first?.id {
+      toast.dismiss(id: feedbackID)
+      return .handled
+    }
+    if contentSessionDetail.selectedSessionDetail != nil {
+      store.inspectorSelection = .none
+      return .handled
+    }
+    return .ignored
+  }
+
+  private func handleExitCommand() {
+    if let feedbackID = toast.activeFeedback.first?.id {
+      toast.dismiss(id: feedbackID)
+    } else if contentSessionDetail.selectedSessionDetail != nil {
+      store.inspectorSelection = .none
+    }
+  }
+
   public init(
     store: HarnessMonitorStore,
     cornerAnimationContent: (() -> AnyView)? = nil
@@ -82,6 +103,7 @@ public struct ContentView: View {
     self.contentSession = store.contentUI.session
     self.contentSessionDetail = store.contentUI.sessionDetail
     self.contentDashboard = store.contentUI.dashboard
+    self.toast = store.toast
     self.auditBuildState = Self.resolveAuditBuildState()
   }
 
@@ -146,6 +168,8 @@ public struct ContentView: View {
     .onChange(of: columnVisibility) { _, _ in
       suppressLayoutGeometry()
     }
+    .onKeyPress(.escape, action: handleEscapeKeyPress)
+    .onExitCommand(perform: handleExitCommand)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay {
@@ -159,11 +183,10 @@ public struct ContentView: View {
       )
     }
     .overlay(alignment: .topTrailing) {
-      if let auditBuildBadgeState, auditBuildBadgeState.showsVisibleBadge {
-        AuditBuildBadge(state: auditBuildBadgeState)
-          .padding(.top, HarnessMonitorTheme.spacingSM)
-          .padding(.trailing, HarnessMonitorTheme.spacingLG)
-      }
+      ContentFloatingOverlay(
+        toast: toast,
+        auditBuildBadgeState: auditBuildBadgeState
+      )
     }
     .background {
       if HarnessMonitorUITestEnvironment.isEnabled {
@@ -216,6 +239,7 @@ public struct ContentView: View {
   private var detailColumn: some View {
     ContentDetailColumn(
       store: store,
+      toast: toast,
       selection: store.selection,
       contentChrome: contentChrome,
       contentSession: contentSession,
@@ -348,6 +372,33 @@ public struct ContentView: View {
       }
       let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
+    }
+  }
+}
+
+private struct ContentFloatingOverlay: View {
+  let toast: ToastSlice
+  let auditBuildBadgeState: AuditBuildDisplayState?
+
+  private var showsContent: Bool {
+    !toast.activeFeedback.isEmpty
+      || auditBuildBadgeState?.showsVisibleBadge == true
+  }
+
+  var body: some View {
+    Group {
+      if showsContent {
+        VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingSM) {
+          if !toast.activeFeedback.isEmpty {
+            HarnessMonitorFeedbackToastView(toast: toast)
+          }
+          if let auditBuildBadgeState, auditBuildBadgeState.showsVisibleBadge {
+            AuditBuildBadge(state: auditBuildBadgeState)
+          }
+        }
+        .padding(.top, HarnessMonitorTheme.spacingSM)
+        .padding(.trailing, HarnessMonitorTheme.spacingLG)
+      }
     }
   }
 }
