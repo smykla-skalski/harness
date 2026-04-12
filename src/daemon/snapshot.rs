@@ -18,6 +18,91 @@ use crate::observe::types::ObserverState;
 use crate::session::types::{
     SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
 };
+
+type SessionCounts = (usize, usize);
+
+fn increment_session_counts(
+    counts: &mut BTreeMap<String, SessionCounts>,
+    key: String,
+    status: SessionStatus,
+) {
+    let entry = counts.entry(key).or_insert((0, 0));
+    entry.1 += 1;
+    if status == SessionStatus::Active {
+        entry.0 += 1;
+    }
+}
+
+fn collect_project_counts(
+    sessions: Vec<ResolvedSession>,
+) -> (
+    BTreeMap<String, SessionCounts>,
+    BTreeMap<String, SessionCounts>,
+) {
+    let mut project_counts = BTreeMap::new();
+    let mut worktree_counts = BTreeMap::new();
+
+    for session in sessions {
+        increment_session_counts(
+            &mut project_counts,
+            session.project.summary_project_id(),
+            session.state.status,
+        );
+        if session.project.is_worktree {
+            increment_session_counts(
+                &mut worktree_counts,
+                session.project.checkout_id.clone(),
+                session.state.status,
+            );
+        }
+    }
+
+    (project_counts, worktree_counts)
+}
+
+fn project_summary_entry<'a>(
+    grouped: &'a mut BTreeMap<String, ProjectSummary>,
+    project: &DiscoveredProject,
+) -> &'a mut ProjectSummary {
+    let project_id = project.summary_project_id();
+    grouped
+        .entry(project_id.clone())
+        .or_insert_with(|| ProjectSummary {
+            project_id,
+            name: project.summary_project_name(),
+            project_dir: project.summary_project_dir(),
+            context_root: project.summary_context_root(),
+            active_session_count: 0,
+            total_session_count: 0,
+            worktrees: Vec::new(),
+        })
+}
+
+fn worktree_summary(
+    project: &DiscoveredProject,
+    worktree_counts: &BTreeMap<String, SessionCounts>,
+) -> Option<WorktreeSummary> {
+    if !project.is_worktree {
+        return None;
+    }
+
+    let (active_session_count, total_session_count) = worktree_counts
+        .get(&project.checkout_id)
+        .copied()
+        .unwrap_or((0, 0));
+
+    Some(WorktreeSummary {
+        checkout_id: project.checkout_id.clone(),
+        name: project.checkout_name.clone(),
+        checkout_root: project
+            .project_dir
+            .as_ref()
+            .map_or_else(String::new, |path| path.display().to_string()),
+        context_root: project.context_root.display().to_string(),
+        active_session_count,
+        total_session_count,
+    })
+}
 /// Build summaries for all discovered projects.
 ///
 /// # Errors
@@ -25,57 +110,13 @@ use crate::session::types::{
 pub fn project_summaries() -> Result<Vec<ProjectSummary>, CliError> {
     let projects = index::discover_projects()?;
     let sessions = index::discover_sessions_for(&projects, true)?;
-    let mut project_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    let mut worktree_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    for session in sessions {
-        let entry = project_counts
-            .entry(session.project.summary_project_id())
-            .or_insert((0, 0));
-        entry.1 += 1;
-        if session.state.status == SessionStatus::Active {
-            entry.0 += 1;
-        }
-        if session.project.is_worktree {
-            let entry = worktree_counts
-                .entry(session.project.checkout_id.clone())
-                .or_insert((0, 0));
-            entry.1 += 1;
-            if session.state.status == SessionStatus::Active {
-                entry.0 += 1;
-            }
-        }
-    }
+    let (project_counts, worktree_counts) = collect_project_counts(sessions);
 
     let mut grouped = BTreeMap::<String, ProjectSummary>::new();
     for project in projects {
-        let project_id = project.summary_project_id();
-        let entry = grouped
-            .entry(project_id.clone())
-            .or_insert_with(|| ProjectSummary {
-                project_id,
-                name: project.summary_project_name(),
-                project_dir: project.summary_project_dir(),
-                context_root: project.summary_context_root(),
-                active_session_count: 0,
-                total_session_count: 0,
-                worktrees: Vec::new(),
-            });
-        if project.is_worktree {
-            let (active_session_count, total_session_count) = worktree_counts
-                .get(&project.checkout_id)
-                .copied()
-                .unwrap_or((0, 0));
-            entry.worktrees.push(WorktreeSummary {
-                checkout_id: project.checkout_id,
-                name: project.checkout_name,
-                checkout_root: project
-                    .project_dir
-                    .as_ref()
-                    .map_or_else(String::new, |path| path.display().to_string()),
-                context_root: project.context_root.display().to_string(),
-                active_session_count,
-                total_session_count,
-            });
+        let entry = project_summary_entry(&mut grouped, &project);
+        if let Some(summary) = worktree_summary(&project, &worktree_counts) {
+            entry.worktrees.push(summary);
         }
     }
 
