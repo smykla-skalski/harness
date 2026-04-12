@@ -224,6 +224,7 @@ enum HarnessMonitorUITestAccessibility {
   static let agentTuiBackToCreateButton = "harness.sheet.agent-tui.back-to-create"
   static let agentTuiWrapToggle = "harness.sheet.agent-tui.wrap-toggle"
   static let codexFlowButton = "harness.session.codex-flow"
+  static let codexFlowWIPBadge = "harness.session.codex-flow.wip"
   static let codexFlowSheet = "harness.sheet.codex-flow"
   static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
   static let codexFlowPromptVoiceButton = "harness.sheet.codex-flow.prompt.voice"

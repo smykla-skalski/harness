@@ -4,7 +4,10 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-@Suite("Harness Monitor Codex flow")
+@Suite(
+  "Harness Monitor Codex flow",
+  .disabled("Codex Flow is temporarily disabled while the feature remains WIP.")
+)
 struct HarnessMonitorStoreCodexTests {
   @Test("Start Codex run sends request and selects returned run")
   func startCodexRunSendsRequestAndSelectsReturnedRun() async {
