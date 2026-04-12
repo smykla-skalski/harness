@@ -1,10 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SidebarSessionListRenderState: Equatable {
+@MainActor
+struct SidebarSessionListRenderState {
+  let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let projectionGroups: [HarnessMonitorStore.SessionGroup]
   let searchPresentation: HarnessMonitorStore.SessionSearchPresentationState
-  let searchVisibleSessions: [SessionSummary]
+  let searchVisibleSessionIDs: [String]
   let selectedSessionIDForAccessibilityMarkers: String?
   let bookmarkedSessionIDs: Set<String>
   let isPersistenceAvailable: Bool
@@ -18,6 +20,10 @@ struct SidebarSessionListRenderState: Equatable {
 
   var usesFlatSearchResults: Bool {
     searchPresentation.isSearchActive
+  }
+
+  func sessionSummary(for sessionID: String) -> SessionSummary? {
+    sessionCatalog.sessionSummary(for: sessionID)
   }
 
   func isCheckoutExpanded(
@@ -35,8 +41,9 @@ struct SidebarSessionListRenderState: Equatable {
   }
 }
 
+@MainActor
 struct SidebarSessionListContent: View {
-  nonisolated(unsafe) let renderState: SidebarSessionListRenderState
+  let renderState: SidebarSessionListRenderState
   let selectSession: (String?) -> Void
   let toggleBookmark: (String, String) -> Void
   let setCheckoutCollapsed: (String, Bool) -> Void
@@ -81,8 +88,10 @@ struct SidebarSessionListContent: View {
 
   @ViewBuilder
   private var flatSearchResults: some View {
-    ForEach(renderState.searchVisibleSessions, id: \.sessionId) { session in
-      sessionRow(session)
+    ForEach(renderState.searchVisibleSessionIDs, id: \.self) { sessionID in
+      if let session = renderState.sessionSummary(for: sessionID) {
+        sessionRow(session)
+      }
     }
   }
 
@@ -137,8 +146,10 @@ struct SidebarSessionListContent: View {
     .selectionDisabled(true)
 
     if expansion.wrappedValue {
-      ForEach(group.sessions, id: \.sessionId) { session in
-        sessionRow(session)
+      ForEach(group.sessionIDs, id: \.self) { sessionID in
+        if let session = renderState.sessionSummary(for: sessionID) {
+          sessionRow(session)
+        }
       }
     }
   }
