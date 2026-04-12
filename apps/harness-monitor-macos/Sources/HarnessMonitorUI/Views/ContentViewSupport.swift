@@ -181,6 +181,7 @@ struct ContentCornerOverlayModifier: ViewModifier {
 
 struct ContentDetailColumn: View {
   let store: HarnessMonitorStore
+  let toast: ToastSlice
   let selection: HarnessMonitorStore.SelectionSlice
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
@@ -206,8 +207,7 @@ struct ContentDetailColumn: View {
         ContentDetailChrome(
           persistenceError: contentChrome.persistenceError,
           sessionDataAvailability: contentChrome.sessionDataAvailability,
-          sessionStatus: contentChrome.sessionStatus,
-          toast: store.toast
+          sessionStatus: contentChrome.sessionStatus
         ) {
           sessionContent
         }
@@ -254,6 +254,10 @@ struct ContentDetailColumn: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.contentRoot).frame")
     .onKeyPress(.escape) {
+      if let feedbackID = toast.activeFeedback.first?.id {
+        toast.dismiss(id: feedbackID)
+        return .handled
+      }
       if contentSessionDetail.selectedSessionDetail != nil {
         store.inspectorSelection = .none
         return .handled
