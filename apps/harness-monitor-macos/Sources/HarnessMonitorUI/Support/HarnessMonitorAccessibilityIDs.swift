@@ -168,6 +168,7 @@ public enum HarnessMonitorAccessibility {
   static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
   static let agentTuiEnableBridgeButton = "harness.sheet.agent-tui.enable-bridge"
   static let agentTuiCopyCommandButton = "harness.sheet.agent-tui.copy-command"
+  static let agentTuiBackToCreateButton = "harness.sheet.agent-tui.back-to-create"
   static let codexFlowButton = "harness.session.codex-flow"
   static let codexFlowSheet = "harness.sheet.codex-flow"
   static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
