@@ -85,10 +85,4 @@ extension View {
   func toolbarBaselineOverlay() -> some View {
     modifier(ToolbarBaselineOverlayModifier())
   }
-
-  func toolbarBaselineOverlay(leadingInset: CGFloat) -> some View {
-    overlay(alignment: .topLeading) {
-      ToolbarBaselineOverlay(leadingInset: leadingInset)
-    }
-  }
 }

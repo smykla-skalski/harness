@@ -34,7 +34,6 @@ public struct ContentView: View {
   @State private var hasAppliedInitialInspectorVisibility = false
   @State private var hasCapturedInitialInspectorWidth = false
   @State private var showInspector = false
-  @State private var sidebarColumnWidth: CGFloat = 260
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var pendingDetailColumnWidth: CGFloat?
   @State private var isLayoutAnimating = false
@@ -184,8 +183,7 @@ public struct ContentView: View {
     }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
-        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay,
-        leadingInset: columnVisibility == .detailOnly ? 0 : sidebarColumnWidth
+        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
       )
     )
     .suppressToolbarBaselineSeparator()
@@ -214,10 +212,10 @@ public struct ContentView: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      sidebarVisible: columnVisibility != .detailOnly,
-      onSidebarWidthChange: updateSidebarColumnWidth
+      sidebarVisible: columnVisibility != .detailOnly
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
+    .toolbarBaselineFrame(.sidebar)
   }
 
   private var detailColumn: some View {
@@ -304,13 +302,6 @@ public struct ContentView: View {
       return
     }
     inspectorColumnWidth = width
-  }
-
-  private func updateSidebarColumnWidth(_ width: CGFloat) {
-    guard abs(width - sidebarColumnWidth) > 1 else {
-      return
-    }
-    sidebarColumnWidth = width
   }
 
   private static func resolveAuditBuildState() -> AuditBuildDisplayState? {

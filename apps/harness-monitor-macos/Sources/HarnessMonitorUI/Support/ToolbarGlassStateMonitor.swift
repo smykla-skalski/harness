@@ -63,16 +63,11 @@ extension View {
 
 struct OptionalToolbarBaselineOverlayModifier: ViewModifier {
   let isEnabled: Bool
-  var leadingInset: CGFloat? = nil
 
   @ViewBuilder
   func body(content: Content) -> some View {
     if isEnabled {
-      if let leadingInset {
-        content.toolbarBaselineOverlay(leadingInset: leadingInset)
-      } else {
-        content.toolbarBaselineOverlay()
-      }
+      content.toolbarBaselineOverlay()
     } else {
       content
     }
