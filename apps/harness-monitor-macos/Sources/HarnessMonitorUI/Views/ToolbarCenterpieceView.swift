@@ -305,5 +305,6 @@ struct ToolbarCenterpieceView: View {
 
   private var daemonStatusDot: some View {
     ToolbarDaemonStatusDot(connectionState: connectionState)
+      .frame(width: 20, height: 20)
   }
 }
