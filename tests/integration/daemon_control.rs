@@ -894,6 +894,14 @@ fn spawn_daemon_serve(home: &Path, xdg: &Path) -> ManagedChild {
     spawn_daemon_serve_with_args(home, xdg, &[])
 }
 
+fn diagnostic_child_stdio() -> Stdio {
+    if std::env::var_os("HARNESS_TEST_INHERIT_CHILD_STDERR").is_some() {
+        Stdio::inherit()
+    } else {
+        Stdio::null()
+    }
+}
+
 fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) -> ManagedChild {
     let mut args = vec!["daemon", "serve", "--host", "127.0.0.1", "--port", "0"];
     args.extend(extra_args);
@@ -905,8 +913,8 @@ fn spawn_daemon_serve_with_args(home: &Path, xdg: &Path, extra_args: &[&str]) ->
             .env("HARNESS_HOST_HOME", home)
             .env("XDG_DATA_HOME", xdg)
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null()),
+            .stdout(diagnostic_child_stdio())
+            .stderr(diagnostic_child_stdio()),
     )
     .expect("spawn daemon serve")
 }
@@ -1166,7 +1174,7 @@ fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Valu
                     runtime.block_on(async { response.json::<Value>().await.expect("json body") });
                 return (status, json);
             }
-            Err(error) if error.is_connect() || error.is_timeout() => {
+            Err(error) if daemon_request_error_is_retryable(&error) => {
                 if Instant::now() >= deadline {
                     panic!("daemon post: {error:?}");
                 }
@@ -1258,7 +1266,7 @@ fn start_session_via_http(
                 }
                 panic!("unexpected body: {body}");
             }
-            Err(error) if session_start_error_is_retryable(&error) => {
+            Err(error) if daemon_request_error_is_retryable(&error) => {
                 if let Some(state) = read_session_status(home, xdg, project_arg, session_id) {
                     return state;
                 }
@@ -1319,7 +1327,7 @@ fn read_session_status(
         .then(|| serde_json::from_slice(&output.stdout).expect("parse session status"))
 }
 
-fn session_start_error_is_retryable(error: &reqwest::Error) -> bool {
+fn daemon_request_error_is_retryable(error: &reqwest::Error) -> bool {
     if error.is_connect() || error.is_timeout() {
         return true;
     }

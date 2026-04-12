@@ -163,10 +163,18 @@ mod tests {
         resolve_git_checkout_identity,
     };
 
+    fn git_null_device() -> &'static str {
+        if cfg!(windows) { "NUL" } else { "/dev/null" }
+    }
+
     fn git(path: &std::path::Path, args: &[&str]) {
         let status = Command::new("git")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", git_null_device())
             .arg("-C")
             .arg(path)
+            .arg("-c")
+            .arg("commit.gpgsign=false")
             .args(args)
             .status()
             .expect("run git");

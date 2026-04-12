@@ -321,11 +321,7 @@ impl CodexControllerHandle {
     }
 
     fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
-        self.state
-            .db
-            .get()
-            .cloned()
-            .ok_or_else(|| CliErrorKind::workflow_io("daemon database is not ready").into())
+        super::db::ensure_shared_db(&self.state.db)
     }
 
     fn active_runs(&self) -> Result<MutexGuard<'_, HashMap<String, ActiveRun>>, CliError> {

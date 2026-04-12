@@ -1130,15 +1130,20 @@ async fn post_session_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::start_session_direct(&request, db_ref).map(|session_state| {
-        SessionMutationResponse {
-            state: session_state,
+    let result = match super::db::ensure_shared_db(&state.db) {
+        Ok(db) => {
+            let db_guard = db.lock().expect("db lock");
+            service::start_session_direct(&request, Some(&db_guard)).map(|session_state| {
+                SessionMutationResponse {
+                    state: session_state,
+                }
+            })
         }
-    });
-    if result.is_ok() {
-        service::broadcast_sessions_updated(&state.sender, db_ref);
+        Err(error) => Err(error),
+    };
+    if result.is_ok() && let Ok(db) = super::db::ensure_shared_db(&state.db) {
+        let db_guard = db.lock().expect("db lock");
+        service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
     }
     timed_json("POST", "/v1/sessions", &request_id, start, result)
 }
@@ -1154,15 +1159,20 @@ async fn post_session_join(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::join_session_direct(&session_id, &request, db_ref).map(|session_state| {
-        SessionMutationResponse {
-            state: session_state,
+    let result = match super::db::ensure_shared_db(&state.db) {
+        Ok(db) => {
+            let db_guard = db.lock().expect("db lock");
+            service::join_session_direct(&session_id, &request, Some(&db_guard)).map(
+                |session_state| SessionMutationResponse {
+                    state: session_state,
+                },
+            )
         }
-    });
-    if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        Err(error) => Err(error),
+    };
+    if result.is_ok() && let Ok(db) = super::db::ensure_shared_db(&state.db) {
+        let db_guard = db.lock().expect("db lock");
+        service::broadcast_session_snapshot(&state.sender, &session_id, Some(&db_guard));
     }
     timed_json("POST", "/v1/sessions/{id}/join", &request_id, start, result)
 }

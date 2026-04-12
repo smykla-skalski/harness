@@ -187,7 +187,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
-    spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
+    initialize_db_and_spawn_background_tasks(&db, sender.clone(), config.poll_interval);
     let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
     let agent_tui_manager =
         super::agent_tui::AgentTuiManagerHandle::new(sender.clone(), db.clone(), config.sandboxed);
@@ -234,26 +234,19 @@ fn open_and_publish_db(
     Some(db)
 }
 
-fn spawn_background_db_init(
-    db_slot: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+fn initialize_db_and_spawn_background_tasks(
+    db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
     sender: broadcast::Sender<super::protocol::StreamEvent>,
     poll_interval: Duration,
 ) {
-    tokio::spawn(async move {
-        let db = spawn_blocking(move || open_and_publish_db(&db_slot))
-            .await
-            .ok()
-            .flatten();
+    let Some(db) = open_and_publish_db(db_slot) else {
+        return;
+    };
 
-        let Some(db) = db else {
-            return;
-        };
-
-        let db_option = Some(Arc::clone(&db));
-        let _watch = watch::spawn_watch_loop(sender, poll_interval, db_option.clone());
-        spawn_background_reconciliation(db_option.clone());
-        spawn_background_diagnostics(db_option);
-    });
+    let db_option = Some(Arc::clone(&db));
+    let _watch = watch::spawn_watch_loop(sender, poll_interval, db_option.clone());
+    spawn_background_reconciliation(db_option.clone());
+    spawn_background_diagnostics(db_option);
 }
 
 fn spawn_background_reconciliation(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {

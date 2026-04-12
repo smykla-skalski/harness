@@ -773,11 +773,7 @@ impl AgentTuiManagerHandle {
     }
 
     fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
-        self.state
-            .db
-            .get()
-            .cloned()
-            .ok_or_else(|| CliErrorKind::workflow_io("daemon database is not ready").into())
+        super::db::ensure_shared_db(&self.state.db)
     }
 
     fn active(&self) -> Result<MutexGuard<'_, BTreeMap<String, ActiveAgentTui>>, CliError> {
