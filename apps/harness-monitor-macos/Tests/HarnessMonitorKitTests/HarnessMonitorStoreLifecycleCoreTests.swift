@@ -168,7 +168,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     let store = await makeBootstrappedStore(client: client)
 
     await store.selectSession(selectedSummary.sessionId)
-    #expect(store.sidebarUI.selectedSessionID == selectedSummary.sessionId)
+    #expect(store.sidebarListUI.selectedSessionID == selectedSummary.sessionId)
     #expect(store.contentUI.session.selectedSessionSummary == selectedSummary)
 
     let replacementSummary = makeSession(
@@ -195,7 +195,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.selectedSession == nil)
     #expect(store.timeline.isEmpty)
     #expect(store.subscribedSessionIDs.isEmpty)
-    #expect(store.sidebarUI.selectedSessionID == nil)
+    #expect(store.sidebarListUI.selectedSessionID == nil)
     #expect(store.contentUI.session.selectedSessionSummary == nil)
   }
 
