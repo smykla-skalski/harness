@@ -59,7 +59,7 @@ struct SessionAgentSummaryCard: View {
       .gemini
     case "copilot":
       .copilot
-    case "mistral":
+    case "mistral", "vibe":
       .mistral
     default:
       nil
