@@ -56,6 +56,110 @@ cleanup_cli_launch_agent() {
   fi
 }
 
+candidate_version() {
+  local candidate="$1"
+  "${candidate}" --version 2>/dev/null | command awk '{print $2}'
+}
+
+candidate_is_harness_cli() {
+  local candidate="$1"
+  "${candidate}" --help 2>/dev/null | command grep -Fq "Harness CLI"
+}
+
+shadow_reconciliation_opted_out() {
+  local candidate="$1"
+  local cargo_home cargo_binary
+  cargo_home="${CARGO_HOME:-${HOME}/.cargo}"
+  cargo_binary="${cargo_home}/bin/harness"
+
+  [[ "${HARNESS_INSTALL_REMOVE_CARGO_SHADOW:-1}" == "0" ]] \
+    && [[ "${candidate}" == "${cargo_binary}" ]]
+}
+
+reconcile_shadowed_harness_binary() {
+  local candidate="$1"
+  local candidate_dir tmp_shadow
+  candidate_dir="$(dirname -- "${candidate}")"
+  tmp_shadow="${candidate}.new"
+
+  if shadow_reconciliation_opted_out "${candidate}"; then
+    printf 'warning: leaving shadowed cargo harness binary at %s because HARNESS_INSTALL_REMOVE_CARGO_SHADOW=0\n' "${candidate}" >&2
+    return 1
+  fi
+
+  if ! candidate_is_harness_cli "${candidate}"; then
+    printf 'warning: refusing to overwrite non-harness CLI shadow binary at %s\n' "${candidate}" >&2
+    return 1
+  fi
+
+  if [[ ! -w "${candidate_dir}" ]]; then
+    printf 'warning: unable to reconcile shadowed harness binary at %s because %s is not writable\n' \
+      "${candidate}" "${candidate_dir}" >&2
+    return 1
+  fi
+
+  command rm -f "${tmp_shadow}"
+  if ! command ln -s "${binary_path}" "${tmp_shadow}"; then
+    printf 'warning: unable to stage reconciled harness binary at %s\n' "${tmp_shadow}" >&2
+    command rm -f "${tmp_shadow}"
+    return 1
+  fi
+
+  if ! command mv -f "${tmp_shadow}" "${candidate}"; then
+    printf 'warning: unable to reconcile shadowed harness binary at %s\n' "${candidate}" >&2
+    command rm -f "${tmp_shadow}"
+    return 1
+  fi
+
+  printf 'reconciled shadowed harness binary at %s -> %s\n' "${candidate}" "${binary_path}" >&2
+}
+
+reconcile_shadowed_harness_binaries() {
+  local candidate candidate_ver
+  local -a unresolved_candidates=()
+
+  IFS=: read -r -a path_entries <<< "${PATH:-}"
+  for path_entry in "${path_entries[@]}"; do
+    [[ -n "${path_entry}" ]] || continue
+    candidate="${path_entry}/harness"
+    [[ -x "${candidate}" ]] || continue
+    [[ -n "${candidate}" ]] || continue
+    if [[ "${candidate}" == "${binary_path}" ]] || [[ "${candidate}" -ef "${binary_path}" ]]; then
+      continue
+    fi
+
+    candidate_ver="$(candidate_version "${candidate}")"
+    if [[ -z "${candidate_ver}" ]]; then
+      unresolved_candidates+=("${candidate}")
+      printf 'warning: unable to determine version for shadowed harness binary at %s\n' "${candidate}" >&2
+      continue
+    fi
+    if [[ "${candidate_ver}" == "${installed_version}" ]]; then
+      continue
+    fi
+
+    if ! reconcile_shadowed_harness_binary "${candidate}"; then
+      unresolved_candidates+=("${candidate}")
+      continue
+    fi
+
+    candidate_ver="$(candidate_version "${candidate}")"
+    if [[ "${candidate_ver}" != "${installed_version}" ]]; then
+      printf 'warning: shadowed harness binary at %s still reports version %s after reconciliation\n' \
+        "${candidate}" "${candidate_ver:-unknown}" >&2
+      unresolved_candidates+=("${candidate}")
+    fi
+  done
+
+  if (( ${#unresolved_candidates[@]} > 0 )); then
+    printf 'unable to reconcile shadowed harness binary path(s); clean them up before using `harness`:\n' >&2
+    for candidate in "${unresolved_candidates[@]}"; do
+      printf '  - %s\n' "${candidate}" >&2
+    done
+    exit 1
+  fi
+}
+
 warn_shadowed_harness_binaries() {
   local candidate candidate_version first_resolved=""
   local printed_shell_guidance=0
@@ -69,10 +173,12 @@ warn_shadowed_harness_binaries() {
     if [[ -z "${first_resolved}" ]]; then
       first_resolved="${candidate}"
     fi
-    [[ "${candidate}" == "${binary_path}" ]] && continue
+    if [[ "${candidate}" == "${binary_path}" ]] || [[ "${candidate}" -ef "${binary_path}" ]]; then
+      continue
+    fi
     [[ -x "${candidate}" ]] || continue
 
-    candidate_version="$("${candidate}" --version 2>/dev/null | command awk '{print $2}')"
+    candidate_version="$(candidate_version "${candidate}")"
     [[ -n "${candidate_version}" ]] || continue
     [[ "${candidate_version}" == "${installed_version}" ]] && continue
 
@@ -114,6 +220,8 @@ if [[ "${installed_version}" != "${expected_version}" ]]; then
   printf 'installed harness version %s != expected %s\n' "${installed_version}" "${expected_version}" >&2
   exit 1
 fi
+
+reconcile_shadowed_harness_binaries
 
 if [[ "${skip_codesign}" != "1" ]]; then
   command codesign --verify --strict --verbose=2 "${binary_path}" >/dev/null

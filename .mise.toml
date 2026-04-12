@@ -49,7 +49,7 @@ description = "Format and apply clippy fixes"
 run = ["cargo fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
-description = "Build release binary, sign it, install to ~/.local/bin, and validate the installed binary"
+description = "Build release binary, sign it, install to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binary"
 run = [
   "./scripts/cargo-local.sh build --release",
   "./scripts/install-harness-release.sh",
