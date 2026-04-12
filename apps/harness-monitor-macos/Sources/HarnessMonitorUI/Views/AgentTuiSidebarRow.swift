@@ -21,25 +21,30 @@ struct AgentTuiSidebarRow: View {
         .scaledFont(.body)
         .lineLimit(1)
         .truncationMode(.tail)
-
-      Spacer(minLength: 0)
-
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .overlay(alignment: .trailing) {
       Group {
         if let brandSymbol {
           ProviderBrandSymbolView(
             symbol: brandSymbol,
             colorMode: .automaticContrast,
-            size: 14
+            size: 36
           )
+          .opacity(0.12)
+          .offset(x: 6, y: 4)
         } else {
           Image(systemName: "terminal")
-            .imageScale(.small)
+            .font(.system(size: 28))
             .foregroundStyle(.secondary)
-            .frame(width: 14, height: 14)
+            .opacity(0.12)
+            .offset(x: 6, y: 4)
         }
       }
       .accessibilityHidden(true)
+      .allowsHitTesting(false)
     }
+    .clipped()
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
       "\(title), \(brandSymbol?.rawValue ?? snapshot.runtime), \(snapshot.status.title)"
