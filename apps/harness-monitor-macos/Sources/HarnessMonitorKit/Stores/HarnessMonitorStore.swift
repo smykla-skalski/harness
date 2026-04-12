@@ -67,13 +67,11 @@ public final class HarnessMonitorStore {
 
   public enum PresentedSheet: Identifiable, Equatable {
     case codexFlow
-    case agentTui
     case sendSignal(agentID: String)
 
     public var id: String {
       switch self {
       case .codexFlow: "codexFlow"
-      case .agentTui: "agentTui"
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       }
     }
