@@ -194,10 +194,7 @@ struct ContentDetailColumn: View {
 
   private var navigationTitleText: String {
     contentSessionDetail.selectedSessionDetail != nil
-      || (
-        contentSession.selectedSessionSummary != nil
-          && contentSession.isSelectionLoading == false
-      )
+      || contentSession.selectedSessionSummary != nil
       ? "Cockpit" : "Dashboard"
   }
 
@@ -250,7 +247,6 @@ struct ContentDetailColumn: View {
         detail: contentSessionDetail.selectedSessionDetail,
         summary: contentSession.selectedSessionSummary,
         timeline: contentSessionDetail.timeline,
-        isSelectionLoading: contentSession.isSelectionLoading,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isExtensionsLoading: contentSession.isExtensionsLoading
       )

@@ -257,7 +257,7 @@ private struct SidebarFilterStateMarker: View {
   }
 
   var body: some View {
-    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+    if HarnessMonitorUITestEnvironment.searchMarkersEnabled {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.sidebarFilterState,
         text: sidebarFilterStateValue

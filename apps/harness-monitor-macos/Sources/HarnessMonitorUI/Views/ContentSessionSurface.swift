@@ -5,7 +5,6 @@ struct SessionContentState: Equatable {
   let detail: SessionDetail?
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
-  let isSelectionLoading: Bool
   let isSessionReadOnly: Bool
   let isExtensionsLoading: Bool
 }
@@ -34,9 +33,6 @@ struct SessionContentContainer: View {
   private var mode: SessionContentMode {
     if let activeDetail {
       return .cockpit(activeDetail)
-    }
-    if state.isSelectionLoading, lastDetail == nil {
-      return .dashboard
     }
     if let summary = state.summary {
       return .loading(summary)
@@ -117,7 +113,6 @@ private struct SessionCockpitLoadingSurface: View {
       detail: nil,
       summary: nil,
       timeline: [],
-      isSelectionLoading: false,
       isSessionReadOnly: false,
       isExtensionsLoading: false
     )
@@ -135,7 +130,6 @@ private struct SessionCockpitLoadingSurface: View {
       detail: store.selectedSession,
       summary: store.selectedSessionSummary,
       timeline: store.timeline,
-      isSelectionLoading: false,
       isSessionReadOnly: false,
       isExtensionsLoading: false
     )

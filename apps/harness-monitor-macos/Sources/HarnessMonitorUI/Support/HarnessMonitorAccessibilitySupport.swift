@@ -7,15 +7,20 @@ public enum HarnessMonitorUITestEnvironment {
   public static let isHostBundle = Bundle.main.bundleIdentifier == hostBundleIdentifier
   public static let isEnabled =
     ProcessInfo.processInfo.environment[environmentKey] == "1" || isHostBundle
-  public static let isPerfScenarioActive: Bool = {
+  public static let perfScenarioRawValue: String? = {
     guard isEnabled else {
-      return false
+      return nil
     }
-    guard let rawScenario = ProcessInfo.processInfo.environment[perfScenarioEnvironmentKey] else {
-      return false
+    guard
+      let rawScenario = ProcessInfo.processInfo.environment[perfScenarioEnvironmentKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !rawScenario.isEmpty
+    else {
+      return nil
     }
-    return !rawScenario.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    return rawScenario
   }()
+  public static let isPerfScenarioActive = perfScenarioRawValue != nil
   public static let accessibilityMarkersEnabled: Bool = {
     guard isEnabled else {
       return false
@@ -23,8 +28,23 @@ public enum HarnessMonitorUITestEnvironment {
     let environment = ProcessInfo.processInfo.environment
     return environment["HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS"] != "0"
   }()
-  public static let selectionMarkersEnabled =
+  public static let generalMarkersEnabled =
     accessibilityMarkersEnabled && !isPerfScenarioActive
+  public static let searchMarkersEnabled: Bool = {
+    guard accessibilityMarkersEnabled else {
+      return false
+    }
+    guard let perfScenarioRawValue else {
+      return true
+    }
+    switch perfScenarioRawValue {
+    case "refresh-and-search", "sidebar-overflow-search":
+      return true
+    default:
+      return false
+    }
+  }()
+  public static let selectionMarkersEnabled = generalMarkersEnabled
 }
 
 private struct AccessibilityFrameMarker: View {
