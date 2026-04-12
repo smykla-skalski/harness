@@ -12,11 +12,6 @@ struct AgentTuiSidebarRow: View {
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(agentTuiStatusColor(for: snapshot.status))
-        .frame(width: 4)
-        .accessibilityHidden(true)
-
       Group {
         if let brandSymbol {
           ProviderBrandSymbolView(
@@ -37,6 +32,13 @@ struct AgentTuiSidebarRow: View {
         .scaledFont(.body)
         .lineLimit(1)
         .truncationMode(.tail)
+
+      Spacer(minLength: 0)
+
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+        .fill(agentTuiStatusColor(for: snapshot.status))
+        .frame(width: 4)
+        .accessibilityHidden(true)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
