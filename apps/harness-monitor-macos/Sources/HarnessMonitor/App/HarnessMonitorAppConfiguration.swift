@@ -31,7 +31,6 @@ struct HarnessMonitorAppConfiguration {
       HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
       HarnessMonitorCornerAnimationDefaults.enabledKey: false,
-      "harnessMonitor.board.onboardingDismissed": false,
       "showInspector": true,
       "inspectorColumnWidth": 420.0,
     ]

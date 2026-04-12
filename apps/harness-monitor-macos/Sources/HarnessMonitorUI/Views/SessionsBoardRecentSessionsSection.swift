@@ -14,7 +14,7 @@ struct SessionsBoardRecentSessionsSection: View {
         .accessibilityAddTraits(.isHeader)
       if sessions.isEmpty {
         Text(
-          "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."
+          "No sessions indexed yet. Start a harness session and refresh to see it here."
         )
         .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
