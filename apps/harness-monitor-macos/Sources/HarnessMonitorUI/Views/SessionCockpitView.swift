@@ -9,6 +9,21 @@ struct SessionCockpitView: View {
   let isExtensionsLoading: Bool
   @Environment(\.openWindow) private var openWindow
 
+  private var tuiStatusByAgent: [String: AgentTuiStatus] {
+    var result: [String: AgentTuiStatus] = [:]
+    result.reserveCapacity(store.selectedAgentTuis.count)
+    for tui in store.selectedAgentTuis {
+      if let existing = result[tui.agentId] {
+        if tui.status.isActive && !existing.isActive {
+          result[tui.agentId] = tui.status
+        }
+      } else {
+        result[tui.agentId] = tui.status
+      }
+    }
+    return result
+  }
+
   var body: some View {
     HarnessMonitorColumnScrollView(
       verticalPadding: HarnessMonitorTheme.spacingXL,
@@ -47,7 +62,8 @@ struct SessionCockpitView: View {
             agents: detail.agents,
             tasks: detail.tasks,
             isSessionReadOnly: isSessionReadOnly,
-            inspectAgent: store.inspect(agentID:)
+            inspectAgent: store.inspect(agentID:),
+            tuiStatusByAgent: tuiStatusByAgent
           )
         }
         SessionCockpitSignalsSection(
@@ -69,6 +85,16 @@ struct SessionCockpitView: View {
 #Preview("Cockpit") {
   SessionCockpitView(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
+    detail: PreviewFixtures.detail,
+    timeline: PreviewFixtures.timeline,
+    isSessionReadOnly: false,
+    isExtensionsLoading: false
+  )
+}
+
+#Preview("Cockpit - TUI agents") {
+  SessionCockpitView(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .agentTuiOverflow),
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     isSessionReadOnly: false,

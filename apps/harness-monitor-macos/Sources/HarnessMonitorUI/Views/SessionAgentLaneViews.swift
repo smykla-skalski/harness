@@ -8,6 +8,7 @@ struct SessionAgentListSection: View {
   let tasks: [WorkItem]
   let isSessionReadOnly: Bool
   let inspectAgent: (String) -> Void
+  let tuiStatusByAgent: [String: AgentTuiStatus]
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -29,7 +30,8 @@ struct SessionAgentListSection: View {
               agent: agent,
               queuedTasks: tasks.queued(for: agent.agentId),
               isSessionReadOnly: isSessionReadOnly,
-              inspectAgent: inspectAgent
+              inspectAgent: inspectAgent,
+              tuiStatus: tuiStatusByAgent[agent.agentId]
             )
           }
         }
@@ -47,6 +49,7 @@ struct SessionAgentSummaryCard: View {
   let queuedTasks: [WorkItem]
   let isSessionReadOnly: Bool
   let inspectAgent: (String) -> Void
+  let tuiStatus: AgentTuiStatus?
   @State private var isDropTargeted = false
 
   private var runtimeSymbol: ProviderBrandSymbol? {
@@ -108,6 +111,13 @@ struct SessionAgentSummaryCard: View {
       : HarnessMonitorTheme.onContrast
   }
 
+  private var tuiMarkerTint: Color {
+    guard let tuiStatus else { return .clear }
+    return tuiStatus.isActive
+      ? HarnessMonitorTheme.accent
+      : HarnessMonitorTheme.secondaryInk
+  }
+
   private var taskDropAction: AgentTaskDropAction {
     AgentTaskDropAction(
       agent: agent,
@@ -135,6 +145,22 @@ struct SessionAgentSummaryCard: View {
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
               .lineLimit(2)
             Spacer()
+            if tuiStatus != nil {
+              Label {
+                Text("TUI")
+                  .scaledFont(.caption.bold())
+              } icon: {
+                Image(systemName: "terminal.fill")
+                  .imageScale(.small)
+              }
+              .harnessPillPadding()
+              .harnessContentPill(tint: tuiMarkerTint)
+              .foregroundStyle(tuiMarkerTint)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
+              )
+              .harnessUITestValue(tuiStatus?.rawValue ?? "")
+            }
             Text(agent.role.title)
               .scaledFont(.caption.bold())
               .harnessPillPadding()
@@ -288,14 +314,29 @@ struct SessionAgentSummaryCard: View {
   }
 }
 
-#Preview("Agent summary") {
+#Preview("Agent summary - TUI running") {
   SessionAgentSummaryCard(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     sessionID: PreviewFixtures.summary.sessionId,
     agent: PreviewFixtures.agents[1],
     queuedTasks: [],
     isSessionReadOnly: false,
-    inspectAgent: { _ in }
+    inspectAgent: { _ in },
+    tuiStatus: .running
+  )
+  .padding()
+  .frame(width: 320)
+}
+
+#Preview("Agent summary - no TUI") {
+  SessionAgentSummaryCard(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
+    sessionID: PreviewFixtures.summary.sessionId,
+    agent: PreviewFixtures.agents[1],
+    queuedTasks: [],
+    isSessionReadOnly: false,
+    inspectAgent: { _ in },
+    tuiStatus: nil
   )
   .padding()
   .frame(width: 320)
