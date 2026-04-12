@@ -78,6 +78,14 @@ pub fn execute_session_watch(
             break;
         }
 
+        // Sync agent liveness each cycle so dead agents are detected promptly
+        let _ = service::sync_agent_liveness(session_id, project_dir);
+
+        // Re-read state after sync since agent statuses may have changed
+        let Ok(state) = service::session_status(session_id, project_dir) else {
+            break;
+        };
+
         let issues = scan_all_agents(&state, session_id, project_dir)?;
         let new_issues: Vec<Issue> = issues
             .into_iter()
