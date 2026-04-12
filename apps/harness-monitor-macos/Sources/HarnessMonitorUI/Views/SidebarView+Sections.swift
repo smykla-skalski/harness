@@ -4,7 +4,7 @@ import SwiftUI
 struct SidebarSessionListRenderState: Equatable {
   let projectionGroups: [HarnessMonitorStore.SessionGroup]
   let searchPresentation: HarnessMonitorStore.SessionSearchPresentationState
-  let searchList: HarnessMonitorStore.SessionSearchResultsListState
+  let searchVisibleSessions: [SessionSummary]
   let selectedSessionIDForAccessibilityMarkers: String?
   let bookmarkedSessionIDs: Set<String>
   let isPersistenceAvailable: Bool
@@ -81,7 +81,7 @@ struct SidebarSessionListContent: View {
 
   @ViewBuilder
   private var flatSearchResults: some View {
-    ForEach(renderState.searchList.visibleSessions, id: \.sessionId) { session in
+    ForEach(renderState.searchVisibleSessions, id: \.sessionId) { session in
       sessionRow(session)
     }
   }

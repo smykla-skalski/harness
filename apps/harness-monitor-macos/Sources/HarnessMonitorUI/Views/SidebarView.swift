@@ -12,6 +12,7 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
+  let onSidebarWidthChange: (CGFloat) -> Void
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -21,10 +22,12 @@ struct SidebarView: View {
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
   @State private var selectionTapBridge = SidebarSelectionTapBridge()
+  @State private var searchDraftText: String
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
+  private static let searchCommitDebounceNanoseconds: UInt64 = 250_000_000
 
   init(
     store: HarnessMonitorStore,
@@ -32,7 +35,8 @@ struct SidebarView: View {
     projection: HarnessMonitorStore.SessionProjectionSlice,
     searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice,
-    sidebarVisible: Bool
+    sidebarVisible: Bool,
+    onSidebarWidthChange: @escaping (CGFloat) -> Void = { _ in }
   ) {
     self.store = store
     self.controls = controls
@@ -40,36 +44,15 @@ struct SidebarView: View {
     self.searchResults = searchResults
     self.sidebarUI = sidebarUI
     self.sidebarVisible = sidebarVisible
+    self.onSidebarWidthChange = onSidebarWidthChange
+    _searchDraftText = State(initialValue: controls.searchText)
   }
 
   private var sidebarSearchText: Binding<String> {
     Binding(
-      get: { controls.searchText },
-      set: { newValue in
-        guard controls.searchText != newValue else {
-          return
-        }
-        store.searchText = newValue
-      }
+      get: { searchDraftText },
+      set: { searchDraftText = $0 }
     )
-  }
-
-  private var hasActiveSidebarFilters: Bool {
-    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || controls.sessionFilter != .all
-      || controls.sessionFocusFilter != .all
-      || controls.sessionSortOrder != .recentActivity
-  }
-
-  private var sidebarFilterStateValue: String {
-    [
-      "status=\(controls.sessionFilter.rawValue)",
-      "focus=\(controls.sessionFocusFilter.rawValue)",
-      "sort=\(controls.sessionSortOrder.rawValue)",
-      "visible=\(searchResults.filteredSessionCount)",
-      "total=\(searchResults.totalSessionCount)",
-      "search=\(controls.searchText)",
-    ].joined(separator: ", ")
   }
 
   // The sidebar search field already moves with the split view. Keep the
@@ -111,29 +94,25 @@ struct SidebarView: View {
       SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
     }
     .toolbar {
-      if filterToolbarVisibilityProgress > 0.02 {
-        ToolbarItem(placement: .primaryAction) {
-          SidebarToolbarFilterMenu(
-            store: store,
-            sessionFilter: controls.sessionFilter,
-            sessionFocusFilter: controls.sessionFocusFilter,
-            sessionSortOrder: controls.sessionSortOrder,
-            hasActiveFilters: hasActiveSidebarFilters
-          )
-          .opacity(filterToolbarVisibilityProgress)
-          .scaleEffect(
-            x: 0.94 + (0.06 * filterToolbarVisibilityProgress),
-            y: 0.94 + (0.06 * filterToolbarVisibilityProgress),
-            anchor: .trailing
-          )
-          .allowsHitTesting(filterToolbarVisibilityProgress > 0.85)
-          .accessibilityHidden(filterToolbarVisibilityProgress < 0.15)
-          .animation(.easeInOut(duration: 0.12), value: filterToolbarVisibilityProgress)
-        }
+      SidebarToolbarFilterToolbarItem(
+        store: store,
+        controls: controls,
+        searchResults: searchResults,
+        visibilityProgress: filterToolbarVisibilityProgress
+      )
+    }
+    .task(id: searchDraftText) {
+      guard searchDraftText != controls.searchText else {
+        return
       }
+      try? await Task.sleep(nanoseconds: Self.searchCommitDebounceNanoseconds)
+      guard !Task.isCancelled, searchDraftText != controls.searchText else {
+        return
+      }
+      commitSearchDraft(flushProjection: true)
     }
     .onSubmit(of: .search) {
-      store.flushPendingSearchRebuild()
+      commitSearchDraft(flushProjection: true)
       if sidebarUI.isPersistenceAvailable {
         _ = store.recordSearch(controls.searchText)
       }
@@ -155,17 +134,21 @@ struct SidebarView: View {
     .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
       isSearchFocused = true
     }
+    .onChange(of: controls.searchText, initial: true) { _, newValue in
+      guard searchDraftText != newValue else {
+        return
+      }
+      searchDraftText = newValue
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
     .overlay {
-      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.sidebarFilterState,
-          text: sidebarFilterStateValue
-        )
-      }
+      SidebarFilterStateMarker(
+        controls: controls,
+        searchResults: searchResults
+      )
     }
   }
 
@@ -188,6 +171,7 @@ struct SidebarView: View {
       return
     }
     sidebarWidth = quantizedWidth
+    onSidebarWidthChange(quantizedWidth)
   }
 
   func setCheckoutCollapsed(
@@ -202,10 +186,82 @@ struct SidebarView: View {
   }
 
   private func applyRecentSearch(_ query: String) {
-    store.searchText = query
-    store.flushPendingSearchRebuild()
+    searchDraftText = query
+    commitSearchDraft(flushProjection: true)
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
+    }
+  }
+
+  private func commitSearchDraft(flushProjection: Bool) {
+    guard controls.searchText != searchDraftText else {
+      return
+    }
+    store.searchText = searchDraftText
+    if flushProjection {
+      store.flushPendingSearchRebuild()
+    }
+  }
+}
+
+private struct SidebarToolbarFilterToolbarItem: ToolbarContent {
+  let store: HarnessMonitorStore
+  let controls: HarnessMonitorStore.SessionControlsSlice
+  let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
+  let visibilityProgress: Double
+
+  private var hasActiveFilters: Bool {
+    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || controls.sessionFilter != .all
+      || controls.sessionFocusFilter != .all
+      || controls.sessionSortOrder != .recentActivity
+  }
+
+  var body: some ToolbarContent {
+    if visibilityProgress > 0.02 {
+      ToolbarItem(placement: .primaryAction) {
+        SidebarToolbarFilterMenu(
+          store: store,
+          sessionFilter: controls.sessionFilter,
+          sessionFocusFilter: controls.sessionFocusFilter,
+          sessionSortOrder: controls.sessionSortOrder,
+          hasActiveFilters: hasActiveFilters
+        )
+        .opacity(visibilityProgress)
+        .scaleEffect(
+          x: 0.94 + (0.06 * visibilityProgress),
+          y: 0.94 + (0.06 * visibilityProgress),
+          anchor: .trailing
+        )
+        .allowsHitTesting(visibilityProgress > 0.85)
+        .accessibilityHidden(visibilityProgress < 0.15)
+        .animation(.easeInOut(duration: 0.12), value: visibilityProgress)
+      }
+    }
+  }
+}
+
+private struct SidebarFilterStateMarker: View {
+  let controls: HarnessMonitorStore.SessionControlsSlice
+  let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
+
+  private var sidebarFilterStateValue: String {
+    [
+      "status=\(controls.sessionFilter.rawValue)",
+      "focus=\(controls.sessionFocusFilter.rawValue)",
+      "sort=\(controls.sessionSortOrder.rawValue)",
+      "visible=\(searchResults.filteredSessionCount)",
+      "total=\(searchResults.totalSessionCount)",
+      "search=\(controls.searchText)",
+    ].joined(separator: ", ")
+  }
+
+  var body: some View {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.sidebarFilterState,
+        text: sidebarFilterStateValue
+      )
     }
   }
 }
@@ -255,7 +311,7 @@ private struct SidebarSessionListColumn: View {
     SidebarSessionListRenderState(
       projectionGroups: projection.groupedSessions,
       searchPresentation: searchResults.presentationState,
-      searchList: searchResults.listState,
+      searchVisibleSessions: searchResults.visibleSessions,
       selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
         .accessibilityMarkersEnabled ? sidebarUI.selectedSessionID : nil,
       bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,

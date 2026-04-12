@@ -111,6 +111,38 @@ struct PersistencePerformanceIntegrationTests {
     #expect(medianMs <= 12)
   }
 
+  @Test("Performance budget: search projection over 72 sessions stays under 12 ms median")
+  func searchProjectionStaysWithinPerformanceBudget() async throws {
+    let fixture = harness.largeSnapshotFixture()
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContainer: container
+    )
+    store.applySessionIndexSnapshot(
+      projects: fixture.projects,
+      sessions: fixture.sessions
+    )
+
+    let queries = [
+      "Regression 0",
+      "leader-2",
+      "observe-3",
+      "session-4",
+    ]
+    var iteration = 0
+
+    let medianMs = await harness.medianRuntimeMs {
+      let query = queries[iteration % queries.count]
+      iteration += 1
+      store.searchText = query
+      store.flushPendingSearchRebuild()
+      #expect(store.visibleSessionIDs.isEmpty == false)
+    }
+
+    #expect(medianMs <= 12)
+  }
+
   @Test("Performance budget: reapplying an unchanged session summary stays under 8 ms median")
   func unchangedSessionSummaryUpdateStaysWithinPerformanceBudget() async throws {
     let fixture = harness.largeSnapshotFixture()
