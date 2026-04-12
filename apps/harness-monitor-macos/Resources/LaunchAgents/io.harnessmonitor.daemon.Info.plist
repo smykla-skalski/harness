@@ -17,7 +17,8 @@
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>19.12.3</string>
+	<string>19.13.0</string>
+
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSBackgroundOnly</key>
