@@ -510,11 +510,9 @@ fn transition_summary(transition: &SessionTransition) -> (&'static str, Option<S
             None,
             format!("{agent_id} disconnected: {reason}"),
         ),
-        SessionTransition::AgentLeft { agent_id } => (
-            "agent_left",
-            None,
-            format!("{agent_id} left the session"),
-        ),
+        SessionTransition::AgentLeft { agent_id } => {
+            ("agent_left", None, format!("{agent_id} left the session"))
+        }
         SessionTransition::LivenessSynced {
             disconnected,
             idled,
