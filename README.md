@@ -11,6 +11,7 @@ mise run install
 ```
 
 Builds a release binary and installs `harness` to `~/.local/bin`. Requires Rust 1.94+.
+The install step also reconciles stale same-tool `harness` binaries found earlier on `PATH`, including stale `~/.cargo/bin/harness` shadows; if a conflicting shadow path cannot be rewritten safely, install fails and prints the path that needs manual cleanup.
 
 ## Fast Local Rust Workflow
 
