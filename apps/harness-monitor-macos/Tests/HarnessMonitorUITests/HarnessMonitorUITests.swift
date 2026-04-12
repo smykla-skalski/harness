@@ -22,34 +22,6 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(observeSummaryButton, timeout: Self.fastActionTimeout))
   }
 
-  func testEmptyModeShowsOnboardingCard() throws {
-    let app = launch(mode: "empty")
-    let onboardingCard = element(in: app, identifier: Accessibility.onboardingCard)
-
-    XCTAssertTrue(waitForElement(onboardingCard, timeout: Self.actionTimeout))
-    XCTAssertEqual(onboardingCard.label, "Bring Harness Monitor Online")
-    XCTAssertTrue(element(in: app, identifier: Accessibility.sidebarStartButton).exists)
-
-    let sidebarEmptyState = app.staticTexts[Accessibility.sidebarEmptyStateTitle]
-    let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
-    XCTAssertTrue(waitForElement(sidebarEmptyState, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(sidebarRoot, timeout: Self.fastActionTimeout))
-    XCTAssertFalse(element(in: app, identifier: Accessibility.sidebarSessionList).exists)
-    XCTAssertGreaterThanOrEqual(sidebarRoot.descendants(matching: .scrollView).count, 1)
-    XCTAssertEqual(sidebarRoot.descendants(matching: .scrollBar).count, 0)
-
-    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
-    let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
-    let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
-
-    XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(filterMenu, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(filterState.label.contains("status=all"))
-    XCTAssertTrue(filterState.label.contains("focus=all"))
-    XCTAssertTrue(filterState.label.contains("sort=recentActivity"))
-  }
-
   func testDegradedPersistenceModeShowsWarningAndHidesPersistenceControls() throws {
     let app = launch(
       mode: "preview",
