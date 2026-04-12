@@ -150,14 +150,20 @@ public struct ContentView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay {
-      ContentAccessibilityOverlayBridge(
-        contentToolbar: contentToolbar,
-        contentSession: contentSession,
-        contentSessionDetail: contentSessionDetail,
-        toolbarCenterpieceDisplayMode: toolbarCenterpieceDisplayMode,
-        appChromeAccessibilityValue: appChromeAccessibilityValue,
-        auditBuildAccessibilityValue: auditBuildAccessibilityValue
-      )
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        ContentGeneralAccessibilityOverlayBridge(
+          contentToolbar: contentToolbar,
+          contentSession: contentSession,
+          contentSessionDetail: contentSessionDetail,
+          toolbarCenterpieceDisplayMode: toolbarCenterpieceDisplayMode,
+          appChromeAccessibilityValue: appChromeAccessibilityValue
+        )
+      }
+      if let auditBuildAccessibilityValue {
+        ContentAuditBuildAccessibilityMarker(
+          auditBuildAccessibilityValue: auditBuildAccessibilityValue
+        )
+      }
     }
     .overlay(alignment: .topTrailing) {
       ContentFloatingOverlay(
@@ -418,40 +424,42 @@ private struct ContentEscapeCommandBridge: View {
   }
 }
 
-private struct ContentAccessibilityOverlayBridge: View {
+private struct ContentGeneralAccessibilityOverlayBridge: View {
   let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode
   let appChromeAccessibilityValue: String
-  let auditBuildAccessibilityValue: String?
 
   var body: some View {
-    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+    if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
       ZStack {
-        if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.appChromeState,
-            text: appChromeAccessibilityValue
-          )
-          ContentToolbarChromeAccessibilityMarker(
-            contentSession: contentSession,
-            contentSessionDetail: contentSessionDetail
-          )
-          ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
-            text: toolbarCenterpieceDisplayMode.rawValue
-          )
-        }
-        if let auditBuildAccessibilityValue {
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.auditBuildState,
-            text: auditBuildAccessibilityValue
-          )
-        }
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.appChromeState,
+          text: appChromeAccessibilityValue
+        )
+        ContentToolbarChromeAccessibilityMarker(
+          contentSession: contentSession,
+          contentSessionDetail: contentSessionDetail
+        )
+        ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
+          text: toolbarCenterpieceDisplayMode.rawValue
+        )
       }
     }
+  }
+}
+
+private struct ContentAuditBuildAccessibilityMarker: View {
+  let auditBuildAccessibilityValue: String
+
+  var body: some View {
+    AccessibilityTextMarker(
+      identifier: HarnessMonitorAccessibility.auditBuildState,
+      text: auditBuildAccessibilityValue
+    )
   }
 }
 
