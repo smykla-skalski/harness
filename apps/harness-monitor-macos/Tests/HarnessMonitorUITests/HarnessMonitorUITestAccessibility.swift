@@ -43,6 +43,7 @@ enum HarnessMonitorUITestAccessibility {
   static let sidebarEmptyStateTitle = "No sessions indexed yet"
   static let sidebarSessionList = "harness.sidebar.session-list"
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
+  static let sidebarSessionListState = "harness.sidebar.session-list.state"
   static let sidebarFiltersCard = "harness.sidebar.filters"
   static let sidebarFiltersCardFrame = "harness.sidebar.filters.frame"
   static let sidebarFilterMenu = "harness.toolbar.sidebar-filters"

@@ -22,6 +22,26 @@ struct SidebarSessionListRenderState {
     searchPresentation.isSearchActive
   }
 
+  var groupedProjectCount: Int {
+    projectionGroups.count
+  }
+
+  var groupedWorktreeCount: Int {
+    projectionGroups.reduce(into: 0) { partialResult, group in
+      partialResult += group.checkoutGroups.count
+    }
+  }
+
+  var groupedSessionCount: Int {
+    projectionGroups.reduce(into: 0) { partialResult, group in
+      partialResult += group.sessionIDs.count
+    }
+  }
+
+  var groupedStateAccessibilityLabel: String {
+    "projects=\(groupedProjectCount), worktrees=\(groupedWorktreeCount), sessions=\(groupedSessionCount)"
+  }
+
   func sessionSummary(for sessionID: String) -> SessionSummary? {
     sessionCatalog.sessionSummary(for: sessionID)
   }
@@ -30,7 +50,8 @@ struct SidebarSessionListRenderState {
     projectID: String,
     checkoutID: String
   ) -> Bool {
-    !collapsedCheckoutKeys.contains(Self.checkoutStorageKey(projectID: projectID, checkoutID: checkoutID))
+    !collapsedCheckoutKeys.contains(
+      Self.checkoutStorageKey(projectID: projectID, checkoutID: checkoutID))
   }
 
   static func checkoutStorageKey(
@@ -118,16 +139,16 @@ struct SidebarSessionListContent: View {
         .font(scaledSidebarFont(.system(.headline, design: .rounded, weight: .semibold)))
       Spacer(minLength: 0)
     }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityElement(children: .combine)
-      .accessibilityAddTraits(.isHeader)
-      .contentShape(Rectangle())
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.projectHeader(group.project.projectId)
-      )
-      .accessibilityFrameMarker(
-        HarnessMonitorAccessibility.projectHeaderFrame(group.project.projectId)
-      )
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
+    .contentShape(Rectangle())
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.projectHeader(group.project.projectId)
+    )
+    .accessibilityFrameMarker(
+      HarnessMonitorAccessibility.projectHeaderFrame(group.project.projectId)
+    )
   }
 
   @ViewBuilder
@@ -279,9 +300,10 @@ struct SidebarSessionListContent: View {
   }
 }
 
-private extension View {
+extension View {
   @ViewBuilder
-  func accessibilityFrameMarker(_ identifier: String, when condition: Bool) -> some View {
+  fileprivate func accessibilityFrameMarker(_ identifier: String, when condition: Bool) -> some View
+  {
     if condition {
       accessibilityFrameMarker(identifier)
     } else {

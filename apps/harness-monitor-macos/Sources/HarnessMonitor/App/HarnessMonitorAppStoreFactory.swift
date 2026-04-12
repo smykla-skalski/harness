@@ -16,6 +16,7 @@ enum HarnessMonitorAppStoreFactory {
     case dashboardLanding = "dashboard-landing"
     case dashboard
     case cockpit
+    case toolbarCountRegression = "toolbar-count-regression"
     case agentTuiOverflow = "agent-tui-overflow"
     case taskDrop = "task-drop"
     case offlineCached = "offline-cached"
@@ -40,6 +41,8 @@ enum HarnessMonitorAppStoreFactory {
         .dashboardLoaded
       case .cockpit:
         .cockpitLoaded
+      case .toolbarCountRegression:
+        .toolbarCountRegression
       case .agentTuiOverflow:
         .agentTuiOverflow
       case .taskDrop:
@@ -180,12 +183,13 @@ enum HarnessMonitorAppStoreFactory {
       return nil
     }
 
-    let running = switch rawRunning {
-    case "0", "false", "no":
-      false
-    default:
-      true
-    }
+    let running =
+      switch rawRunning {
+      case "0", "false", "no":
+        false
+      default:
+        true
+      }
 
     var capabilities: [String: HostBridgeCapabilityManifest] = [:]
     if running, let rawCapabilities {
