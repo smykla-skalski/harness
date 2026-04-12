@@ -169,29 +169,31 @@ struct SessionAgentSummaryCard: View {
         )
         .padding(HarnessMonitorTheme.cardPadding)
         .overlay(alignment: .bottomTrailing) {
-          ZStack(alignment: .topTrailing) {
-            if let runtimeSymbol {
-              ProviderBrandSymbolView(
-                symbol: runtimeSymbol,
-                colorMode: .automaticContrast,
-                size: 110
-              )
-              .opacity(0.12)
-              .offset(x: 18, y: 22)
-            }
-            if tuiStatus != nil {
-              Image(systemName: "terminal.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(tuiMarkerColor)
-                .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
-                .accessibilityIdentifier(
-                  HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
-                )
-                .harnessUITestValue(tuiStatus?.rawValue ?? "")
-            }
+          if let runtimeSymbol {
+            ProviderBrandSymbolView(
+              symbol: runtimeSymbol,
+              colorMode: .automaticContrast,
+              size: 110
+            )
+            .opacity(0.12)
+            .offset(x: 18, y: 22)
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
           }
-          .accessibilityHidden(tuiStatus == nil)
-          .allowsHitTesting(false)
+        }
+        .overlay(alignment: .bottomTrailing) {
+          if tuiStatus != nil {
+            Image(systemName: "terminal.fill")
+              .font(.system(size: 20))
+              .foregroundStyle(tuiMarkerColor)
+              .padding(HarnessMonitorTheme.spacingSM)
+              .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
+              )
+              .harnessUITestValue(tuiStatus?.rawValue ?? "")
+              .allowsHitTesting(false)
+          }
         }
         .clipped()
       }
