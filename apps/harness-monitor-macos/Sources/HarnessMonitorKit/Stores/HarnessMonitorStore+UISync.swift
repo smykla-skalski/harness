@@ -93,9 +93,12 @@ extension HarnessMonitorStore {
       self?.scheduleUISync([.sidebar])
     }
     sessionIndex.onChanged = { [weak self] change in
+      guard let self else {
+        return
+      }
       switch change {
       case .snapshot:
-        self?.scheduleUISync([
+        self.scheduleUISync([
           .contentToolbar,
           .contentChrome,
           .contentSession,
@@ -103,15 +106,15 @@ extension HarnessMonitorStore {
         ])
       case .summaryProjection(let sessionID):
         var areas: Set<UISyncArea> = [.contentToolbar]
-        if self?.selection.selectedSessionID == sessionID {
+        if self.shouldSyncSelectedSessionLoadingChrome(for: sessionID) {
           areas.formUnion([.contentChrome, .contentSession, .inspector])
         }
-        self?.scheduleUISync(areas)
+        self.scheduleUISync(areas)
       case .summaryMetadata(let sessionID):
-        guard self?.selection.selectedSessionID == sessionID else {
+        guard self.shouldSyncSelectedSessionLoadingChrome(for: sessionID) else {
           return
         }
-        self?.scheduleUISync([.contentChrome, .contentSession, .inspector])
+        self.scheduleUISync([.contentChrome, .contentSession, .inspector])
       case .projection:
         break
       }
@@ -188,6 +191,13 @@ extension HarnessMonitorStore {
 
   func debugResetUISyncCounts() {
     debugUISyncCounts.removeAll(keepingCapacity: true)
+  }
+
+  private func shouldSyncSelectedSessionLoadingChrome(for sessionID: String) -> Bool {
+    guard selection.selectedSessionID == sessionID else {
+      return false
+    }
+    return selection.matchedSelectedSession == nil
   }
 
   private func syncContentShellUI() {
