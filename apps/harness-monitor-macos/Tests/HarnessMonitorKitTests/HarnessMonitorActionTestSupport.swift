@@ -131,6 +131,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
   private var _agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
   private var _codexStartError: (any Error)?
+  private var _queuedCodexStartErrors: [any Error] = []
   private var _agentTuiStartError: (any Error)?
   private var _hostBridgeReconfigureError: (any Error)?
   private var _hostBridgeStatusReport = BridgeStatusReport(running: false)
@@ -344,7 +345,17 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   }
 
   func configureCodexStartError(_ error: (any Error)?) {
-    lock.withLock { _codexStartError = error }
+    lock.withLock {
+      _codexStartError = error
+      _queuedCodexStartErrors = []
+    }
+  }
+
+  func configureCodexStartErrors(_ errors: [any Error]) {
+    lock.withLock {
+      _queuedCodexStartErrors = errors
+      _codexStartError = nil
+    }
   }
 
   func configureAgentTuiStartError(_ error: (any Error)?) {
@@ -361,6 +372,16 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
 
   func configuredCodexStartError() -> (any Error)? {
     lock.withLock { _codexStartError }
+  }
+
+  func dequeueConfiguredCodexStartError() -> (any Error)? {
+    lock.withLock {
+      guard let error = _queuedCodexStartErrors.first else {
+        return _codexStartError
+      }
+      _queuedCodexStartErrors.removeFirst()
+      return error
+    }
   }
 
   func configuredAgentTuiStartError() -> (any Error)? {
