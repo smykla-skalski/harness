@@ -155,6 +155,8 @@ public enum HarnessMonitorAccessibility {
   static let agentTuiRuntimePicker = "harness.sheet.agent-tui.runtime"
   static let agentTuiNameField = "harness.sheet.agent-tui.name"
   static let agentTuiPromptField = "harness.sheet.agent-tui.prompt"
+  static let agentTuiProjectDirField = "harness.sheet.agent-tui.project-dir"
+  static let agentTuiArgvField = "harness.sheet.agent-tui.argv"
   static let agentTuiLaunchPane = "harness.sheet.agent-tui.launch-pane"
   static let agentTuiSessionPane = "harness.sheet.agent-tui.session-pane"
   static let agentTuiViewport = "harness.sheet.agent-tui.viewport"
