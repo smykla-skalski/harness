@@ -483,7 +483,9 @@ private struct ContentToolbarChromeAccessibilityMarker: View {
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
 
   private var windowTitle: String {
-    contentSessionDetail.selectedSessionDetail != nil ? "Cockpit" : "Dashboard"
+    contentSessionDetail.selectedSessionDetail != nil
+      || contentSession.selectedSessionSummary != nil
+      ? "Cockpit" : "Dashboard"
   }
 
   var body: some View {
