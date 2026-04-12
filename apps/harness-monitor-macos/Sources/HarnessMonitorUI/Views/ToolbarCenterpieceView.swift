@@ -183,7 +183,7 @@ enum ToolbarCenterpieceDisplayMode: String {
   case compressed
 
   private static let standardDetailThreshold: CGFloat = 1_050
-  private static let compactDetailThreshold: CGFloat = 820
+  private static let compactDetailThreshold: CGFloat = 960
 
   static func forDetailWidth(_ detailWidth: CGFloat) -> Self {
     switch detailWidth {
@@ -209,6 +209,15 @@ enum ToolbarCenterpieceDisplayMode: String {
 
   var showsMetricLabels: Bool { false }
 
+  var principalHorizontalOffset: CGFloat {
+    switch self {
+    case .standard, .compact:
+      0
+    case .compressed:
+      4
+    }
+  }
+
   func centerpieceWidth(for detailWidth: CGFloat) -> CGFloat {
     let ratio: CGFloat =
       switch self {
@@ -217,7 +226,7 @@ enum ToolbarCenterpieceDisplayMode: String {
       case .compact:
         0.42
       case .compressed:
-        0.4
+        0.34
       }
 
     let minimumWidth: CGFloat =
@@ -227,7 +236,7 @@ enum ToolbarCenterpieceDisplayMode: String {
       case .compact:
         340
       case .compressed:
-        260
+        208
       }
 
     let maximumWidth: CGFloat =
@@ -237,7 +246,7 @@ enum ToolbarCenterpieceDisplayMode: String {
       case .compact:
         500
       case .compressed:
-        380
+        300
       }
 
     return min(max(detailWidth * ratio, minimumWidth), maximumWidth)
@@ -252,7 +261,7 @@ enum ToolbarCenterpieceDisplayMode: String {
       case .compact:
         175
       case .compressed:
-        140
+        120
       }
     let maximumWidth: CGFloat =
       switch self {
@@ -261,7 +270,7 @@ enum ToolbarCenterpieceDisplayMode: String {
       case .compact:
         220
       case .compressed:
-        180
+        145
       }
 
     return min(max(centerpieceWidth * 0.44, minimumWidth), maximumWidth)
@@ -281,8 +290,8 @@ struct ToolbarCenterpieceView: View {
   // Leading inset matches the vertical centering gap inside the glass capsule
   // so the first metric token sits at equal distance from the bubble's inner
   // surface on all sides.
-  private static let metricsLeadingInset: CGFloat = 16
-  private static let daemonTrailingInset: CGFloat = 8
+  private static let metricsLeadingInset: CGFloat = 12
+  private static let daemonTrailingInset: CGFloat = 4
 
   init(
     model: ToolbarCenterpieceModel,
@@ -319,20 +328,13 @@ struct ToolbarCenterpieceView: View {
         if !statusMessages.isEmpty {
           ToolbarStatusTickerCapsule(
             messages: statusMessages
-          )
+          ) {
+            daemonAccessory
+          }
           .frame(width: displayMode.statusDropdownWidth(for: availableDetailWidth))
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
-        }
-
-        HStack(spacing: 6) {
-          ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
-          if let store {
-            ToolbarDaemonToggleControl(
-              store: store,
-              connectionState: connectionState,
-              isBusy: isBusy
-            )
-          }
+        } else {
+          daemonAccessory
         }
       }
       .padding(.leading, Self.metricsLeadingInset)
@@ -342,10 +344,25 @@ struct ToolbarCenterpieceView: View {
       width: displayMode.centerpieceWidth(for: availableDetailWidth),
       height: Self.toolbarHeight
     )
+    .offset(x: displayMode.principalHorizontalOffset)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
     .accessibilityLabel(model.accessibilityLabel)
     .accessibilityValue(model.accessibilityValue)
     .help("Live harness summary")
+  }
+
+  @ViewBuilder
+  private var daemonAccessory: some View {
+    HStack(spacing: 6) {
+      ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
+      if let store {
+        ToolbarDaemonToggleControl(
+          store: store,
+          connectionState: connectionState,
+          isBusy: isBusy
+        )
+      }
+    }
   }
 }

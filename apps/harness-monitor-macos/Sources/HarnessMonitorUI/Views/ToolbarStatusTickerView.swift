@@ -60,9 +60,18 @@ enum ToolbarTickerDirection {
   }
 }
 
-struct ToolbarStatusTickerCapsule: View {
+struct ToolbarStatusTickerCapsule<TrailingAccessory: View>: View {
   let messages: [ToolbarStatusMessage]
-  private static let contentHorizontalInset: CGFloat = 16
+  let trailingAccessory: TrailingAccessory
+  private let contentHorizontalInset: CGFloat = 12
+
+  init(
+    messages: [ToolbarStatusMessage],
+    @ViewBuilder trailingAccessory: () -> TrailingAccessory
+  ) {
+    self.messages = messages
+    self.trailingAccessory = trailingAccessory()
+  }
 
   var body: some View {
     HStack(spacing: 8) {
@@ -70,9 +79,10 @@ struct ToolbarStatusTickerCapsule: View {
       ToolbarStatusTickerView(messages: messages, direction: .up)
         .lineLimit(1)
         .truncationMode(.tail)
+      trailingAccessory
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerContentFrame)
-    .padding(.horizontal, Self.contentHorizontalInset)
+    .padding(.horizontal, contentHorizontalInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }

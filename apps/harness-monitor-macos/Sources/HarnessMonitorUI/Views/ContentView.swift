@@ -36,7 +36,9 @@ public struct ContentView: View {
   @State private var showInspector = false
   @State private var sidebarColumnWidth: CGFloat = 260
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
+  @State private var pendingDetailColumnWidth: CGFloat?
   @State private var isLayoutAnimating = false
+  @State private var layoutSuppressionTask: Task<Void, Never>?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var appChromeAccessibilityValue: String {
@@ -211,9 +213,7 @@ public struct ContentView: View {
       controls: store.sessionIndex.controls,
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
-      sidebarShellUI: store.sidebarShellUI,
-      sidebarListUI: store.sidebarListUI,
-      sidebarFooterUI: store.sidebarFooterUI,
+      sidebarUI: store.sidebarUI,
       sidebarVisible: columnVisibility != .detailOnly,
       onSidebarWidthChange: updateSidebarColumnWidth
     )
@@ -232,8 +232,7 @@ public struct ContentView: View {
       dashboardUI: contentDashboard,
       showInspector: $showInspector,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
-      isLayoutAnimating: isLayoutAnimating,
-      detailColumnWidth: $detailColumnWidth
+      onDetailColumnWidthChange: updateDetailColumnWidth
     )
     .inspector(isPresented: $showInspector) {
       inspectorColumn
@@ -258,11 +257,37 @@ public struct ContentView: View {
   }
 
   private func suppressLayoutGeometry() {
+    layoutSuppressionTask?.cancel()
     isLayoutAnimating = true
-    Task {
+    layoutSuppressionTask = Task {
       try? await Task.sleep(for: .milliseconds(400))
+      guard !Task.isCancelled else {
+        return
+      }
+      if let pendingDetailColumnWidth,
+        abs(pendingDetailColumnWidth - detailColumnWidth) >= 1
+      {
+        detailColumnWidth = pendingDetailColumnWidth
+      }
+      self.pendingDetailColumnWidth = nil
       isLayoutAnimating = false
+      layoutSuppressionTask = nil
     }
+  }
+
+  private func updateDetailColumnWidth(_ width: CGFloat) {
+    let nextWidth = ContentToolbarLayoutWidth.normalized(width)
+    if isLayoutAnimating {
+      if abs(nextWidth - (pendingDetailColumnWidth ?? detailColumnWidth)) >= 1 {
+        pendingDetailColumnWidth = nextWidth
+      }
+      return
+    }
+    guard abs(nextWidth - detailColumnWidth) >= 1 else {
+      return
+    }
+    pendingDetailColumnWidth = nil
+    detailColumnWidth = nextWidth
   }
 
   private func updateInspectorWidth(_ width: CGFloat) {
@@ -500,9 +525,7 @@ private struct ContentToolbarChromeAccessibilityMarker: View {
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
 
   private var windowTitle: String {
-    contentSessionDetail.selectedSessionDetail != nil
-      || contentSession.selectedSessionSummary != nil
-      ? "Cockpit" : "Dashboard"
+    contentSessionDetail.selectedSessionDetail != nil ? "Cockpit" : "Dashboard"
   }
 
   var body: some View {
