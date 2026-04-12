@@ -1,12 +1,6 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  public func presentAgentTuiSheet() {
-    guard guardSessionActionsAvailable() else { return }
-    guard selectedSessionID != nil else { return }
-    presentedSheet = .agentTui
-  }
-
   public func presentCodexFlowSheet() {
     guard guardSessionActionsAvailable() else { return }
     guard selectedSessionID != nil else { return }

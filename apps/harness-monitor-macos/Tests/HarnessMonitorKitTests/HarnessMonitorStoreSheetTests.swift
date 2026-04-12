@@ -21,16 +21,6 @@ struct HarnessMonitorStoreSheetTests {
     #expect(store.presentedSheet == .sendSignal(agentID: "leader-claude"))
   }
 
-  @Test("presentAgentTuiSheet sets the sheet when online with a selected session")
-  func presentAgentTuiSheetSetsSheet() async {
-    let store = await makeBootstrappedStore()
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    store.presentAgentTuiSheet()
-
-    #expect(store.presentedSheet == .agentTui)
-  }
-
   @Test("dismissSheet clears the sheet")
   func dismissSheetClearsSheet() async {
     let store = await makeBootstrappedStore()
@@ -92,7 +82,6 @@ struct HarnessMonitorStoreSheetTests {
     let sheet = HarnessMonitorStore.PresentedSheet.codexFlow
     switch sheet {
     case .codexFlow: break
-    case .agentTui: break
     case .sendSignal: break
     }
   }
