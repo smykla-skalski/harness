@@ -1298,6 +1298,72 @@ pub fn sync_agent_liveness(
     Ok(result)
 }
 
+/// Mark the calling agent as disconnected and unassign its tasks.
+///
+/// Leaders cannot leave; they must transfer leadership first. This is a
+/// voluntary, graceful exit - the liveness sync handles involuntary exits.
+///
+/// # Errors
+/// Returns `CliError` on storage failures or if the agent is the leader.
+pub fn leave_session(
+    session_id: &str,
+    agent_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    storage::update_state(project_dir, session_id, |state| {
+        require_active(state)?;
+        require_removable_agent(state, agent_id)?;
+
+        let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "agent '{agent_id}' not found"
+            )))
+        })?;
+        if !agent.status.is_alive() {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "agent '{agent_id}' is already {}",
+                agent_status_label(agent.status)
+            ))
+            .into());
+        }
+
+        agent.status = AgentStatus::Disconnected;
+        agent.updated_at = now.clone();
+        agent.last_activity_at = Some(now.clone());
+        agent.current_task_id = None;
+
+        // Return any assigned tasks to Open
+        for task in state.tasks.values_mut() {
+            if task.assigned_to.as_deref() == Some(agent_id)
+                && !matches!(task.status, TaskStatus::Done)
+            {
+                task.status = TaskStatus::Open;
+                task.assigned_to = None;
+                task.queue_policy = TaskQueuePolicy::Locked;
+                task.queued_at = None;
+                task.updated_at = now.clone();
+            }
+        }
+
+        clear_pending_leader_transfer(state, agent_id);
+        refresh_session(state, &now);
+        Ok(())
+    })?;
+
+    storage::append_log_entry(
+        project_dir,
+        session_id,
+        SessionTransition::AgentLeft {
+            agent_id: agent_id.to_string(),
+        },
+        Some(agent_id),
+        None,
+    )?;
+
+    Ok(())
+}
+
 /// List sessions for a project.
 ///
 /// # Errors
@@ -4575,6 +4641,70 @@ mod tests {
             let state = session_status("sync-4", project).expect("status");
             assert_eq!(state.metrics.active_agent_count, 1);
             assert_eq!(state.metrics.agent_count, 7);
+        });
+    }
+
+    #[test]
+    fn leave_session_marks_agent_disconnected() {
+        with_temp_project(|project| {
+            let state =
+                start_session("test", "", project, Some("claude"), Some("leave-1"))
+                    .expect("start");
+            let leader_id = state.leader_id.clone().expect("leader");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("worker-leave"), || {
+                join_session(
+                    "leave-1",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join");
+            });
+
+            let state = session_status("leave-1", project).expect("status");
+            let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+
+            // Assign a task to the worker
+            let task = create_task(
+                "leave-1",
+                "test task",
+                Some("details"),
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("create task");
+            assign_task("leave-1", &task.task_id, &worker_id, &leader_id, project)
+                .expect("assign");
+
+            leave_session("leave-1", &worker_id, project).expect("leave");
+
+            let state = session_status("leave-1", project).expect("status");
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert_eq!(worker.status, AgentStatus::Disconnected);
+
+            let task = state.tasks.get(&task.task_id).expect("task");
+            assert_eq!(task.status, TaskStatus::Open, "task returned to open");
+            assert!(task.assigned_to.is_none(), "task unassigned");
+
+            assert_eq!(state.metrics.active_agent_count, 1);
+        });
+    }
+
+    #[test]
+    fn leave_session_leader_cannot_leave() {
+        with_temp_project(|project| {
+            let state =
+                start_session("test", "", project, Some("claude"), Some("leave-2"))
+                    .expect("start");
+            let leader_id = state.leader_id.clone().expect("leader");
+
+            let error =
+                leave_session("leave-2", &leader_id, project).expect_err("leader cannot leave");
+            assert_eq!(error.code(), "KSRCLI092");
         });
     }
 }
