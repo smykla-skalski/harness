@@ -248,7 +248,7 @@ struct ToolbarCenterpieceView: View {
   // so the first metric token sits at equal distance from the bubble's inner
   // surface on all sides.
   private static let metricsLeadingInset: CGFloat = 12
-  private static let daemonTrailingInset: CGFloat = 4
+  private static let daemonTrailingInset: CGFloat = 10
 
   init(
     model: ToolbarCenterpieceModel,
