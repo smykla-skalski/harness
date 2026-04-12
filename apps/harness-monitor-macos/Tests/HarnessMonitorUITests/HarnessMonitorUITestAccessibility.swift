@@ -243,6 +243,14 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.timeline.pagination.page.\(pageNumber)"
   }
 
+  static func projectHeader(_ projectID: String) -> String {
+    "harness.sidebar.project-header.\(slug(projectID))"
+  }
+
+  static func worktreeHeader(_ checkoutID: String) -> String {
+    "harness.sidebar.worktree-header.\(slug(checkoutID))"
+  }
+
   static func preferencesBackgroundTile(_ key: String) -> String {
     "harness.preferences.background.\(slug(key))"
   }
@@ -253,6 +261,13 @@ enum HarnessMonitorUITestAccessibility {
 
   static func sidebarFocusChip(_ filter: String) -> String {
     "harness.sidebar.focus-chip.\(slug(filter))"
+  }
+
+  static let leaderAgentTuiMarker = "harness.session.agent.leader-claude.tui-marker"
+  static let workerAgentTuiMarker = "harness.session.agent.worker-codex.tui-marker"
+
+  static func sessionAgentTuiMarker(_ agentID: String) -> String {
+    "harness.session.agent.\(slug(agentID)).tui-marker"
   }
 
   static func sessionAgentTaskDropFeedback(_ agentID: String) -> String {
