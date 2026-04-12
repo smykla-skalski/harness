@@ -185,6 +185,59 @@ pub fn read_acknowledgments(signal_dir: &Path) -> Result<Vec<SignalAck>, CliErro
     read_json_files_from_dir::<SignalAck>(&acknowledged_dir(signal_dir))
 }
 
+/// Return pending signals whose `created_at` is older than `threshold_seconds`.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn check_signal_timeouts(
+    signal_dir: &Path,
+    threshold_seconds: u64,
+) -> Result<Vec<Signal>, CliError> {
+    let signals = read_pending_signals(signal_dir)?;
+    let now = chrono::Utc::now();
+    let mut timed_out = Vec::new();
+    for signal in signals {
+        let Ok(created) = chrono::DateTime::parse_from_rfc3339(&signal.created_at) else {
+            // Unparseable timestamp - treat as timed out
+            timed_out.push(signal);
+            continue;
+        };
+        let elapsed = now
+            .signed_duration_since(created)
+            .num_seconds()
+            .unsigned_abs();
+        if elapsed >= threshold_seconds {
+            timed_out.push(signal);
+        }
+    }
+    Ok(timed_out)
+}
+
+/// Clean up all pending signals for a dead agent by acknowledging them as expired.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn cleanup_pending_signals(
+    signal_dir: &Path,
+    agent_id: &str,
+    session_id: &str,
+) -> Result<(), CliError> {
+    let signals = read_pending_signals(signal_dir)?;
+    let now = chrono::Utc::now().to_rfc3339();
+    for signal in signals {
+        let ack = SignalAck {
+            signal_id: signal.signal_id.clone(),
+            acknowledged_at: now.clone(),
+            result: AckResult::Expired,
+            agent: agent_id.to_string(),
+            session_id: session_id.to_string(),
+            details: Some("agent disconnected by liveness sync".to_string()),
+        };
+        acknowledge_signal(signal_dir, &ack)?;
+    }
+    Ok(())
+}
+
 /// Read acknowledged signal payloads that have already been moved out of pending.
 ///
 /// # Errors
@@ -280,5 +333,47 @@ mod tests {
         assert!(signals.is_empty());
         let acks = read_acknowledgments(tmp.path()).unwrap();
         assert!(acks.is_empty());
+    }
+
+    #[test]
+    fn check_signal_timeouts_detects_expired() {
+        let tmp = tempfile::tempdir().unwrap();
+        let signal_dir = tmp.path().join("signals");
+
+        // Write a signal with an old created_at timestamp
+        let mut signal = sample_signal();
+        signal.created_at = "2020-01-01T00:00:00Z".into();
+        signal.expires_at = "2020-01-01T00:05:00Z".into();
+        write_signal_file(&signal_dir, &signal).unwrap();
+
+        let timed_out = check_signal_timeouts(&signal_dir, 60).unwrap();
+        assert_eq!(timed_out.len(), 1);
+        assert_eq!(timed_out[0].signal_id, "sig-test-001");
+    }
+
+    #[test]
+    fn check_signal_timeouts_ignores_fresh_signals() {
+        let tmp = tempfile::tempdir().unwrap();
+        let signal_dir = tmp.path().join("signals");
+        let mut signal = sample_signal();
+        signal.created_at = chrono::Utc::now().to_rfc3339();
+        write_signal_file(&signal_dir, &signal).unwrap();
+
+        let timed_out = check_signal_timeouts(&signal_dir, 600).unwrap();
+        assert!(timed_out.is_empty());
+    }
+
+    #[test]
+    fn cleanup_pending_signals_moves_to_acknowledged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let signal_dir = tmp.path().join("signals");
+        write_signal_file(&signal_dir, &sample_signal()).unwrap();
+
+        cleanup_pending_signals(&signal_dir, "dead-agent", "sess-1").unwrap();
+
+        assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
+        let acks = read_acknowledgments(&signal_dir).unwrap();
+        assert_eq!(acks.len(), 1);
+        assert_eq!(acks[0].result, AckResult::Expired);
     }
 }
