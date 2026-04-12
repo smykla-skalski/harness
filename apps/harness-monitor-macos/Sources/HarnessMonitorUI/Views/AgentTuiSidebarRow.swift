@@ -12,9 +12,9 @@ struct AgentTuiSidebarRow: View {
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(agentTuiStatusColor(for: snapshot.status))
-        .frame(width: 4)
+      Image(systemName: "terminal")
+        .imageScale(.small)
+        .foregroundStyle(agentTuiStatusColor(for: snapshot.status))
         .accessibilityHidden(true)
 
       Text(title)
