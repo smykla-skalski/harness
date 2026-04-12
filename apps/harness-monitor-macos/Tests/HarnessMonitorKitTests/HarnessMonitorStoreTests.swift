@@ -370,6 +370,36 @@ struct HarnessMonitorStoreTests {
     )
   }
 
+  @Test("Toolbar project count tracks session index when daemon status has orphaned rows")
+  func toolbarProjectCountTracksSessionIndexWhenDaemonStatusHasOrphanedRows() async {
+    let store = await makeBootstrappedStore()
+
+    guard let status = store.daemonStatus else {
+      Issue.record("expected daemonStatus after bootstrap")
+      return
+    }
+    store.daemonStatus = DaemonStatusReport(
+      manifest: status.manifest,
+      launchAgent: status.launchAgent,
+      projectCount: 42,
+      sessionCount: status.sessionCount,
+      diagnostics: status.diagnostics
+    )
+
+    let project1 = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let project2 = ProjectSummary(
+      projectId: "project-b",
+      name: "kuma",
+      projectDir: "/Users/example/Projects/kuma",
+      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-b",
+      activeSessionCount: 1,
+      totalSessionCount: 1
+    )
+    store.applySessionIndexSnapshot(projects: [project1, project2], sessions: [])
+
+    #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
+  }
+
   @Test("Confirm pending remove-agent action executes the mutation")
   func confirmPendingRemoveAgentExecutesMutation() async {
     let client = RecordingHarnessClient()
