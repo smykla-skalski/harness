@@ -62,7 +62,10 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
   @Test("Preview store factory seeds and refreshes agent TUI overflow sessions")
   func previewStoreFactorySeedsAgentTuiOverflowState() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .agentTuiOverflow)
-    let expectedTuiIDs = AgentTuiPreviewSupport.overflowMixed.map(\.tuiId)
+    let expectedTuiIDs = AgentTuiListResponse(tuis: AgentTuiPreviewSupport.overflowMixed)
+      .canonicallySorted(roleByAgent: [:])
+      .tuis
+      .map(\.tuiId)
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
     #expect(store.selectedAgentTuis.map(\.tuiId) == expectedTuiIDs)

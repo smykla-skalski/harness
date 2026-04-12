@@ -283,6 +283,54 @@ public struct AgentTuiSnapshot: Codable, Equatable, Identifiable, Sendable {
   public var id: String { tuiId }
 }
 
+public extension AgentTuiListResponse {
+  func canonicallySorted(roleByAgent: [String: SessionRole]) -> Self {
+    Self(
+      tuis: tuis.sorted { left, right in
+        if left.roleSortPriority(roleByAgent: roleByAgent)
+          != right.roleSortPriority(roleByAgent: roleByAgent)
+        {
+          return left.roleSortPriority(roleByAgent: roleByAgent)
+            < right.roleSortPriority(roleByAgent: roleByAgent)
+        }
+        if left.status.sortPriority != right.status.sortPriority {
+          return left.status.sortPriority < right.status.sortPriority
+        }
+        if left.runtime != right.runtime {
+          return left.runtime < right.runtime
+        }
+        if left.agentId != right.agentId {
+          return left.agentId < right.agentId
+        }
+        if left.createdAt != right.createdAt {
+          return left.createdAt > right.createdAt
+        }
+        return left.tuiId < right.tuiId
+      })
+  }
+}
+
+public extension AgentTuiStatus {
+  var sortPriority: Int {
+    switch self {
+    case .running:
+      0
+    case .stopped:
+      1
+    case .exited:
+      2
+    case .failed:
+      3
+    }
+  }
+}
+
+private extension AgentTuiSnapshot {
+  func roleSortPriority(roleByAgent: [String: SessionRole]) -> Int {
+    roleByAgent[agentId]?.sortPriority ?? SessionRole.worker.sortPriority
+  }
+}
+
 public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
   public let runtime: String
   public let role: SessionRole

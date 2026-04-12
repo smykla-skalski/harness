@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::index::{self, DiscoveredProject, ResolvedSession};
+use super::ordering::{sort_session_agents, sort_session_tasks};
 use super::protocol::{
     AgentToolActivitySummary, ObserverActiveWorker, ObserverAgentSessionSummary,
     ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
@@ -145,10 +146,10 @@ fn build_session_detail(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let mut agents: Vec<_> = resolved.state.agents.values().cloned().collect();
-    agents.sort_by(|left, right| left.agent_id.cmp(&right.agent_id));
+    sort_session_agents(&mut agents);
 
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
-    tasks.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    sort_session_tasks(&mut tasks);
 
     let signals = load_signals_for_resolved(resolved, db)?;
     let agent_activity = if let Some(db) = db {
@@ -175,10 +176,10 @@ fn build_session_detail(
 #[must_use]
 pub fn build_session_detail_core(resolved: &ResolvedSession) -> SessionDetail {
     let mut agents: Vec<_> = resolved.state.agents.values().cloned().collect();
-    agents.sort_by(|left, right| left.agent_id.cmp(&right.agent_id));
+    sort_session_agents(&mut agents);
 
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
-    tasks.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    sort_session_tasks(&mut tasks);
 
     SessionDetail {
         session: summary_from_resolved(resolved),
@@ -524,7 +525,8 @@ mod tests {
     };
     use crate::session::types::{
         AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole,
-        SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
+        SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus, TaskQueuePolicy,
+        TaskSeverity, TaskSource, TaskStatus, WorkItem,
     };
 
     fn write_json(path: &Path, value: &impl serde::Serialize) {
@@ -631,6 +633,33 @@ mod tests {
 
     fn sample_signal(signal_id: &str, message: &str) -> Signal {
         sample_signal_with_idempotency(signal_id, message, None)
+    }
+
+    fn sample_work_item(
+        task_id: &str,
+        severity: TaskSeverity,
+        created_at: &str,
+        updated_at: &str,
+    ) -> WorkItem {
+        WorkItem {
+            task_id: task_id.to_string(),
+            title: task_id.to_string(),
+            context: None,
+            severity,
+            status: TaskStatus::Open,
+            assigned_to: None,
+            queue_policy: TaskQueuePolicy::Locked,
+            queued_at: None,
+            created_at: created_at.to_string(),
+            updated_at: updated_at.to_string(),
+            created_by: None,
+            notes: vec![],
+            suggested_fix: None,
+            source: TaskSource::Manual,
+            blocked_reason: None,
+            completed_at: None,
+            checkpoint_summary: None,
+        }
     }
 
     fn observer_state(session_id: &str) -> ObserverState {
@@ -854,6 +883,107 @@ mod tests {
                 );
 
                 // Session detail is cached in SQLite, not as a file.
+            },
+        );
+    }
+
+    #[test]
+    fn session_detail_applies_shared_agent_and_task_ordering() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-ordering");
+                let session_id = "sess-ordering";
+                let state_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("state.json");
+
+                let mut state = sample_state(session_id);
+                state.agents.insert(
+                    "leader-1".into(),
+                    AgentRegistration {
+                        agent_id: "leader-1".into(),
+                        name: "Leader".into(),
+                        runtime: "claude".into(),
+                        role: SessionRole::Leader,
+                        capabilities: vec![],
+                        joined_at: "2026-03-28T13:58:00Z".into(),
+                        updated_at: "2026-03-28T14:06:00Z".into(),
+                        status: AgentStatus::Active,
+                        agent_session_id: Some("leader-session".into()),
+                        last_activity_at: Some("2026-03-28T14:06:00Z".into()),
+                        current_task_id: None,
+                        runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(
+                        ),
+                    },
+                );
+                state.agents.insert(
+                    "reviewer-1".into(),
+                    AgentRegistration {
+                        agent_id: "reviewer-1".into(),
+                        name: "Reviewer".into(),
+                        runtime: "codex".into(),
+                        role: SessionRole::Reviewer,
+                        capabilities: vec![],
+                        joined_at: "2026-03-28T14:01:00Z".into(),
+                        updated_at: "2026-03-28T14:05:00Z".into(),
+                        status: AgentStatus::Active,
+                        agent_session_id: Some("reviewer-session".into()),
+                        last_activity_at: Some("2026-03-28T14:05:00Z".into()),
+                        current_task_id: None,
+                        runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(
+                        ),
+                    },
+                );
+                state.leader_id = Some("leader-1".into());
+
+                state.tasks.insert(
+                    "task-a".into(),
+                    sample_work_item(
+                        "task-a",
+                        TaskSeverity::Critical,
+                        "2026-03-28T13:00:00Z",
+                        "2026-03-28T14:00:00Z",
+                    ),
+                );
+                state.tasks.insert(
+                    "task-b".into(),
+                    sample_work_item(
+                        "task-b",
+                        TaskSeverity::Critical,
+                        "2026-03-28T13:10:00Z",
+                        "2026-03-28T14:00:00Z",
+                    ),
+                );
+                state.tasks.insert(
+                    "task-c".into(),
+                    sample_work_item(
+                        "task-c",
+                        TaskSeverity::High,
+                        "2026-03-28T13:20:00Z",
+                        "2026-03-28T14:05:00Z",
+                    ),
+                );
+
+                write_json(&state_path, &state);
+
+                let detail = session_detail(session_id).expect("detail");
+                let agent_order: Vec<_> = detail
+                    .agents
+                    .into_iter()
+                    .map(|agent| agent.agent_id)
+                    .collect();
+                assert_eq!(agent_order, vec!["leader-1", "reviewer-1", "codex-worker"]);
+
+                let task_order: Vec<_> =
+                    detail.tasks.into_iter().map(|task| task.task_id).collect();
+                assert_eq!(task_order, vec!["task-b", "task-a", "task-c"]);
             },
         );
     }

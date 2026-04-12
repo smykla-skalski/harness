@@ -118,6 +118,43 @@ public struct SessionDetail: Codable, Equatable, Sendable {
       agentActivity: extensions.agentActivity ?? agentActivity
     )
   }
+
+  public func canonicallySorted() -> Self {
+    Self(
+      session: session,
+      agents: agents.sorted(by: SessionDetail.compareAgents),
+      tasks: tasks.sorted(by: SessionDetail.compareTasks),
+      signals: signals,
+      observer: observer,
+      agentActivity: agentActivity
+    )
+  }
+
+  private static func compareAgents(_ left: AgentRegistration, _ right: AgentRegistration) -> Bool {
+    if left.role.sortPriority != right.role.sortPriority {
+      return left.role.sortPriority < right.role.sortPriority
+    }
+    if left.status.sortPriority != right.status.sortPriority {
+      return left.status.sortPriority < right.status.sortPriority
+    }
+    if left.joinedAt != right.joinedAt {
+      return left.joinedAt < right.joinedAt
+    }
+    return left.agentId < right.agentId
+  }
+
+  private static func compareTasks(_ left: WorkItem, _ right: WorkItem) -> Bool {
+    if left.severity.sortPriority != right.severity.sortPriority {
+      return left.severity.sortPriority > right.severity.sortPriority
+    }
+    if left.updatedAt != right.updatedAt {
+      return left.updatedAt > right.updatedAt
+    }
+    if left.createdAt != right.createdAt {
+      return left.createdAt > right.createdAt
+    }
+    return left.taskId < right.taskId
+  }
 }
 
 public struct SessionExtensionsPayload: Codable, Equatable, Sendable {
@@ -125,4 +162,49 @@ public struct SessionExtensionsPayload: Codable, Equatable, Sendable {
   public let signals: [SessionSignalRecord]?
   public let observer: ObserverSummary?
   public let agentActivity: [AgentToolActivitySummary]?
+}
+
+public extension SessionRole {
+  var sortPriority: Int {
+    switch self {
+    case .leader:
+      0
+    case .observer:
+      1
+    case .reviewer:
+      2
+    case .improver:
+      3
+    case .worker:
+      4
+    }
+  }
+}
+
+public extension AgentStatus {
+  var sortPriority: Int {
+    switch self {
+    case .active:
+      0
+    case .disconnected:
+      1
+    case .removed:
+      2
+    }
+  }
+}
+
+public extension TaskSeverity {
+  var sortPriority: Int {
+    switch self {
+    case .low:
+      1
+    case .medium:
+      2
+    case .high:
+      3
+    case .critical:
+      4
+    }
+  }
 }

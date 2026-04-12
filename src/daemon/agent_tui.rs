@@ -635,7 +635,20 @@ impl AgentTuiManagerHandle {
     /// Returns [`CliError`] when DB access fails.
     pub fn list(&self, session_id: &str) -> Result<AgentTuiListResponse, CliError> {
         let db = self.db()?;
-        let tuis = lock_db(&db)?.list_agent_tuis(session_id)?;
+        let db_guard = lock_db(&db)?;
+        let mut tuis = db_guard.list_agent_tuis(session_id)?;
+        let roles_by_agent = db_guard
+            .resolve_session(session_id)?
+            .map(|resolved| {
+                resolved
+                    .state
+                    .agents
+                    .into_iter()
+                    .map(|(agent_id, agent)| (agent_id, agent.role))
+                    .collect()
+            })
+            .unwrap_or_default();
+        super::ordering::sort_agent_tui_snapshots(&mut tuis, &roles_by_agent);
         Ok(AgentTuiListResponse { tuis })
     }
 
@@ -1323,7 +1336,7 @@ mod tests {
         AgentTuiBackend, AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiLaunchProfile,
         AgentTuiManagerHandle, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,
         AgentTuiSpawnSpec, AgentTuiStartRequest, AgentTuiStatus, DEFAULT_WAIT_TIMEOUT,
-        PortablePtyAgentTuiBackend, TerminalScreenParser,
+        PortablePtyAgentTuiBackend, TerminalScreenParser, TerminalScreenSnapshot,
     };
 
     #[test]
@@ -1731,6 +1744,124 @@ mod tests {
         let updated_snapshot = updated_snapshot.expect("updated snapshot");
         assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
         assert!(updated_snapshot.screen.text.contains("agent-ready"));
+    }
+
+    #[test]
+    fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-ordering".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir),
+            checkout_id: "checkout-tui-ordering".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let mut state = session_service::build_new_session(
+            "ordering test",
+            "ordering",
+            "sess-tui-ordering",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        let worker_id = "codex-worker".to_string();
+        state.agents.insert(
+            worker_id.clone(),
+            crate::session::types::AgentRegistration {
+                agent_id: worker_id.clone(),
+                name: "Worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec![],
+                joined_at: "2026-04-12T09:00:00Z".into(),
+                updated_at: "2026-04-12T09:00:00Z".into(),
+                status: crate::session::types::AgentStatus::Active,
+                agent_session_id: Some("codex-worker-session".into()),
+                last_activity_at: Some("2026-04-12T09:00:00Z".into()),
+                current_task_id: None,
+                runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+            },
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let leader_id = state.leader_id.expect("leader id");
+        db.save_agent_tui(&sample_snapshot(
+            "leader-tui",
+            &state.session_id,
+            &leader_id,
+            "claude",
+            "2026-04-12T09:00:00Z",
+            "2026-04-12T09:01:00Z",
+        ))
+        .expect("save leader tui");
+        db.save_agent_tui(&sample_snapshot(
+            "worker-tui",
+            &state.session_id,
+            &worker_id,
+            "codex",
+            "2026-04-12T09:02:00Z",
+            "2026-04-12T09:05:00Z",
+        ))
+        .expect("save worker tui");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _) = broadcast::channel(4);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+
+        let listed = manager
+            .list("sess-tui-ordering")
+            .expect("list tuis")
+            .tuis
+            .into_iter()
+            .map(|item| item.tui_id)
+            .collect::<Vec<_>>();
+        assert_eq!(listed, vec!["leader-tui", "worker-tui"]);
+    }
+
+    fn sample_snapshot(
+        tui_id: &str,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        created_at: &str,
+        updated_at: &str,
+    ) -> AgentTuiSnapshot {
+        AgentTuiSnapshot {
+            tui_id: tui_id.to_string(),
+            session_id: session_id.to_string(),
+            agent_id: agent_id.to_string(),
+            runtime: runtime.to_string(),
+            status: AgentTuiStatus::Running,
+            argv: vec![runtime.to_string()],
+            project_dir: "/tmp/project".to_string(),
+            size: AgentTuiSize { rows: 24, cols: 80 },
+            screen: TerminalScreenSnapshot {
+                rows: 24,
+                cols: 80,
+                cursor_row: 1,
+                cursor_col: 1,
+                text: "ready".to_string(),
+            },
+            transcript_path: "/tmp/transcript.log".to_string(),
+            exit_code: None,
+            signal: None,
+            error: None,
+            created_at: created_at.to_string(),
+            updated_at: updated_at.to_string(),
+        }
     }
 
     #[test]

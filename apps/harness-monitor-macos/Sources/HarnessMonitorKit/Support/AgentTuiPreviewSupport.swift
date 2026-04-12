@@ -189,11 +189,17 @@ public enum AgentTuiPreviewSupport {
     store.selectedSessionID = PreviewFixtures.summary.sessionId
     store.selectedSession = PreviewFixtures.detail
     store.timeline = PreviewFixtures.timeline
-    store.selectedAgentTuis = tuis
+    let roleByAgent = Dictionary(
+      uniqueKeysWithValues: PreviewFixtures.detail.agents.map { ($0.agentId, $0.role) }
+    )
+    let sortedTuis = AgentTuiListResponse(tuis: tuis)
+      .canonicallySorted(roleByAgent: roleByAgent)
+      .tuis
+    store.selectedAgentTuis = sortedTuis
     if let selectedTuiID {
       store.selectAgentTui(tuiID: selectedTuiID)
     } else {
-      store.selectAgentTui(tuiID: tuis.first?.tuiId)
+      store.selectAgentTui(tuiID: sortedTuis.first?.tuiId)
     }
     store.synchronizeActionActor()
     return store
