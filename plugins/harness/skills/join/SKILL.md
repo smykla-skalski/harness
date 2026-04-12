@@ -25,6 +25,14 @@ Parse from `$ARGUMENTS`:
 | `--runtime` | auto-detect | Which runtime you are (claude, codex, gemini, copilot, opencode) |
 | `--capabilities` | none | Comma-separated capability tags |
 
+## Daemon-spawned TUI context
+
+When `HARNESS_SESSION_ID` and `HARNESS_AGENT_TUI_ID` environment variables are set, this agent was spawned by the daemon as a managed TUI. In that case:
+
+- Use the session ID from `HARNESS_SESSION_ID` instead of prompting for a session picker.
+- Include `agent-tui` and `agent-tui:$HARNESS_AGENT_TUI_ID` in the `--capabilities` flag so the daemon can resolve the agent from session state.
+- The auto-join prompt from the daemon already supplies these as arguments, so this section only applies when manually running the skill in a daemon-spawned terminal.
+
 ## Session picker
 
 When no session ID is provided in arguments, run:
