@@ -152,6 +152,8 @@ extension RecordingHarnessClient {
         runtime: request.runtime,
         name: request.name,
         prompt: request.prompt,
+        projectDir: request.projectDir,
+        argv: request.argv,
         rows: request.rows,
         cols: request.cols
       )
@@ -161,6 +163,9 @@ extension RecordingHarnessClient {
       sessionID: sessionID,
       runtime: request.runtime,
       status: .running,
+      argv: request.argv.isEmpty ? [request.runtime] : request.argv,
+      projectDir: request.projectDir ?? PreviewFixtures.summary.projectDir
+        ?? PreviewFixtures.summary.contextRoot,
       rows: request.rows,
       cols: request.cols
     )
@@ -298,6 +303,8 @@ extension RecordingHarnessClient {
     sessionID: String = PreviewFixtures.summary.sessionId,
     runtime: String = AgentTuiRuntime.copilot.rawValue,
     status: AgentTuiStatus = .running,
+    argv: [String]? = nil,
+    projectDir: String? = nil,
     rows: Int = 32,
     cols: Int = 120,
     screenText: String = "copilot> ready",
@@ -309,8 +316,8 @@ extension RecordingHarnessClient {
       agentId: "agent-\(tuiID)",
       runtime: runtime,
       status: status,
-      argv: [runtime],
-      projectDir: PreviewFixtures.summary.projectDir ?? PreviewFixtures.summary.contextRoot,
+      argv: argv ?? [runtime],
+      projectDir: projectDir ?? PreviewFixtures.summary.projectDir ?? PreviewFixtures.summary.contextRoot,
       size: AgentTuiSize(rows: rows, cols: cols),
       screen: AgentTuiScreenSnapshot(
         rows: rows,
