@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Agent TUI - Create") {
-  agentTuiSheetPreview(
+  agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: [],
       bridgeState: .ready
@@ -11,7 +11,7 @@ import SwiftUI
 }
 
 #Preview("Agent TUI - Create With Recovery") {
-  agentTuiSheetPreview(
+  agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: [],
       bridgeState: .excluded
@@ -20,7 +20,7 @@ import SwiftUI
 }
 
 #Preview("Agent TUI - Running Session") {
-  agentTuiSheetPreview(
+  agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.runningSingle,
       selectedTuiID: AgentTuiPreviewSupport.runningSingle.first?.tuiId
@@ -29,7 +29,7 @@ import SwiftUI
 }
 
 #Preview("Agent TUI - Stopped Session") {
-  agentTuiSheetPreview(
+  agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.stoppedSingle,
       selectedTuiID: AgentTuiPreviewSupport.stoppedSingle.first?.tuiId
@@ -38,8 +38,8 @@ import SwiftUI
 }
 
 #Preview("Agent TUI - Multiple Sessions") {
-  agentTuiSheetPreview(
-    width: 940,
+  agentTuiWindowPreview(
+    width: 980,
     store: AgentTuiPreviewSupport.makeStore(
       tuis: Array(AgentTuiPreviewSupport.overflowMixed.prefix(3)),
       selectedTuiID: AgentTuiPreviewSupport.overflowMixed[1].tuiId
@@ -47,9 +47,9 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Overflow") {
-  agentTuiSheetPreview(
-    width: 760,
+#Preview("Agent TUI - Many Sessions") {
+  agentTuiWindowPreview(
+    width: 980,
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.overflowMixed,
       selectedTuiID: AgentTuiPreviewSupport.overflowMixed[4].tuiId
@@ -58,8 +58,8 @@ import SwiftUI
 }
 
 #Preview("Agent TUI - Mixed Sessions") {
-  agentTuiSheetPreview(
-    width: 820,
+  agentTuiWindowPreview(
+    width: 980,
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.overflowMixed,
       selectedTuiID: AgentTuiPreviewSupport.overflowMixed[5].tuiId
@@ -68,12 +68,12 @@ import SwiftUI
 }
 
 @MainActor
-private func agentTuiSheetPreview(
-  width: CGFloat = 920,
+private func agentTuiWindowPreview(
+  width: CGFloat = 980,
   height: CGFloat = 660,
   store: HarnessMonitorStore
 ) -> some View {
-  AgentTuiSheetView(store: store)
+  AgentTuiWindowView(store: store)
     .frame(width: width, height: height)
     .padding()
 }

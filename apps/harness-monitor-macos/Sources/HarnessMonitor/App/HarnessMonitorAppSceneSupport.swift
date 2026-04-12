@@ -217,6 +217,44 @@ struct HarnessMonitorSettingsRootView: View {
   }
 }
 
+struct AgentTuiWindowRootView: View {
+  let store: HarnessMonitorStore
+  @Binding var themeMode: HarnessMonitorThemeMode
+  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
+  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
+  @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
+  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
+    .storageValue
+
+  private var backdropMode: HarnessMonitorBackdropMode {
+    HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
+  }
+
+  private var backgroundImage: HarnessMonitorBackgroundSelection {
+    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  }
+
+  var body: some View {
+    AgentTuiWindowView(store: store)
+      .writingToolsBehavior(.disabled)
+      .frame(minWidth: 860, minHeight: 620)
+      .modifier(
+        HarnessMonitorWindowBackdropModifier(
+          mode: backdropMode,
+          backgroundImage: backgroundImage
+        )
+      )
+      .instantFocusRing()
+      .modifier(
+        HarnessMonitorSceneAppearanceModifier(
+          themeMode: $themeMode,
+          appliesPreferredColorScheme: true
+        )
+      )
+      .modifier(HarnessMonitorUITestAnimationModifier())
+  }
+}
+
 private struct HarnessMonitorUITestAnimationModifier: ViewModifier {
   private static let isUITesting =
     ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
