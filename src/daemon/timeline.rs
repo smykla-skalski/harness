@@ -505,6 +505,28 @@ fn transition_summary(transition: &SessionTransition) -> (&'static str, Option<S
             agent_id,
             result,
         } => signal_acknowledged_summary(signal_id, agent_id, *result),
+        SessionTransition::AgentDisconnected { agent_id, reason } => (
+            "agent_disconnected",
+            None,
+            format!("{agent_id} disconnected: {reason}"),
+        ),
+        SessionTransition::AgentLeft { agent_id } => (
+            "agent_left",
+            None,
+            format!("{agent_id} left the session"),
+        ),
+        SessionTransition::LivenessSynced {
+            disconnected,
+            idled,
+        } => (
+            "liveness_synced",
+            None,
+            format!(
+                "Liveness sync: {} disconnected, {} idled",
+                disconnected.len(),
+                idled.len()
+            ),
+        ),
     }
 }
 

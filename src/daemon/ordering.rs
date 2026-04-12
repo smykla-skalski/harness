@@ -20,8 +20,9 @@ pub const fn agent_role_priority(role: SessionRole) -> u8 {
 pub const fn agent_status_priority(status: AgentStatus) -> u8 {
     match status {
         AgentStatus::Active => 0,
-        AgentStatus::Disconnected => 1,
-        AgentStatus::Removed => 2,
+        AgentStatus::Idle => 1,
+        AgentStatus::Disconnected => 2,
+        AgentStatus::Removed => 3,
     }
 }
 
