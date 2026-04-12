@@ -301,7 +301,6 @@ public struct AgentTuiWindowView: View {
   private func sessionPane(_ tui: AgentTuiSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       terminalHeader(tui)
-      terminalViewportToolbar
       terminalViewport(tui)
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
@@ -314,17 +313,6 @@ public struct AgentTuiWindowView: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
-  }
-
-  private var terminalViewportToolbar: some View {
-    HStack {
-      Spacer()
-      Toggle("Wrap lines", isOn: $wrapLines)
-        .toggleStyle(.switch)
-        .controlSize(.mini)
-        .keyboardShortcut("l", modifiers: [.command])
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
-    }
   }
 
   @ToolbarContentBuilder
@@ -357,9 +345,17 @@ public struct AgentTuiWindowView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(resolvedTitle(for: tui))
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      Text("\(tui.status.title) • \(tui.size.rows)x\(tui.size.cols)")
-        .scaledFont(.caption.monospacedDigit())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      HStack(alignment: .firstTextBaseline) {
+        Text("\(tui.status.title) • \(tui.size.rows)x\(tui.size.cols)")
+          .scaledFont(.caption.monospacedDigit())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Spacer()
+        Toggle("Wrap lines", isOn: $wrapLines)
+          .toggleStyle(.switch)
+          .controlSize(.mini)
+          .keyboardShortcut("l", modifiers: [.command])
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
+      }
     }
   }
 
