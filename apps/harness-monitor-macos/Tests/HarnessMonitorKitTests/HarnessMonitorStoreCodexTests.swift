@@ -109,13 +109,130 @@ struct HarnessMonitorStoreCodexTests {
     client.configureCodexStartError(
       HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable")
     )
-    let store = await selectedStore(client: client)
+    let daemon = RecordingDaemonController(
+      client: client,
+      statusReport: sandboxedStatus(hostBridge: HostBridgeManifest())
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
 
     let started = await store.startCodexRun(prompt: "Test.", mode: .report)
 
     #expect(started == false)
     #expect(store.codexUnavailable == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
+  }
+
+  @Test("Sandboxed 503 refreshes bridge state and retries Codex start once when the bridge is healthy")
+  func startCodexRunRetriesOnceAfterSandboxed503WhenBridgeRefreshesHealthy() async {
+    let client = RecordingHarnessClient()
+    client.configureCodexStartErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable")
+    ])
+    let daemon = RecordingDaemonController(
+      client: client,
+      statusReport: sandboxedStatus(
+        hostBridge: HostBridgeManifest(
+          running: true,
+          socketPath: "/tmp/bridge.sock",
+          capabilities: [
+            "codex": HostBridgeCapabilityManifest(
+              healthy: true,
+              transport: "websocket",
+              endpoint: "ws://127.0.0.1:4500"
+            )
+          ]
+        )
+      )
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
+
+    let started = await store.startCodexRun(prompt: "Test.", mode: .report)
+
+    #expect(started)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Test.",
+            mode: .report,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          ),
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Test.",
+            mode: .report,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          ),
+        ]
+    )
+    #expect(store.codexUnavailable == false)
+    #expect(store.daemonStatus?.manifest?.hostBridge.running == true)
+    #expect(store.daemonStatus?.manifest?.hostBridge.capabilities["codex"]?.healthy == true)
+    #expect(store.currentSuccessFeedbackMessage == "Codex run started")
+  }
+
+  @Test("Sandboxed 503 keeps running bridge unavailable when the retry still fails")
+  func startCodexRunKeepsRunningBridgeUnavailableWhenRetryStillFails() async {
+    let client = RecordingHarnessClient()
+    client.configureCodexStartErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable"),
+      HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable"),
+    ])
+    let daemon = RecordingDaemonController(
+      client: client,
+      statusReport: sandboxedStatus(
+        hostBridge: HostBridgeManifest(
+          running: true,
+          socketPath: "/tmp/bridge.sock",
+          capabilities: [
+            "codex": HostBridgeCapabilityManifest(
+              healthy: true,
+              transport: "websocket",
+              endpoint: "ws://127.0.0.1:4500"
+            )
+          ]
+        )
+      )
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
+
+    let started = await store.startCodexRun(prompt: "Test.", mode: .report)
+
+    #expect(started == false)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Test.",
+            mode: .report,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          ),
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Test.",
+            mode: .report,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          ),
+        ]
+    )
+    #expect(store.codexUnavailable == true)
+    #expect(store.hostBridgeCapabilityState(for: "codex") == .unavailable)
+    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 
@@ -227,6 +344,36 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.runtime == AgentTuiRuntime.claude.rawValue)
     #expect(store.selectedAgentTuis.first?.tuiId == "agent-tui-2")
     #expect(store.selectedAgentTuis.contains { $0.tuiId == existing.tuiId })
+  }
+
+  @Test("Start agent TUI with vibe runtime sends vibe as the runtime string")
+  func startAgentTuiWithVibeRuntimeSendsVibeRuntimeString() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+
+    let started = await store.startAgentTui(
+      runtime: .vibe,
+      name: "Vibe TUI",
+      prompt: "Run the UI spec.",
+      rows: 32,
+      cols: 120
+    )
+
+    #expect(started)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startAgentTui(
+            sessionID: PreviewFixtures.summary.sessionId,
+            runtime: "vibe",
+            name: "Vibe TUI",
+            prompt: "Run the UI spec.",
+            rows: 32,
+            cols: 120
+          )
+        ]
+    )
+    #expect(store.selectedAgentTui?.runtime == "vibe")
   }
 
   @Test("Agent TUI input updates the selected screen snapshot")
