@@ -25,11 +25,11 @@ struct InspectorColumnView: View {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
         InspectorPrimaryContentBridge(
           store: store,
-          primaryContent: inspectorUI.primaryContent
+          inspectorUI: inspectorUI
         )
         InspectorActionSectionsBridge(
           store: store,
-          actionContext: inspectorUI.actionContext
+          inspectorUI: inspectorUI
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -44,17 +44,19 @@ struct InspectorColumnView: View {
 
 private struct InspectorPrimaryContentBridge: View {
   let store: HarnessMonitorStore
-  let primaryContent: HarnessMonitorStore.InspectorPrimaryContentState
+  let inspectorUI: HarnessMonitorStore.InspectorUISlice
 
   @ViewBuilder
   var body: some View {
-    switch primaryContent {
+    switch inspectorUI.primaryContent {
     case .empty:
       InspectorPrimaryEmptyState()
     case .loading(let summary):
       InspectorPrimaryLoadingState(summary: summary)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .session(let detail):
       SessionInspectorSummaryCard(detail: detail)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .task(let selection):
       TaskInspectorCard(
         store: store,
@@ -68,6 +70,7 @@ private struct InspectorPrimaryContentBridge: View {
           notesSessionID: selection.notesSessionID
         )
       )
+      .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .agent(let selection):
       AgentInspectorCard(
         store: store,
@@ -75,21 +78,24 @@ private struct InspectorPrimaryContentBridge: View {
         activity: selection.activity
       )
       .id(InspectorPrimaryResetKey.agent(agentID: selection.agent.agentId))
+      .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .signal(let signal):
       SignalInspectorCard(signal: signal)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     case .observer(let observer):
       ObserverInspectorCard(observer: observer)
+        .transition(.opacity.animation(.easeOut(duration: 0.08)))
     }
   }
 }
 
 private struct InspectorActionSectionsBridge: View {
   let store: HarnessMonitorStore
-  let actionContext: HarnessMonitorStore.InspectorActionContext?
+  let inspectorUI: HarnessMonitorStore.InspectorUISlice
 
   @ViewBuilder
   var body: some View {
-    if let actionContext {
+    if let actionContext = inspectorUI.actionContext {
       InspectorActionSections(
         store: store,
         context: actionContext
