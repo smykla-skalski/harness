@@ -1655,8 +1655,14 @@ mod tests {
         let snapshot = parser.snapshot();
         // vt100's screen.contents() will have leading newlines for the empty rows.
         // We want them gone.
-        assert!(!snapshot.text.starts_with('\n'), "should not start with newline");
-        assert!(snapshot.text.starts_with("hello"), "should start with hello");
+        assert!(
+            !snapshot.text.starts_with('\n'),
+            "should not start with newline"
+        );
+        assert!(
+            snapshot.text.starts_with("hello"),
+            "should start with hello"
+        );
     }
 
     #[test]
