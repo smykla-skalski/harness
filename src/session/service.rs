@@ -1513,8 +1513,29 @@ pub(crate) fn build_new_session(
     )
 }
 
+/// Find an existing agent whose capabilities include the same
+/// `agent-tui:agent-tui-{uuid}` marker. Returns the agent ID if found.
+fn find_agent_by_tui_marker(state: &SessionState, capabilities: &[String]) -> Option<String> {
+    let marker = capabilities
+        .iter()
+        .find(|capability| capability.starts_with("agent-tui:agent-tui-"))?;
+    state
+        .agents
+        .values()
+        .find(|agent| {
+            agent
+                .capabilities
+                .iter()
+                .any(|capability| capability == marker)
+        })
+        .map(|agent| agent.agent_id.clone())
+}
+
 /// Register a new agent into an existing session state. Returns the assigned
 /// agent ID.
+///
+/// If an agent with the same `agent-tui:{uuid}` marker capability already
+/// exists, return its ID instead of creating a duplicate registration.
 pub(crate) fn apply_join_session(
     state: &mut SessionState,
     display_name: &str,
@@ -1525,6 +1546,11 @@ pub(crate) fn apply_join_session(
     now: &str,
 ) -> Result<String, CliError> {
     require_active(state)?;
+
+    if let Some(existing_id) = find_agent_by_tui_marker(state, capabilities) {
+        return Ok(existing_id);
+    }
+
     let agent_id = next_available_agent_id(runtime_name, &state.agents);
     state.agents.insert(
         agent_id.clone(),
@@ -4688,5 +4714,86 @@ mod tests {
                 leave_session("leave-2", &leader_id, project).expect_err("leader cannot leave");
             assert_eq!(error.code(), "KSRCLI092");
         });
+    }
+
+    #[test]
+    fn apply_join_session_idempotent_by_marker() {
+        let now = "2026-04-12T00:00:00Z";
+        let mut state = build_new_session("test", "test", "s-idem", "claude", None, now);
+
+        let caps = vec![
+            "agent-tui".to_string(),
+            "agent-tui:agent-tui-abc123".to_string(),
+        ];
+
+        let first = apply_join_session(
+            &mut state,
+            "codex worker",
+            "codex",
+            SessionRole::Worker,
+            &caps,
+            None,
+            now,
+        )
+        .expect("first join");
+
+        let second = apply_join_session(
+            &mut state,
+            "codex worker",
+            "codex",
+            SessionRole::Worker,
+            &caps,
+            None,
+            now,
+        )
+        .expect("second join");
+
+        assert_eq!(first, second, "same marker should return same agent_id");
+        // Only the leader + one worker, no duplicate
+        assert_eq!(state.agents.len(), 2);
+    }
+
+    #[test]
+    fn apply_join_session_different_markers_create_distinct() {
+        let now = "2026-04-12T00:00:00Z";
+        let mut state = build_new_session("test", "test", "s-diff", "claude", None, now);
+
+        let caps_a = vec![
+            "agent-tui".to_string(),
+            "agent-tui:agent-tui-aaa".to_string(),
+        ];
+        let caps_b = vec![
+            "agent-tui".to_string(),
+            "agent-tui:agent-tui-bbb".to_string(),
+        ];
+
+        let first = apply_join_session(
+            &mut state,
+            "codex worker A",
+            "codex",
+            SessionRole::Worker,
+            &caps_a,
+            None,
+            now,
+        )
+        .expect("first join");
+
+        let second = apply_join_session(
+            &mut state,
+            "codex worker B",
+            "codex",
+            SessionRole::Worker,
+            &caps_b,
+            None,
+            now,
+        )
+        .expect("second join");
+
+        assert_ne!(
+            first, second,
+            "different markers should create distinct agents"
+        );
+        // Leader + two distinct workers
+        assert_eq!(state.agents.len(), 3);
     }
 }
