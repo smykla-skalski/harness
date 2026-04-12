@@ -376,7 +376,12 @@ pub fn health_response(
 pub fn diagnostics_report(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
-    let manifest = state::load_manifest()?;
+    let manifest = state::load_manifest()?.map(|mut m| {
+        if let Ok(live_bridge) = bridge::host_bridge_manifest() {
+            m.host_bridge = live_bridge;
+        }
+        m
+    });
     let health = manifest
         .as_ref()
         .map(|manifest| health_response(manifest, db))
