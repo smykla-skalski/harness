@@ -183,7 +183,7 @@ struct SessionAgentSummaryCard: View {
         }
         .overlay(alignment: .bottomTrailing) {
           if tuiStatus != nil {
-            Image(systemName: "terminal.fill")
+            Image(systemName: "terminal")
               .font(.system(size: 20))
               .foregroundStyle(tuiMarkerColor)
               .padding(HarnessMonitorTheme.spacingSM)
