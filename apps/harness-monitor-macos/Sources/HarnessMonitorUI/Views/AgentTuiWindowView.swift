@@ -20,6 +20,7 @@ public struct AgentTuiWindowView: View {
   @State private var selection: AgentTuiSheetSelection = .create
   @State private var recentTuiIDs: [String] = []
   @State private var hasInitializedSelection = false
+  @State private var wrapLines = false
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -123,7 +124,7 @@ public struct AgentTuiWindowView: View {
       return "selection=create"
     case .session(let sessionID):
       let status = selectedSessionTui?.status.rawValue ?? "missing"
-      return "selection=session:\(sessionID),status=\(status)"
+      return "selection=session:\(sessionID),status=\(status),wrap=\(wrapLines)"
     }
   }
 
@@ -297,6 +298,7 @@ public struct AgentTuiWindowView: View {
   private func sessionPane(_ tui: AgentTuiSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       terminalHeader(tui)
+      terminalViewportToolbar
       terminalViewport(tui)
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
@@ -349,8 +351,19 @@ public struct AgentTuiWindowView: View {
     }
   }
 
+  private var terminalViewportToolbar: some View {
+    HStack {
+      Spacer()
+      Toggle("Wrap lines", isOn: $wrapLines)
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .keyboardShortcut("l", modifiers: [.command])
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
+    }
+  }
+
   private func terminalViewport(_ tui: AgentTuiSnapshot) -> some View {
-    ScrollView([.horizontal, .vertical]) {
+    ScrollView(wrapLines ? .vertical : [.horizontal, .vertical]) {
       Text(tui.screen.text.isEmpty ? "No terminal output yet." : tui.screen.text)
         .scaledFont(.system(.body, design: .monospaced))
         .textSelection(.enabled)
