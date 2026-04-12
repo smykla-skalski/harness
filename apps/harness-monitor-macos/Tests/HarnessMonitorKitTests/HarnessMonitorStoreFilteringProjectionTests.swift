@@ -130,7 +130,7 @@ struct HarnessMonitorStoreProjectionTests {
           store.sessionIndex.searchResults.isSearchActive,
           store.sessionIndex.searchResults.emptyState,
           store.sessionIndex.searchResults.visibleSessionIDs,
-          store.sessionIndex.searchResults.visibleSessions.map(\.sessionId)
+          store.visibleSessions.map(\.sessionId)
         )
       },
       after: {
@@ -279,6 +279,70 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(store.sessionIndex.sessionSummary(for: "updated")?.context == updated.context)
     #expect(store.totalOpenWorkCount == 5)
     #expect(store.recentSessions.first?.sessionId == "updated")
+  }
+
+  @Test("Projection summary patch refreshes search ordering without a full catalog rebuild")
+  func projectionSummaryPatchRefreshesSearchOrderingWithoutCatalogRebuild() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
+
+    var first = SessionFixture(
+      sessionId: "first",
+      title: "First",
+      context: "Shared lane",
+      status: .active,
+      leaderId: "leader-first",
+      observeId: nil,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    )
+    first.lastActivityAt = "2026-03-28T14:30:00Z"
+
+    var second = SessionFixture(
+      sessionId: "second",
+      title: "Second",
+      context: "Shared lane",
+      status: .active,
+      leaderId: "leader-second",
+      observeId: nil,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    )
+    second.lastActivityAt = "2026-03-28T14:10:00Z"
+
+    store.sessions = [
+      makeSession(first),
+      makeSession(second),
+    ]
+    store.searchText = "shared"
+    store.flushPendingSearchRebuild()
+
+    #expect(store.visibleSessionIDs == ["first", "second"])
+
+    let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
+    let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
+    guard let baseline = store.sessionIndex.sessionSummary(for: "second") else {
+      Issue.record("Missing second fixture session")
+      return
+    }
+
+    let updated = makeUpdatedSession(
+      baseline,
+      context: baseline.context,
+      updatedAt: "2026-03-28T14:45:00Z",
+      agentCount: baseline.metrics.activeAgentCount
+    )
+
+    let didChange = store.sessionIndex.applySessionSummary(updated)
+
+    #expect(didChange)
+    #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
+    #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
+    #expect(store.visibleSessionIDs == ["second", "first"])
   }
 
   @Test("Summary-only updates skip projection rebuilds")

@@ -33,6 +33,7 @@ public struct ContentView: View {
   @State private var hasAppliedInitialInspectorVisibility = false
   @State private var hasCapturedInitialInspectorWidth = false
   @State private var showInspector = false
+  @State private var sidebarColumnWidth: CGFloat = 260
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var isLayoutAnimating = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -148,29 +149,14 @@ public struct ContentView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay {
-      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
-        ZStack {
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.appChromeState,
-            text: appChromeAccessibilityValue
-          )
-          ContentToolbarChromeAccessibilityMarker(
-            contentSession: contentSession,
-            contentSessionDetail: contentSessionDetail
-          )
-          if let auditBuildAccessibilityValue {
-            AccessibilityTextMarker(
-              identifier: HarnessMonitorAccessibility.auditBuildState,
-              text: auditBuildAccessibilityValue
-            )
-          }
-          ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
-            text: toolbarCenterpieceDisplayMode.rawValue
-          )
-        }
-      }
+      ContentAccessibilityOverlayBridge(
+        contentToolbar: contentToolbar,
+        contentSession: contentSession,
+        contentSessionDetail: contentSessionDetail,
+        toolbarCenterpieceDisplayMode: toolbarCenterpieceDisplayMode,
+        appChromeAccessibilityValue: appChromeAccessibilityValue,
+        auditBuildAccessibilityValue: auditBuildAccessibilityValue
+      )
     }
     .overlay(alignment: .topTrailing) {
       if let auditBuildBadgeState, auditBuildBadgeState.showsVisibleBadge {
@@ -187,7 +173,8 @@ public struct ContentView: View {
     }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
-        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
+        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay,
+        leadingInset: columnVisibility == .detailOnly ? 0 : sidebarColumnWidth
       )
     )
     .suppressToolbarBaselineSeparator()
@@ -216,9 +203,9 @@ public struct ContentView: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      sidebarVisible: columnVisibility != .detailOnly
+      sidebarVisible: columnVisibility != .detailOnly,
+      onSidebarWidthChange: updateSidebarColumnWidth
     )
-    .toolbarBaselineFrame(.sidebar)
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }
 
@@ -235,11 +222,6 @@ public struct ContentView: View {
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       isLayoutAnimating: isLayoutAnimating,
       detailColumnWidth: $detailColumnWidth
-    )
-    .navigationTitle(
-      contentSessionDetail.selectedSessionDetail != nil
-        || contentSession.selectedSessionSummary != nil
-        ? "Cockpit" : "Dashboard"
     )
     .inspector(isPresented: $showInspector) {
       inspectorColumn
@@ -285,6 +267,13 @@ public struct ContentView: View {
       return
     }
     inspectorColumnWidth = width
+  }
+
+  private func updateSidebarColumnWidth(_ width: CGFloat) {
+    guard abs(width - sidebarColumnWidth) > 1 else {
+      return
+    }
+    sidebarColumnWidth = width
   }
 
   private static func resolveAuditBuildState() -> AuditBuildDisplayState? {
@@ -355,6 +344,41 @@ public struct ContentView: View {
       }
       let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
+    }
+  }
+}
+
+private struct ContentAccessibilityOverlayBridge: View {
+  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+  let contentSession: HarnessMonitorStore.ContentSessionSlice
+  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
+  let toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode
+  let appChromeAccessibilityValue: String
+  let auditBuildAccessibilityValue: String?
+
+  var body: some View {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+      ZStack {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.appChromeState,
+          text: appChromeAccessibilityValue
+        )
+        ContentToolbarChromeAccessibilityMarker(
+          contentSession: contentSession,
+          contentSessionDetail: contentSessionDetail
+        )
+        if let auditBuildAccessibilityValue {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.auditBuildState,
+            text: auditBuildAccessibilityValue
+          )
+        }
+        ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
+          text: toolbarCenterpieceDisplayMode.rawValue
+        )
+      }
     }
   }
 }
