@@ -954,16 +954,14 @@ impl Execute for SessionSyncArgs {
                 "disconnected": result.disconnected,
                 "idled": result.idled,
             }))?;
+        } else if result.disconnected.is_empty() && result.idled.is_empty() {
+            println!("All agents are alive");
         } else {
-            if result.disconnected.is_empty() && result.idled.is_empty() {
-                println!("All agents are alive");
-            } else {
-                for agent_id in &result.disconnected {
-                    println!("{agent_id}: disconnected");
-                }
-                for agent_id in &result.idled {
-                    println!("{agent_id}: idle");
-                }
+            for agent_id in &result.disconnected {
+                println!("{agent_id}: disconnected");
+            }
+            for agent_id in &result.idled {
+                println!("{agent_id}: idle");
             }
         }
         Ok(0)

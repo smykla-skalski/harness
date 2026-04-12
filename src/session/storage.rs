@@ -740,6 +740,39 @@ mod tests {
         }))
         .expect("migrate v4");
 
+        assert_eq!(migrated["schema_version"], json!(5));
+        assert_eq!(migrated["title"], json!("session title"));
+    }
+
+    #[test]
+    fn migrate_v5_to_v6_stamps_current_schema() {
+        let migrated = migrate_v5_to_v6(json!({
+            "schema_version": 5,
+            "state_version": 3,
+            "session_id": "sess-1",
+            "title": "session title",
+            "context": "session goal",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+            "leader_id": null,
+            "archived_at": null,
+            "last_activity_at": null,
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+                "agent_count": 0,
+                "active_agent_count": 0,
+                "open_task_count": 0,
+                "in_progress_task_count": 0,
+                "blocked_task_count": 0,
+                "completed_task_count": 0
+            }
+        }))
+        .expect("migrate v5");
+
         assert_eq!(migrated["schema_version"], json!(CURRENT_VERSION));
         assert_eq!(migrated["title"], json!("session title"));
     }

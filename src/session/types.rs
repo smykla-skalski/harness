@@ -745,7 +745,10 @@ mod tests {
 
         let metrics = SessionMetrics::recalculate(&state);
         assert_eq!(metrics.agent_count, 3);
-        assert_eq!(metrics.active_agent_count, 1, "only Active counts, not Idle");
+        assert_eq!(
+            metrics.active_agent_count, 1,
+            "only Active counts, not Idle"
+        );
         assert_eq!(metrics.idle_agent_count, 1);
     }
 }
