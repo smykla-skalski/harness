@@ -1254,8 +1254,35 @@ fn failed_snapshot(
     }
 }
 
+/// Return per-runtime argv entries that make the harness session plugin
+/// discoverable when the agent TUI starts.
+fn skill_directory_flags(runtime: &str, project_dir: &Path) -> Vec<String> {
+    match runtime {
+        "claude" => {
+            let plugin_dir = project_dir.join(".claude").join("plugins").join("harness");
+            if plugin_dir.is_dir() {
+                vec!["--plugin-dir".to_string(), plugin_dir.display().to_string()]
+            } else {
+                vec![]
+            }
+        }
+        "copilot" => {
+            let plugin_dir = project_dir.join("plugins").join("harness");
+            if plugin_dir.is_dir() {
+                vec!["--plugin-dir".to_string(), plugin_dir.display().to_string()]
+            } else {
+                vec![]
+            }
+        }
+        // codex: reads .agents/skills/ and .codex-plugin/ from project root by convention
+        // gemini: reads skills from project root conventions
+        // opencode / vibe: config-based, no CLI flag for skill dirs
+        _ => vec![],
+    }
+}
+
 fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
-    let argv = resolved_command_argv(&spec.profile);
+    let argv = resolved_command_argv(&spec.profile, &spec.project_dir);
     let mut cmd = CommandBuilder::from_argv(argv);
     cmd.cwd(spec.project_dir.as_os_str());
     cmd.env("TERM", "xterm-256color");
@@ -1268,13 +1295,16 @@ fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
     cmd
 }
 
-fn resolved_command_argv(profile: &AgentTuiLaunchProfile) -> Vec<OsString> {
+fn resolved_command_argv(profile: &AgentTuiLaunchProfile, project_dir: &Path) -> Vec<OsString> {
     let mut argv = profile.argv.iter().map(OsString::from).collect::<Vec<_>>();
     let Some(program) = profile.argv.first() else {
         return argv;
     };
     if let Some(resolved) = resolve_agent_tui_program(&profile.runtime, program) {
         argv[0] = resolved.into_os_string();
+    }
+    for flag in skill_directory_flags(&profile.runtime, project_dir) {
+        argv.push(OsString::from(flag));
     }
     argv
 }
@@ -2251,5 +2281,46 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert!(condition(), "condition should become true before timeout");
+    }
+
+    #[test]
+    fn skill_directory_flags_claude_returns_plugin_dir() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project = tmp.path().join("project");
+        let plugin = project.join(".claude").join("plugins").join("harness");
+        fs_err::create_dir_all(&plugin).expect("create plugin dir");
+
+        let flags = super::skill_directory_flags("claude", &project);
+        assert_eq!(flags.len(), 2);
+        assert_eq!(flags[0], "--plugin-dir");
+        assert_eq!(PathBuf::from(&flags[1]), plugin);
+    }
+
+    #[test]
+    fn skill_directory_flags_codex_returns_empty() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let flags = super::skill_directory_flags("codex", tmp.path());
+        assert!(flags.is_empty());
+    }
+
+    #[test]
+    fn skill_directory_flags_copilot_returns_plugin_dir() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project = tmp.path().join("project");
+        let plugin = project.join("plugins").join("harness");
+        fs_err::create_dir_all(&plugin).expect("create plugin dir");
+
+        let flags = super::skill_directory_flags("copilot", &project);
+        assert_eq!(flags.len(), 2);
+        assert_eq!(flags[0], "--plugin-dir");
+        assert_eq!(PathBuf::from(&flags[1]), plugin);
+    }
+
+    #[test]
+    fn skill_directory_flags_missing_dir_returns_empty() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project = tmp.path().join("nonexistent");
+        let flags = super::skill_directory_flags("claude", &project);
+        assert!(flags.is_empty());
     }
 }
