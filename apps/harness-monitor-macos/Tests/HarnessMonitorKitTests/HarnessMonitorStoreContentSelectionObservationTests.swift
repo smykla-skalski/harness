@@ -213,8 +213,8 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.sidebarUI.selectedSessionID == PreviewFixtures.summary.sessionId)
   }
 
-  @Test("Priming session selection updates inspector primary content")
-  func primingSessionSelectionUpdatesInspectorPrimaryContent() async {
+  @Test("Priming session selection defers inspector primary content until detail loads")
+  func primingSessionSelectionDefersInspectorPrimaryContentUntilDetailLoads() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
@@ -224,7 +224,7 @@ struct HarnessMonitorContentSelectionTests {
       }
     )
 
-    #expect(didChange)
+    #expect(didChange == false)
   }
 
   @Test("Priming session selection does not resync content chrome before detail loads")
@@ -237,7 +237,7 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentShell) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
     #expect(store.debugUISyncCount(for: .sidebar) == 1)
-    #expect(store.debugUISyncCount(for: .inspector) == 1)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
 

@@ -58,11 +58,14 @@ extension HarnessMonitorStore {
     selection.onChanged = { [weak self] change in
       switch change {
       case .selectedSessionID:
-        self?.scheduleUISync([
+        var areas: Set<UISyncArea> = [
           .contentSession,
           .sidebar,
-          .inspector,
-        ])
+        ]
+        if self?.selection.selectedSessionID == nil {
+          areas.insert(.inspector)
+        }
+        self?.scheduleUISync(areas)
       case .selectedSession:
         self?.scheduleUISync([
           .contentChrome,
