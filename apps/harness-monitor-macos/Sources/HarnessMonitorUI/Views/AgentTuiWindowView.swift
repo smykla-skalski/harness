@@ -369,6 +369,7 @@ public struct AgentTuiWindowView: View {
         Spacer()
         Toggle("Wrap lines", isOn: $wrapLines)
           .toggleStyle(ClickableSwitchStyle())
+          .scaledFont(.caption)
           .controlSize(.mini)
           .keyboardShortcut("l", modifiers: [.command])
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
