@@ -7,7 +7,7 @@ use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::signal::{AckResult, Signal, SignalAck};
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 5;
+pub const CURRENT_VERSION: u32 = 6;
 
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +68,8 @@ pub struct SessionMetrics {
     #[serde(default)]
     pub active_agent_count: u32,
     #[serde(default)]
+    pub idle_agent_count: u32,
+    #[serde(default)]
     pub open_task_count: u32,
     #[serde(default)]
     pub in_progress_task_count: u32,
@@ -88,6 +90,13 @@ impl SessionMetrics {
                 .filter(|agent| agent.status == AgentStatus::Active)
                 .count(),
         );
+        let idle_agent_count = saturating_len(
+            state
+                .agents
+                .values()
+                .filter(|agent| agent.status == AgentStatus::Idle)
+                .count(),
+        );
 
         let mut open_task_count = 0_u32;
         let mut in_progress_task_count = 0_u32;
@@ -105,6 +114,7 @@ impl SessionMetrics {
         Self {
             agent_count,
             active_agent_count,
+            idle_agent_count,
             open_task_count,
             in_progress_task_count,
             blocked_task_count,
@@ -169,8 +179,18 @@ pub enum SessionRole {
 #[serde(rename_all = "snake_case")]
 pub enum AgentStatus {
     Active,
+    /// Agent is alive but has not used tools recently.
+    Idle,
     Disconnected,
     Removed,
+}
+
+impl AgentStatus {
+    /// Whether the agent is considered alive (able to perform actions).
+    #[must_use]
+    pub const fn is_alive(self) -> bool {
+        matches!(self, Self::Active | Self::Idle)
+    }
 }
 
 /// A work item tracked within a session.
@@ -366,6 +386,17 @@ pub enum SessionTransition {
     },
     AgentRemoved {
         agent_id: String,
+    },
+    AgentDisconnected {
+        agent_id: String,
+        reason: String,
+    },
+    AgentLeft {
+        agent_id: String,
+    },
+    LivenessSynced {
+        disconnected: Vec<String>,
+        idled: Vec<String>,
     },
     RoleChanged {
         agent_id: String,
@@ -627,5 +658,94 @@ mod tests {
         assert_eq!(metrics.active_agent_count, 1);
         assert_eq!(metrics.open_task_count, 1);
         assert_eq!(metrics.completed_task_count, 1);
+    }
+
+    #[test]
+    fn idle_agent_status_serde_round_trip() {
+        let json = r#""idle""#;
+        let status: AgentStatus = serde_json::from_str(json).expect("deserializes idle");
+        assert_eq!(status, AgentStatus::Idle);
+        let serialized = serde_json::to_string(&status).expect("serializes");
+        assert_eq!(serialized, r#""idle""#);
+    }
+
+    #[test]
+    fn metrics_exclude_idle_from_active_count() {
+        let mut agents = BTreeMap::new();
+        agents.insert(
+            "a1".into(),
+            AgentRegistration {
+                agent_id: "a1".into(),
+                name: "leader".into(),
+                runtime: "claude".into(),
+                role: SessionRole::Leader,
+                capabilities: vec![],
+                joined_at: "2026-03-28T12:00:00Z".into(),
+                updated_at: "2026-03-28T12:00:00Z".into(),
+                status: AgentStatus::Active,
+                agent_session_id: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+            },
+        );
+        agents.insert(
+            "a2".into(),
+            AgentRegistration {
+                agent_id: "a2".into(),
+                name: "idle-worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec![],
+                joined_at: "2026-03-28T12:00:00Z".into(),
+                updated_at: "2026-03-28T12:00:00Z".into(),
+                status: AgentStatus::Idle,
+                agent_session_id: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+            },
+        );
+        agents.insert(
+            "a3".into(),
+            AgentRegistration {
+                agent_id: "a3".into(),
+                name: "dead-worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec![],
+                joined_at: "2026-03-28T12:00:00Z".into(),
+                updated_at: "2026-03-28T12:00:00Z".into(),
+                status: AgentStatus::Disconnected,
+                agent_session_id: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+            },
+        );
+
+        let state = SessionState {
+            schema_version: CURRENT_VERSION,
+            state_version: 1,
+            session_id: "sess-1".into(),
+            title: "test".into(),
+            context: "ctx".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-03-28T12:00:00Z".into(),
+            updated_at: "2026-03-28T12:00:00Z".into(),
+            agents,
+            tasks: BTreeMap::new(),
+            leader_id: Some("a1".into()),
+            archived_at: None,
+            last_activity_at: None,
+            observe_id: None,
+            pending_leader_transfer: None,
+            metrics: SessionMetrics::default(),
+        };
+
+        let metrics = SessionMetrics::recalculate(&state);
+        assert_eq!(metrics.agent_count, 3);
+        assert_eq!(metrics.active_agent_count, 1, "only Active counts, not Idle");
+        assert_eq!(metrics.idle_agent_count, 1);
     }
 }

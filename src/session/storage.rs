@@ -102,6 +102,7 @@ pub(crate) fn state_repository(
                 Box::new(migrate_v2_to_v3),
                 Box::new(migrate_v3_to_v4),
                 Box::new(migrate_v4_to_v5),
+                Box::new(migrate_v5_to_v6),
             ]),
     )
 }
@@ -427,6 +428,18 @@ fn migrate_v4_to_v5(mut value: Value) -> Result<Value, CliError> {
     };
 
     object.insert("schema_version".to_string(), json!(5));
+    Ok(value)
+}
+
+fn migrate_v5_to_v6(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    // Stamp schema version. The `Idle` agent status variant and `idle_agent_count`
+    // metric are additive and will deserialize correctly from existing data since
+    // no v5 state contains the `idle` status string.
+    object.insert("schema_version".to_string(), json!(6));
     Ok(value)
 }
 

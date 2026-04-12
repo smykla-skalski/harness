@@ -3120,6 +3120,7 @@ mod tests {
             metrics: SessionMetrics {
                 agent_count: 1,
                 active_agent_count: 1,
+                idle_agent_count: 0,
                 open_task_count: 1,
                 in_progress_task_count: (token % 3) as u32,
                 blocked_task_count: (token % 2) as u32,
