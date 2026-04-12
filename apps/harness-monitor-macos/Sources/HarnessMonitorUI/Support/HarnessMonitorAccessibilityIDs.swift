@@ -18,6 +18,7 @@ public enum HarnessMonitorAccessibility {
   static let sidebarEmptyStateFrame = "\(sidebarEmptyState).frame"
   static let sidebarSessionList = "harness.sidebar.session-list"
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
+  static let sidebarSessionListState = "harness.sidebar.session-list.state"
   static let sidebarFiltersCard = "harness.sidebar.filters"
   static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
   static let sidebarFilterMenu = "harness.toolbar.sidebar-filters"

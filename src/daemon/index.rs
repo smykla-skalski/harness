@@ -102,17 +102,23 @@ pub fn fast_counts() -> (usize, usize, usize) {
         .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
         .map(|entry| entry.path())
         .collect();
-    let project_count = context_roots.len();
+    let mut project_count = 0;
     let mut session_count = 0;
     let mut worktree_count = 0;
     for context_root in &context_roots {
+        let mut context_session_count = 0;
         let sessions_dir = context_root.join("orchestration").join("sessions");
         if let Ok(sessions) = fs::read_dir(sessions_dir) {
-            session_count += sessions
+            context_session_count = sessions
                 .filter_map(Result::ok)
                 .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
                 .count();
         }
+        if context_session_count == 0 {
+            continue;
+        }
+        session_count += context_session_count;
+        project_count += 1;
         let origin_path = context_root.join("project-origin.json");
         if let Ok(data) = fs::read_to_string(&origin_path)
             && (data.contains("\"is_worktree\":true") || data.contains("\"is_worktree\": true"))
@@ -624,13 +630,18 @@ fn repair_context_root(context_root: &Path) -> Result<Option<PathBuf>, CliError>
         return Ok(None);
     }
 
+    let has_sessions = context_has_sessions(context_root)?;
     let Some(identity) = infer_checkout_identity(context_root) else {
-        if context_has_sessions(context_root)? {
+        if has_sessions {
             return Ok(Some(context_root.to_path_buf()));
         }
         prune_context_root(context_root, "pruned non-git project context")?;
         return Ok(None);
     };
+    if !identity.checkout_root.exists() && !has_sessions {
+        prune_context_root(context_root, "pruned missing checkout context")?;
+        return Ok(None);
+    }
     let canonical_context_root = project_context_dir(&identity.checkout_root);
     if canonical_context_root != context_root {
         reconcile_legacy_context(context_root, &canonical_context_root)?;
@@ -1065,6 +1076,76 @@ mod tests {
         assert_eq!(identity.repository_root, project_dir);
         assert_eq!(identity.checkout_root, project_dir);
         assert!(!identity.is_worktree);
+    }
+
+    #[test]
+    fn repair_context_root_prunes_missing_recorded_origin_without_sessions() {
+        let tmp = tempdir().expect("tempdir");
+        let context_root = tmp.path().join("context");
+        write_text(
+            &context_root.join("project-origin.json"),
+            &serde_json::json!({
+                "recorded_from_dir": tmp.path().join("missing-project").display().to_string(),
+                "repository_root": null,
+                "checkout_root": null,
+                "is_worktree": false,
+                "worktree_name": null,
+                "recorded_at": "2026-04-10T10:00:00Z",
+            })
+            .to_string(),
+        );
+
+        let repaired = repair_context_root(&context_root).expect("repair context root");
+
+        assert!(repaired.is_none());
+        assert!(
+            !context_root.exists(),
+            "stale context root should be pruned"
+        );
+    }
+
+    #[test]
+    fn fast_counts_ignores_contexts_without_sessions() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_var(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+            || {
+                let projects_root = projects_root();
+                let stale_context = projects_root.join("project-stale");
+                let live_context = projects_root.join("project-live");
+                write_text(
+                    &stale_context.join("project-origin.json"),
+                    &serde_json::json!({
+                        "recorded_from_dir": "/tmp/stale-project",
+                        "repository_root": null,
+                        "checkout_root": null,
+                        "is_worktree": true,
+                        "worktree_name": "stale",
+                        "recorded_at": "2026-04-10T10:00:00Z",
+                    })
+                    .to_string(),
+                );
+                write_text(
+                    &live_context.join("project-origin.json"),
+                    &serde_json::json!({
+                        "recorded_from_dir": "/tmp/live-worktree",
+                        "repository_root": "/tmp/live-repo",
+                        "checkout_root": "/tmp/live-worktree",
+                        "is_worktree": true,
+                        "worktree_name": "live",
+                        "recorded_at": "2026-04-10T10:00:00Z",
+                    })
+                    .to_string(),
+                );
+                fs::create_dir_all(live_context.join("orchestration/sessions/sess-live"))
+                    .expect("create live session dir");
+
+                let counts = fast_counts();
+
+                assert_eq!(counts, (1, 1, 1));
+            },
+        );
     }
 
     #[test]

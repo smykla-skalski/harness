@@ -212,10 +212,9 @@ extension HarnessMonitorStore {
 
   private func syncContentToolbarUI() {
     let toolbarMetrics = ToolbarMetricsState(
-      projectCount: sessionIndex.projects.count,
-      worktreeCount: daemonStatus?.worktreeCount
-        ?? sessionIndex.projects.reduce(0) { $0 + $1.worktrees.count },
-      sessionCount: daemonStatus?.sessionCount ?? sessionIndex.sessions.count,
+      projectCount: indexedProjectCount,
+      worktreeCount: indexedWorktreeCount,
+      sessionCount: indexedSessionCount,
       openWorkCount: sessionIndex.totalOpenWorkCount,
       blockedCount: sessionIndex.totalBlockedCount
     )

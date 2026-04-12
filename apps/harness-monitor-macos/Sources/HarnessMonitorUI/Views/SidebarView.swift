@@ -333,6 +333,10 @@ private struct SidebarSessionListColumn: View {
         setCheckoutCollapsed: setCheckoutCollapsed
       )
     }
+    .accessibilityTestProbe(
+      HarnessMonitorAccessibility.sidebarSessionListState,
+      label: renderState.groupedStateAccessibilityLabel
+    )
   }
 }
 

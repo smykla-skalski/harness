@@ -167,6 +167,74 @@ struct HarnessMonitorStoreDatabaseTests {
     #expect(statsAfter.searchCount == 1)
   }
 
+  @Test("cacheSessionList removes orphaned cached projects and sessions")
+  func cacheSessionListRemovesOrphanedCachedProjectsAndSessions() async throws {
+    let store = makeStore()
+    let projectA = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let projectB = ProjectSummary(
+      projectId: "project-b",
+      name: "kuma",
+      projectDir: "/Users/example/Projects/kuma",
+      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-b",
+      activeSessionCount: 1,
+      totalSessionCount: 1
+    )
+    let sessionA = makeSession(
+      .init(
+        sessionId: "sess-keep",
+        context: "Keep me",
+        status: .active,
+        leaderId: "leader-keep",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let sessionB = makeSession(
+      .init(
+        sessionId: "sess-drop",
+        context: "Drop me",
+        status: .active,
+        projectName: "kuma",
+        projectId: "project-b",
+        leaderId: "leader-drop",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let detailB = makeSessionDetail(
+      summary: sessionB,
+      workerID: "worker-drop",
+      workerName: "Worker Drop"
+    )
+    let timelineB = makeTimelineEntries(
+      sessionID: sessionB.sessionId,
+      agentID: "leader-drop",
+      summary: "Drop me"
+    )
+
+    await store.cacheSessionList([sessionA, sessionB], projects: [projectA, projectB])
+    await store.cacheSessionDetail(detailB, timeline: timelineB)
+
+    await store.cacheSessionList([sessionA], projects: [projectA])
+
+    let statsAfter = await store.gatherDatabaseStatistics()
+    #expect(statsAfter.sessionCount == 1)
+    #expect(statsAfter.projectCount == 1)
+    #expect(statsAfter.agentCount == 0)
+    #expect(statsAfter.timelineCount == 0)
+    if case .some = await store.loadCachedSessionDetail(sessionID: sessionB.sessionId) {
+      Issue.record("expected dropped session detail to be removed from cache")
+    }
+    let cachedList = try #require(await store.loadCachedSessionList())
+    #expect(cachedList.sessions.map(\.sessionId) == [sessionA.sessionId])
+    #expect(cachedList.projects.map(\.projectId) == [projectA.projectId])
+    #expect(store.persistedSessionCount == 1)
+  }
+
   @Test("clearSessionCache fails gracefully without persistence")
   func clearSessionCacheNoPersistence() async {
     let store = HarnessMonitorStore(
