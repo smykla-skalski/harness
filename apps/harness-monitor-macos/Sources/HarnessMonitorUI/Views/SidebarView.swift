@@ -313,7 +313,7 @@ private struct SidebarSessionListColumn: View {
       searchPresentation: searchResults.presentationState,
       searchVisibleSessions: searchResults.visibleSessions,
       selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
-        .accessibilityMarkersEnabled ? sidebarUI.selectedSessionID : nil,
+        .selectionMarkersEnabled ? sidebarUI.selectedSessionID : nil,
       bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
       dateTimeConfiguration: dateTimeConfiguration,

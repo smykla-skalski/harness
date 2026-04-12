@@ -2,10 +2,20 @@ import SwiftUI
 
 public enum HarnessMonitorUITestEnvironment {
   public static let environmentKey = "HARNESS_MONITOR_UI_TESTS"
+  public static let perfScenarioEnvironmentKey = "HARNESS_MONITOR_PERF_SCENARIO"
   public static let hostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   public static let isHostBundle = Bundle.main.bundleIdentifier == hostBundleIdentifier
   public static let isEnabled =
     ProcessInfo.processInfo.environment[environmentKey] == "1" || isHostBundle
+  public static let isPerfScenarioActive: Bool = {
+    guard isEnabled else {
+      return false
+    }
+    guard let rawScenario = ProcessInfo.processInfo.environment[perfScenarioEnvironmentKey] else {
+      return false
+    }
+    return !rawScenario.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }()
   public static let accessibilityMarkersEnabled: Bool = {
     guard isEnabled else {
       return false
@@ -13,6 +23,8 @@ public enum HarnessMonitorUITestEnvironment {
     let environment = ProcessInfo.processInfo.environment
     return environment["HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS"] != "0"
   }()
+  public static let selectionMarkersEnabled =
+    accessibilityMarkersEnabled && !isPerfScenarioActive
 }
 
 private struct AccessibilityFrameMarker: View {
