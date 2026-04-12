@@ -25,7 +25,7 @@ use crate::workspace::{dirs_home, project_context_dir, utc_now};
 
 use super::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
 use super::db::DaemonDb;
-use super::protocol::{SessionJoinRequest, StreamEvent};
+use super::protocol::StreamEvent;
 
 const DEFAULT_ROWS: u16 = 30;
 const DEFAULT_COLS: u16 = 120;
@@ -497,11 +497,16 @@ impl AgentTuiManagerHandle {
         }
     }
 
-    /// Start an agent runtime in a PTY and register it in the session.
+    /// Start an agent runtime in a PTY.
+    ///
+    /// The agent is **not** registered in session state here. Registration
+    /// happens when the auto-join skill invocation executes inside the PTY,
+    /// preventing the duplicate-registration bug that occurred when both the
+    /// daemon and the skill called `join_session`.
     ///
     /// # Errors
-    /// Returns [`CliError`] when the daemon DB is unavailable, the session cannot be joined,
-    /// or PTY/process setup fails.
+    /// Returns [`CliError`] when the daemon DB is unavailable or PTY/process
+    /// setup fails.
     pub fn start(
         &self,
         session_id: &str,
@@ -514,33 +519,16 @@ impl AgentTuiManagerHandle {
         let profile = request.launch_profile()?;
         let size = request.size()?;
         let tui_id = format!("agent-tui-{}", Uuid::new_v4());
-        let marker_capability = format!("agent-tui:{tui_id}");
-        let db = self.db()?;
-        let db_guard = lock_db(&db)?;
-        let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
-        let joined = super::service::join_session_direct(
-            session_id,
-            &SessionJoinRequest {
-                runtime: profile.runtime.clone(),
-                role: request.role,
-                capabilities: agent_tui_capabilities(&request.capabilities, &marker_capability),
-                name: Some(
-                    request
-                        .name
-                        .clone()
-                        .unwrap_or_else(|| format!("{} TUI", profile.runtime)),
-                ),
-                project_dir: project.project_dir.display().to_string(),
-            },
-            Some(&db_guard),
-        )?;
-        let agent_id = agent_id_for_tui(&joined, &marker_capability)?;
-        drop(db_guard);
+        let project = {
+            let db = self.db()?;
+            let db_guard = lock_db(&db)?;
+            resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?
+        };
 
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
         let snapshot_context = AgentTuiSnapshotContext {
             session_id,
-            agent_id: &agent_id,
+            agent_id: "",
             tui_id: &tui_id,
             profile: &profile,
             project_dir: &project.project_dir,
@@ -548,26 +536,61 @@ impl AgentTuiManagerHandle {
         };
         let process = spawn_agent_tui_process(
             session_id,
-            &agent_id,
             &tui_id,
             profile.clone(),
             &project.project_dir,
             size,
         )?;
 
-        if let Some(prompt) = request.prompt.as_deref().filter(|value| !value.is_empty())
-            && let Err(error) = send_initial_prompt(&process, prompt)
-        {
+        self.send_auto_join_and_user_prompt(&process, &snapshot_context, size, request)?;
+        self.activate_tui(process, &snapshot_context)
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion; tokio-rs/tracing#553"
+    )]
+    fn send_auto_join_and_user_prompt(
+        &self,
+        process: &AgentTuiProcess,
+        context: &AgentTuiSnapshotContext<'_>,
+        size: AgentTuiSize,
+        request: &AgentTuiStartRequest,
+    ) -> Result<(), CliError> {
+        let auto_join = build_auto_join_prompt(
+            &context.profile.runtime,
+            context.session_id,
+            request.role,
+            &request.capabilities,
+            context.tui_id,
+            request.name.as_deref(),
+        );
+        if let Err(error) = send_initial_prompt(process, &auto_join) {
             let _ = process.kill();
-            let snapshot = failed_snapshot(&snapshot_context, size, error.to_string());
+            let snapshot = failed_snapshot(context, size, error.to_string());
             let _ = self.save_and_broadcast("agent_tui_failed", &snapshot);
             return Err(error);
         }
 
+        if let Some(prompt) = request.prompt.as_deref().filter(|value| !value.is_empty())
+            && let Err(error) = send_initial_prompt(process, prompt)
+        {
+            tracing::warn!(%error, "failed to send user prompt after auto-join");
+        }
+
+        Ok(())
+    }
+
+    fn activate_tui(
+        &self,
+        process: AgentTuiProcess,
+        context: &AgentTuiSnapshotContext<'_>,
+    ) -> Result<AgentTuiSnapshot, CliError> {
         let process = Arc::new(process);
-        let snapshot = snapshot_from_process(&snapshot_context, &process, AgentTuiStatus::Running)?;
+        let snapshot = snapshot_from_process(context, &process, AgentTuiStatus::Running)?;
         let active = ActiveAgentTui::new(Some(Arc::clone(&process)));
         let stop_flag = Arc::clone(&active.stop_flag);
+        let tui_id = context.tui_id.to_string();
         self.active()?.insert(tui_id.clone(), active);
         if let Err(error) = self.save_and_broadcast("agent_tui_started", &snapshot) {
             let _ = self.remove_active(&tui_id)?;
@@ -585,40 +608,31 @@ impl AgentTuiManagerHandle {
         let profile = request.launch_profile()?;
         let size = request.size()?;
         let tui_id = format!("agent-tui-{}", Uuid::new_v4());
-        let marker_capability = format!("agent-tui:{tui_id}");
         let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
         let db = self.db()?;
         let db_guard = lock_db(&db)?;
         let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
-        let joined = super::service::join_session_direct(
-            session_id,
-            &SessionJoinRequest {
-                runtime: profile.runtime.clone(),
-                role: request.role,
-                capabilities: agent_tui_capabilities(&request.capabilities, &marker_capability),
-                name: Some(
-                    request
-                        .name
-                        .clone()
-                        .unwrap_or_else(|| format!("{} TUI", profile.runtime)),
-                ),
-                project_dir: project.project_dir.display().to_string(),
-            },
-            Some(&db_guard),
-        )?;
-        let agent_id = agent_id_for_tui(&joined, &marker_capability)?;
         drop(db_guard);
+
+        let auto_join = build_auto_join_prompt(
+            &profile.runtime,
+            session_id,
+            request.role,
+            &request.capabilities,
+            &tui_id,
+            request.name.as_deref(),
+        );
 
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
         let snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
             session_id: session_id.to_string(),
-            agent_id,
+            agent_id: String::new(),
             tui_id,
             profile,
             project_dir: project.project_dir,
             transcript_path,
             size,
-            prompt: request.prompt.clone(),
+            prompt: Some(auto_join),
         })?;
         let active = ActiveAgentTui::new(None);
         let stop_flag = Arc::clone(&active.stop_flag);
@@ -829,7 +843,30 @@ impl AgentTuiManagerHandle {
         snapshot.size = snapshot.screen.size();
         snapshot.updated_at = utc_now();
         write_transcript(Path::new(&snapshot.transcript_path), &process.transcript()?)?;
+
+        if snapshot.agent_id.is_empty() {
+            self.try_resolve_agent_id(&mut snapshot);
+        }
+
         Ok(snapshot)
+    }
+
+    /// Check session state for an agent whose capabilities contain the TUI
+    /// marker and back-fill the snapshot's `agent_id` when found.
+    fn try_resolve_agent_id(&self, snapshot: &mut AgentTuiSnapshot) {
+        let marker = format!("agent-tui:{}", snapshot.tui_id);
+        let Ok(db) = self.db() else {
+            return;
+        };
+        let Ok(db_guard) = lock_db(&db) else {
+            return;
+        };
+        let Ok(Some(state)) = db_guard.load_session_state(&snapshot.session_id) else {
+            return;
+        };
+        if let Ok(agent_id) = agent_id_for_tui(&state, &marker) {
+            snapshot.agent_id = agent_id;
+        }
     }
 
     fn persist_refreshed_snapshot(
@@ -850,6 +887,7 @@ impl AgentTuiManagerHandle {
             || previous.exit_code != refreshed.exit_code
             || previous.signal != refreshed.signal
             || previous.error != refreshed.error
+            || previous.agent_id != refreshed.agent_id
     }
 
     fn spawn_live_refresh(&self, tui_id: String, stop_flag: Arc<AtomicBool>) {
@@ -1121,16 +1159,6 @@ fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliErr
     })
 }
 
-fn agent_tui_capabilities(existing: &[String], marker_capability: &str) -> Vec<String> {
-    let mut capabilities = existing.to_vec();
-    for capability in ["agent-tui", marker_capability] {
-        if !capabilities.iter().any(|current| current == capability) {
-            capabilities.push(capability.to_string());
-        }
-    }
-    capabilities
-}
-
 struct ResolvedTuiProject {
     project_dir: PathBuf,
     context_root: PathBuf,
@@ -1185,7 +1213,6 @@ fn agent_id_for_tui(state: &SessionState, marker_capability: &str) -> Result<Str
 
 pub(super) fn spawn_agent_tui_process(
     session_id: &str,
-    agent_id: &str,
     tui_id: &str,
     profile: AgentTuiLaunchProfile,
     project_dir: &Path,
@@ -1193,7 +1220,6 @@ pub(super) fn spawn_agent_tui_process(
 ) -> Result<AgentTuiProcess, CliError> {
     let mut env = BTreeMap::new();
     env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
-    env.insert("HARNESS_AGENT_ID".to_string(), agent_id.to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
     let spec = AgentTuiSpawnSpec::new(profile, project_dir.to_path_buf(), env, size)?;
     PortablePtyAgentTuiBackend.spawn(spec)
@@ -1252,6 +1278,40 @@ fn failed_snapshot(
         created_at: now.clone(),
         updated_at: now,
     }
+}
+
+/// Build the skill invocation string that the daemon sends as the first PTY
+/// input so the agent auto-joins the session.
+fn build_auto_join_prompt(
+    runtime: &str,
+    session_id: &str,
+    role: SessionRole,
+    capabilities: &[String],
+    tui_id: &str,
+    name: Option<&str>,
+) -> String {
+    let mut caps: Vec<&str> = capabilities.iter().map(String::as_str).collect();
+    let marker = format!("agent-tui:{tui_id}");
+    for cap in ["agent-tui", marker.as_str()] {
+        if !caps.contains(&cap) {
+            caps.push(cap);
+        }
+    }
+    let caps_joined = caps.join(",");
+
+    let role_str = match role {
+        SessionRole::Leader => "leader",
+        SessionRole::Worker => "worker",
+        SessionRole::Observer => "observer",
+        SessionRole::Reviewer => "reviewer",
+        SessionRole::Improver => "improver",
+    };
+
+    let name_flag = name.map_or_else(String::new, |value| format!(" --name \"{value}\""));
+
+    format!(
+        "/harness:session:join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{name_flag}"
+    )
 }
 
 /// Return per-runtime argv entries that make the harness session plugin
@@ -1797,6 +1857,11 @@ mod tests {
         assert_eq!(snapshot.argv, vec!["sh", "-c", "cat"]);
         assert!(PathBuf::from(&snapshot.transcript_path).exists());
         assert!(PathBuf::from(&snapshot.transcript_path).starts_with(&context_root));
+        // agent_id is empty at start - resolved lazily after the skill joins
+        assert!(
+            snapshot.agent_id.is_empty(),
+            "agent_id should be empty before join"
+        );
 
         let started_event = receiver.try_recv().expect("started event");
         assert_eq!(started_event.event, "agent_tui_started");
@@ -1805,20 +1870,22 @@ mod tests {
             Some("sess-tui-manager")
         );
 
+        // Agent should NOT be pre-registered in session state
         {
             let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
             let state = db_guard
                 .load_session_state("sess-tui-manager")
                 .expect("load state")
                 .expect("state present");
-            let joined = state.agents.get(&snapshot.agent_id).expect("joined agent");
-            assert_eq!(joined.runtime, "codex");
-            assert!(joined.capabilities.iter().any(|item| item == "agent-tui"));
-            assert!(
-                joined
+            let has_tui_agent = state.agents.values().any(|agent| {
+                agent
                     .capabilities
                     .iter()
-                    .any(|item| item == &format!("agent-tui:{}", snapshot.tui_id))
+                    .any(|cap| cap.starts_with("agent-tui:"))
+            });
+            assert!(
+                !has_tui_agent,
+                "no TUI agent should be in session state yet"
             );
         }
 
@@ -1863,7 +1930,160 @@ mod tests {
         let stopped = manager.stop(&snapshot.tui_id).expect("stop");
         assert_eq!(stopped.status, AgentTuiStatus::Stopped);
         let transcript = fs_err::read(&stopped.transcript_path).expect("read transcript file");
-        assert!(String::from_utf8_lossy(&transcript).contains("hello from manager"));
+        let transcript_text = String::from_utf8_lossy(&transcript);
+        assert!(transcript_text.contains("hello from manager"));
+        // The auto-join prompt should have been sent to the PTY
+        assert!(
+            transcript_text.contains("/harness:session:join"),
+            "auto-join prompt should appear in transcript"
+        );
+    }
+
+    #[test]
+    fn manager_start_does_not_pre_register() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-no-prereg".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-no-prereg".into(),
+            checkout_name: "Directory".into(),
+            context_root: tmp.path().join("context"),
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "no prereg test",
+            "no prereg",
+            "sess-no-prereg",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        let leader_count = state.agents.len();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = manager
+            .start(
+                "sess-no-prereg",
+                &AgentTuiStartRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec![],
+                    name: None,
+                    prompt: None,
+                    project_dir: None,
+                    argv: vec!["sh".into(), "-c".into(), "cat".into()],
+                    rows: 5,
+                    cols: 40,
+                },
+            )
+            .expect("start");
+
+        assert!(snapshot.agent_id.is_empty());
+
+        {
+            let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
+            let loaded = db_guard
+                .load_session_state("sess-no-prereg")
+                .expect("load state")
+                .expect("state present");
+            assert_eq!(
+                loaded.agents.len(),
+                leader_count,
+                "only leader should be registered, no TUI agent"
+            );
+        }
+
+        manager.stop(&snapshot.tui_id).expect("stop");
+    }
+
+    #[test]
+    fn manager_auto_join_prompt_in_transcript() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-auto-join".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-auto-join".into(),
+            checkout_name: "Directory".into(),
+            context_root: tmp.path().join("context"),
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "auto-join test",
+            "auto-join",
+            "sess-auto-join",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = manager
+            .start(
+                "sess-auto-join",
+                &AgentTuiStartRequest {
+                    runtime: "gemini".into(),
+                    role: SessionRole::Observer,
+                    capabilities: vec!["my-cap".into()],
+                    name: Some("auto join agent".into()),
+                    prompt: None,
+                    project_dir: None,
+                    argv: vec!["sh".into(), "-c".into(), "cat".into()],
+                    rows: 5,
+                    cols: 80,
+                },
+            )
+            .expect("start");
+
+        // Wait for the auto-join text to appear in the PTY
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            manager
+                .get(&snapshot.tui_id)
+                .expect("refresh")
+                .screen
+                .text
+                .contains("/harness:session:join")
+        });
+
+        let refreshed = manager.get(&snapshot.tui_id).expect("get");
+        assert!(
+            refreshed.screen.text.contains("sess-auto-join"),
+            "session id in prompt"
+        );
+        assert!(refreshed.screen.text.contains("observer"), "role in prompt");
+        assert!(
+            refreshed.screen.text.contains("my-cap"),
+            "user cap in prompt"
+        );
+
+        manager.stop(&snapshot.tui_id).expect("stop");
     }
 
     #[test]
@@ -2322,5 +2542,48 @@ mod tests {
         let project = tmp.path().join("nonexistent");
         let flags = super::skill_directory_flags("claude", &project);
         assert!(flags.is_empty());
+    }
+
+    #[test]
+    fn build_auto_join_prompt_includes_markers() {
+        let prompt = super::build_auto_join_prompt(
+            "codex",
+            "sess-123",
+            SessionRole::Worker,
+            &[],
+            "agent-tui-abc",
+            None,
+        );
+        assert!(prompt.contains("sess-123"), "should contain session id");
+        assert!(
+            prompt.contains("agent-tui"),
+            "should contain agent-tui capability"
+        );
+        assert!(
+            prompt.contains("agent-tui:agent-tui-abc"),
+            "should contain marker capability"
+        );
+        assert!(prompt.contains("worker"), "should contain role");
+        assert!(prompt.contains("codex"), "should contain runtime");
+    }
+
+    #[test]
+    fn build_auto_join_prompt_preserves_user_capabilities() {
+        let prompt = super::build_auto_join_prompt(
+            "claude",
+            "sess-456",
+            SessionRole::Observer,
+            &["custom-cap".to_string(), "another".to_string()],
+            "agent-tui-def",
+            Some("my worker"),
+        );
+        assert!(prompt.contains("custom-cap"), "should preserve user cap");
+        assert!(prompt.contains("another"), "should preserve user cap");
+        assert!(
+            prompt.contains("agent-tui:agent-tui-def"),
+            "should contain marker"
+        );
+        assert!(prompt.contains("observer"), "should contain role");
+        assert!(prompt.contains("my worker"), "should contain name");
     }
 }
