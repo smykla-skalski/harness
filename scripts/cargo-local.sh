@@ -23,6 +23,22 @@ sanitize_segment() {
   printf '%s' "$1" | tr -cs '[:alnum:]._-' '-'
 }
 
+tmpdir_is_usable() {
+  local candidate probe
+  candidate="${1:-}"
+  candidate="${candidate%/}"
+
+  if [[ -z "$candidate" ]] || [[ ! -d "$candidate" ]]; then
+    return 1
+  fi
+
+  probe="$candidate/.harness-tmp-probe-$$"
+  if ! touch "$probe" 2>/dev/null; then
+    return 1
+  fi
+  rm -f "$probe"
+}
+
 cleanup_stale_leases() {
   local lease_file pid
 
@@ -134,6 +150,16 @@ if [[ -n "$session_id" ]]; then
   target_segment="agent-$(sanitize_segment "$session_id")"
 fi
 
+if ! tmpdir_is_usable "${TMPDIR:-}"; then
+  tmpdir_fallback="$ROOT/target/.cargo-local/tmp/$target_segment"
+  mkdir -p "$tmpdir_fallback"
+  if ! tmpdir_is_usable "$tmpdir_fallback"; then
+    printf 'failed to prepare writable TMPDIR at %s\n' "$tmpdir_fallback" >&2
+    exit 1
+  fi
+  export TMPDIR="$tmpdir_fallback/"
+fi
+
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$ROOT/target/dev/$target_segment}}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
 
@@ -151,6 +177,7 @@ if [[ "${1:-}" == "--print-env" ]]; then
   else
     printf 'SESSION_MODE=local\n'
   fi
+  printf 'TMPDIR=%s\n' "${TMPDIR:-}"
   printf 'RUSTC_WRAPPER=%s\n' "${RUSTC_WRAPPER:-}"
   if [[ -n "${RUSTC_WRAPPER:-}" ]]; then
     printf 'CACHE_MODE=sccache\n'

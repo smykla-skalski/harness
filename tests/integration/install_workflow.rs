@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -30,6 +31,89 @@ fn run_harness_version(path: &Path) -> String {
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+fn parse_env_output(output: &[u8]) -> BTreeMap<String, String> {
+    String::from_utf8_lossy(output)
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect()
+}
+
+#[test]
+fn cargo_local_script_falls_back_to_repo_local_tmpdir_when_tmpdir_is_missing() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/cargo-local.sh"))
+        .arg("--print-env")
+        .current_dir(&repo)
+        .env("HOME", tmp.path().join("home"))
+        .env_remove("TMPDIR")
+        .env_remove("CODEX_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("GEMINI_SESSION_ID")
+        .env_remove("COPILOT_SESSION_ID")
+        .env_remove("OPENCODE_SESSION_ID")
+        .output()
+        .expect("run cargo-local script");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let env = parse_env_output(&output.stdout);
+    let tmpdir = env.get("TMPDIR").expect("TMPDIR line");
+    assert_eq!(
+        tmpdir,
+        &format!("{}/target/.cargo-local/tmp/local/", repo.display())
+    );
+    assert!(
+        Path::new(tmpdir).is_dir(),
+        "expected repo-local tmpdir to exist: {tmpdir}"
+    );
+}
+
+#[test]
+fn cargo_local_script_preserves_explicit_writable_tmpdir() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let explicit_tmpdir = tmp.path().join("explicit-tmp");
+    std::fs::create_dir_all(&explicit_tmpdir).expect("create explicit tmpdir");
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/cargo-local.sh"))
+        .arg("--print-env")
+        .current_dir(&repo)
+        .env("HOME", tmp.path().join("home"))
+        .env("TMPDIR", &explicit_tmpdir)
+        .env_remove("CODEX_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("GEMINI_SESSION_ID")
+        .env_remove("COPILOT_SESSION_ID")
+        .env_remove("OPENCODE_SESSION_ID")
+        .output()
+        .expect("run cargo-local script");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let env = parse_env_output(&output.stdout);
+    assert_eq!(
+        env.get("TMPDIR").expect("TMPDIR line"),
+        &explicit_tmpdir.display().to_string()
+    );
 }
 
 #[test]
