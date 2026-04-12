@@ -363,25 +363,27 @@ private struct ContentAccessibilityOverlayBridge: View {
   var body: some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       ZStack {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.appChromeState,
-          text: appChromeAccessibilityValue
-        )
-        ContentToolbarChromeAccessibilityMarker(
-          contentSession: contentSession,
-          contentSessionDetail: contentSessionDetail
-        )
+        if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.appChromeState,
+            text: appChromeAccessibilityValue
+          )
+          ContentToolbarChromeAccessibilityMarker(
+            contentSession: contentSession,
+            contentSessionDetail: contentSessionDetail
+          )
+          ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
+            text: toolbarCenterpieceDisplayMode.rawValue
+          )
+        }
         if let auditBuildAccessibilityValue {
           AccessibilityTextMarker(
             identifier: HarnessMonitorAccessibility.auditBuildState,
             text: auditBuildAccessibilityValue
           )
         }
-        ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
-          text: toolbarCenterpieceDisplayMode.rawValue
-        )
       }
     }
   }
@@ -431,10 +433,7 @@ private struct ContentToolbarChromeAccessibilityMarker: View {
 
   private var windowTitle: String {
     contentSessionDetail.selectedSessionDetail != nil
-      || (
-        contentSession.selectedSessionSummary != nil
-          && contentSession.isSelectionLoading == false
-      )
+      || contentSession.selectedSessionSummary != nil
       ? "Cockpit" : "Dashboard"
   }
 
