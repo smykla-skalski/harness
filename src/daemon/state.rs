@@ -966,16 +966,9 @@ mod tests {
     fn flock_is_held_at_returns_true_while_another_holder_is_alive() {
         let tmp = tempdir().expect("tempdir");
         let path = tmp.path().join("test.lock");
-        let holder = fs::OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&path)
-            .expect("open");
-        holder.try_lock_exclusive().expect("flock");
+        let guard = acquire_flock_exclusive(&path, "test").expect("acquire");
         assert!(flock_is_held_at(&path));
-        drop(holder);
+        drop(guard);
         assert!(!flock_is_held_at(&path));
     }
 
