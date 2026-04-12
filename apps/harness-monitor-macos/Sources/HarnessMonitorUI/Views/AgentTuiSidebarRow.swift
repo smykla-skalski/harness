@@ -33,13 +33,13 @@ struct AgentTuiSidebarRow: View {
             size: 36
           )
           .opacity(0.12)
-          .offset(x: 6, y: 4)
+          .offset(x: 14, y: 4)
         } else {
           Image(systemName: "terminal")
             .font(.system(size: 28))
             .foregroundStyle(.secondary)
             .opacity(0.12)
-            .offset(x: 6, y: 4)
+            .offset(x: 14, y: 4)
         }
       }
       .accessibilityHidden(true)
