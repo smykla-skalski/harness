@@ -574,6 +574,25 @@ extension HarnessMonitorStore {
     )
   }
 
+  /// Read the manifest file from disk and call `applyManifestRevision` if the
+  /// host bridge state changed. This is the 10s fallback for when the
+  /// DispatchSource watcher stops firing.
+  ///
+  /// No-op when the manifest is absent, undecodable, or bridge state is
+  /// identical to what the store already has. Decoder is allocated once per
+  /// call - this method only runs in the background probe task, never in a
+  /// view body.
+  func refreshBridgeStateFromManifest(at manifestURL: URL = HarnessMonitorPaths.manifestURL()) {
+    guard
+      let data = FileManager.default.contents(atPath: manifestURL.path)
+    else { return }
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    guard let manifest = try? decoder.decode(DaemonManifest.self, from: data) else { return }
+    guard daemonStatus?.manifest?.hostBridge != manifest.hostBridge else { return }
+    applyManifestRevision(manifest)
+  }
+
   private func mutateHostBridgeCapability(
     using client: any HarnessMonitorClientProtocol,
     capability: String,

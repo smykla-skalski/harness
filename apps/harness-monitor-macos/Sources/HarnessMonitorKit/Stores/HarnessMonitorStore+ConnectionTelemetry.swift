@@ -260,6 +260,7 @@ extension HarnessMonitorStore {
               updatesLatency: true,
               countsTowardsTraffic: false
             )
+            refreshBridgeStateFromManifest()
             continue
           }
           let sample = try await Self.measureOperation {
@@ -271,6 +272,7 @@ extension HarnessMonitorStore {
             updatesLatency: true,
             countsTowardsTraffic: false
           )
+          refreshBridgeStateFromManifest()
         } catch {
           if Task.isCancelled {
             return
