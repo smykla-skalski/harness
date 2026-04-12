@@ -172,7 +172,6 @@ struct SidebarSessionListContent: View {
       ),
       fontScale: renderState.fontScale
     )
-    .equatable()
 
     let baseRow =
       row
