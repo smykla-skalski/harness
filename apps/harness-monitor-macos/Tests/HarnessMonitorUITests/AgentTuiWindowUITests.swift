@@ -66,6 +66,40 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     }
   }
 
+  func testWrapToggleSwitchesViewportMode() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "wrap test")
+
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("wrap=false")
+      },
+      "Session should start with wrap disabled"
+    )
+
+    app.typeKey("l", modifierFlags: .command)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("wrap=true")
+      },
+      "After Cmd+L, wrap should be enabled"
+    )
+
+    app.typeKey("l", modifierFlags: .command)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("wrap=false")
+      },
+      "After Cmd+L again, wrap should be disabled"
+    )
+  }
+
   func testStoppedSessionHidesLiveControlsButKeepsTranscriptAction() throws {
     let app = launchInCockpitPreview()
 
