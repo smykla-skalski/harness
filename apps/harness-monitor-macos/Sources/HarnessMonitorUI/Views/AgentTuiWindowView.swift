@@ -123,8 +123,20 @@ public struct AgentTuiWindowView: View {
     selectedSessionTui?.status.isActive == true && !isSubmitting
   }
 
+  private var sortedAgentTuis: [AgentTuiSnapshot] {
+    store.selectedAgentTuis.sorted { left, right in
+      if left.status.sortPriority != right.status.sortPriority {
+        return left.status.sortPriority < right.status.sortPriority
+      }
+      if left.runtime != right.runtime {
+        return left.runtime < right.runtime
+      }
+      return left.tuiId < right.tuiId
+    }
+  }
+
   private var orderedSessionIDs: [String] {
-    store.selectedAgentTuis.map(\.tuiId)
+    sortedAgentTuis.map(\.tuiId)
   }
 
   private var currentStateMarker: String {
@@ -150,7 +162,7 @@ public struct AgentTuiWindowView: View {
     NavigationSplitView {
       AgentTuiSidebar(
         selection: $selection,
-        orderedSessionIDs: orderedSessionIDs,
+        agentTuis: sortedAgentTuis,
         sessionTitlesByID: sessionTitlesByID,
         refresh: refresh
       )
