@@ -229,7 +229,6 @@ extension HarnessMonitorStore {
       to: \.statusMessages,
       on: contentUI.toolbar
     )
-    assign(resolveDaemonIndicatorState(), to: \.daemonIndicator, on: contentUI.toolbar)
     assign(canNavigateBack, to: \.canNavigateBack, on: contentUI.toolbar)
     assign(canNavigateForward, to: \.canNavigateForward, on: contentUI.toolbar)
     assign(isRefreshing, to: \.isRefreshing, on: contentUI.toolbar)
@@ -374,16 +373,6 @@ extension HarnessMonitorStore {
     }
 
     return messages
-  }
-
-  private func resolveDaemonIndicatorState() -> DaemonIndicatorState {
-    guard connectionState == .online else {
-      return .offline
-    }
-    if daemonStatus?.launchAgent.installed == true {
-      return .launchdConnected
-    }
-    return .manualConnected
   }
 
   func assign<Root: AnyObject, Value: Equatable>(
