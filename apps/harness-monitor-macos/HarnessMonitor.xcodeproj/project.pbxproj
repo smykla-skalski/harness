@@ -219,6 +219,7 @@
 		AB59D10BE2E6793B27A004EB /* HarnessMonitorStoreExternalDaemonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E94A0758B871FE52A8D31F /* HarnessMonitorStoreExternalDaemonTests.swift */; };
 		ABAA0783B7517D357D3D79BA /* SessionCacheMemoryTestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541F279DF1DE77AC4B2261E0 /* SessionCacheMemoryTestHarness.swift */; };
 		ABF1815C358F938D7B10A954 /* UserModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF83058E83D56832DD84366 /* UserModels.swift */; };
+		B0AFA4E2C11F4AA98F1E0D17 /* AgentTuiRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67DCBFA7F634143B8F7CC6D /* AgentTuiRuntimeTests.swift */; };
 		AF56300AD89D3A4AA9C2071F /* ServerSentEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E7C6AD7FC7DC6B8F574285 /* ServerSentEventsTests.swift */; };
 		B112BC9721AA6983EF6CD536 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6DFA230C28165C5AF0365371 /* Lottie */; };
 		B18C8D2F94F3B5C655EC4752 /* SessionTaskLaneViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707394EEA2DA5DE9174191BB /* SessionTaskLaneViews.swift */; };
@@ -632,6 +633,7 @@
 		B88AF04DA407A94805DA2A19 /* PreferencesStatusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStatusSection.swift; sourceTree = "<group>"; };
 		B8AAC05121D1DD29B798775C /* HarnessMonitorNotificationFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorNotificationFactory.swift; sourceTree = "<group>"; };
 		BF3AC26237CCD35785DFA1DA /* HarnessMonitorStore+Signals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Signals.swift"; sourceTree = "<group>"; };
+		C67DCBFA7F634143B8F7CC6D /* AgentTuiRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTuiRuntimeTests.swift; sourceTree = "<group>"; };
 		C18B753E8A5DC4BBF6ABE974 /* AgentTuiTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTuiTabs.swift; sourceTree = "<group>"; };
 		C1EB3235CC0B374C119BB1B1 /* PreferencesDatabaseSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesDatabaseSection.swift; sourceTree = "<group>"; };
 		C3D299B91393A9CAF97BA37A /* HarnessMonitorToolbarGlassUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorToolbarGlassUITests.swift; sourceTree = "<group>"; };
@@ -933,6 +935,7 @@
 		6662073C635B546A53BAE49F /* HarnessMonitorKitTests */ = {
 			isa = PBXGroup;
 			children = (
+				C67DCBFA7F634143B8F7CC6D /* AgentTuiRuntimeTests.swift */,
 				5E0286A8A2D9E8F55E2BC377 /* CachedModelsDetailTests.swift */,
 				4867E04ECF63D0A2715695EF /* CachedModelsTests.swift */,
 				447650C240AC036E1222DB52 /* ConnectionModelsTests.swift */,
@@ -1626,6 +1629,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0AFA4E2C11F4AA98F1E0D17 /* AgentTuiRuntimeTests.swift in Sources */,
 				8DC3C0D43218C5D79C8C4FE3 /* CachedModelsDetailTests.swift in Sources */,
 				4F6BBF37BDC6EC822ED36C92 /* CachedModelsTests.swift in Sources */,
 				616DD8C34CC0151BD79FF4D3 /* ConnectionModelsTests.swift in Sources */,
@@ -2059,7 +2063,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 19.9.6;
+				MARKETING_VERSION = 19.9.7;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2188,7 +2192,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 19.9.6;
+				MARKETING_VERSION = 19.9.7;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2528,7 +2532,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 19.9.6;
+				MARKETING_VERSION = 19.9.7;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
