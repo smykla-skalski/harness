@@ -20,17 +20,18 @@ enum HarnessMonitorInspectorLayout {
 // MARK: - Commands state
 
 extension HarnessMonitorStore {
-  // Keep Commands state as plain data sourced from a dedicated UI slice so the
-  // app scene does not observe raw selection and detail state directly.
+  // Keep Commands state as plain data. The scene-level FocusedValue bridge
+  // emitted duplicate update faults during startup when the window toolbar
+  // and command menu refreshed in the same frame.
   public var commandsDisplayState: CommandsDisplayState {
     CommandsDisplayState(
-      canNavigateBack: commandsUI.canNavigateBack,
-      canNavigateForward: commandsUI.canNavigateForward,
-      hasSelectedSession: commandsUI.hasSelectedSession,
-      isSessionReadOnly: commandsUI.isSessionReadOnly,
-      bookmarkTitle: commandsUI.bookmarkTitle,
-      isPersistenceAvailable: commandsUI.isPersistenceAvailable,
-      hasObserver: commandsUI.hasObserver
+      canNavigateBack: canNavigateBack,
+      canNavigateForward: canNavigateForward,
+      hasSelectedSession: selectedSessionID != nil,
+      isSessionReadOnly: isSessionReadOnly,
+      bookmarkTitle: selectedSessionBookmarkTitle,
+      isPersistenceAvailable: isPersistenceAvailable,
+      hasObserver: selectedSession?.observer != nil
     )
   }
 }

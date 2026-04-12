@@ -82,7 +82,6 @@ public final class HarnessMonitorStore {
   public let selection: SelectionSlice
   public let userData: UserDataSlice
   public let contentUI: ContentUISlice
-  public let commandsUI: CommandsUISlice
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
@@ -90,7 +89,7 @@ public final class HarnessMonitorStore {
   public var persistenceError: String? {
     didSet {
       guard oldValue != persistenceError else { return }
-      scheduleUISync([.contentChrome, .commands])
+      scheduleUISync([.contentChrome])
     }
   }
   public var presentedSheet: PresentedSheet? {
@@ -141,13 +140,13 @@ public final class HarnessMonitorStore {
   public var navigationBackStack: [String?] = [] {
     didSet {
       guard oldValue != navigationBackStack else { return }
-      scheduleUISync([.contentToolbar, .commands])
+      scheduleUISync([.contentToolbar])
     }
   }
   public var navigationForwardStack: [String?] = [] {
     didSet {
       guard oldValue != navigationForwardStack else { return }
-      scheduleUISync([.contentToolbar, .commands])
+      scheduleUISync([.contentToolbar])
     }
   }
   var connectionProbeInterval: Duration = .seconds(10)
@@ -217,7 +216,6 @@ public final class HarnessMonitorStore {
     self.selection = SelectionSlice()
     self.userData = UserDataSlice()
     self.contentUI = ContentUISlice()
-    self.commandsUI = CommandsUISlice()
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.toast = ToastSlice()
