@@ -6,6 +6,7 @@ actor RecordingDaemonController: DaemonControlling {
   private let client: any HarnessMonitorClientProtocol
   private var launchAgentInstalled: Bool
   private let registrationStateOverride: DaemonLaunchAgentRegistrationState?
+  private let statusReportOverride: DaemonStatusReport?
   private let warmUpError: (any Error)?
   private var lastEventMessage = "daemon ready"
 
@@ -13,11 +14,13 @@ actor RecordingDaemonController: DaemonControlling {
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
     launchAgentInstalled: Bool = true,
     registrationState: DaemonLaunchAgentRegistrationState? = nil,
+    statusReport: DaemonStatusReport? = nil,
     warmUpError: (any Error)? = nil
   ) {
     self.client = client
     self.launchAgentInstalled = launchAgentInstalled
     self.registrationStateOverride = registrationState
+    self.statusReportOverride = statusReport
     self.warmUpError = warmUpError
   }
 
@@ -72,7 +75,10 @@ actor RecordingDaemonController: DaemonControlling {
   }
 
   func daemonStatus() async throws -> DaemonStatusReport {
-    DaemonStatusReport(
+    if let statusReportOverride {
+      return statusReportOverride
+    }
+    return DaemonStatusReport(
       manifest: DaemonManifest(
         version: "14.5.0",
         pid: 111,
