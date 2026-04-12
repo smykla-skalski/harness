@@ -86,6 +86,10 @@ impl CodexControllerHandle {
     /// Returns `CODEX001` immediately when the probe fails so the HTTP layer
     /// surfaces 503 in the POST response rather than failing asynchronously
     /// in the worker.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "preflight merges sandbox capability checks with live endpoint probing"
+    )]
     fn preflight_websocket_probe(&self, session_id: &str) -> Result<(), CliError> {
         if self.state.sandboxed && var("HARNESS_CODEX_WS_URL").ok().is_none() {
             let Some(capability) = bridge::running_codex_capability()? else {
@@ -149,6 +153,10 @@ impl CodexControllerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session cannot be resolved or the snapshot
     /// cannot be persisted.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "queueing path builds a full persisted snapshot before worker handoff"
+    )]
     pub fn start_run(
         &self,
         session_id: &str,

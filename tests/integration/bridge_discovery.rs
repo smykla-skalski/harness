@@ -15,6 +15,7 @@
 
 #![cfg(target_os = "macos")]
 
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -61,6 +62,8 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
         .expect("hold exclusive flock on fake daemon lock");
 
     let mock_codex = create_mock_codex(home);
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
@@ -70,7 +73,7 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
                 "--capability",
                 "codex",
                 "--codex-port",
-                "14520",
+                &codex_port_text,
                 "--codex-path",
             ])
             .arg(&mock_codex)
@@ -228,6 +231,14 @@ fn run_bridge(home: &Path, xdg: &Path, args: &[&str]) -> Output {
 
 fn harness_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness")
+}
+
+fn unused_local_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("bind local port")
+        .local_addr()
+        .expect("read local addr")
+        .port()
 }
 
 fn wait_for_bridge_exit(bridge: &mut ManagedChild) -> Result<(), String> {

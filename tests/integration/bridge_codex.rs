@@ -71,6 +71,9 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+    let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
@@ -80,7 +83,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
                 "--capability",
                 "codex",
                 "--codex-port",
-                "14500",
+                &codex_port_text,
                 "--codex-path",
             ])
             .arg(&mock_codex)
@@ -99,10 +102,10 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
     let state = wait_for_bridge_state_with_capabilities(tmp.path(), &["codex"]);
     let codex = state.capabilities.get("codex").expect("codex capability");
     assert_eq!(codex.transport, "websocket");
-    assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14500"));
+    assert_eq!(codex.endpoint.as_deref(), Some(codex_endpoint.as_str()));
     assert_eq!(
         codex.metadata.get("port").map(String::as_str),
-        Some("14500")
+        Some(codex_port_text.as_str())
     );
 
     let status_output = run_bridge(&tmp, &["bridge", "status"]);
@@ -144,6 +147,9 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+    let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
@@ -153,7 +159,7 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
                 "--capability",
                 "codex",
                 "--codex-port",
-                "14510",
+                &codex_port_text,
                 "--codex-path",
             ])
             .arg(&mock_codex)
@@ -179,15 +185,19 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
 
     let state = wait_for_bridge_state_with_capabilities(tmp.path(), &["codex"]);
     let codex = state.capabilities.get("codex").expect("codex capability");
-    assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14510"));
+    assert_eq!(codex.endpoint.as_deref(), Some(codex_endpoint.as_str()));
 
     let events = read_daemon_events(tmp.path());
     assert!(
-        events.contains("codex host bridge readiness still pending on ws://127.0.0.1:14510"),
+        events.contains(&format!(
+            "codex host bridge readiness still pending on ws://127.0.0.1:{codex_port}"
+        )),
         "expected readiness warning event, got: {events}"
     );
     assert!(
-        events.contains("codex host bridge ready on ws://127.0.0.1:14510"),
+        events.contains(&format!(
+            "codex host bridge ready on ws://127.0.0.1:{codex_port}"
+        )),
         "expected readiness success event, got: {events}"
     );
 
@@ -205,6 +215,8 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
 
     let output = Command::new(harness_binary())
         .args([
@@ -213,7 +225,7 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
             "--capability",
             "codex",
             "--codex-port",
-            "14511",
+            &codex_port_text,
             "--codex-path",
         ])
         .arg(&mock_codex)
@@ -236,12 +248,67 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
 
     let events = read_daemon_events(tmp.path());
     assert!(
-        events.contains("starting codex host bridge on ws://127.0.0.1:14511"),
+        events.contains(&format!(
+            "starting codex host bridge on ws://127.0.0.1:{codex_port}"
+        )),
         "expected startup event, got: {events}"
     );
     assert!(
-        events.contains("codex host bridge failed before readiness on ws://127.0.0.1:14511"),
+        events.contains(&format!(
+            "codex host bridge failed before readiness on ws://127.0.0.1:{codex_port}"
+        )),
         "expected readiness error event, got: {events}"
+    );
+}
+
+#[test]
+fn bridge_start_fails_when_codex_port_is_already_bound() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let mock_codex = create_mock_codex(tmp.path());
+    let occupied_listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind occupied codex port");
+    let codex_port = occupied_listener
+        .local_addr()
+        .expect("read occupied listener addr")
+        .port();
+    let codex_port_text = codex_port.to_string();
+
+    let output = Command::new(harness_binary())
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            &codex_port_text,
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .output()
+        .expect("run bridge");
+
+    assert!(
+        !output.status.success(),
+        "bridge unexpectedly succeeded: {}",
+        output_text(&output)
+    );
+    assert!(
+        !tmp.path().join("harness/daemon/bridge.json").exists(),
+        "bridge state should not persist when the codex port is already bound"
+    );
+
+    let events = read_daemon_events(tmp.path());
+    assert!(
+        events.contains(&format!(
+            "codex host bridge failed before readiness on ws://127.0.0.1:{codex_port}: 127.0.0.1:{codex_port} is unavailable"
+        )),
+        "expected occupied-port error event, got: {events}"
     );
 }
 
@@ -300,10 +367,18 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
-            .args(["bridge", "start", "--codex-port", "14501", "--codex-path"])
+            .args([
+                "bridge",
+                "start",
+                "--codex-port",
+                &codex_port_text,
+                "--codex-path",
+            ])
             .arg(&mock_codex)
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
@@ -357,6 +432,9 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+    let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
@@ -366,7 +444,7 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
                 "--capability",
                 "agent-tui",
                 "--codex-port",
-                "14502",
+                &codex_port_text,
                 "--codex-path",
             ])
             .arg(&mock_codex)
@@ -397,10 +475,10 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
     assert_eq!(report.pid, Some(initial_state.pid));
     assert!(report.capabilities.contains_key("agent-tui"));
     let codex = report.capabilities.get("codex").expect("codex capability");
-    assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14502"));
+    assert_eq!(codex.endpoint.as_deref(), Some(codex_endpoint.as_str()));
     assert_eq!(
         codex.metadata.get("port").map(String::as_str),
-        Some("14502")
+        Some(codex_port_text.as_str())
     );
 
     let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
@@ -417,10 +495,18 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
-            .args(["bridge", "start", "--codex-port", "14503", "--codex-path"])
+            .args([
+                "bridge",
+                "start",
+                "--codex-port",
+                &codex_port_text,
+                "--codex-path",
+            ])
             .arg(&mock_codex)
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
