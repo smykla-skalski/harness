@@ -53,20 +53,7 @@ struct SessionAgentSummaryCard: View {
   @State private var isDropTargeted = false
 
   private var runtimeSymbol: ProviderBrandSymbol? {
-    switch agent.runtime.lowercased() {
-    case "claude", "anthropic":
-      .claude
-    case "codex", "openai":
-      .openAI
-    case "gemini":
-      .gemini
-    case "copilot":
-      .copilot
-    case "mistral", "vibe":
-      .mistral
-    default:
-      nil
-    }
+    ProviderBrandSymbol(runtimeString: agent.runtime)
   }
 
   private var metadataLine: String {

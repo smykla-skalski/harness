@@ -59,6 +59,23 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
 
   public var id: String { rawValue }
 
+  public init?(runtimeString: String) {
+    switch runtimeString.lowercased() {
+    case "claude", "anthropic":
+      self = .claude
+    case "codex", "openai":
+      self = .openAI
+    case "gemini":
+      self = .gemini
+    case "copilot":
+      self = .copilot
+    case "mistral", "vibe":
+      self = .mistral
+    default:
+      return nil
+    }
+  }
+
   var assetName: String {
     switch self {
     case .openAI:
