@@ -92,6 +92,7 @@ struct HarnessMonitorStoreSheetTests {
     let sheet = HarnessMonitorStore.PresentedSheet.codexFlow
     switch sheet {
     case .codexFlow: break
+    case .agentTui: break
     case .sendSignal: break
     }
   }
