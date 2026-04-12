@@ -280,13 +280,13 @@ struct ToolbarCenterpieceView: View {
           ToolbarStatusTickerCapsule(
             messages: statusMessages
           ) {
-            daemonStatusDot
+            EmptyView()
           }
           .frame(width: displayMode.statusDropdownWidth(for: availableDetailWidth))
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
-        } else {
-          daemonStatusDot
         }
+
+        daemonStatusDot
       }
       .padding(.leading, Self.metricsLeadingInset)
       .padding(.trailing, Self.daemonTrailingInset)
