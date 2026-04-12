@@ -111,11 +111,18 @@ struct SessionAgentSummaryCard: View {
       : HarnessMonitorTheme.onContrast
   }
 
-  private var tuiMarkerTint: Color {
+  private var tuiMarkerColor: Color {
     guard let tuiStatus else { return .clear }
-    return tuiStatus.isActive
-      ? HarnessMonitorTheme.accent
-      : HarnessMonitorTheme.secondaryInk
+    switch tuiStatus {
+    case .running:
+      return HarnessMonitorTheme.success
+    case .stopped:
+      return HarnessMonitorTheme.caution
+    case .exited:
+      return HarnessMonitorTheme.secondaryInk
+    case .failed:
+      return HarnessMonitorTheme.danger
+    }
   }
 
   private var taskDropAction: AgentTaskDropAction {
@@ -145,27 +152,21 @@ struct SessionAgentSummaryCard: View {
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
               .lineLimit(2)
             Spacer()
-            if tuiStatus != nil {
-              Label {
-                Text("TUI")
-                  .scaledFont(.caption.bold())
-              } icon: {
-                Image(systemName: "terminal.fill")
-                  .imageScale(.small)
-              }
-              .harnessPillPadding()
-              .harnessContentPill(tint: tuiMarkerTint)
-              .foregroundStyle(tuiMarkerTint)
-              .accessibilityIdentifier(
-                HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
-              )
-              .harnessUITestValue(tuiStatus?.rawValue ?? "")
-            }
             Text(agent.role.title)
               .scaledFont(.caption.bold())
               .harnessPillPadding()
               .background(roleTint, in: Capsule())
               .foregroundStyle(roleForeground)
+            if tuiStatus != nil {
+              Image(systemName: "terminal.fill")
+                .foregroundStyle(tuiMarkerColor)
+                .imageScale(.small)
+                .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
+                .accessibilityIdentifier(
+                  HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
+                )
+                .harnessUITestValue(tuiStatus?.rawValue ?? "")
+            }
           }
           Text(metadataLine)
             .scaledFont(.caption.monospaced())
