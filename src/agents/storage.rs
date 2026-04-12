@@ -1,9 +1,9 @@
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write as _};
+use std::io::{Read, Seek, SeekFrom, Write as _};
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -26,6 +26,12 @@ fn sessions_root(project_dir: &Path) -> PathBuf {
 
 fn ledger_path(project_dir: &Path) -> PathBuf {
     agents_root(project_dir).join("ledger").join("events.jsonl")
+}
+
+fn ledger_sequence_path(project_dir: &Path) -> PathBuf {
+    agents_root(project_dir)
+        .join("ledger")
+        .join("sequence.json")
 }
 
 fn session_registry_path(project_dir: &Path) -> PathBuf {
@@ -54,6 +60,11 @@ fn agent_name(agent: HookAgent) -> &'static str {
         HookAgent::Vibe => "vibe",
         HookAgent::OpenCode => "opencode",
     }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+struct LedgerSequenceState {
+    last_sequence: u64,
 }
 
 fn with_lock<T>(
@@ -128,7 +139,7 @@ pub(crate) fn append_hook_event(
 ) -> Result<(), CliError> {
     with_lock(project_dir, "ledger", || {
         let ledger = ledger_path(project_dir);
-        let sequence = next_sequence(&ledger)?;
+        let sequence = reserve_next_sequence(project_dir, &ledger)?;
         let recorded_at = utc_now();
         let event = AgentLedgerEvent {
             sequence,
@@ -160,7 +171,7 @@ pub(crate) fn append_session_marker(
 ) -> Result<(), CliError> {
     with_lock(project_dir, "ledger", || {
         let ledger = ledger_path(project_dir);
-        let sequence = next_sequence(&ledger)?;
+        let sequence = reserve_next_sequence(project_dir, &ledger)?;
         let recorded_at = utc_now();
         let payload = serde_json::json!({
             "timestamp": recorded_at,
@@ -280,24 +291,85 @@ pub(crate) fn project_context_root_from_session_path(path: &Path) -> Option<Path
     path.ancestors().nth(5).map(Path::to_path_buf)
 }
 
-fn next_sequence(path: &Path) -> Result<u64, CliError> {
+fn reserve_next_sequence(project_dir: &Path, ledger_path: &Path) -> Result<u64, CliError> {
+    let sequence_path = ledger_sequence_path(project_dir);
+    let last_sequence = if sequence_path.exists() {
+        read_json_typed::<LedgerSequenceState>(&sequence_path)?.last_sequence
+    } else {
+        recover_last_sequence(ledger_path)?
+    };
+    let next_sequence = last_sequence.saturating_add(1);
+    write_json_pretty(
+        &sequence_path,
+        &LedgerSequenceState {
+            last_sequence: next_sequence,
+        },
+    )?;
+    Ok(next_sequence)
+}
+
+fn recover_last_sequence(path: &Path) -> Result<u64, CliError> {
     if !path.exists() {
-        return Ok(1);
+        return Ok(0);
     }
-    let file = File::open(path).map_err(|error| io_err(&error))?;
-    let reader = BufReader::new(file);
-    let mut last = 0;
-    for line in reader.lines() {
-        let line = line.map_err(|error| io_err(&error))?;
-        if line.trim().is_empty() {
+    let Some(line) = read_last_non_empty_line(path)? else {
+        return Ok(0);
+    };
+    let event: AgentLedgerEvent = serde_json::from_str(&line).map_err(|error| {
+        CliErrorKind::session_parse_error(format!("invalid agent ledger entry: {error}"))
+    })?;
+    Ok(event.sequence)
+}
+
+fn read_last_non_empty_line(path: &Path) -> Result<Option<String>, CliError> {
+    const CHUNK_SIZE: u64 = 8 * 1024;
+
+    let mut file = File::open(path).map_err(|error| io_err(&error))?;
+    let mut offset = file
+        .seek(SeekFrom::End(0))
+        .map_err(|error| io_err(&error))?;
+    if offset == 0 {
+        return Ok(None);
+    }
+
+    let mut buffer = Vec::new();
+    while offset > 0 {
+        let read_size = usize::try_from(offset.min(CHUNK_SIZE)).unwrap_or(usize::MAX);
+        offset = offset.saturating_sub(u64::try_from(read_size).unwrap_or(u64::MAX));
+        file.seek(SeekFrom::Start(offset))
+            .map_err(|error| io_err(&error))?;
+
+        let mut chunk = vec![0_u8; read_size];
+        file.read_exact(&mut chunk)
+            .map_err(|error| io_err(&error))?;
+        chunk.extend_from_slice(&buffer);
+        buffer = chunk;
+
+        let Some(line_end) = buffer
+            .iter()
+            .rposition(|byte| !byte.is_ascii_whitespace())
+            .map(|index| index + 1)
+        else {
+            if offset == 0 {
+                return Ok(None);
+            }
             continue;
+        };
+
+        if let Some(start) = buffer[..line_end].iter().rposition(|byte| *byte == b'\n') {
+            return String::from_utf8(buffer[start + 1..line_end].to_vec())
+                .map(Some)
+                .map_err(|error| io_err(&error));
         }
-        let event: AgentLedgerEvent = serde_json::from_str(&line).map_err(|error| {
-            CliErrorKind::session_parse_error(format!("invalid agent ledger entry: {error}"))
-        })?;
-        last = event.sequence;
+
+        if offset == 0 {
+            return String::from_utf8(buffer[..line_end].to_vec())
+                .map(Some)
+                .map_err(|error| io_err(&error));
+        }
     }
-    Ok(last.saturating_add(1))
+
+    Ok(None)
 }
 
 fn append_json_line<T>(path: &Path, payload: &T) -> Result<(), CliError>
@@ -438,12 +510,33 @@ mod tests {
             .collect()
     }
 
+    fn read_sequence_state(project_dir: &Path) -> LedgerSequenceState {
+        read_json_typed(&ledger_sequence_path(project_dir)).unwrap()
+    }
+
     fn read_session_lines(project_dir: &Path, agent: HookAgent, session_id: &str) -> Vec<String> {
         fs::read_to_string(session_file_path(project_dir, agent, session_id))
             .unwrap()
             .lines()
             .map(ToOwned::to_owned)
             .collect()
+    }
+
+    #[test]
+    fn append_session_marker_bootstraps_sequence_state_from_existing_ledger() {
+        with_agent_storage_env(|project_dir| {
+            append_session_marker(project_dir, HookAgent::Codex, "codex-a", "session_start")
+                .unwrap();
+            fs::remove_file(ledger_sequence_path(project_dir)).unwrap();
+
+            append_session_marker(project_dir, HookAgent::Codex, "codex-a", "session_stop")
+                .unwrap();
+
+            let events = read_ledger_events(project_dir);
+            let sequences: Vec<u64> = events.iter().map(|event| event.sequence).collect();
+            assert_eq!(sequences, vec![1, 2]);
+            assert_eq!(read_sequence_state(project_dir).last_sequence, 2);
+        });
     }
 
     #[test]
@@ -472,6 +565,7 @@ mod tests {
             assert_eq!(sequences.len(), events.len());
             assert_eq!(sequences.first().copied(), Some(1));
             assert_eq!(sequences.last().copied(), Some(32));
+            assert_eq!(read_sequence_state(project_dir).last_sequence, 32);
 
             for (agent, session_id) in [
                 (HookAgent::Claude, "claude-a"),
