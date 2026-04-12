@@ -227,6 +227,32 @@ struct HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
+  @Test("Priming session selection updates commands state from the selected summary")
+  func primingSessionSelectionUpdatesCommandsStateFromSummary() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.commandsUI.hasSelectedSession,
+          store.commandsUI.bookmarkTitle,
+          store.commandsUI.hasObserver
+        )
+      },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange)
+    #expect(store.commandsUI.hasSelectedSession)
+    #expect(store.commandsUI.hasObserver)
+    #expect(
+      store.commandsUI.bookmarkTitle
+        == (store.isPersistenceAvailable ? "Bookmark Session" : "Bookmarks Unavailable")
+    )
+  }
+
   @Test("Priming session selection does not resync content chrome before detail loads")
   func primingSessionSelectionSkipsContentChromeResync() async {
     let store = await makeBootstrappedStore()
@@ -237,6 +263,7 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentShell) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
     #expect(store.debugUISyncCount(for: .sidebar) == 1)
+    #expect(store.debugUISyncCount(for: .commands) == 1)
     #expect(store.debugUISyncCount(for: .inspector) == 0)
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
@@ -286,6 +313,7 @@ struct HarnessMonitorContentSelectionTests {
     store.selectedSession = PreviewFixtures.detail
 
     #expect(store.debugUISyncCount(for: .contentShell) == 0)
+    #expect(store.debugUISyncCount(for: .commands) == 0)
     #expect(store.debugUISyncCount(for: .contentChrome) == 1)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 1)
     #expect(store.debugUISyncCount(for: .inspector) == 1)

@@ -300,6 +300,16 @@ extension HarnessMonitorStore {
     public var isLaunchAgentInstalled = false
   }
 
+  public struct CommandsUIState: Equatable {
+    public var canNavigateBack = false
+    public var canNavigateForward = false
+    public var hasSelectedSession = false
+    public var isSessionReadOnly = true
+    public var bookmarkTitle = "Bookmark Session"
+    public var isPersistenceAvailable = false
+    public var hasObserver = false
+  }
+
   public struct SidebarUIState: Equatable {
     public var connectionMetrics: ConnectionMetrics = .initial
     public var selectedSessionID: String?
@@ -451,6 +461,44 @@ extension HarnessMonitorStore {
       }
       if isLaunchAgentInstalled != state.isLaunchAgentInstalled {
         isLaunchAgentInstalled = state.isLaunchAgentInstalled
+      }
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class CommandsUISlice {
+    public var canNavigateBack = false
+    public var canNavigateForward = false
+    public var hasSelectedSession = false
+    public var isSessionReadOnly = true
+    public var bookmarkTitle = "Bookmark Session"
+    public var isPersistenceAvailable = false
+    public var hasObserver = false
+
+    public init() {}
+
+    internal func apply(_ state: CommandsUIState) {
+      if canNavigateBack != state.canNavigateBack {
+        canNavigateBack = state.canNavigateBack
+      }
+      if canNavigateForward != state.canNavigateForward {
+        canNavigateForward = state.canNavigateForward
+      }
+      if hasSelectedSession != state.hasSelectedSession {
+        hasSelectedSession = state.hasSelectedSession
+      }
+      if isSessionReadOnly != state.isSessionReadOnly {
+        isSessionReadOnly = state.isSessionReadOnly
+      }
+      if bookmarkTitle != state.bookmarkTitle {
+        bookmarkTitle = state.bookmarkTitle
+      }
+      if isPersistenceAvailable != state.isPersistenceAvailable {
+        isPersistenceAvailable = state.isPersistenceAvailable
+      }
+      if hasObserver != state.hasObserver {
+        hasObserver = state.hasObserver
       }
     }
   }
