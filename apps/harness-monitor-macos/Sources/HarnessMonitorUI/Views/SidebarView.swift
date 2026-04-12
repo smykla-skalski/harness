@@ -12,7 +12,6 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
-  let onSidebarWidthChange: (CGFloat) -> Void
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -35,8 +34,7 @@ struct SidebarView: View {
     projection: HarnessMonitorStore.SessionProjectionSlice,
     searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice,
-    sidebarVisible: Bool,
-    onSidebarWidthChange: @escaping (CGFloat) -> Void = { _ in }
+    sidebarVisible: Bool
   ) {
     self.store = store
     self.controls = controls
@@ -44,7 +42,6 @@ struct SidebarView: View {
     self.searchResults = searchResults
     self.sidebarUI = sidebarUI
     self.sidebarVisible = sidebarVisible
-    self.onSidebarWidthChange = onSidebarWidthChange
     _searchDraftText = State(initialValue: controls.searchText)
   }
 
@@ -171,7 +168,6 @@ struct SidebarView: View {
       return
     }
     sidebarWidth = quantizedWidth
-    onSidebarWidthChange(quantizedWidth)
   }
 
   func setCheckoutCollapsed(
