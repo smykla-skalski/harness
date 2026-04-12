@@ -82,9 +82,7 @@ public final class HarnessMonitorStore {
   public let selection: SelectionSlice
   public let userData: UserDataSlice
   public let contentUI: ContentUISlice
-  public let sidebarShellUI: SidebarShellUISlice
-  public let sidebarListUI: SidebarListUISlice
-  public let sidebarFooterUI: SidebarFooterUISlice
+  public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
 
@@ -218,9 +216,7 @@ public final class HarnessMonitorStore {
     self.selection = SelectionSlice()
     self.userData = UserDataSlice()
     self.contentUI = ContentUISlice()
-    self.sidebarShellUI = SidebarShellUISlice()
-    self.sidebarListUI = SidebarListUISlice()
-    self.sidebarFooterUI = SidebarFooterUISlice()
+    self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.toast = ToastSlice()
     self.daemonController = daemonController
@@ -335,7 +331,7 @@ public final class HarnessMonitorStore {
   }
 
   public func focusSidebarSearch() {
-    sidebarShellUI.searchFocusRequest += 1
+    sidebarUI.searchFocusRequest += 1
   }
 
   private func awaitManagedDaemonWarmUpWithRecovery() async throws

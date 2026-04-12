@@ -203,14 +203,14 @@ struct HarnessMonitorContentSelectionTests {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      { store.sidebarListUI.selectedSessionID },
+      { store.sidebarUI.selectedSessionID },
       after: {
         store.primeSessionSelection(PreviewFixtures.summary.sessionId)
       }
     )
 
     #expect(didChange)
-    #expect(store.sidebarListUI.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.sidebarUI.selectedSessionID == PreviewFixtures.summary.sessionId)
   }
 
   @Test("Priming session selection defers inspector primary content until detail loads")
@@ -236,9 +236,7 @@ struct HarnessMonitorContentSelectionTests {
 
     #expect(store.debugUISyncCount(for: .contentShell) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
-    #expect(store.debugUISyncCount(for: .sidebarList) == 1)
-    #expect(store.debugUISyncCount(for: .sidebarShell) == 0)
-    #expect(store.debugUISyncCount(for: .sidebarFooter) == 0)
+    #expect(store.debugUISyncCount(for: .sidebar) == 1)
     #expect(store.debugUISyncCount(for: .inspector) == 0)
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
@@ -381,8 +379,8 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
-  @Test("Loading session summary metadata still updates loading surfaces before detail hydrates")
-  func loadingSessionSummaryMetadataStillUpdatesLoadingSurfaces() async {
+  @Test("Loading session summary metadata stays within the content loading surface before detail hydrates")
+  func loadingSessionSummaryMetadataStaysWithinContentLoadingSurface() async {
     let store = await makeBootstrappedStore()
     store.primeSessionSelection(PreviewFixtures.summary.sessionId)
     store.debugResetUISyncCounts()
@@ -420,9 +418,9 @@ struct HarnessMonitorContentSelectionTests {
 
     #expect(didChange)
     #expect(store.debugUISyncCount(for: .contentToolbar) == 0)
-    #expect(store.debugUISyncCount(for: .contentChrome) == 1)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
-    #expect(store.debugUISyncCount(for: .inspector) == 1)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
   @Test("Completing a selection load does not resync the root shell")
