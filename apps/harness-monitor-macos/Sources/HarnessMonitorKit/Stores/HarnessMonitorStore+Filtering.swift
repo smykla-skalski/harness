@@ -391,7 +391,6 @@ extension HarnessMonitorStore {
         }
       }
       let orderedVisibleSessionIDs = orderedVisibleSessionIDs(in: visibleSessionIDSet)
-      let visibleSessions = orderedVisibleSessionIDs.compactMap { sessionRecordsByID[$0]?.summary }
       let emptyState: SidebarEmptyState
       if catalog.totalSessionCount == 0 {
         emptyState = .noSessions
@@ -419,8 +418,7 @@ extension HarnessMonitorStore {
         filteredSessionCount: orderedVisibleSessionIDs.count,
         totalSessionCount: catalog.totalSessionCount,
         list: SessionSearchResultsListState(
-          visibleSessionIDs: orderedVisibleSessionIDs,
-          visibleSessions: visibleSessions
+          visibleSessionIDs: orderedVisibleSessionIDs
         )
       )
       searchResults.apply(nextSearchResults)
@@ -438,7 +436,6 @@ extension HarnessMonitorStore {
               checkout
               .orderedSessionIDs(for: controls.sessionSortOrder)
               .filter { visibleSessionIDSet.contains($0) }
-            let checkoutSessions = checkoutSessionIDs.compactMap { sessionRecordsByID[$0]?.summary }
             guard !checkoutSessionIDs.isEmpty else {
               return nil
             }
@@ -446,7 +443,7 @@ extension HarnessMonitorStore {
               checkoutId: checkout.checkoutId,
               title: checkout.title,
               isWorktree: checkout.isWorktree,
-              sessions: checkoutSessions
+              sessionIDs: checkoutSessionIDs
             )
           }
         guard !checkoutGroups.isEmpty else {
