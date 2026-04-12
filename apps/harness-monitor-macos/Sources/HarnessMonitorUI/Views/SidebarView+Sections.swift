@@ -163,15 +163,7 @@ struct SidebarSessionListContent: View {
     let isSelectedForUITest =
       HarnessMonitorUITestEnvironment.selectionMarkersEnabled
       && renderState.selectedSessionIDForAccessibilityMarkers == session.sessionId
-    let row = SidebarSessionListLinkRow(
-      session: session,
-      isBookmarked: renderState.bookmarkedSessionIDs.contains(session.sessionId),
-      lastActivityText: formatTimestamp(
-        session.lastActivityAt,
-        configuration: renderState.dateTimeConfiguration
-      ),
-      fontScale: renderState.fontScale
-    )
+    let row = sessionRowContent(session)
 
     let baseRow =
       row
@@ -233,6 +225,25 @@ struct SidebarSessionListContent: View {
           HarnessMonitorAccessibility.sessionRowSelectionFrame(session.sessionId),
           when: isSelectedForUITest
         )
+    }
+  }
+
+  @ViewBuilder
+  private func sessionRowContent(_ session: SessionSummary) -> some View {
+    let row = SidebarSessionListLinkRow(
+      session: session,
+      isBookmarked: renderState.bookmarkedSessionIDs.contains(session.sessionId),
+      lastActivityText: formatTimestamp(
+        session.lastActivityAt,
+        configuration: renderState.dateTimeConfiguration
+      ),
+      fontScale: renderState.fontScale
+    )
+
+    if HarnessMonitorUITestEnvironment.isPerfScenarioActive {
+      row.equatable()
+    } else {
+      row
     }
   }
 
