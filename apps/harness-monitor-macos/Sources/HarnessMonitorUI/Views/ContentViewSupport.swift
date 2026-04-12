@@ -146,7 +146,6 @@ struct ContentToolbarAccessibilityMarker: View {
 
 struct ContentCornerOverlayModifier: ViewModifier {
   let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let sessionUI: HarnessMonitorStore.ContentSessionSlice
   let cornerAnimationContent: () -> AnyView
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
