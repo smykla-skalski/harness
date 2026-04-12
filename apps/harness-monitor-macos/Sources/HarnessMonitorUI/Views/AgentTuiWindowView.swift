@@ -24,6 +24,8 @@ public struct AgentTuiWindowView: View {
   @State private var runtime: AgentTuiRuntime = .copilot
   @State private var name = ""
   @State private var prompt = ""
+  @State private var projectDir = ""
+  @State private var argvOverride = ""
   @State private var inputText = ""
   @State private var inputMode: AgentTuiInputMode = .text
   @State private var rows = 32
@@ -38,6 +40,7 @@ public struct AgentTuiWindowView: View {
   private enum Field: Hashable {
     case name
     case prompt
+    case argv
     case input
   }
 
@@ -85,6 +88,18 @@ public struct AgentTuiWindowView: View {
 
   private var trimmedInput: String {
     inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var trimmedProjectDir: String? {
+    let normalized = projectDir.trimmingCharacters(in: .whitespacesAndNewlines)
+    return normalized.isEmpty ? nil : normalized
+  }
+
+  private var parsedArgvOverride: [String] {
+    argvOverride
+      .split(whereSeparator: \.isNewline)
+      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
   }
 
   private var canStart: Bool {
@@ -280,6 +295,16 @@ public struct AgentTuiWindowView: View {
             field: .prompt,
             minHeight: 72,
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPromptField
+          )
+          TextField("Optional project directory override", text: $projectDir)
+            .harnessNativeFormControl()
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiProjectDirField)
+          multilineEditor(
+            placeholder: "Optional argv override (one argument per line; first line is the executable)",
+            text: $argvOverride,
+            field: .argv,
+            minHeight: 88,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
           )
         }
 
@@ -675,12 +700,16 @@ public struct AgentTuiWindowView: View {
         runtime: runtime,
         name: name,
         prompt: prompt,
+        projectDir: trimmedProjectDir,
+        argv: parsedArgvOverride,
         rows: rows,
         cols: cols
       )
       if success, let startedTuiID = store.selectedAgentTui?.tuiId {
         name = ""
         prompt = ""
+        projectDir = ""
+        argvOverride = ""
         inputText = ""
         selection = .session(startedTuiID)
         focusedField = .input

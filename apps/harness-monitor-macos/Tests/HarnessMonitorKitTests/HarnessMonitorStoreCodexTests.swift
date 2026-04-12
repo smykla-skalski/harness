@@ -312,6 +312,8 @@ struct HarnessMonitorStoreAgentTuiTests {
             runtime: "copilot",
             name: "Copilot TUI",
             prompt: "Investigate the latest failure.",
+            projectDir: nil,
+            argv: [],
             rows: 30,
             cols: 110
           )
@@ -371,12 +373,49 @@ struct HarnessMonitorStoreAgentTuiTests {
             runtime: "vibe",
             name: "Vibe TUI",
             prompt: "Run the UI spec.",
+            projectDir: nil,
+            argv: [],
             rows: 32,
             cols: 120
           )
         ]
     )
     #expect(store.selectedAgentTui?.runtime == "vibe")
+  }
+
+  @Test("Start agent TUI sends argv and project directory overrides")
+  func startAgentTuiSendsArgvAndProjectDirectoryOverrides() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+
+    let started = await store.startAgentTui(
+      runtime: .claude,
+      name: "Claude TUI",
+      prompt: "Boot in bare mode.",
+      projectDir: "  /tmp/alt-worktree  ",
+      argv: ["  claude  ", "", "  --bare  "],
+      rows: 24,
+      cols: 90
+    )
+
+    #expect(started)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startAgentTui(
+            sessionID: PreviewFixtures.summary.sessionId,
+            runtime: "claude",
+            name: "Claude TUI",
+            prompt: "Boot in bare mode.",
+            projectDir: "/tmp/alt-worktree",
+            argv: ["claude", "--bare"],
+            rows: 24,
+            cols: 90
+          )
+        ]
+    )
+    #expect(store.selectedAgentTui?.argv == ["claude", "--bare"])
+    #expect(store.selectedAgentTui?.projectDir == "/tmp/alt-worktree")
   }
 
   @Test("Agent TUI input updates the selected screen snapshot")

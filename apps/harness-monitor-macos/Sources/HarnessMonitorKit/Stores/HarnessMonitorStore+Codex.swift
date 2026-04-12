@@ -344,6 +344,8 @@ extension HarnessMonitorStore {
     runtime: AgentTuiRuntime,
     name: String?,
     prompt: String?,
+    projectDir: String? = nil,
+    argv: [String] = [],
     rows: Int,
     cols: Int
   ) async -> Bool {
@@ -356,6 +358,10 @@ extension HarnessMonitorStore {
 
     let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedProjectDir = projectDir?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedArgv = argv
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
 
     return await mutateAgentTui(
       using: client,
@@ -368,6 +374,8 @@ extension HarnessMonitorStore {
           runtime: runtime.rawValue,
           name: trimmedName?.isEmpty == false ? trimmedName : nil,
           prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
+          projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,
+          argv: normalizedArgv,
           rows: rows,
           cols: cols
         )
