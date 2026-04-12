@@ -1200,20 +1200,15 @@ private actor PreviewHarnessClientState {
     }
 
     var tasks = detail.tasks
-    var agents = detail.agents
+    let agents = detail.agents
     let task = tasks[taskIndex]
-    let startsImmediately = agent.currentTaskId == nil
-
     tasks[taskIndex] = task.replacingAssignment(
-      status: startsImmediately ? .inProgress : .open,
+      status: .open,
       assignedTo: targetAgentID,
       queuePolicy: request.queuePolicy,
-      queuedAt: startsImmediately ? nil : Self.mutationTimestamp,
+      queuedAt: agent.currentTaskId == nil ? nil : Self.mutationTimestamp,
       updatedAt: Self.mutationTimestamp
     )
-    if startsImmediately {
-      agents[agentIndex] = agent.replacingCurrentTask(taskID)
-    }
 
     let updatedDetail = SessionDetail(
       session: detail.session.replacing(tasks: tasks, agents: agents),

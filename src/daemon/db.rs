@@ -265,6 +265,17 @@ impl DaemonDb {
         let transition_json = serde_json::to_string(&entry.transition)
             .map_err(|error| db_error(format!("serialize log transition: {error}")))?;
         let transition_kind = extract_transition_kind(&transition_json);
+        let sequence = if entry.sequence == 0 {
+            self.conn
+                .query_row(
+                    "SELECT COALESCE(MAX(sequence), 0) + 1 FROM session_log WHERE session_id = ?1",
+                    [&entry.session_id],
+                    |row| row.get::<_, u64>(0),
+                )
+                .map_err(|error| db_error(format!("next log sequence: {error}")))?
+        } else {
+            entry.sequence
+        };
 
         self.conn
             .execute(
@@ -274,7 +285,7 @@ impl DaemonDb {
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     entry.session_id,
-                    entry.sequence,
+                    sequence,
                     entry.recorded_at,
                     transition_kind,
                     transition_json,
@@ -890,7 +901,7 @@ impl DaemonDb {
     /// Pending signals whose `expires_at` has passed are surfaced as
     /// `Expired` at read time so every caller sees a correct status without
     /// a background sweeper or a schema change. Signals keep their stored
-    /// status once an ack has been written, so acknowledged/rejected/deferred
+    /// status once an ack has been written, so delivered/rejected/deferred
     /// rows pass through unchanged.
     ///
     /// # Errors
@@ -929,7 +940,7 @@ impl DaemonDb {
                 .and_then(|json| serde_json::from_str(json).ok());
             let stored = match status_str.as_str() {
                 "pending" => SessionSignalStatus::Pending,
-                "acknowledged" => SessionSignalStatus::Acknowledged,
+                "acknowledged" | "delivered" => SessionSignalStatus::Delivered,
                 "rejected" => SessionSignalStatus::Rejected,
                 "deferred" => SessionSignalStatus::Deferred,
                 _ => SessionSignalStatus::Expired,
@@ -2794,11 +2805,10 @@ mod tests {
     }
 
     #[test]
-    fn derive_effective_signal_status_acknowledged_passes_through() {
+    fn derive_effective_signal_status_delivered_passes_through() {
         let signal = sample_signal_record("2020-01-01T00:00:00Z");
-        let status =
-            derive_effective_signal_status(SessionSignalStatus::Acknowledged, &signal.signal);
-        assert_eq!(status, SessionSignalStatus::Acknowledged);
+        let status = derive_effective_signal_status(SessionSignalStatus::Delivered, &signal.signal);
+        assert_eq!(status, SessionSignalStatus::Delivered);
     }
 
     #[test]

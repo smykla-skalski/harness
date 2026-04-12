@@ -234,12 +234,13 @@ fn collect_signal_context(
     let now = utc_now();
     let lines: Vec<String> = signals
         .iter()
-        .map(|signal| {
-            acknowledge_signal(&signal_dir, signal, &ids, project_dir, &now);
-            format!("[signal:{}] {}", signal.command, signal.payload.message)
+        .filter_map(|signal| {
+            let result = acknowledge_signal(&signal_dir, signal, &ids, project_dir, &now);
+            (result != runtime::signal::AckResult::Expired)
+                .then(|| format!("[signal:{}] {}", signal.command, signal.payload.message))
         })
         .collect();
-    Some(lines.join("\n"))
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 struct SignalIdentities {
@@ -326,11 +327,13 @@ fn acknowledge_signal(
     ids: &SignalIdentities,
     project_dir: &Path,
     now: &str,
-) {
+) -> runtime::signal::AckResult {
+    let result =
+        session_service::normalize_signal_ack_result(signal, runtime::signal::AckResult::Accepted);
     let ack = runtime::signal::SignalAck {
         signal_id: signal.signal_id.clone(),
         acknowledged_at: now.to_string(),
-        result: runtime::signal::AckResult::Accepted,
+        result,
         agent: ids.runtime_session.clone(),
         session_id: ids.orchestration_session.clone(),
         details: None,
@@ -340,7 +343,7 @@ fn acknowledge_signal(
             "failed to acknowledge signal {}: {error} (session={})",
             signal.signal_id, ids.runtime_session,
         ));
-        return;
+        return result;
     }
     record_signal_ack_in_session(
         &ids.orchestration_session,
@@ -349,6 +352,7 @@ fn acknowledge_signal(
         ack.result,
         project_dir,
     );
+    result
 }
 
 fn record_signal_ack_in_session(
@@ -499,6 +503,104 @@ mod tests {
                         signal_id,
                         agent_id,
                         result: runtime::signal::AckResult::Accepted,
+                    } if signal_id == signal.signal.signal_id && agent_id == worker_id
+                )
+            }));
+        });
+    }
+
+    #[test]
+    fn collect_signal_context_marks_expired_signal_without_injecting_context() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "expired signal hook test",
+                "",
+                project,
+                Some("claude"),
+                Some("hook-expired-sess"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined = temp_env::with_vars(
+                [("CODEX_SESSION_ID", Some("expired-worker-session"))],
+                || {
+                    session_service::join_session(
+                        "hook-expired-sess",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join worker")
+                },
+            );
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|agent_id| agent_id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+
+            let signal = session_service::send_signal(
+                "hook-expired-sess",
+                &worker_id,
+                "inject_context",
+                "stale context should not be delivered",
+                Some("review task-1"),
+                &leader_id,
+                project,
+            )
+            .expect("send signal");
+
+            let runtime = runtime::runtime_for_name("codex").expect("codex runtime");
+            let signal_dir = runtime.signal_dir(project, "expired-worker-session");
+            let expired_signal = runtime::signal::Signal {
+                expires_at: "2000-01-01T00:00:00Z".into(),
+                ..signal.signal.clone()
+            };
+            fs::write(
+                signal_dir
+                    .join("pending")
+                    .join(format!("{}.json", expired_signal.signal_id)),
+                serde_json::to_string_pretty(&expired_signal).expect("serialize expired signal"),
+            )
+            .expect("rewrite expired signal");
+
+            let context = NormalizedHookContext {
+                event: NormalizedEvent::BeforeToolUse,
+                session: SessionContext {
+                    session_id: "expired-worker-session".into(),
+                    cwd: Some(project.to_path_buf()),
+                    transcript_path: None,
+                },
+                tool: None,
+                agent: Some(AgentContext {
+                    agent_id: Some(worker_id.clone()),
+                    agent_type: Some("worker".into()),
+                    prompt: None,
+                    response: None,
+                }),
+                skill: SkillContext::inactive(),
+                raw: RawPayload::new(json!({})),
+            };
+
+            let injected = collect_signal_context(HookAgent::Codex, &context);
+            assert!(injected.is_none());
+
+            let acks = runtime::signal::read_acknowledgments(&signal_dir).expect("acknowledgments");
+            assert_eq!(acks.len(), 1);
+            assert_eq!(acks[0].result, runtime::signal::AckResult::Expired);
+
+            let entries =
+                session_storage::load_log_entries(project, "hook-expired-sess").expect("entries");
+            assert!(entries.into_iter().any(|entry| {
+                matches!(
+                    entry.transition,
+                    SessionTransition::SignalAcknowledged {
+                        signal_id,
+                        agent_id,
+                        result: runtime::signal::AckResult::Expired,
                     } if signal_id == signal.signal.signal_id && agent_id == worker_id
                 )
             }));

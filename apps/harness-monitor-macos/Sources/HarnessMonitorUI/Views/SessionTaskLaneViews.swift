@@ -266,6 +266,9 @@ private struct TaskDragGestureIcon: View {
 
 private extension WorkItem {
   var assignmentStateTitle: String {
+    if isPendingDelivery {
+      return "Pending delivery"
+    }
     if isQueuedForWorker {
       return queuePolicy == .reassignWhenFree ? "Queued · reassignable" : "Queued"
     }
@@ -273,6 +276,6 @@ private extension WorkItem {
   }
 
   var assignmentStateColor: Color {
-    isQueuedForWorker ? HarnessMonitorTheme.caution : taskStatusColor(for: status)
+    (isPendingDelivery || isQueuedForWorker) ? HarnessMonitorTheme.caution : taskStatusColor(for: status)
   }
 }

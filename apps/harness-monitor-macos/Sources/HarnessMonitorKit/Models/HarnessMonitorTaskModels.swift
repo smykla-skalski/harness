@@ -72,6 +72,10 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
 }
 
 public extension WorkItem {
+  var isPendingDelivery: Bool {
+    status == .open && assignedTo != nil && queuedAt == nil
+  }
+
   var isQueuedForWorker: Bool {
     status == .open && assignedTo != nil && queuedAt != nil
   }
@@ -87,6 +91,9 @@ public extension WorkItem {
   var assignmentSummary: String {
     guard let assignedTo else {
       return "Unassigned"
+    }
+    if isPendingDelivery {
+      return "Pending delivery to \(assignedTo)"
     }
     if isQueuedForWorker {
       return "Queued for \(assignedTo)"

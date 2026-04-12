@@ -173,7 +173,7 @@ extension PreviewFixtures {
       sessionId: summary.sessionId,
       agentId: "worker-codex",
       taskId: nil,
-      summary: "sig-ui-1 acknowledged by worker-codex: accepted",
+      summary: "sig-ui-1 delivered to worker-codex: accepted",
       payload: .object(["result": .string("accepted")])
     ),
     TimelineEntry(
