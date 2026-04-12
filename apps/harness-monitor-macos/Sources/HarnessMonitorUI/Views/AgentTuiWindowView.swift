@@ -2,6 +2,23 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+private struct ClickableSwitchStyle: ToggleStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    Button {
+      configuration.isOn.toggle()
+    } label: {
+      HStack {
+        configuration.label
+        Toggle("", isOn: configuration.$isOn)
+          .toggleStyle(.switch)
+          .labelsHidden()
+          .allowsHitTesting(false)
+      }
+    }
+    .buttonStyle(.plain)
+  }
+}
+
 public struct AgentTuiWindowView: View {
   let store: HarnessMonitorStore
 
@@ -351,7 +368,7 @@ public struct AgentTuiWindowView: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Spacer()
         Toggle("Wrap lines", isOn: $wrapLines)
-          .toggleStyle(.switch)
+          .toggleStyle(ClickableSwitchStyle())
           .controlSize(.mini)
           .keyboardShortcut("l", modifiers: [.command])
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
