@@ -712,11 +712,22 @@ impl AgentTuiManagerHandle {
     pub fn stop(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.load_snapshot(tui_id)?;
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let stopped =
-                BridgeClient::for_capability(BridgeCapability::AgentTui)?.agent_tui_stop(tui_id)?;
-            let _ = self.remove_active(tui_id)?;
-            self.save_and_broadcast("agent_tui_stopped", &stopped)?;
-            return Ok(stopped);
+            match BridgeClient::for_capability(BridgeCapability::AgentTui)
+                .and_then(|bridge| bridge.agent_tui_stop(tui_id))
+            {
+                Ok(stopped) => {
+                    let _ = self.remove_active(tui_id)?;
+                    self.save_and_broadcast("agent_tui_stopped", &stopped)?;
+                    return Ok(stopped);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        tui_id,
+                        "bridge unreachable during stop, falling back to local cleanup"
+                    );
+                }
+            }
         }
         let process = self.remove_active(tui_id)?;
         if let Some(process) = process {
