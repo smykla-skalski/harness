@@ -48,34 +48,26 @@ public struct AgentTuiWindowView: View {
     .enter, .tab, .escape, .backspace, .arrowUp, .arrowDown, .arrowLeft, .arrowRight,
   ]
 
-  private var sessionSnapshotsByID: [String: AgentTuiSnapshot] {
-    Dictionary(uniqueKeysWithValues: store.selectedAgentTuis.map { ($0.tuiId, $0) })
-  }
-
-  private var agentNamesByID: [String: String] {
-    Dictionary(
-      uniqueKeysWithValues: (store.selectedSession?.agents ?? []).map { agent in
-        (agent.agentId, agent.name)
-      }
-    )
+  private var selectedSessionTui: AgentTuiSnapshot? {
+    guard let selectedTuiID = selection.sessionID else {
+      return nil
+    }
+    return store.selectedAgentTuis.first { $0.tuiId == selectedTuiID }
   }
 
   private var sessionTitlesByID: [String: String] {
     var titles: [String: String] = [:]
     titles.reserveCapacity(store.selectedAgentTuis.count)
 
+    let agentNames = Dictionary(
+      uniqueKeysWithValues: (store.selectedSession?.agents ?? []).map { ($0.agentId, $0.name) }
+    )
+
     for tui in store.selectedAgentTuis {
-      titles[tui.tuiId] = resolvedTitle(for: tui)
+      titles[tui.tuiId] = agentNames[tui.agentId] ?? resolvedRuntimeTitle(for: tui)
     }
 
     return titles
-  }
-
-  private var selectedSessionTui: AgentTuiSnapshot? {
-    guard let selectedTuiID = selection.sessionID else {
-      return nil
-    }
-    return sessionSnapshotsByID[selectedTuiID]
   }
 
   private var trimmedInput: String {
@@ -149,7 +141,7 @@ public struct AgentTuiWindowView: View {
       AgentTuiSidebar(
         selection: $selection,
         orderedSessionIDs: orderedSessionIDs,
-        titleForSessionID: title(forSessionID:),
+        sessionTitlesByID: sessionTitlesByID,
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
@@ -601,10 +593,10 @@ public struct AgentTuiWindowView: View {
   }
 
   private func resolvedTitle(for tui: AgentTuiSnapshot) -> String {
-    if let matchedName = agentNamesByID[tui.agentId] {
-      return matchedName
-    }
+    sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
+  }
 
+  private func resolvedRuntimeTitle(for tui: AgentTuiSnapshot) -> String {
     if let runtime = AgentTuiRuntime(rawValue: tui.runtime) {
       return runtime.title
     }
@@ -614,10 +606,6 @@ public struct AgentTuiWindowView: View {
     }
 
     return tui.runtime.capitalized
-  }
-
-  private func title(forSessionID sessionID: String) -> String {
-    sessionTitlesByID[sessionID] ?? "Agent session"
   }
 
   private func selectCreateTab() {
