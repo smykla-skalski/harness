@@ -105,7 +105,7 @@ public final class HarnessMonitorStore {
     }
   }
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
-  @ObservationIgnored private var forcedHostBridgeCapabilities: Set<String> = []
+  @ObservationIgnored var forcedHostBridgeCapabilities: Set<String> = []
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
       guard oldValue != selectedCodexRuns else { return }
