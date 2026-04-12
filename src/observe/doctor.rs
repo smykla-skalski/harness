@@ -486,6 +486,7 @@ fn check_runtime_bootstrap_contract(project_dir: &Path) -> Vec<DoctorCheck> {
         HookAgent::Codex,
         HookAgent::Gemini,
         HookAgent::Copilot,
+        HookAgent::Vibe,
         HookAgent::OpenCode,
     ];
     let mut checks = Vec::new();
@@ -548,6 +549,7 @@ fn runtime_bootstrap_code(agent: HookAgent, path: &Path) -> &'static str {
         (HookAgent::Codex, Some("config.toml")) => "observe_runtime_codex_config",
         (HookAgent::Gemini, Some("settings.json")) => "observe_runtime_gemini_settings",
         (HookAgent::Copilot, Some("harness.json")) => "observe_runtime_copilot_hooks",
+        (HookAgent::Vibe, Some("hooks.json")) => "observe_runtime_vibe_hooks",
         (HookAgent::OpenCode, Some("hooks.json")) => "observe_runtime_opencode_hooks",
         _ => "observe_runtime_bootstrap",
     }
@@ -559,6 +561,7 @@ fn runtime_bootstrap_label(agent: HookAgent, path: &Path) -> String {
         HookAgent::Codex => "Codex",
         HookAgent::Gemini => "Gemini",
         HookAgent::Copilot => "Copilot",
+        HookAgent::Vibe => "Vibe",
         HookAgent::OpenCode => "OpenCode",
     };
     let relative = path

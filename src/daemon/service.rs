@@ -1756,6 +1756,7 @@ fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
         "copilot" => Some(HookAgent::Copilot),
         "codex" => Some(HookAgent::Codex),
         "gemini" => Some(HookAgent::Gemini),
+        "vibe" => Some(HookAgent::Vibe),
         "opencode" => Some(HookAgent::OpenCode),
         _ => None,
     }

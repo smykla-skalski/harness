@@ -27,6 +27,7 @@ pub enum AgentAssetTarget {
     Codex,
     Gemini,
     Copilot,
+    Vibe,
     OpenCode,
 }
 
@@ -36,6 +37,7 @@ enum RenderTarget {
     Codex,
     Gemini,
     Copilot,
+    Vibe,
     OpenCode,
     Portable,
 }
@@ -162,12 +164,14 @@ fn selected_targets(selection: AgentAssetTarget) -> &'static [RenderTarget] {
             RenderTarget::Codex,
             RenderTarget::Gemini,
             RenderTarget::Copilot,
+            RenderTarget::Vibe,
             RenderTarget::OpenCode,
         ],
         AgentAssetTarget::Claude => &[RenderTarget::Claude],
         AgentAssetTarget::Codex => &[RenderTarget::Codex],
         AgentAssetTarget::Gemini => &[RenderTarget::Gemini],
         AgentAssetTarget::Copilot => &[RenderTarget::Copilot],
+        AgentAssetTarget::Vibe => &[RenderTarget::Vibe],
         AgentAssetTarget::OpenCode => &[RenderTarget::OpenCode],
     }
 }
@@ -266,6 +270,7 @@ fn render_runtime_outputs(repo_root: &Path, target: RenderTarget) -> Vec<(PathBu
         RenderTarget::Claude
         | RenderTarget::Codex
         | RenderTarget::Gemini
+        | RenderTarget::Vibe
         | RenderTarget::OpenCode
         | RenderTarget::Portable => Vec::new(),
     }
@@ -409,6 +414,21 @@ fn render_skill_outputs(
                 .join(format!("{}.toml", gemini_command_name(&skill.source.name)));
             files.insert(path, render_gemini_command(skill));
         }
+        RenderTarget::Vibe => {
+            let base = repo_root.join(".vibe").join("skills").join(&skill_dir);
+            files.insert(
+                base.join("SKILL.md"),
+                render_skill_markdown(target, skill, None)?,
+            );
+            copy_extra_text_files(
+                &skill.root,
+                &base,
+                &mut files,
+                &["skill.yaml", "body.md"],
+                target,
+                &skill.source.name,
+            )?;
+        }
         RenderTarget::OpenCode => {
             let base = repo_root.join(".opencode").join("skills").join(&skill_dir);
             files.insert(
@@ -458,6 +478,9 @@ fn render_plugin_outputs(
         }
         RenderTarget::Gemini => render_gemini_plugin_outputs(repo_root, plugin, &mut files),
         RenderTarget::Copilot => render_copilot_plugin_outputs(repo_root, plugin, &mut files)?,
+        RenderTarget::Vibe => {
+            render_vibe_plugin_outputs(repo_root, plugin, &mut files)?;
+        }
         RenderTarget::OpenCode => {
             render_opencode_plugin_outputs(repo_root, plugin, &mut files)?;
         }
@@ -559,6 +582,19 @@ fn render_opencode_plugin_outputs(
 ) -> Result<(), CliError> {
     let base = repo_root
         .join(".opencode")
+        .join("plugins")
+        .join(&plugin.source.name);
+    copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
+    render_plugin_skill_markdown(RenderTarget::Portable, plugin, &base, files)
+}
+
+fn render_vibe_plugin_outputs(
+    repo_root: &Path,
+    plugin: &PluginDefinition,
+    files: &mut BTreeMap<PathBuf, String>,
+) -> Result<(), CliError> {
+    let base = repo_root
+        .join(".vibe")
         .join("plugins")
         .join(&plugin.source.name);
     copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
@@ -906,6 +942,7 @@ fn target_label(target: RenderTarget) -> &'static str {
         RenderTarget::Codex => "Codex",
         RenderTarget::Gemini => "Gemini",
         RenderTarget::Copilot => "Copilot",
+        RenderTarget::Vibe => "Vibe",
         RenderTarget::OpenCode => "OpenCode",
         RenderTarget::Portable => "current agent",
     }
@@ -917,6 +954,7 @@ fn target_name(target: RenderTarget) -> &'static str {
         RenderTarget::Codex => "codex",
         RenderTarget::Gemini => "gemini",
         RenderTarget::Copilot => "copilot",
+        RenderTarget::Vibe => "vibe",
         RenderTarget::OpenCode => "opencode",
         RenderTarget::Portable => "portable",
     }
@@ -994,6 +1032,8 @@ fn managed_root_for_path(repo_root: &Path, path: &Path) -> Result<PathBuf, CliEr
         ".agents/plugins",
         ".gemini/commands",
         ".github/hooks",
+        ".vibe/skills",
+        ".vibe/plugins",
         ".opencode/skills",
         ".opencode/plugins",
         "plugins",

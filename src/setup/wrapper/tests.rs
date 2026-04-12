@@ -502,6 +502,27 @@ fn write_agent_bootstrap_writes_opencode_plugin_assets() {
 }
 
 #[test]
+fn write_agent_bootstrap_writes_vibe_plugin_assets() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Vibe).unwrap();
+
+    let hooks_path = dir.path().join(".vibe").join("hooks.json");
+    let plugin_skill = dir
+        .path()
+        .join(".vibe")
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("start")
+        .join("SKILL.md");
+
+    assert!(written.contains(&hooks_path));
+    assert!(written.contains(&plugin_skill));
+    let skill = fs::read_to_string(plugin_skill).unwrap();
+    assert!(skill.contains("name: session:start"));
+}
+
+#[test]
 fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
     let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot).unwrap();
