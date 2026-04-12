@@ -150,7 +150,7 @@ extension View {
 
   @ViewBuilder
   func harnessUITestValue(_ value: String) -> some View {
-    if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       accessibilityValue(value)
     } else {
       self
