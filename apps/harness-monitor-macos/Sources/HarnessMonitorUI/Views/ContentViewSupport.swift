@@ -59,10 +59,6 @@ extension HarnessMonitorStore.ContentToolbarSlice {
   fileprivate var toolbarStatusMessages: [ToolbarStatusMessage] {
     statusMessages.map(ToolbarStatusMessage.init)
   }
-
-  fileprivate var toolbarDaemonIndicator: ToolbarDaemonIndicator {
-    ToolbarDaemonIndicator(daemonIndicator)
-  }
 }
 
 // MARK: - Content toolbar items
@@ -92,10 +88,7 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
       displayMode: displayMode,
       availableDetailWidth: availableDetailWidth,
       statusMessages: toolbarUI.toolbarStatusMessages,
-      daemonIndicator: toolbarUI.toolbarDaemonIndicator,
-      store: store,
-      connectionState: toolbarUI.connectionState,
-      isBusy: toolbarUI.isBusy
+      connectionState: toolbarUI.connectionState
     )
 
     ToolbarItemGroup(placement: .principal) {

@@ -150,8 +150,7 @@ struct HarnessMonitorContentSelectionTests {
       {
         (
           store.contentUI.toolbar.toolbarMetrics,
-          store.contentUI.toolbar.statusMessages,
-          store.contentUI.toolbar.daemonIndicator
+          store.contentUI.toolbar.statusMessages
         )
       },
       after: {

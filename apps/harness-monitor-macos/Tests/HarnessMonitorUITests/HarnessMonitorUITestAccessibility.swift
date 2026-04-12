@@ -18,7 +18,6 @@ enum HarnessMonitorUITestAccessibility {
   static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
   static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
   static let toolbarCenterpieceMetricsFrame = "harness.toolbar.centerpiece.metrics.frame"
-  static let toolbarStartDaemonButton = "harness.toolbar.action.start"
   static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   static let toolbarStatusTickerFrame = "harness.toolbar.status-ticker.frame"
   static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"

@@ -48,12 +48,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  public enum DaemonIndicatorState: Equatable {
-    case offline
-    case launchdConnected
-    case manualConnected
-  }
-
   public struct ToolbarMetricsState: Equatable {
     public var projectCount = 0
     public var worktreeCount = 0
