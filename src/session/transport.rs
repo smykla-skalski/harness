@@ -1048,6 +1048,7 @@ fn agent_to_str(agent: HookAgent) -> &'static str {
         HookAgent::Codex => "codex",
         HookAgent::Gemini => "gemini",
         HookAgent::Copilot => "copilot",
+        HookAgent::Vibe => "vibe",
         HookAgent::OpenCode => "opencode",
     }
 }

@@ -24,11 +24,12 @@ pub struct BootstrapArgs {
     pub agents: Vec<HookAgent>,
 }
 
-const BOOTSTRAP_AGENT_ORDER: [HookAgent; 5] = [
+const BOOTSTRAP_AGENT_ORDER: [HookAgent; 6] = [
     HookAgent::Claude,
     HookAgent::Codex,
     HookAgent::Gemini,
     HookAgent::Copilot,
+    HookAgent::Vibe,
     HookAgent::OpenCode,
 ];
 
@@ -77,6 +78,7 @@ mod tests {
                 HookAgent::Codex,
                 HookAgent::Gemini,
                 HookAgent::Copilot,
+                HookAgent::Vibe,
                 HookAgent::OpenCode,
             ]
         );

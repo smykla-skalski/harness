@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use crate::agents::runtime;
 use crate::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::HookAgent;
 use crate::observe::classifier::classify_line;
 use crate::observe::types::{Issue, IssueSeverity, ScanState};
 
@@ -251,15 +250,7 @@ fn emit_results(issues: &[Issue], json: bool) -> Result<i32, CliError> {
 }
 
 fn resolve_agent_runtime(runtime_name: &str) -> Option<&'static dyn runtime::AgentRuntime> {
-    let agent = match runtime_name {
-        "claude" => HookAgent::Claude,
-        "codex" => HookAgent::Codex,
-        "gemini" => HookAgent::Gemini,
-        "copilot" => HookAgent::Copilot,
-        "opencode" => HookAgent::OpenCode,
-        _ => return None,
-    };
-    Some(runtime::runtime_for(agent))
+    runtime::runtime_for_name(runtime_name)
 }
 
 fn scan_agent_log(
@@ -346,6 +337,7 @@ mod tests {
     use fs_err as fs;
     use harness_testkit::with_isolated_harness_env;
 
+    use crate::hooks::adapters::HookAgent;
     use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueCode, MessageRole};
     use crate::session::types::SessionRole;
     use crate::workspace::project_context_dir;
@@ -464,6 +456,15 @@ mod tests {
                 "expected observe to find transcript issues"
             );
         });
+    }
+
+    #[test]
+    fn runtime_resolution_accepts_vibe_and_opencode() {
+        let vibe_runtime = resolve_agent_runtime("vibe").expect("vibe runtime");
+        let opencode_runtime = resolve_agent_runtime("opencode").expect("opencode runtime");
+
+        assert_eq!(vibe_runtime.name(), "vibe");
+        assert_eq!(opencode_runtime.name(), "opencode");
     }
 
     #[test]
