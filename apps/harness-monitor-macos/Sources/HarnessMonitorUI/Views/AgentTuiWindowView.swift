@@ -235,6 +235,7 @@ public struct AgentTuiWindowView: View {
         selectCreateTab()
       }
       .harnessActionButtonStyle(variant: .bordered, tint: nil)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiBackToCreateButton)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
