@@ -972,7 +972,7 @@ pub fn resolve_session_agent_for_runtime_session(
             continue;
         };
         for (agent_id, agent) in &state.agents {
-            if agent.status != AgentStatus::Active || agent.runtime != runtime_name {
+            if !agent.status.is_alive() || agent.runtime != runtime_name {
                 continue;
             }
             let matches_runtime_session = agent.agent_session_id.as_deref()
@@ -1297,7 +1297,7 @@ pub(crate) fn prepare_end_session_leave_signals(
     state
         .agents
         .values()
-        .filter(|agent| agent.status == AgentStatus::Active)
+        .filter(|agent| agent.status.is_alive())
         .map(|agent| {
             build_leave_signal_record(
                 state,
@@ -1327,7 +1327,7 @@ pub(crate) fn prepare_remove_agent_leave_signal(
             "agent '{agent_id}' not found"
         )))
     })?;
-    if agent.status != AgentStatus::Active {
+    if !agent.status.is_alive() {
         return Ok(None);
     }
 
@@ -1391,7 +1391,7 @@ pub(crate) fn apply_end_session(
 
     touch_agent(state, actor_id, now);
     for agent in state.agents.values_mut() {
-        if agent.status == AgentStatus::Active {
+        if agent.status.is_alive() {
             agent.status = AgentStatus::Disconnected;
             agent.current_task_id = None;
             agent.updated_at = now.to_string();
@@ -1801,7 +1801,7 @@ pub(crate) fn apply_send_signal_state(
             "agent '{agent_id}' not found"
         )))
     })?;
-    if target_agent.status != AgentStatus::Active {
+    if !target_agent.status.is_alive() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' is {}",
             agent_status_label(target_agent.status)
@@ -2126,7 +2126,7 @@ fn resolve_runtime_session_via_daemon(
             continue;
         };
         for agent in &detail.agents {
-            if agent.status != AgentStatus::Active || agent.runtime != runtime_name {
+            if !agent.status.is_alive() || agent.runtime != runtime_name {
                 continue;
             }
             let matches_runtime = agent.agent_session_id.as_deref() == Some(runtime_session_id)
@@ -2253,7 +2253,7 @@ fn require_permission(
             state.session_id
         )))
     })?;
-    if agent.status != AgentStatus::Active {
+    if !agent.status.is_alive() {
         return Err(CliErrorKind::session_permission_denied(format!(
             "agent '{actor_id}' is {} in session '{}'",
             agent_status_label(agent.status),
@@ -2376,7 +2376,7 @@ fn require_active_target_agent(state: &SessionState, agent_id: &str) -> Result<(
             "agent '{agent_id}' not found"
         )))
     })?;
-    if agent.status != AgentStatus::Active {
+    if !agent.status.is_alive() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' is {}",
             agent_status_label(agent.status)
@@ -2613,7 +2613,7 @@ fn free_worker_ids(state: &SessionState) -> Vec<String> {
     state
         .agents
         .values()
-        .filter(|agent| agent.status == AgentStatus::Active && agent.role == SessionRole::Worker)
+        .filter(|agent| agent.status.is_alive() && agent.role == SessionRole::Worker)
         .filter(|agent| is_worker_free(state, &agent.agent_id))
         .map(|agent| agent.agent_id.clone())
         .collect()
@@ -2623,7 +2623,7 @@ fn is_worker_free(state: &SessionState, agent_id: &str) -> bool {
     let Some(agent) = state.agents.get(agent_id) else {
         return false;
     };
-    agent.status == AgentStatus::Active
+    agent.status.is_alive()
         && agent.role == SessionRole::Worker
         && agent.current_task_id.is_none()
         && !state.tasks.values().any(|task| {
@@ -2927,6 +2927,7 @@ fn next_task_id(tasks: &BTreeMap<String, WorkItem>) -> String {
 fn agent_status_label(status: AgentStatus) -> &'static str {
     match status {
         AgentStatus::Active => "active",
+        AgentStatus::Idle => "idle",
         AgentStatus::Disconnected => "disconnected",
         AgentStatus::Removed => "removed",
     }
