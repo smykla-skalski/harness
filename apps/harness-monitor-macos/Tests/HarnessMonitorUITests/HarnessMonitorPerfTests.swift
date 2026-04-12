@@ -56,6 +56,10 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     measureScenario("offline-cached-open", includeMemoryMetric: true)
   }
 
+  func testToastOverlayChurnHitchRate() {
+    measureScenario("toast-overlay-churn")
+  }
+
   func testLaunchDashboardScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "launch-dashboard")
@@ -283,6 +287,8 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     case "refresh-and-search", "sidebar-overflow-search":
       "overflow"
     case "timeline-burst":
+      "cockpit"
+    case "toast-overlay-churn":
       "cockpit"
     case "offline-cached-open":
       "offline-cached"

@@ -64,6 +64,10 @@ enum HarnessMonitorPerfDriver {
       await settle()
       await store.selectSession(PreviewFixtures.summary.sessionId)
       await burstTimeline(store: store)
+    case .toastOverlayChurn:
+      await settle()
+      await store.selectSession(PreviewFixtures.summary.sessionId)
+      await churnToastOverlay(store: store)
     case .offlineCachedOpen:
       await settle()
     }
@@ -133,6 +137,32 @@ enum HarnessMonitorPerfDriver {
     }
     await settle()
   }
+
+  private static func churnToastOverlay(store: HarnessMonitorStore) async {
+    let firstToast = store.presentSuccessFeedback("Observe session")
+    try? await Task.sleep(for: shortDelay)
+
+    let secondToast = store.presentFailureFeedback("Create task failed")
+    try? await Task.sleep(for: shortDelay)
+
+    let thirdToast = store.presentSuccessFeedback("Copied session ID")
+    try? await Task.sleep(for: shortDelay)
+
+    store.dismissFeedback(id: secondToast)
+    try? await Task.sleep(for: shortDelay)
+
+    let fourthToast = store.presentFailureFeedback("Observer unavailable")
+    try? await Task.sleep(for: shortDelay)
+
+    store.dismissFeedback(id: firstToast)
+    try? await Task.sleep(for: shortDelay)
+
+    store.dismissFeedback(id: fourthToast)
+    try? await Task.sleep(for: shortDelay)
+
+    store.dismissFeedback(id: thirdToast)
+    await settle()
+  }
 }
 
 extension HarnessMonitorPerfScenario {
@@ -146,6 +176,7 @@ extension HarnessMonitorPerfScenario {
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
+      .toastOverlayChurn,
       .offlineCachedOpen:
       false
     }
@@ -160,6 +191,7 @@ extension HarnessMonitorPerfScenario {
     case .settingsBackdropCycle: "settings-backdrop-cycle"
     case .settingsBackgroundCycle: "settings-background-cycle"
     case .timelineBurst: "timeline-burst"
+    case .toastOverlayChurn: "toast-overlay-churn"
     case .offlineCachedOpen: "offline-cached-open"
     }
   }

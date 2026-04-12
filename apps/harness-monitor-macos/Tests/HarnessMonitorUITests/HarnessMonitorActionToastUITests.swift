@@ -13,15 +13,7 @@ final class HarnessMonitorActionToastUITests: HarnessMonitorUITestCase {
 
     tapPreviewSession(in: app)
 
-    let observeButton = app.buttons["Observe"].firstMatch
-    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
-    if observeButton.isHittable {
-      observeButton.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: observeButton) {
-      coordinate.tap()
-    } else {
-      XCTFail("Failed to tap Observe button")
-    }
+    triggerObserve(in: app)
 
     let toast = element(in: app, identifier: Accessibility.actionToast)
     XCTAssertTrue(
@@ -145,6 +137,59 @@ final class HarnessMonitorActionToastUITests: HarnessMonitorUITestCase {
       "Second Create Task action with the same message should dedupe (still 1 toast)"
     )
   }
+
+  func testActionToastFloatsAtWindowTrailingEdgeWithoutMovingContent() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit",
+        Self.toastDismissOverrideKey: String(Self.longDismissMilliseconds),
+      ]
+    )
+
+    tapPreviewSession(in: app)
+
+    let window = mainWindow(in: app)
+    let contentRootFrame = frameElement(in: app, identifier: Accessibility.contentRootFrame)
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+
+    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(contentRootFrame.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
+
+    let initialContentFrame = contentRootFrame.frame
+
+    triggerObserve(in: app)
+
+    let toast = element(in: app, identifier: Accessibility.actionToast)
+    let toastFrame = frameElement(in: app, identifier: Accessibility.actionToastFrame)
+    XCTAssertTrue(toast.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(toastFrame.waitForExistence(timeout: Self.actionTimeout))
+
+    XCTAssertEqual(
+      window.frame.maxX - toastFrame.frame.maxX,
+      16,
+      accuracy: 8,
+      "Toast should hug the window trailing edge with the shared large margin"
+    )
+    XCTAssertGreaterThan(
+      toastFrame.frame.maxX,
+      inspectorRoot.frame.minX,
+      "Toast should overlap the inspector edge because the overlay floats above that column too"
+    )
+    XCTAssertEqual(
+      contentRootFrame.frame.minY,
+      initialContentFrame.minY,
+      accuracy: 1,
+      "Toast presentation should not push the detail content down"
+    )
+    XCTAssertEqual(
+      contentRootFrame.frame.height,
+      initialContentFrame.height,
+      accuracy: 1,
+      "Toast presentation should not shrink the detail content"
+    )
+  }
 }
 
 extension HarnessMonitorActionToastUITests {
@@ -162,6 +207,18 @@ extension HarnessMonitorActionToastUITests {
   fileprivate func toastRowQuery(in app: XCUIApplication) -> XCUIElementQuery {
     app.descendants(matching: .button)
       .matching(identifier: Accessibility.actionToastCloseButton)
+  }
+
+  fileprivate func triggerObserve(in app: XCUIApplication) {
+    let observeButton = app.buttons["Observe"].firstMatch
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.actionTimeout))
+    if observeButton.isHittable {
+      observeButton.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: observeButton) {
+      coordinate.tap()
+    } else {
+      XCTFail("Failed to tap Observe button")
+    }
   }
 
   fileprivate func fillCreateTaskTitle(in app: XCUIApplication, text: String) {
