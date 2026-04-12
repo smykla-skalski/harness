@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-enum AgentTuiSheetSelection: Equatable {
+enum AgentTuiSheetSelection: Hashable {
   case create
   case session(String)
 

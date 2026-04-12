@@ -3,11 +3,11 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class AgentTuiSheetUITests: HarnessMonitorUITestCase {
-  func testAgentTuiSheetDefaultsToCreatePaneWhenNoSessionsExist() throws {
+final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
+  func testAgentTuiWindowDefaultsToCreatePaneWhenNoSessionsExist() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiSheet(in: app)
+    openAgentTuiWindow(in: app)
 
     let createTab = button(in: app, identifier: Accessibility.agentTuiCreateTab)
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
@@ -19,13 +19,13 @@ final class AgentTuiSheetUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(state.label.contains("selection=create"))
   }
 
-  func testStartingAgentTuiCreatesAndSelectsSessionTab() throws {
+  func testStartingAgentTuiCreatesAndSelectsSessionRow() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiSheet(in: app)
+    openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "Inspect the cockpit session")
 
-    let sessionTab = button(
+    let sessionRow = button(
       in: app,
       identifier: Accessibility.agentTuiTab("preview-agent-tui-1")
     )
@@ -34,7 +34,7 @@ final class AgentTuiSheetUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        sessionTab.exists
+        sessionRow.exists
           && sessionPane.exists
           && state.label.contains("selection=session:preview-agent-tui-1")
           && state.label.contains("status=running")
@@ -47,43 +47,29 @@ final class AgentTuiSheetUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testOverflowPickerPromotesSelectedSessionIntoVisibleTabs() throws {
+  func testSidebarShowsAllSessionsWithoutOverflow() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-overflow"]
     )
 
-    reopenAgentTuiSheet(in: app)
+    reopenAgentTuiWindow(in: app)
 
-    let overflowPicker = popUpButton(in: app, identifier: Accessibility.agentTuiOverflowPicker)
-    XCTAssertTrue(waitForElement(overflowPicker, timeout: Self.actionTimeout))
-
-    selectMenuOption(
-      in: app,
-      controlIdentifier: Accessibility.agentTuiOverflowPicker,
-      optionTitle: "OpenCode"
-    )
-
-    let promotedTab = button(
-      in: app,
-      identifier: Accessibility.agentTuiTab("preview-agent-tui-5")
-    )
-    let state = element(in: app, identifier: Accessibility.agentTuiState)
-    let tabStripState = element(in: app, identifier: Accessibility.agentTuiTabStripState)
-
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        promotedTab.exists
-          && state.label.contains("selection=session:preview-agent-tui-5")
-          && tabStripState.label.contains("visible=")
-          && tabStripState.label.contains("preview-agent-tui-5")
-      }
-    )
+    for index in 1 ... 6 {
+      let sessionRow = button(
+        in: app,
+        identifier: Accessibility.agentTuiTab("preview-agent-tui-\(index)")
+      )
+      XCTAssertTrue(
+        waitForElement(sessionRow, timeout: Self.actionTimeout),
+        "Session row for preview-agent-tui-\(index) should be visible in sidebar"
+      )
+    }
   }
 
   func testStoppedSessionHidesLiveControlsButKeepsTranscriptAction() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiSheet(in: app)
+    openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "stop after start")
 
     tapButton(in: app, title: "Stop")
@@ -118,7 +104,7 @@ final class AgentTuiSheetUITests: HarnessMonitorUITestCase {
   }
 }
 
-private extension AgentTuiSheetUITests {
+private extension AgentTuiWindowUITests {
   func launchInCockpitPreview(
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {
@@ -133,7 +119,7 @@ private extension AgentTuiSheetUITests {
     )
   }
 
-  func openAgentTuiSheet(in app: XCUIApplication) {
+  func openAgentTuiWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
     XCTAssertTrue(
       waitForElement(
@@ -143,12 +129,22 @@ private extension AgentTuiSheetUITests {
     )
   }
 
-  func reopenAgentTuiSheet(in app: XCUIApplication) {
+  func reopenAgentTuiWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists
           || self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
+      }
+    )
+  }
+
+  func closeAgentTuiWindow(in app: XCUIApplication) {
+    app.typeKey("w", modifierFlags: .command)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        !self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists
+          && !self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
       }
     )
   }
@@ -212,16 +208,6 @@ private extension AgentTuiSheetUITests {
     } else {
       XCTFail("Cannot resolve coordinate for \(label) dock button")
     }
-  }
-
-  func closeAgentTuiSheet(in app: XCUIApplication) {
-    tapButton(in: app, identifier: Accessibility.agentTuiCloseButton)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        !self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists
-          && !self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
-      }
-    )
   }
 
   func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {

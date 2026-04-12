@@ -75,6 +75,13 @@ struct HarnessMonitorApp: App {
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+
+    Window("Agent TUI", id: HarnessMonitorWindowID.agentTui) {
+      AgentTuiWindowRootView(store: store, themeMode: $themeMode)
+    }
+    .windowStyle(.titleBar)
+    .defaultSize(width: 980, height: 620)
+    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 
   private var allowsWindowRestoration: Bool {

@@ -76,17 +76,23 @@ struct HarnessMonitorStoreSheetTests {
 
   @Test("PresentedSheet id is stable and unique per case")
   func presentedSheetIdIsStable() {
-    let agentTuiSheet = HarnessMonitorStore.PresentedSheet.agentTui
     let codexSheet = HarnessMonitorStore.PresentedSheet.codexFlow
     let sheet1 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")
     let sheet2 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-b")
 
-    #expect(agentTuiSheet.id == "agentTui")
     #expect(codexSheet.id == "codexFlow")
     #expect(sheet1.id == "sendSignal:agent-a")
     #expect(sheet2.id == "sendSignal:agent-b")
-    #expect(agentTuiSheet.id != codexSheet.id)
     #expect(codexSheet.id != sheet1.id)
     #expect(sheet1.id != sheet2.id)
+  }
+
+  @Test("PresentedSheet has no agentTui case")
+  func presentedSheetHasNoAgentTuiCase() {
+    let sheet = HarnessMonitorStore.PresentedSheet.codexFlow
+    switch sheet {
+    case .codexFlow: break
+    case .sendSignal: break
+    }
   }
 }

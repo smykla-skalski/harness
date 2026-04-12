@@ -7,6 +7,7 @@ struct SessionCockpitView: View {
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
   let isExtensionsLoading: Bool
+  @Environment(\.openWindow) private var openWindow
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -28,7 +29,7 @@ struct SessionCockpitView: View {
           inspectTask: store.inspect(taskID:),
           inspectAgent: store.inspect(agentID:),
           inspectObserver: store.inspectObserver,
-          openAgentTui: store.presentAgentTuiSheet,
+          openAgentTui: { openWindow(id: HarnessMonitorWindowID.agentTui) },
           openCodexFlow: store.presentCodexFlowSheet
         )
         HarnessMonitorAdaptiveGridLayout(minimumColumnWidth: 340, maximumColumns: 2, spacing: 16) {
