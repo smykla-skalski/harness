@@ -1,6 +1,5 @@
 use std::collections::{HashMap, VecDeque};
 use std::env::var;
-use std::net::TcpStream;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
@@ -82,14 +81,24 @@ impl CodexControllerHandle {
         codex_transport::codex_transport_from_env(self.state.sandboxed)
     }
 
-    /// When the resolved transport is WebSocket, do a synchronous TCP connect
-    /// probe to verify the endpoint is reachable before queueing the run.
+    /// When the resolved transport is WebSocket, verify the endpoint is ready
+    /// before queueing the run.
     /// Returns `CODEX001` immediately when the probe fails so the HTTP layer
     /// surfaces 503 in the POST response rather than failing asynchronously
     /// in the worker.
-    fn preflight_websocket_probe(&self) -> Result<(), CliError> {
+    fn preflight_websocket_probe(&self, session_id: &str) -> Result<(), CliError> {
         if self.state.sandboxed && var("HARNESS_CODEX_WS_URL").ok().is_none() {
             let Some(capability) = bridge::running_codex_capability()? else {
+                tracing::warn!(
+                    session_id,
+                    "codex run preflight blocked because the host bridge capability is unavailable"
+                );
+                state::append_event_best_effort(
+                    "warn",
+                    &format!(
+                        "codex run preflight blocked for session {session_id}: host bridge capability is unavailable"
+                    ),
+                );
                 return Err(CliErrorKind::sandbox_feature_disabled(
                     bridge::BridgeCapability::Codex.sandbox_feature(),
                 )
@@ -99,6 +108,17 @@ impl CodexControllerHandle {
                 let endpoint = capability
                     .endpoint
                     .unwrap_or_else(|| codex_transport::DEFAULT_CODEX_WS_ENDPOINT.to_string());
+                tracing::warn!(
+                    session_id,
+                    %endpoint,
+                    "codex run preflight blocked because the host bridge capability is unhealthy"
+                );
+                state::append_event_best_effort(
+                    "warn",
+                    &format!(
+                        "codex run preflight failed for session {session_id}: host bridge capability is unhealthy at {endpoint}"
+                    ),
+                );
                 return Err(CliErrorKind::codex_server_unavailable(endpoint).into());
             }
         }
@@ -106,20 +126,19 @@ impl CodexControllerHandle {
         let Some(endpoint) = transport.endpoint() else {
             return Ok(());
         };
-        let Some(addr) = endpoint
-            .strip_prefix("ws://")
-            .or_else(|| endpoint.strip_prefix("wss://"))
-        else {
-            return Ok(());
-        };
-        if TcpStream::connect_timeout(
-            &addr
-                .parse()
-                .unwrap_or_else(|_| ([127, 0, 0, 1], 4500).into()),
-            Duration::from_secs(1),
-        )
-        .is_err()
-        {
+        if let Err(reason) = bridge::probe_codex_readiness(endpoint, Duration::from_secs(1)) {
+            tracing::warn!(
+                session_id,
+                %endpoint,
+                %reason,
+                "codex run preflight failed"
+            );
+            state::append_event_best_effort(
+                "warn",
+                &format!(
+                    "codex run preflight failed for session {session_id} at {endpoint}: {reason}"
+                ),
+            );
             return Err(CliErrorKind::codex_server_unavailable(endpoint.to_string()).into());
         }
         Ok(())
@@ -140,7 +159,7 @@ impl CodexControllerHandle {
             return Err(CliErrorKind::workflow_parse("codex prompt cannot be empty").into());
         }
 
-        self.preflight_websocket_probe()?;
+        self.preflight_websocket_probe(session_id)?;
 
         let project_dir = self.project_dir_for_session(session_id)?;
         let now = utc_now();
@@ -164,6 +183,19 @@ impl CodexControllerHandle {
             updated_at: now,
         };
         self.save_and_broadcast(&snapshot)?;
+        tracing::info!(
+            session_id,
+            run_id = %snapshot.run_id,
+            mode = ?snapshot.mode,
+            "queued codex run"
+        );
+        state::append_event_best_effort(
+            "info",
+            &format!(
+                "queued codex run {} for session {}",
+                snapshot.run_id, snapshot.session_id
+            ),
+        );
 
         let (control_tx, control_rx) = mpsc::unbounded_channel();
         self.active_runs()?
@@ -755,7 +787,19 @@ impl CodexRunWorker {
         if let Err(error) = self.controller.save_and_broadcast(&self.snapshot) {
             tracing::warn!(%error, "failed to persist codex failure");
         }
-        let _ = state::append_event("warn", &format!("codex run failed: {message}"));
+        tracing::error!(
+            session_id = %self.snapshot.session_id,
+            run_id = %self.snapshot.run_id,
+            error_message = message,
+            "codex run failed"
+        );
+        state::append_event_best_effort(
+            "warn",
+            &format!(
+                "codex run failed for session {} run {}: {message}",
+                self.snapshot.session_id, self.snapshot.run_id
+            ),
+        );
     }
 
     fn touch_and_save(&mut self) -> Result<(), CliError> {

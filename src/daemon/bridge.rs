@@ -4,6 +4,7 @@ use std::fmt;
 use std::fs::File;
 use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -46,9 +47,13 @@ pub const CODEX_BRIDGE_PORT_ENV: &str = "HARNESS_CODEX_WS_PORT";
 
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(5);
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
-const DETACHED_START_TIMEOUT: Duration = Duration::from_secs(5);
+const DETACHED_START_TIMEOUT: Duration = Duration::from_secs(12);
 const DETACHED_START_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(200);
+const CODEX_READY_TIMEOUT: Duration = Duration::from_secs(10);
+const CODEX_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const CODEX_READY_WARN_AFTER: Duration = Duration::from_secs(1);
+const CODEX_READY_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 const DEFAULT_BRIDGE_SOCKET_NAME: &str = "bridge.sock";
 const FALLBACK_BRIDGE_SOCKET_PREFIX: &str = "h-bridge-";
 const FALLBACK_BRIDGE_SOCKET_SUFFIX: &str = ".sock";
@@ -593,6 +598,25 @@ struct BridgeCodexProcess {
     metadata: BridgeCodexMetadata,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CodexEndpointScheme {
+    WebSocket,
+    SecureWebSocket,
+}
+
+impl CodexEndpointScheme {
+    fn parse(endpoint: &str) -> Option<(Self, &str)> {
+        endpoint
+            .strip_prefix("ws://")
+            .map(|address| (Self::WebSocket, address))
+            .or_else(|| {
+                endpoint
+                    .strip_prefix("wss://")
+                    .map(|address| (Self::SecureWebSocket, address))
+            })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BridgeReconfigureSpec {
     #[serde(default)]
@@ -997,6 +1021,8 @@ impl BridgeServer {
 
     fn set_codex_process(&self, process: BridgeCodexProcess) -> Result<(), CliError> {
         let endpoint = process.endpoint.clone();
+        let port = process.metadata.port;
+        let pid = process.child.id();
         let metadata = stringify_metadata_map(&process.metadata);
         self.capabilities()?.insert(
             BRIDGE_CAPABILITY_CODEX.to_string(),
@@ -1004,11 +1030,16 @@ impl BridgeServer {
                 enabled: true,
                 healthy: true,
                 transport: "websocket".to_string(),
-                endpoint: Some(endpoint),
+                endpoint: Some(endpoint.clone()),
                 metadata,
             },
         );
         *self.codex()? = Some(process);
+        tracing::info!(%endpoint, port, pid, "codex host bridge capability enabled");
+        state::append_event_best_effort(
+            "info",
+            &format!("codex host bridge ready on {endpoint} (pid {pid})"),
+        );
         self.persist_state()
     }
 
@@ -1017,11 +1048,27 @@ impl BridgeServer {
         let Some(codex) = capabilities.get_mut(BRIDGE_CAPABILITY_CODEX) else {
             return Ok(());
         };
+        let endpoint = codex.endpoint.clone().unwrap_or_default();
+        let port = codex
+            .metadata
+            .get("port")
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or_default();
         codex.healthy = false;
         codex
             .metadata
-            .insert("last_exit_status".to_string(), last_exit_status);
+            .insert("last_exit_status".to_string(), last_exit_status.clone());
         drop(capabilities);
+        tracing::warn!(
+            %endpoint,
+            port,
+            exit_status = %last_exit_status,
+            "codex host bridge capability became unhealthy"
+        );
+        state::append_event_best_effort(
+            "warn",
+            &format!("codex host bridge became unhealthy on {endpoint}: {last_exit_status}"),
+        );
         self.persist_state()
     }
 
@@ -1044,7 +1091,7 @@ impl BridgeServer {
         let binary = config.codex_binary.as_ref().ok_or_else(|| {
             CliErrorKind::workflow_io("codex capability requires a resolved codex binary")
         })?;
-        let _ = self.disable_codex();
+        let _ = self.clear_codex(false);
         let process = spawn_codex_process(binary, config.codex_port)?;
         self.set_codex_process(process)?;
         spawn_codex_monitor(Arc::clone(self));
@@ -1069,7 +1116,7 @@ impl BridgeServer {
         }
     }
 
-    fn disable_codex(&self) -> Result<(), CliError> {
+    fn clear_codex(&self, persist_state: bool) -> Result<(), CliError> {
         if let Ok(mut codex) = self.codex.lock()
             && let Some(process) = codex.as_mut()
         {
@@ -1078,7 +1125,14 @@ impl BridgeServer {
             codex.take();
         }
         self.capabilities()?.remove(BRIDGE_CAPABILITY_CODEX);
-        self.persist_state()
+        if persist_state {
+            self.persist_state()?;
+        }
+        Ok(())
+    }
+
+    fn disable_codex(&self) -> Result<(), CliError> {
+        self.clear_codex(true)
     }
 
     fn disable_agent_tui(&self, force: bool) -> Result<(), CliError> {
@@ -2185,6 +2239,157 @@ impl Drop for BridgeSocketGuard {
     }
 }
 
+fn codex_endpoint_address(endpoint: &str) -> Result<(CodexEndpointScheme, String), String> {
+    let Some((scheme, address)) = CodexEndpointScheme::parse(endpoint) else {
+        return Err(format!("unsupported codex endpoint '{endpoint}'"));
+    };
+    let address = address
+        .split('/')
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| format!("missing socket address in codex endpoint '{endpoint}'"))?;
+    Ok((scheme, address.to_string()))
+}
+
+fn codex_endpoint_socket_addr(endpoint: &str) -> Result<SocketAddr, String> {
+    let (_, address) = codex_endpoint_address(endpoint)?;
+    address
+        .to_socket_addrs()
+        .map_err(|error| format!("resolve {address}: {error}"))?
+        .next()
+        .ok_or_else(|| format!("resolve {address}: no socket addresses returned"))
+}
+
+pub(crate) fn probe_codex_readiness(endpoint: &str, timeout: Duration) -> Result<(), String> {
+    let (scheme, address) = codex_endpoint_address(endpoint)?;
+    let socket_addr = codex_endpoint_socket_addr(endpoint)?;
+    let mut stream = TcpStream::connect_timeout(&socket_addr, timeout)
+        .map_err(|error| format!("connect {address}: {error}"))?;
+    let _ = stream.set_read_timeout(Some(timeout));
+    let _ = stream.set_write_timeout(Some(timeout));
+
+    if scheme == CodexEndpointScheme::SecureWebSocket {
+        return Ok(());
+    }
+
+    let readyz_url = format!("http://{address}/readyz");
+    let request = format!("GET /readyz HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n");
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|error| format!("write {readyz_url}: {error}"))?;
+
+    let mut status_line = String::new();
+    BufReader::new(stream)
+        .read_line(&mut status_line)
+        .map_err(|error| format!("read {readyz_url}: {error}"))?;
+    let status_line = status_line.trim();
+    if status_line.starts_with("HTTP/1.1 200") || status_line.starts_with("HTTP/1.0 200") {
+        return Ok(());
+    }
+    Err(format!(
+        "unexpected {readyz_url} response '{}'",
+        if status_line.is_empty() {
+            "<empty>"
+        } else {
+            status_line
+        }
+    ))
+}
+
+fn kill_codex_process(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "startup/readiness loop is intentionally linear and log-heavy"
+)]
+fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), CliError> {
+    let endpoint = process.endpoint.clone();
+    let port = process.metadata.port;
+    let pid = process.child.id();
+    let readyz_url = codex_endpoint_address(&endpoint)
+        .map(|(_, address)| format!("http://{address}/readyz"))
+        .unwrap_or_else(|_| endpoint.clone());
+    let started_at = Instant::now();
+    let mut warned = false;
+
+    loop {
+        let probe_error = match probe_codex_readiness(&endpoint, CODEX_READY_PROBE_TIMEOUT) {
+            Ok(()) => {
+                tracing::info!(%endpoint, %readyz_url, port, pid, "codex app-server ready");
+                return Ok(());
+            }
+            Err(error) => error,
+        };
+
+        if let Some(exit_status) = process
+            .child
+            .try_wait()
+            .map_err(|error| CliErrorKind::workflow_io(format!("poll codex app-server: {error}")))?
+        {
+            let exit_status = exit_status.to_string();
+            tracing::error!(
+                %endpoint,
+                %readyz_url,
+                port,
+                pid,
+                exit_status = %exit_status,
+                "codex app-server exited before readiness"
+            );
+            state::append_event_best_effort(
+                "error",
+                &format!("codex host bridge failed before readiness on {endpoint}: {exit_status}"),
+            );
+            return Err(CliErrorKind::workflow_io(format!(
+                "codex app-server exited before readiness on {endpoint}: {exit_status}"
+            ))
+            .into());
+        }
+
+        if !warned && started_at.elapsed() >= CODEX_READY_WARN_AFTER {
+            tracing::warn!(
+                %endpoint,
+                %readyz_url,
+                port,
+                pid,
+                probe_error = %probe_error,
+                "codex app-server readiness still pending"
+            );
+            state::append_event_best_effort(
+                "warn",
+                &format!("codex host bridge readiness still pending on {endpoint}: {probe_error}"),
+            );
+            warned = true;
+        }
+
+        if started_at.elapsed() >= CODEX_READY_TIMEOUT {
+            tracing::error!(
+                %endpoint,
+                %readyz_url,
+                port,
+                pid,
+                probe_error = %probe_error,
+                timeout_ms = CODEX_READY_TIMEOUT.as_millis(),
+                "codex app-server readiness timed out"
+            );
+            state::append_event_best_effort(
+                "error",
+                &format!("codex host bridge readiness timed out on {endpoint}: {probe_error}"),
+            );
+            kill_codex_process(&mut process.child);
+            return Err(CliErrorKind::workflow_io(format!(
+                "codex app-server did not become ready on {endpoint}: {probe_error}"
+            ))
+            .into());
+        }
+
+        thread::sleep(CODEX_READY_POLL_INTERVAL);
+    }
+}
+
 fn spawn_codex_process(binary: &Path, port: u16) -> Result<BridgeCodexProcess, CliError> {
     let listen_address = format!("ws://127.0.0.1:{port}");
     let child = Command::new(binary)
@@ -2193,7 +2398,19 @@ fn spawn_codex_process(binary: &Path, port: u16) -> Result<BridgeCodexProcess, C
         .spawn()
         .map_err(|error| CliErrorKind::workflow_io(format!("spawn codex app-server: {error}")))?;
     let version = detect_codex_version(binary);
-    Ok(BridgeCodexProcess {
+    let pid = child.id();
+    tracing::info!(
+        binary_path = %binary.display(),
+        endpoint = %listen_address,
+        port,
+        pid,
+        "spawned codex app-server"
+    );
+    state::append_event_best_effort(
+        "info",
+        &format!("starting codex host bridge on {listen_address} (pid {pid})"),
+    );
+    let mut process = BridgeCodexProcess {
         child,
         endpoint: listen_address,
         metadata: BridgeCodexMetadata {
@@ -2202,7 +2419,9 @@ fn spawn_codex_process(binary: &Path, port: u16) -> Result<BridgeCodexProcess, C
             version,
             last_exit_status: None,
         },
-    })
+    };
+    wait_for_codex_process_ready(&mut process)?;
+    Ok(process)
 }
 
 fn spawn_codex_monitor(server: Arc<BridgeServer>) {
@@ -2247,25 +2466,6 @@ fn initial_capabilities(
                 transport: "unix".to_string(),
                 endpoint: Some(config.socket_path.display().to_string()),
                 metadata: stringify_metadata_map(&BridgeAgentTuiMetadata { active_sessions: 0 }),
-            },
-        );
-    }
-    if config.capabilities.contains(&BridgeCapability::Codex)
-        && let Some(binary) = config.codex_binary.as_ref()
-    {
-        capabilities.insert(
-            BRIDGE_CAPABILITY_CODEX.to_string(),
-            HostBridgeCapabilityManifest {
-                enabled: true,
-                healthy: false,
-                transport: "websocket".to_string(),
-                endpoint: Some(format!("ws://127.0.0.1:{}", config.codex_port)),
-                metadata: stringify_metadata_map(&BridgeCodexMetadata {
-                    port: config.codex_port,
-                    binary_path: binary.display().to_string(),
-                    version: detect_codex_version(binary),
-                    last_exit_status: None,
-                }),
             },
         );
     }

@@ -139,6 +139,112 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
 }
 
 #[test]
+fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let mock_codex = create_mock_codex(tmp.path());
+
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args([
+                "bridge",
+                "start",
+                "--capability",
+                "codex",
+                "--codex-port",
+                "14510",
+                "--codex-path",
+            ])
+            .arg(&mock_codex)
+            .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+            .env("XDG_DATA_HOME", tmp.path())
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env("MOCK_CODEX_READY_DELAY_MS", "1500")
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
+
+    thread::sleep(Duration::from_millis(250));
+    let state_path = tmp.path().join("harness/daemon/bridge.json");
+    assert!(
+        !state_path.exists(),
+        "bridge state should not publish before codex readiness"
+    );
+
+    let state = wait_for_bridge_state_with_capabilities(tmp.path(), &["codex"]);
+    let codex = state.capabilities.get("codex").expect("codex capability");
+    assert_eq!(codex.endpoint.as_deref(), Some("ws://127.0.0.1:14510"));
+
+    let events = read_daemon_events(tmp.path());
+    assert!(
+        events.contains("codex host bridge readiness still pending on ws://127.0.0.1:14510"),
+        "expected readiness warning event, got: {events}"
+    );
+    assert!(
+        events.contains("codex host bridge ready on ws://127.0.0.1:14510"),
+        "expected readiness success event, got: {events}"
+    );
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+}
+
+#[test]
+fn bridge_start_records_error_when_codex_exits_before_readiness() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let mock_codex = create_mock_codex(tmp.path());
+
+    let output = Command::new(harness_binary())
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            "14511",
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
+        .env("MOCK_CODEX_EXIT_BEFORE_READY", "1")
+        .env("MOCK_CODEX_EXIT_STATUS", "23")
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .output()
+        .expect("run bridge");
+
+    assert!(!output.status.success(), "bridge unexpectedly succeeded");
+    assert!(
+        !tmp.path().join("harness/daemon/bridge.json").exists(),
+        "bridge state should not persist failed codex readiness"
+    );
+
+    let events = read_daemon_events(tmp.path());
+    assert!(
+        events.contains("starting codex host bridge on ws://127.0.0.1:14511"),
+        "expected startup event, got: {events}"
+    );
+    assert!(
+        events.contains("codex host bridge failed before readiness on ws://127.0.0.1:14511"),
+        "expected readiness error event, got: {events}"
+    );
+}
+
+#[test]
 fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
@@ -372,14 +478,75 @@ fn create_mock_codex(base: &Path) -> PathBuf {
     let script = base.join("mock-codex");
     std::fs::write(
         &script,
-        concat!(
-            "#!/bin/sh\n",
-            "if [ \"$1\" = \"--version\" ]; then\n",
-            "  echo 'mock-codex 0.0.1'\n",
-            "  exit 0\n",
-            "fi\n",
-            "sleep 300\n",
-        ),
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo 'mock-codex 0.0.1'
+  exit 0
+fi
+
+python3 - "$@" <<'PY'
+import os
+import socket
+import sys
+import time
+
+args = sys.argv[1:]
+if len(args) < 3 or args[0] != "app-server" or args[1] != "--listen":
+    print(f"unexpected args: {args}", file=sys.stderr)
+    sys.exit(2)
+
+listen = args[2]
+if not listen.startswith("ws://"):
+    print(f"unexpected listen address: {listen}", file=sys.stderr)
+    sys.exit(3)
+
+address = listen[len("ws://"):]
+host, port = address.rsplit(":", 1)
+port = int(port)
+delay_ms = int(os.environ.get("MOCK_CODEX_READY_DELAY_MS", "0"))
+exit_before_ready = os.environ.get("MOCK_CODEX_EXIT_BEFORE_READY") == "1"
+exit_status = int(os.environ.get("MOCK_CODEX_EXIT_STATUS", "17"))
+
+if delay_ms > 0:
+    time.sleep(delay_ms / 1000.0)
+
+if exit_before_ready:
+    sys.exit(exit_status)
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server.bind((host, port))
+server.listen()
+
+while True:
+    conn, _ = server.accept()
+    request = b""
+    while b"\r\n\r\n" not in request:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        request += chunk
+
+    if request.startswith(b"GET /readyz ") or request.startswith(b"GET /healthz "):
+        body = b"ok\n"
+        response = (
+            b"HTTP/1.1 200 OK\r\n"
+            + f"Content-Length: {len(body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + body
+        )
+    else:
+        body = b"missing\n"
+        response = (
+            b"HTTP/1.1 404 Not Found\r\n"
+            + f"Content-Length: {len(body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + body
+        )
+    conn.sendall(response)
+    conn.close()
+PY
+"#,
     )
     .expect("write mock codex");
     std::fs::set_permissions(
@@ -406,6 +573,10 @@ fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
         );
         thread::sleep(BRIDGE_POLL_INTERVAL);
     }
+}
+
+fn read_daemon_events(data_home: &Path) -> String {
+    std::fs::read_to_string(data_home.join("harness/daemon/events.jsonl")).unwrap_or_default()
 }
 
 fn wait_for_bridge_state_with_capabilities(data_home: &Path, capabilities: &[&str]) -> BridgeState {
