@@ -71,7 +71,10 @@ struct CodexFlowSheetView: View {
       Divider()
       footer
     }
-    .task { await store.refreshSelectedCodexRuns() }
+    .task {
+      await store.refreshDaemonStatus()
+      await store.refreshSelectedCodexRuns()
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowSheet)
   }
