@@ -153,7 +153,7 @@ struct HarnessMonitorStoreFilteringBasicsTests {
     )
 
     let didChange = await didInvalidate(
-      { store.visibleSessionIDs },
+      { store.visibleSessions.map(\.sessionId) },
       after: {
         store.projects = [renamedProject]
       }
