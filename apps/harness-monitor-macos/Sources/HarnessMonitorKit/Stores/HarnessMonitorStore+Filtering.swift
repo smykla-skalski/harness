@@ -22,6 +22,7 @@ extension HarnessMonitorStore {
     @ObservationIgnored var sessionRecordsByID: [String: SessionRecord] = [:]
     @ObservationIgnored private var sessionIndicesByID: [String: Int] = [:]
     @ObservationIgnored var projectCatalogs: [ProjectCatalog] = []
+    @ObservationIgnored var orderedSessionIDsBySortOrder: [SessionSortOrder: [String]] = [:]
     @ObservationIgnored var queryTokens: [String] = []
     @ObservationIgnored private var searchRebuildTask: Task<Void, Never>?
     @ObservationIgnored private(set) var debugCatalogRebuildCount = 0
@@ -282,6 +283,7 @@ extension HarnessMonitorStore {
       }
 
       projectCatalogs = buildProjectCatalogs()
+      rebuildOrderedSessionIDs()
       catalog.recentSessions = sortRecentSessions(catalog.sessions)
     }
 
@@ -301,6 +303,10 @@ extension HarnessMonitorStore {
         catalog.recentSessions = sortRecentSessions(catalog.sessions)
       } else {
         catalog.recentSessions = replacingSession(updatedSummary, in: catalog.recentSessions)
+      }
+      if requiresOrderingRefresh(from: existingSummary, to: updatedSummary) {
+        patchProjectCatalogOrderings(for: updatedSummary)
+        rebuildOrderedSessionIDs()
       }
     }
 
@@ -352,6 +358,21 @@ extension HarnessMonitorStore {
           }
         return ProjectCatalog(project: project, checkouts: checkouts)
       }
+    }
+
+    private func rebuildOrderedSessionIDs() {
+      orderedSessionIDsBySortOrder = Dictionary(
+        uniqueKeysWithValues: SessionSortOrder.allCases.map { sortOrder in
+          (
+            sortOrder,
+            projectCatalogs.flatMap { projectCatalog in
+              projectCatalog.checkouts.flatMap { checkout in
+                checkout.orderedSessionIDs(for: sortOrder)
+              }
+            }
+          )
+        }
+      )
     }
 
     private func rebuildProjection(change: Change) {

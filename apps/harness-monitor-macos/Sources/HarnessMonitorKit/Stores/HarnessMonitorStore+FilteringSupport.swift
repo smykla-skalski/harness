@@ -136,13 +136,8 @@ extension HarnessMonitorStore.SessionIndexSlice {
   }
 
   func orderedVisibleSessionIDs(in visibleSessionIDSet: Set<String>) -> [String] {
-    projectCatalogs.flatMap { projectCatalog in
-      projectCatalog.checkouts.flatMap { checkout in
-        checkout
-          .orderedSessionIDs(for: controls.sessionSortOrder)
-          .filter { visibleSessionIDSet.contains($0) }
-      }
-    }
+    orderedSessionIDsBySortOrder[controls.sessionSortOrder, default: []]
+      .filter { visibleSessionIDSet.contains($0) }
   }
 
   func sortedSessionIDs(
@@ -221,6 +216,17 @@ extension HarnessMonitorStore.SessionIndexSlice {
       || existing.checkoutRoot != updated.checkoutRoot
   }
 
+  func requiresOrderingRefresh(
+    from existing: SessionSummary,
+    to updated: SessionSummary
+  ) -> Bool {
+    let existingRecord = SessionRecord(summary: existing)
+    let updatedRecord = SessionRecord(summary: updated)
+    return existingRecord.normalizedName != updatedRecord.normalizedName
+      || existingRecord.statusSortKey != updatedRecord.statusSortKey
+      || existingRecord.recentActivitySortKey != updatedRecord.recentActivitySortKey
+  }
+
   func summaryChangeImpact(
     from existing: SessionSummary,
     to updated: SessionSummary
@@ -242,6 +248,55 @@ extension HarnessMonitorStore.SessionIndexSlice {
       || existing.metrics.blockedTaskCount != updated.metrics.blockedTaskCount
 
     return affectsProjection ? .projection : .summaryOnly
+  }
+
+  func patchProjectCatalogOrderings(
+    for updatedSummary: SessionSummary
+  ) {
+    guard
+      let projectIndex = projectCatalogs.firstIndex(where: {
+        $0.project.projectId == updatedSummary.projectId
+      })
+    else {
+      return
+    }
+    guard
+      let checkoutIndex = projectCatalogs[projectIndex].checkouts.firstIndex(where: {
+        $0.checkoutId == updatedSummary.checkoutId
+      })
+    else {
+      return
+    }
+
+    let projectCatalog = projectCatalogs[projectIndex]
+    let checkout = projectCatalog.checkouts[checkoutIndex]
+    let memberSessionIDs = checkout.recentActivitySessionIDs
+
+    var updatedCheckouts = projectCatalog.checkouts
+    updatedCheckouts[checkoutIndex] = CheckoutCatalog(
+      checkoutId: checkout.checkoutId,
+      title: checkout.title,
+      isWorktree: checkout.isWorktree,
+      recentActivitySessionIDs: sortedSessionIDs(
+        memberSessionIDs,
+        using: .recentActivity
+      ),
+      nameSessionIDs: sortedSessionIDs(
+        memberSessionIDs,
+        using: .name
+      ),
+      statusSessionIDs: sortedSessionIDs(
+        memberSessionIDs,
+        using: .status
+      )
+    )
+
+    var updatedProjectCatalogs = projectCatalogs
+    updatedProjectCatalogs[projectIndex] = ProjectCatalog(
+      project: projectCatalog.project,
+      checkouts: updatedCheckouts
+    )
+    projectCatalogs = updatedProjectCatalogs
   }
 
   nonisolated static func normalizedSearchCorpus(for summary: SessionSummary) -> String {

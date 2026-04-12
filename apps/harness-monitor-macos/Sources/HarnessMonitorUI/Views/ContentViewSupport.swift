@@ -192,6 +192,12 @@ struct ContentDetailColumn: View {
   let isLayoutAnimating: Bool
   @Binding var detailColumnWidth: CGFloat
 
+  private var navigationTitleText: String {
+    contentSessionDetail.selectedSessionDetail != nil
+      || contentSession.selectedSessionSummary != nil
+      ? "Cockpit" : "Dashboard"
+  }
+
   var body: some View {
     ZStack {
       if toolbarGlassReproConfiguration.disablesContentDetailChrome {
@@ -225,6 +231,7 @@ struct ContentDetailColumn: View {
         showInspector: $showInspector
       )
     }
+    .navigationTitle(navigationTitleText)
     .onChange(of: selection.inspectorSelection) { _, newValue in
       if newValue != .none, !showInspector {
         showInspector = true
