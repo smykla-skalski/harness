@@ -32,7 +32,6 @@ public struct AgentTuiWindowView: View {
   @State private var cols = 120
   @State private var isSubmitting = false
   @State private var selection: AgentTuiSheetSelection = .create
-  @State private var recentTuiIDs: [String] = []
   @State private var hasInitializedSelection = false
   @State private var wrapLines = false
   @FocusState private var focusedField: Field?
@@ -125,24 +124,7 @@ public struct AgentTuiWindowView: View {
   }
 
   private var orderedSessionIDs: [String] {
-    let currentSessionIDs = Set(store.selectedAgentTuis.map(\.tuiId))
-    var seenSessionIDs: Set<String> = []
-    var orderedIDs: [String] = []
-    orderedIDs.reserveCapacity(currentSessionIDs.count)
-
-    for sessionID in recentTuiIDs where currentSessionIDs.contains(sessionID) {
-      if seenSessionIDs.insert(sessionID).inserted {
-        orderedIDs.append(sessionID)
-      }
-    }
-
-    for tui in store.selectedAgentTuis {
-      if seenSessionIDs.insert(tui.tuiId).inserted {
-        orderedIDs.append(tui.tuiId)
-      }
-    }
-
-    return orderedIDs
+    store.selectedAgentTuis.map(\.tuiId)
   }
 
   private var currentStateMarker: String {
@@ -203,7 +185,6 @@ public struct AgentTuiWindowView: View {
       guard let selectedTuiID else {
         return
       }
-      promoteSession(selectedTuiID)
       if selection.sessionID == selectedTuiID {
         syncTerminalSize()
       }
@@ -211,7 +192,6 @@ public struct AgentTuiWindowView: View {
     .onChange(of: selection) { oldValue, newValue in
       guard case .session(let sessionID) = newValue else { return }
       guard oldValue.sessionID != sessionID else { return }
-      promoteSession(sessionID)
       store.selectAgentTui(tuiID: sessionID)
       syncTerminalSize()
     }
@@ -781,22 +761,12 @@ public struct AgentTuiWindowView: View {
     cols = selectedSessionTui.size.cols
   }
 
-  private func promoteSession(_ sessionID: String) {
-    recentTuiIDs.removeAll { candidateID in
-      candidateID == sessionID
-    }
-    recentTuiIDs.insert(sessionID, at: 0)
-  }
-
   private func reconcileSheetState(afterRefresh: Bool) {
-    recentTuiIDs = orderedSessionIDs
-
     if !hasInitializedSelection || afterRefresh {
       hasInitializedSelection = true
       if let selectedTuiID = store.selectedAgentTui?.tuiId ?? orderedSessionIDs.first {
         if selection.sessionID == nil || afterRefresh {
           selection = .session(selectedTuiID)
-          promoteSession(selectedTuiID)
           syncTerminalSize()
         }
       } else {
@@ -812,7 +782,6 @@ public struct AgentTuiWindowView: View {
     guard store.selectedAgentTuis.contains(where: { $0.tuiId == selectedTuiID }) else {
       if let fallbackTuiID = store.selectedAgentTui?.tuiId ?? orderedSessionIDs.first {
         selection = .session(fallbackTuiID)
-        promoteSession(fallbackTuiID)
         syncTerminalSize()
       } else {
         selection = .create
