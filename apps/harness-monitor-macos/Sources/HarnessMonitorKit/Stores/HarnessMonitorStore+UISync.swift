@@ -8,9 +8,7 @@ extension HarnessMonitorStore {
     case contentSession
     case contentSessionDetail
     case contentDashboard
-    case sidebarShell
-    case sidebarList
-    case sidebarFooter
+    case sidebar
     case inspector
   }
 }
@@ -52,11 +50,9 @@ extension HarnessMonitorStore {
         self?.scheduleUISync([
           .contentToolbar,
           .contentChrome,
-          .sidebarShell,
-          .sidebarList,
         ])
       case .metrics:
-        self?.scheduleUISync([.sidebarFooter])
+        self?.scheduleUISync([.sidebar])
       }
     }
     selection.onChanged = { [weak self] change in
@@ -64,7 +60,7 @@ extension HarnessMonitorStore {
       case .selectedSessionID:
         var areas: Set<UISyncArea> = [
           .contentSession,
-          .sidebarList,
+          .sidebar,
         ]
         if self?.selection.selectedSessionID == nil {
           areas.insert(.inspector)
@@ -94,7 +90,7 @@ extension HarnessMonitorStore {
       }
     }
     userData.onChanged = { [weak self] in
-      self?.scheduleUISync([.sidebarList])
+      self?.scheduleUISync([.sidebar])
     }
     sessionIndex.onChanged = { [weak self] change in
       guard let self else {
@@ -111,14 +107,14 @@ extension HarnessMonitorStore {
       case .summaryProjection(let sessionID):
         var areas: Set<UISyncArea> = [.contentToolbar]
         if self.shouldSyncSelectedSessionLoadingChrome(for: sessionID) {
-          areas.formUnion([.contentChrome, .contentSession, .inspector])
+          areas.insert(.contentSession)
         }
         self.scheduleUISync(areas)
       case .summaryMetadata(let sessionID):
         guard self.shouldSyncSelectedSessionLoadingChrome(for: sessionID) else {
           return
         }
-        self.scheduleUISync([.contentChrome, .contentSession, .inspector])
+        self.scheduleUISync([.contentSession])
       case .projection:
         break
       }
@@ -144,9 +140,7 @@ extension HarnessMonitorStore {
       .contentSession,
       .contentSessionDetail,
       .contentDashboard,
-      .sidebarShell,
-      .sidebarList,
-      .sidebarFooter,
+      .sidebar,
       .inspector,
     ])
   }
@@ -180,14 +174,8 @@ extension HarnessMonitorStore {
     if areas.contains(.contentDashboard) {
       syncContentDashboardUI()
     }
-    if areas.contains(.sidebarShell) {
-      syncSidebarShellUI()
-    }
-    if areas.contains(.sidebarList) {
-      syncSidebarListUI()
-    }
-    if areas.contains(.sidebarFooter) {
-      syncSidebarFooterUI()
+    if areas.contains(.sidebar) {
+      syncSidebarUI()
     }
     if areas.contains(.inspector) {
       syncInspectorUI()
@@ -252,15 +240,12 @@ extension HarnessMonitorStore {
 
   private func syncContentChromeUI() {
     let selectedDetail = selection.matchedSelectedSession
-    let selectedSessionSummary = sessionIndex.sessionSummary(
-      for: selection.selectedSessionID
-    )
 
     contentUI.chrome.apply(
       ContentChromeState(
         persistenceError: persistenceError,
         sessionDataAvailability: sessionDataAvailability,
-        sessionStatus: selectedDetail?.session.status ?? selectedSessionSummary?.status
+        sessionStatus: selectedDetail?.session.status
       )
     )
   }
@@ -302,29 +287,14 @@ extension HarnessMonitorStore {
     )
   }
 
-  private func syncSidebarShellUI() {
-    sidebarShellUI.apply(
-      SidebarShellUIState(
-        isPersistenceAvailable: isPersistenceAvailable,
-        searchFocusRequest: sidebarShellUI.searchFocusRequest
-      )
-    )
-  }
-
-  private func syncSidebarListUI() {
-    sidebarListUI.apply(
-      SidebarListUIState(
+  private func syncSidebarUI() {
+    sidebarUI.apply(
+      SidebarUIState(
+        connectionMetrics: connectionMetrics,
         selectedSessionID: selection.selectedSessionID,
         isPersistenceAvailable: isPersistenceAvailable,
-        bookmarkedSessionIds: userData.bookmarkedSessionIds
-      )
-    )
-  }
-
-  private func syncSidebarFooterUI() {
-    sidebarFooterUI.apply(
-      SidebarFooterUIState(
-        connectionMetrics: connectionMetrics
+        bookmarkedSessionIds: userData.bookmarkedSessionIds,
+        searchFocusRequest: sidebarUI.searchFocusRequest
       )
     )
   }

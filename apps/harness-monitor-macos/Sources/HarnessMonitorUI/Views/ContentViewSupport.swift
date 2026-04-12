@@ -189,13 +189,10 @@ struct ContentDetailColumn: View {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @Binding var showInspector: Bool
   let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  let isLayoutAnimating: Bool
-  @Binding var detailColumnWidth: CGFloat
+  let onDetailColumnWidthChange: (CGFloat) -> Void
 
   private var navigationTitleText: String {
-    contentSessionDetail.selectedSessionDetail != nil
-      || contentSession.selectedSessionSummary != nil
-      ? "Cockpit" : "Dashboard"
+    contentSessionDetail.selectedSessionDetail != nil ? "Cockpit" : "Dashboard"
   }
 
   var body: some View {
@@ -215,13 +212,7 @@ struct ContentDetailColumn: View {
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { width in
-      let nextWidth = ContentToolbarLayoutWidth.normalized(width)
-      guard !isLayoutAnimating,
-        abs(nextWidth - detailColumnWidth) >= 1
-      else {
-        return
-      }
-      detailColumnWidth = nextWidth
+      onDetailColumnWidthChange(width)
     }
     .toolbar {
       ContentPrimaryToolbarItems(
