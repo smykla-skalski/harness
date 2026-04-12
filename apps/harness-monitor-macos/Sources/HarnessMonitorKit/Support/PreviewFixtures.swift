@@ -187,7 +187,7 @@ public enum PreviewFixtures {
       runtime: "codex",
       agentId: "worker-codex",
       sessionId: summary.sessionId,
-      status: .acknowledged,
+      status: .delivered,
       signal: Signal(
         signalId: "sig-ui-1",
         version: 1,

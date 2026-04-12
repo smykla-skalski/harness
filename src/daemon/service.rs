@@ -7,6 +7,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use crate::agents::runtime as agents_runtime;
+use crate::agents::runtime::signal::{
+    AckResult, SignalAck, acknowledge_signal as write_signal_ack,
+};
 use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
@@ -564,6 +567,9 @@ pub fn session_detail(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db {
+        reconcile_expired_pending_signals_for_db(session_id, db)?;
+    }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -580,6 +586,9 @@ pub fn session_timeline(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<Vec<TimelineEntry>, CliError> {
+    if let Some(db) = db {
+        reconcile_expired_pending_signals_for_db(session_id, db)?;
+    }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -599,6 +608,9 @@ pub fn session_detail_core(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db {
+        reconcile_expired_pending_signals_for_db(session_id, db)?;
+    }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -616,6 +628,9 @@ pub fn session_extensions(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionExtensionsPayload, CliError> {
+    if let Some(db) = db {
+        reconcile_expired_pending_signals_for_db(session_id, db)?;
+    }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -1374,14 +1389,16 @@ pub fn join_session_direct(
 pub fn record_signal_ack_direct(
     session_id: &str,
     request: &super::protocol::SignalAckRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<(), CliError> {
     let project_dir = Path::new(&request.project_dir);
-    session_service::record_signal_acknowledgment(
+    record_signal_ack(
         session_id,
         &request.agent_id,
         &request.signal_id,
         request.result,
         project_dir,
+        db,
     )
 }
 
@@ -1666,6 +1683,126 @@ fn sync_after_mutation(db: Option<&super::db::DaemonDb>, session_id: &str) {
     }
 }
 
+fn record_signal_ack(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    result: AckResult,
+    project_dir: &Path,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<(), CliError> {
+    let Some(db) = db else {
+        return session_service::record_signal_acknowledgment(
+            session_id,
+            agent_id,
+            signal_id,
+            result,
+            project_dir,
+        );
+    };
+    let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+        return session_service::record_signal_acknowledgment(
+            session_id,
+            agent_id,
+            signal_id,
+            result,
+            project_dir,
+        );
+    };
+
+    let already_logged = db.load_session_log(session_id)?.into_iter().any(|entry| {
+        matches!(
+            entry.transition,
+            SessionTransition::SignalAcknowledged { signal_id: ref existing, .. }
+                if existing == signal_id
+        )
+    });
+    if already_logged {
+        return Ok(());
+    }
+
+    let now = utc_now();
+    let signal = session_service::load_signal_record_for_agent_from_state(
+        &state,
+        agent_id,
+        signal_id,
+        project_dir,
+    )?;
+    let result = signal.as_ref().map_or(result, |signal| {
+        session_service::normalize_signal_ack_result(&signal.signal, result)
+    });
+    let mut started_task = None;
+
+    if let Some(signal) = signal.as_ref() {
+        started_task = session_service::apply_signal_ack_result(
+            &mut state,
+            agent_id,
+            &signal.signal,
+            result,
+            &now,
+        );
+        session_service::refresh_session(&mut state, &now);
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+    }
+
+    if let Some(task_id) = started_task.as_deref() {
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_task_assigned(task_id, agent_id),
+            Some(agent_id),
+            None,
+        ))?;
+    }
+
+    db.append_log_entry(&build_log_entry(
+        session_id,
+        session_service::log_signal_acknowledged(signal_id, agent_id, result),
+        Some(agent_id),
+        None,
+    ))?;
+    refresh_signal_index_for_db(db, session_id)?;
+    db.bump_change(session_id)?;
+    db.bump_change("global")?;
+    Ok(())
+}
+
+fn reconcile_expired_pending_signals_for_db(
+    session_id: &str,
+    db: &super::db::DaemonDb,
+) -> Result<(), CliError> {
+    let Some(state) = db.load_session_state_for_mutation(session_id)? else {
+        return Ok(());
+    };
+    let Some(project_dir) = db.project_dir_for_session(session_id)? else {
+        return Ok(());
+    };
+    let project_dir = PathBuf::from(project_dir);
+    let expired = session_service::collect_expired_pending_signals_for_state(&state, &project_dir)?;
+    for signal in expired {
+        let ack = SignalAck {
+            signal_id: signal.signal.signal_id.clone(),
+            acknowledged_at: utc_now(),
+            result: AckResult::Expired,
+            agent: signal.signal_session_id.clone(),
+            session_id: session_id.to_string(),
+            details: Some("expired before agent acknowledged delivery".to_string()),
+        };
+        write_signal_ack(&signal.signal_dir, &ack)?;
+        record_signal_ack(
+            session_id,
+            &signal.agent_id,
+            &signal.signal.signal_id,
+            AckResult::Expired,
+            &project_dir,
+            Some(db),
+        )?;
+    }
+    Ok(())
+}
+
 fn refresh_signal_index_for_db(db: &super::db::DaemonDb, session_id: &str) -> Result<(), CliError> {
     let resolved = db
         .resolve_session(session_id)?
@@ -1799,12 +1936,6 @@ fn append_task_drop_effect_logs(
     for effect in effects {
         match effect {
             session_service::TaskDropEffect::Started(signal) => {
-                db.append_log_entry(&build_log_entry(
-                    session_id,
-                    session_service::log_task_assigned(&signal.task_id, &signal.agent_id),
-                    Some(actor_id),
-                    None,
-                ))?;
                 db.append_log_entry(&build_log_entry(
                     session_id,
                     session_service::log_signal_sent(
@@ -2643,6 +2774,229 @@ mod tests {
                 .collect();
             assert!(messages.contains(&"first signal"));
             assert!(messages.contains(&"second signal"));
+        });
+    }
+
+    #[test]
+    fn task_start_ack_db_direct_starts_work_only_after_delivery() {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let leader_id = state.leader_id.clone().expect("leader id");
+            let worker_session_id = "db-task-delivery-worker";
+            let worker_id = join_db_codex_worker(&db, &state, project, worker_session_id);
+
+            let created = create_task(
+                &state.session_id,
+                &TaskCreateRequest {
+                    actor: leader_id.clone(),
+                    title: "Start after delivery".into(),
+                    context: None,
+                    severity: crate::session::types::TaskSeverity::Medium,
+                    suggested_fix: None,
+                },
+                Some(&db),
+            )
+            .expect("create task");
+            let task_id = created.tasks[0].task_id.clone();
+
+            let dropped = drop_task(
+                &state.session_id,
+                &task_id,
+                &TaskDropRequest {
+                    actor: leader_id,
+                    target: super::super::protocol::TaskDropTarget::Agent {
+                        agent_id: worker_id.clone(),
+                    },
+                    queue_policy: crate::session::types::TaskQueuePolicy::Locked,
+                },
+                Some(&db),
+            )
+            .expect("drop task");
+
+            let pending_task = dropped
+                .tasks
+                .iter()
+                .find(|task| task.task_id == task_id)
+                .expect("pending task");
+            assert_eq!(pending_task.status, crate::session::types::TaskStatus::Open);
+            assert_eq!(
+                pending_task.assigned_to.as_deref(),
+                Some(worker_id.as_str())
+            );
+            assert!(pending_task.queued_at.is_none());
+            let worker = dropped
+                .agents
+                .iter()
+                .find(|agent| agent.agent_id == worker_id)
+                .expect("worker");
+            assert!(worker.current_task_id.is_none());
+            assert!(
+                !db.load_session_log(&state.session_id)
+                    .expect("session log")
+                    .into_iter()
+                    .any(|entry| matches!(
+                        entry.transition,
+                        SessionTransition::TaskAssigned { ref task_id, ref agent_id }
+                            if task_id == &pending_task.task_id && agent_id == &worker_id
+                    ))
+            );
+
+            let signal = dropped
+                .signals
+                .iter()
+                .find(|signal| signal.agent_id == worker_id)
+                .expect("task signal");
+            let signal_id = signal.signal.signal_id.clone();
+            let runtime = runtime::runtime_for_name("codex").expect("codex runtime");
+            let signal_dir = runtime.signal_dir(project, worker_session_id);
+            runtime::signal::acknowledge_signal(
+                &signal_dir,
+                &SignalAck {
+                    signal_id: signal_id.clone(),
+                    acknowledged_at: utc_now(),
+                    result: AckResult::Accepted,
+                    agent: worker_session_id.to_string(),
+                    session_id: state.session_id.clone(),
+                    details: None,
+                },
+            )
+            .expect("write signal ack");
+
+            record_signal_ack_direct(
+                &state.session_id,
+                &super::super::protocol::SignalAckRequest {
+                    agent_id: worker_id.clone(),
+                    signal_id,
+                    result: AckResult::Accepted,
+                    project_dir: project.to_string_lossy().into_owned(),
+                },
+                Some(&db),
+            )
+            .expect("record signal ack");
+
+            let detail = session_detail(&state.session_id, Some(&db)).expect("session detail");
+            let active_task = detail
+                .tasks
+                .iter()
+                .find(|task| task.task_id == task_id)
+                .expect("active task");
+            assert_eq!(
+                active_task.status,
+                crate::session::types::TaskStatus::InProgress
+            );
+            let worker = detail
+                .agents
+                .iter()
+                .find(|agent| agent.agent_id == worker_id)
+                .expect("worker");
+            assert_eq!(worker.current_task_id.as_deref(), Some(task_id.as_str()));
+            assert!(
+                detail
+                    .signals
+                    .iter()
+                    .any(|signal| signal.status == SessionSignalStatus::Delivered)
+            );
+            assert!(
+                db.load_session_log(&state.session_id)
+                    .expect("session log")
+                    .into_iter()
+                    .any(|entry| matches!(
+                        entry.transition,
+                        SessionTransition::TaskAssigned { ref task_id, ref agent_id }
+                            if task_id == &active_task.task_id && agent_id == &worker_id
+                    ))
+            );
+        });
+    }
+
+    #[test]
+    fn session_detail_core_db_direct_reopens_expired_pending_delivery() {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let leader_id = state.leader_id.clone().expect("leader id");
+            let worker_session_id = "db-task-expired-worker";
+            let worker_id = join_db_codex_worker(&db, &state, project, worker_session_id);
+
+            let created = create_task(
+                &state.session_id,
+                &TaskCreateRequest {
+                    actor: leader_id.clone(),
+                    title: "Expire before delivery".into(),
+                    context: None,
+                    severity: crate::session::types::TaskSeverity::Medium,
+                    suggested_fix: None,
+                },
+                Some(&db),
+            )
+            .expect("create task");
+            let task_id = created.tasks[0].task_id.clone();
+
+            let dropped = drop_task(
+                &state.session_id,
+                &task_id,
+                &TaskDropRequest {
+                    actor: leader_id,
+                    target: super::super::protocol::TaskDropTarget::Agent {
+                        agent_id: worker_id.clone(),
+                    },
+                    queue_policy: crate::session::types::TaskQueuePolicy::Locked,
+                },
+                Some(&db),
+            )
+            .expect("drop task");
+
+            let signal = dropped
+                .signals
+                .iter()
+                .find(|signal| signal.agent_id == worker_id)
+                .expect("task signal")
+                .signal
+                .clone();
+            let runtime = runtime::runtime_for_name("codex").expect("codex runtime");
+            let signal_dir = runtime.signal_dir(project, worker_session_id);
+            let expired_signal = crate::agents::runtime::signal::Signal {
+                expires_at: "2000-01-01T00:00:00Z".into(),
+                ..signal
+            };
+            fs::write(
+                signal_dir
+                    .join("pending")
+                    .join(format!("{}.json", expired_signal.signal_id)),
+                serde_json::to_string_pretty(&expired_signal).expect("serialize expired signal"),
+            )
+            .expect("rewrite expired signal");
+
+            let core = session_detail_core(&state.session_id, Some(&db)).expect("core detail");
+            let reopened_task = core
+                .tasks
+                .iter()
+                .find(|task| task.task_id == task_id)
+                .expect("reopened task");
+            assert_eq!(
+                reopened_task.status,
+                crate::session::types::TaskStatus::Open
+            );
+            assert!(reopened_task.assigned_to.is_none());
+            let worker = core
+                .agents
+                .iter()
+                .find(|agent| agent.agent_id == worker_id)
+                .expect("worker");
+            assert!(worker.current_task_id.is_none());
+
+            let extensions =
+                session_extensions(&state.session_id, Some(&db)).expect("session extensions");
+            let signal = extensions
+                .signals
+                .expect("signals")
+                .into_iter()
+                .find(|signal| signal.agent_id == worker_id)
+                .expect("expired signal");
+            assert_eq!(signal.status, SessionSignalStatus::Expired);
+            assert_eq!(
+                signal.acknowledgment.expect("ack").result,
+                AckResult::Expired
+            );
         });
     }
 

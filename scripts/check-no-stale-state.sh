@@ -5,15 +5,64 @@
 set -euo pipefail
 
 readonly RESET_HINT="run 'mise run clean:stale' to reset"
-readonly HARNESS_DEBUG_PROCESS_PATTERN='target/(debug|dev/[^/]+/debug)/harness (daemon|bridge)'
+readonly APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
+readonly GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$APP_GROUP_ID/harness/daemon"
+readonly APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/harness/daemon"
 
 stale=()
 
+matching_process_pids() {
+  local process_kind="$1"
+
+  ps -Ao pid=,command= | awk -v process_kind="$process_kind" '
+    {
+      pid = $1
+      $1 = ""
+      sub(/^ +/, "", $0)
+      matched = 0
+      if (process_kind == "debug" && $0 ~ /target\/(debug|dev\/.*\/debug)\/harness (daemon|bridge)/) {
+        matched = 1
+      }
+      if (process_kind == "live" && $0 ~ /(^|\/)harness (daemon serve|bridge start)( |$)/) {
+        matched = 1
+      }
+      if (matched == 1) {
+        print pid
+      }
+    }
+  '
+}
+
+root_lock_holder_pids() {
+  local root="$1"
+  local lock_path
+
+  [[ -d "$root" ]] || return 0
+
+  for lock_path in "$root/daemon.lock" "$root/bridge.lock"; do
+    [[ -e "$lock_path" ]] || continue
+    lsof -t "$lock_path" 2>/dev/null || true
+  done | sort -u
+}
+
 # 1. Orphan local debug harness daemon or bridge processes (leak vector for
 #    perf audits or integration tests that crashed mid-run before cleanup ran).
-orphans="$(pgrep -f "$HARNESS_DEBUG_PROCESS_PATTERN" 2>/dev/null || true)"
+orphans="$(matching_process_pids debug)"
 if [[ -n "$orphans" ]]; then
   stale+=("orphan local debug harness processes: $(echo "$orphans" | tr '\n' ' ')")
+fi
+
+# 1b. Live installed/manual harness bridge or daemon processes are stale only
+#     when they still hold the well-known daemon/bridge locks for the user's
+#     real Harness roots.
+group_lock_holders="$(root_lock_holder_pids "$GROUP_CONTAINER_ROOT")"
+if [[ -n "$group_lock_holders" ]]; then
+  stale+=("live harness lock holders in $GROUP_CONTAINER_ROOT: $(echo "$group_lock_holders" | tr '\n' ' ')")
+fi
+
+app_support_lock_holders="$(root_lock_holder_pids "$APPLICATION_SUPPORT_ROOT")"
+if [[ -n "$app_support_lock_holders" ]]; then
+  stale+=("live harness lock holders in $APPLICATION_SUPPORT_ROOT: $(echo "$app_support_lock_holders" | tr '\n' ' ')")
 fi
 
 # 2. Stale /tmp bridge sockets. The sandboxed daemon now uses a Group

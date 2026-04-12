@@ -154,6 +154,40 @@ struct HarnessMonitorSessionModelsTests {
     #expect(item.assignmentSummary == "Queued for worker-codex")
   }
 
+  @Test("Work item decoding exposes pending delivery assignment copy")
+  func workItemDecodingExposesPendingDeliveryCopy() throws {
+    let json = """
+      {
+        "task_id": "task-delivery",
+        "title": "Deliver task start signal",
+        "severity": "medium",
+        "status": "open",
+        "assigned_to": "worker-codex",
+        "created_at": "2026-04-10T07:58:00Z",
+        "updated_at": "2026-04-10T08:00:00Z"
+      }
+      """
+
+    let item = try decoder.decode(WorkItem.self, from: Data(json.utf8))
+
+    #expect(item.isPendingDelivery)
+    #expect(!item.isQueuedForWorker)
+    #expect(item.assignmentSummary == "Pending delivery to worker-codex")
+  }
+
+  @Test("Session signal status decodes legacy acknowledged and encodes delivered")
+  func sessionSignalStatusPreservesLegacyDecodeAndNewEncode() throws {
+    let decoded = try decoder.decode(
+      SessionSignalStatus.self,
+      from: Data(#""acknowledged""#.utf8)
+    )
+    #expect(decoded == .delivered)
+
+    let encoded = try encoder.encode(SessionSignalStatus.delivered)
+    let encodedValue = try #require(String(data: encoded, encoding: .utf8))
+    #expect(encodedValue == #""delivered""#)
+  }
+
   @Test("Task drop request encodes daemon wire values")
   func taskDropRequestEncodesDaemonWireValues() throws {
     let request = TaskDropRequest(

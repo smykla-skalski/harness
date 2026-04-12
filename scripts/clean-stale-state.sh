@@ -11,7 +11,55 @@ readonly GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$APP_GROUP_ID/harn
 readonly APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/harness/daemon"
 readonly MONITOR_APP_PATTERN='/Harness Monitor[.]app/Contents/MacOS/Harness Monitor'
 readonly LAUNCHD_LABEL="io.harnessmonitor.daemon"
-readonly HARNESS_DEBUG_PROCESS_PATTERN='target/(debug|dev/[^/]+/debug)/harness (daemon|bridge)'
+
+kill_matching_processes() {
+  local process_kind="$1"
+  local label="$2"
+  local pids
+
+  pids="$(matching_process_pids "$process_kind")"
+  if [[ -z "$pids" ]]; then
+    return
+  fi
+
+  echo "killing $label..."
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -TERM "$pid" 2>/dev/null || true
+  done <<<"$pids"
+  sleep 1
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -KILL "$pid" 2>/dev/null || true
+  done <<<"$pids"
+}
+
+matching_process_pids() {
+  local process_kind="$1"
+
+  ps -Ao pid=,command= | awk -v process_kind="$process_kind" '
+    {
+      pid = $1
+      $1 = ""
+      sub(/^ +/, "", $0)
+      if (process_kind == "debug" && $0 ~ /target\/(debug|dev\/.*\/debug)\/harness (daemon|bridge)/) {
+        print pid
+      }
+    }
+  '
+}
+
+root_lock_holder_pids() {
+  local root="$1"
+  local lock_path
+
+  [[ -d "$root" ]] || return 0
+
+  for lock_path in "$root/daemon.lock" "$root/bridge.lock"; do
+    [[ -e "$lock_path" ]] || continue
+    lsof -t "$lock_path" 2>/dev/null || true
+  done | sort -u
+}
 
 quit_monitor_app() {
   if ! pgrep -f "$MONITOR_APP_PATTERN" >/dev/null 2>&1; then
@@ -41,13 +89,35 @@ stop_launchd_daemon() {
 }
 
 kill_orphan_harness_processes() {
-  if ! pgrep -f "$HARNESS_DEBUG_PROCESS_PATTERN" >/dev/null 2>&1; then
+  kill_matching_processes debug "orphan local debug harness processes"
+}
+
+kill_live_harness_processes() {
+  local root="$1"
+  local pids
+
+  pids="$(root_lock_holder_pids "$root")"
+  if [[ -z "$pids" ]]; then
     return
   fi
-  echo "killing orphan local debug harness processes..."
-  pkill -TERM -f "$HARNESS_DEBUG_PROCESS_PATTERN" 2>/dev/null || true
+
+  echo "stopping live harness lock holders in $root..."
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -TERM "$pid" 2>/dev/null || true
+  done <<<"$pids"
   sleep 1
-  pkill -KILL -f "$HARNESS_DEBUG_PROCESS_PATTERN" 2>/dev/null || true
+
+  pids="$(root_lock_holder_pids "$root")"
+  if [[ -z "$pids" ]]; then
+    return
+  fi
+
+  echo "force-stopping stubborn harness lock holders in $root..."
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -KILL "$pid" 2>/dev/null || true
+  done <<<"$pids"
 }
 
 remove_tmp_bridge_sockets() {
@@ -87,6 +157,8 @@ wipe_stale_bridge_state() {
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
+kill_live_harness_processes "$GROUP_CONTAINER_ROOT"
+kill_live_harness_processes "$APPLICATION_SUPPORT_ROOT"
 remove_tmp_bridge_sockets
 wipe_stale_bridge_state
 
