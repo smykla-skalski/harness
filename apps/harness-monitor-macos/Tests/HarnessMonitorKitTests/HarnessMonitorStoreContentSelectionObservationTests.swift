@@ -234,9 +234,9 @@ struct HarnessMonitorContentSelectionTests {
     let didChange = await didInvalidate(
       {
         (
-          store.commandsUI.hasSelectedSession,
-          store.commandsUI.bookmarkTitle,
-          store.commandsUI.hasObserver
+          store.commandsUI.displayState.hasSelectedSession,
+          store.commandsUI.displayState.bookmarkTitle,
+          store.commandsUI.displayState.hasObserver
         )
       },
       after: {
@@ -245,10 +245,10 @@ struct HarnessMonitorContentSelectionTests {
     )
 
     #expect(didChange)
-    #expect(store.commandsUI.hasSelectedSession)
-    #expect(store.commandsUI.hasObserver)
+    #expect(store.commandsUI.displayState.hasSelectedSession)
+    #expect(store.commandsUI.displayState.hasObserver)
     #expect(
-      store.commandsUI.bookmarkTitle
+      store.commandsUI.displayState.bookmarkTitle
         == (store.isPersistenceAvailable ? "Bookmark Session" : "Bookmarks Unavailable")
     )
   }
