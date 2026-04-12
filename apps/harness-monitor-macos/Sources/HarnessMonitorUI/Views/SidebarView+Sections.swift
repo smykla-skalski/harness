@@ -161,7 +161,7 @@ struct SidebarSessionListContent: View {
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
     let isSelectedForUITest =
-      HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
+      HarnessMonitorUITestEnvironment.selectionMarkersEnabled
       && renderState.selectedSessionIDForAccessibilityMarkers == session.sessionId
     let row = SidebarSessionListLinkRow(
       session: session,
