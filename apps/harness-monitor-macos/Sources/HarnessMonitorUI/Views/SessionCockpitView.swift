@@ -10,15 +10,25 @@ struct SessionCockpitView: View {
   @Environment(\.openWindow) private var openWindow
 
   private var tuiStatusByAgent: [String: AgentTuiStatus] {
-    var result: [String: AgentTuiStatus] = [:]
-    result.reserveCapacity(store.selectedAgentTuis.count)
+    var snapshotStatus: [String: AgentTuiStatus] = [:]
+    snapshotStatus.reserveCapacity(store.selectedAgentTuis.count)
     for tui in store.selectedAgentTuis {
-      if let existing = result[tui.agentId] {
+      if let existing = snapshotStatus[tui.agentId] {
         if tui.status.isActive && !existing.isActive {
-          result[tui.agentId] = tui.status
+          snapshotStatus[tui.agentId] = tui.status
         }
       } else {
-        result[tui.agentId] = tui.status
+        snapshotStatus[tui.agentId] = tui.status
+      }
+    }
+
+    var result: [String: AgentTuiStatus] = [:]
+    result.reserveCapacity(detail.agents.count)
+    for agent in detail.agents {
+      if let status = snapshotStatus[agent.agentId] {
+        result[agent.agentId] = status
+      } else if agent.capabilities.contains("agent-tui") {
+        result[agent.agentId] = agent.status == .active ? .running : .exited
       }
     }
     return result

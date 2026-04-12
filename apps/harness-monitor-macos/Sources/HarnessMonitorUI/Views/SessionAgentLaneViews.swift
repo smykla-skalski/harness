@@ -139,20 +139,21 @@ struct SessionAgentSummaryCard: View {
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
               .lineLimit(2)
             Spacer()
-            Text(agent.role.title)
-              .scaledFont(.caption.bold())
-              .harnessPillPadding()
-              .background(roleTint, in: Capsule())
-              .foregroundStyle(roleForeground)
-            if tuiStatus != nil {
-              Image(systemName: "terminal.fill")
-                .foregroundStyle(tuiMarkerColor)
-                .imageScale(.small)
-                .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
-                .accessibilityIdentifier(
-                  HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
-                )
-                .harnessUITestValue(tuiStatus?.rawValue ?? "")
+            HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+              Text(agent.role.title)
+                .scaledFont(.caption.bold())
+                .harnessPillPadding()
+                .background(roleTint, in: Capsule())
+                .foregroundStyle(roleForeground)
+              if tuiStatus != nil {
+                Image(systemName: "terminal.fill")
+                  .foregroundStyle(tuiMarkerColor)
+                  .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
+                  .accessibilityIdentifier(
+                    HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
+                  )
+                  .harnessUITestValue(tuiStatus?.rawValue ?? "")
+              }
             }
           }
           Text(metadataLine)
