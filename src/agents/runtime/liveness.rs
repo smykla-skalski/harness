@@ -31,6 +31,35 @@ impl Default for LivenessConfig {
     }
 }
 
+/// Determine the liveness status from a last-activity timestamp string.
+///
+/// Returns `Unresponsive` if the timestamp is `None` or unparseable.
+#[must_use]
+pub fn liveness_from_timestamp(
+    last_activity: Option<&str>,
+    config: &LivenessConfig,
+) -> LivenessStatus {
+    let Some(timestamp) = last_activity else {
+        return LivenessStatus::Unresponsive;
+    };
+    let Ok(activity_time) = chrono::DateTime::parse_from_rfc3339(timestamp) else {
+        return LivenessStatus::Unresponsive;
+    };
+
+    let elapsed = chrono::Utc::now()
+        .signed_duration_since(activity_time)
+        .num_seconds()
+        .unsigned_abs();
+
+    if elapsed < config.active_threshold_seconds {
+        LivenessStatus::Active
+    } else if elapsed < config.unresponsive_timeout_seconds {
+        LivenessStatus::Idle
+    } else {
+        LivenessStatus::Unresponsive
+    }
+}
+
 /// Determine the liveness status of an agent session.
 ///
 /// # Errors
@@ -43,24 +72,5 @@ pub fn check_liveness(
 ) -> Result<LivenessStatus, CliError> {
     let runtime = super::runtime_for(agent);
     let last = runtime.last_activity(project_dir, session_id)?;
-    let Some(last_activity) = last else {
-        return Ok(LivenessStatus::Unresponsive);
-    };
-
-    let Ok(activity_time) = chrono::DateTime::parse_from_rfc3339(&last_activity) else {
-        return Ok(LivenessStatus::Unresponsive);
-    };
-
-    let elapsed = chrono::Utc::now()
-        .signed_duration_since(activity_time)
-        .num_seconds()
-        .unsigned_abs();
-
-    if elapsed < config.active_threshold_seconds {
-        Ok(LivenessStatus::Active)
-    } else if elapsed < config.unresponsive_timeout_seconds {
-        Ok(LivenessStatus::Idle)
-    } else {
-        Ok(LivenessStatus::Unresponsive)
-    }
+    Ok(liveness_from_timestamp(last.as_deref(), config))
 }
