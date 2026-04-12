@@ -1,3 +1,4 @@
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -5,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use harness::daemon::agent_tui::{AgentTuiSnapshot, AgentTuiStatus};
 use harness::daemon::bridge::BridgeStatusReport;
-use harness::daemon::protocol::SessionMutationResponse;
+use harness::daemon::protocol::{CodexRunSnapshot, CodexRunStatus, SessionMutationResponse};
 use harness::daemon::service::DaemonStatusReport;
 use harness::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 use harness::session::types::SessionState;
@@ -536,6 +537,83 @@ fn sandboxed_codex_run_returns_501_when_bridge_excludes_codex() {
     assert_eq!(http_status, 501, "unexpected body: {body}");
     assert_eq!(body["error"], "sandbox-disabled");
     assert_eq!(body["feature"], "codex.host-bridge");
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn sandboxed_codex_run_succeeds_immediately_after_bridge_start_with_codex() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let _initial_status = wait_for_daemon_ready(&home, &xdg);
+    let mut bridge = spawn_bridge(
+        &home,
+        &xdg,
+        &[
+            "--capability",
+            "codex",
+            "--codex-port",
+            &codex_port_text,
+            "--codex-path",
+            mock_codex.to_str().expect("utf8 codex path"),
+        ],
+    );
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
+
+    let project_arg = project.to_str().expect("utf8 project");
+    let session = start_session_via_http(
+        &home,
+        &xdg,
+        project_arg,
+        "sandboxed-codex-run-ready-bridge",
+        "bridge readiness coverage",
+        "verify codex runs queue immediately after bridge startup",
+    );
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+
+    let (http_status, body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/sessions/{}/codex-runs", session.session_id),
+        json!({
+            "prompt": "verify queued codex run after readiness-gated bridge start",
+            "mode": "report",
+        }),
+    );
+    assert_eq!(http_status, 200, "unexpected body: {body}");
+    let snapshot: CodexRunSnapshot =
+        serde_json::from_value(body).expect("parse codex run snapshot");
+    assert_eq!(snapshot.session_id, session.session_id);
+    assert_eq!(snapshot.status, CodexRunStatus::Queued);
+    assert_eq!(
+        snapshot.mode,
+        harness::daemon::protocol::CodexRunMode::Report
+    );
+    assert!(
+        snapshot.run_id.starts_with("codex-"),
+        "unexpected run id: {}",
+        snapshot.run_id
+    );
 
     let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
     assert!(
@@ -1255,7 +1333,7 @@ if [ "$1" = "--version" ]; then
   exit 0
 fi
 
-python3 - "$@" <<'PY'
+exec python3 - "$@" <<'PY'
 import socket
 import sys
 
@@ -1315,6 +1393,14 @@ PY
     )
     .expect("chmod mock codex");
     script
+}
+
+fn unused_local_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("bind local port")
+        .local_addr()
+        .expect("read local addr")
+        .port()
 }
 
 fn harness_binary() -> PathBuf {

@@ -150,7 +150,7 @@ if [ "$1" = "--version" ]; then
   exit 0
 fi
 
-python3 - "$@" <<'PY'
+exec python3 - "$@" <<'PY'
 import socket
 import sys
 
