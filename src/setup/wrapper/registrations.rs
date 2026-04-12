@@ -30,7 +30,9 @@ pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistrat
 
     match agent {
         HookAgent::Claude => registrations.extend(claude_hooks(agent)),
-        HookAgent::Codex | HookAgent::OpenCode => registrations.extend(codex_hooks(agent)),
+        HookAgent::Codex => registrations.extend(codex_hooks(agent)),
+        HookAgent::Vibe => registrations.extend(vibe_hooks(agent)),
+        HookAgent::OpenCode => registrations.extend(opencode_hooks(agent)),
         HookAgent::Copilot => registrations.extend(copilot_hooks(agent)),
         HookAgent::Gemini => registrations.extend(gemini_hooks(agent)),
     }
@@ -39,6 +41,18 @@ pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistrat
 }
 
 fn codex_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    shared_runtime_hooks(agent)
+}
+
+fn vibe_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    shared_runtime_hooks(agent)
+}
+
+fn opencode_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    shared_runtime_hooks(agent)
+}
+
+fn shared_runtime_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     vec![
         command_registration(
             "prompt-submit",
@@ -158,6 +172,7 @@ pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
         HookAgent::Gemini => ("\"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\"", "gemini"),
         HookAgent::Codex => ("\"$PWD\"", "codex"),
         HookAgent::Copilot => ("\"$PWD\"", "copilot"),
+        HookAgent::Vibe => ("\"$PWD\"", "vibe"),
         HookAgent::OpenCode => ("\"$PWD\"", "opencode"),
     };
     match subcommand {

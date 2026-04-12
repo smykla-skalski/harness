@@ -131,6 +131,7 @@ fn agent_asset_target(agent: HookAgent) -> AgentAssetTarget {
         HookAgent::Codex => AgentAssetTarget::Codex,
         HookAgent::Gemini => AgentAssetTarget::Gemini,
         HookAgent::Copilot => AgentAssetTarget::Copilot,
+        HookAgent::Vibe => AgentAssetTarget::Vibe,
         HookAgent::OpenCode => AgentAssetTarget::OpenCode,
     }
 }
@@ -147,6 +148,7 @@ pub(crate) fn planned_agent_bootstrap_files(
             .join("harness.json"),
         HookAgent::Codex => project_dir.join(".codex").join("hooks.json"),
         HookAgent::Gemini => project_dir.join(".gemini").join("settings.json"),
+        HookAgent::Vibe => project_dir.join(".vibe").join("hooks.json"),
         HookAgent::OpenCode => project_dir.join(".opencode").join("hooks.json"),
     };
     let registrations = process_agent_registrations(agent);

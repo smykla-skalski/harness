@@ -3,6 +3,7 @@ mod codex;
 mod copilot;
 mod gemini;
 mod opencode;
+mod vibe;
 
 use std::path::PathBuf;
 
@@ -22,6 +23,7 @@ pub use codex::CodexAdapter;
 pub use copilot::CopilotAdapter;
 pub use gemini::GeminiAdapter;
 pub use opencode::OpenCodeAdapter;
+pub use vibe::VibeAdapter;
 
 /// Supported hook transports/adapters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -31,6 +33,8 @@ pub enum HookAgent {
     Copilot,
     Codex,
     Gemini,
+    #[value(name = "vibe")]
+    Vibe,
     #[value(name = "opencode")]
     OpenCode,
 }
@@ -184,6 +188,7 @@ pub fn adapter_for(agent: HookAgent) -> &'static dyn AgentAdapter {
     static COPILOT: CopilotAdapter = CopilotAdapter;
     static CODEX: CodexAdapter = CodexAdapter;
     static GEMINI: GeminiAdapter = GeminiAdapter;
+    static VIBE: VibeAdapter = VibeAdapter;
     static OPENCODE: OpenCodeAdapter = OpenCodeAdapter;
 
     match agent {
@@ -191,6 +196,7 @@ pub fn adapter_for(agent: HookAgent) -> &'static dyn AgentAdapter {
         HookAgent::Copilot => &COPILOT,
         HookAgent::Codex => &CODEX,
         HookAgent::Gemini => &GEMINI,
+        HookAgent::Vibe => &VIBE,
         HookAgent::OpenCode => &OPENCODE,
     }
 }

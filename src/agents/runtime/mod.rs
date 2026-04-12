@@ -6,6 +6,7 @@ mod gemini;
 pub mod liveness;
 mod opencode;
 pub mod signal;
+mod vibe;
 
 use std::path::{Path, PathBuf};
 
@@ -21,6 +22,7 @@ use self::event::ConversationEvent;
 use self::gemini::GeminiRuntime;
 use self::opencode::OpenCodeRuntime;
 use self::signal::{Signal, SignalAck};
+use self::vibe::VibeRuntime;
 
 pub(crate) use self::claude::parse_common_jsonl as parse_canonical_conversation_line;
 
@@ -156,6 +158,7 @@ pub fn runtime_for(agent: HookAgent) -> &'static dyn AgentRuntime {
     static CODEX: CodexRuntime = CodexRuntime;
     static GEMINI: GeminiRuntime = GeminiRuntime;
     static COPILOT: CopilotRuntime = CopilotRuntime;
+    static VIBE: VibeRuntime = VibeRuntime;
     static OPENCODE: OpenCodeRuntime = OpenCodeRuntime;
 
     match agent {
@@ -163,21 +166,29 @@ pub fn runtime_for(agent: HookAgent) -> &'static dyn AgentRuntime {
         HookAgent::Codex => &CODEX,
         HookAgent::Gemini => &GEMINI,
         HookAgent::Copilot => &COPILOT,
+        HookAgent::Vibe => &VIBE,
         HookAgent::OpenCode => &OPENCODE,
+    }
+}
+
+/// Resolve a hook agent from a runtime name, including legacy aliases.
+#[must_use]
+pub fn hook_agent_for_runtime_name(name: &str) -> Option<HookAgent> {
+    match name {
+        "claude" => Some(HookAgent::Claude),
+        "codex" => Some(HookAgent::Codex),
+        "gemini" => Some(HookAgent::Gemini),
+        "copilot" => Some(HookAgent::Copilot),
+        "vibe" => Some(HookAgent::Vibe),
+        "opencode" => Some(HookAgent::OpenCode),
+        _ => None,
     }
 }
 
 /// Resolve a runtime adapter from its stored string identifier.
 #[must_use]
 pub fn runtime_for_name(name: &str) -> Option<&'static dyn AgentRuntime> {
-    match name {
-        "claude" => Some(runtime_for(HookAgent::Claude)),
-        "codex" => Some(runtime_for(HookAgent::Codex)),
-        "gemini" => Some(runtime_for(HookAgent::Gemini)),
-        "copilot" => Some(runtime_for(HookAgent::Copilot)),
-        "opencode" => Some(runtime_for(HookAgent::OpenCode)),
-        _ => None,
-    }
+    hook_agent_for_runtime_name(name).map(runtime_for)
 }
 
 /// Candidate session keys to inspect for signal delivery.
@@ -201,4 +212,31 @@ pub fn signal_session_keys(
         keys.push(orchestration_session_id.to_string());
     }
     keys
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{hook_agent_for_runtime_name, runtime_for_name};
+    use crate::hooks::adapters::HookAgent;
+
+    #[test]
+    fn hook_agent_resolution_accepts_vibe_and_opencode() {
+        assert_eq!(hook_agent_for_runtime_name("vibe"), Some(HookAgent::Vibe));
+        assert_eq!(
+            hook_agent_for_runtime_name("opencode"),
+            Some(HookAgent::OpenCode)
+        );
+    }
+
+    #[test]
+    fn runtime_adapter_resolution_accepts_vibe_and_opencode() {
+        assert_eq!(
+            runtime_for_name("vibe").map(crate::agents::runtime::AgentRuntime::name),
+            Some("vibe")
+        );
+        assert_eq!(
+            runtime_for_name("opencode").map(crate::agents::runtime::AgentRuntime::name),
+            Some("opencode")
+        );
+    }
 }
