@@ -71,12 +71,12 @@ public enum AgentTuiPreviewSupport {
     ),
     snapshot(
       tuiID: "preview-agent-tui-5",
-      agentID: "preview-agent-opencode",
-      runtime: .opencode,
+      agentID: "preview-agent-codex-2",
+      runtime: .codex,
       status: .running,
       rows: 32,
       cols: 120,
-      text: "opencode> replaying terminal script"
+      text: "codex> replaying terminal script"
     ),
     snapshot(
       tuiID: "preview-agent-tui-6",

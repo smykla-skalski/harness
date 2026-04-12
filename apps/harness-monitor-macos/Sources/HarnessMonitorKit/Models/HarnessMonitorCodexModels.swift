@@ -136,8 +136,8 @@ public enum AgentTuiRuntime: String, Codable, CaseIterable, Identifiable, Sendab
   case codex
   case claude
   case gemini
-  case opencode
   case copilot
+  case vibe
 
   public var id: String { rawValue }
 
@@ -149,10 +149,10 @@ public enum AgentTuiRuntime: String, Codable, CaseIterable, Identifiable, Sendab
       "Claude"
     case .gemini:
       "Gemini"
-    case .opencode:
-      "OpenCode"
     case .copilot:
       "Copilot"
+    case .vibe:
+      "Vibe"
     }
   }
 }
