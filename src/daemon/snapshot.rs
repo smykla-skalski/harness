@@ -529,7 +529,7 @@ pub fn load_signals_for(
             let status = acknowledgment.as_ref().map_or_else(
                 || {
                     if was_acknowledged {
-                        SessionSignalStatus::Acknowledged
+                        SessionSignalStatus::Delivered
                     } else {
                         SessionSignalStatus::Pending
                     }
@@ -845,7 +845,7 @@ mod tests {
                     detail
                         .signals
                         .iter()
-                        .filter(|record| record.status == SessionSignalStatus::Acknowledged)
+                        .filter(|record| record.status == SessionSignalStatus::Delivered)
                         .count(),
                     1
                 );

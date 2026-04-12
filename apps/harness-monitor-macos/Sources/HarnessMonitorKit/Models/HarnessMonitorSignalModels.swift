@@ -161,17 +161,43 @@ public struct SignalAck: Codable, Equatable, Identifiable, Sendable {
 
 public enum SessionSignalStatus: String, Codable, CaseIterable, Sendable {
   case pending
-  case acknowledged
+  case delivered
   case rejected
   case deferred
   case expired
+
+  init?(rawOrLegacyValue value: String) {
+    switch value {
+    case "acknowledged":
+      self = .delivered
+    default:
+      self.init(rawValue: value)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let value = try container.decode(String.self)
+    guard let status = Self(rawOrLegacyValue: value) else {
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Invalid signal status: \(value)"
+      )
+    }
+    self = status
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
 
   public var title: String {
     switch self {
     case .pending:
       "Pending"
-    case .acknowledged:
-      "Acknowledged"
+    case .delivered:
+      "Delivered"
     case .rejected:
       "Rejected"
     case .deferred:

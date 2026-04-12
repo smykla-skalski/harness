@@ -1180,11 +1180,7 @@ async fn post_signal_ack(
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let result = service::record_signal_ack_direct(&session_id, &request);
-    if let Some(db) = db_ref {
-        let _ = db.bump_change(&session_id);
-        let _ = db.bump_change("global");
-    }
+    let result = service::record_signal_ack_direct(&session_id, &request, db_ref);
     if result.is_ok() {
         service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }

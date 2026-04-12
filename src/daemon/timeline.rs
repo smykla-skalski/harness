@@ -356,19 +356,11 @@ fn signal_ack_entry(
     let command = signal
         .map(|signal| signal.command.as_str())
         .or_else(|| logged_signal.map(|logged_signal| logged_signal.command.as_str()));
-    let summary = command.map_or_else(
-        || {
-            format!(
-                "{} acknowledged by {}: {:?}",
-                acknowledgment.signal_id, agent_id, acknowledgment.result
-            )
-        },
-        |command| {
-            format!(
-                "{} acknowledged by {}: {:?} ({command})",
-                acknowledgment.signal_id, agent_id, acknowledgment.result
-            )
-        },
+    let summary = signal_ack_summary(
+        &acknowledgment.signal_id,
+        agent_id,
+        acknowledgment.result,
+        command,
     );
 
     Ok(TimelineEntry {
@@ -675,8 +667,33 @@ fn signal_acknowledged_summary(
     (
         "signal_acknowledged",
         None,
-        format!("{signal_id} acknowledged by {agent_id}: {result:?}"),
+        signal_ack_summary(signal_id, agent_id, result, None),
     )
+}
+
+fn signal_ack_summary(
+    signal_id: &str,
+    agent_id: &str,
+    result: AckResult,
+    command: Option<&str>,
+) -> String {
+    match command {
+        Some(command) => format!(
+            "{signal_id} {} {agent_id}: {result:?} ({command})",
+            signal_ack_verb(result)
+        ),
+        None => format!(
+            "{signal_id} {} {agent_id}: {result:?}",
+            signal_ack_verb(result)
+        ),
+    }
+}
+
+fn signal_ack_verb(result: AckResult) -> &'static str {
+    match result {
+        AckResult::Accepted => "delivered to",
+        AckResult::Rejected | AckResult::Deferred | AckResult::Expired => "acknowledged by",
+    }
 }
 
 #[cfg(test)]
@@ -1009,7 +1026,7 @@ mod tests {
                 assert_eq!(entries[4].kind, "signal_acknowledged");
                 assert_eq!(
                     entries[4].summary,
-                    "sig-acked acknowledged by codex-worker: Accepted (inject_context)"
+                    "sig-acked delivered to codex-worker: Accepted (inject_context)"
                 );
                 assert_eq!(entries[5].kind, "signal_sent");
                 assert_eq!(entries[6].kind, "task_created");

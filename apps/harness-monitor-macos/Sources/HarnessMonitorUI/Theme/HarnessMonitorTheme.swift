@@ -74,7 +74,7 @@ func signalStatusColor(for status: SessionSignalStatus) -> Color {
   switch status {
   case .pending, .deferred:
     HarnessMonitorTheme.caution
-  case .acknowledged:
+  case .delivered:
     HarnessMonitorTheme.success
   case .rejected, .expired:
     HarnessMonitorTheme.danger

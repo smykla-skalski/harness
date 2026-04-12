@@ -48,7 +48,7 @@ struct CachedModelsDetailTests {
       runtime: "claude",
       agentId: "agent-1",
       sessionId: "sess-1",
-      status: .acknowledged,
+      status: .delivered,
       signal: signal,
       acknowledgment: ack
     )

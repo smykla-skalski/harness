@@ -54,10 +54,10 @@ struct SessionSignalRecordEffectiveStatusTests {
     #expect(record.effectiveStatus == .pending)
   }
 
-  @Test("Acknowledged signal never transitions to expired")
-  func acknowledgedPastExpiryStaysAcknowledged() {
-    let record = makeRecord(status: .acknowledged, expiresAt: Self.farPast)
-    #expect(record.effectiveStatus == .acknowledged)
+  @Test("Delivered signal never transitions to expired")
+  func deliveredPastExpiryStaysDelivered() {
+    let record = makeRecord(status: .delivered, expiresAt: Self.farPast)
+    #expect(record.effectiveStatus == .delivered)
   }
 
   @Test("Rejected signal never transitions to expired")

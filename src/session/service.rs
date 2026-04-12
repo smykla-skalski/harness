@@ -73,6 +73,10 @@ pub(crate) enum TaskDropEffect {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskStartSignalRecord {
+    #[expect(
+        dead_code,
+        reason = "task identity is retained for future task-start signal consumers"
+    )]
     pub(crate) task_id: String,
     pub(crate) runtime: String,
     pub(crate) agent_id: String,
@@ -615,6 +619,7 @@ pub fn list_tasks(
         return Ok(items);
     }
 
+    reconcile_expired_pending_signals(session_id, project_dir)?;
     let state = load_state_or_err(session_id, project_dir)?;
     let mut items: Vec<WorkItem> = state
         .tasks
@@ -916,6 +921,7 @@ pub fn list_signals(
         return Ok(signals);
     }
 
+    reconcile_expired_pending_signals(session_id, project_dir)?;
     let state = load_state_or_err(session_id, project_dir)?;
     let mut signals = Vec::new();
 
@@ -1034,6 +1040,31 @@ pub fn record_signal_acknowledgment(
         return Ok(());
     }
 
+    let now = utc_now();
+    let signal = load_signal_record_for_agent(session_id, agent_id, signal_id, project_dir)?;
+    let result = signal.as_ref().map_or(result, |signal| {
+        normalize_signal_ack_result(&signal.signal, result)
+    });
+    let mut started_task = None;
+
+    storage::update_state(project_dir, session_id, |state| {
+        if let Some(signal) = signal.as_ref() {
+            started_task = apply_signal_ack_result(state, agent_id, &signal.signal, result, &now);
+            refresh_session(state, &now);
+        }
+        Ok(())
+    })?;
+
+    if let Some(task_id) = started_task.as_deref() {
+        storage::append_log_entry(
+            project_dir,
+            session_id,
+            log_task_assigned(task_id, agent_id),
+            Some(agent_id),
+            None,
+        )?;
+    }
+
     storage::append_log_entry(
         project_dir,
         session_id,
@@ -1041,6 +1072,241 @@ pub fn record_signal_acknowledgment(
         Some(agent_id),
         None,
     )
+}
+
+fn reconcile_expired_pending_signals(session_id: &str, project_dir: &Path) -> Result<(), CliError> {
+    let expired = collect_expired_pending_signals(session_id, project_dir)?;
+    for signal in expired {
+        let ack = SignalAck {
+            signal_id: signal.signal.signal_id.clone(),
+            acknowledged_at: utc_now(),
+            result: AckResult::Expired,
+            agent: signal.signal_session_id.clone(),
+            session_id: session_id.to_string(),
+            details: Some("expired before agent acknowledged delivery".to_string()),
+        };
+        write_signal_ack(&signal.signal_dir, &ack)?;
+        record_signal_acknowledgment(
+            session_id,
+            &signal.agent_id,
+            &signal.signal.signal_id,
+            AckResult::Expired,
+            project_dir,
+        )?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ExpiredPendingSignal {
+    pub(crate) agent_id: String,
+    pub(crate) signal_session_id: String,
+    pub(crate) signal_dir: PathBuf,
+    pub(crate) signal: Signal,
+}
+
+fn collect_expired_pending_signals(
+    session_id: &str,
+    project_dir: &Path,
+) -> Result<Vec<ExpiredPendingSignal>, CliError> {
+    let state = load_state_or_err(session_id, project_dir)?;
+    collect_expired_pending_signals_for_state(&state, project_dir)
+}
+
+pub(crate) fn collect_expired_pending_signals_for_state(
+    state: &SessionState,
+    project_dir: &Path,
+) -> Result<Vec<ExpiredPendingSignal>, CliError> {
+    let mut expired_by_id = BTreeMap::new();
+
+    for (agent_id, agent) in &state.agents {
+        let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
+            continue;
+        };
+        for signal_session_id in
+            runtime::signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
+        {
+            let signal_dir = runtime.signal_dir(project_dir, &signal_session_id);
+            for signal in read_pending_signals(&signal_dir)? {
+                if !signal_matches_session(
+                    &signal,
+                    None,
+                    &state.session_id,
+                    agent_id,
+                    &signal_session_id,
+                ) || !signal_is_expired(&signal.expires_at)
+                {
+                    continue;
+                }
+                expired_by_id
+                    .entry(signal.signal_id.clone())
+                    .or_insert_with(|| ExpiredPendingSignal {
+                        agent_id: agent_id.clone(),
+                        signal_session_id: signal_session_id.clone(),
+                        signal_dir: signal_dir.clone(),
+                        signal,
+                    });
+            }
+        }
+    }
+
+    Ok(expired_by_id.into_values().collect())
+}
+
+fn load_signal_record_for_agent(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    project_dir: &Path,
+) -> Result<Option<SessionSignalRecord>, CliError> {
+    let state = load_state_or_err(session_id, project_dir)?;
+    load_signal_record_for_agent_from_state(&state, agent_id, signal_id, project_dir)
+}
+
+pub(crate) fn load_signal_record_for_agent_from_state(
+    state: &SessionState,
+    agent_id: &str,
+    signal_id: &str,
+    project_dir: &Path,
+) -> Result<Option<SessionSignalRecord>, CliError> {
+    let Some(agent) = state.agents.get(agent_id) else {
+        return Ok(None);
+    };
+    let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
+        return Ok(None);
+    };
+    let signal_dirs: Vec<_> =
+        runtime::signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
+            .into_iter()
+            .map(|signal_session_id| {
+                (
+                    signal_session_id.clone(),
+                    runtime.signal_dir(project_dir, &signal_session_id),
+                )
+            })
+            .collect();
+    Ok(
+        signal_records_for_dirs(&agent.runtime, agent_id, &state.session_id, &signal_dirs)?
+            .into_iter()
+            .find(|record| record.signal.signal_id == signal_id),
+    )
+}
+
+pub(crate) fn normalize_signal_ack_result(signal: &Signal, result: AckResult) -> AckResult {
+    match result {
+        AckResult::Accepted if signal_is_expired(&signal.expires_at) => AckResult::Expired,
+        _ => result,
+    }
+}
+
+pub(crate) fn apply_signal_ack_result(
+    state: &mut SessionState,
+    agent_id: &str,
+    signal: &Signal,
+    result: AckResult,
+    now: &str,
+) -> Option<String> {
+    match result {
+        AckResult::Accepted => apply_task_start_delivery(state, agent_id, signal, now),
+        AckResult::Expired => {
+            expire_task_start_delivery(state, agent_id, signal, now);
+            None
+        }
+        AckResult::Rejected | AckResult::Deferred => None,
+    }
+}
+
+fn apply_task_start_delivery(
+    state: &mut SessionState,
+    agent_id: &str,
+    signal: &Signal,
+    now: &str,
+) -> Option<String> {
+    let task_id = task_id_for_task_start_signal(signal)?;
+    let previous_assignee = state.tasks.get(task_id)?.assigned_to.clone();
+    if let Some(previous_assignee) = previous_assignee.as_deref()
+        && previous_assignee != agent_id
+    {
+        clear_agent_current_task(state, previous_assignee, task_id, now);
+    }
+
+    let task = state.tasks.get_mut(task_id)?;
+    if matches!(
+        task.status,
+        TaskStatus::Done | TaskStatus::Blocked | TaskStatus::InReview
+    ) {
+        return None;
+    }
+    let started = task.status != TaskStatus::InProgress;
+    task.assigned_to = Some(agent_id.to_string());
+    task.status = TaskStatus::InProgress;
+    task.queue_policy = TaskQueuePolicy::Locked;
+    task.queued_at = None;
+    task.blocked_reason = None;
+    task.completed_at = None;
+    task.updated_at = now.to_string();
+
+    if let Some(agent) = state.agents.get_mut(agent_id) {
+        agent.current_task_id = Some(task_id.to_string());
+        agent.updated_at = now.to_string();
+        agent.last_activity_at = Some(now.to_string());
+    }
+
+    started.then(|| task_id.to_string())
+}
+
+fn expire_task_start_delivery(
+    state: &mut SessionState,
+    agent_id: &str,
+    signal: &Signal,
+    now: &str,
+) {
+    let Some(task_id) = task_id_for_task_start_signal(signal) else {
+        return;
+    };
+    let Some(task) = state.tasks.get_mut(task_id) else {
+        return;
+    };
+    if matches!(
+        task.status,
+        TaskStatus::Done | TaskStatus::Blocked | TaskStatus::InReview
+    ) {
+        return;
+    }
+    if task.assigned_to.as_deref() != Some(agent_id) {
+        return;
+    }
+
+    task.assigned_to = None;
+    task.status = TaskStatus::Open;
+    task.queue_policy = TaskQueuePolicy::Locked;
+    task.queued_at = None;
+    task.blocked_reason = None;
+    task.completed_at = None;
+    task.updated_at = now.to_string();
+    clear_agent_current_task(state, agent_id, task_id, now);
+}
+
+fn task_id_for_task_start_signal(signal: &Signal) -> Option<&str> {
+    if signal.command != START_TASK_SIGNAL_COMMAND {
+        return None;
+    }
+    let task_id = signal
+        .payload
+        .action_hint
+        .as_deref()?
+        .strip_prefix("task:")?;
+    let prefix = format!("Start work on task {task_id}:");
+    signal
+        .payload
+        .message
+        .starts_with(&prefix)
+        .then_some(task_id)
+}
+
+pub(crate) fn signal_is_expired(expires_at: &str) -> bool {
+    chrono::DateTime::parse_from_rfc3339(expires_at)
+        .is_ok_and(|expires| expires < chrono::Utc::now())
 }
 
 fn signal_records_for_dirs(
@@ -1089,7 +1355,7 @@ fn signal_records_for_dirs(
             let status = acknowledgment.as_ref().map_or_else(
                 || {
                     if was_acknowledged {
-                        SessionSignalStatus::Acknowledged
+                        SessionSignalStatus::Delivered
                     } else {
                         SessionSignalStatus::Pending
                     }
@@ -1120,6 +1386,7 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
         return Ok(state);
     }
 
+    reconcile_expired_pending_signals(session_id, project_dir)?;
     let mut state = load_state_or_err(session_id, project_dir)?;
     state.metrics = SessionMetrics::recalculate(&state);
     Ok(state)
@@ -2298,13 +2565,6 @@ fn append_task_drop_effect_logs(
                 storage::append_log_entry(
                     project_dir,
                     session_id,
-                    log_task_assigned(&signal.task_id, &signal.agent_id),
-                    Some(actor_id),
-                    None,
-                )?;
-                storage::append_log_entry(
-                    project_dir,
-                    session_id,
                     log_signal_sent(
                         &signal.signal.signal_id,
                         &signal.agent_id,
@@ -2793,7 +3053,7 @@ fn start_task_for_agent(
         .get_mut(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
     task.assigned_to = Some(agent_id.to_string());
-    task.status = TaskStatus::InProgress;
+    task.status = TaskStatus::Open;
     task.queue_policy = TaskQueuePolicy::Locked;
     task.queued_at = None;
     task.blocked_reason = None;
@@ -2801,9 +3061,7 @@ fn start_task_for_agent(
     task.updated_at = now.to_string();
 
     if let Some(agent) = state.agents.get_mut(agent_id) {
-        agent.current_task_id = Some(task_id.to_string());
         agent.updated_at = now.to_string();
-        agent.last_activity_at = Some(now.to_string());
     }
 
     effects.push(TaskDropEffect::Started(Box::new(signal)));
@@ -2948,7 +3206,7 @@ fn load_state_or_err(session_id: &str, project_dir: &Path) -> Result<SessionStat
     })
 }
 
-fn refresh_session(state: &mut SessionState, now: &str) {
+pub(crate) fn refresh_session(state: &mut SessionState, now: &str) {
     state.updated_at = now.to_string();
     state.last_activity_at = Some(now.to_string());
     state.metrics = SessionMetrics::recalculate(state);
@@ -3727,9 +3985,11 @@ mod tests {
 
             let state = session_status("drop-reassign-free", project).expect("status");
             let started = state.tasks.get(&task.task_id).expect("started task");
-            assert_eq!(started.status, TaskStatus::InProgress);
+            assert_eq!(started.status, TaskStatus::Open);
             assert_eq!(started.assigned_to.as_deref(), Some(free_worker.as_str()));
             assert!(started.queued_at.is_none());
+            let worker = state.agents.get(&free_worker).expect("worker");
+            assert!(worker.current_task_id.is_none());
             let signals =
                 list_signals("drop-reassign-free", Some(&free_worker), project).expect("signals");
             assert_eq!(signals.len(), 1);
@@ -3822,12 +4082,182 @@ mod tests {
 
             let state = session_status("drop-advance-locked", project).expect("status");
             let next = state.tasks.get(&queued.task_id).expect("next task");
-            assert_eq!(next.status, TaskStatus::InProgress);
+            assert_eq!(next.status, TaskStatus::Open);
             assert_eq!(next.assigned_to.as_deref(), Some(worker_id.as_str()));
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert!(worker.current_task_id.is_none());
+        });
+    }
+
+    #[test]
+    fn task_start_signal_acceptance_marks_task_in_progress() {
+        with_temp_project(|project| {
+            let state = start_session("test", "", project, Some("claude"), Some("drop-ack-accept"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("accept-worker"))], || {
+                join_session(
+                    "drop-ack-accept",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join")
+            });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+            let worker = joined.agents.get(&worker_id).expect("worker");
+            let task = create_task(
+                "drop-ack-accept",
+                "queued",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("queued");
+
+            drop_task(
+                "drop-ack-accept",
+                &task.task_id,
+                &protocol::TaskDropTarget::Agent {
+                    agent_id: worker_id.clone(),
+                },
+                TaskQueuePolicy::Locked,
+                &leader_id,
+                project,
+            )
+            .expect("drop");
+
+            let signal = list_signals("drop-ack-accept", Some(&worker_id), project)
+                .expect("signals")[0]
+                .clone();
+            let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
+            let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
+            let signal_dir = runtime.signal_dir(project, &worker_session_id);
+            let ack = SignalAck {
+                signal_id: signal.signal.signal_id.clone(),
+                acknowledged_at: utc_now(),
+                result: AckResult::Accepted,
+                agent: worker_session_id,
+                session_id: "drop-ack-accept".into(),
+                details: None,
+            };
+
+            runtime::signal::acknowledge_signal(&signal_dir, &ack).expect("ack");
+            record_signal_acknowledgment(
+                "drop-ack-accept",
+                &worker_id,
+                &signal.signal.signal_id,
+                AckResult::Accepted,
+                project,
+            )
+            .expect("record ack");
+
+            let state = session_status("drop-ack-accept", project).expect("status");
+            let task = state.tasks.get(&task.task_id).expect("task");
+            assert_eq!(task.status, TaskStatus::InProgress);
+            assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
             let worker = state.agents.get(&worker_id).expect("worker");
             assert_eq!(
                 worker.current_task_id.as_deref(),
-                Some(queued.task_id.as_str())
+                Some(task.task_id.as_str())
+            );
+        });
+    }
+
+    #[test]
+    fn expired_task_start_signal_reopens_task_and_clears_assignment() {
+        with_temp_project(|project| {
+            let state = start_session("test", "", project, Some("claude"), Some("drop-expire"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("expire-worker"))], || {
+                join_session(
+                    "drop-expire",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join")
+            });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+            let worker = joined.agents.get(&worker_id).expect("worker");
+            let task = create_task(
+                "drop-expire",
+                "queued",
+                None,
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("queued");
+
+            drop_task(
+                "drop-expire",
+                &task.task_id,
+                &protocol::TaskDropTarget::Agent {
+                    agent_id: worker_id.clone(),
+                },
+                TaskQueuePolicy::Locked,
+                &leader_id,
+                project,
+            )
+            .expect("drop");
+
+            let signal =
+                list_signals("drop-expire", Some(&worker_id), project).expect("signals")[0].clone();
+            let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
+            let signal_dir = runtime.signal_dir(
+                project,
+                worker
+                    .agent_session_id
+                    .as_deref()
+                    .expect("worker session id"),
+            );
+            let signal_id = signal.signal.signal_id.clone();
+            let expired_signal = Signal {
+                expires_at: "2000-01-01T00:00:00Z".into(),
+                ..signal.signal
+            };
+            let pending_path =
+                runtime::signal::pending_dir(&signal_dir).join(format!("{signal_id}.json"));
+            std::fs::write(
+                &pending_path,
+                serde_json::to_string_pretty(&expired_signal).expect("serialize expired signal"),
+            )
+            .expect("rewrite expired signal");
+
+            let state = session_status("drop-expire", project).expect("status");
+            let task = state.tasks.get(&task.task_id).expect("task");
+            assert_eq!(task.status, TaskStatus::Open);
+            assert!(task.assigned_to.is_none());
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert!(worker.current_task_id.is_none());
+
+            let signals = list_signals("drop-expire", Some(&worker_id), project).expect("signals");
+            assert_eq!(signals.len(), 1);
+            assert_eq!(signals[0].status, SessionSignalStatus::Expired);
+            assert_eq!(
+                signals[0]
+                    .acknowledgment
+                    .as_ref()
+                    .expect("expired acknowledgment")
+                    .result,
+                AckResult::Expired
             );
         });
     }

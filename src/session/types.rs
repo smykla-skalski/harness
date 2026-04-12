@@ -326,7 +326,8 @@ impl From<&TaskCheckpoint> for TaskCheckpointSummary {
 #[serde(rename_all = "snake_case")]
 pub enum SessionSignalStatus {
     Pending,
-    Acknowledged,
+    #[serde(alias = "acknowledged")]
+    Delivered,
     Rejected,
     Deferred,
     Expired,
@@ -336,7 +337,7 @@ impl SessionSignalStatus {
     #[must_use]
     pub fn from_ack_result(result: AckResult) -> Self {
         match result {
-            AckResult::Accepted => Self::Acknowledged,
+            AckResult::Accepted => Self::Delivered,
             AckResult::Rejected => Self::Rejected,
             AckResult::Deferred => Self::Deferred,
             AckResult::Expired => Self::Expired,
