@@ -166,10 +166,14 @@ public struct ContentView: View {
       }
     }
     .background {
-      ContentSceneRestorationBridge(
-        store: store,
-        selection: store.selection
-      )
+      if HarnessMonitorUITestEnvironment.isEnabled {
+        EmptyView()
+      } else {
+        ContentSceneRestorationBridge(
+          store: store,
+          selection: store.selection
+        )
+      }
     }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
@@ -427,7 +431,10 @@ private struct ContentToolbarChromeAccessibilityMarker: View {
 
   private var windowTitle: String {
     contentSessionDetail.selectedSessionDetail != nil
-      || contentSession.selectedSessionSummary != nil
+      || (
+        contentSession.selectedSessionSummary != nil
+          && contentSession.isSelectionLoading == false
+      )
       ? "Cockpit" : "Dashboard"
   }
 
