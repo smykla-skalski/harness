@@ -50,6 +50,10 @@ pub enum SessionCommand {
     },
     /// Observe all agents in a session.
     Observe(SessionObserveArgs),
+    /// Run a one-shot agent liveness reconciliation.
+    Sync(SessionSyncArgs),
+    /// Voluntarily leave a session.
+    Leave(SessionLeaveArgs),
     /// Set or update a session title.
     Title(SessionTitleArgs),
     /// Show current session status.
@@ -115,6 +119,8 @@ impl Execute for SessionCommand {
             Self::Signal { command } => command.execute(context),
             Self::Tui { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
+            Self::Sync(args) => args.execute(context),
+            Self::Leave(args) => args.execute(context),
             Self::Title(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
             Self::List(args) => args.execute(context),
@@ -922,6 +928,67 @@ impl Execute for SessionObserveArgs {
                 self.actor.as_deref(),
             )
         }
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SessionSyncArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for SessionSyncArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        let result = service::sync_agent_liveness(&self.session_id, &project)?;
+        if self.json {
+            print_json(&serde_json::json!({
+                "disconnected": result.disconnected,
+                "idled": result.idled,
+            }))?;
+        } else {
+            if result.disconnected.is_empty() && result.idled.is_empty() {
+                println!("All agents are alive");
+            } else {
+                for agent_id in &result.disconnected {
+                    println!("{agent_id}: disconnected");
+                }
+                for agent_id in &result.idled {
+                    println!("{agent_id}: idle");
+                }
+            }
+        }
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SessionLeaveArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Agent ID of the agent leaving.
+    pub agent_id: String,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for SessionLeaveArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::leave_session(&self.session_id, &self.agent_id, &project)?;
+        println!("{} left session {}", self.agent_id, self.session_id);
+        Ok(0)
     }
 }
 
