@@ -71,26 +71,6 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
   }
 
-  private func handleEscapeKeyPress() -> KeyPress.Result {
-    if let feedbackID = toast.activeFeedback.first?.id {
-      toast.dismiss(id: feedbackID)
-      return .handled
-    }
-    if contentSessionDetail.selectedSessionDetail != nil {
-      store.inspectorSelection = .none
-      return .handled
-    }
-    return .ignored
-  }
-
-  private func handleExitCommand() {
-    if let feedbackID = toast.activeFeedback.first?.id {
-      toast.dismiss(id: feedbackID)
-    } else if contentSessionDetail.selectedSessionDetail != nil {
-      store.inspectorSelection = .none
-    }
-  }
-
   public init(
     store: HarnessMonitorStore,
     cornerAnimationContent: (() -> AnyView)? = nil
@@ -113,7 +93,6 @@ public struct ContentView: View {
         .modifier(
           ContentCornerOverlayModifier(
             toolbarUI: contentToolbar,
-            sessionUI: contentSession,
             cornerAnimationContent: cornerAnimationContent
           )
         )
@@ -168,8 +147,6 @@ public struct ContentView: View {
     .onChange(of: columnVisibility) { _, _ in
       suppressLayoutGeometry()
     }
-    .onKeyPress(.escape, action: handleEscapeKeyPress)
-    .onExitCommand(perform: handleExitCommand)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay {
@@ -197,6 +174,11 @@ public struct ContentView: View {
           selection: store.selection
         )
       }
+      ContentEscapeCommandBridge(
+        store: store,
+        toast: toast,
+        contentSessionDetail: contentSessionDetail
+      )
     }
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
@@ -400,6 +382,39 @@ private struct ContentFloatingOverlay: View {
         .padding(.trailing, HarnessMonitorTheme.spacingLG)
       }
     }
+  }
+}
+
+private struct ContentEscapeCommandBridge: View {
+  let store: HarnessMonitorStore
+  let toast: ToastSlice
+  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
+
+  private func handleEscapeKeyPress() -> KeyPress.Result {
+    if let feedbackID = toast.activeFeedback.first?.id {
+      toast.dismiss(id: feedbackID)
+      return .handled
+    }
+    if contentSessionDetail.selectedSessionDetail != nil {
+      store.inspectorSelection = .none
+      return .handled
+    }
+    return .ignored
+  }
+
+  private func handleExitCommand() {
+    if let feedbackID = toast.activeFeedback.first?.id {
+      toast.dismiss(id: feedbackID)
+    } else if contentSessionDetail.selectedSessionDetail != nil {
+      store.inspectorSelection = .none
+    }
+  }
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .onKeyPress(.escape, action: handleEscapeKeyPress)
+      .onExitCommand(perform: handleExitCommand)
   }
 }
 
