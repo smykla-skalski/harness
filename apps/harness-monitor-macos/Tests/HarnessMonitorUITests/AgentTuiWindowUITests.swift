@@ -9,11 +9,11 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
 
     openAgentTuiWindow(in: app)
 
-    let createTab = button(in: app, identifier: Accessibility.agentTuiCreateTab)
+    let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
 
-    XCTAssertTrue(waitForElement(createTab, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(createRow, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(launchPane, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(state, timeout: Self.fastActionTimeout))
     XCTAssertTrue(state.label.contains("selection=create"))
@@ -25,7 +25,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "Inspect the cockpit session")
 
-    let sessionRow = button(
+    let sessionRow = element(
       in: app,
       identifier: Accessibility.agentTuiTab("preview-agent-tui-1")
     )
@@ -55,7 +55,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     reopenAgentTuiWindow(in: app)
 
     for index in 1 ... 6 {
-      let sessionRow = button(
+      let sessionRow = element(
         in: app,
         identifier: Accessibility.agentTuiTab("preview-agent-tui-\(index)")
       )
