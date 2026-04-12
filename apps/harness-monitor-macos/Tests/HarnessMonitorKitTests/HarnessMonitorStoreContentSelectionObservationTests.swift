@@ -291,6 +291,138 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .inspector) == 1)
   }
 
+  @Test("Selected session summary metadata skips detail-driven surfaces once detail is loaded")
+  func selectedSessionSummaryMetadataSkipsDetailDrivenSurfacesAfterHydration() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.debugResetUISyncCounts()
+
+    let updatedSummary = SessionSummary(
+      projectId: PreviewFixtures.summary.projectId,
+      projectName: PreviewFixtures.summary.projectName,
+      projectDir: PreviewFixtures.summary.projectDir,
+      contextRoot: PreviewFixtures.summary.contextRoot,
+      checkoutId: PreviewFixtures.summary.checkoutId,
+      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
+      isWorktree: PreviewFixtures.summary.isWorktree,
+      worktreeName: PreviewFixtures.summary.worktreeName,
+      sessionId: PreviewFixtures.summary.sessionId,
+      title: PreviewFixtures.summary.title,
+      context: PreviewFixtures.summary.context,
+      status: PreviewFixtures.summary.status,
+      createdAt: PreviewFixtures.summary.createdAt,
+      updatedAt: PreviewFixtures.summary.updatedAt,
+      lastActivityAt: PreviewFixtures.summary.lastActivityAt,
+      leaderId: PreviewFixtures.summary.leaderId,
+      observeId: PreviewFixtures.summary.observeId,
+      pendingLeaderTransfer: PreviewFixtures.summary.pendingLeaderTransfer,
+      metrics: SessionMetrics(
+        agentCount: PreviewFixtures.summary.metrics.agentCount + 1,
+        activeAgentCount: PreviewFixtures.summary.metrics.activeAgentCount,
+        openTaskCount: PreviewFixtures.summary.metrics.openTaskCount,
+        inProgressTaskCount: PreviewFixtures.summary.metrics.inProgressTaskCount,
+        blockedTaskCount: PreviewFixtures.summary.metrics.blockedTaskCount,
+        completedTaskCount: PreviewFixtures.summary.metrics.completedTaskCount
+      )
+    )
+
+    let didChange = store.sessionIndex.applySessionSummary(updatedSummary)
+
+    #expect(didChange)
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
+  @Test("Selected session projection churn skips detail-driven surfaces after hydration")
+  func selectedSessionProjectionChurnSkipsDetailDrivenSurfacesAfterHydration() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.debugResetUISyncCounts()
+
+    let updatedSummary = SessionSummary(
+      projectId: PreviewFixtures.summary.projectId,
+      projectName: PreviewFixtures.summary.projectName,
+      projectDir: PreviewFixtures.summary.projectDir,
+      contextRoot: PreviewFixtures.summary.contextRoot,
+      checkoutId: PreviewFixtures.summary.checkoutId,
+      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
+      isWorktree: PreviewFixtures.summary.isWorktree,
+      worktreeName: PreviewFixtures.summary.worktreeName,
+      sessionId: PreviewFixtures.summary.sessionId,
+      title: PreviewFixtures.summary.title,
+      context: PreviewFixtures.summary.context,
+      status: PreviewFixtures.summary.status,
+      createdAt: PreviewFixtures.summary.createdAt,
+      updatedAt: "2026-03-28T14:19:00Z",
+      lastActivityAt: "2026-03-28T14:19:00Z",
+      leaderId: PreviewFixtures.summary.leaderId,
+      observeId: PreviewFixtures.summary.observeId,
+      pendingLeaderTransfer: PreviewFixtures.summary.pendingLeaderTransfer,
+      metrics: SessionMetrics(
+        agentCount: PreviewFixtures.summary.metrics.agentCount,
+        activeAgentCount: PreviewFixtures.summary.metrics.activeAgentCount,
+        openTaskCount: PreviewFixtures.summary.metrics.openTaskCount + 1,
+        inProgressTaskCount: PreviewFixtures.summary.metrics.inProgressTaskCount,
+        blockedTaskCount: PreviewFixtures.summary.metrics.blockedTaskCount,
+        completedTaskCount: PreviewFixtures.summary.metrics.completedTaskCount
+      )
+    )
+
+    let didChange = store.sessionIndex.applySessionSummary(updatedSummary)
+
+    #expect(didChange)
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+    #expect(store.debugUISyncCount(for: .contentSession) == 0)
+    #expect(store.debugUISyncCount(for: .inspector) == 0)
+  }
+
+  @Test("Loading session summary metadata still updates loading surfaces before detail hydrates")
+  func loadingSessionSummaryMetadataStillUpdatesLoadingSurfaces() async {
+    let store = await makeBootstrappedStore()
+    store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+    store.debugResetUISyncCounts()
+
+    let updatedSummary = SessionSummary(
+      projectId: PreviewFixtures.summary.projectId,
+      projectName: PreviewFixtures.summary.projectName,
+      projectDir: PreviewFixtures.summary.projectDir,
+      contextRoot: PreviewFixtures.summary.contextRoot,
+      checkoutId: PreviewFixtures.summary.checkoutId,
+      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
+      isWorktree: PreviewFixtures.summary.isWorktree,
+      worktreeName: PreviewFixtures.summary.worktreeName,
+      sessionId: PreviewFixtures.summary.sessionId,
+      title: PreviewFixtures.summary.title,
+      context: PreviewFixtures.summary.context,
+      status: PreviewFixtures.summary.status,
+      createdAt: PreviewFixtures.summary.createdAt,
+      updatedAt: PreviewFixtures.summary.updatedAt,
+      lastActivityAt: PreviewFixtures.summary.lastActivityAt,
+      leaderId: PreviewFixtures.summary.leaderId,
+      observeId: PreviewFixtures.summary.observeId,
+      pendingLeaderTransfer: PreviewFixtures.summary.pendingLeaderTransfer,
+      metrics: SessionMetrics(
+        agentCount: PreviewFixtures.summary.metrics.agentCount + 1,
+        activeAgentCount: PreviewFixtures.summary.metrics.activeAgentCount,
+        openTaskCount: PreviewFixtures.summary.metrics.openTaskCount,
+        inProgressTaskCount: PreviewFixtures.summary.metrics.inProgressTaskCount,
+        blockedTaskCount: PreviewFixtures.summary.metrics.blockedTaskCount,
+        completedTaskCount: PreviewFixtures.summary.metrics.completedTaskCount
+      )
+    )
+
+    let didChange = store.sessionIndex.applySessionSummary(updatedSummary)
+
+    #expect(didChange)
+    #expect(store.debugUISyncCount(for: .contentToolbar) == 0)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 1)
+    #expect(store.debugUISyncCount(for: .contentSession) == 1)
+    #expect(store.debugUISyncCount(for: .inspector) == 1)
+  }
+
   @Test("Completing a selection load does not resync the root shell")
   func completingSelectionLoadSkipsShellResync() async {
     let store = await makeBootstrappedStore()
