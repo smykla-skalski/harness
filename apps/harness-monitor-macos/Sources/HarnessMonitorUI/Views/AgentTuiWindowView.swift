@@ -301,6 +301,7 @@ public struct AgentTuiWindowView: View {
   private func sessionPane(_ tui: AgentTuiSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       terminalHeader(tui)
+      terminalViewportToolbar
       terminalViewport(tui)
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
@@ -315,21 +316,27 @@ public struct AgentTuiWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
+  private var terminalViewportToolbar: some View {
+    HStack {
+      Spacer()
+      Toggle("Wrap lines", isOn: $wrapLines)
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .keyboardShortcut("l", modifiers: [.command])
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
+    }
+  }
+
   @ToolbarContentBuilder
   private var sessionToolbarItems: some ToolbarContent {
     if let selectedSessionTui {
       ToolbarItemGroup(placement: .primaryAction) {
-        Toggle("Wrap lines", isOn: $wrapLines)
-          .toggleStyle(.switch)
-          .controlSize(.mini)
-          .keyboardShortcut("l", modifiers: [.command])
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
-
         Button {
           revealTranscript(selectedSessionTui)
         } label: {
           Label("Transcript", systemImage: "doc.text")
         }
+        .help("Reveal transcript in Finder")
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRevealTranscriptButton)
 
         if selectedSessionTui.status.isActive {
@@ -339,6 +346,7 @@ public struct AgentTuiWindowView: View {
             Label("Stop", systemImage: "stop.fill")
           }
           .disabled(!canStop)
+          .help("Stop this agent TUI session")
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiStopButton)
         }
       }
