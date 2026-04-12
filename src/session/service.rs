@@ -8,6 +8,7 @@ use chrono::{Duration, Utc};
 use serde_json::Value;
 
 use crate::agents::runtime;
+use crate::agents::runtime::liveness::LivenessConfig;
 use crate::agents::runtime::signal::{
     AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
     acknowledge_signal as write_signal_ack, read_acknowledged_signals, read_acknowledgments,
@@ -1151,111 +1152,17 @@ pub fn sync_agent_liveness(
     session_id: &str,
     project_dir: &Path,
 ) -> Result<LivenessSyncResult, CliError> {
-    use crate::agents::runtime::liveness::{LivenessConfig, liveness_from_timestamp};
-
-    let config = LivenessConfig::default();
     let now = utc_now();
     let mut result = LivenessSyncResult::default();
-
-    // Collect runtime activity timestamps and signal directory info before entering
-    // the state update closure, since filesystem access should not happen under the
-    // state lock.
-    let state = load_state_or_err(session_id, project_dir)?;
-    let mut activity_map: Vec<(String, Option<String>, String, Option<String>)> = Vec::new();
-
-    for agent in state.agents.values() {
-        if !agent.status.is_alive() {
-            continue;
-        }
-        let Some(agent_runtime) = runtime::runtime_for_name(&agent.runtime) else {
-            continue;
-        };
-        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
-            continue;
-        };
-        let last_activity = agent_runtime
-            .last_activity(project_dir, agent_session_id)
-            .unwrap_or(None);
-        activity_map.push((
-            agent.agent_id.clone(),
-            last_activity,
-            agent.runtime.clone(),
-            agent.agent_session_id.clone(),
-        ));
-    }
+    let activity_map = collect_agent_activity(session_id, project_dir)?;
 
     storage::update_state(project_dir, session_id, |state| {
         require_active(state)?;
-
-        for (agent_id, last_activity, _runtime, _session) in &activity_map {
-            let Some(agent) = state.agents.get_mut(agent_id) else {
-                continue;
-            };
-            if !agent.status.is_alive() {
-                continue;
-            }
-
-            // Update last_activity_at from the runtime's actual log timestamp
-            if let Some(timestamp) = last_activity {
-                agent.last_activity_at = Some(timestamp.clone());
-            }
-
-            let liveness = liveness_from_timestamp(
-                last_activity.as_deref(),
-                &config,
-            );
-
-            let new_status = match liveness {
-                crate::agents::runtime::liveness::LivenessStatus::Active => AgentStatus::Active,
-                crate::agents::runtime::liveness::LivenessStatus::Idle => AgentStatus::Idle,
-                crate::agents::runtime::liveness::LivenessStatus::Unresponsive => {
-                    AgentStatus::Disconnected
-                }
-            };
-
-            if new_status == agent.status {
-                continue;
-            }
-
-            let old_status = agent.status;
-            agent.status = new_status;
-            agent.updated_at = now.clone();
-
-            match new_status {
-                AgentStatus::Disconnected => {
-                    // Return any assigned task to Open
-                    if let Some(ref task_id) = agent.current_task_id.take() {
-                        if let Some(task) = state.tasks.get_mut(task_id) {
-                            if !matches!(task.status, TaskStatus::Done) {
-                                task.status = TaskStatus::Open;
-                                task.assigned_to = None;
-                                task.queue_policy = TaskQueuePolicy::Locked;
-                                task.queued_at = None;
-                                task.updated_at = now.clone();
-                            }
-                        }
-                    }
-                    clear_pending_leader_transfer(state, agent_id);
-                    result.disconnected.push(agent_id.clone());
-                    tracing::info!(
-                        agent_id,
-                        ?old_status,
-                        "agent marked disconnected by liveness sync"
-                    );
-                }
-                AgentStatus::Idle => {
-                    result.idled.push(agent_id.clone());
-                    tracing::debug!(agent_id, "agent transitioned to idle");
-                }
-                _ => {}
-            }
-        }
-
+        apply_liveness_transitions(state, &activity_map, &now, &mut result);
         refresh_session(state, &now);
         Ok(())
     })?;
 
-    // Log the sync transition if any agents were affected
     if !result.disconnected.is_empty() || !result.idled.is_empty() {
         let _ = storage::append_log_entry(
             project_dir,
@@ -1269,33 +1176,163 @@ pub fn sync_agent_liveness(
         );
     }
 
-    // Clean up pending signals for disconnected agents (outside state lock)
-    for (agent_id, _last_activity, runtime_name, agent_session_id) in &activity_map {
-        if !result.disconnected.contains(agent_id) {
+    cleanup_dead_agent_signals(&activity_map, &result, session_id, project_dir);
+    Ok(result)
+}
+
+struct AgentActivityRecord {
+    agent_id: String,
+    last_activity: Option<String>,
+    runtime_name: String,
+    agent_session_id: Option<String>,
+}
+
+fn collect_agent_activity(
+    session_id: &str,
+    project_dir: &Path,
+) -> Result<Vec<AgentActivityRecord>, CliError> {
+    let state = load_state_or_err(session_id, project_dir)?;
+    let mut records = Vec::new();
+    for agent in state.agents.values() {
+        if !agent.status.is_alive() {
             continue;
         }
-        let Some(agent_runtime) = runtime::runtime_for_name(runtime_name) else {
+        let Some(agent_runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-        // Clean up signals keyed by agent's runtime session
-        if let Some(agent_session) = agent_session_id {
-            let signal_dir = agent_runtime.signal_dir(project_dir, agent_session);
-            let _ = crate::agents::runtime::signal::cleanup_pending_signals(
-                &signal_dir,
-                agent_id,
-                session_id,
-            );
+        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
+            continue;
+        };
+        let last_activity = agent_runtime
+            .last_activity(project_dir, agent_session_id)
+            .unwrap_or(None);
+        records.push(AgentActivityRecord {
+            agent_id: agent.agent_id.clone(),
+            last_activity,
+            runtime_name: agent.runtime.clone(),
+            agent_session_id: agent.agent_session_id.clone(),
+        });
+    }
+    Ok(records)
+}
+
+fn apply_liveness_transitions(
+    state: &mut SessionState,
+    activity_map: &[AgentActivityRecord],
+    now: &str,
+    result: &mut LivenessSyncResult,
+) {
+    let config = LivenessConfig::default();
+    for record in activity_map {
+        if let Some(transition) = compute_agent_transition(state, record, &config) {
+            apply_single_transition(state, record, transition, now, result);
         }
-        // Clean up signals keyed by orchestration session (legacy)
-        let signal_dir = agent_runtime.signal_dir(project_dir, session_id);
-        let _ = crate::agents::runtime::signal::cleanup_pending_signals(
-            &signal_dir,
-            agent_id,
-            session_id,
-        );
+    }
+}
+
+fn compute_agent_transition(
+    state: &SessionState,
+    record: &AgentActivityRecord,
+    config: &LivenessConfig,
+) -> Option<AgentStatus> {
+    use crate::agents::runtime::liveness::{LivenessStatus, liveness_from_timestamp};
+
+    let agent = state.agents.get(&record.agent_id)?;
+    if !agent.status.is_alive() {
+        return None;
     }
 
-    Ok(result)
+    let new_status = match liveness_from_timestamp(record.last_activity.as_deref(), config) {
+        LivenessStatus::Active => AgentStatus::Active,
+        LivenessStatus::Idle => AgentStatus::Idle,
+        LivenessStatus::Unresponsive => AgentStatus::Disconnected,
+    };
+
+    if new_status == agent.status {
+        None
+    } else {
+        Some(new_status)
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn apply_single_transition(
+    state: &mut SessionState,
+    record: &AgentActivityRecord,
+    new_status: AgentStatus,
+    now: &str,
+    result: &mut LivenessSyncResult,
+) {
+    let Some(agent) = state.agents.get_mut(&record.agent_id) else {
+        return;
+    };
+
+    if let Some(ref timestamp) = record.last_activity {
+        agent.last_activity_at = Some(timestamp.clone());
+    }
+
+    let old_status = agent.status;
+    agent.status = new_status;
+    now.clone_into(&mut agent.updated_at);
+
+    if new_status == AgentStatus::Disconnected {
+        release_agent_tasks(state, &record.agent_id, now);
+        clear_pending_leader_transfer(state, &record.agent_id);
+        result.disconnected.push(record.agent_id.clone());
+        tracing::info!(
+            agent_id = record.agent_id,
+            ?old_status,
+            "agent disconnected by liveness sync"
+        );
+    } else if new_status == AgentStatus::Idle {
+        result.idled.push(record.agent_id.clone());
+        tracing::debug!(agent_id = record.agent_id, "agent transitioned to idle");
+    }
+}
+
+fn release_agent_tasks(state: &mut SessionState, agent_id: &str, now: &str) {
+    // Clear current_task_id on the agent
+    if let Some(agent) = state.agents.get_mut(agent_id) {
+        agent.current_task_id = None;
+    }
+    // Return assigned tasks to Open
+    for task in state.tasks.values_mut() {
+        if task.assigned_to.as_deref() == Some(agent_id) && !matches!(task.status, TaskStatus::Done)
+        {
+            task.status = TaskStatus::Open;
+            task.assigned_to = None;
+            task.queue_policy = TaskQueuePolicy::Locked;
+            task.queued_at = None;
+            now.clone_into(&mut task.updated_at);
+        }
+    }
+}
+
+fn cleanup_dead_agent_signals(
+    activity_map: &[AgentActivityRecord],
+    result: &LivenessSyncResult,
+    session_id: &str,
+    project_dir: &Path,
+) {
+    use crate::agents::runtime::signal::cleanup_pending_signals;
+
+    for record in activity_map {
+        if !result.disconnected.contains(&record.agent_id) {
+            continue;
+        }
+        let Some(agent_runtime) = runtime::runtime_for_name(&record.runtime_name) else {
+            continue;
+        };
+        if let Some(ref agent_session) = record.agent_session_id {
+            let signal_dir = agent_runtime.signal_dir(project_dir, agent_session);
+            let _ = cleanup_pending_signals(&signal_dir, &record.agent_id, session_id);
+        }
+        let signal_dir = agent_runtime.signal_dir(project_dir, session_id);
+        let _ = cleanup_pending_signals(&signal_dir, &record.agent_id, session_id);
+    }
 }
 
 /// Mark the calling agent as disconnected and unassign its tasks.
@@ -1305,11 +1342,7 @@ pub fn sync_agent_liveness(
 ///
 /// # Errors
 /// Returns `CliError` on storage failures or if the agent is the leader.
-pub fn leave_session(
-    session_id: &str,
-    agent_id: &str,
-    project_dir: &Path,
-) -> Result<(), CliError> {
+pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Result<(), CliError> {
     let now = utc_now();
     storage::update_state(project_dir, session_id, |state| {
         require_active(state)?;
@@ -1329,22 +1362,11 @@ pub fn leave_session(
         }
 
         agent.status = AgentStatus::Disconnected;
-        agent.updated_at = now.clone();
+        now.clone_into(&mut agent.updated_at);
         agent.last_activity_at = Some(now.clone());
         agent.current_task_id = None;
 
-        // Return any assigned tasks to Open
-        for task in state.tasks.values_mut() {
-            if task.assigned_to.as_deref() == Some(agent_id)
-                && !matches!(task.status, TaskStatus::Done)
-            {
-                task.status = TaskStatus::Open;
-                task.assigned_to = None;
-                task.queue_policy = TaskQueuePolicy::Locked;
-                task.queued_at = None;
-                task.updated_at = now.clone();
-            }
-        }
+        release_agent_tasks(state, agent_id, &now);
 
         clear_pending_leader_transfer(state, agent_id);
         refresh_session(state, &now);
@@ -4442,10 +4464,7 @@ mod tests {
         });
     }
 
-    fn find_agent_by_runtime<'a>(
-        state: &'a SessionState,
-        runtime: &str,
-    ) -> &'a AgentRegistration {
+    fn find_agent_by_runtime<'a>(state: &'a SessionState, runtime: &str) -> &'a AgentRegistration {
         state
             .agents
             .values()
@@ -4454,8 +4473,7 @@ mod tests {
     }
 
     fn set_log_mtime_seconds_ago(path: &std::path::Path, seconds: u64) {
-        let old_time = std::time::SystemTime::now()
-            - std::time::Duration::from_secs(seconds);
+        let old_time = std::time::SystemTime::now() - std::time::Duration::from_secs(seconds);
         std::fs::File::options()
             .write(true)
             .open(path)
@@ -4476,20 +4494,12 @@ mod tests {
     fn sync_liveness_transitions_stale_agent_to_disconnected() {
         with_temp_project(|project| {
             let state =
-                start_session("test", "", project, Some("claude"), Some("sync-1"))
-                    .expect("start");
+                start_session("test", "", project, Some("claude"), Some("sync-1")).expect("start");
             let leader_id = state.leader_id.clone().expect("leader");
 
             temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess"), || {
-                join_session(
-                    "sync-1",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                )
-                .expect("join worker");
+                join_session("sync-1", SessionRole::Worker, "codex", &[], None, project)
+                    .expect("join worker");
             });
 
             let state = session_status("sync-1", project).expect("status");
@@ -4521,8 +4531,7 @@ mod tests {
     #[test]
     fn sync_liveness_updates_last_activity_from_runtime() {
         with_temp_project(|project| {
-            start_session("test", "", project, Some("claude"), Some("sync-2"))
-                .expect("start");
+            start_session("test", "", project, Some("claude"), Some("sync-2")).expect("start");
 
             // Write a fresh log for the leader
             let leader_log = crate::workspace::project_context_dir(project)
@@ -4543,20 +4552,12 @@ mod tests {
     fn sync_liveness_returns_dead_agent_task_to_open() {
         with_temp_project(|project| {
             let state =
-                start_session("test", "", project, Some("claude"), Some("sync-3"))
-                    .expect("start");
+                start_session("test", "", project, Some("claude"), Some("sync-3")).expect("start");
             let leader_id = state.leader_id.clone().expect("leader");
 
             temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess-3"), || {
-                join_session(
-                    "sync-3",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                )
-                .expect("join");
+                join_session("sync-3", SessionRole::Worker, "codex", &[], None, project)
+                    .expect("join");
             });
 
             let state = session_status("sync-3", project).expect("status");
@@ -4572,8 +4573,7 @@ mod tests {
                 project,
             )
             .expect("create task");
-            assign_task("sync-3", &task.task_id, &worker_id, &leader_id, project)
-                .expect("assign");
+            assign_task("sync-3", &task.task_id, &worker_id, &leader_id, project).expect("assign");
             update_task(
                 "sync-3",
                 &task.task_id,
@@ -4595,7 +4595,11 @@ mod tests {
 
             let state = session_status("sync-3", project).expect("status");
             let task = state.tasks.get(&task.task_id).expect("task");
-            assert_eq!(task.status, TaskStatus::Open, "dead agent task returns to Open");
+            assert_eq!(
+                task.status,
+                TaskStatus::Open,
+                "dead agent task returns to Open"
+            );
             assert!(task.assigned_to.is_none(), "dead agent task is unassigned");
         });
     }
@@ -4603,32 +4607,20 @@ mod tests {
     #[test]
     fn sync_liveness_seven_agents_six_die() {
         with_temp_project(|project| {
-            start_session("test", "", project, Some("claude"), Some("sync-4"))
-                .expect("start");
+            start_session("test", "", project, Some("claude"), Some("sync-4")).expect("start");
 
             // Join 6 more workers with distinct runtime session IDs
             for i in 1..=6 {
                 let session_val = format!("worker-{i}");
                 temp_env::with_var("CODEX_SESSION_ID", Some(&session_val), || {
-                    join_session(
-                        "sync-4",
-                        SessionRole::Worker,
-                        "codex",
-                        &[],
-                        None,
-                        project,
-                    )
-                    .expect("join");
+                    join_session("sync-4", SessionRole::Worker, "codex", &[], None, project)
+                        .expect("join");
                 });
             }
 
             // Make all 6 workers stale
             for i in 1..=6 {
-                let log_path = write_agent_log_file(
-                    project,
-                    "codex",
-                    &format!("worker-{i}"),
-                );
+                let log_path = write_agent_log_file(project, "codex", &format!("worker-{i}"));
                 set_log_mtime_seconds_ago(&log_path, 600);
             }
 
@@ -4648,20 +4640,12 @@ mod tests {
     fn leave_session_marks_agent_disconnected() {
         with_temp_project(|project| {
             let state =
-                start_session("test", "", project, Some("claude"), Some("leave-1"))
-                    .expect("start");
+                start_session("test", "", project, Some("claude"), Some("leave-1")).expect("start");
             let leader_id = state.leader_id.clone().expect("leader");
 
             temp_env::with_var("CODEX_SESSION_ID", Some("worker-leave"), || {
-                join_session(
-                    "leave-1",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                )
-                .expect("join");
+                join_session("leave-1", SessionRole::Worker, "codex", &[], None, project)
+                    .expect("join");
             });
 
             let state = session_status("leave-1", project).expect("status");
@@ -4677,8 +4661,7 @@ mod tests {
                 project,
             )
             .expect("create task");
-            assign_task("leave-1", &task.task_id, &worker_id, &leader_id, project)
-                .expect("assign");
+            assign_task("leave-1", &task.task_id, &worker_id, &leader_id, project).expect("assign");
 
             leave_session("leave-1", &worker_id, project).expect("leave");
 
@@ -4698,8 +4681,7 @@ mod tests {
     fn leave_session_leader_cannot_leave() {
         with_temp_project(|project| {
             let state =
-                start_session("test", "", project, Some("claude"), Some("leave-2"))
-                    .expect("start");
+                start_session("test", "", project, Some("claude"), Some("leave-2")).expect("start");
             let leader_id = state.leader_id.clone().expect("leader");
 
             let error =
