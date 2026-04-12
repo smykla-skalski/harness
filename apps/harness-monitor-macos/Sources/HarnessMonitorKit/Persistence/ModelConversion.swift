@@ -106,7 +106,7 @@ extension CachedSession {
       signals: signals.map { $0.toSessionSignalRecord() },
       observer: observer?.toObserverSummary(),
       agentActivity: agentActivity.map { $0.toAgentToolActivitySummary() }
-    )
+    ).canonicallySorted()
   }
 
   func update(from summary: SessionSummary) {

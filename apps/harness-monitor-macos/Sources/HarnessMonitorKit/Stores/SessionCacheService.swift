@@ -315,6 +315,25 @@ public actor SessionCacheService {
     for existing in session.agents where !incomingIds.contains(existing.agentId) {
       context.delete(existing)
     }
+
+    session.agents.sort { left, right in
+      let leftRole = rolePriority(raw: left.roleRaw)
+      let rightRole = rolePriority(raw: right.roleRaw)
+      if leftRole != rightRole {
+        return leftRole < rightRole
+      }
+
+      let leftStatus = agentStatusPriority(raw: left.statusRaw)
+      let rightStatus = agentStatusPriority(raw: right.statusRaw)
+      if leftStatus != rightStatus {
+        return leftStatus < rightStatus
+      }
+
+      if left.joinedAt != right.joinedAt {
+        return left.joinedAt < right.joinedAt
+      }
+      return left.agentId < right.agentId
+    }
   }
 
   private func syncTasks(
@@ -337,6 +356,21 @@ public actor SessionCacheService {
 
     for existing in session.tasks where !incomingIds.contains(existing.taskId) {
       context.delete(existing)
+    }
+
+    session.tasks.sort { left, right in
+      let leftSeverity = taskSeverityPriority(raw: left.severityRaw)
+      let rightSeverity = taskSeverityPriority(raw: right.severityRaw)
+      if leftSeverity != rightSeverity {
+        return leftSeverity > rightSeverity
+      }
+      if left.updatedAt != right.updatedAt {
+        return left.updatedAt > right.updatedAt
+      }
+      if left.createdAt != right.createdAt {
+        return left.createdAt > right.createdAt
+      }
+      return left.taskId < right.taskId
     }
   }
 
@@ -420,6 +454,18 @@ public actor SessionCacheService {
     } else if let observer {
       session.observer = observer.toCachedObserver()
     }
+  }
+
+  private func rolePriority(raw: String) -> Int {
+    SessionRole(rawValue: raw)?.sortPriority ?? SessionRole.worker.sortPriority
+  }
+
+  private func agentStatusPriority(raw: String) -> Int {
+    AgentStatus(rawValue: raw)?.sortPriority ?? AgentStatus.removed.sortPriority
+  }
+
+  private func taskSeverityPriority(raw: String) -> Int {
+    TaskSeverity(rawValue: raw)?.sortPriority ?? TaskSeverity.low.sortPriority
   }
 
 }

@@ -101,8 +101,14 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.timeline = configuration.timeline
     if let selectedSessionID = configuration.selectedSessionID {
       let initialAgentTuis = configuration.fixtures.agentTuisBySessionID[selectedSessionID] ?? []
-      store.selectedAgentTuis = initialAgentTuis
-      store.selectAgentTui(tuiID: initialAgentTuis.first?.tuiId)
+      let roleByAgent = Dictionary(
+        uniqueKeysWithValues: (configuration.selectedDetail?.agents ?? []).map { ($0.agentId, $0.role) }
+      )
+      let sortedAgentTuis = AgentTuiListResponse(tuis: initialAgentTuis)
+        .canonicallySorted(roleByAgent: roleByAgent)
+        .tuis
+      store.selectedAgentTuis = sortedAgentTuis
+      store.selectAgentTui(tuiID: sortedAgentTuis.first?.tuiId)
     }
     store.isSelectionLoading = false
     store.isShowingCachedData = configuration.isShowingCachedData

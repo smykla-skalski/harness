@@ -1,4 +1,3 @@
-use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt;
@@ -17,6 +16,7 @@ use crate::agents::runtime::signal::{
 use crate::agents::service as agents_service;
 use crate::daemon::client::DaemonClient;
 use crate::daemon::index as daemon_index;
+use crate::daemon::ordering::sort_session_tasks;
 use crate::daemon::protocol;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
@@ -98,6 +98,7 @@ pub fn start_session(
             "session start requires --runtime for leader session tracking".to_string(),
         ))
     })?;
+    ensure_known_runtime(runtime_name, "session start requires a known runtime")?;
 
     if let Some(client) = DaemonClient::try_connect() {
         return client.start_session(&protocol::SessionStartRequest {
@@ -159,6 +160,7 @@ pub fn join_session(
     name: Option<&str>,
     project_dir: &Path,
 ) -> Result<SessionState, CliError> {
+    ensure_known_runtime(runtime_name, "agent join requires a known runtime")?;
     if let Some(client) = DaemonClient::try_connect() {
         return client.join_session(
             session_id,
@@ -453,7 +455,13 @@ pub fn create_task_with_source(
                 suggested_fix: spec.suggested_fix.map(ToString::to_string),
             },
         )?;
-        return detail.tasks.into_iter().last().ok_or_else(|| {
+        let created = detail.tasks.into_iter().max_by(|left, right| {
+            left.created_at
+                .cmp(&right.created_at)
+                .then_with(|| left.updated_at.cmp(&right.updated_at))
+                .then_with(|| left.task_id.cmp(&right.task_id))
+        });
+        return created.ok_or_else(|| {
             CliErrorKind::workflow_io("daemon created task but returned empty task list").into()
         });
     }
@@ -602,9 +610,7 @@ pub fn list_tasks(
             .into_iter()
             .filter(|task| status_filter.is_none_or(|status| task.status == status))
             .collect();
-        items.sort_unstable_by_key(|item| {
-            (Reverse(item.severity), Reverse(item.updated_at.clone()))
-        });
+        sort_session_tasks(&mut items);
         return Ok(items);
     }
 
@@ -614,7 +620,7 @@ pub fn list_tasks(
         .into_values()
         .filter(|task| status_filter.is_none_or(|status| task.status == status))
         .collect();
-    items.sort_unstable_by_key(|item| (Reverse(item.severity), Reverse(item.updated_at.clone())));
+    sort_session_tasks(&mut items);
     Ok(items)
 }
 
@@ -2632,8 +2638,19 @@ fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
         "copilot" => Some(HookAgent::Copilot),
         "codex" => Some(HookAgent::Codex),
         "gemini" => Some(HookAgent::Gemini),
+        "vibe" => Some(HookAgent::Vibe),
         "opencode" => Some(HookAgent::OpenCode),
         _ => None,
+    }
+}
+
+fn ensure_known_runtime(runtime_name: &str, message_prefix: &str) -> Result<(), CliError> {
+    if resolve_registered_runtime(runtime_name).is_some() {
+        Ok(())
+    } else {
+        Err(CliError::from(CliErrorKind::session_agent_conflict(
+            format!("{message_prefix}, got '{runtime_name}'"),
+        )))
     }
 }
 
@@ -2874,7 +2891,11 @@ fn runtime_capabilities(runtime_name: &str) -> runtime::RuntimeCapabilities {
             runtime: runtime_name.to_string(),
             ..runtime::RuntimeCapabilities::default()
         },
-        super::super::agents::runtime::AgentRuntime::capabilities,
+        |agent_runtime| {
+            let mut capabilities = agent_runtime.capabilities();
+            capabilities.runtime = runtime_name.to_string();
+            capabilities
+        },
     )
 }
 
@@ -3043,6 +3064,38 @@ mod tests {
             let unknown_runtime = start_session("goal", "", project, Some("unknown"), Some("bad"))
                 .expect_err("unknown runtime should be rejected");
             assert_eq!(unknown_runtime.code(), "KSRCLI092");
+        });
+    }
+
+    #[test]
+    fn start_session_accepts_vibe_and_opencode_as_distinct_runtime_names() {
+        with_temp_project(|project| {
+            let vibe = start_session("goal", "", project, Some("vibe"), Some("vibe-runtime"))
+                .expect("vibe runtime should be accepted");
+            let opencode = start_session(
+                "goal",
+                "",
+                project,
+                Some("opencode"),
+                Some("opencode-runtime"),
+            )
+            .expect("opencode runtime should remain accepted");
+
+            let vibe_leader = vibe
+                .agents
+                .values()
+                .find(|agent| agent.role == SessionRole::Leader)
+                .expect("vibe leader");
+            assert_eq!(vibe_leader.runtime, "vibe");
+            assert_eq!(vibe_leader.runtime_capabilities.runtime, "vibe");
+
+            let opencode_leader = opencode
+                .agents
+                .values()
+                .find(|agent| agent.role == SessionRole::Leader)
+                .expect("opencode leader");
+            assert_eq!(opencode_leader.runtime, "opencode");
+            assert_eq!(opencode_leader.runtime_capabilities.runtime, "opencode");
         });
     }
 

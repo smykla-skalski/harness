@@ -475,8 +475,9 @@ extension HarnessMonitorStore {
       }
       clearHostBridgeIssue(for: "agent-tui")
       cancelAgentTuiActionRefresh()
-      selectedAgentTuis = measuredTuis.value.tuis
-      selectedAgentTui = preferredAgentTui(from: measuredTuis.value.tuis)
+      let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles()).tuis
+      selectedAgentTuis = sortedTuis
+      selectedAgentTui = preferredAgentTui(from: sortedTuis)
       return true
     } catch {
       return applyAgentTuiError(error, selectedSessionID: sessionID)
@@ -637,8 +638,16 @@ extension HarnessMonitorStore {
     into tuis: [AgentTuiSnapshot]
   ) -> [AgentTuiSnapshot] {
     var updatedTuis = tuis.filter { $0.tuiId != tui.tuiId }
-    updatedTuis.insert(tui, at: 0)
-    return updatedTuis
+    updatedTuis.append(tui)
+    return AgentTuiListResponse(tuis: updatedTuis)
+      .canonicallySorted(roleByAgent: selectedSessionRoles()).tuis
+  }
+
+  private func selectedSessionRoles() -> [String: SessionRole] {
+    Dictionary(
+      uniqueKeysWithValues:
+        (selectedSession?.agents ?? []).map { ($0.agentId, $0.role) }
+    )
   }
 
   private func applyHostBridgeStatus(_ status: BridgeStatusReport) {
