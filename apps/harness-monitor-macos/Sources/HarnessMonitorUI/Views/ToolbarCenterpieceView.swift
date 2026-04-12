@@ -1,62 +1,25 @@
 import HarnessMonitorKit
 import SwiftUI
 
-enum ToolbarDaemonIndicator: Equatable {
-  case offline
-  case launchdConnected
-  case manualConnected
-
-  var foregroundColor: Color {
-    switch self {
-    case .offline:
-      .secondary
-    case .launchdConnected, .manualConnected:
-      HarnessMonitorTheme.success
-    }
-  }
-}
-
-extension ToolbarDaemonIndicator {
-  init(_ state: HarnessMonitorStore.DaemonIndicatorState) {
-    switch state {
-    case .offline:
-      self = .offline
-    case .launchdConnected:
-      self = .launchdConnected
-    case .manualConnected:
-      self = .manualConnected
-    }
-  }
-}
-
 struct ContentCenterpieceToolbar: ToolbarContent {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
-  var daemonIndicator: ToolbarDaemonIndicator = .offline
-  var store: HarnessMonitorStore?
   var connectionState: HarnessMonitorStore.ConnectionState = .idle
-  var isBusy: Bool = false
 
   init(
     model: ToolbarCenterpieceModel = .preview,
     displayMode: ToolbarCenterpieceDisplayMode = .standard,
     availableDetailWidth: CGFloat = 1_024,
     statusMessages: [ToolbarStatusMessage] = [],
-    daemonIndicator: ToolbarDaemonIndicator = .offline,
-    store: HarnessMonitorStore? = nil,
-    connectionState: HarnessMonitorStore.ConnectionState = .idle,
-    isBusy: Bool = false
+    connectionState: HarnessMonitorStore.ConnectionState = .idle
   ) {
     self.model = model
     self.displayMode = displayMode
     self.availableDetailWidth = availableDetailWidth
     self.statusMessages = statusMessages
-    self.daemonIndicator = daemonIndicator
-    self.store = store
     self.connectionState = connectionState
-    self.isBusy = isBusy
   }
 
   var body: some ToolbarContent {
@@ -66,10 +29,7 @@ struct ContentCenterpieceToolbar: ToolbarContent {
         displayMode: displayMode,
         availableDetailWidth: availableDetailWidth,
         statusMessages: statusMessages,
-        daemonIndicator: daemonIndicator,
-        store: store,
-        connectionState: connectionState,
-        isBusy: isBusy
+        connectionState: connectionState
       )
     }
   }
@@ -282,10 +242,7 @@ struct ToolbarCenterpieceView: View {
   let displayMode: ToolbarCenterpieceDisplayMode
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
-  var daemonIndicator: ToolbarDaemonIndicator = .offline
-  var store: HarnessMonitorStore?
   var connectionState: HarnessMonitorStore.ConnectionState = .idle
-  var isBusy: Bool = false
   private static let toolbarHeight: CGFloat = 32
   // Leading inset matches the vertical centering gap inside the glass capsule
   // so the first metric token sits at equal distance from the bubble's inner
@@ -298,19 +255,13 @@ struct ToolbarCenterpieceView: View {
     displayMode: ToolbarCenterpieceDisplayMode,
     availableDetailWidth: CGFloat = 1_024,
     statusMessages: [ToolbarStatusMessage] = [],
-    daemonIndicator: ToolbarDaemonIndicator = .offline,
-    store: HarnessMonitorStore? = nil,
-    connectionState: HarnessMonitorStore.ConnectionState = .idle,
-    isBusy: Bool = false
+    connectionState: HarnessMonitorStore.ConnectionState = .idle
   ) {
     self.model = model
     self.displayMode = displayMode
     self.availableDetailWidth = availableDetailWidth
     self.statusMessages = statusMessages
-    self.daemonIndicator = daemonIndicator
-    self.store = store
     self.connectionState = connectionState
-    self.isBusy = isBusy
   }
 
   var body: some View {
@@ -329,12 +280,12 @@ struct ToolbarCenterpieceView: View {
           ToolbarStatusTickerCapsule(
             messages: statusMessages
           ) {
-            daemonAccessory
+            daemonStatusDot
           }
           .frame(width: displayMode.statusDropdownWidth(for: availableDetailWidth))
           .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
         } else {
-          daemonAccessory
+          daemonStatusDot
         }
       }
       .padding(.leading, Self.metricsLeadingInset)
@@ -352,17 +303,7 @@ struct ToolbarCenterpieceView: View {
     .help("Live harness summary")
   }
 
-  @ViewBuilder
-  private var daemonAccessory: some View {
-    HStack(spacing: 6) {
-      ToolbarDaemonIndicatorIcon(indicator: daemonIndicator)
-      if let store {
-        ToolbarDaemonToggleControl(
-          store: store,
-          connectionState: connectionState,
-          isBusy: isBusy
-        )
-      }
-    }
+  private var daemonStatusDot: some View {
+    ToolbarDaemonStatusDot(connectionState: connectionState)
   }
 }

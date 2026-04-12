@@ -344,7 +344,6 @@ extension HarnessMonitorStore {
   public final class ContentToolbarSlice {
     public var toolbarMetrics = HarnessMonitorStore.ToolbarMetricsState()
     public var statusMessages: [HarnessMonitorStore.StatusMessageState] = []
-    public var daemonIndicator: HarnessMonitorStore.DaemonIndicatorState = .offline
     public var canNavigateBack = false
     public var canNavigateForward = false
     public var isRefreshing = false
