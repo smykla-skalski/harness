@@ -3000,8 +3000,7 @@ mod tests {
                 .expect("write bridge state");
 
                 // Acquire the bridge lock to simulate a running bridge process
-                let _bridge_lock =
-                    bridge::acquire_bridge_lock_exclusive().expect("bridge lock");
+                let _bridge_lock = bridge::acquire_bridge_lock_exclusive().expect("bridge lock");
 
                 let report = diagnostics_report(None).expect("diagnostics");
                 let host_bridge = report.manifest.expect("manifest").host_bridge;
