@@ -43,7 +43,7 @@ struct AgentTuiSidebar: View {
               title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
             )
             .padding(.vertical, rowPadding)
-            .listRowInsets(EdgeInsets())
+
             .tag(AgentTuiSheetSelection.session(tui.tuiId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
           }
@@ -58,7 +58,7 @@ struct AgentTuiSidebar: View {
               title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
             )
             .padding(.vertical, rowPadding)
-            .listRowInsets(EdgeInsets())
+
             .tag(AgentTuiSheetSelection.session(tui.tuiId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
           }
