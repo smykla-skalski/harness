@@ -400,6 +400,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case settingsBackdropCycle = "settings-backdrop-cycle"
   case settingsBackgroundCycle = "settings-background-cycle"
   case timelineBurst = "timeline-burst"
+  case toastOverlayChurn = "toast-overlay-churn"
   case offlineCachedOpen = "offline-cached-open"
 
   init?(environment: HarnessMonitorEnvironment) {
@@ -420,7 +421,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       return "dashboard"
     case .refreshAndSearch, .sidebarOverflowSearch:
       return "overflow"
-    case .timelineBurst:
+    case .timelineBurst, .toastOverlayChurn:
       return "cockpit"
     case .offlineCachedOpen:
       return "offline-cached"
@@ -436,6 +437,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .refreshAndSearch,
       .sidebarOverflowSearch,
       .timelineBurst,
+      .toastOverlayChurn,
       .offlineCachedOpen:
       return .general
     }
