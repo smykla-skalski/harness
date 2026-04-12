@@ -176,8 +176,8 @@ public struct ContentView: View {
       }
       ContentEscapeCommandBridge(
         store: store,
-        toast: toast,
-        contentSessionDetail: contentSessionDetail
+        activeFeedbackID: toast.activeFeedback.first?.id,
+        hasSelectedSessionDetail: contentSessionDetail.selectedSessionDetail != nil
       )
     }
     .modifier(
@@ -387,15 +387,15 @@ private struct ContentFloatingOverlay: View {
 
 private struct ContentEscapeCommandBridge: View {
   let store: HarnessMonitorStore
-  let toast: ToastSlice
-  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
+  let activeFeedbackID: UUID?
+  let hasSelectedSessionDetail: Bool
 
   private func handleEscapeKeyPress() -> KeyPress.Result {
-    if let feedbackID = toast.activeFeedback.first?.id {
-      toast.dismiss(id: feedbackID)
+    if let activeFeedbackID {
+      store.toast.dismiss(id: activeFeedbackID)
       return .handled
     }
-    if contentSessionDetail.selectedSessionDetail != nil {
+    if hasSelectedSessionDetail {
       store.inspectorSelection = .none
       return .handled
     }
@@ -403,9 +403,9 @@ private struct ContentEscapeCommandBridge: View {
   }
 
   private func handleExitCommand() {
-    if let feedbackID = toast.activeFeedback.first?.id {
-      toast.dismiss(id: feedbackID)
-    } else if contentSessionDetail.selectedSessionDetail != nil {
+    if let activeFeedbackID {
+      store.toast.dismiss(id: activeFeedbackID)
+    } else if hasSelectedSessionDetail {
       store.inspectorSelection = .none
     }
   }
