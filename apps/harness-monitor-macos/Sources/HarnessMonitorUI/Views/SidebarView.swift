@@ -10,7 +10,9 @@ struct SidebarView: View {
   let controls: HarnessMonitorStore.SessionControlsSlice
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
-  let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let sidebarShellUI: HarnessMonitorStore.SidebarShellUISlice
+  let sidebarListUI: HarnessMonitorStore.SidebarListUISlice
+  let sidebarFooterUI: HarnessMonitorStore.SidebarFooterUISlice
   let sidebarVisible: Bool
   let onSidebarWidthChange: (CGFloat) -> Void
   @Environment(\.harnessDateTimeConfiguration)
@@ -34,7 +36,9 @@ struct SidebarView: View {
     controls: HarnessMonitorStore.SessionControlsSlice,
     projection: HarnessMonitorStore.SessionProjectionSlice,
     searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
-    sidebarUI: HarnessMonitorStore.SidebarUISlice,
+    sidebarShellUI: HarnessMonitorStore.SidebarShellUISlice,
+    sidebarListUI: HarnessMonitorStore.SidebarListUISlice,
+    sidebarFooterUI: HarnessMonitorStore.SidebarFooterUISlice,
     sidebarVisible: Bool,
     onSidebarWidthChange: @escaping (CGFloat) -> Void = { _ in }
   ) {
@@ -42,7 +46,9 @@ struct SidebarView: View {
     self.controls = controls
     self.projection = projection
     self.searchResults = searchResults
-    self.sidebarUI = sidebarUI
+    self.sidebarShellUI = sidebarShellUI
+    self.sidebarListUI = sidebarListUI
+    self.sidebarFooterUI = sidebarFooterUI
     self.sidebarVisible = sidebarVisible
     self.onSidebarWidthChange = onSidebarWidthChange
     _searchDraftText = State(initialValue: controls.searchText)
@@ -72,7 +78,7 @@ struct SidebarView: View {
       store: store,
       projection: projection,
       searchResults: searchResults,
-      sidebarUI: sidebarUI,
+      sidebarListUI: sidebarListUI,
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
       collapsedCheckoutKeys: collapsedCheckoutKeys,
@@ -91,7 +97,7 @@ struct SidebarView: View {
       sidebarHeader
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
+      SidebarFooterMetricsBridge(sidebarFooterUI: sidebarFooterUI)
     }
     .toolbar {
       SidebarToolbarFilterToolbarItem(
@@ -113,7 +119,7 @@ struct SidebarView: View {
     }
     .onSubmit(of: .search) {
       commitSearchDraft(flushProjection: true)
-      if sidebarUI.isPersistenceAvailable {
+      if sidebarShellUI.isPersistenceAvailable {
         _ = store.recordSearch(controls.searchText)
       }
     }
@@ -131,7 +137,7 @@ struct SidebarView: View {
         sidebarVisibilityPhase = nextPhase
       }
     }
-    .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
+    .onChange(of: sidebarShellUI.searchFocusRequest) { _, _ in
       isSearchFocused = true
     }
     .onChange(of: controls.searchText, initial: true) { _, newValue in
@@ -154,7 +160,7 @@ struct SidebarView: View {
 
   @ViewBuilder private var sidebarHeader: some View {
     SidebarRecentSearchesHeader(
-      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+      isPersistenceAvailable: sidebarShellUI.isPersistenceAvailable,
       applyQuery: applyRecentSearch,
       clearHistory: { _ = store.clearSearchHistory() }
     )
@@ -188,7 +194,7 @@ struct SidebarView: View {
   private func applyRecentSearch(_ query: String) {
     searchDraftText = query
     commitSearchDraft(flushProjection: true)
-    if sidebarUI.isPersistenceAvailable {
+    if sidebarShellUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
     }
   }
@@ -270,7 +276,7 @@ private struct SidebarSessionListColumn: View {
   let store: HarnessMonitorStore
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
-  let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let sidebarListUI: HarnessMonitorStore.SidebarListUISlice
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
@@ -287,10 +293,10 @@ private struct SidebarSessionListColumn: View {
             return
           }
         }
-        if newValue == nil, sidebarUI.selectedSessionID != nil {
+        if newValue == nil, sidebarListUI.selectedSessionID != nil {
           return
         }
-        guard sidebarUI.selectedSessionID != newValue else {
+        guard sidebarListUI.selectedSessionID != newValue else {
           return
         }
         store.selectSessionFromList(newValue)
@@ -299,7 +305,7 @@ private struct SidebarSessionListColumn: View {
   }
 
   private var renderedSidebarSelectionID: String? {
-    guard let selectedSessionID = sidebarUI.selectedSessionID,
+    guard let selectedSessionID = sidebarListUI.selectedSessionID,
       searchResults.visibleSessionIDs.contains(selectedSessionID)
     else {
       return nil
@@ -314,9 +320,9 @@ private struct SidebarSessionListColumn: View {
       searchPresentation: searchResults.presentationState,
       searchVisibleSessionIDs: searchResults.visibleSessionIDs,
       selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
-        .selectionMarkersEnabled ? sidebarUI.selectedSessionID : nil,
-      bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
-      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+        .selectionMarkersEnabled ? sidebarListUI.selectedSessionID : nil,
+      bookmarkedSessionIDs: sidebarListUI.bookmarkedSessionIds,
+      isPersistenceAvailable: sidebarListUI.isPersistenceAvailable,
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
       collapsedCheckoutKeys: collapsedCheckoutKeys
@@ -341,9 +347,9 @@ private struct SidebarSessionListColumn: View {
 }
 
 private struct SidebarFooterMetricsBridge: View {
-  let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let sidebarFooterUI: HarnessMonitorStore.SidebarFooterUISlice
 
   var body: some View {
-    SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
+    SidebarFooterAccessory(metrics: sidebarFooterUI.connectionMetrics)
   }
 }

@@ -8,7 +8,9 @@ extension HarnessMonitorStore {
     case contentSession
     case contentSessionDetail
     case contentDashboard
-    case sidebar
+    case sidebarShell
+    case sidebarList
+    case sidebarFooter
     case inspector
   }
 }
@@ -50,9 +52,11 @@ extension HarnessMonitorStore {
         self?.scheduleUISync([
           .contentToolbar,
           .contentChrome,
+          .sidebarShell,
+          .sidebarList,
         ])
       case .metrics:
-        self?.scheduleUISync([.sidebar])
+        self?.scheduleUISync([.sidebarFooter])
       }
     }
     selection.onChanged = { [weak self] change in
@@ -60,7 +64,7 @@ extension HarnessMonitorStore {
       case .selectedSessionID:
         var areas: Set<UISyncArea> = [
           .contentSession,
-          .sidebar,
+          .sidebarList,
         ]
         if self?.selection.selectedSessionID == nil {
           areas.insert(.inspector)
@@ -90,7 +94,7 @@ extension HarnessMonitorStore {
       }
     }
     userData.onChanged = { [weak self] in
-      self?.scheduleUISync([.sidebar])
+      self?.scheduleUISync([.sidebarList])
     }
     sessionIndex.onChanged = { [weak self] change in
       guard let self else {
@@ -140,7 +144,9 @@ extension HarnessMonitorStore {
       .contentSession,
       .contentSessionDetail,
       .contentDashboard,
-      .sidebar,
+      .sidebarShell,
+      .sidebarList,
+      .sidebarFooter,
       .inspector,
     ])
   }
@@ -174,8 +180,14 @@ extension HarnessMonitorStore {
     if areas.contains(.contentDashboard) {
       syncContentDashboardUI()
     }
-    if areas.contains(.sidebar) {
-      syncSidebarUI()
+    if areas.contains(.sidebarShell) {
+      syncSidebarShellUI()
+    }
+    if areas.contains(.sidebarList) {
+      syncSidebarListUI()
+    }
+    if areas.contains(.sidebarFooter) {
+      syncSidebarFooterUI()
     }
     if areas.contains(.inspector) {
       syncInspectorUI()
@@ -290,14 +302,29 @@ extension HarnessMonitorStore {
     )
   }
 
-  private func syncSidebarUI() {
-    sidebarUI.apply(
-      SidebarUIState(
-        connectionMetrics: connectionMetrics,
+  private func syncSidebarShellUI() {
+    sidebarShellUI.apply(
+      SidebarShellUIState(
+        isPersistenceAvailable: isPersistenceAvailable,
+        searchFocusRequest: sidebarShellUI.searchFocusRequest
+      )
+    )
+  }
+
+  private func syncSidebarListUI() {
+    sidebarListUI.apply(
+      SidebarListUIState(
         selectedSessionID: selection.selectedSessionID,
         isPersistenceAvailable: isPersistenceAvailable,
-        bookmarkedSessionIds: userData.bookmarkedSessionIds,
-        searchFocusRequest: sidebarUI.searchFocusRequest
+        bookmarkedSessionIds: userData.bookmarkedSessionIds
+      )
+    )
+  }
+
+  private func syncSidebarFooterUI() {
+    sidebarFooterUI.apply(
+      SidebarFooterUIState(
+        connectionMetrics: connectionMetrics
       )
     )
   }
