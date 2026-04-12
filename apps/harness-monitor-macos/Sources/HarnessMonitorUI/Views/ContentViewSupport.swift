@@ -194,7 +194,9 @@ struct ContentDetailColumn: View {
   @Binding var detailColumnWidth: CGFloat
 
   private var navigationTitleText: String {
-    contentSessionDetail.selectedSessionDetail != nil ? "Cockpit" : "Dashboard"
+    contentSessionDetail.selectedSessionDetail != nil
+      || contentSession.selectedSessionSummary != nil
+      ? "Cockpit" : "Dashboard"
   }
 
   var body: some View {

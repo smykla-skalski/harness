@@ -1,7 +1,6 @@
 import Testing
 
 @testable import HarnessMonitorKit
-@testable import HarnessMonitorUI
 
 @MainActor
 @Suite("Harness Monitor content selection observation")
@@ -345,41 +344,5 @@ struct HarnessMonitorContentSelectionTests {
     #expect(inspectorChanged == false)
     #expect(store.selectedSession == PreviewFixtures.detail)
     #expect(store.isSelectionLoading == false)
-  }
-
-  @Test("Session content presentation keeps dashboard visible until detail arrives")
-  func sessionContentPresentationKeepsDashboardVisibleUntilDetailArrives() {
-    let presentation = SessionContentPresentation(
-      state: .init(
-        detail: nil,
-        summary: PreviewFixtures.summary,
-        timeline: [],
-        isSessionReadOnly: false,
-        isExtensionsLoading: false
-      ),
-      lastDetail: nil,
-      lastTimeline: []
-    )
-
-    #expect(presentation.mode == .dashboard)
-    #expect(presentation.activeTimeline.isEmpty)
-  }
-
-  @Test("Session content presentation preserves cockpit when the same detail is cached")
-  func sessionContentPresentationPreservesCachedCockpitForSameSession() {
-    let presentation = SessionContentPresentation(
-      state: .init(
-        detail: nil,
-        summary: PreviewFixtures.summary,
-        timeline: [],
-        isSessionReadOnly: false,
-        isExtensionsLoading: true
-      ),
-      lastDetail: PreviewFixtures.detail,
-      lastTimeline: PreviewFixtures.timeline
-    )
-
-    #expect(presentation.mode == .cockpit(PreviewFixtures.detail))
-    #expect(presentation.activeTimeline == PreviewFixtures.timeline)
   }
 }

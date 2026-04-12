@@ -9,34 +9,6 @@ struct SessionContentState: Equatable {
   let isExtensionsLoading: Bool
 }
 
-struct SessionContentPresentation: Equatable {
-  let mode: SessionContentMode
-  let activeTimeline: [TimelineEntry]
-
-  init(
-    state: SessionContentState,
-    lastDetail: SessionDetail?,
-    lastTimeline: [TimelineEntry]
-  ) {
-    let activeDetail: SessionDetail? = if let detail = state.detail {
-      detail
-    } else if lastDetail?.session.sessionId == state.summary?.sessionId {
-      lastDetail
-    } else {
-      nil
-    }
-
-    activeTimeline = state.detail != nil ? state.timeline : lastTimeline
-    if let activeDetail {
-      mode = .cockpit(activeDetail)
-    } else {
-      // Keep the dashboard stable until live detail is available so the first
-      // selection does not force a dashboard -> loading -> cockpit swap.
-      mode = .dashboard
-    }
-  }
-}
-
 struct SessionContentContainer: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
@@ -44,17 +16,33 @@ struct SessionContentContainer: View {
   @State private var lastDetail: SessionDetail?
   @State private var lastTimeline: [TimelineEntry] = []
 
-  private var presentation: SessionContentPresentation {
-    SessionContentPresentation(
-      state: state,
-      lastDetail: lastDetail,
-      lastTimeline: lastTimeline
-    )
+  private var activeDetail: SessionDetail? {
+    if let detail = state.detail {
+      return detail
+    }
+    guard lastDetail?.session.sessionId == state.summary?.sessionId else {
+      return nil
+    }
+    return lastDetail
+  }
+
+  private var activeTimeline: [TimelineEntry] {
+    state.detail != nil ? state.timeline : lastTimeline
+  }
+
+  private var mode: SessionContentMode {
+    if let activeDetail {
+      return .cockpit(activeDetail)
+    }
+    if let summary = state.summary {
+      return .loading(summary)
+    }
+    return .dashboard
   }
 
   var body: some View {
     ZStack(alignment: .topLeading) {
-      switch presentation.mode {
+      switch mode {
       case .dashboard:
         SessionsBoardView(
           store: store,
@@ -65,10 +53,12 @@ struct SessionContentContainer: View {
         SessionCockpitView(
           store: store,
           detail: cockpitDetail,
-          timeline: presentation.activeTimeline,
+          timeline: activeTimeline,
           isSessionReadOnly: state.isSessionReadOnly,
           isExtensionsLoading: state.isExtensionsLoading
         )
+      case .loading(let summary):
+        SessionCockpitLoadingSurface(summary: summary)
       }
     }
     .onChange(of: state.detail) { _, newDetail in
@@ -87,9 +77,30 @@ struct SessionContentContainer: View {
 
 }
 
-enum SessionContentMode: Equatable {
+private enum SessionContentMode {
   case dashboard
   case cockpit(SessionDetail)
+  case loading(SessionSummary)
+}
+
+private struct SessionCockpitLoadingSurface: View {
+  let summary: SessionSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      Label(summary.displayTitle, systemImage: "arrow.trianglehead.2.clockwise")
+        .font(.system(.title3, design: .rounded, weight: .semibold))
+      Text("Loading session details")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      ProgressView()
+        .controlSize(.small)
+    }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Loading \(summary.displayTitle)")
+  }
 }
 
 #Preview("Session Content - Dashboard") {
