@@ -435,6 +435,18 @@ pub fn append_event(level: &str, message: &str) -> Result<(), CliError> {
         .map_err(|error| CliErrorKind::workflow_io(format!("append daemon event: {error}")).into())
 }
 
+/// Append a daemon-owned audit event and degrade to tracing on failure.
+pub fn append_event_best_effort(level: &str, message: &str) {
+    if let Err(error) = append_event(level, message) {
+        tracing::warn!(
+            %error,
+            level,
+            event_message = message,
+            "failed to append daemon audit event"
+        );
+    }
+}
+
 /// Read the newest daemon audit events from disk.
 ///
 /// # Errors
