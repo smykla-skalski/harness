@@ -92,7 +92,7 @@ struct HarnessMonitorStoreMetricsTests {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      { store.sidebarUI.connectionMetrics },
+      { store.sidebarFooterUI.connectionMetrics },
       after: {
         var metrics = store.connectionMetrics
         metrics.messagesReceived += 1

@@ -5,15 +5,15 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store filtering projection")
 struct HarnessMonitorStoreProjectionTests {
-  @Test("Sidebar UI list-facing state ignores footer-only metric churn")
-  func sidebarUIListFacingStateIgnoresFooterMetricChurn() async {
+  @Test("Sidebar list state ignores footer-only metric churn")
+  func sidebarListStateIgnoresFooterMetricChurn() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
       {
         (
-          store.sidebarUI.selectedSessionID,
-          store.sidebarUI.bookmarkedSessionIds
+          store.sidebarListUI.selectedSessionID,
+          store.sidebarListUI.bookmarkedSessionIds
         )
       },
       after: {
@@ -27,12 +27,12 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(didChange == false)
   }
 
-  @Test("Sidebar bookmarks invalidate the shell while search stays in projection state")
-  func sidebarShellAndProjectionObservationBoundaries() async {
+  @Test("Sidebar list invalidates for bookmarks while search stays in projection state")
+  func sidebarListAndProjectionObservationBoundaries() async {
     let store = await makeBootstrappedStore()
 
     let bookmarkInvalidated = await didInvalidate(
-      { store.sidebarUI.bookmarkedSessionIds },
+      { store.sidebarListUI.bookmarkedSessionIds },
       after: {
         store.bookmarkedSessionIds = ["bookmark-observed"]
       }
@@ -41,11 +41,11 @@ struct HarnessMonitorStoreProjectionTests {
 
     let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
     let initialProjectionRebuilds = store.sessionIndex.debugProjectionRebuildCount
-    let sidebarShellInvalidated = await didInvalidate(
+    let sidebarListInvalidated = await didInvalidate(
       {
         (
-          store.sidebarUI.selectedSessionID,
-          store.sidebarUI.bookmarkedSessionIds
+          store.sidebarListUI.selectedSessionID,
+          store.sidebarListUI.bookmarkedSessionIds
         )
       },
       after: {
@@ -54,9 +54,28 @@ struct HarnessMonitorStoreProjectionTests {
       }
     )
 
-    #expect(sidebarShellInvalidated == false)
+    #expect(sidebarListInvalidated == false)
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
+  }
+
+  @Test("Sidebar shell ignores session selection churn")
+  func sidebarShellIgnoresSessionSelectionChurn() async {
+    let store = await makeBootstrappedStore()
+
+    let didChange = await didInvalidate(
+      {
+        (
+          store.sidebarShellUI.isPersistenceAvailable,
+          store.sidebarShellUI.searchFocusRequest
+        )
+      },
+      after: {
+        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
+      }
+    )
+
+    #expect(didChange == false)
   }
 
   @Test("Projection-only changes do not rebuild the session catalog")

@@ -300,12 +300,19 @@ extension HarnessMonitorStore {
     public var isLaunchAgentInstalled = false
   }
 
-  public struct SidebarUIState: Equatable {
-    public var connectionMetrics: ConnectionMetrics = .initial
+  public struct SidebarShellUIState: Equatable {
+    public var isPersistenceAvailable = false
+    public var searchFocusRequest = 0
+  }
+
+  public struct SidebarListUIState: Equatable {
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
-    public var searchFocusRequest = 0
+  }
+
+  public struct SidebarFooterUIState: Equatable {
+    public var connectionMetrics: ConnectionMetrics = .initial
   }
 
   public struct InspectorUIState: Equatable {
@@ -457,19 +464,32 @@ extension HarnessMonitorStore {
 
   @MainActor
   @Observable
-  public final class SidebarUISlice {
-    public var connectionMetrics: ConnectionMetrics = .initial
-    public var selectedSessionID: String?
+  public final class SidebarShellUISlice {
     public var isPersistenceAvailable = false
-    public var bookmarkedSessionIds: Set<String> = []
     public var searchFocusRequest = 0
 
     public init() {}
 
-    internal func apply(_ state: SidebarUIState) {
-      if connectionMetrics != state.connectionMetrics {
-        connectionMetrics = state.connectionMetrics
+    internal func apply(_ state: SidebarShellUIState) {
+      if isPersistenceAvailable != state.isPersistenceAvailable {
+        isPersistenceAvailable = state.isPersistenceAvailable
       }
+      if searchFocusRequest != state.searchFocusRequest {
+        searchFocusRequest = state.searchFocusRequest
+      }
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class SidebarListUISlice {
+    public var selectedSessionID: String?
+    public var isPersistenceAvailable = false
+    public var bookmarkedSessionIds: Set<String> = []
+
+    public init() {}
+
+    internal func apply(_ state: SidebarListUIState) {
       if selectedSessionID != state.selectedSessionID {
         selectedSessionID = state.selectedSessionID
       }
@@ -479,8 +499,19 @@ extension HarnessMonitorStore {
       if bookmarkedSessionIds != state.bookmarkedSessionIds {
         bookmarkedSessionIds = state.bookmarkedSessionIds
       }
-      if searchFocusRequest != state.searchFocusRequest {
-        searchFocusRequest = state.searchFocusRequest
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class SidebarFooterUISlice {
+    public var connectionMetrics: ConnectionMetrics = .initial
+
+    public init() {}
+
+    internal func apply(_ state: SidebarFooterUIState) {
+      if connectionMetrics != state.connectionMetrics {
+        connectionMetrics = state.connectionMetrics
       }
     }
   }

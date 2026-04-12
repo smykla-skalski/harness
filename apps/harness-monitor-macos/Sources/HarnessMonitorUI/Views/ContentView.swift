@@ -211,7 +211,9 @@ public struct ContentView: View {
       controls: store.sessionIndex.controls,
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
-      sidebarUI: store.sidebarUI,
+      sidebarShellUI: store.sidebarShellUI,
+      sidebarListUI: store.sidebarListUI,
+      sidebarFooterUI: store.sidebarFooterUI,
       sidebarVisible: columnVisibility != .detailOnly,
       onSidebarWidthChange: updateSidebarColumnWidth
     )
