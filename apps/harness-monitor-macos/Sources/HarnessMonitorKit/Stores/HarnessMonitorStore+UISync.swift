@@ -8,6 +8,7 @@ extension HarnessMonitorStore {
     case contentSession
     case contentSessionDetail
     case contentDashboard
+    case commands
     case sidebar
     case inspector
   }
@@ -34,6 +35,7 @@ extension HarnessMonitorStore {
           .contentChrome,
           .contentSession,
           .contentDashboard,
+          .commands,
           .inspector,
         ])
       case .daemonStatus:
@@ -60,6 +62,7 @@ extension HarnessMonitorStore {
       case .selectedSessionID:
         var areas: Set<UISyncArea> = [
           .contentSession,
+          .commands,
           .sidebar,
         ]
         if self?.selection.selectedSessionID == nil {
@@ -95,23 +98,27 @@ extension HarnessMonitorStore {
     sessionIndex.onChanged = { [weak self] change in
       switch change {
       case .snapshot:
-        self?.scheduleUISync([
+        var areas: Set<UISyncArea> = [
           .contentToolbar,
           .contentChrome,
           .contentSession,
           .inspector,
-        ])
+        ]
+        if self?.selection.selectedSessionID != nil {
+          areas.insert(.commands)
+        }
+        self?.scheduleUISync(areas)
       case .summaryProjection(let sessionID):
         var areas: Set<UISyncArea> = [.contentToolbar]
         if self?.selection.selectedSessionID == sessionID {
-          areas.formUnion([.contentChrome, .contentSession, .inspector])
+          areas.formUnion([.contentChrome, .contentSession, .commands, .inspector])
         }
         self?.scheduleUISync(areas)
       case .summaryMetadata(let sessionID):
         guard self?.selection.selectedSessionID == sessionID else {
           return
         }
-        self?.scheduleUISync([.contentChrome, .contentSession, .inspector])
+        self?.scheduleUISync([.contentChrome, .contentSession, .commands, .inspector])
       case .projection:
         break
       }
@@ -137,6 +144,7 @@ extension HarnessMonitorStore {
       .contentSession,
       .contentSessionDetail,
       .contentDashboard,
+      .commands,
       .sidebar,
       .inspector,
     ])
@@ -170,6 +178,9 @@ extension HarnessMonitorStore {
     }
     if areas.contains(.contentDashboard) {
       syncContentDashboardUI()
+    }
+    if areas.contains(.commands) {
+      syncCommandsUI()
     }
     if areas.contains(.sidebar) {
       syncSidebarUI()
@@ -276,6 +287,24 @@ extension HarnessMonitorStore {
         isBusy: isBusy,
         isRefreshing: isRefreshing,
         isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true
+      )
+    )
+  }
+
+  private func syncCommandsUI() {
+    let selectedSessionSummary = sessionIndex.sessionSummary(
+      for: selection.selectedSessionID
+    )
+
+    commandsUI.apply(
+      CommandsUIState(
+        canNavigateBack: canNavigateBack,
+        canNavigateForward: canNavigateForward,
+        hasSelectedSession: selection.selectedSessionID != nil,
+        isSessionReadOnly: isSessionReadOnly,
+        bookmarkTitle: selectedSessionBookmarkTitle,
+        isPersistenceAvailable: isPersistenceAvailable,
+        hasObserver: selectedSessionSummary?.observeId != nil
       )
     )
   }
