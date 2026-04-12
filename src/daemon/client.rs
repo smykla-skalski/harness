@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use tokio::runtime::Handle;
 use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -53,7 +54,12 @@ impl DaemonClient {
     /// the wrong daemon.
     #[must_use]
     pub fn try_connect() -> Option<Self> {
-        try_build_client()
+        if daemon_client_allowed_in_current_context() {
+            try_build_client()
+        } else {
+            log_daemon_client_discovery_skipped();
+            None
+        }
     }
 
     pub fn start_session(&self, request: &SessionStartRequest) -> Result<SessionState, CliError> {
@@ -277,6 +283,18 @@ impl DaemonClient {
         });
         process_response(response, "POST", path, &request_id, &start)
     }
+}
+
+fn daemon_client_allowed_in_current_context() -> bool {
+    Handle::try_current().is_err()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_daemon_client_discovery_skipped() {
+    tracing::debug!("skipping daemon client discovery inside active tokio runtime");
 }
 
 fn try_build_client() -> Option<DaemonClient> {
@@ -603,6 +621,16 @@ mod tests {
         ));
         assert!(session_calls.load(Ordering::SeqCst) >= 2);
         server.join().expect("server");
+    }
+
+    #[test]
+    fn daemon_client_allowed_in_current_context_rejects_active_tokio_runtime() {
+        assert!(daemon_client_allowed_in_current_context());
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            assert!(!daemon_client_allowed_in_current_context());
+        });
     }
 
     #[test]

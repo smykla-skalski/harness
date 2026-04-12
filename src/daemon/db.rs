@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{Error as IoError, ErrorKind};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use rusqlite::{Connection, types::Type};
 
@@ -19,6 +20,8 @@ use crate::session::types::{
     SessionStatus, TaskCheckpoint, WorkItem,
 };
 use crate::workspace::{project_context_dir, project_context_id, utc_now};
+
+use super::state;
 
 /// `SQLite`-backed storage for the harness daemon. Replaces the file-based
 /// discovery layer with indexed queries while keeping file writes for
@@ -1628,6 +1631,19 @@ impl DaemonDb {
         }
         Ok(snapshots)
     }
+}
+
+pub(crate) fn ensure_shared_db(
+    db_slot: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
+    if let Some(db) = db_slot.get() {
+        return Ok(Arc::clone(db));
+    }
+
+    let db_path = state::daemon_root().join("harness.db");
+    let db = Arc::new(Mutex::new(DaemonDb::open(&db_path)?));
+    let _ = db_slot.set(Arc::clone(&db));
+    Ok(db_slot.get().cloned().unwrap_or(db))
 }
 
 fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
