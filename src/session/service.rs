@@ -1157,10 +1157,11 @@ pub fn sync_agent_liveness(
     let now = utc_now();
     let mut result = LivenessSyncResult::default();
 
-    // Collect runtime activity timestamps before entering the state update closure,
-    // since we need filesystem access that should not happen under the state lock.
+    // Collect runtime activity timestamps and signal directory info before entering
+    // the state update closure, since filesystem access should not happen under the
+    // state lock.
     let state = load_state_or_err(session_id, project_dir)?;
-    let mut activity_map: Vec<(String, Option<String>)> = Vec::new();
+    let mut activity_map: Vec<(String, Option<String>, String, Option<String>)> = Vec::new();
 
     for agent in state.agents.values() {
         if !agent.status.is_alive() {
@@ -1175,13 +1176,18 @@ pub fn sync_agent_liveness(
         let last_activity = agent_runtime
             .last_activity(project_dir, agent_session_id)
             .unwrap_or(None);
-        activity_map.push((agent.agent_id.clone(), last_activity));
+        activity_map.push((
+            agent.agent_id.clone(),
+            last_activity,
+            agent.runtime.clone(),
+            agent.agent_session_id.clone(),
+        ));
     }
 
     storage::update_state(project_dir, session_id, |state| {
         require_active(state)?;
 
-        for (agent_id, last_activity) in &activity_map {
+        for (agent_id, last_activity, _runtime, _session) in &activity_map {
             let Some(agent) = state.agents.get_mut(agent_id) else {
                 continue;
             };
@@ -1260,6 +1266,32 @@ pub fn sync_agent_liveness(
             },
             None,
             Some("liveness sync"),
+        );
+    }
+
+    // Clean up pending signals for disconnected agents (outside state lock)
+    for (agent_id, _last_activity, runtime_name, agent_session_id) in &activity_map {
+        if !result.disconnected.contains(agent_id) {
+            continue;
+        }
+        let Some(agent_runtime) = runtime::runtime_for_name(runtime_name) else {
+            continue;
+        };
+        // Clean up signals keyed by agent's runtime session
+        if let Some(agent_session) = agent_session_id {
+            let signal_dir = agent_runtime.signal_dir(project_dir, agent_session);
+            let _ = crate::agents::runtime::signal::cleanup_pending_signals(
+                &signal_dir,
+                agent_id,
+                session_id,
+            );
+        }
+        // Clean up signals keyed by orchestration session (legacy)
+        let signal_dir = agent_runtime.signal_dir(project_dir, session_id);
+        let _ = crate::agents::runtime::signal::cleanup_pending_signals(
+            &signal_dir,
+            agent_id,
+            session_id,
         );
     }
 
