@@ -350,7 +350,11 @@ struct CodexFlowSheetView: View {
     case .excluded:
       "Codex is excluded from the host bridge"
     case .unavailable:
-      "Codex host bridge is not running"
+      if hostBridge.running && codexBridgeCapabilityPresent {
+        "Codex host bridge is unavailable"
+      } else {
+        "Codex host bridge is not running"
+      }
     case .ready:
       "Codex host bridge ready"
     }
