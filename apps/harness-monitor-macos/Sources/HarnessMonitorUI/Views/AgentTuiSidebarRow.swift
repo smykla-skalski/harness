@@ -11,7 +11,7 @@ struct AgentTuiSidebarRow: View {
   }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
         .fill(agentTuiStatusColor(for: snapshot.status))
         .frame(width: 4)
@@ -22,6 +22,7 @@ struct AgentTuiSidebarRow: View {
         .lineLimit(1)
         .truncationMode(.tail)
     }
+    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .trailing) {
       Group {
