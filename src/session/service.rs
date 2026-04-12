@@ -1124,6 +1124,148 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
     Ok(state)
 }
 
+/// Result of a liveness synchronization pass.
+#[derive(Debug, Clone, Default)]
+pub struct LivenessSyncResult {
+    /// Agent IDs that were marked as disconnected (unresponsive).
+    pub disconnected: Vec<String>,
+    /// Agent IDs that were transitioned to idle.
+    pub idled: Vec<String>,
+}
+
+/// Run a one-shot liveness reconciliation for all agents in a session.
+///
+/// For each alive agent, reads the runtime's actual log file mtime, updates
+/// `last_activity_at` in session state, and transitions the agent's status
+/// based on the configured liveness thresholds:
+/// - Active: log activity within 30 seconds
+/// - Idle: log activity between 30 and 300 seconds ago
+/// - Disconnected: no log activity for 300+ seconds
+///
+/// When an agent transitions to `Disconnected`, any in-progress task assigned
+/// to it is returned to `Open` so it can be reassigned.
+///
+/// # Errors
+/// Returns `CliError` on storage or filesystem failures.
+pub fn sync_agent_liveness(
+    session_id: &str,
+    project_dir: &Path,
+) -> Result<LivenessSyncResult, CliError> {
+    use crate::agents::runtime::liveness::{LivenessConfig, liveness_from_timestamp};
+
+    let config = LivenessConfig::default();
+    let now = utc_now();
+    let mut result = LivenessSyncResult::default();
+
+    // Collect runtime activity timestamps before entering the state update closure,
+    // since we need filesystem access that should not happen under the state lock.
+    let state = load_state_or_err(session_id, project_dir)?;
+    let mut activity_map: Vec<(String, Option<String>)> = Vec::new();
+
+    for agent in state.agents.values() {
+        if !agent.status.is_alive() {
+            continue;
+        }
+        let Some(agent_runtime) = runtime::runtime_for_name(&agent.runtime) else {
+            continue;
+        };
+        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
+            continue;
+        };
+        let last_activity = agent_runtime
+            .last_activity(project_dir, agent_session_id)
+            .unwrap_or(None);
+        activity_map.push((agent.agent_id.clone(), last_activity));
+    }
+
+    storage::update_state(project_dir, session_id, |state| {
+        require_active(state)?;
+
+        for (agent_id, last_activity) in &activity_map {
+            let Some(agent) = state.agents.get_mut(agent_id) else {
+                continue;
+            };
+            if !agent.status.is_alive() {
+                continue;
+            }
+
+            // Update last_activity_at from the runtime's actual log timestamp
+            if let Some(timestamp) = last_activity {
+                agent.last_activity_at = Some(timestamp.clone());
+            }
+
+            let liveness = liveness_from_timestamp(
+                last_activity.as_deref(),
+                &config,
+            );
+
+            let new_status = match liveness {
+                crate::agents::runtime::liveness::LivenessStatus::Active => AgentStatus::Active,
+                crate::agents::runtime::liveness::LivenessStatus::Idle => AgentStatus::Idle,
+                crate::agents::runtime::liveness::LivenessStatus::Unresponsive => {
+                    AgentStatus::Disconnected
+                }
+            };
+
+            if new_status == agent.status {
+                continue;
+            }
+
+            let old_status = agent.status;
+            agent.status = new_status;
+            agent.updated_at = now.clone();
+
+            match new_status {
+                AgentStatus::Disconnected => {
+                    // Return any assigned task to Open
+                    if let Some(ref task_id) = agent.current_task_id.take() {
+                        if let Some(task) = state.tasks.get_mut(task_id) {
+                            if !matches!(task.status, TaskStatus::Done) {
+                                task.status = TaskStatus::Open;
+                                task.assigned_to = None;
+                                task.queue_policy = TaskQueuePolicy::Locked;
+                                task.queued_at = None;
+                                task.updated_at = now.clone();
+                            }
+                        }
+                    }
+                    clear_pending_leader_transfer(state, agent_id);
+                    result.disconnected.push(agent_id.clone());
+                    tracing::info!(
+                        agent_id,
+                        ?old_status,
+                        "agent marked disconnected by liveness sync"
+                    );
+                }
+                AgentStatus::Idle => {
+                    result.idled.push(agent_id.clone());
+                    tracing::debug!(agent_id, "agent transitioned to idle");
+                }
+                _ => {}
+            }
+        }
+
+        refresh_session(state, &now);
+        Ok(())
+    })?;
+
+    // Log the sync transition if any agents were affected
+    if !result.disconnected.is_empty() || !result.idled.is_empty() {
+        let _ = storage::append_log_entry(
+            project_dir,
+            session_id,
+            SessionTransition::LivenessSynced {
+                disconnected: result.disconnected.clone(),
+                idled: result.idled.clone(),
+            },
+            None,
+            Some("liveness sync"),
+        );
+    }
+
+    Ok(result)
+}
+
 /// List sessions for a project.
 ///
 /// # Errors
@@ -4199,6 +4341,208 @@ mod tests {
             .expect_err("permission denied");
 
             assert_eq!(error.code(), "KSRCLI091");
+        });
+    }
+
+    fn find_agent_by_runtime<'a>(
+        state: &'a SessionState,
+        runtime: &str,
+    ) -> &'a AgentRegistration {
+        state
+            .agents
+            .values()
+            .find(|agent| agent.runtime == runtime)
+            .unwrap_or_else(|| panic!("no agent with runtime '{runtime}'"))
+    }
+
+    fn set_log_mtime_seconds_ago(path: &std::path::Path, seconds: u64) {
+        let old_time = std::time::SystemTime::now()
+            - std::time::Duration::from_secs(seconds);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .expect("open for mtime")
+            .set_times(std::fs::FileTimes::new().set_modified(old_time))
+            .expect("set mtime");
+    }
+
+    fn write_agent_log_file(project: &Path, runtime: &str, session_id: &str) -> PathBuf {
+        let log_path = crate::workspace::project_context_dir(project)
+            .join(format!("agents/sessions/{runtime}/{session_id}/raw.jsonl"));
+        fs_err::create_dir_all(log_path.parent().unwrap()).expect("dirs");
+        fs_err::write(&log_path, "{}\n").expect("write log");
+        log_path
+    }
+
+    #[test]
+    fn sync_liveness_transitions_stale_agent_to_disconnected() {
+        with_temp_project(|project| {
+            let state =
+                start_session("test", "", project, Some("claude"), Some("sync-1"))
+                    .expect("start");
+            let leader_id = state.leader_id.clone().expect("leader");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess"), || {
+                join_session(
+                    "sync-1",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join worker");
+            });
+
+            let state = session_status("sync-1", project).expect("status");
+            let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+
+            // Write a log file for the worker with old mtime (600s > 300s threshold)
+            let log_path = write_agent_log_file(project, "codex", "worker-sess");
+            set_log_mtime_seconds_ago(&log_path, 600);
+
+            // Write a fresh log for the leader
+            write_agent_log_file(project, "claude", "test-service");
+
+            let result = sync_agent_liveness("sync-1", project).expect("sync");
+
+            assert_eq!(result.disconnected.len(), 1);
+            assert!(result.disconnected.contains(&worker_id));
+
+            let state = session_status("sync-1", project).expect("status");
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert_eq!(worker.status, AgentStatus::Disconnected);
+
+            let leader = state.agents.get(&leader_id).expect("leader");
+            assert_eq!(leader.status, AgentStatus::Active);
+
+            assert_eq!(state.metrics.active_agent_count, 1);
+        });
+    }
+
+    #[test]
+    fn sync_liveness_updates_last_activity_from_runtime() {
+        with_temp_project(|project| {
+            start_session("test", "", project, Some("claude"), Some("sync-2"))
+                .expect("start");
+
+            // Write a fresh log for the leader
+            let leader_log = crate::workspace::project_context_dir(project)
+                .join("agents/sessions/claude/test-service/raw.jsonl");
+            fs_err::create_dir_all(leader_log.parent().unwrap()).expect("dirs");
+            fs_err::write(&leader_log, "{}\n").expect("write log");
+
+            let _ = sync_agent_liveness("sync-2", project).expect("sync");
+
+            let state = session_status("sync-2", project).expect("status");
+            let leader = state.agents.values().next().expect("leader");
+            // last_activity_at should be updated from the runtime log's mtime
+            assert!(leader.last_activity_at.is_some());
+        });
+    }
+
+    #[test]
+    fn sync_liveness_returns_dead_agent_task_to_open() {
+        with_temp_project(|project| {
+            let state =
+                start_session("test", "", project, Some("claude"), Some("sync-3"))
+                    .expect("start");
+            let leader_id = state.leader_id.clone().expect("leader");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess-3"), || {
+                join_session(
+                    "sync-3",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join");
+            });
+
+            let state = session_status("sync-3", project).expect("status");
+            let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+
+            // Create a task and assign it to the worker
+            let task = create_task(
+                "sync-3",
+                "test task",
+                Some("details"),
+                TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("create task");
+            assign_task("sync-3", &task.task_id, &worker_id, &leader_id, project)
+                .expect("assign");
+            update_task(
+                "sync-3",
+                &task.task_id,
+                TaskStatus::InProgress,
+                None,
+                &worker_id,
+                project,
+            )
+            .expect("start");
+
+            // Make the worker agent stale
+            let log_path = write_agent_log_file(project, "codex", "worker-sess-3");
+            set_log_mtime_seconds_ago(&log_path, 600);
+
+            // Keep leader alive
+            write_agent_log_file(project, "claude", "test-service");
+
+            let _ = sync_agent_liveness("sync-3", project).expect("sync");
+
+            let state = session_status("sync-3", project).expect("status");
+            let task = state.tasks.get(&task.task_id).expect("task");
+            assert_eq!(task.status, TaskStatus::Open, "dead agent task returns to Open");
+            assert!(task.assigned_to.is_none(), "dead agent task is unassigned");
+        });
+    }
+
+    #[test]
+    fn sync_liveness_seven_agents_six_die() {
+        with_temp_project(|project| {
+            start_session("test", "", project, Some("claude"), Some("sync-4"))
+                .expect("start");
+
+            // Join 6 more workers with distinct runtime session IDs
+            for i in 1..=6 {
+                let session_val = format!("worker-{i}");
+                temp_env::with_var("CODEX_SESSION_ID", Some(&session_val), || {
+                    join_session(
+                        "sync-4",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join");
+                });
+            }
+
+            // Make all 6 workers stale
+            for i in 1..=6 {
+                let log_path = write_agent_log_file(
+                    project,
+                    "codex",
+                    &format!("worker-{i}"),
+                );
+                set_log_mtime_seconds_ago(&log_path, 600);
+            }
+
+            // Keep leader alive
+            write_agent_log_file(project, "claude", "test-service");
+
+            let result = sync_agent_liveness("sync-4", project).expect("sync");
+            assert_eq!(result.disconnected.len(), 6);
+
+            let state = session_status("sync-4", project).expect("status");
+            assert_eq!(state.metrics.active_agent_count, 1);
+            assert_eq!(state.metrics.agent_count, 7);
         });
     }
 }
