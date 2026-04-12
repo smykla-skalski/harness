@@ -461,7 +461,7 @@ impl TerminalScreenParser {
             cols,
             cursor_row,
             cursor_col,
-            text: screen.contents(),
+            text: screen.contents().trim_start_matches('\n').to_string(),
         }
     }
 }
@@ -1539,6 +1539,32 @@ mod tests {
         let resized = parser.snapshot();
         assert_eq!(resized.rows, 10);
         assert_eq!(resized.cols, 40);
+    }
+
+    #[test]
+    fn terminal_parser_trims_leading_newlines() {
+        let mut parser = TerminalScreenParser::new(AgentTuiSize { rows: 5, cols: 40 });
+        // Position cursor at row 3, col 1 and print "hello"
+        // Row 1: empty
+        // Row 2: empty
+        // Row 3: hello
+        parser.process(b"\x1b[3;1Hhello");
+
+        let snapshot = parser.snapshot();
+        // vt100's screen.contents() will have leading newlines for the empty rows.
+        // We want them gone.
+        assert!(!snapshot.text.starts_with('\n'), "should not start with newline");
+        assert!(snapshot.text.starts_with("hello"), "should start with hello");
+    }
+
+    #[test]
+    fn terminal_parser_preserves_row_zero_content() {
+        let mut parser = TerminalScreenParser::new(AgentTuiSize { rows: 5, cols: 40 });
+        // Content starts at the very top
+        parser.process(b"top-content");
+
+        let snapshot = parser.snapshot();
+        assert!(snapshot.text.starts_with("top-content"));
     }
 
     #[test]
