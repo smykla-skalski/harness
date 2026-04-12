@@ -130,7 +130,7 @@ struct HarnessMonitorStoreProjectionTests {
           store.sessionIndex.searchResults.isSearchActive,
           store.sessionIndex.searchResults.emptyState,
           store.sessionIndex.searchResults.visibleSessionIDs,
-          store.visibleSessions.map(\.sessionId)
+          store.visibleSessionIDs
         )
       },
       after: {
