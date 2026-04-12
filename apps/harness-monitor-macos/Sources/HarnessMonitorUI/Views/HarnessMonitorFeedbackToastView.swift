@@ -5,15 +5,17 @@ struct HarnessMonitorFeedbackToastView: View {
   let toast: ToastSlice
 
   var body: some View {
-    VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-      ForEach(toast.activeFeedback) { feedback in
-        HarnessMonitorFeedbackToastRow(feedback: feedback, toast: toast)
-          .transition(
-            .asymmetric(
-              insertion: .move(edge: .top).combined(with: .opacity),
-              removal: .opacity.combined(with: .scale(scale: 0.95))
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingSM) {
+      VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
+        ForEach(toast.activeFeedback) { feedback in
+          HarnessMonitorFeedbackToastRow(feedback: feedback, toast: toast)
+            .transition(
+              .asymmetric(
+                insertion: .move(edge: .top).combined(with: .opacity),
+                removal: .opacity.combined(with: .scale(scale: 0.95))
+              )
             )
-          )
+        }
       }
     }
     .frame(maxWidth: 420, alignment: .trailing)
@@ -31,14 +33,10 @@ struct HarnessMonitorFeedbackToastView: View {
 private struct HarnessMonitorFeedbackToastRow: View {
   let feedback: ActionFeedback
   let toast: ToastSlice
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: iconName)
-        .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
-        .foregroundStyle(tintColor)
-        .accessibilityHidden(true)
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+      HarnessMonitorFeedbackToastStrip(tint: tintColor)
       Text(feedback.message)
         .scaledFont(.system(.callout, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.ink)
@@ -47,11 +45,12 @@ private struct HarnessMonitorFeedbackToastRow: View {
       Button {
         toast.dismiss(id: feedback.id)
       } label: {
-        Image(systemName: "xmark.circle.fill")
-          .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+        Image(systemName: "xmark")
+          .scaledFont(.system(.footnote, design: .rounded, weight: .bold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .frame(width: 24, height: 24)
-          .contentShape(.rect)
+          .frame(width: 28, height: 28)
+          .contentShape(.circle)
+          .modifier(HarnessMonitorFeedbackToastDismissGlass())
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Dismiss feedback")
@@ -60,14 +59,10 @@ private struct HarnessMonitorFeedbackToastRow: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .background(toastBackground)
-  }
-
-  private var iconName: String {
-    switch feedback.severity {
-    case .success: "checkmark.circle.fill"
-    case .failure: "exclamationmark.triangle.fill"
-    }
+    .harnessFloatingControlGlass(
+      cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
+      tint: tintColor
+    )
   }
 
   private var tintColor: Color {
@@ -83,21 +78,60 @@ private struct HarnessMonitorFeedbackToastRow: View {
     case .failure: "Action failed. \(feedback.message)"
     }
   }
+}
 
-  @ViewBuilder
-  private var toastBackground: some View {
-    let shape = RoundedRectangle(
-      cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-      style: .continuous
-    )
+private struct HarnessMonitorFeedbackToastStrip: View {
+  let tint: Color
+  @ScaledMetric(relativeTo: .body) private var stripHeight = 18.0
+  @ScaledMetric(relativeTo: .body) private var stripWidth = 6.0
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: stripWidth / 2, style: .continuous)
+      .fill(tint.opacity(0.75))
+      .frame(width: stripWidth, height: stripHeight)
+      .accessibilityHidden(true)
+  }
+}
+
+private struct HarnessMonitorFeedbackToastDismissGlass: ViewModifier {
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
     if reduceTransparency {
-      shape
-        .fill(Color(nsColor: .windowBackgroundColor))
-        .overlay { shape.stroke(tintColor.opacity(0.4), lineWidth: 1) }
+      return colorSchemeContrast == .increased ? 0.24 : 0.16
+    }
+    return colorSchemeContrast == .increased ? 0.12 : 0.08
+  }
+
+  private var fallbackStrokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.28 : 0.18
+  }
+
+  private var glassTintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.16 : 0.1
+  }
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content
+        .background {
+          Circle()
+            .fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          Circle()
+            .strokeBorder(
+              HarnessMonitorTheme.ink.opacity(fallbackStrokeOpacity),
+              lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+            )
+        }
     } else {
-      shape
-        .fill(.regularMaterial)
-        .overlay { shape.stroke(tintColor.opacity(0.4), lineWidth: 1) }
+      content
+        .glassEffect(
+          .regular.tint(HarnessMonitorTheme.ink.opacity(glassTintOpacity)).interactive(),
+          in: .circle
+        )
     }
   }
 }
