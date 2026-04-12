@@ -139,22 +139,11 @@ struct SessionAgentSummaryCard: View {
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
               .lineLimit(2)
             Spacer()
-            HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-              Text(agent.role.title)
-                .scaledFont(.caption.bold())
-                .harnessPillPadding()
-                .background(roleTint, in: Capsule())
-                .foregroundStyle(roleForeground)
-              if tuiStatus != nil {
-                Image(systemName: "terminal.fill")
-                  .foregroundStyle(tuiMarkerColor)
-                  .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
-                  .accessibilityIdentifier(
-                    HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
-                  )
-                  .harnessUITestValue(tuiStatus?.rawValue ?? "")
-              }
-            }
+            Text(agent.role.title)
+              .scaledFont(.caption.bold())
+              .harnessPillPadding()
+              .background(roleTint, in: Capsule())
+              .foregroundStyle(roleForeground)
           }
           Text(metadataLine)
             .scaledFont(.caption.monospaced())
@@ -180,17 +169,29 @@ struct SessionAgentSummaryCard: View {
         )
         .padding(HarnessMonitorTheme.cardPadding)
         .overlay(alignment: .bottomTrailing) {
-          if let runtimeSymbol {
-            ProviderBrandSymbolView(
-              symbol: runtimeSymbol,
-              colorMode: .automaticContrast,
-              size: 110
-            )
-            .opacity(0.12)
-            .offset(x: 18, y: 22)
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
+          ZStack(alignment: .topTrailing) {
+            if let runtimeSymbol {
+              ProviderBrandSymbolView(
+                symbol: runtimeSymbol,
+                colorMode: .automaticContrast,
+                size: 110
+              )
+              .opacity(0.12)
+              .offset(x: 18, y: 22)
+            }
+            if tuiStatus != nil {
+              Image(systemName: "terminal.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(tuiMarkerColor)
+                .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
+                .accessibilityIdentifier(
+                  HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
+                )
+                .harnessUITestValue(tuiStatus?.rawValue ?? "")
+            }
           }
+          .accessibilityHidden(tuiStatus == nil)
+          .allowsHitTesting(false)
         }
         .clipped()
       }
