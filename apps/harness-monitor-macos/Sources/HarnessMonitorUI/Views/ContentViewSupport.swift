@@ -23,15 +23,14 @@ extension HarnessMonitorStore {
   // Keep Commands state as plain data sourced from a dedicated UI slice so the
   // app scene does not observe raw selection and detail state directly.
   public var commandsDisplayState: CommandsDisplayState {
-    let displayState = commandsUI.displayState
-    return CommandsDisplayState(
-      canNavigateBack: displayState.canNavigateBack,
-      canNavigateForward: displayState.canNavigateForward,
-      hasSelectedSession: displayState.hasSelectedSession,
-      isSessionReadOnly: displayState.isSessionReadOnly,
-      bookmarkTitle: displayState.bookmarkTitle,
-      isPersistenceAvailable: displayState.isPersistenceAvailable,
-      hasObserver: displayState.hasObserver
+    CommandsDisplayState(
+      canNavigateBack: commandsUI.canNavigateBack,
+      canNavigateForward: commandsUI.canNavigateForward,
+      hasSelectedSession: commandsUI.hasSelectedSession,
+      isSessionReadOnly: commandsUI.isSessionReadOnly,
+      bookmarkTitle: commandsUI.bookmarkTitle,
+      isPersistenceAvailable: commandsUI.isPersistenceAvailable,
+      hasObserver: commandsUI.hasObserver
     )
   }
 }
