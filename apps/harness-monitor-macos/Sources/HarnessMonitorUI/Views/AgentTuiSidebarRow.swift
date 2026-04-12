@@ -22,7 +22,6 @@ struct AgentTuiSidebarRow: View {
         .lineLimit(1)
         .truncationMode(.tail)
     }
-    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .trailing) {
       Group {
@@ -33,13 +32,13 @@ struct AgentTuiSidebarRow: View {
             size: 36
           )
           .opacity(0.12)
-          .offset(x: 6, y: 4)
+          .offset(x: 12, y: 8)
         } else {
           Image(systemName: "terminal")
             .font(.system(size: 28))
             .foregroundStyle(.secondary)
             .opacity(0.12)
-            .offset(x: 6, y: 4)
+            .offset(x: 12, y: 8)
         }
       }
       .accessibilityHidden(true)
