@@ -157,6 +157,9 @@ public struct AgentTuiWindowView: View {
           .padding(HarnessMonitorTheme.spacingLG)
       }
       .id(scrollContainerIdentity)
+      .toolbar {
+        sessionToolbarItems
+      }
     }
     .navigationSplitViewStyle(.balanced)
     .toolbarBaselineOverlay()
@@ -298,7 +301,6 @@ public struct AgentTuiWindowView: View {
   private func sessionPane(_ tui: AgentTuiSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       terminalHeader(tui)
-      terminalViewportToolbar
       terminalViewport(tui)
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
@@ -313,52 +315,43 @@ public struct AgentTuiWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
-  private func terminalHeader(_ tui: AgentTuiSnapshot) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.sectionSpacing) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text(resolvedTitle(for: tui))
-          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        Text("\(tui.status.title) • \(tui.size.rows)x\(tui.size.cols)")
-          .scaledFont(.caption.monospacedDigit())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      Spacer()
-      HarnessMonitorActionButton(
-        title: "Transcript",
-        variant: .bordered,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiRevealTranscriptButton
-      ) {
-        revealTranscript(tui)
-      }
-      .accessibilityTestProbe(
-        HarnessMonitorAccessibility.agentTuiRevealTranscriptButton,
-        label: "Transcript"
-      )
-      if tui.status.isActive {
-        HarnessMonitorActionButton(
-          title: "Stop",
-          variant: .bordered,
-          accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStopButton
-        ) {
-          stopTui(tui)
+  @ToolbarContentBuilder
+  private var sessionToolbarItems: some ToolbarContent {
+    if let selectedSessionTui {
+      ToolbarItemGroup(placement: .primaryAction) {
+        Toggle("Wrap lines", isOn: $wrapLines)
+          .toggleStyle(.switch)
+          .controlSize(.mini)
+          .keyboardShortcut("l", modifiers: [.command])
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
+
+        Button {
+          revealTranscript(selectedSessionTui)
+        } label: {
+          Label("Transcript", systemImage: "doc.text")
         }
-        .disabled(!canStop)
-        .accessibilityTestProbe(
-          HarnessMonitorAccessibility.agentTuiStopButton,
-          label: "Stop"
-        )
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRevealTranscriptButton)
+
+        if selectedSessionTui.status.isActive {
+          Button {
+            stopTui(selectedSessionTui)
+          } label: {
+            Label("Stop", systemImage: "stop.fill")
+          }
+          .disabled(!canStop)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiStopButton)
+        }
       }
     }
   }
 
-  private var terminalViewportToolbar: some View {
-    HStack {
-      Spacer()
-      Toggle("Wrap lines", isOn: $wrapLines)
-        .toggleStyle(.switch)
-        .controlSize(.mini)
-        .keyboardShortcut("l", modifiers: [.command])
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
+  private func terminalHeader(_ tui: AgentTuiSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(resolvedTitle(for: tui))
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+      Text("\(tui.status.title) • \(tui.size.rows)x\(tui.size.cols)")
+        .scaledFont(.caption.monospacedDigit())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
   }
 
