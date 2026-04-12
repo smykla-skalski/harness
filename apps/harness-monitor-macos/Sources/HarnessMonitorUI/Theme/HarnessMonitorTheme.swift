@@ -95,3 +95,16 @@ func taskStatusColor(for status: TaskStatus) -> Color {
     HarnessMonitorTheme.danger
   }
 }
+
+func agentTuiStatusColor(for status: AgentTuiStatus) -> Color {
+  switch status {
+  case .running:
+    HarnessMonitorTheme.success
+  case .stopped:
+    HarnessMonitorTheme.caution
+  case .exited:
+    HarnessMonitorTheme.ink.opacity(0.55)
+  case .failed:
+    HarnessMonitorTheme.danger
+  }
+}
