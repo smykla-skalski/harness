@@ -1,7 +1,7 @@
 use super::*;
 use crate::agents::transport::AgentPromptSubmitArgs;
 use crate::daemon::bridge::BridgeCapability;
-use crate::daemon::transport::DaemonCommand;
+use crate::daemon::transport::{DaemonCommand, HARNESS_MONITOR_APP_GROUP_ID};
 use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::run::{
@@ -557,6 +557,22 @@ fn parse_daemon_stop() {
             command: DaemonCommand::Stop(args),
         } => assert!(!args.json),
         _ => panic!("expected daemon stop command"),
+    }
+}
+
+#[test]
+fn parse_daemon_dev() {
+    let cli = Cli::try_parse_from(["harness", "daemon", "dev"]).unwrap();
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Dev(args),
+        } => {
+            assert_eq!(args.host, "127.0.0.1");
+            assert_eq!(args.port, 0);
+            assert_eq!(args.app_group_id, HARNESS_MONITOR_APP_GROUP_ID);
+            assert!(args.codex_ws_url.is_none());
+        }
+        _ => panic!("expected daemon dev command"),
     }
 }
 
