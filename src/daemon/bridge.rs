@@ -2157,6 +2157,7 @@ fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     // The happy-path cleanup is handled by `clear_bridge_state()` below and
     // disarms the guard so it does not double-unlink.
     let mut socket_guard = BridgeSocketGuard::new(config.socket_path.clone());
+    let mut state_guard = BridgeStateGuard::new();
     fs::set_permissions(&config.socket_path, Permissions::from_mode(0o600)).map_err(|error| {
         CliErrorKind::workflow_io(format!(
             "set bridge socket permissions {}: {error}",
@@ -2195,6 +2196,7 @@ fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     server.cleanup();
     clear_bridge_state()?;
     socket_guard.disarm();
+    state_guard.disarm();
     Ok(0)
 }
 
@@ -2235,6 +2237,34 @@ impl Drop for BridgeSocketGuard {
                 %error,
                 "failed to unlink bridge socket on drop"
             );
+        }
+    }
+}
+
+/// RAII guard that removes persisted bridge state on drop unless `disarm()`
+/// is called. Installed by `run_bridge_server` so startup failures do not
+/// leave stale bridge state behind.
+struct BridgeStateGuard {
+    armed: bool,
+}
+
+impl BridgeStateGuard {
+    fn new() -> Self {
+        Self { armed: true }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for BridgeStateGuard {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        if let Err(error) = clear_bridge_state() {
+            tracing::warn!(%error, "failed to clear bridge state on drop");
         }
     }
 }

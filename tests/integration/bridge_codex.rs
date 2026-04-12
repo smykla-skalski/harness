@@ -1,3 +1,4 @@
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -245,6 +246,56 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
 }
 
 #[test]
+fn bridge_start_records_error_when_codex_readiness_times_out() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let mock_codex = create_mock_codex(tmp.path());
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+
+    let output = Command::new(harness_binary())
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            &codex_port_text,
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .env("HARNESS_HOST_HOME", &host_home)
+        .env("HOME", &host_home)
+        .env("MOCK_CODEX_READY_DELAY_MS", "11000")
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .output()
+        .expect("run bridge");
+
+    assert!(!output.status.success(), "bridge unexpectedly succeeded");
+    assert!(
+        !tmp.path().join("harness/daemon/bridge.json").exists(),
+        "bridge state should not persist timed out codex readiness"
+    );
+
+    let events = read_daemon_events(tmp.path());
+    assert!(
+        events.contains(&format!(
+            "codex host bridge readiness still pending on ws://127.0.0.1:{codex_port}"
+        )),
+        "expected readiness warning event, got: {events}"
+    );
+    assert!(
+        events.contains(&format!(
+            "codex host bridge readiness timed out on ws://127.0.0.1:{codex_port}"
+        )),
+        "expected readiness timeout event, got: {events}"
+    );
+}
+
+#[test]
 fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
@@ -484,7 +535,7 @@ if [ "$1" = "--version" ]; then
   exit 0
 fi
 
-python3 - "$@" <<'PY'
+exec python3 - "$@" <<'PY'
 import os
 import socket
 import sys
@@ -631,6 +682,14 @@ fn ensure_host_home(data_home: &Path) -> PathBuf {
     let host_home = data_home.join("host-home");
     std::fs::create_dir_all(&host_home).expect("create host home");
     host_home
+}
+
+fn unused_local_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("bind local port")
+        .local_addr()
+        .expect("read local addr")
+        .port()
 }
 
 fn harness_binary() -> PathBuf {

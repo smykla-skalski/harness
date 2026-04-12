@@ -87,6 +87,27 @@ final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
 
 @MainActor
 final class CodexFlowSheetUITests: HarnessMonitorUITestCase {
+  func testCodexFlowShowsBridgeStartBannerWhenHostBridgeIsAbsent() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_RUNNING": "false"
+      ]
+    )
+
+    openCodexFlowSheet(in: app)
+
+    let banner = element(in: app, identifier: CodexFlowSheetAccessibility.recoveryBanner)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        banner.exists
+          && app.staticTexts["Codex host bridge is not running"].exists
+          && app.staticTexts["harness bridge start"].exists
+          && !app.staticTexts["harness bridge reconfigure --enable codex"].exists
+      },
+      "Absent host bridge should show the not-running banner and the bridge start command"
+    )
+  }
+
   func testStartCodexRunShowsQueuedRunWhenPreviewStartSucceeds() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [
