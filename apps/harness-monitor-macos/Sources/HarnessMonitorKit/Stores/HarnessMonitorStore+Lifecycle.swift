@@ -159,8 +159,10 @@ extension HarnessMonitorStore {
 
       let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
       let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: sessionID, scope: timelineScope) {
-          batch, batchIndex, _ in
+        try await client.timeline(
+          sessionID: sessionID,
+          scope: timelineScope
+        ) { batch, batchIndex, _ in
           await MainActor.run {
             guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
               return
@@ -214,8 +216,9 @@ extension HarnessMonitorStore {
       // Background hydration: log silently. The fallback to cached/index data
       // below is the user-visible recovery; we do not surface a toast for an
       // automatic load the user did not explicitly invoke.
+      let err = error.localizedDescription
       HarnessMonitorLogger.store.warning(
-        "session detail hydration failed for \(sessionID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        "session detail hydration failed for \(sessionID, privacy: .public): \(err, privacy: .public)"
       )
       withUISyncBatch {
         isExtensionsLoading = false

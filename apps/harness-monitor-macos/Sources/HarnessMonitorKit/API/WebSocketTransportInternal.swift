@@ -296,8 +296,9 @@ extension WebSocketTransport {
         continuation.yield(pushEvent)
       }
     } catch {
+      let err = error.localizedDescription
       HarnessMonitorLogger.websocket.warning(
-        "Dropping malformed push frame \(event, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        "Dropping malformed push frame \(event, privacy: .public): \(err, privacy: .public)"
       )
     }
   }

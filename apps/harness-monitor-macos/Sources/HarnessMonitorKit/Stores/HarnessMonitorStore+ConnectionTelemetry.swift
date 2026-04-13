@@ -218,8 +218,9 @@ extension HarnessMonitorStore {
     // Background reconnect: log silently. Surface state through the existing
     // refresh-spinner / SessionDataAvailabilityBanner instead of the toast,
     // which is reserved for explicit user actions.
+    let err = error.localizedDescription
     HarnessMonitorLogger.store.warning(
-      "reconnecting \(scope, privacy: .public) attempt \(nextAttempt): \(error.localizedDescription, privacy: .public)"
+      "reconnecting \(scope, privacy: .public) attempt \(nextAttempt): \(err, privacy: .public)"
     )
     appendConnectionEvent(
       kind: .reconnecting,

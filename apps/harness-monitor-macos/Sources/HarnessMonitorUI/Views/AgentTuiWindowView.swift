@@ -388,17 +388,22 @@ public struct AgentTuiWindowView: View {
     }
   }
 
+  private var createPaneDescription: String {
+    if displayState.hasAgentTuis {
+      "Open Agent TUI sessions stay pinned in the sidebar so you can launch "
+      + "another agent without losing the active terminal."
+    } else {
+      "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
+    }
+  }
+
   private var createPane: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       if displayState.agentTuiUnavailable {
         agentTuiUnavailableBanner
       }
       launchSection
-      Text(
-        !displayState.hasAgentTuis
-          ? "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
-          : "Open Agent TUI sessions stay pinned in the sidebar so you can launch another agent without losing the active terminal."
-      )
+      Text(createPaneDescription)
       .scaledFont(.subheadline)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -941,12 +946,15 @@ public struct AgentTuiWindowView: View {
   private var agentTuiBridgeMessage: String {
     switch agentTuiBridgeState {
     case .excluded:
-      "The shared host bridge is running without terminal control enabled. Enable it now or run this in a terminal:"
+      "The shared host bridge is running without terminal control enabled. "
+      + "Enable it now or run this in a terminal:"
     case .unavailable:
       if hostBridge.running && agentTuiBridgeCapabilityPresent {
-        "The shared host bridge is running, but terminal control is unavailable. Re-enable it or run this in a terminal:"
+        "The shared host bridge is running, but terminal control is unavailable. "
+        + "Re-enable it or run this in a terminal:"
       } else {
-        "Harness Monitor runs sandboxed and needs the host bridge to start or steer terminal-backed agents. Run this in a terminal:"
+        "Harness Monitor runs sandboxed and needs the host bridge to start "
+        + "or steer terminal-backed agents. Run this in a terminal:"
       }
     case .ready:
       ""

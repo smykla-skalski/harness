@@ -363,10 +363,12 @@ struct CodexFlowSheetView: View {
   private var codexBridgeMessage: String {
     switch codexBridgeState {
     case .excluded:
-      "The shared host bridge is running without the Codex capability. Enable it now or run this in a terminal:"
+      "The shared host bridge is running without the Codex capability. "
+      + "Enable it now or run this in a terminal:"
     case .unavailable:
       if hostBridge.running && codexBridgeCapabilityPresent {
-        "The shared host bridge is running, but the Codex capability is unavailable. Re-enable it or run this in a terminal:"
+        "The shared host bridge is running, but the Codex capability is unavailable. "
+        + "Re-enable it or run this in a terminal:"
       } else {
         "Harness Monitor runs sandboxed and cannot start Codex directly. Run this in a terminal:"
       }
