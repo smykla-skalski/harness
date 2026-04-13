@@ -239,7 +239,7 @@ struct SessionAgentSummaryCard: View {
       )
       if showPulseBorder {
         DropTargetPulseBorder()
-          .transition(.opacity)
+          .transition(.opacity.animation(.easeInOut(duration: 0.2)))
       }
       if let feedback = taskDropFeedback {
         ZStack {
@@ -250,15 +250,19 @@ struct SessionAgentSummaryCard: View {
               label: feedback.accessibilityLabel
             )
         }
-        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .transition(
+          .opacity
+            .combined(with: .scale(scale: 0.98))
+            .animation(.easeInOut(duration: 0.12))
+        )
       }
     }
     .contentShape(.rect)
     .dropDestination(for: TaskDragPayload.self, action: handleTaskDrop) { targeted in
-      isDropTargeted = targeted
+      withAnimation(.easeInOut(duration: 0.12)) {
+        isDropTargeted = targeted
+      }
     }
-    .animation(.easeInOut(duration: 0.12), value: isDropTargeted)
-    .animation(.easeInOut(duration: 0.2), value: showPulseBorder)
   }
 
   private var showPulseBorder: Bool {
