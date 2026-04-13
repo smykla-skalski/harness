@@ -381,4 +381,18 @@ extension HarnessMonitorStore {
 
     return readySessionID
   }
+
+  @discardableResult
+  public func presentSuccessFeedback(_ message: String) -> UUID {
+    toast.presentSuccess(message)
+  }
+
+  @discardableResult
+  public func presentFailureFeedback(_ message: String) -> UUID {
+    toast.presentFailure(message)
+  }
+
+  public func dismissFeedback(id: UUID) {
+    toast.dismiss(id: id)
+  }
 }

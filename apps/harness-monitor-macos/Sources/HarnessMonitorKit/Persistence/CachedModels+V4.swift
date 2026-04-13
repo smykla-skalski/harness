@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV3 {
+extension HarnessMonitorSchemaV4 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -193,6 +193,8 @@ extension HarnessMonitorSchemaV3 {
     var severityRaw: String
     var statusRaw: String
     var assignedTo: String?
+    var queuePolicyRaw: String = TaskQueuePolicy.locked.rawValue
+    var queuedAt: String?
     var createdAt: String
     var updatedAt: String
     var createdBy: String?
@@ -212,6 +214,8 @@ extension HarnessMonitorSchemaV3 {
       severityRaw: String,
       statusRaw: String,
       assignedTo: String?,
+      queuePolicyRaw: String = TaskQueuePolicy.locked.rawValue,
+      queuedAt: String? = nil,
       createdAt: String,
       updatedAt: String,
       createdBy: String?,
@@ -228,6 +232,8 @@ extension HarnessMonitorSchemaV3 {
       self.severityRaw = severityRaw
       self.statusRaw = statusRaw
       self.assignedTo = assignedTo
+      self.queuePolicyRaw = queuePolicyRaw
+      self.queuedAt = queuedAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.createdBy = createdBy
@@ -374,3 +380,12 @@ extension HarnessMonitorSchemaV3 {
     }
   }
 }
+
+typealias CachedProject = HarnessMonitorSchemaV4.CachedProject
+typealias CachedSession = HarnessMonitorSchemaV4.CachedSession
+typealias CachedAgent = HarnessMonitorSchemaV4.CachedAgent
+typealias CachedWorkItem = HarnessMonitorSchemaV4.CachedWorkItem
+typealias CachedSignalRecord = HarnessMonitorSchemaV4.CachedSignalRecord
+typealias CachedTimelineEntry = HarnessMonitorSchemaV4.CachedTimelineEntry
+typealias CachedObserver = HarnessMonitorSchemaV4.CachedObserver
+typealias CachedAgentActivity = HarnessMonitorSchemaV4.CachedAgentActivity

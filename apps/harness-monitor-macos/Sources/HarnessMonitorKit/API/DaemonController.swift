@@ -111,7 +111,7 @@ public enum TransportPreference: Sendable {
   case http
 }
 
-private struct ManagedStaleManifestTracker {
+struct ManagedStaleManifestTracker {
   private var signature: String?
   private var firstObservedAt: ContinuousClock.Instant?
 
@@ -141,16 +141,15 @@ private struct ManagedStaleManifestTracker {
 }
 
 public struct DaemonController: DaemonControlling {
-  private static let managedStaleManifestGracePeriod: Duration = .seconds(5)
+  private static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
 
-  private let environment: HarnessMonitorEnvironment
-  private let sessionFactory:
-    @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
-  private let transportPreference: TransportPreference
-  private let launchAgentManager: any DaemonLaunchAgentManaging
-  private let ownership: DaemonOwnership
-  private let endpointProbe: @Sendable (URL) async -> Bool
-  private let managedStaleManifestGracePeriod: Duration
+  let environment: HarnessMonitorEnvironment
+  let sessionFactory: @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
+  let transportPreference: TransportPreference
+  let launchAgentManager: any DaemonLaunchAgentManaging
+  let ownership: DaemonOwnership
+  let endpointProbe: @Sendable (URL) async -> Bool
+  let managedStaleManifestGracePeriod: Duration
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -184,11 +183,11 @@ public struct DaemonController: DaemonControlling {
     return try await bootstrap(connection: connection)
   }
 
-  private func loadConnection() throws -> HarnessMonitorConnection {
-    try connection(from: loadManifest())
+  func loadConnection() throws -> HarnessMonitorConnection {
+    try daemonConnection(from: loadManifest())
   }
 
-  private func bootstrap(
+  func bootstrap(
     connection: HarnessMonitorConnection
   ) async throws -> any HarnessMonitorClientProtocol {
     HarnessMonitorLogger.lifecycle.trace(
@@ -212,7 +211,7 @@ public struct DaemonController: DaemonControlling {
     return httpClient
   }
 
-  private func bootstrapWebSocket(
+  func bootstrapWebSocket(
     connection: HarnessMonitorConnection
   ) async throws -> WebSocketTransport {
     let transport = WebSocketTransport(connection: connection)
@@ -254,196 +253,6 @@ public struct DaemonController: DaemonControlling {
       return
     }
     throw DaemonControlError.daemonDidNotStart
-  }
-
-  public func awaitManifestWarmUp(
-    timeout: Duration
-  ) async throws -> any HarnessMonitorClientProtocol {
-    let timeoutDesc = String(describing: timeout)
-    HarnessMonitorLogger.lifecycle.trace(
-      "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
-    )
-    let deadline = ContinuousClock.now + timeout
-    var state = WarmUpLoopState()
-    while ContinuousClock.now < deadline {
-      let shouldBreak = try await warmUpIteration(state: &state)
-      if let client = shouldBreak.liveClient {
-        return client
-      }
-      if shouldBreak.stop { break }
-      try await Task.sleep(for: .milliseconds(250))
-    }
-    if let immediateError = state.immediateError {
-      throw immediateError
-    }
-    if let client = try? await bootstrapClient() {
-      return client
-    }
-    if ownership == .external {
-      let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
-      if state.sawUnreachableManifest {
-        // Manifest existed throughout the warm-up but nothing bound to its
-        // endpoint. Classic crash-without-cleanup: SIGKILL'd dev daemon.
-        throw DaemonControlError.externalDaemonManifestStale(manifestPath: manifestPath)
-      }
-      // No manifest ever appeared; the dev daemon was never started.
-      throw DaemonControlError.externalDaemonOffline(manifestPath: manifestPath)
-    }
-    throw state.lastError ?? DaemonControlError.daemonDidNotStart
-  }
-
-  private struct WarmUpLoopState {
-    var lastError: (any Error)?
-    var sawUnreachableManifest = false
-    var immediateError: (any Error)?
-    var managedStaleManifestTracker = ManagedStaleManifestTracker()
-  }
-
-  private struct WarmUpIterationOutcome {
-    var liveClient: (any HarnessMonitorClientProtocol)?
-    var stop: Bool
-
-    static let continueLoop = Self(liveClient: nil, stop: false)
-    static let stopLoop = Self(liveClient: nil, stop: true)
-  }
-
-  private func warmUpIteration(
-    state: inout WarmUpLoopState
-  ) async throws -> WarmUpIterationOutcome {
-    do {
-      let manifest = try loadManifest()
-      let connection = try connection(from: manifest)
-      let endpoint = connection.endpoint.absoluteString
-      let manifestPid = manifest.pid
-      HarnessMonitorLogger.lifecycle.trace(
-        "Warm-up observed manifest pid=\(manifestPid, privacy: .public)"
-      )
-      HarnessMonitorLogger.lifecycle.trace("  endpoint=\(endpoint, privacy: .public)")
-      if await endpointProbe(connection.endpoint) {
-        HarnessMonitorLogger.lifecycle.trace(
-          "Warm-up confirmed live daemon endpoint \(endpoint, privacy: .public)"
-        )
-        let client = try await bootstrap(connection: connection)
-        return WarmUpIterationOutcome(liveClient: client, stop: true)
-      }
-      return handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
-    } catch let error as DaemonControlError {
-      state.managedStaleManifestTracker.reset()
-      if case .invalidManifest = error, ownership == .external {
-        state.immediateError = error
-        return .stopLoop
-      }
-      state.lastError = error
-      HarnessMonitorLogger.lifecycle.trace(
-        "Warm-up retry after \(error.localizedDescription, privacy: .public)"
-      )
-    } catch {
-      state.managedStaleManifestTracker.reset()
-      state.lastError = error
-      HarnessMonitorLogger.lifecycle.trace(
-        "Warm-up retry after \(error.localizedDescription, privacy: .public)"
-      )
-    }
-    return .continueLoop
-  }
-
-  private func handleStaleManifest(
-    manifest: DaemonManifest,
-    endpoint: String,
-    state: inout WarmUpLoopState
-  ) -> WarmUpIterationOutcome {
-    let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
-    HarnessMonitorLogger.lifecycle.error(
-      "Warm-up found stale daemon manifest at \(manifestPath, privacy: .public)"
-    )
-    HarnessMonitorLogger.lifecycle.error("  stale endpoint: \(endpoint, privacy: .public)")
-    state.sawUnreachableManifest = true
-    if ownership == .external {
-      state.immediateError = DaemonControlError.externalDaemonManifestStale(
-        manifestPath: manifestPath
-      )
-      return .stopLoop
-    }
-    return handleManagedStaleManifest(manifest: manifest, path: manifestPath, state: &state)
-  }
-
-  private func handleManagedStaleManifest(
-    manifest: DaemonManifest,
-    path: String,
-    state: inout WarmUpLoopState
-  ) -> WarmUpIterationOutcome {
-    state.lastError = DaemonControlError.daemonDidNotStart
-    if Self.processIsAlive(pid: manifest.pid) == false {
-      let pid = manifest.pid
-      HarnessMonitorLogger.lifecycle.error(
-        "Warm-up detected dead managed daemon pid \(pid, privacy: .public)"
-      )
-      HarnessMonitorLogger.lifecycle.error("  stale manifest at \(path, privacy: .public)")
-      return .stopLoop
-    }
-    let staleSignature = Self.managedStaleManifestSignature(for: manifest)
-    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
-    if state.managedStaleManifestTracker.expired(
-      signature: staleSignature,
-      now: ContinuousClock.now,
-      gracePeriod: managedStaleManifestGracePeriod
-    ) {
-      HarnessMonitorLogger.lifecycle.error(
-        "Warm-up aborting managed stale manifest wait at \(path, privacy: .public)"
-      )
-      HarnessMonitorLogger.lifecycle.error(
-        "  grace period elapsed: \(gracePeriod, privacy: .public)"
-      )
-      return .stopLoop
-    }
-    HarnessMonitorLogger.lifecycle.trace(
-      "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
-    )
-    return .continueLoop
-  }
-
-  private func connection(from manifest: DaemonManifest) throws -> HarnessMonitorConnection {
-    let endpoint = try endpointURL(from: manifest.endpoint)
-    let token = try loadToken(path: manifest.tokenPath)
-    return HarnessMonitorConnection(endpoint: endpoint, token: token)
-  }
-
-  public static func defaultEndpointProbe(_ endpoint: URL) async -> Bool {
-    guard let host = endpoint.host, let port = endpoint.port else {
-      return true
-    }
-    let candidate = UInt16(exactly: port) ?? 0
-    guard candidate != 0 else { return true }
-    return await Task.detached(priority: .userInitiated) {
-      DaemonPortProbe.isListening(
-        host: host,
-        port: candidate,
-        timeout: .milliseconds(200)
-      )
-    }.value
-  }
-
-  private static func managedStaleManifestSignature(for manifest: DaemonManifest) -> String {
-    "\(manifest.pid)|\(manifest.endpoint)|\(manifest.startedAt)"
-  }
-
-  private static func processIsAlive(pid: Int) -> Bool? {
-    guard pid > 0 else {
-      return nil
-    }
-
-    if kill(pid_t(pid), 0) == 0 {
-      return true
-    }
-
-    switch errno {
-    case ESRCH:
-      return false
-    case EPERM:
-      return true
-    default:
-      return nil
-    }
   }
 
   public func stopDaemon() async throws -> String {
@@ -509,161 +318,24 @@ public struct DaemonController: DaemonControlling {
     }
   }
 
-  private func loadManifest() throws -> DaemonManifest {
-    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
-    guard FileManager.default.fileExists(atPath: manifestURL.path) else {
-      throw DaemonControlError.manifestMissing
+  public static func defaultEndpointProbe(_ endpoint: URL) async -> Bool {
+    guard let host = endpoint.host, let port = endpoint.port else {
+      return true
     }
-
-    guard let data = FileManager.default.contents(atPath: manifestURL.path) else {
-      throw DaemonControlError.manifestUnreadable
-    }
-
-    let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
-    let manifestFilePath = manifestURL.path
-    let pid = manifest.pid
-    HarnessMonitorLogger.lifecycle.trace(
-      "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
-    )
-    return manifest
-  }
-
-  private func loadToken(path: String) throws -> String {
-    let tokenURL = try validatedTokenURL(from: path)
-    let token = try String(contentsOf: tokenURL, encoding: .utf8)
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    HarnessMonitorLogger.lifecycle.trace(
-      "Loaded daemon auth token from \(tokenURL.path, privacy: .public)"
-    )
-    return token
-  }
-
-  private func endpointURL(from value: String) throws -> URL {
-    guard let url = URL(string: value) else {
-      throw HarnessMonitorAPIError.invalidEndpoint(value)
-    }
-    guard ownership != .managed || Self.isTrustedManagedEndpoint(url) else {
-      throw DaemonControlError.invalidManifest(
-        "managed daemon endpoints must use loopback http(s): \(value)"
+    let candidate = UInt16(exactly: port) ?? 0
+    guard candidate != 0 else { return true }
+    return await Task.detached(priority: .userInitiated) {
+      DaemonPortProbe.isListening(
+        host: host,
+        port: candidate,
+        timeout: .milliseconds(200)
       )
-    }
-    return url
-  }
-
-  private func validatedTokenURL(from path: String) throws -> URL {
-    guard (path as NSString).isAbsolutePath else {
-      throw DaemonControlError.invalidManifest("token path must be absolute")
-    }
-
-    let tokenURL = URL(fileURLWithPath: path).standardizedFileURL
-    let resolvedTokenURL = tokenURL.resolvingSymlinksInPath()
-    guard tokenURL.path == resolvedTokenURL.path else {
-      throw DaemonControlError.invalidManifest("token path must not include symlinks")
-    }
-
-    let daemonRoot = HarnessMonitorPaths.daemonRoot(using: environment)
-      .standardizedFileURL
-      .resolvingSymlinksInPath()
-    guard Self.isWithinDirectory(resolvedTokenURL, root: daemonRoot) else {
-      throw DaemonControlError.invalidManifest(
-        "token path must stay inside \(daemonRoot.path)"
-      )
-    }
-
-    let attributes = try FileManager.default.attributesOfItem(atPath: resolvedTokenURL.path)
-    guard attributes[.type] as? FileAttributeType == .typeRegular else {
-      throw DaemonControlError.invalidManifest("token path must reference a regular file")
-    }
-    guard
-      let ownerID = (attributes[.ownerAccountID] as? NSNumber)?.uint32Value,
-      ownerID == getuid()
-    else {
-      throw DaemonControlError.invalidManifest("token file must be owned by the current user")
-    }
-    let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
-    guard permissions & 0o077 == 0 else {
-      throw DaemonControlError.invalidManifest(
-        "token file permissions must not grant group or world access"
-      )
-    }
-    return resolvedTokenURL
-  }
-
-  private static func isTrustedManagedEndpoint(_ url: URL) -> Bool {
-    guard
-      let scheme = url.scheme?.lowercased(),
-      ["http", "https"].contains(scheme),
-      let host = url.host?.lowercased(),
-      url.user == nil,
-      url.password == nil
-    else {
-      return false
-    }
-    return [
-      "127.0.0.1",
-      "::1",
-      "0:0:0:0:0:0:0:1",
-      "localhost",
-    ].contains(host)
-  }
-
-  private static func isWithinDirectory(_ fileURL: URL, root: URL) -> Bool {
-    let rootPath = root.path.hasSuffix("/") ? String(root.path.dropLast()) : root.path
-    let filePath = fileURL.path
-    return filePath == rootPath || filePath.hasPrefix(rootPath + "/")
-  }
-
-  private func launchAgentStatus() -> LaunchAgentStatus {
-    switch launchAgentManager.registrationState() {
-    case .enabled:
-      LaunchAgentStatus(
-        installed: true,
-        loaded: true,
-        label: "io.harnessmonitor.daemon",
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon",
-        state: "enabled"
-      )
-    case .requiresApproval:
-      LaunchAgentStatus(
-        installed: true,
-        loaded: false,
-        label: "io.harnessmonitor.daemon",
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon",
-        statusError: "Approval required in System Settings > General > Login Items"
-      )
-    case .notRegistered:
-      LaunchAgentStatus(
-        installed: false,
-        loaded: false,
-        label: "io.harnessmonitor.daemon",
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon"
-      )
-    case .notFound:
-      LaunchAgentStatus(
-        installed: false,
-        loaded: false,
-        label: "io.harnessmonitor.daemon",
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon",
-        statusError: "Bundled daemon launch agent plist was not found"
-      )
-    }
-  }
-
-  private func makeDecoder() -> JSONDecoder {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    return decoder
+    }.value
   }
 }
 
 extension DaemonStatusReport {
-  fileprivate func replacingLaunchAgentStatus(
-    _ launchAgent: LaunchAgentStatus
-  ) -> DaemonStatusReport {
+  func replacingLaunchAgentStatus(_ launchAgent: LaunchAgentStatus) -> DaemonStatusReport {
     DaemonStatusReport(
       manifest: manifest,
       launchAgent: launchAgent,

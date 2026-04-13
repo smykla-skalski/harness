@@ -1,0 +1,316 @@
+import AppKit
+import HarnessMonitorKit
+import SwiftUI
+
+extension AgentTuiWindowView {
+  @ViewBuilder var detailColumnContent: some View {
+    if usesLiveViewportSplitLayout, let selectedSessionTui {
+      sessionPane(selectedSessionTui)
+        .padding(HarnessMonitorTheme.spacingLG)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .id(scrollContainerIdentity)
+    } else if case .create = selection {
+      ScrollView {
+        createPane
+          .padding(HarnessMonitorTheme.spacingLG)
+      }
+      .id(scrollContainerIdentity)
+    } else {
+      ScrollView {
+        paneContent
+          .padding(HarnessMonitorTheme.spacingLG)
+      }
+      .id(scrollContainerIdentity)
+    }
+  }
+
+  @ViewBuilder var paneContent: some View {
+    switch selection {
+    case .create:
+      createPane
+    case .session:
+      if let selectedSessionTui {
+        sessionPane(selectedSessionTui)
+      } else {
+        unavailableSessionPane
+      }
+    }
+  }
+
+  var createPaneDescription: String {
+    if displayState.hasAgentTuis {
+      "Open Agent TUI sessions stay pinned in the sidebar so you can launch "
+        + "another agent without losing the active terminal."
+    } else {
+      "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
+    }
+  }
+
+  var createPane: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      if displayState.agentTuiUnavailable {
+        agentTuiUnavailableBanner
+      }
+      launchSection
+      Text(createPaneDescription)
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiLaunchPane)
+  }
+
+  var unavailableSessionPane: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("That Agent TUI session is no longer available.")
+        .scaledFont(.headline)
+      Button("Back to create") {
+        selectCreateTab()
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: nil)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiBackToCreateButton)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
+  }
+
+  var launchSection: some View {
+    launchForm
+  }
+
+  var launchForm: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("New agent")
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          Picker("Runtime", selection: $runtime) {
+            ForEach(AgentTuiRuntime.allCases) { runtime in
+              Text(runtime.title).tag(runtime)
+            }
+          }
+          .pickerStyle(.segmented)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
+          if !availablePersonas.isEmpty {
+            inlinePersonaGrid
+          }
+          TextField("Optional display name", text: $name)
+            .harnessNativeFormControl()
+            .focused($focusedField, equals: .name)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNameField)
+          multilineEditor(
+            placeholder: "Optional first prompt to submit inside the TUI",
+            text: $prompt,
+            field: .prompt,
+            minHeight: 72,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPromptField
+          )
+          TextField("Optional project directory override", text: $projectDir)
+            .harnessNativeFormControl()
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiProjectDirField)
+          multilineEditor(
+            placeholder:
+              "Optional argv override (one argument per line; first line is the executable)",
+            text: $argvOverride,
+            field: .argv,
+            minHeight: 88,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
+          )
+        }
+
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          Text("Terminal size")
+            .scaledFont(.caption.bold())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Stepper("Rows \(rows)", value: $rows, in: TerminalViewportSizing.rowRange)
+          Stepper("Cols \(cols)", value: $cols, in: TerminalViewportSizing.colRange, step: 10)
+          Spacer(minLength: 0)
+          HarnessMonitorActionButton(
+            title: "Start \(runtime.title)",
+            variant: .prominent,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
+            fillsWidth: true
+          ) {
+            startTui()
+          }
+          .keyboardShortcut(.defaultAction)
+          .disabled(!canStart)
+          .accessibilityTestProbe(
+            HarnessMonitorAccessibility.agentTuiStartButton,
+            label: "Start \(runtime.title)"
+          )
+        }
+        .frame(width: 240, alignment: .topLeading)
+      }
+    }
+  }
+
+  static let personaColumns = [
+    GridItem(.adaptive(minimum: 140), spacing: HarnessMonitorTheme.spacingMD)
+  ]
+
+  var inlinePersonaGrid: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Persona")
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      LazyVGrid(columns: Self.personaColumns, spacing: HarnessMonitorTheme.spacingMD) {
+        ForEach(availablePersonas, id: \.identifier) { persona in
+          personaCardButton(persona)
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaPicker)
+  }
+
+  func personaCardButton(_ persona: AgentPersona) -> some View {
+    let isSelected = selectedPersona == persona.identifier
+    return Button {
+      selectedPersona = isSelected ? nil : persona.identifier
+    } label: {
+      VStack(spacing: HarnessMonitorTheme.spacingSM) {
+        PersonaSymbolView(symbol: persona.symbol, size: 40)
+          .foregroundStyle(isSelected ? HarnessMonitorTheme.accent : .secondary)
+        Text(persona.name)
+          .scaledFont(.callout.weight(.medium))
+          .lineLimit(2)
+          .multilineTextAlignment(.center)
+      }
+      .frame(minWidth: 120, minHeight: 100)
+      .frame(maxWidth: .infinity)
+      .overlay(alignment: .topTrailing) {
+        if isSelected {
+          Image(systemName: "checkmark.circle.fill")
+            .foregroundStyle(HarnessMonitorTheme.accent)
+            .font(.system(size: 14))
+            .padding(HarnessMonitorTheme.spacingXS)
+        }
+      }
+    }
+    .harnessInteractiveCardButtonStyle(tint: isSelected ? HarnessMonitorTheme.accent : nil)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaCard(persona.identifier))
+    .accessibilityLabel(persona.name)
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+    .popover(
+      isPresented: Binding(
+        get: { expandedPersonaInfo == persona.identifier },
+        set: { if !$0 { expandedPersonaInfo = nil } }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        Text(persona.name)
+          .scaledFont(.headline)
+        Text(persona.description)
+          .scaledFont(.body)
+          .foregroundStyle(.secondary)
+      }
+      .padding()
+      .frame(maxWidth: 280)
+    }
+    .contextMenu {
+      Button("Learn more") {
+        expandedPersonaInfo = persona.identifier
+      }
+    }
+  }
+
+  func sessionPane(_ tui: AgentTuiSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      terminalHeader(tui)
+      if tui.status.isActive {
+        liveSessionLayout(tui)
+      } else {
+        terminalViewport(tui)
+        if let error = tui.error, !error.isEmpty {
+          terminalError(error)
+        }
+        terminalOutcome(tui)
+      }
+    }
+    .frame(
+      maxWidth: .infinity, maxHeight: tui.status.isActive ? .infinity : nil, alignment: .topLeading
+    )
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
+  }
+
+  func liveSessionLayout(_ tui: AgentTuiSnapshot) -> some View {
+    VSplitView {
+      terminalViewport(tui)
+        .frame(
+          minHeight: TerminalViewportSizing.minimumViewportHeight,
+          idealHeight: TerminalViewportSizing.idealViewportHeight
+        )
+
+      ScrollView {
+        liveSessionControls(tui)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.top, HarnessMonitorTheme.spacingXS)
+      }
+      .frame(minHeight: TerminalViewportSizing.minimumControlsHeight)
+      .accessibilityIdentifier("harness.sheet.agent-tui.controls")
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  func liveSessionControls(_ tui: AgentTuiSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      if let error = tui.error, !error.isEmpty {
+        terminalError(error)
+      }
+      terminalInputControls(tui)
+      terminalKeyControls(tui)
+      terminalResizeControls()
+    }
+  }
+
+  @ToolbarContentBuilder var agentTuiNavigationToolbarItems: some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      Button {
+        navigateHistoryBack()
+      } label: {
+        Label("Back", systemImage: "chevron.backward")
+      }
+      .disabled(!windowNavigation.canGoBack)
+      .help("Go back")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateBackButton)
+
+      Button {
+        navigateHistoryForward()
+      } label: {
+        Label("Forward", systemImage: "chevron.forward")
+      }
+      .disabled(!windowNavigation.canGoForward)
+      .help("Go forward")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateForwardButton)
+    }
+  }
+
+  @ToolbarContentBuilder var sessionToolbarItems: some ToolbarContent {
+    if let selectedSessionTui {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          revealTranscript(selectedSessionTui)
+        } label: {
+          Label("Transcript", systemImage: "doc.text")
+        }
+        .help("Reveal transcript in Finder")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRevealTranscriptButton)
+      }
+
+      if selectedSessionTui.status.isActive {
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            stopTui(selectedSessionTui)
+          } label: {
+            Label("Stop", systemImage: "stop.fill")
+          }
+          .disabled(!canStop)
+          .help("Stop this agent TUI session")
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiStopButton)
+        }
+      }
+    }
+  }
+}

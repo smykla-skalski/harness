@@ -5,6 +5,7 @@ public struct ObserverIssueSummary: Codable, Equatable, Identifiable, Sendable {
   public let code: String
   public let summary: String
   public let severity: String
+  public let category: String
   public let fingerprint: String?
   public let firstSeenLine: Int?
   public let lastSeenLine: Int?
