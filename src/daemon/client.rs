@@ -236,6 +236,11 @@ impl DaemonClient {
         self.post(&format!("/v1/agent-tuis/{tui_id}/stop"), &body)
     }
 
+    pub fn signal_tui_ready(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        let body = serde_json::json!({});
+        self.post(&format!("/v1/agent-tuis/{tui_id}/ready"), &body)
+    }
+
     // --- Read operations ---
 
     pub fn get_session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {

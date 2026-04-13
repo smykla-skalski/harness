@@ -29,6 +29,7 @@ pub async fn session_start(
             resolve_or_create_session_id(agent, &project_dir, session_id_hint.as_deref())?;
         storage::set_current_session_id(&project_dir, agent, &session_id)?;
         storage::append_session_marker(&project_dir, agent, &session_id, "session_start")?;
+        signal_tui_readiness_if_managed();
         session_service::restore_compact_handoff(&project_dir)
     })
     .await
@@ -37,6 +38,26 @@ pub async fn session_start(
             "session-start join error: {error}"
         )))
     })?
+}
+
+/// When running inside a daemon-managed TUI process, signal the daemon that
+/// this agent is ready to accept input. The `HARNESS_AGENT_TUI_ID` env var is
+/// set by the daemon at spawn time; its presence identifies a managed TUI.
+fn signal_tui_readiness_if_managed() {
+    let Ok(tui_id) = env::var("HARNESS_AGENT_TUI_ID") else {
+        return;
+    };
+    if tui_id.is_empty() {
+        return;
+    }
+    let Some(client) = crate::daemon::client::DaemonClient::try_connect() else {
+        tracing::debug!(tui_id = %tui_id, "no daemon client for TUI readiness signal");
+        return;
+    };
+    match client.signal_tui_ready(&tui_id) {
+        Ok(_) => tracing::info!(tui_id = %tui_id, "TUI readiness signaled to daemon"),
+        Err(error) => tracing::warn!(%error, tui_id = %tui_id, "failed to signal TUI readiness"),
+    }
 }
 
 /// Stop the active agent session for a project.
