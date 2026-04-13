@@ -50,9 +50,9 @@ private struct HarnessMonitorFeedbackToastRow: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .frame(width: 28, height: 28)
           .contentShape(.circle)
-          .modifier(HarnessMonitorFeedbackToastDismissGlass())
+          .harnessToastDismissGlass()
       }
-      .buttonStyle(.plain)
+      .harnessDismissButtonStyle()
       .accessibilityLabel("Dismiss feedback")
       .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastCloseButton)
       .keyboardShortcut(.cancelAction)
@@ -92,50 +92,5 @@ private struct HarnessMonitorFeedbackToastStrip: View {
       .fill(tint.opacity(0.75))
       .frame(width: stripWidth, height: stripHeight)
       .accessibilityHidden(true)
-  }
-}
-
-private struct HarnessMonitorFeedbackToastDismissGlass: ViewModifier {
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-
-  private var fallbackFillOpacity: Double {
-    if reduceTransparency {
-      return colorSchemeContrast == .increased ? 0.24 : 0.16
-    }
-    return colorSchemeContrast == .increased ? 0.12 : 0.08
-  }
-
-  private var fallbackStrokeOpacity: Double {
-    colorSchemeContrast == .increased ? 0.28 : 0.18
-  }
-
-  private var glassTintOpacity: Double {
-    colorSchemeContrast == .increased ? 0.16 : 0.1
-  }
-
-  func body(content: Content) -> some View {
-    if reduceTransparency {
-      content
-        .background {
-          Circle()
-            .fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
-        }
-        .overlay {
-          Circle()
-            .strokeBorder(
-              HarnessMonitorTheme.ink.opacity(fallbackStrokeOpacity),
-              lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
-            )
-        }
-    } else {
-      content
-        .glassEffect(
-          .regular.tint(HarnessMonitorTheme.ink.opacity(glassTintOpacity)).interactive(),
-          in: .circle
-        )
-    }
   }
 }

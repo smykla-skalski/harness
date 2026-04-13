@@ -57,7 +57,7 @@ struct PreferencesHostBridgeSection: View {
       } footer: {
         Text(
           "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
-          + "compiled capability, or narrow it with repeated --capability flags."
+            + "compiled capability, or narrow it with repeated --capability flags."
         )
         .scaledFont(.caption)
       }

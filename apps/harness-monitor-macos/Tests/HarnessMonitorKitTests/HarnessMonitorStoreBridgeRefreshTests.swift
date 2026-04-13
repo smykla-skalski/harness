@@ -149,4 +149,27 @@ struct HarnessMonitorStoreBridgeRefreshTests {
     #expect(store.codexUnavailable == true)
     #expect(store.connectionEvents.count == eventCountBefore)
   }
+
+  @Test("refreshBridgeStateFromManifest records malformed manifest errors")
+  func refreshBridgeStateFromManifestRecordsMalformedManifestErrors() async throws {
+    let store = await makeBootstrappedStore()
+    store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
+    let eventCountBefore = store.connectionEvents.count
+
+    let tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("bridge-malformed-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let manifestURL = tempDir.appendingPathComponent("manifest.json")
+    try Data("{ not valid json".utf8).write(to: manifestURL)
+
+    store.refreshBridgeStateFromManifest(at: manifestURL)
+
+    #expect(store.codexUnavailable == true)
+    #expect(store.connectionEvents.count == eventCountBefore + 1)
+    #expect(store.connectionEvents.last?.kind == .error)
+    let lastDetail = store.connectionEvents.last?.detail ?? ""
+    #expect(lastDetail.contains("Failed to decode daemon manifest") == true)
+  }
 }

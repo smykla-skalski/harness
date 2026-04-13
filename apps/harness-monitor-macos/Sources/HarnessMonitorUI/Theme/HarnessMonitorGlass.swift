@@ -206,3 +206,88 @@ extension View {
     modifier(HarnessMonitorDragFeedbackSurfaceModifier(shape: Capsule(), tint: tint))
   }
 }
+
+// MARK: - Panel glass (non-interactive rectangle backgrounds)
+
+private struct HarnessMonitorPanelGlassModifier: ViewModifier {
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
+    reduceTransparency
+      ? (colorSchemeContrast == .increased ? 0.32 : 0.22)
+      : (colorSchemeContrast == .increased ? 0.18 : 0.12)
+  }
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content
+        .background {
+          Rectangle().fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
+        }
+    } else {
+      content
+        .glassEffect(.regular, in: .rect)
+    }
+  }
+}
+
+extension View {
+  func harnessPanelGlass() -> some View {
+    modifier(HarnessMonitorPanelGlassModifier())
+  }
+}
+
+// MARK: - Toast dismiss circle glass
+
+private struct HarnessMonitorToastDismissGlassModifier: ViewModifier {
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.24 : 0.16
+    }
+    return colorSchemeContrast == .increased ? 0.12 : 0.08
+  }
+
+  private var fallbackStrokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.28 : 0.18
+  }
+
+  private var glassTintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.16 : 0.1
+  }
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content
+        .background {
+          Circle().fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          Circle()
+            .strokeBorder(
+              HarnessMonitorTheme.ink.opacity(fallbackStrokeOpacity),
+              lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+            )
+        }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(HarnessMonitorTheme.ink.opacity(glassTintOpacity)).interactive(),
+          in: .circle
+        )
+    }
+  }
+}
+
+extension View {
+  func harnessToastDismissGlass() -> some View {
+    modifier(HarnessMonitorToastDismissGlassModifier())
+  }
+}

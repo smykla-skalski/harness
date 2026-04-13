@@ -339,7 +339,7 @@ private struct SidebarCheckoutDisclosureHeader: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    .harnessDismissButtonStyle()
     .onHover { isHovered = $0 }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(group.title)
