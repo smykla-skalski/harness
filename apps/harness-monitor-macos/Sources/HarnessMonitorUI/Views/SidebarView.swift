@@ -20,11 +20,16 @@ struct SidebarView: View {
   @State private var collapsedCheckoutKeys: Set<String> = []
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
+  @State private var isSidebarVisibilityAnimating = false
+  @State private var pendingSidebarWidth: CGFloat?
+  @State private var sidebarVisibilityResetTask: Task<Void, Never>?
   @State private var selectionTapBridge = SidebarSelectionTapBridge()
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
+  private static let sidebarVisibilityAnimationDurationSeconds = 0.18
+  private static let sidebarVisibilityAnimationDurationNanoseconds: UInt64 = 180_000_000
 
   private var sidebarSearchText: Binding<String> {
     Binding(
@@ -95,12 +100,14 @@ struct SidebarView: View {
       guard sidebarVisibilityPhase != nextPhase else {
         return
       }
-      withAnimation(.easeInOut(duration: 0.18)) {
-        sidebarVisibilityPhase = nextPhase
-      }
+      beginSidebarVisibilityTransition(to: nextPhase)
     }
     .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
       isSearchFocused = true
+    }
+    .onDisappear {
+      sidebarVisibilityResetTask?.cancel()
+      sidebarVisibilityResetTask = nil
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
@@ -132,7 +139,41 @@ struct SidebarView: View {
     guard abs(quantizedWidth - sidebarWidth) >= 1 else {
       return
     }
+    guard !isSidebarVisibilityAnimating else {
+      pendingSidebarWidth = quantizedWidth
+      return
+    }
     sidebarWidth = quantizedWidth
+  }
+
+  private func beginSidebarVisibilityTransition(to nextPhase: Double) {
+    isSidebarVisibilityAnimating = true
+    sidebarVisibilityResetTask?.cancel()
+    withAnimation(.easeInOut(duration: Self.sidebarVisibilityAnimationDurationSeconds)) {
+      sidebarVisibilityPhase = nextPhase
+    }
+    sidebarVisibilityResetTask = Task { @MainActor in
+      try? await Task.sleep(
+        nanoseconds: Self.sidebarVisibilityAnimationDurationNanoseconds
+      )
+      guard !Task.isCancelled else {
+        return
+      }
+      isSidebarVisibilityAnimating = false
+      applyPendingSidebarWidthIfNeeded()
+      sidebarVisibilityResetTask = nil
+    }
+  }
+
+  private func applyPendingSidebarWidthIfNeeded() {
+    guard let pendingSidebarWidth else {
+      return
+    }
+    self.pendingSidebarWidth = nil
+    guard abs(pendingSidebarWidth - sidebarWidth) >= 1 else {
+      return
+    }
+    sidebarWidth = pendingSidebarWidth
   }
 
   func setCheckoutCollapsed(
