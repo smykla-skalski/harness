@@ -356,8 +356,8 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                             "-c".into(),
                             "printf 'agent-ready\\n'; sleep 2".into(),
                         ],
-                        rows: 5,
-                        cols: 40,
+                        rows: 30,
+                        cols: 120,
                         persona: None,
                     },
                 )

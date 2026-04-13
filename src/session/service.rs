@@ -1567,12 +1567,12 @@ pub(crate) fn apply_agent_disconnected(
     state: &mut SessionState,
     agent_id: &str,
     now: &str,
-) -> Result<bool, CliError> {
+) -> bool {
     let Some(current_status) = state.agents.get(agent_id).map(|agent| agent.status) else {
-        return Ok(false);
+        return false;
     };
     if !current_status.is_alive() {
-        return Ok(false);
+        return false;
     }
 
     if let Some(agent) = state.agents.get_mut(agent_id) {
@@ -1585,7 +1585,7 @@ pub(crate) fn apply_agent_disconnected(
     release_agent_tasks(state, agent_id, now);
     clear_pending_leader_transfer(state, agent_id);
     refresh_session(state, now);
-    Ok(true)
+    true
 }
 
 fn release_agent_tasks(state: &mut SessionState, agent_id: &str, now: &str) {
