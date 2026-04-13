@@ -22,6 +22,7 @@ private struct ObserverIssuePayload: Encodable {
   let code: String
   let summary: String
   let severity: String
+  let category: String
   let fingerprint: String?
   let firstSeenLine: Int?
   let lastSeenLine: Int?
@@ -97,6 +98,7 @@ struct ObserverSummaryTests {
           code: "agent_stalled_progress",
           summary: "worker stalled",
           severity: "critical",
+          category: "agent_coordination",
           fingerprint: "fp-1",
           firstSeenLine: 10,
           lastSeenLine: 14,
@@ -144,10 +146,12 @@ struct ObserverSummaryTests {
     #expect(summary.openIssues?.count == 1)
     #expect(summary.resolvedIssueCount == 2)
     #expect(openIssue.code == "agent_stalled_progress")
+    #expect(openIssue.category == "agent_coordination")
     #expect(summary.mutedCodes == ["agent_repeated_error"])
     #expect(activeWorker.agentId == "worker-codex")
     #expect(cycle.resolved == 1)
     #expect(agentSession.runtime == "codex")
+    #expect(openIssue.evidenceExcerpt == "No checkpoint for 12 minutes.")
   }
 
   @Test("Preview observer includes rich observe detail")
