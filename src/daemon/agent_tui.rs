@@ -320,6 +320,15 @@ impl AgentTuiStatus {
     }
 }
 
+const fn session_disconnect_reason(status: AgentTuiStatus) -> Option<&'static str> {
+    match status {
+        AgentTuiStatus::Exited => Some("managed agent TUI exited"),
+        AgentTuiStatus::Failed => Some("managed agent TUI failed"),
+        AgentTuiStatus::Stopped => Some("managed agent TUI stopped"),
+        AgentTuiStatus::Starting | AgentTuiStatus::Running => None,
+    }
+}
+
 /// Request body for starting an agent runtime in an interactive PTY.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiStartRequest {
@@ -733,8 +742,10 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiInputRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
-                .agent_tui_input(tui_id, request)?;
+            let snapshot = self.normalize_snapshot(
+                BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                    .agent_tui_input(tui_id, request)?,
+            );
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
@@ -794,8 +805,10 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiResizeRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
-                .agent_tui_resize(tui_id, request)?;
+            let snapshot = self.normalize_snapshot(
+                BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                    .agent_tui_resize(tui_id, request)?,
+            );
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
@@ -819,6 +832,7 @@ impl AgentTuiManagerHandle {
                 .and_then(|bridge| bridge.agent_tui_stop(tui_id))
             {
                 Ok(stopped) => {
+                    let stopped = self.normalize_snapshot(stopped);
                     let _ = self.remove_active(tui_id)?;
                     self.save_and_broadcast("agent_tui_stopped", &stopped)?;
                     return Ok(stopped);
@@ -849,6 +863,7 @@ impl AgentTuiManagerHandle {
             let mut stopped =
                 snapshot_from_process(&snapshot_context, &process, AgentTuiStatus::Stopped)?;
             stopped.created_at = snapshot.created_at;
+            let stopped = self.normalize_snapshot(stopped);
             self.save_and_broadcast("agent_tui_stopped", &stopped)?;
             return Ok(stopped);
         }
@@ -856,6 +871,7 @@ impl AgentTuiManagerHandle {
         let mut stopped = snapshot;
         stopped.status = AgentTuiStatus::Stopped;
         stopped.updated_at = utc_now();
+        let stopped = self.normalize_snapshot(stopped);
         self.save_and_broadcast("agent_tui_stopped", &stopped)?;
         Ok(stopped)
     }
@@ -909,8 +925,9 @@ impl AgentTuiManagerHandle {
         snapshot: AgentTuiSnapshot,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            return BridgeClient::for_capability(BridgeCapability::AgentTui)?
-                .agent_tui_get(&snapshot.tui_id);
+            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_get(&snapshot.tui_id)?;
+            return Ok(self.normalize_snapshot(snapshot));
         }
         self.refresh_local_snapshot(snapshot)
     }
@@ -962,6 +979,13 @@ impl AgentTuiManagerHandle {
         if let Ok(agent_id) = agent_id_for_tui(&state, &marker) {
             snapshot.agent_id = agent_id;
         }
+    }
+
+    fn normalize_snapshot(&self, mut snapshot: AgentTuiSnapshot) -> AgentTuiSnapshot {
+        if snapshot.agent_id.is_empty() {
+            self.try_resolve_agent_id(&mut snapshot);
+        }
+        snapshot
     }
 
     fn persist_refreshed_snapshot(
@@ -1053,18 +1077,46 @@ impl AgentTuiManagerHandle {
         event_name: &str,
         snapshot: &AgentTuiSnapshot,
     ) -> Result<(), CliError> {
+        let snapshot = self.normalize_snapshot(snapshot.clone());
         let db = self.db()?;
-        lock_db(&db)?.save_agent_tui(snapshot)?;
-        let payload = serde_json::to_value(snapshot).map_err(|error| {
+        lock_db(&db)?.save_agent_tui(&snapshot)?;
+        let session_id = snapshot.session_id.clone();
+        let payload = serde_json::to_value(&snapshot).map_err(|error| {
             CliErrorKind::workflow_serialize(format!("serialize agent TUI event: {error}"))
         })?;
         let event = StreamEvent {
             event: event_name.to_string(),
             recorded_at: utc_now(),
-            session_id: Some(snapshot.session_id.clone()),
+            session_id: Some(session_id),
             payload,
         };
         let _ = self.state.sender.send(event);
+        self.reconcile_terminal_agent_state(&snapshot)?;
+        Ok(())
+    }
+
+    fn reconcile_terminal_agent_state(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+        let Some(reason) = session_disconnect_reason(snapshot.status) else {
+            return Ok(());
+        };
+        if snapshot.agent_id.is_empty() {
+            return Ok(());
+        }
+
+        let db = self.db()?;
+        let db_guard = lock_db(&db)?;
+        if super::service::disconnect_agent_direct(
+            &snapshot.session_id,
+            &snapshot.agent_id,
+            reason,
+            Some(&db_guard),
+        )? {
+            super::service::broadcast_session_snapshot(
+                &self.state.sender,
+                &snapshot.session_id,
+                Some(&db_guard),
+            );
+        }
         Ok(())
     }
 }
@@ -1620,13 +1672,17 @@ fn check_readiness_pattern(
         .saturating_sub(chunk_len + pattern.len() - 1);
     let tail = &transcript[search_start..];
     if tail.windows(pattern.len()).any(|window| window == pattern) {
-        if let Ok(mut state) = readiness.0.lock() {
-            state.ready = true;
-        }
-        readiness.1.notify_all();
+        signal_readiness_ready(readiness);
         return true;
     }
     false
+}
+
+fn signal_readiness_ready(readiness: &ReadinessSignal) {
+    if let Ok(mut state) = readiness.0.lock() {
+        state.ready = true;
+    }
+    readiness.1.notify_all();
 }
 
 fn signal_readiness_closed(readiness: &ReadinessSignal) {
@@ -1643,20 +1699,11 @@ fn spawn_reader_thread(
     readiness_pattern: Option<&'static str>,
     readiness: ReadinessSignal,
 ) -> JoinHandle<()> {
-    // When no pattern is configured, signal ready immediately so callers
-    // of `wait_ready` return without blocking.
-    if readiness_pattern.is_none() {
-        if let Ok(mut state) = readiness.0.lock() {
-            state.ready = true;
-        }
-        readiness.1.notify_all();
-    }
-
     let pattern_bytes: Option<Vec<u8>> =
         readiness_pattern.map(|pattern| pattern.as_bytes().to_vec());
-    let mut signaled = readiness_pattern.is_none();
 
     thread::spawn(move || {
+        let mut signaled = false;
         let mut buffer = [0_u8; 8192];
         loop {
             match reader.read(&mut buffer) {
@@ -1665,9 +1712,18 @@ fn spawn_reader_thread(
                     let bytes = &buffer[..read];
                     if let Ok(mut transcript) = transcript.lock() {
                         transcript.extend_from_slice(bytes);
-                        if !signaled && let Some(pattern) = &pattern_bytes {
-                            signaled =
-                                check_readiness_pattern(&transcript, read, pattern, &readiness);
+                        if !signaled {
+                            signaled = match &pattern_bytes {
+                                Some(pattern) => {
+                                    check_readiness_pattern(&transcript, read, pattern, &readiness)
+                                }
+                                // No marker configured: any output means the process
+                                // started and its terminal is initializing.
+                                None => {
+                                    signal_readiness_ready(&readiness);
+                                    true
+                                }
+                            };
                         }
                     }
                     if let Ok(mut screen) = screen.lock() {
@@ -2095,7 +2151,7 @@ mod tests {
                     prompt: None,
                     project_dir: None,
                     persona: None,
-                    argv: vec!["sh".into(), "-c".into(), "cat".into()],
+                    argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                     rows: 5,
                     cols: 40,
                 },
@@ -2104,7 +2160,7 @@ mod tests {
 
         assert_eq!(snapshot.status, AgentTuiStatus::Running);
         assert_eq!(snapshot.runtime, "codex");
-        assert_eq!(snapshot.argv, vec!["sh", "-c", "cat"]);
+        assert_eq!(snapshot.argv, vec!["sh", "-c", "printf 'ready\\n'; cat"]);
         assert!(PathBuf::from(&snapshot.transcript_path).exists());
         assert!(PathBuf::from(&snapshot.transcript_path).starts_with(&context_root));
         // agent_id is empty at start - resolved lazily after the skill joins
@@ -2242,7 +2298,7 @@ mod tests {
                     prompt: None,
                     project_dir: None,
                     persona: None,
-                    argv: vec!["sh".into(), "-c".into(), "cat".into()],
+                    argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                     rows: 5,
                     cols: 40,
                 },
@@ -2313,7 +2369,7 @@ mod tests {
                     prompt: None,
                     project_dir: None,
                     persona: None,
-                    argv: vec!["sh".into(), "-c".into(), "cat".into()],
+                    argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                     rows: 5,
                     cols: 80,
                 },
@@ -2402,32 +2458,32 @@ mod tests {
             )
             .expect("start manager TUI");
 
-        let started_event = receiver.try_recv().expect("started event");
-        assert_eq!(started_event.event, "agent_tui_started");
-        wait_until(DEFAULT_WAIT_TIMEOUT, || {
-            receiver
-                .try_recv()
-                .is_ok_and(|event| event.event == "agent_tui_ready")
-        });
-
+        // Drain events until we see an updated snapshot containing "agent-ready".
+        // The deferred join thread sends the prompt asynchronously, and the live
+        // refresh thread broadcasts snapshot updates. Both feed the same channel.
         let mut updated_snapshot = None;
         wait_until(DEFAULT_WAIT_TIMEOUT, || {
-            while let Ok(event) = receiver.try_recv() {
-                if event.event != "agent_tui_updated" {
-                    continue;
-                }
-                let event_snapshot: AgentTuiSnapshot =
-                    serde_json::from_value(event.payload).expect("decode snapshot");
-                if event_snapshot.tui_id == snapshot.tui_id
-                    && event_snapshot.screen.text.contains("agent-ready")
-                {
-                    updated_snapshot = Some(event_snapshot);
-                    return true;
+            loop {
+                match receiver.try_recv() {
+                    Ok(event) if event.event == "agent_tui_updated" => {
+                        if let Ok(event_snapshot) =
+                            serde_json::from_value::<AgentTuiSnapshot>(event.payload)
+                        {
+                            if event_snapshot.tui_id == snapshot.tui_id
+                                && event_snapshot.screen.text.contains("agent-ready")
+                            {
+                                updated_snapshot = Some(event_snapshot);
+                                return true;
+                            }
+                        }
+                    }
+                    Ok(_) => {} // consume other events
+                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {} // skip
+                    Err(_) => break,
                 }
             }
             false
         });
-
         let updated_snapshot = updated_snapshot.expect("updated snapshot");
         assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
         assert!(updated_snapshot.screen.text.contains("agent-ready"));
@@ -2604,6 +2660,121 @@ mod tests {
         assert_eq!(listed, vec!["leader-tui", "worker-tui"]);
     }
 
+    #[test]
+    fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refresh() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-exit".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-exit".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+
+        let mut state = session_service::build_new_session(
+            "disconnect test",
+            "managed tui exit",
+            "sess-tui-exit",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        let worker_id = "codex-worker-exit".to_string();
+        state.agents.insert(
+            worker_id.clone(),
+            crate::session::types::AgentRegistration {
+                agent_id: worker_id.clone(),
+                name: "Worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec!["agent-tui".into(), "agent-tui:worker-tui-exit".into()],
+                joined_at: "2026-04-13T09:00:00Z".into(),
+                updated_at: "2026-04-13T09:00:00Z".into(),
+                status: crate::session::types::AgentStatus::Active,
+                agent_session_id: Some("codex-worker-exit-session".into()),
+                last_activity_at: Some("2026-04-13T09:00:00Z".into()),
+                current_task_id: None,
+                runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                persona: None,
+            },
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, mut receiver) = broadcast::channel(16);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+
+        let mut exited = sample_snapshot(
+            "worker-tui-exit",
+            &state.session_id,
+            "",
+            "codex",
+            "2026-04-13T09:00:00Z",
+            "2026-04-13T09:01:00Z",
+        );
+        exited.status = AgentTuiStatus::Exited;
+        exited.exit_code = Some(0);
+        exited.project_dir = project_dir.display().to_string();
+
+        manager
+            .save_and_broadcast("agent_tui_updated", &exited)
+            .expect("publish exited snapshot");
+
+        let updated_event = receiver.try_recv().expect("agent tui event");
+        assert_eq!(updated_event.event, "agent_tui_updated");
+        let updated_snapshot: AgentTuiSnapshot =
+            serde_json::from_value(updated_event.payload).expect("decode snapshot");
+        assert_eq!(updated_snapshot.agent_id, worker_id);
+        assert_eq!(updated_snapshot.status, AgentTuiStatus::Exited);
+
+        let persisted = manager
+            .load_snapshot("worker-tui-exit")
+            .expect("load persisted snapshot");
+        assert_eq!(persisted.agent_id, worker_id);
+        assert_eq!(persisted.exit_code, Some(0));
+
+        let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
+        let refreshed_state = db_guard
+            .load_session_state("sess-tui-exit")
+            .expect("load session")
+            .expect("session present");
+        let worker = refreshed_state
+            .agents
+            .get(&worker_id)
+            .expect("worker present");
+        assert_eq!(
+            worker.status,
+            crate::session::types::AgentStatus::Disconnected
+        );
+
+        let mut saw_sessions_updated = false;
+        let mut saw_session_updated = false;
+        while let Ok(event) = receiver.try_recv() {
+            match event.event.as_str() {
+                "sessions_updated" => saw_sessions_updated = true,
+                "session_updated" if event.session_id.as_deref() == Some("sess-tui-exit") => {
+                    saw_session_updated = true;
+                }
+                _ => {}
+            }
+        }
+        assert!(saw_sessions_updated, "expected global session refresh");
+        assert!(saw_session_updated, "expected scoped session refresh");
+    }
+
     fn sample_snapshot(
         tui_id: &str,
         session_id: &str,
@@ -2674,7 +2845,7 @@ mod tests {
             agent_id: "agent-stop-test".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
-            argv: vec!["sh".into(), "-c".into(), "cat".into()],
+            argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
             project_dir: tmp.path().display().to_string(),
             size: AgentTuiSize { rows: 24, cols: 80 },
             screen: TerminalScreenSnapshot {
@@ -2995,6 +3166,50 @@ mod tests {
             String::from_utf8_lossy(&process.transcript().expect("transcript"))
                 .contains("test-join-msg")
         });
+    }
+
+    #[test]
+    fn no_pattern_runtime_waits_for_first_output() {
+        // Runtimes without a readiness pattern (codex, gemini, etc.) should
+        // wait for the process to produce ANY output before signaling ready.
+        // A process that delays its first output must block wait_ready.
+        let process = spawn_shell_with_readiness(
+            "sleep 0.3 && printf 'started\\n' && cat",
+            None, // no pattern - simulates codex/gemini
+        );
+
+        // Immediately after spawn, readiness should NOT be signaled because
+        // the process hasn't produced any output yet.
+        let immediate_ready = process.wait_ready(Duration::from_millis(50));
+        assert!(
+            !immediate_ready,
+            "wait_ready should NOT return true before any PTY output"
+        );
+
+        // After the process produces output, readiness should trigger.
+        assert!(
+            process.wait_ready(DEFAULT_WAIT_TIMEOUT),
+            "wait_ready should return true after first output"
+        );
+
+        // Verify input can be sent after readiness.
+        super::send_initial_prompt(&process, "hello-after-ready").expect("send");
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            String::from_utf8_lossy(&process.transcript().expect("transcript"))
+                .contains("hello-after-ready")
+        });
+    }
+
+    #[test]
+    fn no_pattern_runtime_times_out_when_no_output() {
+        // If the process never produces output, wait_ready should still
+        // time out and return false (not hang forever).
+        let process = spawn_shell_with_readiness("sleep 30", None);
+        let ready = process.wait_ready(Duration::from_millis(200));
+        assert!(
+            !ready,
+            "wait_ready should return false when process produces no output"
+        );
     }
 
     fn spawn_shell_with_readiness(
