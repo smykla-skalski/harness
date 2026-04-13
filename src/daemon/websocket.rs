@@ -555,7 +555,8 @@ fn prepare_push_frames(
     };
     let frames = serialize_push_frames(&push).ok();
     if let Some(ref frames) = frames {
-        tracing::info!(
+        tracing::event!(
+            ws_activity_log_level(),
             event = %event.event,
             session_id = event.session_id.as_deref().unwrap_or("-"),
             seq,
@@ -605,7 +606,8 @@ async fn dispatch(
     let response = dispatch_inner(request, state, connection).await;
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = response.error.is_some();
-    tracing::info!(
+    tracing::event!(
+        ws_activity_log_level(),
         method = %request.method,
         request_id = %request.id,
         duration_ms,
@@ -613,6 +615,10 @@ async fn dispatch(
         "ws dispatch"
     );
     response
+}
+
+const fn ws_activity_log_level() -> tracing::Level {
+    crate::DAEMON_ACTIVITY_LOG_LEVEL
 }
 
 async fn dispatch_inner(
@@ -1311,6 +1317,11 @@ mod tests {
 
         let replayed = buffer.replay_since(0).expect("replay should succeed");
         assert_eq!(replayed.len(), 3);
+    }
+
+    #[test]
+    fn websocket_activity_logging_uses_debug_level() {
+        assert_eq!(ws_activity_log_level(), tracing::Level::DEBUG);
     }
 
     #[test]
