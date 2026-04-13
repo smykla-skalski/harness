@@ -126,8 +126,13 @@ extension HarnessMonitorStore {
     guard let cacheService else { return [] }
     let recentIDs = Set(await cacheService.recentlyViewedSessionIDs(limit: 10))
     let selectedSessionID = selectedSessionID
+    let selectedSessionNeedsHydration =
+      selectedSessionID != nil && (selectedSession == nil || isShowingCachedData)
     return sessions.filter {
-      recentIDs.contains($0.sessionId) && $0.sessionId != selectedSessionID
+      if $0.sessionId == selectedSessionID {
+        return selectedSessionNeedsHydration
+      }
+      return recentIDs.contains($0.sessionId)
     }
   }
 
@@ -142,22 +147,45 @@ extension HarnessMonitorStore {
       let measuredDetail = try await Self.measureOperation {
         try await client.sessionDetail(id: summary.sessionId, scope: detailScope)
       }
-      let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: summary.sessionId, scope: timelineScope)
-      }
       recordRequestSuccess()
-      recordRequestSuccess()
-
-      batch.append((detail: measuredDetail.value, timeline: measuredTimeline.value))
-
       let isSelected = selectedSessionID == summary.sessionId
       let needsUpdate = selectedSession == nil || isShowingCachedData
       if isSelected && needsUpdate {
         applySelectedSessionSnapshot(
           sessionID: summary.sessionId,
           detail: measuredDetail.value,
+          timeline: timeline,
+          showingCachedData: false,
+          cancelPendingTimelineRefresh: false
+        )
+      }
+
+      let measuredTimeline = try await Self.measureOperation {
+        try await client.timeline(
+          sessionID: summary.sessionId,
+          scope: timelineScope
+        ) { [weak self] batch, batchIndex, _ in
+          await MainActor.run {
+            guard isSelected && needsUpdate else { return }
+            self?.applySelectedTimelineBatch(
+              batch,
+              index: batchIndex,
+              sessionID: summary.sessionId
+            )
+          }
+        }
+      }
+      recordRequestSuccess()
+
+      batch.append((detail: measuredDetail.value, timeline: measuredTimeline.value))
+
+      if isSelected && needsUpdate {
+        applySelectedSessionSnapshot(
+          sessionID: summary.sessionId,
+          detail: measuredDetail.value,
           timeline: measuredTimeline.value,
-          showingCachedData: false
+          showingCachedData: false,
+          cancelPendingTimelineRefresh: false
         )
       }
     } catch {
