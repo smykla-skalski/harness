@@ -160,6 +160,9 @@ pub struct AgentTuiSpawnSpec {
     pub project_dir: PathBuf,
     pub env: BTreeMap<String, String>,
     pub size: AgentTuiSize,
+    /// Optional byte pattern that indicates the runtime is ready for input.
+    /// Set from `AgentRuntime::readiness_pattern()`.
+    pub readiness_pattern: Option<&'static str>,
 }
 
 impl AgentTuiSpawnSpec {
@@ -179,6 +182,7 @@ impl AgentTuiSpawnSpec {
             project_dir,
             env,
             size: size.validate()?,
+            readiness_pattern: None,
         })
     }
 }
@@ -1025,6 +1029,10 @@ pub(super) fn snapshot_from_process(
     })
 }
 
+/// Shared readiness signal: the reader thread sets the flag and notifies
+/// the condvar when the runtime's readiness pattern is detected in PTY output.
+type ReadinessSignal = Arc<(Mutex<bool>, std::sync::Condvar)>;
+
 /// Live process handle for an agent TUI running inside a PTY.
 pub struct AgentTuiProcess {
     master: Shared<Box<dyn MasterPty + Send>>,
@@ -1033,6 +1041,7 @@ pub struct AgentTuiProcess {
     transcript: Shared<Vec<u8>>,
     screen: Shared<TerminalScreenParser>,
     reader_thread: Option<JoinHandle<()>>,
+    readiness: ReadinessSignal,
 }
 
 impl AgentTuiProcess {
@@ -1060,8 +1069,15 @@ impl AgentTuiProcess {
 
         let transcript = Arc::new(Mutex::new(Vec::new()));
         let screen = Arc::new(Mutex::new(TerminalScreenParser::new(spec.size)));
-        let reader_thread =
-            spawn_reader_thread(reader, Arc::clone(&transcript), Arc::clone(&screen));
+        let readiness: ReadinessSignal =
+            Arc::new((Mutex::new(false), std::sync::Condvar::new()));
+        let reader_thread = spawn_reader_thread(
+            reader,
+            Arc::clone(&transcript),
+            Arc::clone(&screen),
+            spec.readiness_pattern,
+            Arc::clone(&readiness),
+        );
 
         Ok(Self {
             master: Arc::new(Mutex::new(pair.master)),
@@ -1070,6 +1086,7 @@ impl AgentTuiProcess {
             transcript,
             screen,
             reader_thread: Some(reader_thread),
+            readiness,
         })
     }
 
@@ -1163,6 +1180,25 @@ impl AgentTuiProcess {
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!("kill agent TUI process: {error}")).into()
             })
+    }
+
+    /// Block until the readiness pattern is detected or the timeout elapses.
+    ///
+    /// Returns `true` if the pattern was found, `false` on timeout. When no
+    /// readiness pattern was configured at spawn time, returns `true`
+    /// immediately (the process is assumed ready).
+    pub fn wait_ready(&self, timeout: Duration) -> bool {
+        let (flag, condvar) = &*self.readiness;
+        let Ok(guard) = flag.lock() else {
+            return false;
+        };
+        if *guard {
+            return true;
+        }
+        match condvar.wait_timeout(guard, timeout) {
+            Ok((guard, _)) => *guard,
+            Err(_) => false,
+        }
     }
 }
 
@@ -1459,7 +1495,22 @@ fn spawn_reader_thread(
     mut reader: Box<dyn Read + Send>,
     transcript: Shared<Vec<u8>>,
     screen: Shared<TerminalScreenParser>,
+    readiness_pattern: Option<&'static str>,
+    readiness: ReadinessSignal,
 ) -> JoinHandle<()> {
+    // When no pattern is configured, signal ready immediately so callers
+    // of `wait_ready` return without blocking.
+    if readiness_pattern.is_none() {
+        if let Ok(mut flag) = readiness.0.lock() {
+            *flag = true;
+        }
+        readiness.1.notify_all();
+    }
+
+    let pattern_bytes: Option<Vec<u8>> =
+        readiness_pattern.map(|pattern| pattern.as_bytes().to_vec());
+    let mut signaled = readiness_pattern.is_none();
+
     thread::spawn(move || {
         let mut buffer = [0_u8; 8192];
         loop {
@@ -1469,6 +1520,27 @@ fn spawn_reader_thread(
                     let bytes = &buffer[..read];
                     if let Ok(mut transcript) = transcript.lock() {
                         transcript.extend_from_slice(bytes);
+
+                        // Check the transcript tail for the readiness pattern.
+                        // Checking the transcript instead of the raw chunk handles
+                        // the edge case where a multi-byte pattern spans two reads.
+                        if !signaled {
+                            if let Some(pattern) = &pattern_bytes {
+                                let search_start =
+                                    transcript.len().saturating_sub(read + pattern.len() - 1);
+                                let tail = &transcript[search_start..];
+                                if tail
+                                    .windows(pattern.len())
+                                    .any(|window| window == pattern.as_slice())
+                                {
+                                    if let Ok(mut flag) = readiness.0.lock() {
+                                        *flag = true;
+                                    }
+                                    readiness.1.notify_all();
+                                    signaled = true;
+                                }
+                            }
+                        }
                     }
                     if let Ok(mut screen) = screen.lock() {
                         screen.process(bytes);
@@ -2718,5 +2790,86 @@ mod tests {
         );
         assert!(prompt.contains("observer"), "should contain role");
         assert!(prompt.contains("my worker"), "should contain name");
+    }
+
+    #[test]
+    fn readiness_flag_set_when_reader_encounters_pattern() {
+        let process = spawn_shell_with_readiness(
+            "printf 'loading...\\n\u{256d} ready\\n'",
+            Some("\u{256d}"),
+        );
+        assert!(
+            process.wait_ready(DEFAULT_WAIT_TIMEOUT),
+            "readiness flag should be set when pattern appears in output"
+        );
+    }
+
+    #[test]
+    fn readiness_times_out_and_join_still_sent() {
+        let process = spawn_shell_with_readiness("sleep 30", Some("\u{256d}"));
+        let ready = process.wait_ready(Duration::from_millis(200));
+        assert!(
+            !ready,
+            "wait_ready should return false when pattern never appears"
+        );
+        // The process is still alive - verify we can still send input after timeout.
+        assert!(
+            process
+                .send_input(&AgentTuiInput::Control { key: 'c' })
+                .is_ok(),
+            "should still be able to send input after readiness timeout"
+        );
+    }
+
+    #[test]
+    fn join_message_not_sent_before_readiness() {
+        // Spawn a shell that prints the readiness marker after a delay.
+        let process = spawn_shell_with_readiness(
+            "sleep 0.3 && printf '\u{256d} ready\\n' && cat",
+            Some("\u{256d}"),
+        );
+
+        // Before readiness, the transcript should not contain our test input.
+        let raw = process.transcript().expect("transcript");
+        let transcript_before = String::from_utf8_lossy(&raw);
+        assert!(
+            !transcript_before.contains("test-join-msg"),
+            "no input should have been sent yet"
+        );
+
+        // Wait for readiness.
+        assert!(
+            process.wait_ready(DEFAULT_WAIT_TIMEOUT),
+            "should become ready"
+        );
+
+        // Now send input and verify it arrives.
+        super::send_initial_prompt(&process, "test-join-msg").expect("send after ready");
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            String::from_utf8_lossy(&process.transcript().expect("transcript"))
+                .contains("test-join-msg")
+        });
+    }
+
+    fn spawn_shell_with_readiness(
+        script: &str,
+        readiness_pattern: Option<&'static str>,
+    ) -> super::AgentTuiProcess {
+        let profile = AgentTuiLaunchProfile::from_argv(
+            "codex",
+            vec!["sh".to_string(), "-c".to_string(), script.to_string()],
+        )
+        .expect("profile");
+        let mut spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("."),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        spec.readiness_pattern = readiness_pattern;
+        PortablePtyAgentTuiBackend
+            .spawn(spec)
+            .expect("spawn pty process")
     }
 }
