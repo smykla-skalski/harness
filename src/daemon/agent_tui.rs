@@ -1713,16 +1713,13 @@ fn spawn_reader_thread(
                     if let Ok(mut transcript) = transcript.lock() {
                         transcript.extend_from_slice(bytes);
                         if !signaled {
-                            signaled = match &pattern_bytes {
-                                Some(pattern) => {
-                                    check_readiness_pattern(&transcript, read, pattern, &readiness)
-                                }
+                            signaled = if let Some(pattern) = &pattern_bytes {
+                                check_readiness_pattern(&transcript, read, pattern, &readiness)
+                            } else {
                                 // No marker configured: any output means the process
                                 // started and its terminal is initializing.
-                                None => {
-                                    signal_readiness_ready(&readiness);
-                                    true
-                                }
+                                signal_readiness_ready(&readiness);
+                                true
                             };
                         }
                     }
@@ -2452,8 +2449,8 @@ mod tests {
                         "-c".into(),
                         "sleep 0.2; printf 'agent-ready\\n'; sleep 0.2".into(),
                     ],
-                    rows: 5,
-                    cols: 40,
+                    rows: 30,
+                    cols: 120,
                 },
             )
             .expect("start manager TUI");
@@ -2477,8 +2474,8 @@ mod tests {
                             }
                         }
                     }
-                    Ok(_) => {} // consume other events
-                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {} // skip
+                    Ok(_) => {}
+                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {}
                     Err(_) => break,
                 }
             }
