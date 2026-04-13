@@ -69,7 +69,7 @@ extension RecordingHarnessClient {
 
   func recordTimelineScope(sessionID: String, scope: TimelineScope) {
     lock.withLock {
-      _timelineScopesBySessionID[sessionID, default: []].append(scope)
+      _timelineScopesByID[sessionID, default: []].append(scope)
     }
   }
 
@@ -79,7 +79,7 @@ extension RecordingHarnessClient {
     }
   }
 
-  private func dequeueAgentTuiSnapshot(
+  func dequeueAgentTuiSnapshot(
     from storage: inout [String: [AgentTuiSnapshot]],
     tuiID: String
   ) -> AgentTuiSnapshot? {

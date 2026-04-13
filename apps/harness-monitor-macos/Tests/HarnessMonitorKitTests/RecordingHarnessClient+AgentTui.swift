@@ -3,7 +3,7 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
-  fileprivate func replacing(tasks: [WorkItem]) -> SessionDetail {
+  func replacing(tasks: [WorkItem]) -> SessionDetail {
     SessionDetail(
       session: updatedSession(),
       agents: detail.agents,
@@ -14,7 +14,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  fileprivate func replacingTask(
+  func replacingTask(
     _ taskID: String,
     transform: (WorkItem) -> WorkItem
   ) -> SessionDetail {
@@ -31,7 +31,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  fileprivate func replacingAgent(
+  func replacingAgent(
     _ agentID: String,
     transform: (AgentRegistration) -> AgentRegistration
   ) -> SessionDetail {
@@ -62,7 +62,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  fileprivate func updatedSession() -> SessionSummary {
+  func updatedSession() -> SessionSummary {
     SessionSummary(
       projectId: detail.session.projectId,
       projectName: detail.session.projectName,
@@ -82,7 +82,7 @@ extension RecordingHarnessClient {
     )
   }
 
-  fileprivate func note(from request: TaskUpdateRequest) -> [TaskNote] {
+  func note(from request: TaskUpdateRequest) -> [TaskNote] {
     guard let note = request.note else {
       return []
     }

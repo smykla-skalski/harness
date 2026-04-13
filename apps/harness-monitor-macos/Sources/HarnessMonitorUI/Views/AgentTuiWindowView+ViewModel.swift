@@ -124,6 +124,7 @@ extension AgentTuiWindowView {
     }
   }
 
+  @MainActor
   @Observable
   final class ViewModel {
     var displayState = AgentTuiDisplayState()

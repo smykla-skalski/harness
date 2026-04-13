@@ -17,7 +17,7 @@ struct HarnessMonitorStoreDatabaseTests {
     container = try HarnessMonitorModelContainer.preview()
   }
 
-  private func makeStore(
+  func makeStore(
     cacheService: SessionCacheService? = nil
   ) -> HarnessMonitorStore {
     HarnessMonitorStore(

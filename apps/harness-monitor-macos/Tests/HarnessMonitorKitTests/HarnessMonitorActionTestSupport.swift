@@ -2,7 +2,7 @@ import Foundation
 
 @testable import HarnessMonitorKit
 
-private struct ProjectFixture {
+struct ProjectFixture {
   let name: String
   let projectDir: String?
   let contextRoot: String
@@ -112,47 +112,47 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case timeline(String)
   }
 
-  private let lock = NSLock()
-  private var _calls: [Call] = []
-  private var _detail: SessionDetail
-  private var _healthDelay: Duration?
-  private var _transportLatencyMs: Int?
-  private var _transportLatencyError: (any Error)?
-  private var _diagnosticsDelay: Duration?
-  private var _mutationDelay: Duration?
-  private var _projectSummaries: [ProjectSummary]?
-  private var _sessionSummaries: [SessionSummary]?
-  private var _sessionDetailsByID: [String: SessionDetail] = [:]
-  private var _detailDelays: [String: Duration] = [:]
-  private var _sessionDetailErrorsByID: [String: any Error] = [:]
-  private var _sessionDetailScopesByID: [String: [String?]] = [:]
-  private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
-  private var _timelineScopesBySessionID: [String: [TimelineScope]] = [:]
-  private var _timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
-  private var _timelineDelays: [String: Duration] = [:]
-  private var _timelineBatchDelaysBySessionID: [String: Duration] = [:]
-  private var _timelineErrorsByID: [String: any Error] = [:]
-  private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
-  private var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
-  private var _agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
-  private var _agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
-  private var _codexStartError: (any Error)?
-  private var _queuedCodexStartErrors: [any Error] = []
-  private var _agentTuiStartError: (any Error)?
-  private var _hostBridgeReconfigureError: (any Error)?
-  private var _hostBridgeStatusReport = BridgeStatusReport(running: false)
-  private var _globalStreamEvents: [DaemonPushEvent] = []
-  private var _globalStreamError: (any Error)?
-  private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
-  private var _sessionStreamErrorsByID: [String: any Error] = [:]
-  private var _shutdownCallCount = 0
-  private var _healthCallCount = 0
-  private var _transportLatencyCallCount = 0
-  private var _diagnosticsCallCount = 0
-  private var _projectsCallCount = 0
-  private var _sessionsCallCount = 0
-  private var _sessionDetailCallCounts: [String: Int] = [:]
-  private var _timelineCallCounts: [String: Int] = [:]
+  let lock = NSLock()
+  var _calls: [Call] = []
+  var _detail: SessionDetail
+  var _healthDelay: Duration?
+  var _transportLatencyMs: Int?
+  var _transportLatencyError: (any Error)?
+  var _diagnosticsDelay: Duration?
+  var _mutationDelay: Duration?
+  var _projectSummaries: [ProjectSummary]?
+  var _sessionSummaries: [SessionSummary]?
+  var _sessionDetailsByID: [String: SessionDetail] = [:]
+  var _detailDelays: [String: Duration] = [:]
+  var _sessionDetailErrorsByID: [String: any Error] = [:]
+  var _sessionDetailScopesByID: [String: [String?]] = [:]
+  var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
+  var _timelineScopesByID: [String: [TimelineScope]] = [:]
+  var _timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
+  var _timelineDelays: [String: Duration] = [:]
+  var _timelineBatchDelaysBySessionID: [String: Duration] = [:]
+  var _timelineErrorsByID: [String: any Error] = [:]
+  var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
+  var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
+  var _agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
+  var _agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
+  var _codexStartError: (any Error)?
+  var _queuedCodexStartErrors: [any Error] = []
+  var _agentTuiStartError: (any Error)?
+  var _hostBridgeReconfigureError: (any Error)?
+  var _hostBridgeStatusReport = BridgeStatusReport(running: false)
+  var _globalStreamEvents: [DaemonPushEvent] = []
+  var _globalStreamError: (any Error)?
+  var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
+  var _sessionStreamErrorsByID: [String: any Error] = [:]
+  var _shutdownCallCount = 0
+  var _healthCallCount = 0
+  var _transportLatencyCallCount = 0
+  var _diagnosticsCallCount = 0
+  var _projectsCallCount = 0
+  var _sessionsCallCount = 0
+  var _sessionDetailCallCounts: [String: Int] = [:]
+  var _timelineCallCounts: [String: Int] = [:]
 
   var calls: [Call] {
     get { lock.withLock { _calls } }
