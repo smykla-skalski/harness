@@ -564,28 +564,33 @@ private struct VoiceCaptureFailurePresentation: Equatable {
         title: "Microphone Access Needed",
         message: message,
         recoverySuggestion:
-          "Open System Settings > Privacy & Security > Microphone, allow Harness Monitor, then try recording again."
+          "Open System Settings > Privacy & Security > Microphone, allow Harness Monitor, "
+          + "then try recording again."
       )
     case .speechAssetsUnavailable(let locale):
       self.init(
         title: "Speech Assets Needed",
         message: message,
         recoverySuggestion:
-          "Open Preferences > Voice to confirm the selected locale, then open System Settings > Keyboard > Dictation and download that language or switch to a supported English locale such as English (US). macOS does not have an on-device speech asset ready for \(locale)."
+          "Open Preferences > Voice to confirm the selected locale, then open System Settings > "
+          + "Keyboard > Dictation and download that language or switch to a supported English locale "
+          + "such as English (US). macOS does not have an on-device speech asset ready for \(locale)."
       )
     case .unsupportedLocale(let locale):
       self.init(
         title: "Speech Language Unsupported",
         message: message,
         recoverySuggestion:
-          "Open Preferences > Voice and choose a Speech-supported locale such as English (US), then try recording again. Harness Monitor asked for \(locale)."
+          "Open Preferences > Voice and choose a Speech-supported locale such as English (US), "
+          + "then try recording again. Harness Monitor asked for \(locale)."
       )
     case .speechUnavailable:
       self.init(
         title: "Speech Unavailable",
         message: message,
         recoverySuggestion:
-          "Make sure speech recognition and dictation are available on this Mac, install the required language assets in System Settings, then try recording again."
+          "Make sure speech recognition and dictation are available on this Mac, install the "
+          + "required language assets in System Settings, then try recording again."
       )
     case .noInputFormat, .couldNotCopyAudioBuffer, .couldNotConvertAudioBuffer:
       self.init(

@@ -76,7 +76,8 @@ final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
       waitUntil(timeout: Self.actionTimeout) {
         banner.exists && unavailableTitle.exists && startCommand.exists
       },
-      "Stopped host bridge recovery should keep the banner visible, switch it to the unavailable copy, and show the start command"
+      "Stopped host bridge recovery should keep the banner visible, "
+      + "switch it to the unavailable copy, and show the start command"
     )
     XCTAssertFalse(enableButton.exists)
     XCTAssertTrue(copyButton.exists)

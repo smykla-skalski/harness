@@ -652,8 +652,10 @@ extension HarnessMonitorStore {
       applyAgentTui(measuredTui.value)
       return measuredTui.value != baseline
     } catch {
+      let tuiId = baseline.tuiId
+      let err = error.localizedDescription
       HarnessMonitorLogger.store.warning(
-        "agent TUI post-action refresh failed for \(baseline.tuiId, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        "agent TUI post-action refresh failed for \(tuiId, privacy: .public): \(err, privacy: .public)"
       )
       return true
     }
