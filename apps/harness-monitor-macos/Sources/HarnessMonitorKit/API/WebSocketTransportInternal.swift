@@ -140,6 +140,7 @@ extension WebSocketTransport {
     task.resume()
     startHeartbeat()
     try await resubscribe()
+    emitReconnectReadyEvents()
   }
 
   func resubscribe() async throws {
@@ -154,6 +155,16 @@ extension WebSocketTransport {
         method: "session.subscribe",
         params: .object(["session_id": .string(sessionID)])
       )
+    }
+  }
+
+  func emitReconnectReadyEvents() {
+    let recordedAt = ISO8601DateFormatter().string(from: Date())
+    if globalSubscriptionActive {
+      globalStreamContinuation?.yield(.ready(recordedAt: recordedAt))
+    }
+    for (sessionID, continuation) in sessionStreamContinuations {
+      continuation.yield(.ready(recordedAt: recordedAt, sessionId: sessionID))
     }
   }
 

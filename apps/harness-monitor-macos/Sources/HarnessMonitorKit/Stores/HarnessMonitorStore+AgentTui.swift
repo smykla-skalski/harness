@@ -194,6 +194,40 @@ extension HarnessMonitorStore {
     }
   }
 
+  func recoverSelectedAgentTuisAfterReconnect(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async {
+    do {
+      let measuredTuis = try await Self.measureOperation {
+        try await client.agentTuis(sessionID: sessionID)
+      }
+      recordRequestSuccess()
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      clearHostBridgeIssue(for: "agent-tui")
+      let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles())
+        .tuis
+      selectedAgentTuis = sortedTuis
+      selectedAgentTui = preferredAgentTui(from: sortedTuis)
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        case .server(let code, _) = apiError,
+        code == 501
+      {
+        markHostBridgeIssue(for: "agent-tui", statusCode: code)
+      }
+      let err = error.localizedDescription
+      HarnessMonitorLogger.store.warning(
+        "websocket reconnect agent TUI refresh failed: \(err, privacy: .public)"
+      )
+    }
+  }
+
   func refreshAgentTui(
     using client: any HarnessMonitorClientProtocol,
     tuiID: String

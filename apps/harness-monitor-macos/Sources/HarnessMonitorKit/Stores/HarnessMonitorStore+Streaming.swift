@@ -25,6 +25,7 @@ extension HarnessMonitorStore {
             attempt = 0
             recordStreamEvent(countedInTraffic: true)
             if case .ready = event.kind {
+              await recoverGlobalPushOnlyState(using: client)
               continue
             }
             applyGlobalPushEvent(event)
@@ -73,6 +74,10 @@ extension HarnessMonitorStore {
             let countedInTraffic = activeTransport == .httpSSE
             recordStreamEvent(countedInTraffic: countedInTraffic)
             if case .ready = event.kind {
+              await recoverSelectedSessionPushOnlyState(
+                using: client,
+                sessionID: sessionID
+              )
               continue
             }
             applySessionPushEvent(event)
@@ -102,6 +107,37 @@ extension HarnessMonitorStore {
         try? await Task.sleep(for: delay)
       }
     }
+  }
+
+  private func recoverGlobalPushOnlyState(
+    using client: any HarnessMonitorClientProtocol
+  ) async {
+    do {
+      let measuredLogLevel = try await Self.measureOperation {
+        try await client.logLevel()
+      }
+      recordRequestSuccess()
+      daemonLogLevel = measuredLogLevel.value.level
+    } catch {
+      let err = error.localizedDescription
+      HarnessMonitorLogger.store.warning(
+        "websocket reconnect log-level refresh failed: \(err, privacy: .public)"
+      )
+    }
+  }
+
+  private func recoverSelectedSessionPushOnlyState(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async {
+    await recoverSelectedCodexRunsAfterReconnect(
+      using: client,
+      sessionID: sessionID
+    )
+    await recoverSelectedAgentTuisAfterReconnect(
+      using: client,
+      sessionID: sessionID
+    )
   }
 
   func scheduleSessionPushFallback(
