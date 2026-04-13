@@ -95,9 +95,7 @@ extension HarnessMonitorStore {
 
       if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
         let requestID = beginSessionLoad()
-        Task { @MainActor [weak self] in
-          await self?.loadSession(using: client, sessionID: selectedSessionID, requestID: requestID)
-        }
+        startSessionLoad(using: client, sessionID: selectedSessionID, requestID: requestID)
       } else {
         synchronizeActionActor()
         if let previewReadySessionID = previewReadySessionID(
@@ -135,9 +133,11 @@ extension HarnessMonitorStore {
       let measuredDetail = try await Self.measureOperation {
         try await client.sessionDetail(id: sessionID, scope: nil)
       }
+      try Task.checkCancellation()
       let measuredTimeline = try await Self.measureOperation {
         try await client.timeline(sessionID: sessionID)
       }
+      try Task.checkCancellation()
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
@@ -167,6 +167,8 @@ extension HarnessMonitorStore {
           self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
         }
       }
+    } catch is CancellationError {
+      return
     } catch {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return

@@ -17,8 +17,17 @@ private struct ClickableSwitchStyle: ToggleStyle {
 public struct AgentTuiWindowView: View {
   let store: HarnessMonitorStore
 
+  @MainActor
   public init(store: HarnessMonitorStore) {
     self.store = store
+    let initialDisplayState = AgentTuiDisplayState(store: store)
+    _displayState = State(initialValue: initialDisplayState)
+    _selection = State(
+      initialValue: Self.initialSelection(
+        displayState: initialDisplayState,
+        selectedTuiID: store.selectedAgentTui?.tuiId
+      )
+    )
   }
 
   @State private var displayState = AgentTuiDisplayState()
@@ -33,7 +42,6 @@ public struct AgentTuiWindowView: View {
   @State private var cols = 120
   @State private var isSubmitting = false
   @State private var selection: AgentTuiSheetSelection = .create
-  @State private var hasInitializedSelection = false
   @State private var wrapLines = false
   @State private var selectedPersona: String?
   @State private var availablePersonas: [AgentPersona] = []
@@ -283,11 +291,14 @@ public struct AgentTuiWindowView: View {
     .task {
       windowNavigation.backHandler = { navigateHistoryBack() }
       windowNavigation.forwardHandler = { navigateHistoryForward() }
-      refreshDisplayState()
+      await Task.yield()
       async let tuiRefresh = store.refreshSelectedAgentTuis()
       async let personas = store.fetchPersonas()
-      availablePersonas = await personas
+      let loadedPersonas = await personas
       _ = await tuiRefresh
+      if availablePersonas != loadedPersonas {
+        availablePersonas = loadedPersonas
+      }
       refreshDisplayState()
       reconcileSheetState(afterRefresh: true)
     }
@@ -961,6 +972,20 @@ public struct AgentTuiWindowView: View {
     return tui.runtime.capitalized
   }
 
+  private static func initialSelection(
+    displayState: AgentTuiDisplayState,
+    selectedTuiID: String?
+  ) -> AgentTuiSheetSelection {
+    let orderedSessionIDs = displayState.sortedAgentTuis.map(\.tuiId)
+    if let selectedTuiID, orderedSessionIDs.contains(selectedTuiID) {
+      return .session(selectedTuiID)
+    }
+    if let fallbackTuiID = orderedSessionIDs.first {
+      return .session(fallbackTuiID)
+    }
+    return .create
+  }
+
   private func selectCreateTab() {
     selection = .create
   }
@@ -1139,17 +1164,13 @@ public struct AgentTuiWindowView: View {
   }
 
   private func reconcileSheetState(afterRefresh: Bool) {
-    suppressHistoryRecording = true
-    if !hasInitializedSelection || afterRefresh {
-      hasInitializedSelection = true
-      if let selectedTuiID = store.selectedAgentTui?.tuiId ?? orderedSessionIDs.first {
-        if selection.sessionID == nil || afterRefresh {
-          selection = .session(selectedTuiID)
-          syncTerminalSize()
-        }
-      } else {
-        selection = .create
-      }
+    let preferredSelection = Self.initialSelection(
+      displayState: displayState,
+      selectedTuiID: store.selectedAgentTui?.tuiId
+    )
+
+    if afterRefresh {
+      applyProgrammaticSelection(preferredSelection)
       return
     }
 
@@ -1158,16 +1179,25 @@ public struct AgentTuiWindowView: View {
     }
 
     guard store.selectedAgentTuis.contains(where: { $0.tuiId == selectedTuiID }) else {
-      if let fallbackTuiID = store.selectedAgentTui?.tuiId ?? orderedSessionIDs.first {
-        selection = .session(fallbackTuiID)
-        syncTerminalSize()
-      } else {
-        selection = .create
-      }
+      applyProgrammaticSelection(preferredSelection)
       return
     }
 
     syncTerminalSize()
+  }
+
+  private func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
+    guard selection != nextSelection else {
+      if nextSelection.sessionID != nil {
+        syncTerminalSize()
+      }
+      return
+    }
+    suppressHistoryRecording = true
+    selection = nextSelection
+    if nextSelection.sessionID != nil {
+      syncTerminalSize()
+    }
   }
 
   private func navigateHistoryBack() {
