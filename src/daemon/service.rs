@@ -2720,7 +2720,10 @@ done
                     .expect("worker session id"),
             );
 
-            let detail = session_detail(&state.session_id, None).expect("session detail");
+            let db = setup_db_with_project(project);
+            let project_id = index::discovered_project_for_checkout(project).project_id;
+            db.sync_session(&project_id, &state).expect("sync");
+            let detail = session_detail(&state.session_id, Some(&db)).expect("session detail");
             assert!(
                 detail.session.leader_id.is_none(),
                 "dead leader should clear leader_id"
