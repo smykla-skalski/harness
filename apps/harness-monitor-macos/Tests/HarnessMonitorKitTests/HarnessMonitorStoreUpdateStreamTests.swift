@@ -273,6 +273,44 @@ struct HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("Push fallback timeline refresh is rate-limited for repeated selected-session updates")
+  func pushFallbackTimelineRefreshIsRateLimitedForRepeatedSelectedSessionUpdates() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .webSocket
+    store.sessionPushFallbackDelay = .milliseconds(20)
+    store.sessionPushFallbackMinimumInterval = .milliseconds(120)
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    let baselineTimelineCalls = client.readCallCount(.timeline(PreviewFixtures.summary.sessionId))
+
+    store.scheduleSessionPushFallback(
+      using: client,
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+    try? await Task.sleep(for: .milliseconds(50))
+
+    let timelineKey = RecordingHarnessClient.ReadCall.timeline(PreviewFixtures.summary.sessionId)
+    #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
+    #expect(
+      client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary, .summary]
+    )
+
+    store.scheduleSessionPushFallback(
+      using: client,
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+    try? await Task.sleep(for: .milliseconds(60))
+
+    #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
+
+    try? await Task.sleep(for: .milliseconds(90))
+
+    #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 2)
+
+    store.stopAllStreams()
+  }
+
   @Test("Selected session update with deferred extensions preserves visible signals")
   func selectedSessionUpdateWithDeferredExtensionsPreservesVisibleSignals() async {
     let client = RecordingHarnessClient()

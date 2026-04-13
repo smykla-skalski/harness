@@ -127,7 +127,7 @@ public struct AgentTuiWindowView: View {
     }
   }
 
-  private struct TerminalViewportSizing {
+  private enum TerminalViewportSizing {
     static let rowRange = 8...240
     static let colRange = 20...400
     static let minimumViewportHeight: CGFloat = 220
@@ -391,7 +391,7 @@ public struct AgentTuiWindowView: View {
   private var createPaneDescription: String {
     if displayState.hasAgentTuis {
       "Open Agent TUI sessions stay pinned in the sidebar so you can launch "
-      + "another agent without losing the active terminal."
+        + "another agent without losing the active terminal."
     } else {
       "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
     }
@@ -404,8 +404,8 @@ public struct AgentTuiWindowView: View {
       }
       launchSection
       Text(createPaneDescription)
-      .scaledFont(.subheadline)
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiLaunchPane)
   }
@@ -947,14 +947,14 @@ public struct AgentTuiWindowView: View {
     switch agentTuiBridgeState {
     case .excluded:
       "The shared host bridge is running without terminal control enabled. "
-      + "Enable it now or run this in a terminal:"
+        + "Enable it now or run this in a terminal:"
     case .unavailable:
       if hostBridge.running && agentTuiBridgeCapabilityPresent {
         "The shared host bridge is running, but terminal control is unavailable. "
-        + "Re-enable it or run this in a terminal:"
+          + "Re-enable it or run this in a terminal:"
       } else {
         "Harness Monitor runs sandboxed and needs the host bridge to start "
-        + "or steer terminal-backed agents. Run this in a terminal:"
+          + "or steer terminal-backed agents. Run this in a terminal:"
       }
     case .ready:
       ""

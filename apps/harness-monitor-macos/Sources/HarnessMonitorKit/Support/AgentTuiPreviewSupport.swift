@@ -1,5 +1,27 @@
 import Foundation
 
+public struct AgentTuiSnapshotSpec {
+  public let agentID: String
+  public let runtime: AgentTuiRuntime
+  public let status: AgentTuiStatus
+  public let size: AgentTuiSize
+  public let text: String
+
+  public init(
+    agentID: String,
+    runtime: AgentTuiRuntime,
+    status: AgentTuiStatus,
+    size: AgentTuiSize,
+    text: String
+  ) {
+    self.agentID = agentID
+    self.runtime = runtime
+    self.status = status
+    self.size = size
+    self.text = text
+  }
+}
+
 @MainActor
 public enum AgentTuiPreviewSupport {
   public enum BridgeState {
@@ -11,115 +33,119 @@ public enum AgentTuiPreviewSupport {
   public static let runningSingle = [
     snapshot(
       tuiID: "preview-agent-tui-1",
-      agentID: PreviewFixtures.agents[0].agentId,
-      runtime: .claude,
-      status: .running,
-      rows: 30,
-      cols: 110,
-      text: "claude> Investigating the task lane regression"
+      spec: AgentTuiSnapshotSpec(
+        agentID: PreviewFixtures.agents[0].agentId,
+        runtime: .claude,
+        status: .running,
+        size: AgentTuiSize(rows: 30, cols: 110),
+        text: "claude> Investigating the task lane regression"
+      )
     )
   ]
 
   public static let stoppedSingle = [
     snapshot(
       tuiID: "preview-agent-tui-2",
-      agentID: PreviewFixtures.agents[1].agentId,
-      runtime: .codex,
-      status: .stopped,
-      rows: 28,
-      cols: 108,
-      text: "codex> Applied the patch and exited cleanly"
+      spec: AgentTuiSnapshotSpec(
+        agentID: PreviewFixtures.agents[1].agentId,
+        runtime: .codex,
+        status: .stopped,
+        size: AgentTuiSize(rows: 28, cols: 108),
+        text: "codex> Applied the patch and exited cleanly"
+      )
     )
   ]
 
   public static let overflowMixed = [
     snapshot(
       tuiID: "preview-agent-tui-1",
-      agentID: PreviewFixtures.agents[0].agentId,
-      runtime: .claude,
-      status: .running,
-      rows: 30,
-      cols: 110,
-      text: "claude> triaging observer findings"
+      spec: AgentTuiSnapshotSpec(
+        agentID: PreviewFixtures.agents[0].agentId,
+        runtime: .claude,
+        status: .running,
+        size: AgentTuiSize(rows: 30, cols: 110),
+        text: "claude> triaging observer findings"
+      )
     ),
     snapshot(
       tuiID: "preview-agent-tui-2",
-      agentID: PreviewFixtures.agents[1].agentId,
-      runtime: .codex,
-      status: .running,
-      rows: 32,
-      cols: 120,
-      text: "codex> preparing patch set"
+      spec: AgentTuiSnapshotSpec(
+        agentID: PreviewFixtures.agents[1].agentId,
+        runtime: .codex,
+        status: .running,
+        size: AgentTuiSize(rows: 32, cols: 120),
+        text: "codex> preparing patch set"
+      )
     ),
     snapshot(
       tuiID: "preview-agent-tui-3",
-      agentID: "preview-agent-gemini",
-      runtime: .gemini,
-      status: .stopped,
-      rows: 26,
-      cols: 96,
-      text: "gemini> report delivered"
+      spec: AgentTuiSnapshotSpec(
+        agentID: "preview-agent-gemini",
+        runtime: .gemini,
+        status: .stopped,
+        size: AgentTuiSize(rows: 26, cols: 96),
+        text: "gemini> report delivered"
+      )
     ),
     snapshot(
       tuiID: "preview-agent-tui-4",
-      agentID: "preview-agent-copilot",
-      runtime: .copilot,
-      status: .running,
-      rows: 28,
-      cols: 100,
-      text: "copilot> verifying UI snapshots"
+      spec: AgentTuiSnapshotSpec(
+        agentID: "preview-agent-copilot",
+        runtime: .copilot,
+        status: .running,
+        size: AgentTuiSize(rows: 28, cols: 100),
+        text: "copilot> verifying UI snapshots"
+      )
     ),
     snapshot(
       tuiID: "preview-agent-tui-5",
-      agentID: "preview-agent-codex-2",
-      runtime: .codex,
-      status: .running,
-      rows: 32,
-      cols: 120,
-      text: "codex> replaying terminal script"
+      spec: AgentTuiSnapshotSpec(
+        agentID: "preview-agent-codex-2",
+        runtime: .codex,
+        status: .running,
+        size: AgentTuiSize(rows: 32, cols: 120),
+        text: "codex> replaying terminal script"
+      )
     ),
     snapshot(
       tuiID: "preview-agent-tui-6",
-      agentID: "preview-agent-gemini-2",
-      runtime: .gemini,
-      status: .stopped,
-      rows: 24,
-      cols: 88,
-      text: "gemini> final notes captured"
+      spec: AgentTuiSnapshotSpec(
+        agentID: "preview-agent-gemini-2",
+        runtime: .gemini,
+        status: .stopped,
+        size: AgentTuiSize(rows: 24, cols: 88),
+        text: "gemini> final notes captured"
+      )
     ),
   ]
 
   public static func snapshot(
     tuiID: String,
-    agentID: String,
-    runtime: AgentTuiRuntime,
-    status: AgentTuiStatus,
-    rows: Int,
-    cols: Int,
-    text: String
+    spec: AgentTuiSnapshotSpec
   ) -> AgentTuiSnapshot {
-    AgentTuiSnapshot(
+    let lines = spec.text.split(separator: "\n", omittingEmptySubsequences: false)
+    let cursorRow = max(lines.count, 1)
+    let cursorCol = min((lines.last?.count ?? 0) + 1, spec.size.cols)
+    return AgentTuiSnapshot(
       tuiId: tuiID,
       sessionId: PreviewFixtures.summary.sessionId,
-      agentId: agentID,
-      runtime: runtime.rawValue,
-      status: status,
-      argv: [runtime.rawValue],
+      agentId: spec.agentID,
+      runtime: spec.runtime.rawValue,
+      status: spec.status,
+      argv: [spec.runtime.rawValue],
       projectDir: PreviewFixtures.summary.projectDir ?? "/Users/example/Projects/harness",
-      size: AgentTuiSize(rows: rows, cols: cols),
+      size: spec.size,
       screen: AgentTuiScreenSnapshot(
-        rows: rows,
-        cols: cols,
-        cursorRow: max(text.split(separator: "\n", omittingEmptySubsequences: false).count, 1),
-        cursorCol: min(
-          (text.split(separator: "\n", omittingEmptySubsequences: false).last?.count ?? 0) + 1, cols
-        ),
-        text: text
+        rows: spec.size.rows,
+        cols: spec.size.cols,
+        cursorRow: cursorRow,
+        cursorCol: cursorCol,
+        text: spec.text
       ),
       transcriptPath: "/Users/example/Projects/harness/transcripts/\(tuiID).log",
-      exitCode: status.isActive ? nil : 0,
+      exitCode: spec.status.isActive ? nil : 0,
       signal: nil,
-      error: status == .failed ? "Preview failure" : nil,
+      error: spec.status == .failed ? "Preview failure" : nil,
       createdAt: "2026-04-11T09:00:00Z",
       updatedAt: "2026-04-11T09:01:00Z"
     )
