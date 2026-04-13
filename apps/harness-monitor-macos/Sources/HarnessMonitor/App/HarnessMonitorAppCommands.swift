@@ -12,6 +12,8 @@ struct HarnessMonitorAppCommands: Commands {
 
   @Environment(\.openWindow)
   private var openWindow
+  @FocusedValue(\.windowNavigation)
+  private var windowNavigation
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
@@ -80,16 +82,20 @@ struct HarnessMonitorAppCommands: Commands {
       Divider()
 
       Button("Back") {
-        Task { await store.navigateBack() }
+        if let windowNavigation {
+          Task { await windowNavigation.navigateBack() }
+        }
       }
       .keyboardShortcut("[", modifiers: [.command])
-      .disabled(!displayState.canNavigateBack)
+      .disabled(windowNavigation?.canGoBack != true)
 
       Button("Forward") {
-        Task { await store.navigateForward() }
+        if let windowNavigation {
+          Task { await windowNavigation.navigateForward() }
+        }
       }
       .keyboardShortcut("]", modifiers: [.command])
-      .disabled(!displayState.canNavigateForward)
+      .disabled(windowNavigation?.canGoForward != true)
 
       Divider()
 

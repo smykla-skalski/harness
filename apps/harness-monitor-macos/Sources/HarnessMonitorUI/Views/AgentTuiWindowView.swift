@@ -252,6 +252,13 @@ public struct AgentTuiWindowView: View {
       }
     }
     .onChange(of: selection) { oldValue, newValue in
+      if suppressHistoryRecording {
+        suppressHistoryRecording = false
+      } else if oldValue != newValue {
+        navigationBackStack.append(oldValue)
+        navigationForwardStack.removeAll()
+        updateNavigationState()
+      }
       guard case .session(let sessionID) = newValue else { return }
       guard oldValue.sessionID != sessionID else { return }
       store.selectAgentTui(tuiID: sessionID)
@@ -405,6 +412,29 @@ public struct AgentTuiWindowView: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
+  }
+
+  @ToolbarContentBuilder
+  private var agentTuiNavigationToolbarItems: some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      Button {
+        navigateHistoryBack()
+      } label: {
+        Label("Back", systemImage: "chevron.backward")
+      }
+      .disabled(!windowNavigation.canGoBack)
+      .help("Go back")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateBackButton)
+
+      Button {
+        navigateHistoryForward()
+      } label: {
+        Label("Forward", systemImage: "chevron.forward")
+      }
+      .disabled(!windowNavigation.canGoForward)
+      .help("Go forward")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateForwardButton)
+    }
   }
 
   @ToolbarContentBuilder
@@ -851,6 +881,7 @@ public struct AgentTuiWindowView: View {
   }
 
   private func reconcileSheetState(afterRefresh: Bool) {
+    suppressHistoryRecording = true
     if !hasInitializedSelection || afterRefresh {
       hasInitializedSelection = true
       if let selectedTuiID = store.selectedAgentTui?.tuiId ?? orderedSessionIDs.first {
@@ -879,5 +910,28 @@ public struct AgentTuiWindowView: View {
     }
 
     syncTerminalSize()
+  }
+
+  private func navigateHistoryBack() {
+    guard !navigationBackStack.isEmpty else { return }
+    let destination = navigationBackStack.removeLast()
+    navigationForwardStack.append(selection)
+    suppressHistoryRecording = true
+    selection = destination
+    updateNavigationState()
+  }
+
+  private func navigateHistoryForward() {
+    guard !navigationForwardStack.isEmpty else { return }
+    let destination = navigationForwardStack.removeLast()
+    navigationBackStack.append(selection)
+    suppressHistoryRecording = true
+    selection = destination
+    updateNavigationState()
+  }
+
+  private func updateNavigationState() {
+    windowNavigation.canGoBack = !navigationBackStack.isEmpty
+    windowNavigation.canGoForward = !navigationForwardStack.isEmpty
   }
 }
