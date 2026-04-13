@@ -4,6 +4,7 @@
 
 # Local scratch
 /tmp/
+.envrc
 
 # macOS
 .DS_Store
