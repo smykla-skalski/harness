@@ -58,6 +58,7 @@ struct HarnessMonitorWindowRootView: View {
       )
     )
     .modifier(PinchToZoomTextSizeModifier())
+    .smartZoom()
     .modifier(
       HarnessMonitorWindowBackdropModifier(
         mode: backdropMode,
@@ -215,6 +216,7 @@ struct HarnessMonitorSettingsRootView: View {
       )
     )
     .modifier(PinchToZoomTextSizeModifier())
+    .smartZoom()
     .modifier(HarnessMonitorUITestAnimationModifier())
   }
 }
@@ -254,6 +256,7 @@ struct AgentTuiWindowRootView: View {
         )
       )
       .modifier(PinchToZoomTextSizeModifier())
+      .smartZoom()
       .modifier(HarnessMonitorUITestAnimationModifier())
   }
 }
