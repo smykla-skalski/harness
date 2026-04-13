@@ -284,26 +284,105 @@ fn spawn_background_reconciliation(db: Option<Arc<Mutex<super::db::DaemonDb>>>) 
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
-    let Ok(db_guard) = db.lock() else {
-        return;
-    };
-    match db_guard.reconcile_from_files() {
-        Ok(result) => {
-            let message = format!(
-                "background reconciliation: {} projects, {} sessions imported, {} skipped",
-                result.projects, result.sessions_imported, result.sessions_skipped
-            );
-            tracing::info!("{message}");
-            let _ = state::append_event("info", &message);
-        }
+    let projects = match index::discover_projects() {
+        Ok(projects) => projects,
         Err(error) => {
             tracing::warn!(%error, "background file reconciliation failed");
             let _ = state::append_event(
                 "warn",
                 &format!("background file reconciliation failed: {error}"),
             );
+            return;
+        }
+    };
+    let mut sessions = match index::discover_sessions_for(&projects, true) {
+        Ok(sessions) => sessions,
+        Err(error) => {
+            tracing::warn!(%error, "background file reconciliation failed");
+            let _ = state::append_event(
+                "warn",
+                &format!("background file reconciliation failed: {error}"),
+            );
+            return;
+        }
+    };
+    sessions.sort_by(|left, right| {
+        let left_active = left.state.status == SessionStatus::Active;
+        let right_active = right.state.status == SessionStatus::Active;
+        right_active
+            .cmp(&left_active)
+            .then(right.state.updated_at.cmp(&left.state.updated_at))
+            .then(left.state.session_id.cmp(&right.state.session_id))
+    });
+
+    let mut result = super::db::ReconcileResult::default();
+    {
+        let Ok(db_guard) = db.lock() else {
+            return;
+        };
+        for project in &projects {
+            if let Err(error) = db_guard.sync_project(project) {
+                tracing::warn!(%error, project_id = %project.project_id, "background project sync failed");
+                let _ = state::append_event(
+                    "warn",
+                    &format!(
+                        "background file reconciliation failed while syncing project {}: {error}",
+                        project.project_id
+                    ),
+                );
+                return;
+            }
+            result.projects += 1;
         }
     }
+
+    for resolved in &sessions {
+        let prepared = match super::db::DaemonDb::prepare_session_import_from_resolved(resolved) {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    session_id = %resolved.state.session_id,
+                    "background session prepare failed"
+                );
+                continue;
+            }
+        };
+        let Ok(db_guard) = db.lock() else {
+            return;
+        };
+        let db_version = match db_guard.session_state_version(&prepared.resolved.state.session_id) {
+            Ok(version) => version,
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    session_id = %prepared.resolved.state.session_id,
+                    "background session version check failed"
+                );
+                continue;
+            }
+        };
+        let file_version = i64::try_from(prepared.resolved.state.state_version).unwrap_or(i64::MAX);
+        if db_version.is_some_and(|version| version >= file_version) {
+            result.sessions_skipped += 1;
+            continue;
+        }
+        if let Err(error) = db_guard.apply_prepared_session_resync(&prepared) {
+            tracing::warn!(
+                %error,
+                session_id = %prepared.resolved.state.session_id,
+                "background session import failed"
+            );
+            continue;
+        }
+        result.sessions_imported += 1;
+    }
+    let message = format!(
+        "background reconciliation: {} projects, {} sessions imported, {} skipped",
+        result.projects, result.sessions_imported, result.sessions_skipped
+    );
+    tracing::info!("{message}");
+    let _ = state::append_event("info", &message);
 }
 
 fn spawn_background_diagnostics(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
