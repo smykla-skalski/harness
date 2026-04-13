@@ -1,8 +1,9 @@
-use std::io::Write as _;
-use std::path::PathBuf;
+use std::io::{ErrorKind, Write as _};
+use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -18,6 +19,7 @@ use super::protocol::{
 use super::state;
 
 const MAX_AUDIO_CHUNK_BYTES: usize = 1_048_576;
+const VOICE_SESSION_TTL_SECS: i64 = 15 * 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct VoiceSessionRecord {
@@ -30,6 +32,8 @@ struct VoiceSessionRecord {
     requires_confirmation: bool,
     remote_processor_url: Option<String>,
     created_at: String,
+    #[serde(default)]
+    updated_at: Option<String>,
     last_sequence: u64,
 }
 
@@ -53,8 +57,10 @@ pub fn start_session(
     harness_session_id: &str,
     request: &VoiceSessionStartRequest,
 ) -> Result<VoiceSessionStartResponse, CliError> {
+    cleanup_abandoned_sessions()?;
     let voice_session_id = format!("voice-{}", Uuid::new_v4());
     let accepted_sinks = accepted_sinks(request)?;
+    let now = utc_now();
     let record = VoiceSessionRecord {
         voice_session_id: voice_session_id.clone(),
         harness_session_id: harness_session_id.to_string(),
@@ -64,14 +70,19 @@ pub fn start_session(
         route_target: request.route_target.clone(),
         requires_confirmation: request.requires_confirmation,
         remote_processor_url: request.remote_processor_url.clone(),
-        created_at: utc_now(),
+        created_at: now.clone(),
+        updated_at: Some(now),
         last_sequence: 0,
     };
 
-    fs::create_dir_all(session_dir(&voice_session_id)).map_err(|error| {
+    let dir = session_dir(&voice_session_id);
+    fs::create_dir_all(&dir).map_err(|error| {
         CliErrorKind::workflow_io(format!("create voice session directory: {error}"))
     })?;
-    write_record(&record)?;
+    if let Err(error) = write_record(&record) {
+        let _ = remove_session_dir(&dir);
+        return Err(error);
+    }
 
     Ok(VoiceSessionStartResponse {
         voice_session_id,
@@ -85,6 +96,16 @@ pub fn start_session(
 /// # Errors
 /// Returns `CliError` for invalid ordering, oversized payloads, decode failures, or sink failures.
 pub async fn append_audio_chunk(
+    voice_session_id: &str,
+    request: &VoiceAudioChunkRequest,
+) -> Result<VoiceSessionMutationResponse, CliError> {
+    cleanup_session_after_error(
+        voice_session_id,
+        append_audio_chunk_inner(voice_session_id, request).await,
+    )
+}
+
+async fn append_audio_chunk_inner(
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
@@ -124,6 +145,7 @@ pub async fn append_audio_chunk(
     )?;
 
     record.last_sequence = request.sequence;
+    record.updated_at = Some(utc_now());
     write_record(&record)?;
 
     if record
@@ -147,8 +169,20 @@ pub fn append_transcript(
     voice_session_id: &str,
     request: &VoiceTranscriptUpdateRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
-    let _record = read_record(voice_session_id)?;
+    cleanup_session_after_error(
+        voice_session_id,
+        append_transcript_inner(voice_session_id, request),
+    )
+}
+
+fn append_transcript_inner(
+    voice_session_id: &str,
+    request: &VoiceTranscriptUpdateRequest,
+) -> Result<VoiceSessionMutationResponse, CliError> {
+    let mut record = read_record(voice_session_id)?;
     append_json_line(&transcript_path(voice_session_id), request)?;
+    record.updated_at = Some(utc_now());
+    write_record(&record)?;
     Ok(VoiceSessionMutationResponse {
         voice_session_id: voice_session_id.to_string(),
         status: "recording".into(),
@@ -168,16 +202,19 @@ pub fn finish_session(
         VoiceSessionFinishReason::Completed => "completed",
         VoiceSessionFinishReason::Cancelled => "cancelled",
     };
-    let dir = session_dir(voice_session_id);
-    if dir.exists() {
-        fs::remove_dir_all(&dir).map_err(|error| {
-            CliErrorKind::workflow_io(format!("remove voice session {}: {error}", dir.display()))
-        })?;
-    }
+    remove_session_dir(&session_dir(voice_session_id))?;
     Ok(VoiceSessionMutationResponse {
         voice_session_id: voice_session_id.to_string(),
         status: status.into(),
     })
+}
+
+/// Remove abandoned voice-session artifacts from prior crashed or disconnected flows.
+///
+/// # Errors
+/// Returns `CliError` when cleanup cannot enumerate or delete session directories.
+pub fn cleanup_abandoned_sessions() -> Result<(), CliError> {
+    cleanup_abandoned_sessions_at(&Utc::now())
 }
 
 fn accepted_sinks(
@@ -266,10 +303,24 @@ fn transcript_path(voice_session_id: &str) -> PathBuf {
 
 fn read_record(voice_session_id: &str) -> Result<VoiceSessionRecord, CliError> {
     let path = session_record_path(voice_session_id);
-    let data = fs::read_to_string(&path).map_err(|error| {
-        CliErrorKind::workflow_io(format!("read voice session {}: {error}", path.display()))
-    })?;
-    serde_json::from_str(&data).map_err(|error| {
+    read_record_from_path(&path)?.ok_or_else(|| {
+        CliErrorKind::workflow_io(format!("missing voice session {}", path.display())).into()
+    })
+}
+
+fn read_record_from_path(path: &Path) -> Result<Option<VoiceSessionRecord>, CliError> {
+    let data = match fs::read_to_string(path) {
+        Ok(data) => data,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(CliErrorKind::workflow_io(format!(
+                "read voice session {}: {error}",
+                path.display()
+            ))
+            .into());
+        }
+    };
+    serde_json::from_str(&data).map(Some).map_err(|error| {
         CliErrorKind::workflow_parse(format!("parse voice session {}: {error}", path.display()))
             .into()
     })
@@ -304,7 +355,7 @@ fn append_chunk_metadata(voice_session_id: &str, chunk: &StoredVoiceChunk) -> Re
     append_json_line(&chunks_metadata_path(voice_session_id), chunk)
 }
 
-fn append_json_line<T: Serialize>(path: &PathBuf, value: &T) -> Result<(), CliError> {
+fn append_json_line<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -320,12 +371,79 @@ fn append_json_line<T: Serialize>(path: &PathBuf, value: &T) -> Result<(), CliEr
     Ok(())
 }
 
+fn cleanup_session_after_error<T>(
+    voice_session_id: &str,
+    result: Result<T, CliError>,
+) -> Result<T, CliError> {
+    if result.is_err() {
+        let _ = remove_session_dir(&session_dir(voice_session_id));
+    }
+    result
+}
+
+fn cleanup_abandoned_sessions_at(now: &DateTime<Utc>) -> Result<(), CliError> {
+    for dir in voice_session_dirs()? {
+        if voice_session_has_expired(&dir, now)? {
+            remove_session_dir(&dir)?;
+        }
+    }
+    Ok(())
+}
+
+fn voice_session_dirs() -> Result<Vec<PathBuf>, CliError> {
+    let root = voice_root();
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut dirs = Vec::new();
+    for entry in fs::read_dir(&root).map_err(|error| {
+        CliErrorKind::workflow_io(format!("read voice root {}: {error}", root.display()))
+    })? {
+        let entry = entry.map_err(|error| {
+            CliErrorKind::workflow_io(format!("read voice root entry {}: {error}", root.display()))
+        })?;
+        let path = entry.path();
+        if path.is_dir() {
+            dirs.push(path);
+        }
+    }
+    Ok(dirs)
+}
+
+fn voice_session_has_expired(dir: &Path, now: &DateTime<Utc>) -> Result<bool, CliError> {
+    let path = dir.join("session.json");
+    let Some(record) = read_record_from_path(&path)? else {
+        return Ok(true);
+    };
+    Ok(
+        voice_session_last_activity(&record).is_none_or(|last_activity| {
+            now.signed_duration_since(last_activity)
+                >= ChronoDuration::seconds(VOICE_SESSION_TTL_SECS)
+        }),
+    )
+}
+
+fn voice_session_last_activity(record: &VoiceSessionRecord) -> Option<DateTime<Utc>> {
+    let timestamp = record.updated_at.as_deref().unwrap_or(&record.created_at);
+    DateTime::parse_from_rfc3339(timestamp).ok().map(Into::into)
+}
+
+fn remove_session_dir(path: &Path) -> Result<(), CliError> {
+    if path.exists() {
+        fs::remove_dir_all(path).map_err(|error| {
+            CliErrorKind::workflow_io(format!("remove voice session {}: {error}", path.display()))
+        })?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::daemon::protocol::{
         VoiceAudioFormatDescriptor, VoiceRouteTarget, VoiceRouteTargetKind, VoiceTranscriptSegment,
     };
+    use serde_json::json;
 
     fn request() -> VoiceSessionStartRequest {
         VoiceSessionStartRequest {
@@ -344,32 +462,109 @@ mod tests {
         }
     }
 
-    #[test]
-    fn voice_session_persists_chunk_sequence_and_cleans_up() {
+    fn chunk(sequence: u64) -> VoiceAudioChunkRequest {
+        VoiceAudioChunkRequest {
+            actor: "harness-app".into(),
+            sequence,
+            format: VoiceAudioFormatDescriptor {
+                sample_rate: 48_000.0,
+                channel_count: 1,
+                common_format: "pcm_f32".into(),
+                interleaved: false,
+            },
+            frame_count: 4,
+            started_at_seconds: 0.0,
+            duration_seconds: 0.01,
+            audio_base64: STANDARD.encode([1_u8, 2, 3, 4]),
+        }
+    }
+
+    fn with_temp_voice_root<F: FnOnce()>(f: F) {
         let tempdir = tempfile::tempdir().expect("tempdir");
         let data_home = tempdir.path().to_string_lossy().into_owned();
-        temp_env::with_var("HARNESS_DAEMON_DATA_HOME", Some(data_home.as_str()), || {
+        temp_env::with_var("HARNESS_DAEMON_DATA_HOME", Some(data_home.as_str()), f);
+    }
+
+    fn write_stale_session(voice_session_id: &str) {
+        fs::create_dir_all(session_dir(voice_session_id)).expect("create voice session dir");
+        fs::write(
+            session_record_path(voice_session_id),
+            serde_json::to_string_pretty(&json!({
+                "voice_session_id": voice_session_id,
+                "harness_session_id": "session-a",
+                "actor": "harness-app",
+                "locale_identifier": "en_US",
+                "accepted_sinks": ["localDaemon"],
+                "route_target": {
+                    "kind": "codexPrompt",
+                    "run_id": null,
+                    "agent_id": null,
+                    "command": null,
+                    "action_hint": null
+                },
+                "requires_confirmation": true,
+                "remote_processor_url": null,
+                "created_at": "2000-01-01T00:00:00Z",
+                "last_sequence": 1
+            }))
+            .expect("serialize stale session"),
+        )
+        .expect("write stale session");
+        fs::write(chunks_path(voice_session_id), [1_u8, 2, 3, 4]).expect("write chunks");
+        fs::write(chunks_metadata_path(voice_session_id), "{}\n").expect("write chunk metadata");
+        fs::write(transcript_path(voice_session_id), "{}\n").expect("write transcript");
+    }
+
+    #[test]
+    fn start_session_cleans_up_stale_voice_sessions() {
+        with_temp_voice_root(|| {
+            let stale_session_id = "voice-stale";
+            write_stale_session(stale_session_id);
+
+            start_session("session-b", &request()).expect("start");
+
+            assert!(
+                !session_dir(stale_session_id).exists(),
+                "stale voice data survived startup cleanup"
+            );
+        });
+    }
+
+    #[test]
+    fn append_audio_chunk_error_cleans_up_voice_session() {
+        with_temp_voice_root(|| {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .expect("runtime");
             runtime.block_on(async {
                 let started = start_session("session-a", &request()).expect("start");
-                let chunk = VoiceAudioChunkRequest {
-                    actor: "harness-app".into(),
-                    sequence: 1,
-                    format: VoiceAudioFormatDescriptor {
-                        sample_rate: 48_000.0,
-                        channel_count: 1,
-                        common_format: "pcm_f32".into(),
-                        interleaved: false,
-                    },
-                    frame_count: 4,
-                    started_at_seconds: 0.0,
-                    duration_seconds: 0.01,
-                    audio_base64: STANDARD.encode([1_u8, 2, 3, 4]),
-                };
-                append_audio_chunk(&started.voice_session_id, &chunk)
+                let dir = session_dir(&started.voice_session_id);
+
+                let error = append_audio_chunk(&started.voice_session_id, &chunk(2))
+                    .await
+                    .expect_err("out-of-order chunk rejected");
+
+                assert!(
+                    error
+                        .to_string()
+                        .contains("voice chunk sequence out of order")
+                );
+                assert!(!dir.exists(), "error path left voice session on disk");
+            });
+        });
+    }
+
+    #[test]
+    fn voice_session_persists_chunk_sequence_and_cleans_up() {
+        with_temp_voice_root(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("runtime");
+            runtime.block_on(async {
+                let started = start_session("session-a", &request()).expect("start");
+                append_audio_chunk(&started.voice_session_id, &chunk(1))
                     .await
                     .expect("chunk");
                 append_transcript(

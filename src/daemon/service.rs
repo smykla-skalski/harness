@@ -170,6 +170,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     log_sandbox_startup(config.sandboxed);
 
     state::ensure_daemon_dirs()?;
+    super::voice::cleanup_abandoned_sessions()?;
     let daemon_lock = state::acquire_singleton_lock()?;
     let token = state::ensure_auth_token()?;
 
