@@ -170,6 +170,9 @@ pub struct AgentTuiSpawnSpec {
     /// Join prompt to inject into the CLI argv for `CliPositional`/`CliFlag`
     /// delivery. `None` for `PtySend` runtimes (sent via PTY after readiness).
     pub cli_prompt: Option<String>,
+    /// Fall back to screen-text detection when the runtime has no hook system
+    /// (Vibe). The reader thread signals ready when visible content appears.
+    pub screen_text_fallback: bool,
 }
 
 impl AgentTuiSpawnSpec {
@@ -192,6 +195,7 @@ impl AgentTuiSpawnSpec {
             readiness_pattern: None,
             prompt_delivery: InitialPromptDelivery::PtySend,
             cli_prompt: None,
+            screen_text_fallback: false,
         })
     }
 }
@@ -1266,6 +1270,7 @@ impl AgentTuiProcess {
             Arc::clone(&transcript),
             Arc::clone(&screen),
             spec.readiness_pattern,
+            spec.screen_text_fallback,
             Arc::clone(&readiness),
         );
 
@@ -1501,10 +1506,13 @@ pub(super) fn spawn_agent_tui_process(
         }
         InitialPromptDelivery::PtySend => None,
     };
+    let screen_text_fallback =
+        runtime.is_some_and(|rt| !rt.supports_readiness_hook() && rt.readiness_pattern().is_none());
     let mut spec = AgentTuiSpawnSpec::new(profile, project_dir.to_path_buf(), env, size)?;
     spec.readiness_pattern = readiness_pattern;
     spec.prompt_delivery = prompt_delivery;
     spec.cli_prompt = cli_prompt;
+    spec.screen_text_fallback = screen_text_fallback;
     PortablePtyAgentTuiBackend.spawn(spec)
 }
 
@@ -1779,16 +1787,14 @@ fn spawn_reader_thread(
     transcript: Shared<Vec<u8>>,
     screen: Shared<TerminalScreenParser>,
     readiness_pattern: Option<&'static str>,
+    screen_text_fallback: bool,
     readiness: ReadinessSignal,
 ) -> JoinHandle<()> {
-    // Pattern-based readiness detection (Claude). For runtimes without a
-    // pattern, readiness is signaled via the daemon callback endpoint when
-    // the SessionStart hook fires - no output-based heuristic needed.
     let pattern_bytes: Option<Vec<u8>> =
         readiness_pattern.map(|pattern| pattern.as_bytes().to_vec());
 
     thread::spawn(move || {
-        let mut pattern_matched = false;
+        let mut signaled = false;
         let mut buffer = [0_u8; 8192];
         loop {
             match reader.read(&mut buffer) {
@@ -1797,13 +1803,20 @@ fn spawn_reader_thread(
                     let bytes = &buffer[..read];
                     if let Ok(mut transcript) = transcript.lock() {
                         transcript.extend_from_slice(bytes);
-                        if !pattern_matched && let Some(pattern) = &pattern_bytes {
-                            pattern_matched =
+                        // Pattern-based detection (Claude fast path).
+                        if !signaled && let Some(pattern) = &pattern_bytes {
+                            signaled =
                                 check_readiness_pattern(&transcript, read, pattern, &readiness);
                         }
                     }
                     if let Ok(mut screen) = screen.lock() {
                         screen.process(bytes);
+                        // Screen-text fallback for runtimes without hooks
+                        // (Vibe). Visible content means the TUI rendered.
+                        if !signaled && screen_text_fallback && !screen.snapshot().text.is_empty() {
+                            signal_readiness_ready(&readiness);
+                            signaled = true;
+                        }
                     }
                 }
                 Err(error) if error.kind() == ErrorKind::Interrupted => {}
@@ -3344,6 +3357,124 @@ mod tests {
         assert!(
             !prompt.contains("--persona"),
             "should not contain persona flag when None: {prompt}"
+        );
+    }
+
+    #[test]
+    fn cli_positional_appends_prompt_to_argv() {
+        let profile =
+            AgentTuiLaunchProfile::from_argv("codex", vec!["codex".into()]).expect("profile");
+        let mut spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("/tmp/project"),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        spec.prompt_delivery = super::InitialPromptDelivery::CliPositional;
+        spec.cli_prompt = Some("/harness:session:join test-session".into());
+
+        let argv = super::resolved_command_argv(&spec);
+        let last = argv.last().expect("last arg");
+        assert_eq!(
+            last.to_str().expect("utf8"),
+            "/harness:session:join test-session"
+        );
+    }
+
+    #[test]
+    fn cli_flag_appends_flag_and_prompt() {
+        let profile =
+            AgentTuiLaunchProfile::from_argv("gemini", vec!["gemini".into()]).expect("profile");
+        let mut spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("/tmp/project"),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        spec.prompt_delivery = super::InitialPromptDelivery::CliFlag("--prompt-interactive");
+        spec.cli_prompt = Some("/harness:session:join test-session".into());
+
+        let argv = super::resolved_command_argv(&spec);
+        let argv_strings: Vec<_> = argv
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            argv_strings.contains(&"--prompt-interactive".to_string()),
+            "should contain flag: {argv_strings:?}"
+        );
+        assert!(
+            argv_strings.contains(&"/harness:session:join test-session".to_string()),
+            "should contain prompt: {argv_strings:?}"
+        );
+    }
+
+    #[test]
+    fn pty_send_does_not_modify_argv() {
+        let profile =
+            AgentTuiLaunchProfile::from_argv("copilot", vec!["copilot".into()]).expect("profile");
+        let mut spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("/tmp/project"),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        spec.prompt_delivery = super::InitialPromptDelivery::PtySend;
+        spec.cli_prompt = None;
+
+        let argv = super::resolved_command_argv(&spec);
+        let argv_strings: Vec<_> = argv
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            !argv_strings
+                .iter()
+                .any(|arg| arg.contains("harness:session:join")),
+            "PtySend should not inject prompt into argv: {argv_strings:?}"
+        );
+    }
+
+    #[test]
+    fn screen_text_fallback_signals_on_visible_content() {
+        // Simulate Vibe: no pattern, no hooks, screen_text_fallback = true.
+        // The reader thread signals ready when visible content appears.
+        let profile = AgentTuiLaunchProfile::from_argv(
+            "codex",
+            vec![
+                "sh".to_string(),
+                "-c".to_string(),
+                // Emit terminal init escapes, then visible content after delay.
+                "printf '\\033[?1049h\\033[?25l'; sleep 0.3; printf 'Vibe ready>\\n'; cat"
+                    .to_string(),
+            ],
+        )
+        .expect("profile");
+        let mut spec = AgentTuiSpawnSpec::new(
+            profile,
+            PathBuf::from("."),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 30, cols: 80 },
+        )
+        .expect("spec");
+        spec.screen_text_fallback = true;
+
+        let process = PortablePtyAgentTuiBackend.spawn(spec).expect("spawn");
+
+        // Init escapes alone should not trigger readiness.
+        let early = process.wait_ready(Duration::from_millis(100));
+        assert!(
+            !early,
+            "screen-text fallback should not fire on escape codes alone"
+        );
+
+        // After visible content renders, readiness should fire.
+        assert!(
+            process.wait_ready(DEFAULT_WAIT_TIMEOUT),
+            "screen-text fallback should fire when visible content appears"
         );
     }
 }
