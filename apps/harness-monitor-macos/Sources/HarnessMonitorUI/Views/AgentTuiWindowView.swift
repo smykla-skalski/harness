@@ -37,6 +37,7 @@ public struct AgentTuiWindowView: View {
   @State private var wrapLines = false
   @State private var selectedPersona: String?
   @State private var availablePersonas: [AgentPersona] = []
+  @State private var expandedPersonaInfo: String?
   @State private var navigationBackStack: [AgentTuiSheetSelection] = []
   @State private var navigationForwardStack: [AgentTuiSheetSelection] = []
   @State private var suppressHistoryRecording = false
@@ -339,13 +340,7 @@ public struct AgentTuiWindowView: View {
           .pickerStyle(.segmented)
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
           if !availablePersonas.isEmpty {
-            Picker("Persona", selection: $selectedPersona) {
-              Text("None").tag(nil as String?)
-              ForEach(availablePersonas, id: \.identifier) { persona in
-                Text(persona.name).tag(persona.identifier as String?)
-              }
-            }
-            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaPicker)
+            inlinePersonaGrid
           }
           TextField("Optional display name", text: $name)
             .harnessNativeFormControl()
@@ -393,6 +388,74 @@ public struct AgentTuiWindowView: View {
           )
         }
         .frame(width: 240, alignment: .topLeading)
+      }
+    }
+  }
+
+  private static let personaColumns = [
+    GridItem(.adaptive(minimum: 140), spacing: HarnessMonitorTheme.spacingMD),
+  ]
+
+  private var inlinePersonaGrid: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Persona")
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      LazyVGrid(columns: Self.personaColumns, spacing: HarnessMonitorTheme.spacingMD) {
+        ForEach(availablePersonas, id: \.identifier) { persona in
+          personaCardButton(persona)
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaPicker)
+  }
+
+  private func personaCardButton(_ persona: AgentPersona) -> some View {
+    let isSelected = selectedPersona == persona.identifier
+    return Button {
+      selectedPersona = isSelected ? nil : persona.identifier
+    } label: {
+      VStack(spacing: HarnessMonitorTheme.spacingSM) {
+        PersonaSymbolView(symbol: persona.symbol, size: 40)
+          .foregroundStyle(isSelected ? HarnessMonitorTheme.accent : .secondary)
+        Text(persona.name)
+          .scaledFont(.callout.weight(.medium))
+          .lineLimit(2)
+          .multilineTextAlignment(.center)
+      }
+      .frame(minWidth: 120, minHeight: 100)
+      .frame(maxWidth: .infinity)
+      .overlay(alignment: .topTrailing) {
+        if isSelected {
+          Image(systemName: "checkmark.circle.fill")
+            .foregroundStyle(HarnessMonitorTheme.accent)
+            .font(.system(size: 14))
+            .padding(HarnessMonitorTheme.spacingXS)
+        }
+      }
+    }
+    .harnessInteractiveCardButtonStyle(tint: isSelected ? HarnessMonitorTheme.accent : nil)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaCard(persona.identifier))
+    .accessibilityLabel(persona.name)
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+    .popover(isPresented: Binding(
+      get: { expandedPersonaInfo == persona.identifier },
+      set: { if !$0 { expandedPersonaInfo = nil } }
+    )) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        Text(persona.name)
+          .scaledFont(.headline)
+        Text(persona.description)
+          .scaledFont(.body)
+          .foregroundStyle(.secondary)
+      }
+      .padding()
+      .frame(maxWidth: 280)
+    }
+    .contextMenu {
+      Button("Learn more") {
+        expandedPersonaInfo = persona.identifier
       }
     }
   }

@@ -168,6 +168,9 @@ public enum HarnessMonitorAccessibility {
   static let agentTuiNavigateBackButton = "harness.sheet.agent-tui.navigate-back"
   static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
   static let agentTuiPersonaPicker = "harness.sheet.agent-tui.persona-picker"
+  static func agentTuiPersonaCard(_ identifier: String) -> String {
+    "harness.sheet.agent-tui.persona.\(identifier)"
+  }
   static let codexFlowButton = "harness.session.codex-flow"
   static let codexFlowWIPBadge = "harness.session.codex-flow.wip"
   static let codexFlowSheet = "harness.sheet.codex-flow"
