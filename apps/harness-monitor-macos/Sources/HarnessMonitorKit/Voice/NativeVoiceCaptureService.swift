@@ -48,7 +48,9 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
 
   public init() {}
 
-  public nonisolated func capture(configuration: VoiceCaptureConfiguration) -> VoiceCaptureEventStream {
+  public nonisolated func capture(configuration: VoiceCaptureConfiguration)
+    -> VoiceCaptureEventStream
+  {
     VoiceCaptureEventStream { continuation in
       let task = Task {
         await self.startCapture(configuration: configuration, continuation: continuation)
@@ -132,7 +134,8 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
       ) ?? naturalFormat
     try await analyzer.prepareToAnalyze(in: analysisFormat)
 
-    guard let bufferConverter = VoiceAudioBufferConverter(from: naturalFormat, to: analysisFormat) else {
+    guard let bufferConverter = VoiceAudioBufferConverter(from: naturalFormat, to: analysisFormat)
+    else {
       throw NativeVoiceCaptureError.couldNotConvertAudioBuffer
     }
     let tapState = VoiceAudioTapState(sampleRate: analysisFormat.sampleRate)
@@ -296,10 +299,12 @@ private final class VoiceAudioBufferConverter: @unchecked Sendable {
       }
 
       let frameCapacity = convertedFrameCapacity(for: buffer)
-      guard let converted = AVAudioPCMBuffer(
-        pcmFormat: outputFormat,
-        frameCapacity: frameCapacity
-      ) else {
+      guard
+        let converted = AVAudioPCMBuffer(
+          pcmFormat: outputFormat,
+          frameCapacity: frameCapacity
+        )
+      else {
         return nil
       }
 
@@ -355,7 +360,9 @@ private final class VoiceAudioTapState: @unchecked Sendable {
     self.sampleRate = sampleRate
   }
 
-  func nextTiming(frameCount: Int) -> (sequence: UInt64, startedAtSeconds: Double, durationSeconds: Double) {
+  func nextTiming(frameCount: Int) -> (
+    sequence: UInt64, startedAtSeconds: Double, durationSeconds: Double
+  ) {
     lock.withLock {
       nextSequence += 1
       let startedAtSeconds = Double(frameOffset) / sampleRate
@@ -368,10 +375,12 @@ private final class VoiceAudioTapState: @unchecked Sendable {
 
 private enum VoiceAudioBufferCodec {
   static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
-    guard let copied = AVAudioPCMBuffer(
-      pcmFormat: buffer.format,
-      frameCapacity: buffer.frameLength
-    ) else {
+    guard
+      let copied = AVAudioPCMBuffer(
+        pcmFormat: buffer.format,
+        frameCapacity: buffer.frameLength
+      )
+    else {
       return nil
     }
     copied.frameLength = buffer.frameLength
@@ -439,8 +448,8 @@ private enum VoiceAudioBufferCodec {
   }
 }
 
-private extension VoiceAudioFormatDescriptor {
-  init(format: AVAudioFormat) {
+extension VoiceAudioFormatDescriptor {
+  fileprivate init(format: AVAudioFormat) {
     self.init(
       sampleRate: format.sampleRate,
       channelCount: Int(format.channelCount),
@@ -450,8 +459,8 @@ private extension VoiceAudioFormatDescriptor {
   }
 }
 
-private extension AVAudioFormat {
-  func hasSameVoiceLayout(as other: AVAudioFormat) -> Bool {
+extension AVAudioFormat {
+  fileprivate func hasSameVoiceLayout(as other: AVAudioFormat) -> Bool {
     sampleRate == other.sampleRate
       && channelCount == other.channelCount
       && commonFormat == other.commonFormat
@@ -459,8 +468,8 @@ private extension AVAudioFormat {
   }
 }
 
-private extension AVAudioCommonFormat {
-  var voiceDescription: String {
+extension AVAudioCommonFormat {
+  fileprivate var voiceDescription: String {
     switch self {
     case .pcmFormatFloat32:
       "pcm_f32"

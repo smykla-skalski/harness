@@ -65,7 +65,8 @@ final class HarnessMonitorSettingsVoiceUITests: HarnessMonitorUITestCase {
       preferencesStateLabel(.voice(mode: "dark"))
     )
 
-    let remoteToggle = element(in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorToggle)
+    let remoteToggle = element(
+      in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorToggle)
     XCTAssertTrue(remoteToggle.waitForExistence(timeout: Self.actionTimeout))
     if (remoteToggle.value as? String) != "1" {
       tapElement(in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorToggle)

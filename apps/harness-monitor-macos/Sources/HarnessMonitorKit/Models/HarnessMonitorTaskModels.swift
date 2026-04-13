@@ -71,24 +71,24 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
   }
 }
 
-public extension WorkItem {
-  var isPendingDelivery: Bool {
+extension WorkItem {
+  public var isPendingDelivery: Bool {
     status == .open && assignedTo != nil && queuedAt == nil
   }
 
-  var isQueuedForWorker: Bool {
+  public var isQueuedForWorker: Bool {
     status == .open && assignedTo != nil && queuedAt != nil
   }
 
-  var isLeaderAssignable: Bool {
+  public var isLeaderAssignable: Bool {
     status == .open && assignedTo == nil
   }
 
-  var isReassignableQueuedTask: Bool {
+  public var isReassignableQueuedTask: Bool {
     isQueuedForWorker && queuePolicy == .reassignWhenFree
   }
 
-  var assignmentSummary: String {
+  public var assignmentSummary: String {
     guard let assignedTo else {
       return "Unassigned"
     }

@@ -19,7 +19,8 @@ struct PreferencesDiagnosticsSnapshot {
     self.launchAgent = launchAgent
     tokenPresent = workspaceDiagnostics?.authTokenPresent ?? false
     projectCount = store.daemonStatus?.projectCount ?? store.projects.count
-    worktreeCount = store.daemonStatus?.worktreeCount
+    worktreeCount =
+      store.daemonStatus?.worktreeCount
       ?? store.projects.reduce(0) { $0 + $1.worktrees.count }
     sessionCount = store.daemonStatus?.sessionCount ?? store.sessions.count
     lastEvent = workspaceDiagnostics?.lastEvent

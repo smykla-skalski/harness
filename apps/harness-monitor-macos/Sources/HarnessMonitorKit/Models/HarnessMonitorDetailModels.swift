@@ -164,8 +164,8 @@ public struct SessionExtensionsPayload: Codable, Equatable, Sendable {
   public let agentActivity: [AgentToolActivitySummary]?
 }
 
-public extension SessionRole {
-  var sortPriority: Int {
+extension SessionRole {
+  public var sortPriority: Int {
     switch self {
     case .leader:
       0
@@ -181,8 +181,8 @@ public extension SessionRole {
   }
 }
 
-public extension AgentStatus {
-  var sortPriority: Int {
+extension AgentStatus {
+  public var sortPriority: Int {
     switch self {
     case .active:
       0
@@ -194,8 +194,8 @@ public extension AgentStatus {
   }
 }
 
-public extension TaskSeverity {
-  var sortPriority: Int {
+extension TaskSeverity {
+  public var sortPriority: Int {
     switch self {
     case .low:
       1

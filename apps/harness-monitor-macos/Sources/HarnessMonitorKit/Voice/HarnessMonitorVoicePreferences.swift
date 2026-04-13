@@ -146,7 +146,8 @@ public struct HarnessMonitorVoicePreferences: Equatable, Sendable {
 
   public static func stored(defaults: UserDefaults = .standard) -> Self {
     Self(
-      localeIdentifier: defaults.string(forKey: HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey)
+      localeIdentifier: defaults.string(
+        forKey: HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey)
         ?? defaultLocaleIdentifier,
       localDaemonSinkEnabled: defaults.object(
         forKey: HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey

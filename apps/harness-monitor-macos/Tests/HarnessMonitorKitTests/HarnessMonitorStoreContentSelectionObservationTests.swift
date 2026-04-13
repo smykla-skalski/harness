@@ -276,7 +276,8 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.sessionDetail.timeline == PreviewFixtures.timeline)
   }
 
-  @Test("Hydrating the selected session detail skips shell resync when the summary is already selected")
+  @Test(
+    "Hydrating the selected session detail skips shell resync when the summary is already selected")
   func selectedSessionHydrationSkipsShellResync() async {
     let store = await makeBootstrappedStore()
     store.primeSessionSelection(PreviewFixtures.summary.sessionId)
@@ -378,7 +379,9 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
-  @Test("Loading session summary metadata stays within the content loading surface before detail hydrates")
+  @Test(
+    "Loading session summary metadata stays within the content loading surface before detail hydrates"
+  )
   func loadingSessionSummaryMetadataStaysWithinContentLoadingSurface() async {
     let store = await makeBootstrappedStore()
     store.primeSessionSelection(PreviewFixtures.summary.sessionId)

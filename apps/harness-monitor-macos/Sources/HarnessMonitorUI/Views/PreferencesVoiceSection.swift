@@ -47,7 +47,9 @@ struct PreferencesVoiceSection: View {
   private var pendingAudioChunkLimitBinding: Binding<Int> {
     Binding(
       get: { pendingAudioChunkLimit },
-      set: { pendingAudioChunkLimit = HarnessMonitorVoicePreferences.normalizedPendingAudioChunkLimit($0) }
+      set: {
+        pendingAudioChunkLimit = HarnessMonitorVoicePreferences.normalizedPendingAudioChunkLimit($0)
+      }
     )
   }
 
@@ -185,7 +187,8 @@ private struct PreferencesVoiceRemoteProcessorSection: View {
         .harnessNativeFormControl()
         .autocorrectionDisabled()
         .disabled(!remoteProcessorSinkEnabled)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesVoiceRemoteProcessorURLField)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.preferencesVoiceRemoteProcessorURLField)
 
       switch remoteProcessorStatus {
       case .disabled:
@@ -201,7 +204,9 @@ private struct PreferencesVoiceRemoteProcessorSection: View {
     } header: {
       Text("Remote Processor")
     } footer: {
-      Text("This v1 configuration stores a single shared HTTPS endpoint without custom headers or auth tokens.")
+      Text(
+        "This v1 configuration stores a single shared HTTPS endpoint without custom headers or auth tokens."
+      )
     }
   }
 }
@@ -243,19 +248,26 @@ private struct PreferencesVoiceAdvancedSection: View {
       PreferencesVoiceNumericField(
         title: "Pending audio chunks",
         value: $pendingAudioChunkLimit,
-        range: (HarnessMonitorVoicePreferences.minPendingAudioChunkLimit...HarnessMonitorVoicePreferences.maxPendingAudioChunkLimit),
-        accessibilityIdentifier: HarnessMonitorAccessibility.preferencesVoicePendingAudioChunkLimitField
+        range: (HarnessMonitorVoicePreferences
+          .minPendingAudioChunkLimit...HarnessMonitorVoicePreferences.maxPendingAudioChunkLimit),
+        accessibilityIdentifier: HarnessMonitorAccessibility
+          .preferencesVoicePendingAudioChunkLimitField
       )
       PreferencesVoiceNumericField(
         title: "Pending transcript segments",
         value: $pendingTranscriptSegmentLimit,
-        range: (HarnessMonitorVoicePreferences.minPendingTranscriptSegmentLimit...HarnessMonitorVoicePreferences.maxPendingTranscriptSegmentLimit),
-        accessibilityIdentifier: HarnessMonitorAccessibility.preferencesVoicePendingTranscriptLimitField
+        range: (HarnessMonitorVoicePreferences
+          .minPendingTranscriptSegmentLimit...HarnessMonitorVoicePreferences
+          .maxPendingTranscriptSegmentLimit),
+        accessibilityIdentifier: HarnessMonitorAccessibility
+          .preferencesVoicePendingTranscriptLimitField
       )
     } header: {
       Text("Advanced")
     } footer: {
-      Text("Pending limits cap how many events stay buffered locally before the daemon voice session is ready.")
+      Text(
+        "Pending limits cap how many events stay buffered locally before the daemon voice session is ready."
+      )
     }
   }
 }
@@ -284,7 +296,9 @@ private struct PreferencesVoiceStatusSection: View {
     } header: {
       Text("Status & Recovery")
     } footer: {
-      Text("Microphone permission is still enforced when recording starts. If speech assets are missing, Harness Monitor surfaces the same System Settings recovery path from the voice popover.")
+      Text(
+        "Microphone permission is still enforced when recording starts. If speech assets are missing, Harness Monitor surfaces the same System Settings recovery path from the voice popover."
+      )
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesVoiceStatus)

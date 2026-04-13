@@ -182,7 +182,7 @@ public final class ToastSlice {
     resumeObservationTask = nil
   }
 
-/// Test helper: dismiss every toast whose virtual target instant has elapsed
+  /// Test helper: dismiss every toast whose virtual target instant has elapsed
   /// according to the injected clock. Cancels and removes any in-flight real
   /// dismiss tasks for matured toasts. Toasts whose timers are paused are
   /// skipped.

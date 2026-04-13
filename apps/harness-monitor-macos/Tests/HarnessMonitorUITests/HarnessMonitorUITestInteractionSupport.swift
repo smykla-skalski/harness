@@ -219,7 +219,8 @@ extension HarnessMonitorUITestCase {
     guard sessionRow.exists else { return false }
 
     if let rawValue = sessionRow.value as? String {
-      return rawValue
+      return
+        rawValue
         .split(separator: ",")
         .contains { component in
           component.trimmingCharacters(in: .whitespacesAndNewlines) == "selected"

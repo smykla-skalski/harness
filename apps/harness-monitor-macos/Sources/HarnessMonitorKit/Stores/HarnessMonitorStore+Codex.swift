@@ -372,7 +372,8 @@ extension HarnessMonitorStore {
     let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedProjectDir = projectDir?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let normalizedArgv = argv
+    let normalizedArgv =
+      argv
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
 
@@ -462,7 +463,8 @@ extension HarnessMonitorStore {
       }
       return
     }
-    selectedAgentTui = selectedAgentTuis.first(where: { $0.tuiId == tuiID })
+    selectedAgentTui =
+      selectedAgentTuis.first(where: { $0.tuiId == tuiID })
       ?? preferredAgentTui(from: selectedAgentTuis)
     if selectedAgentTui?.tuiId != previousTuiID {
       cancelAgentTuiActionRefresh()
@@ -506,7 +508,8 @@ extension HarnessMonitorStore {
       }
       clearHostBridgeIssue(for: "agent-tui")
       cancelAgentTuiActionRefresh()
-      let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles()).tuis
+      let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles())
+        .tuis
       selectedAgentTuis = sortedTuis
       selectedAgentTui = preferredAgentTui(from: sortedTuis)
       return true
@@ -599,7 +602,7 @@ extension HarnessMonitorStore {
         }
       }
 
-      for _ in 0 ..< Self.agentTuiActionRefreshAttempts {
+      for _ in 0..<Self.agentTuiActionRefreshAttempts {
         try? await Task.sleep(for: Self.agentTuiActionRefreshDelay)
         guard !Task.isCancelled else {
           return
@@ -677,8 +680,7 @@ extension HarnessMonitorStore {
 
   private func selectedSessionRoles() -> [String: SessionRole] {
     Dictionary(
-      uniqueKeysWithValues:
-        (selectedSession?.agents ?? []).map { ($0.agentId, $0.role) }
+      uniqueKeysWithValues: (selectedSession?.agents ?? []).map { ($0.agentId, $0.role) }
     )
   }
 
@@ -912,6 +914,7 @@ extension HarnessMonitorStore {
       default:
         capability.replacingOccurrences(of: "-", with: " ").capitalized
       }
-    return enabled ? "Enabled \(capabilityName) host bridge" : "Disabled \(capabilityName) host bridge"
+    return enabled
+      ? "Enabled \(capabilityName) host bridge" : "Disabled \(capabilityName) host bridge"
   }
 }

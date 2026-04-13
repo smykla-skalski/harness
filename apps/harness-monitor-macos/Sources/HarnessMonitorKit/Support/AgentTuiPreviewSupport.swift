@@ -111,7 +111,9 @@ public enum AgentTuiPreviewSupport {
         rows: rows,
         cols: cols,
         cursorRow: max(text.split(separator: "\n", omittingEmptySubsequences: false).count, 1),
-        cursorCol: min((text.split(separator: "\n", omittingEmptySubsequences: false).last?.count ?? 0) + 1, cols),
+        cursorCol: min(
+          (text.split(separator: "\n", omittingEmptySubsequences: false).last?.count ?? 0) + 1, cols
+        ),
         text: text
       ),
       transcriptPath: "/Users/example/Projects/harness/transcripts/\(tuiID).log",

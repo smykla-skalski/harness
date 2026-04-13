@@ -15,7 +15,9 @@ struct SessionsBoardView: View {
   }
 
   var body: some View {
-    HarnessMonitorColumnScrollView(constrainContentWidth: true) {
+    HarnessMonitorColumnScrollView(
+      constrainContentWidth: true
+    ) {
       VStack(alignment: .leading, spacing: 24) {
         SessionsBoardRecentSessionsSection(
           sessions: sessionCatalog.recentSessions,

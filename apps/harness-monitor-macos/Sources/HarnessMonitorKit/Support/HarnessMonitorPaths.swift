@@ -23,7 +23,8 @@ public enum HarnessMonitorAppGroup {
 
 public enum HarnessMonitorPaths {
   public static func dataRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
-    let daemonDataHomeValue = environment.values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
+    let daemonDataHomeValue = environment.values[
+      HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
     if let daemonDataHomeValue, !daemonDataHomeValue.isEmpty {
       return URL(fileURLWithPath: daemonDataHomeValue, isDirectory: true)

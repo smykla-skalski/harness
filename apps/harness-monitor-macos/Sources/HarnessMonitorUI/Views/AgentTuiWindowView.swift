@@ -100,7 +100,8 @@ public struct AgentTuiWindowView: View {
       var sessionTitlesByID: [String: String] = [:]
       sessionTitlesByID.reserveCapacity(sortedAgentTuis.count)
       for tui in sortedAgentTuis {
-        sessionTitlesByID[tui.tuiId] = agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
+        sessionTitlesByID[tui.tuiId] =
+          agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
       }
 
       self.sortedAgentTuis = sortedAgentTuis
@@ -126,8 +127,8 @@ public struct AgentTuiWindowView: View {
   }
 
   private struct TerminalViewportSizing {
-    static let rowRange = 8 ... 240
-    static let colRange = 20 ... 400
+    static let rowRange = 8...240
+    static let colRange = 20...400
     static let minimumViewportHeight: CGFloat = 220
     static let idealViewportHeight: CGFloat = 320
     static let minimumControlsHeight: CGFloat = 220
@@ -278,10 +279,10 @@ public struct AgentTuiWindowView: View {
       .toolbarBaselineFrame(.sidebar)
     } detail: {
       detailColumnContent
-      .toolbar {
-        agentTuiNavigationToolbarItems
-        sessionToolbarItems
-      }
+        .toolbar {
+          agentTuiNavigationToolbarItems
+          sessionToolbarItems
+        }
     }
     .navigationSplitViewStyle(.balanced)
     .toolbarBaselineOverlay()
@@ -359,6 +360,12 @@ public struct AgentTuiWindowView: View {
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .id(scrollContainerIdentity)
+    } else if case .create = selection {
+      ScrollView {
+        createPane
+          .padding(HarnessMonitorTheme.spacingLG)
+      }
+      .id(scrollContainerIdentity)
     } else {
       ScrollView {
         paneContent
@@ -448,7 +455,8 @@ public struct AgentTuiWindowView: View {
             .harnessNativeFormControl()
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiProjectDirField)
           multilineEditor(
-            placeholder: "Optional argv override (one argument per line; first line is the executable)",
+            placeholder:
+              "Optional argv override (one argument per line; first line is the executable)",
             text: $argvOverride,
             field: .argv,
             minHeight: 88,
@@ -484,7 +492,7 @@ public struct AgentTuiWindowView: View {
   }
 
   private static let personaColumns = [
-    GridItem(.adaptive(minimum: 140), spacing: HarnessMonitorTheme.spacingMD),
+    GridItem(.adaptive(minimum: 140), spacing: HarnessMonitorTheme.spacingMD)
   ]
 
   private var inlinePersonaGrid: some View {
@@ -530,10 +538,12 @@ public struct AgentTuiWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaCard(persona.identifier))
     .accessibilityLabel(persona.name)
     .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .popover(isPresented: Binding(
-      get: { expandedPersonaInfo == persona.identifier },
-      set: { if !$0 { expandedPersonaInfo = nil } }
-    )) {
+    .popover(
+      isPresented: Binding(
+        get: { expandedPersonaInfo == persona.identifier },
+        set: { if !$0 { expandedPersonaInfo = nil } }
+      )
+    ) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         Text(persona.name)
           .scaledFont(.headline)
@@ -564,7 +574,9 @@ public struct AgentTuiWindowView: View {
         terminalOutcome(tui)
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: tui.status.isActive ? .infinity : nil, alignment: .topLeading)
+    .frame(
+      maxWidth: .infinity, maxHeight: tui.status.isActive ? .infinity : nil, alignment: .topLeading
+    )
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
@@ -1092,10 +1104,12 @@ public struct AgentTuiWindowView: View {
     guard selection.sessionID == tui.tuiId, tui.status.isActive else {
       return
     }
-    guard let terminalSize = TerminalViewportSizing.terminalSize(
-      for: viewportSize,
-      fontScale: fontScale
-    ) else {
+    guard
+      let terminalSize = TerminalViewportSizing.terminalSize(
+        for: viewportSize,
+        fontScale: fontScale
+      )
+    else {
       return
     }
     if rows != terminalSize.rows {
