@@ -367,6 +367,7 @@ fn load_observer_summary(
                 occurrence_count: issue.occurrence_count,
                 last_seen_line: issue.last_seen_line,
                 fix_safety: issue.fix_safety,
+                evidence_excerpt: issue.evidence_excerpt,
             })
             .collect(),
         muted_codes: observer.muted_codes,
@@ -759,6 +760,7 @@ mod tests {
                 category: IssueCategory::AgentCoordination,
                 summary: "worker stalled".into(),
                 fix_safety: FixSafety::TriageRequired,
+                evidence_excerpt: Some("No checkpoint for 12 minutes.".into()),
             }],
             resolved_issue_ids: vec!["issue-0".into()],
             issue_attempts: Vec::new(),
@@ -902,38 +904,20 @@ mod tests {
                         .resolved_issue_count,
                     1
                 );
+                let open_issue = detail
+                    .observer
+                    .as_ref()
+                    .expect("observer")
+                    .open_issues
+                    .first()
+                    .expect("open issue");
+                assert_eq!(open_issue.summary, "worker stalled");
+                assert_eq!(open_issue.category, IssueCategory::AgentCoordination);
+                assert_eq!(open_issue.fingerprint, "fingerprint");
+                assert_eq!(open_issue.first_seen_line, 8);
                 assert_eq!(
-                    detail
-                        .observer
-                        .as_ref()
-                        .expect("observer")
-                        .open_issues
-                        .first()
-                        .expect("open issue")
-                        .summary,
-                    "worker stalled"
-                );
-                assert_eq!(
-                    detail
-                        .observer
-                        .as_ref()
-                        .expect("observer")
-                        .open_issues
-                        .first()
-                        .expect("open issue")
-                        .fingerprint,
-                    "fingerprint"
-                );
-                assert_eq!(
-                    detail
-                        .observer
-                        .as_ref()
-                        .expect("observer")
-                        .open_issues
-                        .first()
-                        .expect("open issue")
-                        .first_seen_line,
-                    8
+                    open_issue.evidence_excerpt.as_deref(),
+                    Some("No checkpoint for 12 minutes.")
                 );
                 assert_eq!(
                     detail.observer.as_ref().expect("observer").muted_codes,
