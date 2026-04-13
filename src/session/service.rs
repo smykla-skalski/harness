@@ -982,10 +982,7 @@ pub fn resolve_session_agent_for_runtime_session(
             if !agent.status.is_alive() || agent.runtime != runtime_name {
                 continue;
             }
-            let matches_runtime_session = agent.agent_session_id.as_deref()
-                == Some(runtime_session_id)
-                || (agent.agent_session_id.is_none() && state.session_id == runtime_session_id);
-            if matches_runtime_session {
+            if runtime_session_matches_agent(&state.session_id, agent, runtime_session_id) {
                 matches.push(ResolvedRuntimeSessionAgent {
                     orchestration_session_id: state.session_id.clone(),
                     agent_id: agent_id.clone(),
@@ -1195,6 +1192,25 @@ fn signal_dirs_for_agent(
             (signal_session_id, signal_dir)
         })
         .collect()
+}
+
+pub(crate) fn agent_runtime_session_id<'a>(
+    orchestration_session_id: &'a str,
+    agent: &'a AgentRegistration,
+) -> &'a str {
+    agent
+        .agent_session_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(orchestration_session_id)
+}
+
+fn runtime_session_matches_agent(
+    orchestration_session_id: &str,
+    agent: &AgentRegistration,
+    runtime_session_id: &str,
+) -> bool {
+    agent_runtime_session_id(orchestration_session_id, agent) == runtime_session_id
 }
 
 fn load_signal_record_for_agent(
@@ -1510,9 +1526,7 @@ fn collect_agent_activity(
         let Some(agent_runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
-            continue;
-        };
+        let agent_session_id = agent_runtime_session_id(session_id, agent);
         let last_activity = agent_runtime
             .last_activity(project_dir, agent_session_id)
             .unwrap_or(None);
@@ -2771,9 +2785,7 @@ fn resolve_runtime_session_via_daemon(
             if !agent.status.is_alive() || agent.runtime != runtime_name {
                 continue;
             }
-            let matches_runtime = agent.agent_session_id.as_deref() == Some(runtime_session_id)
-                || (agent.agent_session_id.is_none() && summary.session_id == runtime_session_id);
-            if matches_runtime {
+            if runtime_session_matches_agent(&summary.session_id, agent, runtime_session_id) {
                 matches.push(ResolvedRuntimeSessionAgent {
                     orchestration_session_id: summary.session_id.clone(),
                     agent_id: agent.agent_id.clone(),
@@ -5223,6 +5235,42 @@ mod tests {
             let leader = state.agents.values().next().expect("leader");
             // last_activity_at should be updated from the runtime log's mtime
             assert!(leader.last_activity_at.is_some());
+        });
+    }
+
+    #[test]
+    fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
+        with_temp_project(|project| {
+            start_session("test", "", project, Some("claude"), Some("sync-legacy")).expect("start");
+
+            join_session(
+                "sync-legacy",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join worker");
+
+            let state = session_status("sync-legacy", project).expect("status");
+            let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+            let worker = state.agents.get(&worker_id).expect("worker");
+            assert!(worker.agent_session_id.is_none());
+
+            let legacy_worker_log = write_agent_log_file(project, "codex", "sync-legacy");
+            set_log_mtime_seconds_ago(&legacy_worker_log, 600);
+            write_agent_log_file(project, "claude", "test-service");
+
+            let result = sync_agent_liveness("sync-legacy", project).expect("sync");
+
+            assert_eq!(result.disconnected, vec![worker_id.clone()]);
+            let updated = session_status("sync-legacy", project).expect("updated");
+            assert_eq!(
+                updated.agents.get(&worker_id).expect("worker").status,
+                AgentStatus::Disconnected
+            );
         });
     }
 
