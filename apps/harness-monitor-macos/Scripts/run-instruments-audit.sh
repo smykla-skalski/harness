@@ -61,6 +61,7 @@ ALL_SCENARIOS=(
   "settings-backdrop-cycle"
   "settings-background-cycle"
   "timeline-burst"
+  "toast-overlay-churn"
   "offline-cached-open"
 )
 SWIFTUI_SCENARIOS=(
@@ -69,6 +70,7 @@ SWIFTUI_SCENARIOS=(
   "refresh-and-search"
   "sidebar-overflow-search"
   "timeline-burst"
+  "toast-overlay-churn"
   "offline-cached-open"
 )
 ALLOCATIONS_SCENARIOS=(
@@ -149,7 +151,7 @@ preview_scenario_for() {
     refresh-and-search|sidebar-overflow-search)
       printf '%s\n' "overflow"
       ;;
-    timeline-burst)
+    timeline-burst|toast-overlay-churn)
       printf '%s\n' "cockpit"
       ;;
     offline-cached-open)
@@ -170,6 +172,7 @@ duration_for() {
     settings-backdrop-cycle) printf '%s\n' "9" ;;
     settings-background-cycle) printf '%s\n' "10" ;;
     timeline-burst) printf '%s\n' "8" ;;
+    toast-overlay-churn) printf '%s\n' "8" ;;
     offline-cached-open) printf '%s\n' "7" ;;
     *) printf '%s\n' "8" ;;
   esac
@@ -1235,7 +1238,7 @@ manifest = {
         },
     },
     "templates": {
-        "swiftui": ["launch-dashboard", "select-session-cockpit", "refresh-and-search", "sidebar-overflow-search", "timeline-burst", "offline-cached-open"],
+        "swiftui": ["launch-dashboard", "select-session-cockpit", "refresh-and-search", "sidebar-overflow-search", "timeline-burst", "toast-overlay-churn", "offline-cached-open"],
         "allocations": ["settings-backdrop-cycle", "settings-background-cycle", "offline-cached-open"],
     },
     "default_environment": default_environment,
