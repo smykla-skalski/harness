@@ -119,6 +119,23 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 - Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
 - Default filter: `RUST_LOG=harness=trace`
 
+## Clippy complexity and tracing
+
+Tracing macros inflate `clippy::cognitive_complexity` scores artificially (tokio-rs/tracing#553). When clippy flags a function for complexity, triage before suppressing:
+
+1. Read the function critically - if it is genuinely complex, simplify it first. Be strict: even slightly too complex means refactor.
+2. Only after the function is as simple as it can be, check whether tracing macro expansion is the sole remaining driver of the warning.
+3. If and only if tracing is the only reason the score is over threshold, suppress with `#[expect]` and cite the known issue:
+
+```rust
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+```
+
+Never add `#[expect(clippy::cognitive_complexity)]` as a first move. Always simplify first.
+
 ## Gotchas
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
