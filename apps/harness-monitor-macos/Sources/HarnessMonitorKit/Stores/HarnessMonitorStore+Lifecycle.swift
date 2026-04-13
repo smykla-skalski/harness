@@ -144,6 +144,10 @@ extension HarnessMonitorStore {
         pendingExtensions = nil
         isExtensionsLoading = false
       }
+      detail = sessionDetailPreservingFresherSelectedSummary(
+        sessionID: sessionID,
+        detail: detail
+      )
 
       let preserveVisibleTimeline =
         isShowingCachedData && selectedSession?.session.sessionId == sessionID
@@ -351,6 +355,39 @@ extension HarnessMonitorStore {
       signals: selectedSession.signals,
       observer: selectedSession.observer,
       agentActivity: selectedSession.agentActivity
+    )
+  }
+
+  func sessionDetailPreservingFresherSelectedSummary(
+    sessionID: String,
+    detail: SessionDetail
+  ) -> SessionDetail {
+    guard sessionID == selectedSessionID, let selectedSession else {
+      return detail
+    }
+
+    let selectedSummary = selectedSession.session
+    guard selectedSummary.sessionId == detail.session.sessionId else {
+      return detail
+    }
+
+    guard
+      selectedSummary.updatedAt > detail.session.updatedAt
+        || (
+          selectedSummary.updatedAt == detail.session.updatedAt
+            && selectedSummary != detail.session
+        )
+    else {
+      return detail
+    }
+
+    return SessionDetail(
+      session: selectedSummary,
+      agents: detail.agents,
+      tasks: detail.tasks,
+      signals: detail.signals,
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
     )
   }
 

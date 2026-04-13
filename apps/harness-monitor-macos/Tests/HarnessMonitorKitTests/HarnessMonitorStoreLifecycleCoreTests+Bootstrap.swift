@@ -239,6 +239,71 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
   }
 
+  @Test("Managed bootstrap restores cached state before warm-up completes")
+  func managedBootstrapRestoresCachedStateBeforeWarmUpCompletes() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-cached-bootstrap",
+        context: "Cached bootstrap session",
+        status: .active,
+        leaderId: "leader-cached-bootstrap",
+        observeId: "observe-cached-bootstrap",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1,
+        lastActivityAt: "2026-04-13T20:59:00Z"
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-cached-bootstrap",
+      workerName: "Worker Cached Bootstrap"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-cached-bootstrap",
+      summary: "Cached bootstrap timeline"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: timeline],
+      detail: detail
+    )
+    let daemon = DelayedWarmUpDaemonController(
+      client: client,
+      warmUpDelay: .milliseconds(250)
+    )
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      modelContainer: container
+    )
+
+    await store.cacheSessionList(
+      [summary],
+      projects: [makeProject(totalSessionCount: 1, activeSessionCount: 1)]
+    )
+    await store.cacheSessionDetail(detail, timeline: timeline)
+    store.primeSessionSelection(summary.sessionId)
+
+    let bootstrapTask = Task { @MainActor in
+      await store.bootstrap()
+    }
+
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.connectionState == .connecting)
+    #expect(store.sessions.map(\.sessionId) == [summary.sessionId])
+    #expect(store.selectedSession?.session.sessionId == summary.sessionId)
+    #expect(store.timeline == timeline)
+    #expect(store.isShowingCachedData)
+
+    await bootstrapTask.value
+    #expect(store.connectionState == .online)
+  }
+
   @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
   func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
     let daemon = RecordingDaemonController(
@@ -264,4 +329,92 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     )
   }
 
+}
+
+actor DelayedWarmUpDaemonController: DaemonControlling {
+  private let client: any HarnessMonitorClientProtocol
+  private let warmUpDelay: Duration
+
+  init(
+    client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
+    warmUpDelay: Duration
+  ) {
+    self.client = client
+    self.warmUpDelay = warmUpDelay
+  }
+
+  func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
+    client
+  }
+
+  func stopDaemon() async throws -> String {
+    "stopped"
+  }
+
+  func daemonStatus() async throws -> DaemonStatusReport {
+    DaemonStatusReport(
+      manifest: DaemonManifest(
+        version: "20.6.10",
+        pid: 111,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-04-13T20:58:00Z",
+        tokenPath: "/tmp/token"
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: true,
+        loaded: true,
+        label: "io.harness.daemon",
+        path: "/tmp/io.harness.daemon.plist"
+      ),
+      projectCount: 1,
+      sessionCount: 1,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/tmp/harness/daemon",
+        manifestPath: "/tmp/harness/daemon/manifest.json",
+        authTokenPath: "/tmp/token",
+        authTokenPresent: true,
+        eventsPath: "/tmp/harness/daemon/events.jsonl",
+        databasePath: "/tmp/harness/daemon/harness.db",
+        databaseSizeBytes: 1_024,
+        lastEvent: nil
+      )
+    )
+  }
+
+  func installLaunchAgent() async throws -> String {
+    "launch agent installed"
+  }
+
+  func removeLaunchAgent() async throws -> String {
+    "launch agent removed"
+  }
+
+  func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    .enabled
+  }
+
+  func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    .enabled
+  }
+
+  func launchAgentSnapshot() async -> LaunchAgentStatus {
+    LaunchAgentStatus(
+      installed: true,
+      loaded: true,
+      label: "io.harness.daemon",
+      path: "/tmp/io.harness.daemon.plist"
+    )
+  }
+
+  func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {}
+
+  func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
+    try await Task.sleep(for: warmUpDelay)
+    return client
+  }
 }
