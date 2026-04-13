@@ -171,6 +171,7 @@ fn agent_tui_routes() -> Router<DaemonHttpState> {
             post(post_agent_tui_resize),
         )
         .route("/v1/agent-tuis/{tui_id}/stop", post(post_agent_tui_stop))
+        .route("/v1/agent-tuis/{tui_id}/ready", post(post_agent_tui_ready))
 }
 
 fn signal_routes() -> Router<DaemonHttpState> {
@@ -777,6 +778,25 @@ async fn post_agent_tui_stop(
         &request_id,
         start,
         result,
+    )
+}
+
+async fn post_agent_tui_ready(
+    Path(tui_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "POST",
+        "/v1/agent-tuis/{id}/ready",
+        &request_id,
+        start,
+        state.agent_tui_manager.signal_ready(&tui_id),
     )
 }
 

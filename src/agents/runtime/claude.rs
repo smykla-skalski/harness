@@ -84,6 +84,10 @@ impl AgentRuntime for ClaudeRuntime {
         // Claude Code renders a box-drawing border when its TUI prompt is ready.
         Some("\u{256d}")
     }
+
+    fn initial_prompt_delivery(&self) -> super::InitialPromptDelivery {
+        super::InitialPromptDelivery::CliPositional
+    }
 }
 
 /// Parse a JSONL line using the common transcript format shared by all runtimes.
