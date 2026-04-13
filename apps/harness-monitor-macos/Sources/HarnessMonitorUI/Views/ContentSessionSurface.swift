@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionContentState: Equatable {
+struct SessionContentState {
   let detail: SessionDetail?
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
@@ -13,26 +13,10 @@ struct SessionContentContainer: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let state: SessionContentState
-  @State private var lastDetail: SessionDetail?
-  @State private var lastTimeline: [TimelineEntry] = []
-
-  private var activeDetail: SessionDetail? {
-    if let detail = state.detail {
-      return detail
-    }
-    guard lastDetail?.session.sessionId == state.summary?.sessionId else {
-      return nil
-    }
-    return lastDetail
-  }
-
-  private var activeTimeline: [TimelineEntry] {
-    state.detail != nil ? state.timeline : lastTimeline
-  }
 
   private var mode: SessionContentMode {
-    if let activeDetail {
-      return .cockpit(activeDetail)
+    if let detail = state.detail {
+      return .cockpit(detail)
     }
     if let summary = state.summary {
       return .loading(summary)
@@ -53,24 +37,12 @@ struct SessionContentContainer: View {
         SessionCockpitView(
           store: store,
           detail: cockpitDetail,
-          timeline: activeTimeline,
+          timeline: state.timeline,
           isSessionReadOnly: state.isSessionReadOnly,
           isExtensionsLoading: state.isExtensionsLoading
         )
       case .loading(let summary):
         SessionCockpitLoadingSurface(summary: summary)
-      }
-    }
-    .onChange(of: state.detail) { _, newDetail in
-      if let newDetail {
-        lastDetail = newDetail
-        lastTimeline = state.timeline
-      }
-    }
-    .onChange(of: state.summary?.sessionId) { _, newID in
-      if lastDetail?.session.sessionId != newID {
-        lastDetail = nil
-        lastTimeline = []
       }
     }
   }
