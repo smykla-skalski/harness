@@ -186,7 +186,7 @@ fn poll_change_tracking(
                 changes.sessions_updated = true;
                 *last_global_version = version;
             }
-        } else if let Some(session_id) = scope.strip_prefix("session:") {
+        } else if let Some(session_id) = super::db::session_id_from_change_scope(&scope) {
             let last = last_session_versions.get(session_id).copied().unwrap_or(0);
             if version > last {
                 changes.session_ids.insert(session_id.to_string());
@@ -628,6 +628,19 @@ mod tests {
             assert_eq!(worker.agent_session_id.as_deref(), Some("worker-session"));
             assert_eq!(state.session_id, "watch-map");
         });
+    }
+
+    #[test]
+    fn poll_change_tracking_accepts_raw_session_scope() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        db.bump_change("watch-sess").expect("bump change");
+
+        let mut last_global_version = 0;
+        let mut last_session_versions = BTreeMap::new();
+        let changes =
+            poll_change_tracking(&db, &mut last_global_version, &mut last_session_versions);
+
+        assert!(changes.session_ids.contains("watch-sess"));
     }
 
     #[test]
