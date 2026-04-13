@@ -127,7 +127,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _sessionDetailErrorsByID: [String: any Error] = [:]
   private var _sessionDetailScopesByID: [String: [String?]] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
+  private var _timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
+  private var _timelineBatchDelaysBySessionID: [String: Duration] = [:]
   private var _timelineErrorsByID: [String: any Error] = [:]
   private var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   private var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
@@ -420,8 +422,14 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredTimeline(for sessionID: String) -> [TimelineEntry]? {
     lock.withLock { _timelinesBySessionID[sessionID] }
   }
+  func configuredTimelineBatches(for sessionID: String) -> [[TimelineEntry]]? {
+    lock.withLock { _timelineBatchesBySessionID[sessionID] }
+  }
   func configuredTimelineDelay(for sessionID: String) -> Duration? {
     lock.withLock { _timelineDelays[sessionID] }
+  }
+  func configuredTimelineBatchDelay(for sessionID: String) -> Duration? {
+    lock.withLock { _timelineBatchDelaysBySessionID[sessionID] }
   }
   func configuredCodexRuns(for sessionID: String) -> [CodexRunSnapshot] {
     lock.withLock { _codexRunsBySessionID[sessionID] ?? [] }
@@ -526,6 +534,22 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func recordSessionDetailScope(id: String, scope: String?) {
     lock.withLock {
       _sessionDetailScopesByID[id, default: []].append(scope)
+    }
+  }
+
+  func configureTimelineBatches(
+    _ batches: [[TimelineEntry]],
+    batchDelay: Duration? = nil,
+    for sessionID: String
+  ) {
+    lock.withLock {
+      _timelineBatchesBySessionID[sessionID] = batches
+      if let batchDelay {
+        _timelineBatchDelaysBySessionID[sessionID] = batchDelay
+      } else {
+        _timelineBatchDelaysBySessionID.removeValue(forKey: sessionID)
+      }
+      _timelinesBySessionID[sessionID] = batches.flatMap(\.self)
     }
   }
 

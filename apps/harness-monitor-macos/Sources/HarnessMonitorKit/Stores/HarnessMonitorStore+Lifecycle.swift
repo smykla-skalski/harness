@@ -130,19 +130,15 @@ extension HarnessMonitorStore {
     isExtensionsLoading = false
 
     do {
+      let detailScope = activeTransport == .webSocket ? "core" : nil
       let measuredDetail = try await Self.measureOperation {
-        try await client.sessionDetail(id: sessionID, scope: nil)
-      }
-      try Task.checkCancellation()
-      let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: sessionID)
+        try await client.sessionDetail(id: sessionID, scope: detailScope)
       }
       try Task.checkCancellation()
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
 
-      recordRequestSuccess()
       recordRequestSuccess()
 
       var detail = measuredDetail.value
@@ -151,6 +147,40 @@ extension HarnessMonitorStore {
         pendingExtensions = nil
         isExtensionsLoading = false
       }
+
+      let preserveVisibleTimeline =
+        isShowingCachedData && selectedSession?.session.sessionId == sessionID
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: detail,
+        timeline: preserveVisibleTimeline ? timeline : [],
+        showingCachedData: preserveVisibleTimeline
+      )
+
+      let measuredTimeline = try await Self.measureOperation {
+        try await client.timeline(sessionID: sessionID) { batch, batchIndex, _ in
+          await MainActor.run {
+            guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+              return
+            }
+
+            if batchIndex == 0 {
+              self.timeline = batch
+            } else {
+              var updatedTimeline = self.timeline
+              updatedTimeline.append(contentsOf: batch)
+              self.timeline = updatedTimeline
+            }
+            self.isShowingCachedData = false
+          }
+        }
+      }
+      try Task.checkCancellation()
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
+
+      recordRequestSuccess()
 
       applySelectedSessionSnapshot(
         sessionID: sessionID,
