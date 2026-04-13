@@ -251,6 +251,9 @@ pub struct SessionJoinArgs {
     /// Project directory.
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
+    /// Persona identifier to attach to the agent registration.
+    #[arg(long)]
+    pub persona: Option<String>,
 }
 
 impl Execute for SessionJoinArgs {
@@ -277,6 +280,7 @@ impl Execute for SessionJoinArgs {
             &capabilities,
             self.name.as_deref(),
             &project,
+            self.persona.as_deref(),
         )?;
         print_json(&state)?;
         Ok(0)
@@ -705,6 +709,9 @@ pub struct TuiStartArgs {
     /// Initial PTY columns.
     #[arg(long, default_value_t = 120)]
     pub cols: u16,
+    /// Persona identifier to attach to the agent registration.
+    #[arg(long)]
+    pub persona: Option<String>,
 }
 
 impl Execute for TuiStartArgs {
@@ -722,6 +729,7 @@ impl Execute for TuiStartArgs {
             argv: self.argv.clone(),
             rows: self.rows,
             cols: self.cols,
+            persona: self.persona.clone(),
         };
         let snapshot = daemon_client()?.start_agent_tui(&self.session_id, &request)?;
         print_json(&snapshot)?;
