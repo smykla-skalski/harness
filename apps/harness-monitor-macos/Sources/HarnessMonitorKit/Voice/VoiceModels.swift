@@ -64,18 +64,18 @@ public struct VoiceRouteTarget: Codable, Equatable, Sendable {
     self.actionHint = actionHint
   }
 
-  public static let codexPrompt = VoiceRouteTarget(kind: .codexPrompt)
+  public static let codexPrompt = Self(kind: .codexPrompt)
 
-  public static func codexContext(runID: String?) -> VoiceRouteTarget {
-    VoiceRouteTarget(kind: .codexContext, runId: runID)
+  public static func codexContext(runID: String?) -> Self {
+    Self(kind: .codexContext, runId: runID)
   }
 
   public static func signal(
     agentID: String,
     command: String,
     actionHint: String?
-  ) -> VoiceRouteTarget {
-    VoiceRouteTarget(
+  ) -> Self {
+    Self(
       kind: .signal,
       agentId: agentID,
       command: command,
@@ -83,7 +83,7 @@ public struct VoiceRouteTarget: Codable, Equatable, Sendable {
     )
   }
 
-  public static let systemFocusedField = VoiceRouteTarget(kind: .systemFocusedField)
+  public static let systemFocusedField = Self(kind: .systemFocusedField)
 }
 
 public enum VoiceProcessingSink: String, Codable, CaseIterable, Equatable, Sendable {

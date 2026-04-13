@@ -251,7 +251,7 @@ private struct PreferencesVoiceAdvancedSection: View {
         range: (HarnessMonitorVoicePreferences
           .minPendingAudioChunkLimit...HarnessMonitorVoicePreferences.maxPendingAudioChunkLimit),
         accessibilityIdentifier: HarnessMonitorAccessibility
-          .preferencesVoicePendingAudioChunkLimitField
+          .preferencesVoicePendingAudioField
       )
       PreferencesVoiceNumericField(
         title: "Pending transcript segments",
@@ -260,7 +260,7 @@ private struct PreferencesVoiceAdvancedSection: View {
           .minPendingTranscriptSegmentLimit...HarnessMonitorVoicePreferences
           .maxPendingTranscriptSegmentLimit),
         accessibilityIdentifier: HarnessMonitorAccessibility
-          .preferencesVoicePendingTranscriptLimitField
+          .preferencesVoicePendingTranscriptField
       )
     } header: {
       Text("Advanced")

@@ -28,8 +28,8 @@ struct SidebarView: View {
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
-  private static let sidebarVisibilityAnimationDurationSeconds = 0.18
-  private static let sidebarVisibilityAnimationDurationNanoseconds: UInt64 = 180_000_000
+  private static let sidebarAnimationDurationSeconds = 0.18
+  private static let sidebarAnimationDurationNanoseconds: UInt64 = 180_000_000
 
   private var sidebarSearchText: Binding<String> {
     Binding(
@@ -149,12 +149,12 @@ struct SidebarView: View {
   private func beginSidebarVisibilityTransition(to nextPhase: Double) {
     isSidebarVisibilityAnimating = true
     sidebarVisibilityResetTask?.cancel()
-    withAnimation(.easeInOut(duration: Self.sidebarVisibilityAnimationDurationSeconds)) {
+    withAnimation(.easeInOut(duration: Self.sidebarAnimationDurationSeconds)) {
       sidebarVisibilityPhase = nextPhase
     }
     sidebarVisibilityResetTask = Task { @MainActor in
       try? await Task.sleep(
-        nanoseconds: Self.sidebarVisibilityAnimationDurationNanoseconds
+        nanoseconds: Self.sidebarAnimationDurationNanoseconds
       )
       guard !Task.isCancelled else {
         return

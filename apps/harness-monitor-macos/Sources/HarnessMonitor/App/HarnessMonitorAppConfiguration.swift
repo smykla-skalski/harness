@@ -303,7 +303,7 @@ struct HarnessMonitorAppConfiguration {
     let remoteProcessorSinkEnabled =
       uiTestBoolOverride(
         from: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestRemoteProcessorSinkEnabledOverrideKey
+          HarnessMonitorVoicePreferencesDefaults.uiTestRemoteProcessorEnabledOverrideKey
         ]
       ) ?? false
     let remoteProcessorURL = voiceStringOverride(
@@ -329,7 +329,7 @@ struct HarnessMonitorAppConfiguration {
       HarnessMonitorVoicePreferences.normalizedPendingTranscriptSegmentLimit(
         uiTestIntOverride(
           from: environment.values[
-            HarnessMonitorVoicePreferencesDefaults.uiTestPendingTranscriptSegmentLimitOverrideKey
+            HarnessMonitorVoicePreferencesDefaults.uiTestPendingTranscriptLimitOverrideKey
           ]
         ) ?? HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
       )

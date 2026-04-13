@@ -48,13 +48,13 @@ final class HarnessMonitorSettingsVoiceUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       editableField(
         in: app,
-        identifier: Accessibility.preferencesVoicePendingAudioChunkLimitField
+        identifier: Accessibility.preferencesVoicePendingAudioField
       ).exists
     )
     XCTAssertTrue(
       editableField(
         in: app,
-        identifier: Accessibility.preferencesVoicePendingTranscriptLimitField
+        identifier: Accessibility.preferencesVoicePendingTranscriptField
       ).exists
     )
     XCTAssertTrue(

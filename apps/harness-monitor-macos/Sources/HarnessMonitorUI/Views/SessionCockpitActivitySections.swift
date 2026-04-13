@@ -186,7 +186,7 @@ private struct SignalHoverActionStrip: View {
   let canResend: Bool
   let reduceMotion: Bool
 
-  @State private var displayScale: CGFloat = SignalHoverActionStrip.hiddenScale
+  @State private var displayScale: CGFloat = Self.hiddenScale
   @State private var isCancelHovering = false
   @State private var isResendHovering = false
 

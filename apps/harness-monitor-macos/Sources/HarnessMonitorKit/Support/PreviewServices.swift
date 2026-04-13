@@ -126,7 +126,7 @@ public actor PreviewVoiceCaptureService: VoiceCaptureProviding {
     self.behavior = behavior ?? .transcript(Self.defaultTranscript)
   }
 
-  public nonisolated func capture(configuration _: VoiceCaptureConfiguration)
+  nonisolated public func capture(configuration _: VoiceCaptureConfiguration)
     -> VoiceCaptureEventStream
   {
     VoiceCaptureEventStream { continuation in

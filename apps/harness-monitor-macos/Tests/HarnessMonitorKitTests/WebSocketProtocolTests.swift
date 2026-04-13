@@ -48,7 +48,7 @@ struct WebSocketProtocolTests {
   }()
 
   private func makeTransport(
-    endpoint: URL = WebSocketProtocolTests.testEndpoint
+    endpoint: URL = Self.testEndpoint
   ) -> WebSocketTransport {
     WebSocketTransport(
       connection: HarnessMonitorConnection(
