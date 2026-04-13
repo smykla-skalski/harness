@@ -122,8 +122,8 @@ public struct SessionDetail: Codable, Equatable, Sendable {
   public func canonicallySorted() -> Self {
     Self(
       session: session,
-      agents: agents.sorted(by: SessionDetail.compareAgents),
-      tasks: tasks.sorted(by: SessionDetail.compareTasks),
+      agents: agents.sorted(by: Self.compareAgents),
+      tasks: tasks.sorted(by: Self.compareTasks),
       signals: signals,
       observer: observer,
       agentActivity: agentActivity

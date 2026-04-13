@@ -10,7 +10,7 @@ public enum SystemVoiceTextInsertionResult: Equatable, Sendable {
 }
 
 @MainActor
-public struct SystemVoiceTextInsertionService: Sendable {
+public struct SystemVoiceTextInsertionService {
   private let accessibilityTrustCheck: @MainActor @Sendable (Bool) -> Bool
   private let accessibilityInserter: @MainActor @Sendable (String) -> Bool
   private let pasteboardWriter: @MainActor @Sendable (String) -> Void

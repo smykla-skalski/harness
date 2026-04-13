@@ -16,7 +16,7 @@ public enum HarnessMonitorVoicePreferencesDefaults {
     "HARNESS_MONITOR_VOICE_LOCAL_DAEMON_ENABLED_OVERRIDE"
   public static let uiTestAgentBridgeSinkEnabledOverrideKey =
     "HARNESS_MONITOR_VOICE_AGENT_BRIDGE_ENABLED_OVERRIDE"
-  public static let uiTestRemoteProcessorSinkEnabledOverrideKey =
+  public static let uiTestRemoteProcessorEnabledOverrideKey =
     "HARNESS_MONITOR_VOICE_REMOTE_PROCESSOR_ENABLED_OVERRIDE"
   public static let uiTestRemoteProcessorURLOverrideKey =
     "HARNESS_MONITOR_VOICE_REMOTE_PROCESSOR_URL_OVERRIDE"
@@ -26,7 +26,7 @@ public enum HarnessMonitorVoicePreferencesDefaults {
     "HARNESS_MONITOR_VOICE_DELIVERS_AUDIO_CHUNKS_OVERRIDE"
   public static let uiTestPendingAudioChunkLimitOverrideKey =
     "HARNESS_MONITOR_VOICE_PENDING_AUDIO_LIMIT_OVERRIDE"
-  public static let uiTestPendingTranscriptSegmentLimitOverrideKey =
+  public static let uiTestPendingTranscriptLimitOverrideKey =
     "HARNESS_MONITOR_VOICE_PENDING_TRANSCRIPT_LIMIT_OVERRIDE"
 }
 

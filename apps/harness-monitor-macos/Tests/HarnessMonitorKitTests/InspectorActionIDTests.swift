@@ -79,31 +79,31 @@ struct InspectorActionIDTests {
 
   @Test("Keys are distinct between sessions")
   func keysAreDistinctBetweenSessions() {
-    let a = InspectorActionID.createTask(sessionID: "sess-1")
-    let b = InspectorActionID.createTask(sessionID: "sess-2")
-    #expect(a.key != b.key)
+    let lhs = InspectorActionID.createTask(sessionID: "sess-1")
+    let rhs = InspectorActionID.createTask(sessionID: "sess-2")
+    #expect(lhs.key != rhs.key)
   }
 
   @Test("Keys are distinct between verbs on the same subject")
   func keysAreDistinctBetweenVerbs() {
-    let a = InspectorActionID.assignTask(sessionID: "sess-1", taskID: "task-42")
-    let b = InspectorActionID.dropTask(sessionID: "sess-1", taskID: "task-42")
-    #expect(a.key != b.key)
+    let lhs = InspectorActionID.assignTask(sessionID: "sess-1", taskID: "task-42")
+    let rhs = InspectorActionID.dropTask(sessionID: "sess-1", taskID: "task-42")
+    #expect(lhs.key != rhs.key)
   }
 
   @Test("Keys are distinct between subjects of the same verb")
   func keysAreDistinctBetweenSubjects() {
-    let a = InspectorActionID.assignTask(sessionID: "sess-1", taskID: "task-1")
-    let b = InspectorActionID.assignTask(sessionID: "sess-1", taskID: "task-2")
-    #expect(a.key != b.key)
+    let lhs = InspectorActionID.assignTask(sessionID: "sess-1", taskID: "task-1")
+    let rhs = InspectorActionID.assignTask(sessionID: "sess-1", taskID: "task-2")
+    #expect(lhs.key != rhs.key)
   }
 
   @Test("Equal payloads produce equal keys")
   func equalPayloadsProduceEqualKeys() {
-    let a = InspectorActionID.createTask(sessionID: "sess-1")
-    let b = InspectorActionID.createTask(sessionID: "sess-1")
-    #expect(a.key == b.key)
-    #expect(a == b)
+    let lhs = InspectorActionID.createTask(sessionID: "sess-1")
+    let rhs = InspectorActionID.createTask(sessionID: "sess-1")
+    #expect(lhs.key == rhs.key)
+    #expect(lhs == rhs)
   }
 
   @Test("Hashable conformance deduplicates Set membership")

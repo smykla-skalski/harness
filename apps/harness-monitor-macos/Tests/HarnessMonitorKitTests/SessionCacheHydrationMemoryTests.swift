@@ -331,16 +331,15 @@ struct SessionCacheHydrationMemoryTests {
     await store.cacheSessionList(sessions, projects: [project])
 
     let initialEntries: [(detail: SessionDetail, timeline: [TimelineEntry])] = sessions.map {
-      summary in
       (
         detail: makeSessionDetail(
-          summary: summary,
-          workerID: "worker-\(summary.sessionId)",
+          summary: $0,
+          workerID: "worker-\($0.sessionId)",
           workerName: "Worker v1"
         ),
         timeline: makeTimelineEntries(
-          sessionID: summary.sessionId,
-          agentID: summary.leaderId ?? "",
+          sessionID: $0.sessionId,
+          agentID: $0.leaderId ?? "",
           summary: "First entry"
         )
       )
@@ -349,16 +348,15 @@ struct SessionCacheHydrationMemoryTests {
     await store.cacheSessionDetails(initialEntries, markViewed: false)
 
     let updatedEntries: [(detail: SessionDetail, timeline: [TimelineEntry])] = sessions.map {
-      summary in
       (
         detail: makeSessionDetail(
-          summary: summary,
-          workerID: "worker-\(summary.sessionId)-new",
+          summary: $0,
+          workerID: "worker-\($0.sessionId)-new",
           workerName: "Worker v2"
         ),
         timeline: makeTimelineEntries(
-          sessionID: summary.sessionId,
-          agentID: summary.leaderId ?? "",
+          sessionID: $0.sessionId,
+          agentID: $0.leaderId ?? "",
           summary: "Updated entry"
         )
       )

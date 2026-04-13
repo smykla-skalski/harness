@@ -44,11 +44,17 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     let reservedLocale: Locale
   }
 
+  private struct TranscriptionModules {
+    let locale: Locale
+    let transcriber: SpeechTranscriber
+    let modules: [any SpeechModule]
+  }
+
   private var activeCapture: ActiveCapture?
 
   public init() {}
 
-  public nonisolated func capture(configuration: VoiceCaptureConfiguration)
+  nonisolated public func capture(configuration: VoiceCaptureConfiguration)
     -> VoiceCaptureEventStream
   {
     VoiceCaptureEventStream { continuation in
@@ -105,9 +111,10 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     }
 
     continuation.yield(.state(.preparingAssets))
-    let (locale, transcriber, modules) = try await makeTranscriptionModules(
-      configuration: configuration
-    )
+    let ready = try await makeTranscriptionModules(configuration: configuration)
+    let locale = ready.locale
+    let transcriber = ready.transcriber
+    let modules = ready.modules
 
     var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     let inputStream = AsyncStream<AnalyzerInput>(bufferingPolicy: .bufferingNewest(16)) {
@@ -191,7 +198,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
 
   private func makeTranscriptionModules(
     configuration: VoiceCaptureConfiguration
-  ) async throws -> (Locale, SpeechTranscriber, [any SpeechModule]) {
+  ) async throws -> TranscriptionModules {
     var foundSupportedLocale = false
     for candidate in HarnessMonitorVoiceLocaleSupport.candidateLocales(
       for: configuration.localeIdentifier
@@ -207,7 +214,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
       let modules: [any SpeechModule] = [transcriber]
       do {
         try await prepareAssets(for: modules, locale: locale)
-        return (locale, transcriber, modules)
+        return TranscriptionModules(locale: locale, transcriber: transcriber, modules: modules)
       } catch let error as NativeVoiceCaptureError {
         guard error == .speechAssetsUnavailable(locale.identifier) else {
           throw error
@@ -243,7 +250,7 @@ public actor NativeVoiceCaptureService: VoiceCaptureProviding {
     }
   }
 
-  private nonisolated func streamResults(
+  nonisolated private func streamResults(
     from transcriber: SpeechTranscriber,
     to continuation: VoiceCaptureEventStream.Continuation
   ) async {
@@ -350,6 +357,12 @@ private final class VoiceAudioConverterInputProvider: @unchecked Sendable {
   }
 }
 
+private struct VoiceAudioTiming {
+  let sequence: UInt64
+  let startedAtSeconds: Double
+  let durationSeconds: Double
+}
+
 private final class VoiceAudioTapState: @unchecked Sendable {
   private let lock = NSLock()
   private let sampleRate: Double
@@ -360,15 +373,17 @@ private final class VoiceAudioTapState: @unchecked Sendable {
     self.sampleRate = sampleRate
   }
 
-  func nextTiming(frameCount: Int) -> (
-    sequence: UInt64, startedAtSeconds: Double, durationSeconds: Double
-  ) {
+  func nextTiming(frameCount: Int) -> VoiceAudioTiming {
     lock.withLock {
       nextSequence += 1
       let startedAtSeconds = Double(frameOffset) / sampleRate
       let durationSeconds = Double(frameCount) / sampleRate
       frameOffset += Int64(frameCount)
-      return (nextSequence, startedAtSeconds, durationSeconds)
+      return VoiceAudioTiming(
+        sequence: nextSequence,
+        startedAtSeconds: startedAtSeconds,
+        durationSeconds: durationSeconds
+      )
     }
   }
 }

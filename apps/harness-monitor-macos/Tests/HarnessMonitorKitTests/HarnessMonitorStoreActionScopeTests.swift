@@ -126,16 +126,20 @@ struct HarnessMonitorStoreActionScopeTests {
     let key2 = InspectorActionID.assignTask(sessionID: sessionID, taskID: "t1").key
 
     async let r1: Bool = store.mutateSelectedSession(
-      actionName: "Create task", actionID: key1,
-      using: client, sessionID: sessionID,
+      actionName: "Create task",
+      actionID: key1,
+      using: client,
+      sessionID: sessionID,
       mutation: {
         try await Task.sleep(for: .milliseconds(20))
         return PreviewFixtures.detail
       }
     )
     async let r2: Bool = store.mutateSelectedSession(
-      actionName: "Assign task", actionID: key2,
-      using: client, sessionID: sessionID,
+      actionName: "Assign task",
+      actionID: key2,
+      using: client,
+      sessionID: sessionID,
       mutation: {
         try await Task.sleep(for: .milliseconds(10))
         return PreviewFixtures.detail
