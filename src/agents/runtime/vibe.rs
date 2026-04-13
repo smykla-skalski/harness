@@ -72,6 +72,10 @@ impl AgentRuntime for VibeRuntime {
         HOOK_POINTS
     }
 
+    fn supports_readiness_hook(&self) -> bool {
+        false
+    }
+
     fn initial_prompt_delivery(&self) -> super::InitialPromptDelivery {
         super::InitialPromptDelivery::CliPositional
     }

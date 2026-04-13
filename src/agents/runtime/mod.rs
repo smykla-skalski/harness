@@ -145,6 +145,13 @@ pub trait AgentRuntime: Send + Sync {
         None
     }
 
+    /// Whether this runtime fires a `SessionStart` hook that can signal
+    /// readiness via the daemon callback. Runtimes without hooks (Vibe) return
+    /// `false` and the daemon falls back to screen-text detection.
+    fn supports_readiness_hook(&self) -> bool {
+        true
+    }
+
     /// How the daemon should deliver the initial join prompt to this runtime.
     ///
     /// Runtimes that accept an initial prompt via CLI argument avoid the PTY
