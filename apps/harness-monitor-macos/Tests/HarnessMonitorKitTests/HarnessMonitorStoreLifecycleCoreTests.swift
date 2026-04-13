@@ -240,4 +240,71 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCount + 1)
   }
 
+  @Test("Summary refresh during selection load keeps the selected session stream attached")
+  func summaryRefreshDuringSelectionLoadKeepsSelectedSessionStreamAttached() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-refresh-stream",
+        context: "Refresh stream baseline",
+        status: .active,
+        leaderId: "leader-refresh-stream",
+        observeId: "observe-refresh-stream",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let updatedSummary = makeUpdatedSession(
+      summary,
+      context: "Refresh stream updated",
+      updatedAt: "2026-03-28T15:07:00Z",
+      agentCount: 2
+    )
+    let initialDetail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-refresh-stream-before",
+      workerName: "Worker Refresh Stream Before"
+    )
+    let updatedDetail = makeSessionDetail(
+      summary: updatedSummary,
+      workerID: "worker-refresh-stream-after",
+      workerName: "Worker Refresh Stream After"
+    )
+    let refreshedTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-refresh-stream-after",
+      summary: "Refresh stream timeline"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: initialDetail],
+      timelinesBySessionID: [summary.sessionId: refreshedTimeline],
+      detail: initialDetail
+    )
+    client.configureSessionStream(events: [], for: summary.sessionId)
+    client.configureDetailDelay(.milliseconds(200), for: summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+
+    let selectionTask = Task {
+      await store.selectSession(summary.sessionId)
+    }
+    try await Task.sleep(for: .milliseconds(40))
+
+    client.configureSessions(
+      summaries: [updatedSummary],
+      detailsByID: [summary.sessionId: updatedDetail],
+      timelinesBySessionID: [summary.sessionId: refreshedTimeline]
+    )
+    store.refreshSelectedSessionIfSummaryChanged(sessions: [updatedSummary])
+
+    await selectionTask.value
+    while let sessionLoadTask = store.sessionLoadTask {
+      await sessionLoadTask.value
+    }
+
+    #expect(store.selectedSession?.session.context == updatedSummary.context)
+    #expect(store.subscribedSessionIDs == Set([summary.sessionId]))
+    #expect(store.sessionStreamTask != nil)
+  }
+
 }
