@@ -15,7 +15,7 @@ use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionState, SessionTransition, TaskSource,
+    AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
 };
 use crate::session::{
     observe as session_observe, service as session_service, storage as session_storage,
@@ -567,6 +567,7 @@ pub fn list_sessions(
     include_all: bool,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<Vec<SessionSummary>, CliError> {
+    reconcile_active_session_liveness_for_reads(include_all, db)?;
     if let Some(db) = db {
         return db.list_session_summaries_full();
     }
@@ -584,6 +585,7 @@ pub fn session_detail(
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
+    reconcile_session_liveness_for_read(session_id, db)?;
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -625,6 +627,7 @@ pub fn session_detail_core(
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
+    reconcile_session_liveness_for_read(session_id, db)?;
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -652,6 +655,70 @@ pub fn session_extensions(
     }
     let resolved = index::resolve_session(session_id)?;
     snapshot::build_session_extensions(&resolved, None)
+}
+
+fn reconcile_active_session_liveness_for_reads(
+    include_all: bool,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<(), CliError> {
+    if let Some(db) = db {
+        let session_ids: Vec<_> = db
+            .list_session_summaries()?
+            .into_iter()
+            .filter(|state| state.status == SessionStatus::Active)
+            .map(|state| state.session_id)
+            .collect();
+        for session_id in session_ids {
+            reconcile_session_liveness_for_read(&session_id, Some(db))?;
+        }
+        return Ok(());
+    }
+
+    let session_ids: Vec<_> = index::discover_sessions(include_all)?
+        .into_iter()
+        .filter(|resolved| resolved.state.status == SessionStatus::Active)
+        .map(|resolved| resolved.state.session_id)
+        .collect();
+    for session_id in session_ids {
+        reconcile_session_liveness_for_read(&session_id, None)?;
+    }
+    Ok(())
+}
+
+fn reconcile_session_liveness_for_read(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<(), CliError> {
+    let Some(resolved) = resolve_session_for_read(session_id, db)? else {
+        return Ok(());
+    };
+    if resolved.state.status != SessionStatus::Active {
+        return Ok(());
+    }
+    let Some(project_dir) = resolved.project.project_dir.as_deref() else {
+        return Ok(());
+    };
+    if session_storage::load_state(project_dir, session_id)?.is_none() {
+        return Ok(());
+    }
+
+    let result = session_service::sync_agent_liveness(session_id, project_dir)?;
+    if let Some(db) = db
+        && (!result.disconnected.is_empty() || !result.idled.is_empty())
+    {
+        db.resync_session(session_id)?;
+    }
+    Ok(())
+}
+
+fn resolve_session_for_read(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<Option<ResolvedSession>, CliError> {
+    if let Some(db) = db {
+        return db.resolve_session(session_id);
+    }
+    Ok(Some(index::resolve_session(session_id)?))
 }
 
 /// Create a task through the shared session service.
@@ -2346,7 +2413,7 @@ mod tests {
     use super::*;
 
     use std::os::unix::fs::PermissionsExt;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::{Arc, Mutex, OnceLock};
 
@@ -2413,6 +2480,24 @@ mod tests {
             ),
         )
         .expect("write log");
+    }
+
+    fn write_agent_log_file(project: &Path, runtime: &str, session_id: &str) -> PathBuf {
+        let log_path = crate::workspace::project_context_dir(project)
+            .join(format!("agents/sessions/{runtime}/{session_id}/raw.jsonl"));
+        fs::create_dir_all(log_path.parent().expect("agent log dir")).expect("create log dir");
+        fs::write(&log_path, "{}\n").expect("write log");
+        log_path
+    }
+
+    fn set_log_mtime_seconds_ago(path: &Path, seconds: u64) {
+        let old_time = std::time::SystemTime::now() - std::time::Duration::from_secs(seconds);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .expect("open for mtime")
+            .set_times(std::fs::FileTimes::new().set_modified(old_time))
+            .expect("set mtime");
     }
 
     #[derive(Clone, Copy)]
@@ -2576,6 +2661,142 @@ done
             assert_eq!(payload.projects.len(), 1);
             assert_eq!(payload.sessions.len(), 1);
             assert_eq!(payload.sessions[0].session_id, state.session_id);
+        });
+    }
+
+    #[test]
+    fn session_detail_reconciles_stale_agent_liveness_before_serving() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon stale detail",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-stale-detail"),
+            )
+            .expect("start session");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("stale-worker-session"), || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            });
+
+            let status =
+                session_service::session_status(&state.session_id, project).expect("status");
+            let leader = status
+                .leader_id
+                .as_ref()
+                .and_then(|agent_id| status.agents.get(agent_id))
+                .expect("leader agent");
+            let worker = status
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("worker agent");
+
+            let leader_session_id = leader
+                .agent_session_id
+                .as_deref()
+                .expect("leader session id");
+            let worker_session_id = worker
+                .agent_session_id
+                .as_deref()
+                .expect("worker session id");
+
+            write_agent_log_file(project, "claude", leader_session_id);
+            let worker_log = write_agent_log_file(project, "codex", worker_session_id);
+            set_log_mtime_seconds_ago(&worker_log, 600);
+
+            let detail = session_detail(&state.session_id, None).expect("session detail");
+            let worker = detail
+                .agents
+                .iter()
+                .find(|agent| agent.runtime == "codex")
+                .expect("worker detail");
+
+            assert_eq!(worker.status, AgentStatus::Disconnected);
+            assert_eq!(detail.session.metrics.active_agent_count, 1);
+        });
+    }
+
+    #[test]
+    fn list_sessions_db_reconciles_stale_agent_liveness_before_serving() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon stale summaries",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-stale-summaries"),
+            )
+            .expect("start session");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("stale-db-worker-session"), || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            });
+
+            let status =
+                session_service::session_status(&state.session_id, project).expect("status");
+            let leader = status
+                .leader_id
+                .as_ref()
+                .and_then(|agent_id| status.agents.get(agent_id))
+                .expect("leader agent");
+            let worker = status
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("worker agent");
+
+            let leader_session_id = leader
+                .agent_session_id
+                .as_deref()
+                .expect("leader session id");
+            let worker_session_id = worker
+                .agent_session_id
+                .as_deref()
+                .expect("worker session id");
+
+            write_agent_log_file(project, "claude", leader_session_id);
+            let worker_log = write_agent_log_file(project, "codex", worker_session_id);
+            set_log_mtime_seconds_ago(&worker_log, 600);
+
+            let db = setup_db_with_session(project, &state.session_id);
+
+            let sessions = list_sessions(true, Some(&db)).expect("session summaries");
+            let summary = sessions
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("summary");
+            assert_eq!(summary.metrics.active_agent_count, 1);
+
+            let synced_state = db
+                .load_session_state(&state.session_id)
+                .expect("load state")
+                .expect("session present");
+            let worker = synced_state
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("worker");
+            assert_eq!(worker.status, AgentStatus::Disconnected);
         });
     }
 
@@ -3172,10 +3393,6 @@ done
     }
 
     /// Build an in-memory DB with a project and session loaded from files.
-    #[expect(
-        dead_code,
-        reason = "used by future DB-direct tests that also need file state"
-    )]
     fn setup_db_with_session(project: &Path, session_id: &str) -> crate::daemon::db::DaemonDb {
         let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
         let projects = index::discover_projects().expect("discover projects");
