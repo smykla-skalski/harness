@@ -15,7 +15,8 @@ use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
+    AgentRegistration, SessionLogEntry, SessionRole, SessionState, SessionStatus,
+    SessionTransition, TaskSource,
 };
 use crate::session::{
     observe as session_observe, service as session_service, storage as session_storage,
@@ -1880,6 +1881,12 @@ pub fn join_session_direct(
     request: &super::protocol::SessionJoinRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
+    if request.role == SessionRole::Leader {
+        return Err(CliErrorKind::session_agent_conflict(
+            "daemon join requests cannot claim the leader role",
+        )
+        .into());
+    }
     let display_name = request
         .name
         .clone()
@@ -3835,6 +3842,46 @@ done
                 .expect("load state")
                 .expect("state present");
             assert_eq!(db_state.tasks.len(), 1);
+        });
+    }
+
+    #[test]
+    fn join_session_direct_rejects_leader_role() {
+        with_temp_project(|project| {
+            use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+
+            let db = setup_db_with_project(project);
+            start_session_direct(
+                &SessionStartRequest {
+                    title: "leader join denied".into(),
+                    context: "daemon joins cannot claim leader".into(),
+                    runtime: "claude".into(),
+                    session_id: Some("leader-join-denied".into()),
+                    project_dir: project.to_string_lossy().into(),
+                },
+                Some(&db),
+            )
+            .expect("start session");
+
+            let result =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("leader-join-worker"))], || {
+                    join_session_direct(
+                        "leader-join-denied",
+                        &SessionJoinRequest {
+                            runtime: "codex".into(),
+                            role: SessionRole::Leader,
+                            capabilities: vec![],
+                            name: Some("spoofed leader".into()),
+                            project_dir: project.to_string_lossy().into(),
+                            persona: None,
+                        },
+                        Some(&db),
+                    )
+                });
+
+            let error = result.expect_err("leader join should be rejected");
+            assert_eq!(error.code(), "KSRCLI092");
+            assert!(error.message().contains("leader"));
         });
     }
 

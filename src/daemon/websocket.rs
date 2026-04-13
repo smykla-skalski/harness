@@ -20,6 +20,7 @@ use super::protocol::{
     SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
     TaskQueuePolicyRequest, TaskUpdateRequest, WsErrorPayload, WsPushEvent, WsRequest, WsResponse,
+    bind_control_plane_actor_value,
 };
 use super::service;
 
@@ -630,8 +631,10 @@ fn dispatch_mutation(
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
+    let mut params = request.params.clone();
+    bind_control_plane_actor_value(&mut params);
 
-    match handler(session_id.clone(), request.params.clone(), db_ref) {
+    match handler(session_id.clone(), params, db_ref) {
         Ok(detail) => {
             service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
             match serde_json::to_value(detail) {
@@ -665,8 +668,10 @@ fn dispatch_mutation_with_task(
     let Some(task_id) = extract_string_param(&request.params, "task_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing task_id");
     };
+    let mut params = request.params.clone();
+    bind_control_plane_actor_value(&mut params);
 
-    match handler(session_id.clone(), task_id, request.params.clone(), db_ref) {
+    match handler(session_id.clone(), task_id, params, db_ref) {
         Ok(detail) => {
             service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
             match serde_json::to_value(detail) {
@@ -700,8 +705,10 @@ fn dispatch_mutation_with_agent(
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
+    let mut params = request.params.clone();
+    bind_control_plane_actor_value(&mut params);
 
-    match handler(session_id.clone(), agent_id, request.params.clone(), db_ref) {
+    match handler(session_id.clone(), agent_id, params, db_ref) {
         Ok(detail) => {
             service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
             match serde_json::to_value(detail) {
@@ -784,6 +791,38 @@ fn serialize_error_response(request_id: Option<&str>, code: &str, message: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::daemon::agent_tui::AgentTuiManagerHandle;
+    use crate::daemon::codex_controller::CodexControllerHandle;
+    use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
+    use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+    use serde_json::json;
+    use std::sync::{Arc, Mutex, OnceLock};
+    use tokio::sync::broadcast;
+
+    fn test_ws_state() -> DaemonHttpState {
+        let (sender, _) = broadcast::channel(8);
+        let db_slot = Arc::new(OnceLock::new());
+        DaemonHttpState {
+            token: "token".into(),
+            sender: sender.clone(),
+            manifest: DaemonManifest {
+                version: "20.6.0".into(),
+                pid: 1,
+                endpoint: "http://127.0.0.1:0".into(),
+                started_at: "2026-04-13T00:00:00Z".into(),
+                token_path: "/tmp/token".into(),
+                sandboxed: false,
+                host_bridge: HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
+            },
+            daemon_epoch: "epoch".into(),
+            replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
+            db: db_slot.clone(),
+            codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+            agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+        }
+    }
 
     #[test]
     fn replay_buffer_append_and_replay() {
@@ -830,6 +869,33 @@ mod tests {
         let buffer = ReplayBuffer::new(10);
         assert_eq!(buffer.current_seq(), 0);
         assert!(buffer.replay_since(0).is_none());
+    }
+
+    #[test]
+    fn dispatch_mutation_rebinds_client_actor() {
+        let state = test_ws_state();
+        let request = WsRequest {
+            id: "req-1".into(),
+            method: "session.end".into(),
+            params: json!({
+                "session_id": "sess-1",
+                "actor": "spoofed-leader",
+            }),
+        };
+
+        let response = dispatch_mutation(&request, &state, |session_id, params, _db| {
+            assert_eq!(session_id, "sess-1");
+            assert_eq!(params["actor"], CONTROL_PLANE_ACTOR_ID);
+            Err(MutationError {
+                code: "EXPECTED".into(),
+                message: "stop here".into(),
+            })
+        });
+
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("EXPECTED")
+        );
     }
 
     #[test]
