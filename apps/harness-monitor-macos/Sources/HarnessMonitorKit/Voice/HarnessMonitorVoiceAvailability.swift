@@ -25,7 +25,8 @@ public enum HarnessMonitorVoiceLocaleAvailability: Equatable, Sendable {
     case .ready:
       "Recording can start immediately with the selected language."
     case .assetsRequired:
-      "Open System Settings > Keyboard > Dictation and download the language assets for the selected locale or switch to a supported English locale."
+      "Open System Settings > Keyboard > Dictation and download the language assets "
+      + "for the selected locale or switch to a supported English locale."
     case .unsupported:
       "Use a supported BCP-47 locale identifier such as en_US, en_GB, or pl_PL."
     case .speechUnavailable:

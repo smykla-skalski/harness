@@ -270,19 +270,28 @@ public struct DaemonController: DaemonControlling {
     while ContinuousClock.now < deadline {
       do {
         let manifest = try loadManifest()
+        let manifestPid = manifest.pid
         let connection = try connection(from: manifest)
+        let endpoint = connection.endpoint.absoluteString
         HarnessMonitorLogger.lifecycle.trace(
-          "Warm-up observed manifest pid=\(manifest.pid, privacy: .public) endpoint=\(connection.endpoint.absoluteString, privacy: .public)"
+          "Warm-up observed manifest pid=\(manifestPid, privacy: .public)"
+        )
+        HarnessMonitorLogger.lifecycle.trace(
+          "  endpoint=\(endpoint, privacy: .public)"
         )
         if await endpointProbe(connection.endpoint) {
           HarnessMonitorLogger.lifecycle.trace(
-            "Warm-up confirmed live daemon endpoint \(connection.endpoint.absoluteString, privacy: .public)"
+            "Warm-up confirmed live daemon endpoint \(endpoint, privacy: .public)"
           )
           return try await bootstrap(connection: connection)
         }
         let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+        let path = manifestPath
         HarnessMonitorLogger.lifecycle.error(
-          "Warm-up found stale daemon manifest at \(manifestPath, privacy: .public) for endpoint \(connection.endpoint.absoluteString, privacy: .public)"
+          "Warm-up found stale daemon manifest at \(path, privacy: .public)"
+        )
+        HarnessMonitorLogger.lifecycle.error(
+          "  stale endpoint: \(endpoint, privacy: .public)"
         )
         if ownership == .external {
           immediateError = DaemonControlError.externalDaemonManifestStale(
@@ -293,26 +302,34 @@ public struct DaemonController: DaemonControlling {
         } else {
           if Self.processIsAlive(pid: manifest.pid) == false {
             lastError = DaemonControlError.daemonDidNotStart
+            let pid = manifest.pid
             HarnessMonitorLogger.lifecycle.error(
-              "Warm-up detected dead managed daemon pid \(manifest.pid, privacy: .public) for stale manifest at \(manifestPath, privacy: .public)"
+              "Warm-up detected dead managed daemon pid \(pid, privacy: .public)"
+            )
+            HarnessMonitorLogger.lifecycle.error(
+              "  stale manifest at \(path, privacy: .public)"
             )
             sawUnreachableManifest = true
             break
           }
           lastError = DaemonControlError.daemonDidNotStart
           let staleSignature = Self.managedStaleManifestSignature(for: manifest)
+          let gracePeriod = String(describing: managedStaleManifestGracePeriod)
           if managedStaleManifestTracker.expired(
             signature: staleSignature,
             now: ContinuousClock.now,
             gracePeriod: managedStaleManifestGracePeriod
           ) {
             HarnessMonitorLogger.lifecycle.error(
-              "Warm-up aborting managed stale manifest wait at \(manifestPath, privacy: .public) after \(String(describing: managedStaleManifestGracePeriod), privacy: .public)"
+              "Warm-up aborting managed stale manifest wait at \(path, privacy: .public)"
+            )
+            HarnessMonitorLogger.lifecycle.error(
+              "  grace period elapsed: \(gracePeriod, privacy: .public)"
             )
             break
           }
           HarnessMonitorLogger.lifecycle.trace(
-            "Warm-up waiting for managed daemon to rewrite stale manifest at \(manifestPath, privacy: .public)"
+            "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
           )
         }
         sawUnreachableManifest = true
@@ -472,8 +489,10 @@ public struct DaemonController: DaemonControlling {
     }
 
     let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
+    let manifestFilePath = manifestURL.path
+    let pid = manifest.pid
     HarnessMonitorLogger.lifecycle.trace(
-      "Loaded daemon manifest from \(manifestURL.path, privacy: .public) for pid \(manifest.pid, privacy: .public)"
+      "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
     )
     return manifest
   }
