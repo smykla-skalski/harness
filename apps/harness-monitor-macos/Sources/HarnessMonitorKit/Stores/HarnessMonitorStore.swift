@@ -79,6 +79,7 @@ public final class HarnessMonitorStore {
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
+  var selectedSessionRefreshFallbackDelay: Duration = .milliseconds(150)
   var sessionPushFallbackDelay: Duration = .milliseconds(900)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
 
@@ -93,6 +94,7 @@ public final class HarnessMonitorStore {
   var sessionStreamTask: Task<Void, Never>?
   var connectionProbeTask: Task<Void, Never>?
   var sessionPushFallbackTask: Task<Void, Never>?
+  @ObservationIgnored var selectedSessionRefreshFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTaskToken: UInt64 = 0
@@ -106,8 +108,10 @@ public final class HarnessMonitorStore {
   var activeSessionLoadRequest: UInt64 = 0
   var sessionLoadSequence: UInt64 = 0
   var sessionPushFallbackSequence: UInt64 = 0
+  @ObservationIgnored var selectedSessionRefreshFallbackSequence: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshSequence: UInt64 = 0
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
+  @ObservationIgnored var pendingSelectedSessionRefreshFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var lastSessionPushFallbackAt: [String: ContinuousClock.Instant] = [:]
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
