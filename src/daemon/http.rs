@@ -13,6 +13,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::session::persona;
 
 use super::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use super::protocol::{
@@ -92,6 +93,7 @@ fn core_routes() -> Router<DaemonHttpState> {
             "/v1/daemon/log-level",
             get(get_log_level).put(put_log_level),
         )
+        .route("/v1/personas", get(get_personas))
         .route("/v1/projects", get(get_projects))
         .route("/v1/ws", get(super::websocket::ws_upgrade_handler))
         .route("/v1/stream", get(stream_global))
@@ -245,6 +247,22 @@ async fn get_diagnostics(headers: HeaderMap, State(state): State<DaemonHttpState
         &request_id,
         start,
         service::diagnostics_report(db_guard.as_deref()),
+    )
+}
+
+async fn get_personas(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let personas = persona::all();
+    timed_json(
+        "GET",
+        "/v1/personas",
+        &request_id,
+        start,
+        Ok::<_, CliError>(personas),
     )
 }
 

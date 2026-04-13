@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 use crate::infra::io::read_json_typed;
+use crate::session::types::AgentPersona;
 
 use super::agent_tui::{
     AgentTuiInputRequest, AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSnapshot,
@@ -60,6 +61,14 @@ impl DaemonClient {
             log_daemon_client_discovery_skipped();
             None
         }
+    }
+
+    /// Fetch the list of available agent personas from the daemon.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on network or deserialization failures.
+    pub fn personas(&self) -> Result<Vec<AgentPersona>, CliError> {
+        self.get("/v1/personas")
     }
 
     pub fn start_session(&self, request: &SessionStartRequest) -> Result<SessionState, CliError> {
