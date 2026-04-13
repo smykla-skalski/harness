@@ -8,16 +8,16 @@ use crate::errors::CliError;
 use super::canonical_checkout_root;
 #[cfg(target_os = "macos")]
 use super::paths::host_home_dir;
-use super::paths::{dirs_home, harness_data_root};
+use super::paths::{dirs_home, harness_data_root, normalized_env_value};
 
 /// XDG data root (`XDG_DATA_HOME` or `~/.local/share`).
 #[must_use]
 pub fn data_root() -> PathBuf {
-    if let Some(value) = context_scope_value("XDG_DATA_HOME") {
+    if let Some(value) = normalized_env_value("XDG_DATA_HOME") {
         return PathBuf::from(value);
     }
     #[cfg(target_os = "macos")]
-    if context_scope_value("HARNESS_APP_GROUP_ID").is_some() {
+    if normalized_env_value("HARNESS_APP_GROUP_ID").is_some() {
         return host_home_dir().join("Library").join("Application Support");
     }
     user_dirs::data_dir().unwrap_or_else(|_| dirs_home().join(".local").join("share"))
@@ -27,23 +27,6 @@ pub fn data_root() -> PathBuf {
 #[must_use]
 pub fn suite_root() -> PathBuf {
     harness_data_root().join("suites")
-}
-
-/// Read an env var, returning `None` if empty, an unexpanded shell variable,
-/// or a known sentinel value like "UNSET".
-fn context_scope_value(name: &str) -> Option<String> {
-    let value = env::var(name).unwrap_or_default();
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    if trimmed.starts_with("${") && trimmed.ends_with('}') {
-        return None;
-    }
-    if trimmed.eq_ignore_ascii_case("unset") {
-        return None;
-    }
-    Some(trimmed.to_string())
 }
 
 /// Compute a hex digest prefix from a scope string.
@@ -77,11 +60,11 @@ fn project_scope_key_for(project_dir: &Path) -> String {
 /// # Errors
 /// Returns `CliError` if the current directory cannot be determined.
 pub fn session_scope_key() -> Result<String, CliError> {
-    if let Some(session_id) = context_scope_value("CLAUDE_SESSION_ID") {
+    if let Some(session_id) = normalized_env_value("CLAUDE_SESSION_ID") {
         let scope = format!("session:{session_id}");
         return Ok(format!("session-{}", scope_digest(&scope)));
     }
-    if let Some(project_dir) = context_scope_value("CLAUDE_PROJECT_DIR") {
+    if let Some(project_dir) = normalized_env_value("CLAUDE_PROJECT_DIR") {
         return Ok(project_scope_key_for(Path::new(&project_dir)));
     }
     let cwd = env::current_dir()?;

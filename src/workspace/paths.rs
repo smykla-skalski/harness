@@ -22,11 +22,11 @@ pub fn dirs_home() -> PathBuf {
 
 #[must_use]
 pub(crate) fn host_home_dir() -> PathBuf {
-    if let Some(value) = env_value(HARNESS_HOST_HOME_ENV) {
+    if let Some(value) = normalized_env_value(HARNESS_HOST_HOME_ENV) {
         return PathBuf::from(value);
     }
     account_home_dir()
-        .or_else(|| env_value("HOME").map(PathBuf::from))
+        .or_else(|| normalized_env_value("HOME").map(PathBuf::from))
         .unwrap_or_else(dirs_home)
 }
 
@@ -42,7 +42,8 @@ fn account_home_dir() -> Option<PathBuf> {
     None
 }
 
-fn env_value(name: &str) -> Option<String> {
+#[must_use]
+pub(crate) fn normalized_env_value(name: &str) -> Option<String> {
     let value = env::var(name).unwrap_or_default();
     let trimmed = value.trim();
     if trimmed.is_empty() {

@@ -1,4 +1,4 @@
-use std::env::{self, current_exe};
+use std::env::current_exe;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -12,6 +12,7 @@ use tokio::runtime::Runtime;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
+use crate::workspace::normalized_env_value;
 
 use super::discovery::{self, AdoptionOutcome};
 use super::launchd;
@@ -268,7 +269,7 @@ impl DaemonDevArgs {
 
         let mut set_env = Vec::new();
         let mut log_effective_app_group = None;
-        if env::var_os("HARNESS_APP_GROUP_ID").is_none() {
+        if normalized_env_value(state::APP_GROUP_ID_ENV).is_none() {
             set_env.push((
                 "HARNESS_APP_GROUP_ID".to_string(),
                 self.app_group_id.clone(),
@@ -926,6 +927,30 @@ mod tests {
     #[test]
     fn daemon_dev_spawn_plan_defaults_app_group_when_env_unset() {
         temp_env::with_var("HARNESS_APP_GROUP_ID", Option::<&str>::None, || {
+            let dev = DaemonDevArgs {
+                host: "127.0.0.1".to_string(),
+                port: 0,
+                app_group_id: "com.example.custom".to_string(),
+                codex_ws_url: None,
+            };
+            let plan = dev.spawn_plan();
+            assert_eq!(
+                plan.set_env,
+                vec![(
+                    "HARNESS_APP_GROUP_ID".to_string(),
+                    "com.example.custom".to_string(),
+                )]
+            );
+            assert_eq!(
+                plan.log_effective_app_group.as_deref(),
+                Some("com.example.custom")
+            );
+        });
+    }
+
+    #[test]
+    fn daemon_dev_spawn_plan_defaults_app_group_when_env_blank() {
+        temp_env::with_var("HARNESS_APP_GROUP_ID", Some("   "), || {
             let dev = DaemonDevArgs {
                 host: "127.0.0.1".to_string(),
                 port: 0,
