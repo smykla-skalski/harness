@@ -2992,6 +2992,7 @@ mod tests {
                 last_activity_at: Some("2026-04-03T12:05:00Z".into()),
                 current_task_id: None,
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
 
@@ -3154,6 +3155,7 @@ mod tests {
                 last_activity_at: Some(timestamp.clone()),
                 current_task_id: Some(task_id.clone()),
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
 
