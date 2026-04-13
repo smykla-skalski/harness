@@ -264,13 +264,11 @@ extension HarnessMonitorStore {
     }
 
     let requestID = beginSessionLoad()
-    Task { @MainActor [weak self] in
-      await self?.loadSession(
-        using: client,
-        sessionID: selectedSessionID,
-        requestID: requestID
-      )
-    }
+    startSessionLoad(
+      using: client,
+      sessionID: selectedSessionID,
+      requestID: requestID
+    )
   }
 
   func applySessionPushEvent(_ event: DaemonPushEvent) {

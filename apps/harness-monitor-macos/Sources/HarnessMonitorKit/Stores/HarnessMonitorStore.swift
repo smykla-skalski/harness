@@ -164,6 +164,8 @@ public final class HarnessMonitorStore {
   var connectionProbeTask: Task<Void, Never>?
   var sessionPushFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
+  @ObservationIgnored var sessionLoadTask: Task<Void, Never>?
+  @ObservationIgnored var sessionLoadTaskToken: UInt64 = 0
   var selectionTask: Task<Void, Never>?
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
@@ -615,6 +617,7 @@ public final class HarnessMonitorStore {
     stopSessionStream(resetSubscriptions: resetSubscriptions)
     stopConnectionProbe()
     cancelSessionPushFallback()
+    cancelSessionLoad()
     sessionSnapshotHydrationTask?.cancel()
     sessionSnapshotHydrationTask = nil
   }
