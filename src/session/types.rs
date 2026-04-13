@@ -150,6 +150,9 @@ pub struct AgentRegistration {
     /// Runtime delivery and transcript features for UI badges.
     #[serde(default)]
     pub runtime_capabilities: RuntimeCapabilities,
+    /// Optional persona assigned at agent join time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<AgentPersona>,
 }
 
 /// A pending leadership transfer initiated by a non-leader actor.
@@ -191,6 +194,29 @@ impl AgentStatus {
     pub const fn is_alive(self) -> bool {
         matches!(self, Self::Active | Self::Idle)
     }
+}
+
+/// Icon source for a persona, supporting system SF Symbols or bundled assets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum PersonaSymbol {
+    /// A system SF Symbol identified by name (e.g. `magnifyingglass.circle.fill`).
+    SfSymbol { name: String },
+    /// An image baked into the app's asset catalog.
+    Asset { name: String },
+}
+
+/// A predefined agent definition that shapes an agent's role and focus.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentPersona {
+    /// Unique slug (e.g. `code-reviewer`, `test-writer`).
+    pub identifier: String,
+    /// Human-readable display name.
+    pub name: String,
+    /// Icon for visual identification.
+    pub symbol: PersonaSymbol,
+    /// What this persona does, shown in detail views.
+    pub description: String,
 }
 
 /// A work item tracked within a session.
@@ -632,6 +658,7 @@ mod tests {
                 last_activity_at: None,
                 current_task_id: None,
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
 
@@ -688,6 +715,7 @@ mod tests {
                 last_activity_at: None,
                 current_task_id: None,
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
         agents.insert(
@@ -705,6 +733,7 @@ mod tests {
                 last_activity_at: None,
                 current_task_id: None,
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
         agents.insert(
@@ -722,6 +751,7 @@ mod tests {
                 last_activity_at: None,
                 current_task_id: None,
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
 
@@ -751,5 +781,146 @@ mod tests {
             "only Active counts, not Idle"
         );
         assert_eq!(metrics.idle_agent_count, 1);
+    }
+
+    #[test]
+    fn persona_symbol_sf_symbol_serde_round_trip() {
+        let symbol = PersonaSymbol::SfSymbol {
+            name: "magnifyingglass.circle.fill".into(),
+        };
+        let json = serde_json::to_string(&symbol).expect("serializes");
+        assert!(
+            json.contains(r#""type":"sf_symbol""#),
+            "tagged as sf_symbol"
+        );
+        assert!(
+            json.contains(r#""name":"magnifyingglass.circle.fill""#),
+            "contains name"
+        );
+        let parsed: PersonaSymbol = serde_json::from_str(&json).expect("deserializes");
+        assert_eq!(parsed, symbol);
+    }
+
+    #[test]
+    fn persona_symbol_asset_serde_round_trip() {
+        let symbol = PersonaSymbol::Asset {
+            name: "custom-icon".into(),
+        };
+        let json = serde_json::to_string(&symbol).expect("serializes");
+        assert!(json.contains(r#""type":"asset""#), "tagged as asset");
+        assert!(json.contains(r#""name":"custom-icon""#), "contains name");
+        let parsed: PersonaSymbol = serde_json::from_str(&json).expect("deserializes");
+        assert_eq!(parsed, symbol);
+    }
+
+    #[test]
+    fn persona_symbol_rejects_unknown_type() {
+        let json = r#"{"type":"unknown","name":"x"}"#;
+        let result = serde_json::from_str::<PersonaSymbol>(json);
+        assert!(result.is_err(), "unknown type should fail to deserialize");
+    }
+
+    #[test]
+    fn agent_persona_serde_round_trip() {
+        let persona = AgentPersona {
+            identifier: "code-reviewer".into(),
+            name: "Code Reviewer".into(),
+            symbol: PersonaSymbol::SfSymbol {
+                name: "magnifyingglass.circle.fill".into(),
+            },
+            description: "Reviews code for correctness".into(),
+        };
+        let json = serde_json::to_string(&persona).expect("serializes");
+        let parsed: AgentPersona = serde_json::from_str(&json).expect("deserializes");
+        assert_eq!(parsed, persona);
+    }
+
+    #[test]
+    fn agent_persona_with_asset_serde_round_trip() {
+        let persona = AgentPersona {
+            identifier: "custom".into(),
+            name: "Custom".into(),
+            symbol: PersonaSymbol::Asset {
+                name: "custom-icon".into(),
+            },
+            description: "A custom persona".into(),
+        };
+        let json = serde_json::to_string(&persona).expect("serializes");
+        let parsed: AgentPersona = serde_json::from_str(&json).expect("deserializes");
+        assert_eq!(parsed, persona);
+    }
+
+    #[test]
+    fn agent_registration_without_persona_deserializes() {
+        let json = r#"{
+            "agent_id": "a1",
+            "name": "agent",
+            "runtime": "codex",
+            "role": "worker",
+            "capabilities": [],
+            "joined_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "status": "active"
+        }"#;
+        let reg: AgentRegistration = serde_json::from_str(json).expect("deserializes");
+        assert_eq!(reg.agent_id, "a1");
+        assert!(
+            reg.persona.is_none(),
+            "missing persona should default to None"
+        );
+    }
+
+    #[test]
+    fn agent_registration_with_persona_deserializes() {
+        let json = r#"{
+            "agent_id": "a1",
+            "name": "agent",
+            "runtime": "codex",
+            "role": "worker",
+            "capabilities": [],
+            "joined_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "status": "active",
+            "persona": {
+                "identifier": "code-reviewer",
+                "name": "Code Reviewer",
+                "symbol": {"type": "sf_symbol", "name": "magnifyingglass.circle.fill"},
+                "description": "Reviews code"
+            }
+        }"#;
+        let reg: AgentRegistration = serde_json::from_str(json).expect("deserializes");
+        let persona = reg.persona.expect("persona should be present");
+        assert_eq!(persona.identifier, "code-reviewer");
+        assert_eq!(persona.name, "Code Reviewer");
+        assert_eq!(
+            persona.symbol,
+            PersonaSymbol::SfSymbol {
+                name: "magnifyingglass.circle.fill".into()
+            }
+        );
+    }
+
+    #[test]
+    fn agent_registration_persona_skipped_when_none() {
+        let reg = AgentRegistration {
+            agent_id: "a1".into(),
+            name: "agent".into(),
+            runtime: "codex".into(),
+            role: SessionRole::Worker,
+            capabilities: vec![],
+            joined_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+            status: AgentStatus::Active,
+            agent_session_id: None,
+            last_activity_at: None,
+            current_task_id: None,
+            runtime_capabilities: RuntimeCapabilities::default(),
+            persona: None,
+        };
+        let json = serde_json::to_string(&reg).expect("serializes");
+        assert!(
+            !json.contains("persona"),
+            "persona key should be omitted when None"
+        );
     }
 }

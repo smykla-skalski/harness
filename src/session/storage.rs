@@ -593,6 +593,7 @@ mod tests {
                     last_activity_at: Some("2026-01-01T00:00:00Z".into()),
                     current_task_id: None,
                     runtime_capabilities: RuntimeCapabilities::default(),
+                    persona: None,
                 },
             )]),
             tasks: BTreeMap::from([(
