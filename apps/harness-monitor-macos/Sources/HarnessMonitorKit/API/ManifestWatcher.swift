@@ -138,10 +138,27 @@ final class ManifestWatcher: Sendable {
   }
 
   private func handleDirectoryChange() {
-    guard
-      let data = FileManager.default.contents(atPath: manifestPath),
-      let manifest = try? decoder.decode(DaemonManifest.self, from: data)
-    else {
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: manifestPath) else {
+      return
+    }
+    guard let data = fileManager.contents(atPath: manifestPath) else {
+      HarnessMonitorLogger.lifecycle.warning(
+        "ManifestWatcher: failed to read manifest \(self.manifestPath, privacy: .public)"
+      )
+      return
+    }
+    let manifest: DaemonManifest
+    do {
+      manifest = try decoder.decode(DaemonManifest.self, from: data)
+    } catch {
+      HarnessMonitorLogger.lifecycle.warning(
+        """
+        ManifestWatcher: failed to decode manifest \
+        \(self.manifestPath, privacy: .public): \
+        \(error.localizedDescription, privacy: .public)
+        """
+      )
       return
     }
 
