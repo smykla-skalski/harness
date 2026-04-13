@@ -1,4 +1,5 @@
 use std::collections::{HashSet, VecDeque};
+use std::mem;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
@@ -6,9 +7,12 @@ use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::http::HeaderMap;
 use axum::response::Response;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval as tokio_interval};
 use tracing::{debug, info};
 
@@ -19,10 +23,16 @@ use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
     SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, WsErrorPayload, WsPushEvent, WsRequest, WsResponse,
-    bind_control_plane_actor_value,
+    TaskQueuePolicyRequest, TaskUpdateRequest, WsChunkFrame, WsErrorPayload, WsPushEvent,
+    WsRequest, WsResponse, bind_control_plane_actor_value,
 };
+use super::read_cache::run_preferred_db_read;
 use super::service;
+
+const MAX_INLINE_WS_TEXT_BYTES: usize = 256 * 1024;
+const MAX_SEMANTIC_WS_ARRAY_BATCH_BYTES: usize = 128 * 1024;
+const MAX_SEMANTIC_WS_ARRAY_BATCH_ITEMS: usize = 64;
+const WS_CHUNK_DATA_BYTES: usize = 128 * 1024;
 
 /// Bounded replay buffer for reconnecting clients.
 #[derive(Debug)]
@@ -152,12 +162,16 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                                 message,
                                 &state,
                                 &connection_dispatch,
-                            ) {
+                            )
+                            .await
+                            {
                                 IncomingMessageAction::ContinueLoop => {}
                                 IncomingMessageAction::CloseConnection => break,
-                                IncomingMessageAction::Respond(frame) => {
-                                    if priority_tx_dispatch.send(frame).await.is_err() {
-                                        break;
+                                IncomingMessageAction::RespondBatch(frames) => {
+                                    for frame in frames {
+                                        if priority_tx_dispatch.send(frame).await.is_err() {
+                                            return;
+                                        }
                                     }
                                 }
                             }
@@ -199,18 +213,81 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
         let _ = sender.close().await;
     });
 
-    tokio::select! {
-        _ = relay_task => {}
-        _ = inbound_task => {}
-        _ = writer_task => {}
-    }
+    await_connection_tasks(relay_task, inbound_task, writer_task).await;
     tracing::info!("websocket connection closed");
+}
+
+async fn await_connection_tasks(
+    mut relay_task: JoinHandle<()>,
+    mut inbound_task: JoinHandle<()>,
+    mut writer_task: JoinHandle<()>,
+) {
+    let completed =
+        select_connection_task(&mut relay_task, &mut inbound_task, &mut writer_task).await;
+    abort_connection_siblings(completed, &relay_task, &inbound_task, &writer_task);
+    await_connection_siblings(completed, relay_task, inbound_task, writer_task).await;
+}
+
+#[derive(Clone, Copy)]
+enum CompletedConnectionTask {
+    Relay,
+    Inbound,
+    Writer,
+}
+
+async fn select_connection_task(
+    relay_task: &mut JoinHandle<()>,
+    inbound_task: &mut JoinHandle<()>,
+    writer_task: &mut JoinHandle<()>,
+) -> CompletedConnectionTask {
+    tokio::select! {
+        _ = relay_task => CompletedConnectionTask::Relay,
+        _ = inbound_task => CompletedConnectionTask::Inbound,
+        _ = writer_task => CompletedConnectionTask::Writer,
+    }
+}
+
+fn abort_connection_siblings(
+    completed: CompletedConnectionTask,
+    relay_task: &JoinHandle<()>,
+    inbound_task: &JoinHandle<()>,
+    writer_task: &JoinHandle<()>,
+) {
+    match completed {
+        CompletedConnectionTask::Relay => {
+            inbound_task.abort();
+            writer_task.abort();
+        }
+        CompletedConnectionTask::Inbound => {
+            relay_task.abort();
+            writer_task.abort();
+        }
+        CompletedConnectionTask::Writer => {
+            relay_task.abort();
+            inbound_task.abort();
+        }
+    }
+}
+
+async fn await_connection_siblings(
+    completed: CompletedConnectionTask,
+    relay_task: JoinHandle<()>,
+    inbound_task: JoinHandle<()>,
+    writer_task: JoinHandle<()>,
+) {
+    let (first, second) = match completed {
+        CompletedConnectionTask::Relay => (inbound_task, writer_task),
+        CompletedConnectionTask::Inbound => (relay_task, writer_task),
+        CompletedConnectionTask::Writer => (relay_task, inbound_task),
+    };
+    let _ = first.await;
+    let _ = second.await;
 }
 
 enum IncomingMessageAction {
     ContinueLoop,
     CloseConnection,
-    Respond(Message),
+    RespondBatch(Vec<Message>),
 }
 
 fn incoming_message_counts_as_activity(message: &Message) -> bool {
@@ -220,16 +297,16 @@ fn incoming_message_counts_as_activity(message: &Message) -> bool {
     )
 }
 
-fn handle_incoming_message(
+async fn handle_incoming_message(
     message: Message,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> IncomingMessageAction {
     match message {
         Message::Text(text) => {
-            IncomingMessageAction::Respond(Message::text(handle_message(&text, state, connection)))
+            IncomingMessageAction::RespondBatch(handle_message(&text, state, connection).await)
         }
-        Message::Ping(payload) => IncomingMessageAction::Respond(Message::Pong(payload)),
+        Message::Ping(payload) => IncomingMessageAction::RespondBatch(vec![Message::Pong(payload)]),
         Message::Close(_) => IncomingMessageAction::CloseConnection,
         Message::Binary(_) | Message::Pong(_) => IncomingMessageAction::ContinueLoop,
     }
@@ -241,22 +318,25 @@ async fn relay_broadcast(
     connection: Arc<Mutex<ConnectionState>>,
     replay_buffer: Arc<Mutex<ReplayBuffer>>,
 ) {
-    while let Some(text) = next_relay_frame(&mut broadcast_rx, &connection, &replay_buffer).await {
-        if outbound_tx.send(text).await.is_err() {
-            break;
+    while let Some(frames) = next_relay_frames(&mut broadcast_rx, &connection, &replay_buffer).await
+    {
+        for frame in frames {
+            if outbound_tx.send(frame).await.is_err() {
+                return;
+            }
         }
     }
 }
 
-async fn next_relay_frame(
+async fn next_relay_frames(
     broadcast_rx: &mut broadcast::Receiver<StreamEvent>,
     connection: &Arc<Mutex<ConnectionState>>,
     replay_buffer: &Arc<Mutex<ReplayBuffer>>,
-) -> Option<Message> {
+) -> Option<Vec<Message>> {
     loop {
         let event = recv_broadcast_event(broadcast_rx).await?;
-        if let Some(text) = prepare_push_frame(&event, connection, replay_buffer) {
-            return Some(Message::text(text));
+        if let Some(frames) = prepare_push_frames(&event, connection, replay_buffer) {
+            return Some(frames);
         }
     }
 }
@@ -279,11 +359,11 @@ async fn recv_broadcast_event(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-fn prepare_push_frame(
+fn prepare_push_frames(
     event: &StreamEvent,
     connection: &Arc<Mutex<ConnectionState>>,
     replay_buffer: &Arc<Mutex<ReplayBuffer>>,
-) -> Option<String> {
+) -> Option<Vec<Message>> {
     let should_relay = {
         let state = connection.lock().expect("connection lock");
         state.should_relay(event)
@@ -305,27 +385,28 @@ fn prepare_push_frame(
         payload: event.payload.clone(),
         seq,
     };
-    let json = serde_json::to_string(&push).ok();
-    if json.is_some() {
+    let frames = serialize_push_frames(&push).ok();
+    if let Some(ref frames) = frames {
         tracing::info!(
             event = %event.event,
             session_id = event.session_id.as_deref().unwrap_or("-"),
             seq,
+            frame_count = frames.len(),
             "ws push"
         );
     }
-    json
+    frames
 }
 
-fn handle_message(
+async fn handle_message(
     text: &str,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
-) -> String {
+) -> Vec<Message> {
     let request: WsRequest = match serde_json::from_str(text) {
         Ok(request) => request,
         Err(error) => {
-            return serialize_error_response(
+            return serialize_error_response_frames(
                 None,
                 "MALFORMED_MESSAGE",
                 &format!("failed to parse message: {error}"),
@@ -333,9 +414,9 @@ fn handle_message(
         }
     };
 
-    let response = dispatch(&request, state, connection);
-    serde_json::to_string(&response).unwrap_or_else(|error| {
-        serialize_error_response(
+    let response = dispatch(&request, state, connection).await;
+    serialize_response_frames(&response).unwrap_or_else(|error| {
+        serialize_error_response_frames(
             Some(&request.id),
             "SERIALIZE_ERROR",
             &format!("failed to serialize response: {error}"),
@@ -347,13 +428,13 @@ fn handle_message(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-fn dispatch(
+async fn dispatch(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
     let start = Instant::now();
-    let response = dispatch_inner(request, state, connection);
+    let response = dispatch_inner(request, state, connection).await;
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = response.error.is_some();
     tracing::info!(
@@ -366,7 +447,7 @@ fn dispatch(
     response
 }
 
-fn dispatch_inner(
+async fn dispatch_inner(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
@@ -374,7 +455,7 @@ fn dispatch_inner(
     match request.method.as_str() {
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
         "health" | "diagnostics" | "daemon.stop" | "daemon.log_level" | "projects" | "sessions"
-        | "session.detail" | "session.timeline" => dispatch_read_query(request, state),
+        | "session.detail" | "session.timeline" => dispatch_read_query(request, state).await,
         "daemon.set_log_level" => {
             let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
                 Ok(body) => body,
@@ -388,7 +469,7 @@ fn dispatch_inner(
             };
             dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
         }
-        "session.subscribe" => handle_session_subscribe(request, state, connection),
+        "session.subscribe" => handle_session_subscribe(request, state, connection).await,
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
         "stream.subscribe" => handle_stream_subscribe(request, state, connection),
         "stream.unsubscribe" => handle_stream_unsubscribe(request, connection),
@@ -468,42 +549,128 @@ fn dispatch_inner(
     }
 }
 
-fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let db_guard = try_db_guard(state);
-    let db_ref = db_guard.as_deref();
-
+async fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     match request.method.as_str() {
-        "health" => dispatch_query(&request.id, || {
-            service::health_response(&state.manifest, db_ref)
-        }),
-        "diagnostics" => dispatch_query(&request.id, || service::diagnostics_report(db_ref)),
+        "health" => dispatch_health_query(&request.id, state),
+        "diagnostics" => dispatch_diagnostics_query(&request.id, state),
         "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
         "daemon.log_level" => dispatch_query(&request.id, service::get_log_level),
-        "projects" => dispatch_query(&request.id, || service::list_projects(db_ref)),
-        "sessions" => dispatch_query(&request.id, || service::list_sessions(true, db_ref)),
-        "session.detail" => match extract_session_id(&request.params) {
-            Some(session_id) => {
-                let scope = extract_string_param(&request.params, "scope");
-                if scope.as_deref() == Some("core") {
-                    let response = dispatch_query(&request.id, || {
-                        service::session_detail_core(&session_id, db_ref)
-                    });
-                    schedule_extensions_push(&state.sender, &state.db, &session_id);
-                    response
-                } else {
-                    dispatch_query(&request.id, || service::session_detail(&session_id, db_ref))
-                }
-            }
-            None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
-        },
-        "session.timeline" => match extract_session_id(&request.params) {
-            Some(session_id) => dispatch_query(&request.id, || {
-                service::session_timeline(&session_id, db_ref)
-            }),
-            None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
-        },
+        "projects" => dispatch_projects_query(&request.id, state).await,
+        "sessions" => dispatch_sessions_query(&request.id, state).await,
+        "session.detail" => dispatch_session_detail_query(request, state).await,
+        "session.timeline" => dispatch_session_timeline_query(request, state).await,
         _ => error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method"),
     }
+}
+
+async fn dispatch_projects_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    dispatch_query_result(
+        request_id,
+        run_preferred_db_read(
+            &state.db,
+            "projects",
+            |db| service::list_projects(Some(db)),
+            || service::list_projects(None),
+        )
+        .await,
+    )
+}
+
+async fn dispatch_sessions_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    dispatch_query_result(
+        request_id,
+        run_preferred_db_read(
+            &state.db,
+            "sessions",
+            |db| service::list_sessions(true, Some(db)),
+            || service::list_sessions(true, None),
+        )
+        .await,
+    )
+}
+
+async fn dispatch_session_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Some(session_id) = extract_session_id(&request.params) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    };
+
+    let scope = extract_string_param(&request.params, "scope");
+    if scope.as_deref() == Some("core") {
+        return dispatch_session_detail_core_query(&request.id, state, session_id).await;
+    }
+
+    dispatch_query_result(
+        &request.id,
+        run_preferred_db_read(
+            &state.db,
+            "session detail",
+            {
+                let session_id = session_id.clone();
+                move |db| service::session_detail(&session_id, Some(db))
+            },
+            || service::session_detail(&session_id, None),
+        )
+        .await,
+    )
+}
+
+async fn dispatch_session_detail_core_query(
+    request_id: &str,
+    state: &DaemonHttpState,
+    session_id: String,
+) -> WsResponse {
+    let response = dispatch_query_result(
+        request_id,
+        run_preferred_db_read(
+            &state.db,
+            "session detail core",
+            {
+                let session_id = session_id.clone();
+                move |db| service::session_detail_core(&session_id, Some(db))
+            },
+            || service::session_detail_core(&session_id, None),
+        )
+        .await,
+    );
+    schedule_extensions_push(&state.sender, &state.db, &session_id);
+    response
+}
+
+async fn dispatch_session_timeline_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(session_id) = extract_session_id(&request.params) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    };
+
+    dispatch_query_result(
+        &request.id,
+        run_preferred_db_read(
+            &state.db,
+            "session timeline",
+            {
+                let session_id = session_id.clone();
+                move |db| service::session_timeline(&session_id, Some(db))
+            },
+            || service::session_timeline(&session_id, None),
+        )
+        .await,
+    )
+}
+
+fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    let db_guard = try_db_guard(state);
+    dispatch_query(request_id, || {
+        service::health_response(&state.manifest, db_guard.as_deref())
+    })
+}
+
+fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    let db_guard = try_db_guard(state);
+    dispatch_query(request_id, || {
+        service::diagnostics_report(db_guard.as_deref())
+    })
 }
 
 fn try_db_guard(state: &DaemonHttpState) -> Option<MutexGuard<'_, super::db::DaemonDb>> {
@@ -537,7 +704,7 @@ fn schedule_extensions_push(
     });
 }
 
-fn handle_session_subscribe(
+async fn handle_session_subscribe(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
@@ -551,9 +718,24 @@ fn handle_session_subscribe(
         state.session_subscriptions.insert(session_id.clone());
     }
 
-    let db_guard = try_db_guard(state);
-    let db_ref = db_guard.as_deref();
-    service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    let sender = state.sender.clone();
+    let _ = run_preferred_db_read(
+        &state.db,
+        "session subscribe snapshot",
+        {
+            let session_id = session_id.clone();
+            let sender = sender.clone();
+            move |db| {
+                service::broadcast_session_snapshot(&sender, &session_id, Some(db));
+                Ok(())
+            }
+        },
+        || {
+            service::broadcast_session_snapshot(&sender, &session_id, None);
+            Ok(())
+        },
+    )
+    .await;
 
     ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
@@ -604,7 +786,14 @@ fn dispatch_query<T: serde::Serialize>(
     request_id: &str,
     query: impl FnOnce() -> Result<T, CliError>,
 ) -> WsResponse {
-    match query() {
+    dispatch_query_result(request_id, query())
+}
+
+fn dispatch_query_result<T: serde::Serialize>(
+    request_id: &str,
+    result: Result<T, CliError>,
+) -> WsResponse {
+    match result {
         Ok(value) => match serde_json::to_value(value) {
             Ok(json) => ok_response(request_id, json),
             Err(error) => error_response(
@@ -760,6 +949,8 @@ fn ok_response(request_id: &str, result: Value) -> WsResponse {
         id: request_id.into(),
         result: Some(result),
         error: None,
+        batch_index: None,
+        batch_count: None,
     }
 }
 
@@ -772,10 +963,116 @@ fn error_response(request_id: &str, code: &str, message: &str) -> WsResponse {
             message: message.into(),
             details: vec![],
         }),
+        batch_index: None,
+        batch_count: None,
     }
 }
 
-fn serialize_error_response(request_id: Option<&str>, code: &str, message: &str) -> String {
+fn serialize_response_frames(response: &WsResponse) -> Result<Vec<Message>, serde_json::Error> {
+    if let Some(frames) = serialize_semantic_array_response_frames(response)? {
+        return Ok(frames);
+    }
+    serialize_ws_frames(response, &format!("response:{}", response.id))
+}
+
+fn serialize_semantic_array_response_frames(
+    response: &WsResponse,
+) -> Result<Option<Vec<Message>>, serde_json::Error> {
+    let Some(Value::Array(items)) = response.result.as_ref() else {
+        return Ok(None);
+    };
+    if response.error.is_some() || items.is_empty() {
+        return Ok(None);
+    }
+
+    let batches = build_semantic_array_batches(items)?;
+    if batches.len() <= 1 {
+        return Ok(None);
+    }
+
+    let batch_count = batches.len();
+    let mut frames = Vec::with_capacity(batch_count);
+    for (batch_index, batch_items) in batches.into_iter().enumerate() {
+        let batch_response = WsResponse {
+            id: response.id.clone(),
+            result: Some(Value::Array(batch_items)),
+            error: None,
+            batch_index: Some(batch_index),
+            batch_count: Some(batch_count),
+        };
+        frames.extend(serialize_ws_frames(
+            &batch_response,
+            &format!("response:{}:batch:{batch_index}", response.id),
+        )?);
+    }
+    Ok(Some(frames))
+}
+
+fn build_semantic_array_batches(items: &[Value]) -> Result<Vec<Vec<Value>>, serde_json::Error> {
+    let mut batches = Vec::new();
+    let mut current = Vec::new();
+    let mut current_bytes = 0usize;
+
+    for item in items {
+        let item_bytes = serde_json::to_vec(item)?.len();
+        let reached_item_limit = current.len() >= MAX_SEMANTIC_WS_ARRAY_BATCH_ITEMS;
+        let reached_byte_limit =
+            !current.is_empty() && current_bytes + item_bytes > MAX_SEMANTIC_WS_ARRAY_BATCH_BYTES;
+        if reached_item_limit || reached_byte_limit {
+            batches.push(mem::take(&mut current));
+            current_bytes = 0;
+        }
+
+        current.push(item.clone());
+        current_bytes += item_bytes;
+    }
+
+    if !current.is_empty() {
+        batches.push(current);
+    }
+
+    Ok(batches)
+}
+
+fn serialize_push_frames(push: &WsPushEvent) -> Result<Vec<Message>, serde_json::Error> {
+    serialize_ws_frames(push, &format!("push:{}", push.seq))
+}
+
+fn serialize_ws_frames(
+    frame: &impl serde::Serialize,
+    chunk_id: &str,
+) -> Result<Vec<Message>, serde_json::Error> {
+    let serialized = serde_json::to_string(frame)?;
+    Ok(chunk_serialized_text(serialized, chunk_id))
+}
+
+fn chunk_serialized_text(serialized: String, chunk_id: &str) -> Vec<Message> {
+    if serialized.len() <= MAX_INLINE_WS_TEXT_BYTES {
+        return vec![Message::text(serialized)];
+    }
+
+    let bytes = serialized.into_bytes();
+    let chunk_count = bytes.len().div_ceil(WS_CHUNK_DATA_BYTES);
+    bytes
+        .chunks(WS_CHUNK_DATA_BYTES)
+        .enumerate()
+        .map(|(chunk_index, chunk)| {
+            let frame = WsChunkFrame {
+                chunk_id: chunk_id.to_string(),
+                chunk_index,
+                chunk_count,
+                chunk_base64: BASE64_STANDARD.encode(chunk),
+            };
+            Message::text(serde_json::to_string(&frame).expect("serialize ws chunk frame"))
+        })
+        .collect()
+}
+
+fn serialize_error_response_frames(
+    request_id: Option<&str>,
+    code: &str,
+    message: &str,
+) -> Vec<Message> {
     let response = WsResponse {
         id: request_id.unwrap_or("").into(),
         result: None,
@@ -784,8 +1081,10 @@ fn serialize_error_response(request_id: Option<&str>, code: &str, message: &str)
             message: message.into(),
             details: vec![],
         }),
+        batch_index: None,
+        batch_count: None,
     };
-    serde_json::to_string(&response).unwrap_or_default()
+    serialize_response_frames(&response).unwrap_or_else(|_| vec![Message::text("{}")])
 }
 
 #[cfg(test)]
@@ -952,6 +1251,96 @@ mod tests {
     }
 
     #[test]
+    fn oversized_ws_responses_are_chunked() {
+        let response = ok_response(
+            "req-large",
+            json!({
+                "timeline": "x".repeat(300_000),
+            }),
+        );
+
+        let frames = serialize_response_frames(&response).expect("serialize response frames");
+
+        assert!(
+            frames.len() > 1,
+            "large response should be split into chunks"
+        );
+    }
+
+    #[test]
+    fn oversized_ws_push_events_are_chunked() {
+        let push = WsPushEvent {
+            event: "session_extensions".into(),
+            recorded_at: "2026-04-13T00:00:00Z".into(),
+            session_id: Some("sess-large".into()),
+            payload: json!({
+                "agent_activity": "x".repeat(300_000),
+            }),
+            seq: 7,
+        };
+
+        let frames = serialize_push_frames(&push).expect("serialize push frames");
+
+        assert!(
+            frames.len() > 1,
+            "large push event should be split into chunks"
+        );
+    }
+
+    #[test]
+    fn large_array_responses_use_semantic_batches_before_binary_chunking() {
+        let items: Vec<Value> = (0..320)
+            .map(|index| {
+                json!({
+                    "entry_id": format!("entry-{index}"),
+                    "summary": "x".repeat(2_048),
+                })
+            })
+            .collect();
+        let response = WsResponse {
+            id: "req-array".into(),
+            result: Some(Value::Array(items)),
+            error: None,
+            batch_index: None,
+            batch_count: None,
+        };
+
+        let frames = serialize_response_frames(&response).expect("serialize response frames");
+
+        assert!(
+            frames.len() > 1,
+            "large array response should be split into semantic batches"
+        );
+        let mut seen_indices = Vec::new();
+        let mut expected_batch_count = None;
+        for frame in frames {
+            let Message::Text(text) = frame else {
+                panic!("semantic batches should stay as JSON text frames");
+            };
+            let response: WsResponse =
+                serde_json::from_str(&text).expect("deserialize semantic response batch");
+            let batch_index = response.batch_index.expect("batch index");
+            let batch_count = response.batch_count.expect("batch count");
+            let result = response.result.expect("batch result");
+            assert!(
+                matches!(result, Value::Array(_)),
+                "each semantic batch should carry displayable array entries"
+            );
+            if let Some(expected) = expected_batch_count {
+                assert_eq!(batch_count, expected);
+            } else {
+                expected_batch_count = Some(batch_count);
+            }
+            seen_indices.push(batch_index);
+        }
+        seen_indices.sort_unstable();
+        assert_eq!(
+            seen_indices,
+            (0..expected_batch_count.expect("semantic batch count")).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn incoming_ping_frames_count_as_activity() {
         assert!(incoming_message_counts_as_activity(&Message::Ping(
             vec![1, 2, 3].into(),
@@ -962,24 +1351,54 @@ mod tests {
         assert!(!incoming_message_counts_as_activity(&Message::Close(None)));
     }
 
-    #[test]
-    fn incoming_ping_frames_reply_with_matching_pong() {
+    #[tokio::test]
+    async fn await_connection_tasks_releases_relay_receiver_when_a_sibling_exits() {
+        let (sender, _) = broadcast::channel::<StreamEvent>(8);
+        let relay_task = tokio::spawn({
+            let mut receiver = sender.subscribe();
+            async move {
+                let _ = receiver.recv().await;
+            }
+        });
+        let inbound_task = tokio::spawn(async {});
+        let writer_task = tokio::spawn(async {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        });
+
+        await_connection_tasks(relay_task, inbound_task, writer_task).await;
+        tokio::task::yield_now().await;
+
+        assert_eq!(
+            sender.receiver_count(),
+            0,
+            "relay task should release its broadcast receiver when the connection closes"
+        );
+    }
+
+    #[tokio::test]
+    async fn incoming_ping_frames_reply_with_matching_pong() {
         let state = test_http_state();
         let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
         let action =
-            handle_incoming_message(Message::Ping(vec![4, 5, 6].into()), &state, &connection);
+            handle_incoming_message(Message::Ping(vec![4, 5, 6].into()), &state, &connection).await;
 
         match action {
-            IncomingMessageAction::Respond(Message::Pong(payload)) => {
-                assert_eq!(payload.as_ref(), [4, 5, 6]);
+            IncomingMessageAction::RespondBatch(frames) => {
+                assert_eq!(frames.len(), 1);
+                match &frames[0] {
+                    Message::Pong(payload) => {
+                        assert_eq!(payload.as_ref(), [4, 5, 6]);
+                    }
+                    _ => panic!("expected pong response"),
+                }
             }
-            _ => panic!("expected pong response"),
+            _ => panic!("expected pong response batch"),
         }
     }
 
-    #[test]
-    fn dispatch_read_query_health_succeeds_when_db_lock_is_held() {
+    #[tokio::test]
+    async fn dispatch_read_query_health_succeeds_when_db_lock_is_held() {
         let state = test_http_state_with_db();
         let db = state.db.get().expect("db slot").clone();
         let _db_guard = db.lock().expect("db lock");
@@ -989,7 +1408,7 @@ mod tests {
             params: serde_json::json!({}),
         };
 
-        let response = dispatch_read_query(&request, &state);
+        let response = dispatch_read_query(&request, &state).await;
 
         assert_eq!(response.id, "req-1");
         assert!(response.error.is_none());
