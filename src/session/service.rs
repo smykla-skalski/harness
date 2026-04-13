@@ -21,7 +21,7 @@ use crate::daemon::ordering::sort_session_tasks;
 use crate::daemon::protocol;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
-use crate::workspace::utc_now;
+use crate::workspace::{project_context_dir, utc_now};
 
 use super::roles::{SessionAction, is_permitted};
 use super::storage;
@@ -927,6 +927,7 @@ pub fn list_signals(
     reconcile_expired_pending_signals(session_id, project_dir)?;
     let state = load_state_or_err(session_id, project_dir)?;
     let mut signals = Vec::new();
+    let context_root = signal_context_root(project_dir);
 
     for (agent_id, agent) in state.agents {
         if agent_filter.is_some_and(|filter| filter != agent_id) {
@@ -935,16 +936,12 @@ pub fn list_signals(
         let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-        let signal_dirs: Vec<_> =
-            runtime::signal_session_keys(session_id, agent.agent_session_id.as_deref())
-                .into_iter()
-                .map(|signal_session_id| {
-                    (
-                        signal_session_id.clone(),
-                        runtime.signal_dir(project_dir, &signal_session_id),
-                    )
-                })
-                .collect();
+        let signal_dirs = signal_dirs_for_agent(
+            runtime,
+            session_id,
+            agent.agent_session_id.as_deref(),
+            &context_root,
+        );
         signals.extend(signal_records_for_dirs(
             &agent.runtime,
             &agent_id,
@@ -1120,16 +1117,41 @@ pub(crate) fn collect_expired_pending_signals_for_state(
     state: &SessionState,
     project_dir: &Path,
 ) -> Result<Vec<ExpiredPendingSignal>, CliError> {
+    collect_expired_pending_signals_for_state_with_context_root_resolver(
+        state,
+        project_dir,
+        signal_context_root,
+    )
+}
+
+fn collect_expired_pending_signals_for_state_with_context_root_resolver<F>(
+    state: &SessionState,
+    project_dir: &Path,
+    context_root_resolver: F,
+) -> Result<Vec<ExpiredPendingSignal>, CliError>
+where
+    F: FnOnce(&Path) -> PathBuf,
+{
+    let context_root = context_root_resolver(project_dir);
+    collect_expired_pending_signals_for_state_in_context_root(state, &context_root)
+}
+
+fn collect_expired_pending_signals_for_state_in_context_root(
+    state: &SessionState,
+    context_root: &Path,
+) -> Result<Vec<ExpiredPendingSignal>, CliError> {
     let mut expired_by_id = BTreeMap::new();
 
     for (agent_id, agent) in &state.agents {
         let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-        for signal_session_id in
-            runtime::signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
-        {
-            let signal_dir = runtime.signal_dir(project_dir, &signal_session_id);
+        for (signal_session_id, signal_dir) in signal_dirs_for_agent(
+            runtime,
+            &state.session_id,
+            agent.agent_session_id.as_deref(),
+            context_root,
+        ) {
             for signal in read_pending_signals(&signal_dir)? {
                 if !signal_matches_session(
                     &signal,
@@ -1156,6 +1178,25 @@ pub(crate) fn collect_expired_pending_signals_for_state(
     Ok(expired_by_id.into_values().collect())
 }
 
+fn signal_context_root(project_dir: &Path) -> PathBuf {
+    project_context_dir(project_dir)
+}
+
+fn signal_dirs_for_agent(
+    runtime: &dyn runtime::AgentRuntime,
+    orchestration_session_id: &str,
+    agent_session_id: Option<&str>,
+    context_root: &Path,
+) -> Vec<(String, PathBuf)> {
+    runtime::signal_session_keys(orchestration_session_id, agent_session_id)
+        .into_iter()
+        .map(|signal_session_id| {
+            let signal_dir = runtime.signal_dir(context_root, &signal_session_id);
+            (signal_session_id, signal_dir)
+        })
+        .collect()
+}
+
 fn load_signal_record_for_agent(
     session_id: &str,
     agent_id: &str,
@@ -1178,16 +1219,13 @@ pub(crate) fn load_signal_record_for_agent_from_state(
     let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
         return Ok(None);
     };
-    let signal_dirs: Vec<_> =
-        runtime::signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
-            .into_iter()
-            .map(|signal_session_id| {
-                (
-                    signal_session_id.clone(),
-                    runtime.signal_dir(project_dir, &signal_session_id),
-                )
-            })
-            .collect();
+    let context_root = signal_context_root(project_dir);
+    let signal_dirs = signal_dirs_for_agent(
+        runtime,
+        &state.session_id,
+        agent.agent_session_id.as_deref(),
+        &context_root,
+    );
     Ok(
         signal_records_for_dirs(&agent.runtime, agent_id, &state.session_id, &signal_dirs)?
             .into_iter()
@@ -1626,6 +1664,7 @@ fn cleanup_dead_agent_signals(
     project_dir: &Path,
 ) {
     use crate::agents::runtime::signal::cleanup_pending_signals;
+    let context_root = signal_context_root(project_dir);
 
     for record in activity_map {
         if !result.disconnected.contains(&record.agent_id) {
@@ -1635,10 +1674,10 @@ fn cleanup_dead_agent_signals(
             continue;
         };
         if let Some(ref agent_session) = record.agent_session_id {
-            let signal_dir = agent_runtime.signal_dir(project_dir, agent_session);
+            let signal_dir = agent_runtime.signal_dir(&context_root, agent_session);
             let _ = cleanup_pending_signals(&signal_dir, &record.agent_id, session_id);
         }
-        let signal_dir = agent_runtime.signal_dir(project_dir, session_id);
+        let signal_dir = agent_runtime.signal_dir(&context_root, session_id);
         let _ = cleanup_pending_signals(&signal_dir, &record.agent_id, session_id);
     }
 }
@@ -4335,6 +4374,51 @@ mod tests {
                     .result,
                 AckResult::Expired
             );
+        });
+    }
+
+    #[test]
+    fn collect_expired_pending_signals_resolves_context_root_once_per_pass() {
+        with_temp_project(|project| {
+            let state = start_session(
+                "test",
+                "",
+                project,
+                Some("claude"),
+                Some("signal-root-once"),
+            )
+            .expect("start");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("signal-root-worker"))], || {
+                    join_session(
+                        "signal-root-once",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                        None,
+                    )
+                    .expect("join")
+                });
+            let resolver_calls = std::cell::Cell::new(0usize);
+
+            let expired = collect_expired_pending_signals_for_state_with_context_root_resolver(
+                &joined,
+                project,
+                |path| {
+                    resolver_calls.set(resolver_calls.get() + 1);
+                    crate::workspace::project_context_dir(path)
+                },
+            )
+            .expect("collect expired");
+
+            assert!(
+                expired.is_empty(),
+                "fresh session should not contain expired signals"
+            );
+            assert_eq!(resolver_calls.get(), 1);
+            assert_eq!(state.session_id, joined.session_id);
         });
     }
 
