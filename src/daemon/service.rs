@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::env;
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -26,8 +26,9 @@ use crate::workspace::utc_now;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;
+use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch as tokio_watch};
-use tokio::task::spawn_blocking;
+use tokio::task::{AbortHandle, spawn_blocking};
 
 use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
@@ -54,8 +55,39 @@ use super::websocket::ReplayBuffer;
 struct DaemonObserveRuntime {
     sender: broadcast::Sender<StreamEvent>,
     poll_interval: Duration,
-    running_sessions: Arc<Mutex<BTreeSet<String>>>,
+    running_sessions: Arc<Mutex<BTreeMap<String, ObserveLoopRegistration>>>,
     db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ObserveLoopRequest {
+    actor_id: Option<String>,
+}
+
+impl ObserveLoopRequest {
+    fn new(actor_id: Option<&str>) -> Self {
+        Self {
+            actor_id: actor_id
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToString::to_string),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ObserveLoopRegistration {
+    request: ObserveLoopRequest,
+    generation: u64,
+    abort_handle: AbortHandle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ObserveLoopState {
+    Unavailable,
+    Started,
+    AlreadyRunning,
+    Restarted,
 }
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
@@ -2041,7 +2073,9 @@ pub fn observe_session(
     request: Option<&ObserveSessionRequest>,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let actor_id = request.and_then(|request| request.actor.as_deref());
+    let actor_id = request
+        .and_then(|request| request.actor.as_deref())
+        .filter(|value| !value.trim().is_empty());
 
     // Resolve project_dir from the DB when available, falling back to
     // file-based discovery.
@@ -2054,9 +2088,8 @@ pub fn observe_session(
         effective_project_dir(&resolved).to_path_buf()
     };
 
-    if !start_daemon_observe_loop(session_id, &project_dir, actor_id) {
-        let _ = session_observe::run_session_observe(session_id, &project_dir, actor_id)?;
-    }
+    let _ = session_observe::run_session_observe(session_id, &project_dir, actor_id)?;
+    let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -2617,43 +2650,103 @@ fn effective_project_dir(resolved: &ResolvedSession) -> &Path {
         .unwrap_or(&resolved.project.context_root)
 }
 
-fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Option<&str>) -> bool {
+fn start_daemon_observe_loop(
+    session_id: &str,
+    project_dir: &Path,
+    actor_id: Option<&str>,
+) -> ObserveLoopState {
     let Some(runtime) = OBSERVE_RUNTIME.get().cloned() else {
-        return false;
+        return ObserveLoopState::Unavailable;
     };
-
-    {
-        let Ok(mut running_sessions) = runtime.running_sessions.lock() else {
-            return false;
-        };
-        if !running_sessions.insert(session_id.to_string()) {
-            return true;
-        }
-    }
-
+    let Ok(handle) = Handle::try_current() else {
+        return ObserveLoopState::Unavailable;
+    };
+    let request = ObserveLoopRequest::new(actor_id);
     let session_id = session_id.to_string();
     let project_dir = project_dir.to_path_buf();
-    let actor_id = actor_id.map(ToString::to_string);
-    tokio::spawn(async move {
-        let result = run_daemon_observe_task(
-            session_id.clone(),
-            project_dir.clone(),
-            runtime.poll_interval,
-            actor_id.clone(),
-        )
-        .await;
-        if let Err(error) = result {
-            tracing::warn!(%error, session_id, "daemon observe loop exited with error");
+
+    let (state, stale_handle) = {
+        let Ok(mut running_sessions) = runtime.running_sessions.lock() else {
+            return ObserveLoopState::Unavailable;
+        };
+        if let Some(existing) = running_sessions.get(&session_id)
+            && existing.request == request
+        {
+            return ObserveLoopState::AlreadyRunning;
         }
-        if let Ok(mut running_sessions) = runtime.running_sessions.lock() {
-            running_sessions.remove(&session_id);
+
+        let (stale_handle, generation) =
+            running_sessions
+                .get(&session_id)
+                .map_or((None, 1), |existing| {
+                    (
+                        Some(existing.abort_handle.clone()),
+                        existing.generation.saturating_add(1),
+                    )
+                });
+        let state = if stale_handle.is_some() {
+            ObserveLoopState::Restarted
+        } else {
+            ObserveLoopState::Started
+        };
+        let registration_session_id = session_id.clone();
+        let abort_handle = spawn_daemon_observe_loop(
+            &handle,
+            runtime.clone(),
+            session_id,
+            project_dir,
+            request.actor_id.clone(),
+            generation,
+        );
+        running_sessions.insert(
+            registration_session_id,
+            ObserveLoopRegistration {
+                request,
+                generation,
+                abort_handle,
+            },
+        );
+        (state, stale_handle)
+    };
+
+    if let Some(stale_handle) = stale_handle {
+        stale_handle.abort();
+    }
+    state
+}
+
+fn spawn_daemon_observe_loop(
+    handle: &Handle,
+    runtime: DaemonObserveRuntime,
+    session_id: String,
+    project_dir: PathBuf,
+    actor_id: Option<String>,
+    generation: u64,
+) -> AbortHandle {
+    let join_handle = handle.spawn(async move {
+        let cleanup_session_id = session_id.clone();
+        let result =
+            run_daemon_observe_task(session_id, project_dir, runtime.poll_interval, actor_id).await;
+        if let Err(error) = result {
+            tracing::warn!(
+                %error,
+                session_id = cleanup_session_id,
+                "daemon observe loop exited with error"
+            );
+        }
+        if let Ok(mut running_sessions) = runtime.running_sessions.lock()
+            && running_sessions
+                .get(&cleanup_session_id)
+                .is_some_and(|registration| registration.generation == generation)
+        {
+            running_sessions.remove(&cleanup_session_id);
         }
         let db_guard = runtime.db.get().and_then(|db| db.lock().ok());
         let db_ref = db_guard.as_deref();
-        sync_after_mutation(db_ref, &session_id);
-        broadcast_session_snapshot(&runtime.sender, &session_id, db_ref);
+        sync_after_mutation(db_ref, &cleanup_session_id);
+        broadcast_session_snapshot(&runtime.sender, &cleanup_session_id, db_ref);
     });
-    true
+    join_handle.abort_handle()
 }
 
 async fn run_daemon_observe_task(
@@ -2718,6 +2811,16 @@ mod tests {
     };
     use crate::workspace::project_context_dir;
     use harness_testkit::with_isolated_harness_env;
+
+    fn install_test_observe_runtime(poll_interval: Duration) {
+        let (sender, _) = broadcast::channel(8);
+        let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
+            sender,
+            poll_interval,
+            running_sessions: Arc::default(),
+            db: Arc::new(OnceLock::new()),
+        });
+    }
 
     fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
         let tmp = tempdir().expect("tempdir");
@@ -4285,6 +4388,11 @@ done
 
     #[test]
     fn observe_session_with_actor_creates_tasks() {
+        install_test_observe_runtime(Duration::from_secs(60));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "observe test",
@@ -4317,20 +4425,109 @@ done
                 "This is a harness infrastructure issue - the KDS port wasn't forwarded",
             );
 
-            let detail = observe_session(
-                &state.session_id,
-                Some(&ObserveSessionRequest {
-                    actor: Some(leader_id),
-                }),
-                None,
-            )
-            .expect("observe session");
+            let detail = runtime
+                .block_on(async {
+                    observe_session(
+                        &state.session_id,
+                        Some(&ObserveSessionRequest {
+                            actor: Some(leader_id),
+                        }),
+                        None,
+                    )
+                })
+                .expect("observe session");
 
             assert_eq!(detail.tasks.len(), 1);
             assert_eq!(
                 detail.tasks[0].source,
                 crate::session::types::TaskSource::Observe
             );
+        });
+    }
+
+    #[test]
+    fn observe_session_restarts_running_loop_when_actor_changes() {
+        install_test_observe_runtime(Duration::from_secs(60));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "observe restart test",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-observe"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.clone().expect("leader id");
+
+            let joined_state =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
+                    session_service::join_session(
+                        &state.session_id,
+                        SessionRole::Observer,
+                        "codex",
+                        &[],
+                        Some("observer"),
+                        project,
+                        None,
+                    )
+                })
+                .expect("join observer");
+            let observer_id = joined_state
+                .agents
+                .values()
+                .find(|agent| agent.role == SessionRole::Observer)
+                .map(|agent| agent.agent_id.clone())
+                .expect("observer id");
+
+            append_project_ledger_entry(project);
+            write_agent_log(
+                project,
+                HookAgent::Codex,
+                "observer-session",
+                "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+            );
+
+            runtime
+                .block_on(async {
+                    observe_session(
+                        &state.session_id,
+                        Some(&ObserveSessionRequest {
+                            actor: Some(leader_id),
+                        }),
+                        None,
+                    )
+                })
+                .expect("observe session with leader");
+            runtime
+                .block_on(async {
+                    observe_session(
+                        &state.session_id,
+                        Some(&ObserveSessionRequest {
+                            actor: Some(observer_id.clone()),
+                        }),
+                        None,
+                    )
+                })
+                .expect("observe session with observer");
+
+            let observe_runtime = OBSERVE_RUNTIME.get().expect("observe runtime");
+            let running_sessions = observe_runtime
+                .running_sessions
+                .lock()
+                .expect("running sessions lock");
+            let registration = running_sessions
+                .get(&state.session_id)
+                .expect("running session registration");
+
+            assert_eq!(
+                registration.request.actor_id.as_deref(),
+                Some(observer_id.as_str())
+            );
+            assert_eq!(registration.generation, 2);
         });
     }
 
