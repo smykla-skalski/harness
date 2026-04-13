@@ -552,6 +552,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join worker")
                 });
@@ -624,6 +625,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join worker")
                 });

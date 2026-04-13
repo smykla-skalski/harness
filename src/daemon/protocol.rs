@@ -436,6 +436,9 @@ pub struct SessionJoinRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub project_dir: String,
+    /// Persona identifier to resolve and attach to the agent registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -642,6 +645,7 @@ mod tests {
             capabilities: vec!["general".into()],
             name: Some("codex worker".into()),
             project_dir: "/tmp/project".into(),
+            persona: None,
         };
         let json = serde_json::to_value(&request).expect("serialize");
         assert_eq!(json["role"], "worker");

@@ -439,6 +439,7 @@ mod tests {
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join codex worker");
                 let worker = joined
@@ -540,6 +541,7 @@ mod tests {
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join codex worker");
             });

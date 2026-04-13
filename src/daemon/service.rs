@@ -1608,6 +1608,7 @@ pub fn join_session_direct(
             &request.capabilities,
             agent_session_id.as_deref(),
             &now,
+            request.persona.as_deref(),
         )?;
         let project_id = db
             .project_id_for_session(session_id)?
@@ -1632,6 +1633,7 @@ pub fn join_session_direct(
         &request.capabilities,
         request.name.as_deref(),
         project_dir,
+        request.persona.as_deref(),
     )
 }
 
@@ -2646,6 +2648,7 @@ done
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join worker")
             });
@@ -2707,6 +2710,7 @@ done
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join worker")
                 });
@@ -2798,6 +2802,7 @@ done
                         argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
                         rows: 5,
                         cols: 40,
+                        persona: None,
                     },
                 )
                 .expect("start agent tui");
@@ -2816,6 +2821,7 @@ done
                             ],
                             name: Some("idle worker".into()),
                             project_dir: project.to_string_lossy().into(),
+                            persona: None,
                         },
                         Some(&db_guard),
                     )
@@ -2913,6 +2919,7 @@ done
                         argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
                         rows: 5,
                         cols: 40,
+                        persona: None,
                     },
                 )
                 .expect("start agent tui");
@@ -2931,6 +2938,7 @@ done
                             ],
                             name: Some("sleepy worker".into()),
                             project_dir: project.to_string_lossy().into(),
+                            persona: None,
                         },
                         Some(&db_guard),
                     )
@@ -3003,6 +3011,7 @@ done
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join worker")
                 });
@@ -3085,6 +3094,7 @@ done
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join worker")
                 },
@@ -3173,6 +3183,7 @@ done
                     capabilities: vec![],
                     name: None,
                     project_dir: project.to_string_lossy().into(),
+                    persona: None,
                 },
                 Some(db),
             )
@@ -3582,6 +3593,7 @@ done
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join codex worker");
             });
@@ -3718,6 +3730,7 @@ done
                     capabilities: vec![],
                     name: None,
                     project_dir: project.to_string_lossy().into(),
+                    persona: None,
                 },
                 Some(&db),
             )

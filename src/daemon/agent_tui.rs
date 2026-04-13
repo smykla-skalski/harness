@@ -340,6 +340,9 @@ pub struct AgentTuiStartRequest {
     pub rows: u16,
     #[serde(default = "default_agent_tui_cols")]
     pub cols: u16,
+    /// Persona identifier to resolve and attach to the agent registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<String>,
 }
 
 impl AgentTuiStartRequest {
@@ -591,6 +594,7 @@ impl AgentTuiManagerHandle {
             &request.capabilities,
             context.tui_id,
             request.name.as_deref(),
+            request.persona.as_deref(),
         );
         if let Err(error) = send_initial_prompt(process, &auto_join) {
             let _ = process.kill();
@@ -648,6 +652,7 @@ impl AgentTuiManagerHandle {
             &request.capabilities,
             &tui_id,
             request.name.as_deref(),
+            request.persona.as_deref(),
         );
 
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
@@ -1453,6 +1458,7 @@ fn build_auto_join_prompt(
     capabilities: &[String],
     tui_id: &str,
     name: Option<&str>,
+    persona: Option<&str>,
 ) -> String {
     let mut caps: Vec<&str> = capabilities.iter().map(String::as_str).collect();
     let marker = format!("agent-tui:{tui_id}");
@@ -1472,9 +1478,10 @@ fn build_auto_join_prompt(
     };
 
     let name_flag = name.map_or_else(String::new, |value| format!(" --name \"{value}\""));
+    let persona_flag = persona.map_or_else(String::new, |value| format!(" --persona \"{value}\""));
 
     format!(
-        "/harness:session:join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{name_flag}"
+        "/harness:session:join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{name_flag}{persona_flag}"
     )
 }
 
@@ -2076,6 +2083,7 @@ mod tests {
                     name: Some("PTY worker".into()),
                     prompt: None,
                     project_dir: None,
+                    persona: None,
                     argv: vec!["sh".into(), "-c".into(), "cat".into()],
                     rows: 5,
                     cols: 40,
@@ -2218,6 +2226,7 @@ mod tests {
                     name: None,
                     prompt: None,
                     project_dir: None,
+                    persona: None,
                     argv: vec!["sh".into(), "-c".into(), "cat".into()],
                     rows: 5,
                     cols: 40,
@@ -2288,6 +2297,7 @@ mod tests {
                     name: Some("auto join agent".into()),
                     prompt: None,
                     project_dir: None,
+                    persona: None,
                     argv: vec!["sh".into(), "-c".into(), "cat".into()],
                     rows: 5,
                     cols: 80,
@@ -2365,6 +2375,7 @@ mod tests {
                     name: Some("Delayed output".into()),
                     prompt: None,
                     project_dir: None,
+                    persona: None,
                     argv: vec![
                         "sh".into(),
                         "-c".into(),
@@ -2747,6 +2758,7 @@ mod tests {
                             name: Some("Copilot TUI".into()),
                             prompt: Some("hello".into()),
                             project_dir: None,
+                            persona: None,
                             argv: vec![],
                             rows: 24,
                             cols: 80,
@@ -2874,6 +2886,7 @@ mod tests {
             &[],
             "agent-tui-abc",
             None,
+            None,
         );
         assert!(prompt.contains("sess-123"), "should contain session id");
         assert!(
@@ -2897,6 +2910,7 @@ mod tests {
             &["custom-cap".to_string(), "another".to_string()],
             "agent-tui-def",
             Some("my worker"),
+            None,
         );
         assert!(prompt.contains("custom-cap"), "should preserve user cap");
         assert!(prompt.contains("another"), "should preserve user cap");
@@ -2985,5 +2999,39 @@ mod tests {
         PortablePtyAgentTuiBackend
             .spawn(spec)
             .expect("spawn pty process")
+    }
+
+    #[test]
+    fn build_auto_join_prompt_includes_persona_flag() {
+        let prompt = super::build_auto_join_prompt(
+            "codex",
+            "sess-789",
+            SessionRole::Worker,
+            &[],
+            "agent-tui-xyz",
+            None,
+            Some("code-reviewer"),
+        );
+        assert!(
+            prompt.contains("--persona \"code-reviewer\""),
+            "should contain persona flag: {prompt}"
+        );
+    }
+
+    #[test]
+    fn build_auto_join_prompt_omits_persona_when_none() {
+        let prompt = super::build_auto_join_prompt(
+            "codex",
+            "sess-789",
+            SessionRole::Worker,
+            &[],
+            "agent-tui-xyz",
+            None,
+            None,
+        );
+        assert!(
+            !prompt.contains("--persona"),
+            "should not contain persona flag when None: {prompt}"
+        );
     }
 }

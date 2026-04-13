@@ -164,6 +164,7 @@ pub fn join_session(
     capabilities: &[String],
     name: Option<&str>,
     project_dir: &Path,
+    persona: Option<&str>,
 ) -> Result<SessionState, CliError> {
     ensure_known_runtime(runtime_name, "agent join requires a known runtime")?;
     if let Some(client) = DaemonClient::try_connect() {
@@ -175,6 +176,7 @@ pub fn join_session(
                 capabilities: capabilities.to_vec(),
                 name: name.map(ToString::to_string),
                 project_dir: project_dir.to_string_lossy().into_owned(),
+                persona: persona.map(ToString::to_string),
             },
         );
     }
@@ -202,6 +204,7 @@ pub fn join_session(
             capabilities,
             agent_session_id.as_deref(),
             &now,
+            persona,
         )?;
         joined_agent_id = Some(agent_id);
         Ok(())
@@ -1803,6 +1806,10 @@ fn find_agent_by_tui_marker(state: &SessionState, capabilities: &[String]) -> Op
 ///
 /// If an agent with the same `agent-tui:{uuid}` marker capability already
 /// exists, return its ID instead of creating a duplicate registration.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "session join requires all registration fields; a builder would add indirection without reducing complexity"
+)]
 pub(crate) fn apply_join_session(
     state: &mut SessionState,
     display_name: &str,
@@ -1811,6 +1818,7 @@ pub(crate) fn apply_join_session(
     capabilities: &[String],
     agent_session_id: Option<&str>,
     now: &str,
+    persona: Option<&str>,
 ) -> Result<String, CliError> {
     require_active(state)?;
 
@@ -1834,7 +1842,7 @@ pub(crate) fn apply_join_session(
             last_activity_at: Some(now.to_string()),
             current_task_id: None,
             runtime_capabilities: runtime_capabilities(runtime_name),
-            persona: None,
+            persona: persona.and_then(super::persona::resolve),
         },
     );
     refresh_session(state, now);
@@ -3566,6 +3574,7 @@ mod tests {
                 &["general".into()],
                 None,
                 project,
+                None,
             )
             .expect("join");
             assert_eq!(state.agents.len(), 2);
@@ -3671,6 +3680,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("first");
                     let second = join_session(
@@ -3680,6 +3690,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("second");
                     (first, second)
@@ -3709,6 +3720,7 @@ mod tests {
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .unwrap()
             });
@@ -3737,6 +3749,7 @@ mod tests {
                 &[],
                 None,
                 project,
+                None,
             )
             .expect("join");
             let worker_id = joined
@@ -3794,8 +3807,8 @@ mod tests {
             let state =
                 start_session("test", "", project, Some("claude"), Some("s4")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined =
-                join_session("s4", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let joined = join_session("s4", SessionRole::Worker, "codex", &[], None, project, None)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -3835,6 +3848,7 @@ mod tests {
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join")
             });
@@ -3918,6 +3932,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join busy")
                 });
@@ -3936,6 +3951,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join free")
                 });
@@ -4025,6 +4041,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join")
                 });
@@ -4105,6 +4122,7 @@ mod tests {
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join")
             });
@@ -4188,6 +4206,7 @@ mod tests {
                     &[],
                     None,
                     project,
+                    None,
                 )
                 .expect("join")
             });
@@ -4279,6 +4298,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join")
                 });
@@ -4352,6 +4372,7 @@ mod tests {
                         &[],
                         None,
                         project,
+                        None,
                     )
                     .expect("join")
                 });
@@ -4401,6 +4422,7 @@ mod tests {
                 &[],
                 None,
                 project,
+                None,
             )
             .expect("join");
             let worker_id = joined
@@ -4438,8 +4460,16 @@ mod tests {
             let state =
                 start_session("test", "", project, Some("claude"), Some("perm")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined = join_session("perm", SessionRole::Worker, "codex", &[], None, project)
-                .expect("join");
+            let joined = join_session(
+                "perm",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -4477,8 +4507,16 @@ mod tests {
             let state =
                 start_session("test", "", project, Some("claude"), Some("roles")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined = join_session("roles", SessionRole::Worker, "codex", &[], None, project)
-                .expect("join");
+            let joined = join_session(
+                "roles",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -4505,8 +4543,16 @@ mod tests {
             let state =
                 start_session("test", "", project, Some("claude"), Some("assign")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined = join_session("assign", SessionRole::Worker, "codex", &[], None, project)
-                .expect("join");
+            let joined = join_session(
+                "assign",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -4537,8 +4583,16 @@ mod tests {
             let state = start_session("test", "", project, Some("claude"), Some("transfer"))
                 .expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined = join_session("transfer", SessionRole::Worker, "codex", &[], None, project)
-                .expect("join");
+            let joined = join_session(
+                "transfer",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -4575,6 +4629,7 @@ mod tests {
                         &[],
                         Some("observer"),
                         project,
+                        None,
                     )
                     .expect("join observer")
                 });
@@ -4627,6 +4682,7 @@ mod tests {
                         &[],
                         Some("observer"),
                         project,
+                        None,
                     )
                     .expect("join observer")
                 });
@@ -4701,6 +4757,7 @@ mod tests {
                         &[],
                         Some("observer"),
                         project,
+                        None,
                     )
                     .expect("join observer")
                 });
@@ -4800,8 +4857,8 @@ mod tests {
             let state =
                 start_session("test", "", project, Some("claude"), Some("s6")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined =
-                join_session("s6", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let joined = join_session("s6", SessionRole::Worker, "codex", &[], None, project, None)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -4836,8 +4893,16 @@ mod tests {
             let leader_one = session_one.leader_id.expect("alpha leader id");
             let joined_one =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
-                    join_session("s6-alpha", SessionRole::Worker, "codex", &[], None, project)
-                        .expect("join alpha worker")
+                    join_session(
+                        "s6-alpha",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                        None,
+                    )
+                    .expect("join alpha worker")
                 });
             let worker_one = joined_one
                 .agents
@@ -4851,8 +4916,16 @@ mod tests {
             let leader_two = session_two.leader_id.expect("beta leader id");
             let joined_two =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
-                    join_session("s6-beta", SessionRole::Worker, "codex", &[], None, project)
-                        .expect("join beta worker")
+                    join_session(
+                        "s6-beta",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                        None,
+                    )
+                    .expect("join beta worker")
                 });
             let worker_two = joined_two
                 .agents
@@ -4898,8 +4971,8 @@ mod tests {
     fn send_signal_denies_worker_actor() {
         with_temp_project(|project| {
             start_session("test", "", project, Some("claude"), Some("s7")).expect("start");
-            let joined =
-                join_session("s7", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let joined = join_session("s7", SessionRole::Worker, "codex", &[], None, project, None)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -4956,8 +5029,16 @@ mod tests {
             let leader_id = state.leader_id.clone().expect("leader");
 
             temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess"), || {
-                join_session("sync-1", SessionRole::Worker, "codex", &[], None, project)
-                    .expect("join worker");
+                join_session(
+                    "sync-1",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
             });
 
             let state = session_status("sync-1", project).expect("status");
@@ -5014,8 +5095,16 @@ mod tests {
             let leader_id = state.leader_id.clone().expect("leader");
 
             temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess-3"), || {
-                join_session("sync-3", SessionRole::Worker, "codex", &[], None, project)
-                    .expect("join");
+                join_session(
+                    "sync-3",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join");
             });
 
             let state = session_status("sync-3", project).expect("status");
@@ -5071,8 +5160,16 @@ mod tests {
             for i in 1..=6 {
                 let session_val = format!("worker-{i}");
                 temp_env::with_var("CODEX_SESSION_ID", Some(&session_val), || {
-                    join_session("sync-4", SessionRole::Worker, "codex", &[], None, project)
-                        .expect("join");
+                    join_session(
+                        "sync-4",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                        None,
+                    )
+                    .expect("join");
                 });
             }
 
@@ -5102,8 +5199,16 @@ mod tests {
             let leader_id = state.leader_id.clone().expect("leader");
 
             temp_env::with_var("CODEX_SESSION_ID", Some("worker-leave"), || {
-                join_session("leave-1", SessionRole::Worker, "codex", &[], None, project)
-                    .expect("join");
+                join_session(
+                    "leave-1",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join");
             });
 
             let state = session_status("leave-1", project).expect("status");
@@ -5166,6 +5271,7 @@ mod tests {
             &caps,
             None,
             now,
+            None,
         )
         .expect("first join");
 
@@ -5177,6 +5283,7 @@ mod tests {
             &caps,
             None,
             now,
+            None,
         )
         .expect("second join");
 
@@ -5207,6 +5314,7 @@ mod tests {
             &caps_a,
             None,
             now,
+            None,
         )
         .expect("first join");
 
@@ -5218,6 +5326,7 @@ mod tests {
             &caps_b,
             None,
             now,
+            None,
         )
         .expect("second join");
 
