@@ -1426,11 +1426,13 @@ pub fn sync_agent_liveness(
     let mut result = LivenessSyncResult::default();
     let activity_map = collect_agent_activity(session_id, project_dir)?;
 
-    storage::update_state(project_dir, session_id, |state| {
+    storage::update_state_if_changed(project_dir, session_id, |state| {
         require_active(state)?;
-        apply_liveness_transitions(state, &activity_map, &now, &mut result);
-        refresh_session(state, &now);
-        Ok(())
+        let changed = apply_liveness_transitions(state, &activity_map, &now, &mut result);
+        if changed {
+            refresh_session(state, &now);
+        }
+        Ok(changed)
     })?;
 
     if !result.disconnected.is_empty() || !result.idled.is_empty() {
@@ -1491,13 +1493,16 @@ fn apply_liveness_transitions(
     activity_map: &[AgentActivityRecord],
     now: &str,
     result: &mut LivenessSyncResult,
-) {
+) -> bool {
     let config = LivenessConfig::default();
+    let mut changed = false;
     for record in activity_map {
         if let Some(transition) = compute_agent_transition(state, record, &config) {
+            changed = true;
             apply_single_transition(state, record, transition, now, result);
         }
     }
+    changed
 }
 
 fn compute_agent_transition(
@@ -5289,6 +5294,28 @@ mod tests {
             let state = session_status("sync-4", project).expect("status");
             assert_eq!(state.metrics.active_agent_count, 1);
             assert_eq!(state.metrics.agent_count, 1);
+        });
+    }
+
+    #[test]
+    fn sync_liveness_skips_rewrite_when_state_is_unchanged() {
+        with_temp_project(|project| {
+            start_session("test", "", project, Some("claude"), Some("sync-noop")).expect("start");
+            let leader_log = crate::workspace::project_context_dir(project)
+                .join("agents/sessions/claude/test-service/raw.jsonl");
+            fs_err::create_dir_all(leader_log.parent().unwrap()).expect("dirs");
+            fs_err::write(&leader_log, "{}\n").expect("write log");
+
+            let _ = sync_agent_liveness("sync-noop", project).expect("initial sync");
+            let baseline = session_status("sync-noop", project).expect("baseline");
+
+            let result = sync_agent_liveness("sync-noop", project).expect("noop sync");
+            let after = session_status("sync-noop", project).expect("after");
+
+            assert!(result.disconnected.is_empty());
+            assert!(result.idled.is_empty());
+            assert_eq!(after.state_version, baseline.state_version);
+            assert_eq!(after.updated_at, baseline.updated_at);
         });
     }
 

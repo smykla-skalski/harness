@@ -2,6 +2,7 @@ use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use std::time::Duration;
 
 use super::*;
 use serde_json::json;
@@ -174,6 +175,24 @@ fn update_serializes_concurrent_writers() {
         .unwrap()
         .unwrap();
     assert_eq!(loaded["count"], 200);
+}
+
+#[test]
+fn update_skips_rewrite_when_state_is_unchanged() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("state.json");
+    let repo = VersionedJsonRepository::<Value>::new(path.clone(), 1);
+    let state = json!({"schema_version": 1, "phase": "steady"});
+    repo.save(&state).unwrap();
+
+    let before = fs::metadata(&path).unwrap().modified().unwrap();
+    thread::sleep(Duration::from_millis(20));
+
+    let updated = repo.update(|current| Ok(current)).unwrap().unwrap();
+
+    let after = fs::metadata(&path).unwrap().modified().unwrap();
+    assert_eq!(updated, state);
+    assert_eq!(before, after);
 }
 
 #[test]

@@ -113,7 +113,10 @@ where
 
             if let Some(state) = next.as_ref() {
                 let value = self.serialize(state)?;
-                self.write_value(&value)?;
+                let should_write = current_value.as_ref() != Some(&value);
+                if should_write {
+                    self.write_value(&value)?;
+                }
             } else if migrated && let Some(value) = current_value.as_ref() {
                 self.write_value(value)?;
             }

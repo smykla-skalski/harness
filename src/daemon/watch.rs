@@ -212,14 +212,41 @@ fn reindex_sessions_from_paths(db: &Arc<Mutex<DaemonDb>>, paths: &[PathBuf]) {
         "reindexing sessions from file events"
     );
     let start = Instant::now();
+    let prepare_start = Instant::now();
+    let mut prepared = Vec::new();
+    for session_id in &session_ids {
+        match DaemonDb::prepare_session_resync(session_id) {
+            Ok(import) => prepared.push(import),
+            Err(error) => tracing::warn!(
+                %error,
+                session_id,
+                "failed to prepare session reindex"
+            ),
+        }
+    }
+    let prepare_ms = u64::try_from(prepare_start.elapsed().as_millis()).unwrap_or(u64::MAX);
+    if prepared.is_empty() {
+        return;
+    }
+
+    let apply_start = Instant::now();
     let Ok(db_guard) = db.lock() else {
         return;
     };
-    for session_id in &session_ids {
-        let _ = db_guard.resync_session(session_id);
+    for import in &prepared {
+        if let Err(error) = db_guard.apply_prepared_session_resync(import) {
+            tracing::warn!(%error, "failed to apply prepared session reindex");
+        }
     }
+    let apply_ms = u64::try_from(apply_start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-    tracing::debug!(duration_ms, count = session_ids.len(), "reindex complete");
+    tracing::debug!(
+        duration_ms,
+        prepare_ms,
+        apply_ms,
+        count = session_ids.len(),
+        "reindex complete"
+    );
 }
 
 fn create_watcher(
