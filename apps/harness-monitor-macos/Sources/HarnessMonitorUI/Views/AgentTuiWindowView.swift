@@ -21,6 +21,7 @@ public struct AgentTuiWindowView: View {
     self.store = store
   }
 
+  @State private var displayState = AgentTuiDisplayState()
   @State private var runtime: AgentTuiRuntime = .copilot
   @State private var name = ""
   @State private var prompt = ""
@@ -36,7 +37,10 @@ public struct AgentTuiWindowView: View {
   @State private var wrapLines = false
   @State private var selectedPersona: String?
   @State private var availablePersonas: [AgentPersona] = []
-  @State private var showPersonaPicker = false
+  @State private var navigationBackStack: [AgentTuiSheetSelection] = []
+  @State private var navigationForwardStack: [AgentTuiSheetSelection] = []
+  @State private var suppressHistoryRecording = false
+  @State private var windowNavigation = WindowNavigationState()
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -44,6 +48,53 @@ public struct AgentTuiWindowView: View {
     case prompt
     case argv
     case input
+  }
+
+  private struct AgentNameMapping: Equatable {
+    let agentID: String
+    let name: String
+  }
+
+  private struct AgentTuiDisplayState: Equatable {
+    let sortedAgentTuis: [AgentTuiSnapshot]
+    let sessionTitlesByID: [String: String]
+    let agentTuiUnavailable: Bool
+
+    var hasAgentTuis: Bool {
+      !sortedAgentTuis.isEmpty
+    }
+
+    init() {
+      sortedAgentTuis = []
+      sessionTitlesByID = [:]
+      agentTuiUnavailable = false
+    }
+
+    @MainActor
+    init(store: HarnessMonitorStore) {
+      let sortedAgentTuis = store.selectedAgentTuis.sorted { left, right in
+        if left.status.sortPriority != right.status.sortPriority {
+          return left.status.sortPriority < right.status.sortPriority
+        }
+        if left.runtime != right.runtime {
+          return left.runtime < right.runtime
+        }
+        return left.tuiId < right.tuiId
+      }
+
+      let agentNames = Dictionary(
+        uniqueKeysWithValues: (store.selectedSession?.agents ?? []).map { ($0.agentId, $0.name) }
+      )
+      var sessionTitlesByID: [String: String] = [:]
+      sessionTitlesByID.reserveCapacity(sortedAgentTuis.count)
+      for tui in sortedAgentTuis {
+        sessionTitlesByID[tui.tuiId] = agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
+      }
+
+      self.sortedAgentTuis = sortedAgentTuis
+      self.sessionTitlesByID = sessionTitlesByID
+      self.agentTuiUnavailable = store.agentTuiUnavailable
+    }
   }
 
   private enum AgentTuiInputMode: String, CaseIterable, Identifiable {
@@ -66,26 +117,17 @@ public struct AgentTuiWindowView: View {
     .enter, .tab, .escape, .backspace, .arrowUp, .arrowDown, .arrowLeft, .arrowRight,
   ]
 
+  private var selectedAgentNames: [AgentNameMapping] {
+    (store.selectedSession?.agents ?? []).map {
+      AgentNameMapping(agentID: $0.agentId, name: $0.name)
+    }
+  }
+
   private var selectedSessionTui: AgentTuiSnapshot? {
     guard let selectedTuiID = selection.sessionID else {
       return nil
     }
-    return store.selectedAgentTuis.first { $0.tuiId == selectedTuiID }
-  }
-
-  private var sessionTitlesByID: [String: String] {
-    var titles: [String: String] = [:]
-    titles.reserveCapacity(store.selectedAgentTuis.count)
-
-    let agentNames = Dictionary(
-      uniqueKeysWithValues: (store.selectedSession?.agents ?? []).map { ($0.agentId, $0.name) }
-    )
-
-    for tui in store.selectedAgentTuis {
-      titles[tui.tuiId] = agentNames[tui.agentId] ?? resolvedRuntimeTitle(for: tui)
-    }
-
-    return titles
+    return displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
   }
 
   private var trimmedInput: String {
@@ -126,20 +168,8 @@ public struct AgentTuiWindowView: View {
     selectedSessionTui?.status.isActive == true && !isSubmitting
   }
 
-  private var sortedAgentTuis: [AgentTuiSnapshot] {
-    store.selectedAgentTuis.sorted { left, right in
-      if left.status.sortPriority != right.status.sortPriority {
-        return left.status.sortPriority < right.status.sortPriority
-      }
-      if left.runtime != right.runtime {
-        return left.runtime < right.runtime
-      }
-      return left.tuiId < right.tuiId
-    }
-  }
-
   private var orderedSessionIDs: [String] {
-    sortedAgentTuis.map(\.tuiId)
+    displayState.sortedAgentTuis.map(\.tuiId)
   }
 
   private var currentStateMarker: String {
@@ -165,8 +195,8 @@ public struct AgentTuiWindowView: View {
     NavigationSplitView {
       AgentTuiSidebar(
         selection: $selection,
-        agentTuis: sortedAgentTuis,
-        sessionTitlesByID: sessionTitlesByID,
+        agentTuis: displayState.sortedAgentTuis,
+        sessionTitlesByID: displayState.sessionTitlesByID,
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
@@ -182,6 +212,7 @@ public struct AgentTuiWindowView: View {
       }
       .id(scrollContainerIdentity)
       .toolbar {
+        agentTuiNavigationToolbarItems
         sessionToolbarItems
       }
     }
@@ -189,14 +220,27 @@ public struct AgentTuiWindowView: View {
     .toolbarBaselineOverlay()
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
+    .focusedSceneValue(\.windowNavigation, windowNavigation)
     .task {
+      windowNavigation.backHandler = { navigateHistoryBack() }
+      windowNavigation.forwardHandler = { navigateHistoryForward() }
+      refreshDisplayState()
       async let tuiRefresh = store.refreshSelectedAgentTuis()
       async let personas = store.fetchPersonas()
       availablePersonas = await personas
       _ = await tuiRefresh
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: true)
     }
     .onChange(of: store.selectedAgentTuis) { _, _ in
+      refreshDisplayState()
+      reconcileSheetState(afterRefresh: false)
+    }
+    .onChange(of: selectedAgentNames) { _, _ in
+      refreshDisplayState()
+    }
+    .onChange(of: store.agentTuiUnavailable) { _, _ in
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
@@ -241,12 +285,12 @@ public struct AgentTuiWindowView: View {
 
   private var createPane: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      if store.agentTuiUnavailable {
+      if displayState.agentTuiUnavailable {
         agentTuiUnavailableBanner
       }
       launchSection
       Text(
-        store.selectedAgentTuis.isEmpty
+        !displayState.hasAgentTuis
           ? "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
           : "Open Agent TUI sessions stay pinned in the sidebar so you can launch another agent without losing the active terminal."
       )
@@ -269,17 +313,8 @@ public struct AgentTuiWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
-  @ViewBuilder
   private var launchSection: some View {
-    if showPersonaPicker {
-      PersonaPickerView(personas: availablePersonas) { identifier in
-        selectedPersona = identifier
-        showPersonaPicker = false
-        startTui()
-      }
-    } else {
-      launchForm
-    }
+    launchForm
   }
 
   private var launchForm: some View {
@@ -296,6 +331,15 @@ public struct AgentTuiWindowView: View {
           }
           .pickerStyle(.segmented)
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
+          if !availablePersonas.isEmpty {
+            Picker("Persona", selection: $selectedPersona) {
+              Text("None").tag(nil as String?)
+              ForEach(availablePersonas, id: \.identifier) { persona in
+                Text(persona.name).tag(persona.identifier as String?)
+              }
+            }
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaPicker)
+          }
           TextField("Optional display name", text: $name)
             .harnessNativeFormControl()
             .focused($focusedField, equals: .name)
@@ -332,11 +376,7 @@ public struct AgentTuiWindowView: View {
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
             fillsWidth: true
           ) {
-            if availablePersonas.isEmpty {
-              startTui()
-            } else {
-              showPersonaPicker = true
-            }
+            startTui()
           }
           .keyboardShortcut(.defaultAction)
           .disabled(!canStart)
@@ -672,11 +712,23 @@ public struct AgentTuiWindowView: View {
     }
   }
 
+  private func refreshDisplayState() {
+    let nextState = AgentTuiDisplayState(store: store)
+    guard displayState != nextState else {
+      return
+    }
+    displayState = nextState
+  }
+
   private func resolvedTitle(for tui: AgentTuiSnapshot) -> String {
-    sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
+    displayState.sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
   }
 
   private func resolvedRuntimeTitle(for tui: AgentTuiSnapshot) -> String {
+    Self.runtimeTitle(for: tui)
+  }
+
+  private static func runtimeTitle(for tui: AgentTuiSnapshot) -> String {
     if let runtime = AgentTuiRuntime(rawValue: tui.runtime) {
       return runtime.title
     }
