@@ -16,6 +16,10 @@
 //! HARNESS_SANDBOXED=1 cargo run --bin harness -- daemon serve --port 0
 //! ```
 
+use std::net::IpAddr;
+
+use axum::http::Uri;
+
 pub mod agent_tui;
 pub mod bridge;
 pub mod client;
@@ -36,3 +40,29 @@ pub mod transport;
 pub mod voice;
 pub mod watch;
 pub mod websocket;
+
+#[must_use]
+pub(crate) fn is_loopback_host(host: &str) -> bool {
+    let host = host.trim();
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
+}
+
+#[must_use]
+pub(crate) fn is_local_websocket_endpoint(endpoint: &str) -> bool {
+    let Ok(uri) = endpoint.trim().parse::<Uri>() else {
+        return false;
+    };
+    let Some(scheme) = uri.scheme_str() else {
+        return false;
+    };
+    if !matches!(scheme, "ws" | "wss") {
+        return false;
+    }
+    let Some(host) = uri.host() else {
+        return false;
+    };
+    is_loopback_host(host)
+}

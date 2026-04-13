@@ -342,6 +342,7 @@ fn check_daemon_health(client: &DaemonClient, endpoint: &str) -> bool {
         client
             .http
             .get(format!("{endpoint}/v1/health"))
+            .bearer_auth(&client.token)
             .timeout(HEALTH_TIMEOUT)
             .send()
             .await
@@ -662,6 +663,11 @@ mod tests {
                 let (mut stream, _) = listener.accept().expect("accept");
                 let request = read_http_request(&mut stream);
                 if request.starts_with("GET /v1/health ") {
+                    let request_lower = request.to_ascii_lowercase();
+                    assert!(
+                        request_lower.contains("authorization: bearer test-token"),
+                        "missing bearer auth: {request}"
+                    );
                     write_http_response(&mut stream, "200 OK", "text/plain", "ok");
                     continue;
                 }
@@ -769,6 +775,11 @@ mod tests {
                 let (mut stream, _) = listener.accept().expect("accept");
                 let request = read_http_request(&mut stream);
                 if request.starts_with("GET /v1/health ") {
+                    let request_lower = request.to_ascii_lowercase();
+                    assert!(
+                        request_lower.contains("authorization: bearer test-token"),
+                        "missing bearer auth: {request}"
+                    );
                     write_http_response(&mut stream, "200 OK", "text/plain", "ok");
                     continue;
                 }
@@ -912,6 +923,14 @@ mod tests {
                 let (mut stream, _) = listener.accept().expect("accept");
                 let request = read_http_request(&mut stream);
                 if request.starts_with("GET /v1/health ") {
+                    let request_lower = request.to_ascii_lowercase();
+                    assert!(
+                        request_lower.contains(&format!(
+                            "authorization: bearer {}",
+                            token_value.to_ascii_lowercase()
+                        )),
+                        "missing bearer auth: {request}"
+                    );
                     write_http_response(&mut stream, "200 OK", "text/plain", "ok");
                     continue;
                 }

@@ -88,11 +88,15 @@ pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
 
-    if let Some(endpoint) = override_url {
+    if let Some(endpoint) =
+        override_url.and_then(|endpoint| sandboxed_websocket_endpoint(sandboxed, endpoint, "env"))
+    {
         return CodexTransportKind::WebSocket { endpoint };
     }
 
-    if let Some(endpoint) = bridge_endpoint_from_state_file() {
+    if let Some(endpoint) = bridge_endpoint_from_state_file()
+        .and_then(|endpoint| sandboxed_websocket_endpoint(sandboxed, endpoint, "bridge"))
+    {
         return CodexTransportKind::WebSocket { endpoint };
     }
 
@@ -103,6 +107,34 @@ pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
     }
 
     CodexTransportKind::Stdio
+}
+
+fn sandboxed_websocket_endpoint(
+    sandboxed: bool,
+    endpoint: String,
+    source: &'static str,
+) -> Option<String> {
+    if websocket_endpoint_is_allowed(sandboxed, &endpoint) {
+        return Some(endpoint);
+    }
+    log_rejected_sandboxed_endpoint(source, &endpoint);
+    None
+}
+
+fn websocket_endpoint_is_allowed(sandboxed: bool, endpoint: &str) -> bool {
+    !sandboxed || super::is_local_websocket_endpoint(endpoint)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_rejected_sandboxed_endpoint(source: &'static str, endpoint: &str) {
+    tracing::warn!(
+        source,
+        endpoint,
+        "ignoring non-loopback Codex websocket endpoint for sandboxed daemon"
+    );
 }
 
 #[expect(
@@ -470,6 +502,45 @@ mod tests {
                 codex_transport_from_env(false),
                 CodexTransportKind::WebSocket {
                     endpoint: "ws://127.0.0.1:4501".to_string(),
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn codex_transport_from_env_rejects_nonlocal_override_when_sandboxed() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "HARNESS_DAEMON_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("HARNESS_APP_GROUP_ID", None),
+                ("HARNESS_CODEX_WS_URL", Some("ws://10.0.0.5:7000")),
+                ("XDG_DATA_HOME", None),
+            ],
+            || {
+                assert_eq!(
+                    codex_transport_from_env(true),
+                    CodexTransportKind::WebSocket {
+                        endpoint: DEFAULT_CODEX_WS_ENDPOINT.to_string(),
+                    },
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn codex_transport_from_env_rejects_nonlocal_bridge_state_when_sandboxed() {
+        with_isolated_env(|| {
+            write_bridge_state_for_test("ws://10.0.0.5:7000");
+            let _lock = acquire_bridge_lock_exclusive().expect("bridge lock");
+
+            assert_eq!(
+                codex_transport_from_env(true),
+                CodexTransportKind::WebSocket {
+                    endpoint: DEFAULT_CODEX_WS_ENDPOINT.to_string(),
                 },
             );
         });
