@@ -302,8 +302,7 @@ mod tests {
 
         // Verify the field round-trips through serde.
         let json = serde_json::to_string(&claude_caps).expect("serialize");
-        let deser: super::RuntimeCapabilities =
-            serde_json::from_str(&json).expect("deserialize");
+        let deser: super::RuntimeCapabilities = serde_json::from_str(&json).expect("deserialize");
         assert!(deser.supports_readiness_signal);
     }
 }
