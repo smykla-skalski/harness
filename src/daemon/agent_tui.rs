@@ -2251,7 +2251,10 @@ mod tests {
             started_event.session_id.as_deref(),
             Some("sess-tui-manager")
         );
-        // The ready event arrives asynchronously from the deferred join thread.
+        // Simulate the SessionStart hook callback that would fire in production.
+        manager
+            .signal_ready(&snapshot.tui_id)
+            .expect("signal ready");
         wait_until(DEFAULT_WAIT_TIMEOUT, || {
             receiver
                 .try_recv()
@@ -2320,10 +2323,14 @@ mod tests {
         let transcript = fs_err::read(&stopped.transcript_path).expect("read transcript file");
         let transcript_text = String::from_utf8_lossy(&transcript);
         assert!(transcript_text.contains("hello from manager"));
-        // The auto-join prompt should have been sent to the PTY
-        assert!(
-            transcript_text.contains("/harness:session:join"),
-            "auto-join prompt should appear in transcript"
+        // For CLI-arg runtimes (codex = CliPositional), the join prompt is
+        // injected into the spawned argv, not sent via PTY transcript.
+        assert_eq!(
+            super::runtime_for_name("codex")
+                .expect("codex runtime")
+                .initial_prompt_delivery(),
+            super::InitialPromptDelivery::CliPositional,
+            "codex should use CliPositional delivery"
         );
     }
 
@@ -2452,25 +2459,28 @@ mod tests {
             )
             .expect("start");
 
-        // Wait for the auto-join text to appear in the PTY
-        wait_until(DEFAULT_WAIT_TIMEOUT, || {
-            manager
-                .get(&snapshot.tui_id)
-                .expect("refresh")
-                .screen
-                .text
-                .contains("/harness:session:join")
-        });
-
-        let refreshed = manager.get(&snapshot.tui_id).expect("get");
-        assert!(
-            refreshed.screen.text.contains("sess-auto-join"),
-            "session id in prompt"
+        // For CLI-arg runtimes (gemini uses CliFlag), the join prompt is
+        // injected into the spawned process argv by resolved_command_argv,
+        // not stored in the profile-level snapshot.argv. Verify the builder
+        // produces the right content and the runtime declares CliFlag delivery.
+        let prompt = super::build_auto_join_prompt(
+            "gemini",
+            "sess-auto-join",
+            SessionRole::Observer,
+            &["my-cap".to_string()],
+            &snapshot.tui_id,
+            Some("auto join agent"),
+            None,
         );
-        assert!(refreshed.screen.text.contains("observer"), "role in prompt");
-        assert!(
-            refreshed.screen.text.contains("my-cap"),
-            "user cap in prompt"
+        assert!(prompt.contains("/harness:session:join"));
+        assert!(prompt.contains("sess-auto-join"));
+        assert!(prompt.contains("observer"));
+        assert!(prompt.contains("my-cap"));
+        assert_eq!(
+            super::runtime_for_name("gemini")
+                .expect("gemini runtime")
+                .initial_prompt_delivery(),
+            super::InitialPromptDelivery::CliFlag("--prompt-interactive")
         );
 
         manager.stop(&snapshot.tui_id).expect("stop");
@@ -3245,46 +3255,39 @@ mod tests {
     }
 
     #[test]
-    fn no_pattern_runtime_waits_for_first_output() {
-        // Runtimes without a readiness pattern (codex, gemini, etc.) should
-        // wait for the process to produce ANY output before signaling ready.
-        // A process that delays its first output must block wait_ready.
-        let process = spawn_shell_with_readiness(
-            "sleep 0.3 && printf 'started\\n' && cat",
-            None, // no pattern - simulates codex/gemini
-        );
+    fn callback_readiness_unblocks_wait_ready() {
+        // No-pattern runtimes rely on the daemon callback to signal readiness.
+        // Simulate: spawn process, verify wait_ready blocks, signal from
+        // another thread, verify it unblocks.
+        let process = spawn_shell_with_readiness("cat", None);
 
-        // Immediately after spawn, readiness should NOT be signaled because
-        // the process hasn't produced any output yet.
-        let immediate_ready = process.wait_ready(Duration::from_millis(50));
+        // Without a callback, wait_ready should time out quickly.
+        let immediate = process.wait_ready(Duration::from_millis(50));
         assert!(
-            !immediate_ready,
-            "wait_ready should NOT return true before any PTY output"
+            !immediate,
+            "wait_ready should not return true without callback"
         );
 
-        // After the process produces output, readiness should trigger.
+        // Signal readiness from another thread (simulates the hook callback).
+        let readiness = Arc::clone(&process.readiness);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            super::signal_readiness_ready(&readiness);
+        });
+
         assert!(
             process.wait_ready(DEFAULT_WAIT_TIMEOUT),
-            "wait_ready should return true after first output"
+            "wait_ready should return true after callback signal"
         );
-
-        // Verify input can be sent after readiness.
-        super::send_initial_prompt(&process, "hello-after-ready").expect("send");
-        wait_until(DEFAULT_WAIT_TIMEOUT, || {
-            String::from_utf8_lossy(&process.transcript().expect("transcript"))
-                .contains("hello-after-ready")
-        });
     }
 
     #[test]
-    fn no_pattern_runtime_times_out_when_no_output() {
-        // If the process never produces output, wait_ready should still
-        // time out and return false (not hang forever).
+    fn callback_readiness_times_out_without_signal() {
         let process = spawn_shell_with_readiness("sleep 30", None);
         let ready = process.wait_ready(Duration::from_millis(200));
         assert!(
             !ready,
-            "wait_ready should return false when process produces no output"
+            "wait_ready should return false when no callback arrives"
         );
     }
 
