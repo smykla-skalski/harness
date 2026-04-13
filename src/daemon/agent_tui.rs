@@ -30,6 +30,7 @@ use super::protocol::StreamEvent;
 const DEFAULT_ROWS: u16 = 30;
 const DEFAULT_COLS: u16 = 120;
 const LIVE_REFRESH_INTERVAL: Duration = Duration::from_millis(100);
+pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 #[cfg(test)]
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -562,8 +563,19 @@ impl AgentTuiManagerHandle {
             size,
         )?;
 
+        if !process.wait_ready(READINESS_TIMEOUT) {
+            tracing::warn!(
+                runtime = %profile.runtime,
+                tui_id = %tui_id,
+                "agent TUI readiness timeout, sending join message anyway"
+            );
+        }
         self.send_auto_join_and_user_prompt(&process, &snapshot_context, size, request)?;
-        self.activate_tui(process, &snapshot_context)
+        let result = self.activate_tui(process, &snapshot_context);
+        if let Ok(snapshot) = &result {
+            let _ = self.save_and_broadcast("agent_tui_ready", snapshot);
+        }
+        result
     }
 
     #[expect(
@@ -1029,9 +1041,15 @@ pub(super) fn snapshot_from_process(
     })
 }
 
-/// Shared readiness signal: the reader thread sets the flag and notifies
+/// Shared readiness signal: the reader thread sets `ready` and notifies
 /// the condvar when the runtime's readiness pattern is detected in PTY output.
-type ReadinessSignal = Arc<(Mutex<bool>, std::sync::Condvar)>;
+/// The `closed` flag indicates the reader thread has exited (process gone).
+struct ReadinessState {
+    ready: bool,
+    closed: bool,
+}
+
+type ReadinessSignal = Arc<(Mutex<ReadinessState>, std::sync::Condvar)>;
 
 /// Live process handle for an agent TUI running inside a PTY.
 pub struct AgentTuiProcess {
@@ -1069,8 +1087,13 @@ impl AgentTuiProcess {
 
         let transcript = Arc::new(Mutex::new(Vec::new()));
         let screen = Arc::new(Mutex::new(TerminalScreenParser::new(spec.size)));
-        let readiness: ReadinessSignal =
-            Arc::new((Mutex::new(false), std::sync::Condvar::new()));
+        let readiness: ReadinessSignal = Arc::new((
+            Mutex::new(ReadinessState {
+                ready: false,
+                closed: false,
+            }),
+            std::sync::Condvar::new(),
+        ));
         let reader_thread = spawn_reader_thread(
             reader,
             Arc::clone(&transcript),
@@ -1184,21 +1207,31 @@ impl AgentTuiProcess {
 
     /// Block until the readiness pattern is detected or the timeout elapses.
     ///
-    /// Returns `true` if the pattern was found, `false` on timeout. When no
-    /// readiness pattern was configured at spawn time, returns `true`
-    /// immediately (the process is assumed ready).
+    /// Returns `true` if the pattern was found, `false` on timeout or if the
+    /// process exits before becoming ready. When no readiness pattern was
+    /// configured at spawn time, returns `true` immediately.
     pub fn wait_ready(&self, timeout: Duration) -> bool {
-        let (flag, condvar) = &*self.readiness;
-        let Ok(guard) = flag.lock() else {
+        let (state, condvar) = &*self.readiness;
+        let Ok(mut guard) = state.lock() else {
             return false;
         };
-        if *guard {
-            return true;
+        let deadline = Instant::now() + timeout;
+        while !guard.ready && !guard.closed {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return false;
+            }
+            match condvar.wait_timeout(guard, remaining) {
+                Ok((new_guard, result)) => {
+                    guard = new_guard;
+                    if result.timed_out() {
+                        return guard.ready;
+                    }
+                }
+                Err(_) => return false,
+            }
         }
-        match condvar.wait_timeout(guard, timeout) {
-            Ok((guard, _)) => *guard,
-            Err(_) => false,
-        }
+        guard.ready
     }
 }
 
@@ -1287,7 +1320,10 @@ pub(super) fn spawn_agent_tui_process(
     let mut env = BTreeMap::new();
     env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
-    let spec = AgentTuiSpawnSpec::new(profile, project_dir.to_path_buf(), env, size)?;
+    let readiness_pattern = crate::agents::runtime::runtime_for_name(&profile.runtime)
+        .and_then(crate::agents::runtime::AgentRuntime::readiness_pattern);
+    let mut spec = AgentTuiSpawnSpec::new(profile, project_dir.to_path_buf(), env, size)?;
+    spec.readiness_pattern = readiness_pattern;
     PortablePtyAgentTuiBackend.spawn(spec)
 }
 
@@ -1501,8 +1537,8 @@ fn spawn_reader_thread(
     // When no pattern is configured, signal ready immediately so callers
     // of `wait_ready` return without blocking.
     if readiness_pattern.is_none() {
-        if let Ok(mut flag) = readiness.0.lock() {
-            *flag = true;
+        if let Ok(mut state) = readiness.0.lock() {
+            state.ready = true;
         }
         readiness.1.notify_all();
     }
@@ -1533,8 +1569,8 @@ fn spawn_reader_thread(
                                     .windows(pattern.len())
                                     .any(|window| window == pattern.as_slice())
                                 {
-                                    if let Ok(mut flag) = readiness.0.lock() {
-                                        *flag = true;
+                                    if let Ok(mut state) = readiness.0.lock() {
+                                        state.ready = true;
                                     }
                                     readiness.1.notify_all();
                                     signaled = true;
@@ -1550,6 +1586,12 @@ fn spawn_reader_thread(
                 Err(_) => break,
             }
         }
+        // Wake up any wait_ready caller when the reader exits so it does not
+        // block for the full timeout if the process died before becoming ready.
+        if let Ok(mut state) = readiness.0.lock() {
+            state.closed = true;
+        }
+        readiness.1.notify_all();
     })
 }
 
@@ -1989,6 +2031,8 @@ mod tests {
             started_event.session_id.as_deref(),
             Some("sess-tui-manager")
         );
+        let ready_event = receiver.try_recv().expect("ready event");
+        assert_eq!(ready_event.event, "agent_tui_ready");
 
         // Agent should NOT be pre-registered in session state
         {
@@ -2246,7 +2290,7 @@ mod tests {
             .start(
                 "sess-tui-live-refresh",
                 &AgentTuiStartRequest {
-                    runtime: "claude".into(),
+                    runtime: "codex".into(),
                     role: SessionRole::Worker,
                     capabilities: vec![],
                     name: Some("Delayed output".into()),
@@ -2265,6 +2309,8 @@ mod tests {
 
         let started_event = receiver.try_recv().expect("started event");
         assert_eq!(started_event.event, "agent_tui_started");
+        let ready_event = receiver.try_recv().expect("ready event");
+        assert_eq!(ready_event.event, "agent_tui_ready");
 
         let mut updated_snapshot = None;
         wait_until(DEFAULT_WAIT_TIMEOUT, || {

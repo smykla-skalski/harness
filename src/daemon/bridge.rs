@@ -930,6 +930,13 @@ impl BridgeServer {
             &spec.project_dir,
             spec.size,
         )?;
+        if !process.wait_ready(super::agent_tui::READINESS_TIMEOUT) {
+            tracing::warn!(
+                runtime = %spec.profile.runtime,
+                tui_id = %spec.tui_id,
+                "agent TUI readiness timeout in bridge, sending prompt anyway"
+            );
+        }
         if let Some(prompt) = spec.prompt.as_deref().filter(|prompt| !prompt.is_empty()) {
             send_initial_prompt(&process, prompt)?;
         }
