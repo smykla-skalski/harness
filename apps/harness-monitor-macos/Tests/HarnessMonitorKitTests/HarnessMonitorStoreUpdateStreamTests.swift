@@ -182,6 +182,73 @@ struct HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("Global session snapshot waits before selected-session fallback refetch")
+  func globalSessionSnapshotWaitsBeforeSelectedSessionFallbackRefetch() async {
+    let client = RecordingHarnessClient()
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-selected-fallback-delay",
+        context: "Selected cockpit",
+        status: .active,
+        leaderId: "leader-selected",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let updatedSummary = makeUpdatedSession(
+      summary,
+      context: "Selected cockpit updated by summary push",
+      updatedAt: "2026-03-31T12:02:00Z",
+      agentCount: 2
+    )
+    let initialDetail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-before",
+      workerName: "Worker Before"
+    )
+
+    client.configureSessions(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: initialDetail],
+      timelinesBySessionID: [summary.sessionId: PreviewFixtures.timeline]
+    )
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(summary.sessionId)
+    #expect(store.selectedSession?.session.context == summary.context)
+    #expect(
+      store.selectedSession?.agents.contains(where: { $0.agentId == "worker-before" }) == true
+    )
+
+    let baselineDetailCalls = client.readCallCount(.sessionDetail(summary.sessionId))
+    let baselineTimelineCalls = client.readCallCount(.timeline(summary.sessionId))
+
+    store.applyGlobalPushEvent(
+      .sessionsUpdated(
+        recordedAt: "2026-03-31T12:02:00Z",
+        projects: [makeProject(totalSessionCount: 1, activeSessionCount: 1)],
+        sessions: [updatedSummary]
+      )
+    )
+
+    try? await Task.sleep(for: .milliseconds(300))
+
+    #expect(store.selectedSession?.session.context == updatedSummary.context)
+    #expect(
+      store.selectedSession?.agents.contains(where: { $0.agentId == "worker-before" }) == true
+    )
+    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCalls)
+    #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCalls)
+
+    store.stopAllStreams()
+  }
+
   @Test("Global session snapshot prefers selected-session pushes over full refetch")
   func globalSessionSnapshotPrefersSelectedSessionPushesOverFullRefetch() async {
     let client = RecordingHarnessClient()
@@ -273,6 +340,85 @@ struct HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("Selected session update waits before timeline fallback refetch")
+  func selectedSessionUpdateWaitsBeforeTimelineFallbackRefetch() async {
+    let client = RecordingHarnessClient()
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-selected-timeline-delay",
+        context: "Selected cockpit",
+        status: .active,
+        leaderId: "leader-selected",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let updatedSummary = SessionSummary(
+      projectId: summary.projectId,
+      projectName: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      sessionId: summary.sessionId,
+      title: summary.title,
+      context: "Selected cockpit updated",
+      status: .active,
+      createdAt: summary.createdAt,
+      updatedAt: "2026-03-31T12:03:00Z",
+      lastActivityAt: "2026-03-31T12:03:00Z",
+      leaderId: summary.leaderId,
+      observeId: summary.observeId,
+      pendingLeaderTransfer: summary.pendingLeaderTransfer,
+      metrics: summary.metrics
+    )
+    let initialDetail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-selected",
+      workerName: "Worker Selected"
+    )
+    let updatedDetail = makeSessionDetail(
+      summary: updatedSummary,
+      workerID: "worker-selected",
+      workerName: "Worker Selected"
+    )
+    let initialTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-selected",
+      summary: "Initial timeline"
+    )
+
+    client.configureSessions(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: initialDetail],
+      timelinesBySessionID: [summary.sessionId: initialTimeline]
+    )
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(summary.sessionId)
+    let baselineTimelineCalls = client.readCallCount(.timeline(summary.sessionId))
+
+    store.applySessionPushEvent(
+      .sessionUpdated(
+        recordedAt: "2026-03-31T12:03:00Z",
+        sessionId: summary.sessionId,
+        detail: updatedDetail
+      )
+    )
+
+    try? await Task.sleep(for: .milliseconds(1_200))
+
+    #expect(store.selectedSession?.session.context == updatedSummary.context)
+    #expect(store.timeline == initialTimeline)
+    #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCalls)
+
+    store.stopAllStreams()
+  }
+
   @Test("Selected session update without timeline refetches timeline separately")
   func selectedSessionUpdateWithoutTimelineRefetchesTimelineSeparately() async {
     let client = RecordingHarnessClient()
@@ -345,6 +491,7 @@ struct HarnessMonitorStoreUpdateStreamTests {
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
     )
+    store.sessionPushFallbackDelay = .milliseconds(20)
 
     await store.bootstrap()
     await store.selectSession(summary.sessionId)
@@ -355,8 +502,7 @@ struct HarnessMonitorStoreUpdateStreamTests {
       detailsByID: [summary.sessionId: updatedDetail],
       timelinesBySessionID: [summary.sessionId: refreshedTimeline]
     )
-
-    try? await Task.sleep(for: .milliseconds(1_050))
+    try? await Task.sleep(for: .milliseconds(80))
 
     #expect(store.selectedSession?.session.context == "Selected cockpit updated")
     #expect(store.timeline == refreshedTimeline)

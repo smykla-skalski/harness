@@ -79,8 +79,8 @@ public final class HarnessMonitorStore {
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
-  var selectedSessionRefreshFallbackDelay: Duration = .milliseconds(150)
-  var sessionPushFallbackDelay: Duration = .milliseconds(900)
+  var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
+  var sessionPushFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
 
   let daemonController: any DaemonControlling
