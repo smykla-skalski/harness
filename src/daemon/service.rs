@@ -1637,6 +1637,46 @@ pub fn join_session_direct(
     )
 }
 
+/// Mark a session agent as disconnected, writing directly to `SQLite` when a
+/// DB is available.
+///
+/// Returns `Ok(false)` when the agent is already non-live or missing.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be loaded or persisted.
+pub fn disconnect_agent_direct(
+    session_id: &str,
+    agent_id: &str,
+    reason: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<bool, CliError> {
+    let Some(db) = db else {
+        return Ok(false);
+    };
+    let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+        return Ok(false);
+    };
+
+    let now = utc_now();
+    if !session_service::apply_agent_disconnected(&mut state, agent_id, &now)? {
+        return Ok(false);
+    }
+
+    let project_id = db
+        .project_id_for_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    db.save_session_state(&project_id, &state)?;
+    db.append_log_entry(&build_log_entry(
+        session_id,
+        session_service::log_agent_disconnected(agent_id, reason),
+        None,
+        None,
+    ))?;
+    db.bump_change(session_id)?;
+    db.bump_change("global")?;
+    Ok(true)
+}
+
 /// Record a signal acknowledgment, delegating to the session service.
 ///
 /// # Errors

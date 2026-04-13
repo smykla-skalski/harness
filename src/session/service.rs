@@ -1563,6 +1563,31 @@ fn apply_single_transition(
     }
 }
 
+pub(crate) fn apply_agent_disconnected(
+    state: &mut SessionState,
+    agent_id: &str,
+    now: &str,
+) -> Result<bool, CliError> {
+    let Some(current_status) = state.agents.get(agent_id).map(|agent| agent.status) else {
+        return Ok(false);
+    };
+    if !current_status.is_alive() {
+        return Ok(false);
+    }
+
+    if let Some(agent) = state.agents.get_mut(agent_id) {
+        agent.status = AgentStatus::Disconnected;
+        now.clone_into(&mut agent.updated_at);
+        agent.last_activity_at = Some(now.to_string());
+        agent.current_task_id = None;
+    }
+
+    release_agent_tasks(state, agent_id, now);
+    clear_pending_leader_transfer(state, agent_id);
+    refresh_session(state, now);
+    Ok(true)
+}
+
 fn release_agent_tasks(state: &mut SessionState, agent_id: &str, now: &str) {
     // Clear current_task_id on the agent
     if let Some(agent) = state.agents.get_mut(agent_id) {
@@ -2462,6 +2487,13 @@ pub(crate) fn log_role_changed(
 pub(crate) fn log_agent_removed(agent_id: &str) -> SessionTransition {
     SessionTransition::AgentRemoved {
         agent_id: agent_id.to_string(),
+    }
+}
+
+pub(crate) fn log_agent_disconnected(agent_id: &str, reason: &str) -> SessionTransition {
+    SessionTransition::AgentDisconnected {
+        agent_id: agent_id.to_string(),
+        reason: reason.to_string(),
     }
 }
 
