@@ -33,6 +33,9 @@ pub(in crate::observe::application) fn execute_cycle(
             if let Some(open_issue) = existing {
                 open_issue.occurrence_count += 1;
                 open_issue.last_seen_line = issue.line;
+                open_issue
+                    .evidence_excerpt
+                    .clone_from(&issue.evidence_excerpt);
             } else {
                 observer_state.open_issues.push(types::OpenIssue {
                     issue_id: issue.id.clone(),
@@ -45,6 +48,7 @@ pub(in crate::observe::application) fn execute_cycle(
                     category: issue.category,
                     summary: issue.summary.clone(),
                     fix_safety: issue.fix_safety,
+                    evidence_excerpt: issue.evidence_excerpt.clone(),
                 });
             }
         }
