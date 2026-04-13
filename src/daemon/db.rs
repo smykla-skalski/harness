@@ -30,6 +30,12 @@ pub struct DaemonDb {
     conn: Connection,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AgentTuiLiveRefreshState {
+    pub(crate) status: AgentTuiStatus,
+    pub(crate) updated_at: String,
+}
+
 impl fmt::Debug for DaemonDb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DaemonDb").finish_non_exhaustive()
@@ -1616,6 +1622,36 @@ impl DaemonDb {
             Ok(snapshot) => Ok(Some(snapshot)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(error) => Err(db_error(format!("load agent TUI: {error}"))),
+        }
+    }
+
+    /// Load the minimal freshness state needed to guard live-refresh persists.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub(crate) fn agent_tui_live_refresh_state(
+        &self,
+        tui_id: &str,
+    ) -> Result<Option<AgentTuiLiveRefreshState>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT status, updated_at
+             FROM agent_tuis
+             WHERE tui_id = ?1",
+            [tui_id],
+            |row| {
+                let status_raw: String = row.get(0)?;
+                Ok(AgentTuiLiveRefreshState {
+                    status: AgentTuiStatus::from_str(&status_raw).map_err(parse_error_to_sql)?,
+                    updated_at: row.get(1)?,
+                })
+            },
+        );
+        match result {
+            Ok(state) => Ok(Some(state)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!(
+                "load agent TUI live-refresh state: {error}"
+            ))),
         }
     }
 

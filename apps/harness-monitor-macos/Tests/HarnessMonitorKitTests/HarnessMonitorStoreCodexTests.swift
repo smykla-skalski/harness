@@ -469,6 +469,46 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.screen.text == "copilot> ready\nstatus")
   }
 
+  @Test("Resize corrective refresh runs despite stale streaming event")
+  func resizeAgentTuiCorrectiveRefreshRunsDespiteStaleStreamingEvent() async {
+    let client = RecordingHarnessClient()
+    let running = client.agentTuiFixture(rows: 32, cols: 120)
+    let stale = client.agentTuiFixture(
+      tuiID: running.tuiId,
+      sessionID: running.sessionId,
+      runtime: running.runtime,
+      status: .running,
+      rows: 32,
+      cols: 120,
+      screenText: running.screen.text
+    )
+    let refreshed = client.agentTuiFixture(
+      tuiID: running.tuiId,
+      sessionID: running.sessionId,
+      runtime: running.runtime,
+      status: .running,
+      rows: 48,
+      cols: 120,
+      screenText: running.screen.text
+    )
+    client.configureAgentTuis([running], for: PreviewFixtures.summary.sessionId)
+    client.configureAgentTuiReadSnapshots([refreshed], for: running.tuiId)
+    let store = await selectedStore(client: client)
+
+    let resized = await store.resizeAgentTui(tuiID: running.tuiId, rows: 48, cols: 120)
+
+    #expect(resized)
+    #expect(store.selectedAgentTui?.size.rows == 48)
+
+    store.applyAgentTui(stale)
+    #expect(store.selectedAgentTui?.size.rows == 32)
+
+    try? await Task.sleep(for: .seconds(1))
+
+    #expect(store.selectedAgentTui?.size.rows == 48)
+    #expect(store.selectedAgentTuis.first?.size.rows == 48)
+  }
+
   @Test("Agent TUI stream update refreshes selected TUI")
   func agentTuiStreamUpdateRefreshesSelectedTui() async {
     let client = RecordingHarnessClient()
