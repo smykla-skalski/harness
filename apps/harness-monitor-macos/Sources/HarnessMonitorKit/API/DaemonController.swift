@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import ServiceManagement
 
@@ -71,6 +72,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case harnessBinaryNotFound
   case manifestMissing
   case manifestUnreadable
+  case invalidManifest(String)
   case daemonOffline
   case daemonDidNotStart
   case externalDaemonOffline(manifestPath: String)
@@ -85,6 +87,8 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
       "The harness daemon manifest is missing."
     case .manifestUnreadable:
       "The harness daemon manifest could not be read."
+    case .invalidManifest(let message):
+      "The harness daemon manifest failed trust validation: \(message)"
     case .daemonOffline:
       "The harness daemon is offline. Start the daemon to load live sessions."
     case .daemonDidNotStart:
@@ -147,12 +151,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   private func loadConnection() throws -> HarnessMonitorConnection {
-    let manifest = try loadManifest()
-    let token = try loadToken(path: manifest.tokenPath)
-    return HarnessMonitorConnection(
-      endpoint: try endpointURL(from: manifest.endpoint),
-      token: token
-    )
+    try connection(from: loadManifest())
   }
 
   private func bootstrap(
@@ -236,11 +235,7 @@ public struct DaemonController: DaemonControlling {
     while ContinuousClock.now < deadline {
       do {
         let manifest = try loadManifest()
-        let token = try loadToken(path: manifest.tokenPath)
-        let connection = HarnessMonitorConnection(
-          endpoint: try endpointURL(from: manifest.endpoint),
-          token: token
-        )
+        let connection = try connection(from: manifest)
         HarnessMonitorLogger.lifecycle.trace(
           "Warm-up observed manifest pid=\(manifest.pid, privacy: .public) endpoint=\(connection.endpoint.absoluteString, privacy: .public)"
         )
@@ -267,6 +262,15 @@ public struct DaemonController: DaemonControlling {
           )
         }
         sawUnreachableManifest = true
+      } catch let error as DaemonControlError {
+        if case .invalidManifest = error, ownership == .external {
+          immediateError = error
+          break
+        }
+        lastError = error
+        HarnessMonitorLogger.lifecycle.trace(
+          "Warm-up retry after \(error.localizedDescription, privacy: .public)"
+        )
       } catch {
         lastError = error
         HarnessMonitorLogger.lifecycle.trace(
@@ -292,6 +296,12 @@ public struct DaemonController: DaemonControlling {
       throw DaemonControlError.externalDaemonOffline(manifestPath: manifestPath)
     }
     throw lastError ?? DaemonControlError.daemonDidNotStart
+  }
+
+  private func connection(from manifest: DaemonManifest) throws -> HarnessMonitorConnection {
+    let endpoint = try endpointURL(from: manifest.endpoint)
+    let token = try loadToken(path: manifest.tokenPath)
+    return HarnessMonitorConnection(endpoint: endpoint, token: token)
   }
 
   public static func defaultEndpointProbe(_ endpoint: URL) async -> Bool {
@@ -390,7 +400,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   private func loadToken(path: String) throws -> String {
-    let tokenURL = URL(fileURLWithPath: path)
+    let tokenURL = try validatedTokenURL(from: path)
     let token = try String(contentsOf: tokenURL, encoding: .utf8)
       .trimmingCharacters(in: .whitespacesAndNewlines)
     HarnessMonitorLogger.lifecycle.trace(
@@ -403,7 +413,75 @@ public struct DaemonController: DaemonControlling {
     guard let url = URL(string: value) else {
       throw HarnessMonitorAPIError.invalidEndpoint(value)
     }
+    guard ownership != .managed || Self.isTrustedManagedEndpoint(url) else {
+      throw DaemonControlError.invalidManifest(
+        "managed daemon endpoints must use loopback http(s): \(value)"
+      )
+    }
     return url
+  }
+
+  private func validatedTokenURL(from path: String) throws -> URL {
+    guard (path as NSString).isAbsolutePath else {
+      throw DaemonControlError.invalidManifest("token path must be absolute")
+    }
+
+    let tokenURL = URL(fileURLWithPath: path).standardizedFileURL
+    let resolvedTokenURL = tokenURL.resolvingSymlinksInPath()
+    guard tokenURL.path == resolvedTokenURL.path else {
+      throw DaemonControlError.invalidManifest("token path must not include symlinks")
+    }
+
+    let daemonRoot = HarnessMonitorPaths.daemonRoot(using: environment)
+      .standardizedFileURL
+      .resolvingSymlinksInPath()
+    guard Self.isWithinDirectory(resolvedTokenURL, root: daemonRoot) else {
+      throw DaemonControlError.invalidManifest(
+        "token path must stay inside \(daemonRoot.path)"
+      )
+    }
+
+    let attributes = try FileManager.default.attributesOfItem(atPath: resolvedTokenURL.path)
+    guard attributes[.type] as? FileAttributeType == .typeRegular else {
+      throw DaemonControlError.invalidManifest("token path must reference a regular file")
+    }
+    guard
+      let ownerID = (attributes[.ownerAccountID] as? NSNumber)?.uint32Value,
+      ownerID == getuid()
+    else {
+      throw DaemonControlError.invalidManifest("token file must be owned by the current user")
+    }
+    let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
+    guard permissions & 0o077 == 0 else {
+      throw DaemonControlError.invalidManifest(
+        "token file permissions must not grant group or world access"
+      )
+    }
+    return resolvedTokenURL
+  }
+
+  private static func isTrustedManagedEndpoint(_ url: URL) -> Bool {
+    guard
+      let scheme = url.scheme?.lowercased(),
+      ["http", "https"].contains(scheme),
+      let host = url.host?.lowercased(),
+      url.user == nil,
+      url.password == nil
+    else {
+      return false
+    }
+    return [
+      "127.0.0.1",
+      "::1",
+      "0:0:0:0:0:0:0:1",
+      "localhost",
+    ].contains(host)
+  }
+
+  private static func isWithinDirectory(_ fileURL: URL, root: URL) -> Bool {
+    let rootPath = root.path.hasSuffix("/") ? String(root.path.dropLast()) : root.path
+    let filePath = fileURL.path
+    return filePath == rootPath || filePath.hasPrefix(rootPath + "/")
   }
 
   private func launchAgentStatus() -> LaunchAgentStatus {

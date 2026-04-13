@@ -114,6 +114,101 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test("bootstrapClient rejects managed manifests with non-loopback endpoints")
+  func bootstrapClientRejectsNonLoopbackManagedEndpoint() async throws {
+    try await withTempDaemonFixture(
+      pid: 1_234,
+      endpoint: "http://example.com:65534"
+    ) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { _ in PreviewHarnessClient() }
+      )
+
+      do {
+        _ = try await controller.bootstrapClient()
+        Issue.record("Expected invalidManifest")
+      } catch let error as DaemonControlError {
+        guard case .invalidManifest(let reason) = error else {
+          Issue.record("Expected invalidManifest, got \(error)")
+          return
+        }
+        #expect(reason.contains("loopback"))
+      } catch {
+        Issue.record("Expected DaemonControlError, got \(error)")
+      }
+    }
+  }
+
+  @Test("bootstrapClient rejects symlinked token paths")
+  func bootstrapClientRejectsSymlinkedTokenPath() async throws {
+    try await withTempDaemonFixture(
+      pid: 1_234,
+      tokenPathFactory: { daemonRoot in
+        let outsideToken = daemonRoot.deletingLastPathComponent()
+          .appendingPathComponent("outside-auth-token")
+        try writeTokenFixture(to: outsideToken)
+        let symlinkURL = daemonRoot.appendingPathComponent("auth-token-link")
+        try FileManager.default.createSymbolicLink(at: symlinkURL, withDestinationURL: outsideToken)
+        return symlinkURL
+      }
+    ) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { _ in PreviewHarnessClient() }
+      )
+
+      do {
+        _ = try await controller.bootstrapClient()
+        Issue.record("Expected invalidManifest")
+      } catch let error as DaemonControlError {
+        guard case .invalidManifest(let reason) = error else {
+          Issue.record("Expected invalidManifest, got \(error)")
+          return
+        }
+        #expect(reason.contains("symlink"))
+      } catch {
+        Issue.record("Expected DaemonControlError, got \(error)")
+      }
+    }
+  }
+
+  @Test("bootstrapClient rejects group-readable token files")
+  func bootstrapClientRejectsPermissiveTokenPermissions() async throws {
+    try await withTempDaemonFixture(
+      pid: 1_234,
+      tokenPathFactory: { daemonRoot in
+        let tokenURL = daemonRoot.appendingPathComponent("auth-token")
+        try writeTokenFixture(to: tokenURL, permissions: 0o644)
+        return tokenURL
+      }
+    ) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { _ in PreviewHarnessClient() }
+      )
+
+      do {
+        _ = try await controller.bootstrapClient()
+        Issue.record("Expected invalidManifest")
+      } catch let error as DaemonControlError {
+        guard case .invalidManifest(let reason) = error else {
+          Issue.record("Expected invalidManifest, got \(error)")
+          return
+        }
+        #expect(reason.contains("permissions"))
+      } catch {
+        Issue.record("Expected DaemonControlError, got \(error)")
+      }
+    }
+  }
+
   @Test("Installing launch agent registers the bundled service")
   func installingLaunchAgentRegistersBundledService() async throws {
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
@@ -219,6 +314,8 @@ struct DaemonControllerTests {
 
 private func withTempDaemonFixture(
   pid: UInt32,
+  endpoint: String = "http://127.0.0.1:65534",
+  tokenPathFactory: ((URL) throws -> URL)? = nil,
   perform: (HarnessMonitorEnvironment) async throws -> Void
 ) async throws {
   let root = FileManager.default.temporaryDirectory
@@ -230,13 +327,18 @@ private func withTempDaemonFixture(
   try FileManager.default.createDirectory(at: daemonRoot, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: root) }
 
-  let tokenPath = daemonRoot.appendingPathComponent("auth-token")
-  try "test-token".write(to: tokenPath, atomically: true, encoding: .utf8)
+  let tokenPath: URL
+  if let tokenPathFactory {
+    tokenPath = try tokenPathFactory(daemonRoot)
+  } else {
+    tokenPath = daemonRoot.appendingPathComponent("auth-token")
+    try writeTokenFixture(to: tokenPath)
+  }
 
   let manifest = DaemonManifest(
     version: "19.4.1",
     pid: Int(pid),
-    endpoint: "http://127.0.0.1:65534",
+    endpoint: endpoint,
     startedAt: "2026-04-11T12:00:00Z",
     tokenPath: tokenPath.path,
     sandboxed: true,
@@ -253,6 +355,15 @@ private func withTempDaemonFixture(
     homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
   )
   try await perform(environment)
+}
+
+private func writeTokenFixture(
+  _ value: String = "test-token",
+  to url: URL,
+  permissions: Int = 0o600
+) throws {
+  try value.write(to: url, atomically: true, encoding: .utf8)
+  try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: url.path)
 }
 
 private func rewriteTempDaemonFixtureManifest(
