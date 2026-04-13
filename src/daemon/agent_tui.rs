@@ -10,7 +10,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
+use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::{dirs_home, project_context_dir, utc_now};
@@ -563,13 +564,7 @@ impl AgentTuiManagerHandle {
             size,
         )?;
 
-        if !process.wait_ready(READINESS_TIMEOUT) {
-            tracing::warn!(
-                runtime = %profile.runtime,
-                tui_id = %tui_id,
-                "agent TUI readiness timeout, sending join message anyway"
-            );
-        }
+        wait_for_readiness(&process, &profile.runtime, &tui_id);
         self.send_auto_join_and_user_prompt(&process, &snapshot_context, size, request)?;
         let result = self.activate_tui(process, &snapshot_context);
         if let Ok(snapshot) = &result {
@@ -1049,7 +1044,7 @@ struct ReadinessState {
     closed: bool,
 }
 
-type ReadinessSignal = Arc<(Mutex<ReadinessState>, std::sync::Condvar)>;
+type ReadinessSignal = Arc<(Mutex<ReadinessState>, Condvar)>;
 
 /// Live process handle for an agent TUI running inside a PTY.
 pub struct AgentTuiProcess {
@@ -1092,7 +1087,7 @@ impl AgentTuiProcess {
                 ready: false,
                 closed: false,
             }),
-            std::sync::Condvar::new(),
+            Condvar::new(),
         ));
         let reader_thread = spawn_reader_thread(
             reader,
@@ -1210,7 +1205,7 @@ impl AgentTuiProcess {
     /// Returns `true` if the pattern was found, `false` on timeout or if the
     /// process exits before becoming ready. When no readiness pattern was
     /// configured at spawn time, returns `true` immediately.
-    #[must_use] 
+    #[must_use]
     pub fn wait_ready(&self, timeout: Duration) -> bool {
         let (state, condvar) = &*self.readiness;
         let Ok(mut guard) = state.lock() else {
@@ -1321,11 +1316,25 @@ pub(super) fn spawn_agent_tui_process(
     let mut env = BTreeMap::new();
     env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
-    let readiness_pattern = crate::agents::runtime::runtime_for_name(&profile.runtime)
-        .and_then(crate::agents::runtime::AgentRuntime::readiness_pattern);
+    let readiness_pattern =
+        runtime_for_name(&profile.runtime).and_then(AgentRuntime::readiness_pattern);
     let mut spec = AgentTuiSpawnSpec::new(profile, project_dir.to_path_buf(), env, size)?;
     spec.readiness_pattern = readiness_pattern;
     PortablePtyAgentTuiBackend.spawn(spec)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub(super) fn wait_for_readiness(process: &AgentTuiProcess, runtime: &str, tui_id: &str) {
+    if !process.wait_ready(READINESS_TIMEOUT) {
+        tracing::warn!(
+            runtime = %runtime,
+            tui_id = %tui_id,
+            "agent TUI readiness timeout, sending join message anyway"
+        );
+    }
 }
 
 pub(super) fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Result<(), CliError> {
@@ -1528,6 +1537,35 @@ fn is_executable(path: &Path) -> bool {
         .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
 }
 
+/// Check whether the transcript tail contains the readiness pattern.
+/// Returns `true` when the pattern is found for the first time.
+fn check_readiness_pattern(
+    transcript: &[u8],
+    chunk_len: usize,
+    pattern: &[u8],
+    readiness: &ReadinessSignal,
+) -> bool {
+    let search_start = transcript
+        .len()
+        .saturating_sub(chunk_len + pattern.len() - 1);
+    let tail = &transcript[search_start..];
+    if tail.windows(pattern.len()).any(|window| window == pattern) {
+        if let Ok(mut state) = readiness.0.lock() {
+            state.ready = true;
+        }
+        readiness.1.notify_all();
+        return true;
+    }
+    false
+}
+
+fn signal_readiness_closed(readiness: &ReadinessSignal) {
+    if let Ok(mut state) = readiness.0.lock() {
+        state.closed = true;
+    }
+    readiness.1.notify_all();
+}
+
 fn spawn_reader_thread(
     mut reader: Box<dyn Read + Send>,
     transcript: Shared<Vec<u8>>,
@@ -1557,26 +1595,10 @@ fn spawn_reader_thread(
                     let bytes = &buffer[..read];
                     if let Ok(mut transcript) = transcript.lock() {
                         transcript.extend_from_slice(bytes);
-
-                        // Check the transcript tail for the readiness pattern.
-                        // Checking the transcript instead of the raw chunk handles
-                        // the edge case where a multi-byte pattern spans two reads.
-                        if !signaled
-                            && let Some(pattern) = &pattern_bytes {
-                                let search_start =
-                                    transcript.len().saturating_sub(read + pattern.len() - 1);
-                                let tail = &transcript[search_start..];
-                                if tail
-                                    .windows(pattern.len())
-                                    .any(|window| window == pattern.as_slice())
-                                {
-                                    if let Ok(mut state) = readiness.0.lock() {
-                                        state.ready = true;
-                                    }
-                                    readiness.1.notify_all();
-                                    signaled = true;
-                                }
-                            }
+                        if !signaled && let Some(pattern) = &pattern_bytes {
+                            signaled =
+                                check_readiness_pattern(&transcript, read, pattern, &readiness);
+                        }
                     }
                     if let Ok(mut screen) = screen.lock() {
                         screen.process(bytes);
@@ -1586,12 +1608,7 @@ fn spawn_reader_thread(
                 Err(_) => break,
             }
         }
-        // Wake up any wait_ready caller when the reader exits so it does not
-        // block for the full timeout if the process died before becoming ready.
-        if let Ok(mut state) = readiness.0.lock() {
-            state.closed = true;
-        }
-        readiness.1.notify_all();
+        signal_readiness_closed(&readiness);
     })
 }
 

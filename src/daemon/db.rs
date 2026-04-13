@@ -498,16 +498,10 @@ impl DaemonDb {
                  JOIN projects p ON p.project_id = s.project_id",
                 [],
                 |row| {
-                    let v0 = row.get::<_, i64>(0)?;
-                    let v1 = row.get::<_, i64>(1)?;
-                    let v2 = row.get::<_, i64>(2)?;
                     Ok((
-                        usize::try_from(v0)
-                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, v0))?,
-                        usize::try_from(v1)
-                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(1, v1))?,
-                        usize::try_from(v2)
-                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(2, v2))?,
+                        usize_from_i64(row.get(0)?),
+                        usize_from_i64(row.get(1)?),
+                        usize_from_i64(row.get(2)?),
                     ))
                 },
             )
@@ -548,16 +542,8 @@ impl DaemonDb {
                     checkout_name: row.get(6)?,
                     is_worktree: row.get(7)?,
                     worktree_name: row.get(8)?,
-                    active_session_count: {
-                        let v = row.get::<_, i64>(9)?;
-                        usize::try_from(v)
-                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(9, v))?
-                    },
-                    total_session_count: {
-                        let v = row.get::<_, i64>(10)?;
-                        usize::try_from(v)
-                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(10, v))?
-                    },
+                    active_session_count: usize_from_i64(row.get(9)?),
+                    total_session_count: usize_from_i64(row.get(10)?),
                 })
             })
             .map_err(|error| db_error(format!("query project summaries: {error}")))?;
@@ -2230,6 +2216,11 @@ const fn i64_from_u64(value: u64) -> i64 {
 )]
 const fn u64_from_i64(value: i64) -> u64 {
     value as u64
+}
+
+/// Convert a non-negative SQL integer to `usize` for count fields.
+fn usize_from_i64(value: i64) -> usize {
+    usize::try_from(value).unwrap_or(0)
 }
 
 fn replace_agents(
