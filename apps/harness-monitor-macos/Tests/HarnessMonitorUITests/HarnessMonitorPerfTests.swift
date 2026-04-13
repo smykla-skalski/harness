@@ -47,6 +47,58 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     measureScenario("settings-background-cycle", includeMemoryMetric: true)
   }
 
+  func testPreferencesDatabaseScrollHitchRate() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let options = XCTMeasureOptions()
+    options.iterationCount = 3
+
+    measure(metrics: [XCTHitchMetric(application: app)], options: options) {
+      terminateIfRunning(app)
+      app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+      app.launchEnvironment = [
+        "HARNESS_MONITOR_UI_TESTS": "1",
+        Self.launchModeKey: "preview",
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard",
+      ]
+      guard configureIsolatedDataHome(for: app, purpose: "preferences-database-scroll") else {
+        return
+      }
+
+      app.launch()
+
+      openSettings(in: app)
+      let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+      XCTAssertTrue(waitForElement(preferencesRoot, timeout: Self.uiTimeout))
+
+      let databaseItem = button(in: app, title: "Database")
+      XCTAssertTrue(waitForElement(databaseItem, timeout: Self.actionTimeout))
+      if databaseItem.isHittable {
+        databaseItem.tap()
+      } else if let coordinate = centerCoordinate(in: app, for: databaseItem) {
+        coordinate.tap()
+      } else {
+        XCTFail("Failed to resolve the Database section control")
+        return
+      }
+
+      let title = element(in: app, identifier: Accessibility.preferencesTitle)
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          title.exists && title.label == "Database"
+        }
+      )
+
+      let statisticsHeader = app.staticTexts["Statistics"].firstMatch
+      XCTAssertTrue(waitForElement(statisticsHeader, timeout: Self.actionTimeout))
+      dragUp(in: app, element: statisticsHeader, distanceRatio: 3.0)
+
+      let clearCacheButton = app.buttons["Clear Session Cache"].firstMatch
+      XCTAssertTrue(waitForElement(clearCacheButton, timeout: Self.actionTimeout))
+
+      app.terminate()
+    }
+  }
+
   func testTimelineBurstHitchRate() {
     measureScenario("timeline-burst")
   }

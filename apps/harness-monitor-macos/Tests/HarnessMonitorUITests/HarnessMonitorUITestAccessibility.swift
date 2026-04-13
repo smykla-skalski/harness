@@ -3,9 +3,6 @@ enum HarnessMonitorUITestAccessibility {
   static let appChromeState = "harness.app.chrome.state"
   static let auditBuildState = "harness.audit.build.state"
   static let auditBuildBadge = "harness.audit.build.badge"
-  static let smartZoomState = "harness.smart-zoom.state"
-  static let smartZoomViewport = "harness.smart-zoom.viewport"
-  static let smartZoomViewportFrame = "harness.smart-zoom.viewport.frame"
   static let perfScenarioState = "harness.perf.scenario.state"
   static let toolbarChromeState = "harness.toolbar.chrome.state"
   static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
@@ -236,6 +233,10 @@ enum HarnessMonitorUITestAccessibility {
   static let codexFlowRecoveryBanner = "harness.sheet.codex-flow.recovery-banner"
   static let codexFlowEnableBridgeButton = "harness.sheet.codex-flow.enable-bridge"
   static let codexFlowCopyCommandButton = "harness.sheet.codex-flow.copy-command"
+
+  static func preferencesSectionButton(_ key: String) -> String {
+    "harness.preferences.section.\(key)"
+  }
 
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
     "harness.session.timeline.pagination.page.\(pageNumber)"
