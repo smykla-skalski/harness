@@ -39,6 +39,10 @@ pub struct HookIntegrationPoint {
 
 /// Serializable runtime capability metadata exposed to session state and the daemon.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each bool is an independent capability flag in a serialized protocol type"
+)]
 pub struct RuntimeCapabilities {
     pub runtime: String,
     pub supports_native_transcript: bool,
