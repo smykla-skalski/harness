@@ -492,10 +492,16 @@ impl DaemonDb {
                  JOIN projects p ON p.project_id = s.project_id",
                 [],
                 |row| {
+                    let v0 = row.get::<_, i64>(0)?;
+                    let v1 = row.get::<_, i64>(1)?;
+                    let v2 = row.get::<_, i64>(2)?;
                     Ok((
-                        row.get::<_, i64>(0)? as usize,
-                        row.get::<_, i64>(1)? as usize,
-                        row.get::<_, i64>(2)? as usize,
+                        usize::try_from(v0)
+                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, v0))?,
+                        usize::try_from(v1)
+                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(1, v1))?,
+                        usize::try_from(v2)
+                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(2, v2))?,
                     ))
                 },
             )
@@ -536,8 +542,16 @@ impl DaemonDb {
                     checkout_name: row.get(6)?,
                     is_worktree: row.get(7)?,
                     worktree_name: row.get(8)?,
-                    active_session_count: row.get::<_, i64>(9)? as usize,
-                    total_session_count: row.get::<_, i64>(10)? as usize,
+                    active_session_count: {
+                        let v = row.get::<_, i64>(9)?;
+                        usize::try_from(v)
+                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(9, v))?
+                    },
+                    total_session_count: {
+                        let v = row.get::<_, i64>(10)?;
+                        usize::try_from(v)
+                            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(10, v))?
+                    },
                 })
             })
             .map_err(|error| db_error(format!("query project summaries: {error}")))?;
@@ -1231,7 +1245,7 @@ impl DaemonDb {
     /// Returns [`CliError`] on query failure.
     pub fn load_recent_daemon_events(
         &self,
-        limit: usize,
+        limit: u32,
     ) -> Result<Vec<super::state::DaemonAuditEvent>, CliError> {
         let mut statement = self
             .conn
@@ -1242,7 +1256,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("prepare daemon events: {error}")))?;
 
         let rows = statement
-            .query_map([limit as i64], |row| {
+            .query_map([i64::from(limit)], |row| {
                 Ok(super::state::DaemonAuditEvent {
                     recorded_at: row.get(0)?,
                     level: row.get(1)?,
@@ -2161,9 +2175,9 @@ fn db_error(detail: impl Into<Cow<'static, str>>) -> CliError {
     CliError::from(CliErrorKind::workflow_io(detail))
 }
 
-/// Lossless `u64` -> `i64` reinterpretation for SQLite storage.
+/// Lossless `u64` -> `i64` reinterpretation for `SQLite` storage.
 ///
-/// SQLite stores integers as signed 64-bit; these helpers preserve the full
+/// `SQLite` stores integers as signed 64-bit; these helpers preserve the full
 /// `u64` range by treating the bit pattern as `i64` on write and reversing
 /// it on read.
 #[expect(
