@@ -1,8 +1,8 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private static let agentTuiActionRefreshDelay = Duration.milliseconds(250)
-  private static let agentTuiActionRefreshAttempts = 4
+  static let agentTuiActionRefreshDelay = Duration.milliseconds(250)
+  static let agentTuiActionRefreshAttempts = 4
 
   private enum CodexStartRecoveryOutcome {
     case notAttempted

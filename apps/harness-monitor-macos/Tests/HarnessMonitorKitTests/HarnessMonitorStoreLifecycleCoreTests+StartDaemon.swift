@@ -4,7 +4,6 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-
 @MainActor
 extension HarnessMonitorStoreLifecycleCoreTests {
   @Test("startDaemon registers the launch agent when notRegistered then connects")

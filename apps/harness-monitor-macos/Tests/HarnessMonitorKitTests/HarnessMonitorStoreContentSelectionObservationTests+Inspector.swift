@@ -3,8 +3,6 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-
-@MainActor
 extension HarnessMonitorContentSelectionTests {
   @Test("Inspector primary content ignores toast feedback churn")
   func inspectorPrimaryContentIgnoresToastFeedbackChurn() async {
@@ -40,6 +38,37 @@ extension HarnessMonitorContentSelectionTests {
     #expect(didChange)
     #expect(store.contentUI.sessionDetail.selectedSessionDetail == PreviewFixtures.detail)
     #expect(store.contentUI.sessionDetail.timeline == PreviewFixtures.timeline)
+  }
+
+  @Test("Content session detail presentation retains the current cockpit during same-session reloads")
+  func contentSessionDetailPresentationRetainsCurrentCockpitDuringSameSessionReloads() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.selectedSession = nil
+    store.timeline = []
+
+    #expect(store.contentUI.session.selectedSessionSummary?.sessionId == PreviewFixtures.summary.sessionId)
+    #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == PreviewFixtures.detail)
+    #expect(store.contentUI.sessionDetail.presentedTimeline == PreviewFixtures.timeline)
+  }
+
+  @Test("Content session detail presentation clears for a different selected summary")
+  func contentSessionDetailPresentationClearsForDifferentSelectedSummary() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let nextSummary = alternateSummary()
+    let didChange = store.sessionIndex.applySessionSummary(nextSummary)
+    #expect(didChange)
+
+    store.primeSessionSelection(nextSummary.sessionId)
+
+    #expect(store.contentUI.session.selectedSessionSummary?.sessionId == nextSummary.sessionId)
+    #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedTimeline.isEmpty)
   }
 
   @Test(
@@ -244,5 +273,29 @@ extension HarnessMonitorContentSelectionTests {
     #expect(inspectorChanged == false)
     #expect(store.selectedSession == PreviewFixtures.detail)
     #expect(store.isSelectionLoading == false)
+  }
+
+  private func alternateSummary() -> SessionSummary {
+    SessionSummary(
+      projectId: PreviewFixtures.summary.projectId,
+      projectName: PreviewFixtures.summary.projectName,
+      projectDir: PreviewFixtures.summary.projectDir,
+      contextRoot: PreviewFixtures.summary.contextRoot,
+      checkoutId: PreviewFixtures.summary.checkoutId,
+      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
+      isWorktree: PreviewFixtures.summary.isWorktree,
+      worktreeName: PreviewFixtures.summary.worktreeName,
+      sessionId: "session-alternate",
+      title: "Alternate session",
+      context: "A different selection target",
+      status: PreviewFixtures.summary.status,
+      createdAt: "2026-03-28T14:20:00Z",
+      updatedAt: "2026-03-28T14:20:00Z",
+      lastActivityAt: "2026-03-28T14:20:00Z",
+      leaderId: PreviewFixtures.summary.leaderId,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: PreviewFixtures.summary.metrics
+    )
   }
 }

@@ -31,7 +31,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     scheduleSearchRebuild(for: newValue)
   }
 
-  func updateSessionFilter(_ newValue: SessionFilter) {
+  func updateSessionFilter(_ newValue: HarnessMonitorStore.SessionFilter) {
     guard controls.sessionFilter != newValue else {
       return
     }
@@ -213,7 +213,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
       }
     }
     let orderedVisibleSessionIDs = orderedVisibleSessionIDs(in: visibleSessionIDSet)
-    let emptyState: SidebarEmptyState
+    let emptyState: HarnessMonitorStore.SidebarEmptyState
     if catalog.totalSessionCount == 0 {
       emptyState = .noSessions
     } else if orderedVisibleSessionIDs.isEmpty {
@@ -224,7 +224,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
 
     if queryTokens.isEmpty {
       projection.apply(
-        SessionProjectionState(
+        HarnessMonitorStore.SessionProjectionState(
           groupedSessions: buildGroupedSessions(visibleSessionIDSet: visibleSessionIDSet),
           filteredSessionCount: orderedVisibleSessionIDs.count,
           totalSessionCount: catalog.totalSessionCount,
@@ -232,14 +232,14 @@ extension HarnessMonitorStore.SessionIndexSlice {
         )
       )
     }
-    let nextSearchResults = SessionSearchResultsState(
-      presentation: SessionSearchPresentationState(
+    let nextSearchResults = HarnessMonitorStore.SessionSearchResultsState(
+      presentation: HarnessMonitorStore.SessionSearchPresentationState(
         isSearchActive: !queryTokens.isEmpty,
         emptyState: emptyState
       ),
       filteredSessionCount: orderedVisibleSessionIDs.count,
       totalSessionCount: catalog.totalSessionCount,
-      list: SessionSearchResultsListState(
+      list: HarnessMonitorStore.SessionSearchResultsListState(
         visibleSessionIDs: orderedVisibleSessionIDs
       )
     )
@@ -250,8 +250,8 @@ extension HarnessMonitorStore.SessionIndexSlice {
 
   func buildGroupedSessions(
     visibleSessionIDSet: Set<String>
-  ) -> [SessionGroup] {
-    projectCatalogs.compactMap { projectCatalog -> SessionGroup? in
+  ) -> [HarnessMonitorStore.SessionGroup] {
+    projectCatalogs.compactMap { projectCatalog -> HarnessMonitorStore.SessionGroup? in
       let checkoutGroups =
         projectCatalog.checkouts.compactMap { checkout -> HarnessMonitorStore.CheckoutGroup? in
           let checkoutSessionIDs =
@@ -271,7 +271,10 @@ extension HarnessMonitorStore.SessionIndexSlice {
       guard !checkoutGroups.isEmpty else {
         return nil
       }
-      return SessionGroup(project: projectCatalog.project, checkoutGroups: checkoutGroups)
+      return HarnessMonitorStore.SessionGroup(
+        project: projectCatalog.project,
+        checkoutGroups: checkoutGroups
+      )
     }
   }
 }

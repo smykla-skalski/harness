@@ -112,10 +112,10 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
-  private var hasBootstrapped = false
-  private var isBootstrapping = false
-  private var isReconnecting = false
-  private var reconnectRequestedDuringReconnect = false
+  var hasBootstrapped = false
+  var isBootstrapping = false
+  var isReconnecting = false
+  var reconnectRequestedDuringReconnect = false
   private let sleepAssertion = SleepAssertion()
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false

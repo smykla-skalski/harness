@@ -3,7 +3,6 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-
 @MainActor
 extension HarnessMonitorStoreExternalDaemonTests {
   @Test("Manifest watcher fires connectionChange when startedAt changes")
