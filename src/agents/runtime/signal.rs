@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::write_text;
+use crate::infra::io::{validate_safe_segment, write_text};
 
 /// A signal file sent to an agent session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +112,16 @@ pub fn acknowledged_dir(signal_dir: &Path) -> PathBuf {
     signal_dir.join("acknowledged")
 }
 
+fn signal_json_name(signal_id: &str) -> Result<String, CliError> {
+    validate_safe_segment(signal_id)?;
+    Ok(format!("{signal_id}.json"))
+}
+
+fn signal_ack_name(signal_id: &str) -> Result<String, CliError> {
+    validate_safe_segment(signal_id)?;
+    Ok(format!("{signal_id}.ack.json"))
+}
+
 /// Write a signal file atomically to the pending directory.
 ///
 /// # Errors
@@ -120,7 +130,7 @@ pub fn write_signal_file(signal_dir: &Path, signal: &Signal) -> Result<PathBuf, 
     let pending = pending_dir(signal_dir);
     fs::create_dir_all(&pending)
         .map_err(|error| CliErrorKind::workflow_io(format!("create signal dir: {error}")))?;
-    let filename = format!("{}.json", signal.signal_id);
+    let filename = signal_json_name(&signal.signal_id)?;
     let target = pending.join(&filename);
     let content = serde_json::to_string_pretty(signal)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("signal: {error}")))?;
@@ -164,15 +174,16 @@ pub fn acknowledge_signal(signal_dir: &Path, ack: &SignalAck) -> Result<(), CliE
     fs::create_dir_all(&acked)
         .map_err(|error| CliErrorKind::workflow_io(format!("create ack dir: {error}")))?;
 
-    let signal_file = pending.join(format!("{}.json", ack.signal_id));
-    let ack_file = acked.join(format!("{}.ack.json", ack.signal_id));
+    let signal_file = pending.join(signal_json_name(&ack.signal_id)?);
+    let ack_file = acked.join(signal_ack_name(&ack.signal_id)?);
+    let acknowledged_signal_file = acked.join(signal_json_name(&ack.signal_id)?);
 
     let ack_json = serde_json::to_string_pretty(ack)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
     write_text(&ack_file, &ack_json)?;
 
     // Atomic move: rename fails silently if another process already moved it
-    let _ = fs::rename(&signal_file, acked.join(format!("{}.json", ack.signal_id)));
+    let _ = fs::rename(&signal_file, acknowledged_signal_file);
 
     Ok(())
 }
@@ -375,5 +386,46 @@ mod tests {
         let acks = read_acknowledgments(&signal_dir).unwrap();
         assert_eq!(acks.len(), 1);
         assert_eq!(acks[0].result, AckResult::Expired);
+    }
+
+    #[test]
+    fn write_signal_file_rejects_unsafe_signal_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let signal_dir = tmp.path().join("signals");
+        let escaped = tmp.path().join("escape.json");
+        let mut signal = sample_signal();
+        signal.signal_id = "../../escape".into();
+
+        let error = write_signal_file(&signal_dir, &signal).unwrap_err();
+
+        assert!(
+            error.to_string().contains("unsafe name") || error.to_string().contains("unsafe"),
+            "{error}"
+        );
+        assert!(!escaped.exists());
+    }
+
+    #[test]
+    fn acknowledge_signal_rejects_unsafe_signal_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let signal_dir = tmp.path().join("signals");
+        let escaped_ack = tmp.path().join("escape.ack.json");
+
+        let ack = SignalAck {
+            signal_id: "../../escape".into(),
+            acknowledged_at: "2026-03-28T12:00:03Z".into(),
+            result: AckResult::Accepted,
+            agent: "codex".into(),
+            session_id: "sess-1".into(),
+            details: None,
+        };
+
+        let error = acknowledge_signal(&signal_dir, &ack).unwrap_err();
+
+        assert!(
+            error.to_string().contains("unsafe name") || error.to_string().contains("unsafe"),
+            "{error}"
+        );
+        assert!(!escaped_ack.exists());
     }
 }
