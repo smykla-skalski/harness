@@ -1210,6 +1210,7 @@ impl AgentTuiProcess {
     /// Returns `true` if the pattern was found, `false` on timeout or if the
     /// process exits before becoming ready. When no readiness pattern was
     /// configured at spawn time, returns `true` immediately.
+    #[must_use] 
     pub fn wait_ready(&self, timeout: Duration) -> bool {
         let (state, condvar) = &*self.readiness;
         let Ok(mut guard) = state.lock() else {
@@ -1560,8 +1561,8 @@ fn spawn_reader_thread(
                         // Check the transcript tail for the readiness pattern.
                         // Checking the transcript instead of the raw chunk handles
                         // the edge case where a multi-byte pattern spans two reads.
-                        if !signaled {
-                            if let Some(pattern) = &pattern_bytes {
+                        if !signaled
+                            && let Some(pattern) = &pattern_bytes {
                                 let search_start =
                                     transcript.len().saturating_sub(read + pattern.len() - 1);
                                 let tail = &transcript[search_start..];
@@ -1576,7 +1577,6 @@ fn spawn_reader_thread(
                                     signaled = true;
                                 }
                             }
-                        }
                     }
                     if let Ok(mut screen) = screen.lock() {
                         screen.process(bytes);
@@ -2840,10 +2840,8 @@ mod tests {
 
     #[test]
     fn readiness_flag_set_when_reader_encounters_pattern() {
-        let process = spawn_shell_with_readiness(
-            "printf 'loading...\\n\u{256d} ready\\n'",
-            Some("\u{256d}"),
-        );
+        let process =
+            spawn_shell_with_readiness("printf 'loading...\\n\u{256d} ready\\n'", Some("\u{256d}"));
         assert!(
             process.wait_ready(DEFAULT_WAIT_TIMEOUT),
             "readiness flag should be set when pattern appears in output"
