@@ -941,8 +941,23 @@ impl AgentTuiManagerHandle {
         }
 
         let refreshed = self.refresh_live_snapshot(previous.clone())?;
+        if let Some(status) = self.live_refresh_skip_status(tui_id, &previous.updated_at)? {
+            return Ok(status == AgentTuiStatus::Running);
+        }
         self.persist_refreshed_snapshot(&previous, &refreshed)?;
         Ok(refreshed.status == AgentTuiStatus::Running)
+    }
+
+    fn live_refresh_skip_status(
+        &self,
+        tui_id: &str,
+        previous_updated_at: &str,
+    ) -> Result<Option<AgentTuiStatus>, CliError> {
+        let db = self.db()?;
+        let current = lock_db(&db)?.agent_tui_live_refresh_state(tui_id)?;
+        Ok(current
+            .filter(|state| state.updated_at.as_str() > previous_updated_at)
+            .map(|state| state.status))
     }
 
     #[expect(
@@ -2200,6 +2215,91 @@ mod tests {
         let updated_snapshot = updated_snapshot.expect("updated snapshot");
         assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
         assert!(updated_snapshot.screen.text.contains("agent-ready"));
+    }
+
+    #[test]
+    fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-live-refresh".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir),
+            checkout_id: "checkout-live-refresh".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let session_state = session_service::build_new_session(
+            "live refresh concurrency",
+            "managed tui",
+            "sess-live-refresh",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &session_state)
+            .expect("sync session");
+
+        let previous = sample_snapshot(
+            "concurrent-live-refresh",
+            "sess-live-refresh",
+            "agent-live-refresh",
+            "codex",
+            "2026-04-13T07:00:00Z",
+            "2026-04-13T07:00:01Z",
+        );
+        db.save_agent_tui(&previous)
+            .expect("seed previous snapshot");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, mut receiver) = broadcast::channel(4);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+
+        let mut refreshed = previous.clone();
+        refreshed.screen.text = "ready\nlive output".to_string();
+        refreshed.updated_at = "2026-04-13T07:00:02Z".to_string();
+
+        let mut concurrent_resize = previous.clone();
+        concurrent_resize.size = AgentTuiSize { rows: 48, cols: 80 };
+        concurrent_resize.screen.rows = 48;
+        concurrent_resize.updated_at = "2026-04-13T07:00:03Z".to_string();
+        manager
+            .db()
+            .expect("manager db")
+            .lock()
+            .expect("db lock")
+            .save_agent_tui(&concurrent_resize)
+            .expect("save concurrent resize");
+
+        let skip_status = manager
+            .live_refresh_skip_status(&previous.tui_id, &previous.updated_at)
+            .expect("live refresh guard");
+        if skip_status.is_none() {
+            manager
+                .persist_refreshed_snapshot(&previous, &refreshed)
+                .expect("persist refreshed snapshot");
+        }
+
+        assert_eq!(skip_status, Some(AgentTuiStatus::Running));
+        assert!(
+            receiver.try_recv().is_err(),
+            "concurrent resize should suppress stale live-refresh broadcast"
+        );
+        let persisted = manager
+            .load_snapshot(&previous.tui_id)
+            .expect("load persisted snapshot");
+        assert_eq!(persisted.size, concurrent_resize.size);
+        assert_eq!(persisted.updated_at, concurrent_resize.updated_at);
     }
 
     #[test]
