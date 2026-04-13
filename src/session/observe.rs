@@ -772,7 +772,16 @@ mod tests {
                 .values()
                 .find(|agent| agent.runtime == "codex")
                 .expect("codex worker should be registered");
-            assert!(worker.agent_session_id.is_none());
+            let worker_id = worker.agent_id.clone();
+            crate::session::storage::update_state(project, &state.session_id, |state| {
+                state
+                    .agents
+                    .get_mut(&worker_id)
+                    .expect("legacy worker should exist")
+                    .agent_session_id = None;
+                Ok(())
+            })
+            .expect("clear worker runtime session id for legacy fixture");
 
             write_agent_log(
                 project,
@@ -783,6 +792,11 @@ mod tests {
 
             let state =
                 service::session_status("sess-legacy", project).expect("load session status");
+            let worker = state
+                .agents
+                .get(&worker_id)
+                .expect("legacy worker should be present");
+            assert!(worker.agent_session_id.is_none());
             let issues =
                 scan_all_agents(&state, "sess-legacy", project).expect("scan legacy session logs");
 

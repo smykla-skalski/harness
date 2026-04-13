@@ -26,6 +26,7 @@ use super::protocol::{
     VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
     VoiceTranscriptUpdateRequest,
 };
+use super::read_cache::run_preferred_db_read;
 use super::service;
 use super::state::DaemonManifest;
 use super::websocket::ReplayBuffer;
@@ -359,14 +360,14 @@ async fn get_projects(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = try_db_guard(&state);
-    timed_json(
-        "GET",
-        "/v1/projects",
-        &request_id,
-        start,
-        service::list_projects(db_guard.as_deref()),
+    let result = run_preferred_db_read(
+        &state.db,
+        "projects",
+        |db| service::list_projects(Some(db)),
+        || service::list_projects(None),
     )
+    .await;
+    timed_json("GET", "/v1/projects", &request_id, start, result)
 }
 
 async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
@@ -375,14 +376,14 @@ async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = try_db_guard(&state);
-    timed_json(
-        "GET",
-        "/v1/sessions",
-        &request_id,
-        start,
-        service::list_sessions(true, db_guard.as_deref()),
+    let result = run_preferred_db_read(
+        &state.db,
+        "sessions",
+        |db| service::list_sessions(true, Some(db)),
+        || service::list_sessions(true, None),
     )
+    .await;
+    timed_json("GET", "/v1/sessions", &request_id, start, result)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -402,24 +403,36 @@ async fn get_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = try_db_guard(&state);
-    let db_ref = db_guard.as_deref();
     if query.scope.as_deref() == Some("core") {
+        let result = run_preferred_db_read(
+            &state.db,
+            "session detail core",
+            {
+                let session_id = session_id.clone();
+                move |db| service::session_detail_core(&session_id, Some(db))
+            },
+            || service::session_detail_core(&session_id, None),
+        )
+        .await;
         return timed_json(
             "GET",
             "/v1/sessions/{id}?scope=core",
             &request_id,
             start,
-            service::session_detail_core(&session_id, db_ref),
+            result,
         );
     }
-    timed_json(
-        "GET",
-        "/v1/sessions/{id}",
-        &request_id,
-        start,
-        service::session_detail(&session_id, db_ref),
+    let result = run_preferred_db_read(
+        &state.db,
+        "session detail",
+        {
+            let session_id = session_id.clone();
+            move |db| service::session_detail(&session_id, Some(db))
+        },
+        || service::session_detail(&session_id, None),
     )
+    .await;
+    timed_json("GET", "/v1/sessions/{id}", &request_id, start, result)
 }
 
 async fn get_timeline(
@@ -432,13 +445,22 @@ async fn get_timeline(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = try_db_guard(&state);
+    let result = run_preferred_db_read(
+        &state.db,
+        "session timeline",
+        {
+            let session_id = session_id.clone();
+            move |db| service::session_timeline(&session_id, Some(db))
+        },
+        || service::session_timeline(&session_id, None),
+    )
+    .await;
     timed_json(
         "GET",
         "/v1/sessions/{id}/timeline",
         &request_id,
         start,
-        service::session_timeline(&session_id, db_guard.as_deref()),
+        result,
     )
 }
 
