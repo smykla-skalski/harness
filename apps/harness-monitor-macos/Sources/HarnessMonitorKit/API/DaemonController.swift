@@ -291,6 +291,14 @@ public struct DaemonController: DaemonControlling {
           sawUnreachableManifest = true
           break
         } else {
+          if Self.processIsAlive(pid: manifest.pid) == false {
+            lastError = DaemonControlError.daemonDidNotStart
+            HarnessMonitorLogger.lifecycle.error(
+              "Warm-up detected dead managed daemon pid \(manifest.pid, privacy: .public) for stale manifest at \(manifestPath, privacy: .public)"
+            )
+            sawUnreachableManifest = true
+            break
+          }
           lastError = DaemonControlError.daemonDidNotStart
           let staleSignature = Self.managedStaleManifestSignature(for: manifest)
           if managedStaleManifestTracker.expired(
@@ -369,6 +377,25 @@ public struct DaemonController: DaemonControlling {
 
   private static func managedStaleManifestSignature(for manifest: DaemonManifest) -> String {
     "\(manifest.pid)|\(manifest.endpoint)|\(manifest.startedAt)"
+  }
+
+  private static func processIsAlive(pid: Int) -> Bool? {
+    guard pid > 0 else {
+      return nil
+    }
+
+    if kill(pid_t(pid), 0) == 0 {
+      return true
+    }
+
+    switch errno {
+    case ESRCH:
+      return false
+    case EPERM:
+      return true
+    default:
+      return nil
+    }
   }
 
   public func stopDaemon() async throws -> String {
