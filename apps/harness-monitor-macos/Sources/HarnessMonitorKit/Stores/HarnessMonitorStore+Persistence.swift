@@ -8,8 +8,8 @@ extension HarnessMonitorStore {
   ) async {
     guard let cacheService, persistenceError == nil else { return }
 
-    _ = await cacheService.cacheSessionList(sessions, projects: projects)
-    await refreshPersistedSessionMetadata()
+    let result = await cacheService.cacheSessionList(sessions, projects: projects)
+    await applyPersistedCacheWriteResult(result)
   }
 
   func cacheSessionDetail(
@@ -18,12 +18,12 @@ extension HarnessMonitorStore {
     markViewed: Bool = true
   ) async {
     guard let cacheService, persistenceError == nil else { return }
-    let insertedCount = await cacheService.cacheSessionDetail(
+    let result = await cacheService.cacheSessionDetail(
       detail,
       timeline: timeline,
       markViewed: markViewed
     )
-    updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+    await applyPersistedCacheWriteResult(result)
   }
 
   func cacheSessionDetails(
@@ -32,8 +32,8 @@ extension HarnessMonitorStore {
   ) async {
     guard let cacheService, persistenceError == nil else { return }
     guard !entries.isEmpty else { return }
-    let insertedCount = await cacheService.cacheSessionDetails(entries, markViewed: markViewed)
-    updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+    let result = await cacheService.cacheSessionDetails(entries, markViewed: markViewed)
+    await applyPersistedCacheWriteResult(result)
   }
 
   func cacheSessionSummary(
@@ -42,10 +42,8 @@ extension HarnessMonitorStore {
   ) async {
     guard let cacheService, persistenceError == nil else { return }
 
-    let isInsert = await cacheService.cacheSessionSummary(summary, project: project)
-    if isInsert {
-      updatePersistedSessionMetadataAfterSave(insertedSessionCount: 1)
-    }
+    let result = await cacheService.cacheSessionSummary(summary, project: project)
+    await applyPersistedCacheWriteResult(result)
   }
 
   func loadCachedSessionList() async -> (
@@ -83,18 +81,48 @@ extension HarnessMonitorStore {
     return await cacheService.hydrationQueue(for: summaries)
   }
 
-  func scheduleCacheWrite(_ work: @escaping @MainActor (SessionCacheService) async -> Void) {
+  func scheduleCacheWrite(
+    _ work: @escaping @MainActor (SessionCacheService) async -> SessionCacheService.WriteResult
+  ) {
     guard let cacheService, persistenceError == nil else { return }
-    pendingCacheWriteTask?.cancel()
+    cancelPendingCacheWrite()
+    pendingCacheWriteTaskToken &+= 1
+    let taskToken = pendingCacheWriteTaskToken
     pendingCacheWriteTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      await work(cacheService)
-      self.pendingCacheWriteTask = nil
+      defer {
+        if self.pendingCacheWriteTaskToken == taskToken {
+          self.pendingCacheWriteTask = nil
+        }
+      }
+      let result = await work(cacheService)
+      await self.applyPersistedCacheWriteResult(result)
     }
   }
 
   func updatePersistedSessionMetadataAfterSave(insertedSessionCount: Int) {
     persistedSessionCount += insertedSessionCount
     lastPersistedSnapshotAt = .now
+  }
+
+  func cancelPendingCacheWrite() {
+    pendingCacheWriteTask?.cancel()
+    pendingCacheWriteTask = nil
+    pendingCacheWriteTaskToken &+= 1
+  }
+
+  private func applyPersistedCacheWriteResult(_ result: SessionCacheService.WriteResult) async {
+    guard result.didPersist else {
+      return
+    }
+
+    switch result.metadataUpdate {
+    case .refresh:
+      await refreshPersistedSessionMetadata()
+    case .advance(let insertedSessionCount):
+      updatePersistedSessionMetadataAfterSave(
+        insertedSessionCount: insertedSessionCount
+      )
+    }
   }
 }

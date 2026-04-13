@@ -168,6 +168,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var sessionLoadTaskToken: UInt64 = 0
   var selectionTask: Task<Void, Never>?
   var pendingCacheWriteTask: Task<Void, Never>?
+  @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
   var latencySamplesMs: [Int] = []
@@ -193,7 +194,8 @@ public final class HarnessMonitorStore {
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
     daemonOwnership: DaemonOwnership = .managed,
     modelContainer: ModelContainer? = nil,
-    persistenceError: String? = nil
+    persistenceError: String? = nil,
+    cacheService: SessionCacheService? = nil
   ) {
     self.init(
       daemonController: daemonController,
@@ -201,7 +203,8 @@ public final class HarnessMonitorStore {
       voiceCapture: NativeVoiceCaptureService(),
       daemonOwnership: daemonOwnership,
       modelContainer: modelContainer,
-      persistenceError: persistenceError
+      persistenceError: persistenceError,
+      cacheService: cacheService
     )
   }
 
@@ -211,7 +214,8 @@ public final class HarnessMonitorStore {
     voiceCapture: any VoiceCaptureProviding,
     daemonOwnership: DaemonOwnership = .managed,
     modelContainer: ModelContainer? = nil,
-    persistenceError: String? = nil
+    persistenceError: String? = nil,
+    cacheService: SessionCacheService? = nil
   ) {
     self.connection = ConnectionSlice()
     self.sessionIndex = SessionIndexSlice()
@@ -226,7 +230,9 @@ public final class HarnessMonitorStore {
     self.fileViewer = fileViewer
     self.voiceCapture = voiceCapture
     self.modelContext = modelContainer?.mainContext
-    if let modelContainer {
+    if let cacheService {
+      self.cacheService = cacheService
+    } else if let modelContainer {
       self.cacheService = SessionCacheService(modelContainer: modelContainer)
     } else {
       self.cacheService = nil
@@ -618,6 +624,7 @@ public final class HarnessMonitorStore {
     stopConnectionProbe()
     cancelSessionPushFallback()
     cancelSessionLoad()
+    cancelPendingCacheWrite()
     sessionSnapshotHydrationTask?.cancel()
     sessionSnapshotHydrationTask = nil
   }

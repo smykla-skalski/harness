@@ -156,10 +156,9 @@ extension HarnessMonitorStore {
       timeline = measuredTimeline.value
       if let selectedSession {
         scheduleCacheWrite { service in
-          let insertedCount = await service.cacheSessionDetail(
+          await service.cacheSessionDetail(
             selectedSession, timeline: measuredTimeline.value
           )
-          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
         }
       }
     } catch {
@@ -228,10 +227,9 @@ extension HarnessMonitorStore {
       applySessionSummaryUpdate(detail.session)
       if let timeline = payload.timeline {
         scheduleCacheWrite { service in
-          let insertedCount = await service.cacheSessionDetail(
+          await service.cacheSessionDetail(
             detail, timeline: timeline, markViewed: false
           )
-          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
         }
       }
       return
@@ -246,8 +244,7 @@ extension HarnessMonitorStore {
     )
     if let freshTimeline = payload.timeline {
       scheduleCacheWrite { service in
-        let insertedCount = await service.cacheSessionDetail(detail, timeline: freshTimeline)
-        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+        await service.cacheSessionDetail(detail, timeline: freshTimeline)
       }
     } else if let client {
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
@@ -303,8 +300,7 @@ extension HarnessMonitorStore {
       )
       if let freshTimeline = payload.timeline {
         scheduleCacheWrite { service in
-          let insertedCount = await service.cacheSessionDetail(detail, timeline: freshTimeline)
-          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+          await service.cacheSessionDetail(detail, timeline: freshTimeline)
         }
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)

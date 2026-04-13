@@ -2,10 +2,30 @@ import Foundation
 import SwiftData
 
 public actor SessionCacheService {
-  private let modelContainer: ModelContainer
+  enum MetadataUpdate: Sendable {
+    case refresh
+    case advance(insertedSessionCount: Int)
+  }
 
-  public init(modelContainer: ModelContainer) {
+  struct WriteResult: Sendable {
+    let didPersist: Bool
+    let metadataUpdate: MetadataUpdate
+  }
+
+  private let modelContainer: ModelContainer
+  private let beforeSave: () async throws -> Void
+  private let saveChanges: (ModelContext) throws -> Void
+
+  public init(
+    modelContainer: ModelContainer,
+    beforeSave: @escaping @Sendable () async throws -> Void = {},
+    saveChanges: @escaping @Sendable (ModelContext) throws -> Void = { context in
+      try context.save()
+    }
+  ) {
     self.modelContainer = modelContainer
+    self.beforeSave = beforeSave
+    self.saveChanges = saveChanges
   }
 
   struct SessionMetadata: Sendable {
@@ -102,20 +122,28 @@ public actor SessionCacheService {
       predicate: #Predicate { summaryIds.contains($0.sessionId) }
     )
     guard let cached = try? context.fetch(descriptor) else { return summaries }
+    let timelineDescriptor = FetchDescriptor<CachedTimelineEntry>(
+      predicate: #Predicate { summaryIds.contains($0.sessionId) }
+    )
+    let timelineSessionIDs = Set(
+      ((try? context.fetch(timelineDescriptor)) ?? []).map(\.sessionId)
+    )
 
-    var snapshotState: [String: (updatedAt: String?, hasTimeline: Bool)] = [:]
+    var snapshotState: [String: Bool] = [:]
     for session in cached {
-      snapshotState[session.sessionId] = (
-        updatedAt: session.updatedAt,
-        hasTimeline: hasDetailSnapshot(sessionId: session.sessionId, context: context)
-      )
+      snapshotState[session.sessionId] = timelineSessionIDs.contains(session.sessionId)
     }
 
     return summaries.filter { summary in
-      guard let state = snapshotState[summary.sessionId] else {
+      guard let hasTimeline = snapshotState[summary.sessionId] else {
         return true
       }
-      return state.updatedAt != summary.updatedAt || !state.hasTimeline
+      // Background hydration is a startup fallback, not the authoritative live
+      // refresh path. Once a session already has a cached timeline, keep that
+      // snapshot and let the selected-session live load fetch exact detail on
+      // demand instead of rehydrating every recently viewed session in the
+      // background whenever only the summary timestamp changes.
+      return !hasTimeline
     }
   }
 
@@ -124,7 +152,7 @@ public actor SessionCacheService {
   func cacheSessionList(
     _ sessions: [SessionSummary],
     projects: [ProjectSummary]
-  ) -> Int {
+  ) async -> WriteResult {
     let context = makeContext()
     let projectMap = buildProjectMap(context: context)
     let sessionMap = buildSessionMap(context: context)
@@ -155,16 +183,18 @@ public actor SessionCacheService {
         insertedSessionCount += 1
       }
     }
-    try? context.save()
-    return insertedSessionCount
+    let didPersist = await persist(context, operation: "cache session list")
+    return WriteResult(
+      didPersist: didPersist,
+      metadataUpdate: .refresh
+    )
   }
 
-  @discardableResult
   func cacheSessionDetail(
     _ detail: SessionDetail,
     timeline: [TimelineEntry],
     markViewed: Bool = true
-  ) -> Int {
+  ) async -> WriteResult {
     let context = makeContext()
     let cached: CachedSession
     let insertedCount: Int
@@ -189,17 +219,22 @@ public actor SessionCacheService {
     syncActivity(detail.agentActivity, on: cached, context: context)
     syncObserver(detail.observer, on: cached, context: context)
 
-    try? context.save()
-    return insertedCount
+    let didPersist = await persist(context, operation: "cache session detail")
+    return WriteResult(
+      didPersist: didPersist,
+      metadataUpdate: .advance(insertedSessionCount: insertedCount)
+    )
   }
 
-  @discardableResult
   func cacheSessionDetails(
     _ entries: [(detail: SessionDetail, timeline: [TimelineEntry])],
     markViewed: Bool = false
-  ) -> Int {
+  ) async -> WriteResult {
     guard !entries.isEmpty else {
-      return 0
+      return WriteResult(
+        didPersist: true,
+        metadataUpdate: .advance(insertedSessionCount: 0)
+      )
     }
 
     let context = makeContext()
@@ -235,22 +270,28 @@ public actor SessionCacheService {
       syncObserver(detail.observer, on: cached, context: context)
     }
 
-    try? context.save()
-    return insertedCount
+    let didPersist = await persist(context, operation: "cache session details")
+    return WriteResult(
+      didPersist: didPersist,
+      metadataUpdate: .advance(insertedSessionCount: insertedCount)
+    )
   }
 
   func cacheSessionSummary(
     _ summary: SessionSummary,
     project: ProjectSummary?
-  ) -> Bool {
+  ) async -> WriteResult {
     let context = makeContext()
     if let project {
       upsertProject(project, context: context)
     }
 
     let isInsert = upsertSession(summary, context: context)
-    try? context.save()
-    return isInsert
+    let didPersist = await persist(context, operation: "cache session summary")
+    return WriteResult(
+      didPersist: didPersist,
+      metadataUpdate: .advance(insertedSessionCount: isInsert ? 1 : 0)
+    )
   }
 
   // MARK: - Private helpers
@@ -273,14 +314,6 @@ public actor SessionCacheService {
     return try? context.fetch(descriptor).first
   }
 
-  private func hasDetailSnapshot(sessionId: String, context: ModelContext) -> Bool {
-    var descriptor = FetchDescriptor<CachedTimelineEntry>(
-      predicate: #Predicate { $0.sessionId == sessionId }
-    )
-    descriptor.fetchLimit = 1
-    return ((try? context.fetchCount(descriptor)) ?? 0) > 0
-  }
-
   private func upsertProject(_ project: ProjectSummary, context: ModelContext) {
     var descriptor = FetchDescriptor<CachedProject>(
       predicate: #Predicate { $0.projectId == project.projectId }
@@ -301,6 +334,23 @@ public actor SessionCacheService {
     }
     context.insert(summary.toCachedSession())
     return true
+  }
+
+  private func persist(_ context: ModelContext, operation: String) async -> Bool {
+    do {
+      try Task.checkCancellation()
+      try await beforeSave()
+      try Task.checkCancellation()
+      try saveChanges(context)
+      return true
+    } catch is CancellationError {
+      return false
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "\(operation, privacy: .public) failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return false
+    }
   }
 
   // MARK: - Sync helpers
