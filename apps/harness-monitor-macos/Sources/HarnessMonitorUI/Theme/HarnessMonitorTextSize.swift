@@ -72,6 +72,26 @@ public enum HarnessMonitorTextSize {
   public static func canDecrease(_ index: Int) -> Bool {
     index > 0
   }
+
+  /// Returns the index step (-1, 0, or +1) for a completed magnify gesture.
+  ///
+  /// `magnification` is the raw gesture value where 1.0 means no change,
+  /// values above 1.0 mean pinch-out (zoom in), and below 1.0 mean
+  /// pinch-in (zoom out). The step only fires when the absolute change
+  /// exceeds `threshold`, preventing accidental triggers from scroll gestures.
+  public static func indexDelta(
+    forMagnification magnification: CGFloat,
+    currentIndex: Int,
+    threshold: CGFloat = 0.15
+  ) -> Int {
+    let change = magnification - 1.0
+    if change > threshold && canIncrease(currentIndex) {
+      return 1
+    } else if change < -threshold && canDecrease(currentIndex) {
+      return -1
+    }
+    return 0
+  }
 }
 
 // MARK: - Environment key
