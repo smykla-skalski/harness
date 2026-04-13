@@ -12,7 +12,6 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
       app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
       app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
-      app.launchEnvironment["HARNESS_MONITOR_LAUNCH_MODE"] = "preview"
       app.launchEnvironment["HARNESS_MONITOR_KEEP_ANIMATIONS"] = "1"
       guard configureIsolatedDataHome(for: app, purpose: "launch-performance") else {
         return
@@ -151,7 +150,6 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     app.launchEnvironment = [
       "HARNESS_MONITOR_UI_TESTS": "1",
       "HARNESS_MONITOR_KEEP_ANIMATIONS": "1",
-      "HARNESS_MONITOR_LAUNCH_MODE": "preview",
       "HARNESS_MONITOR_PERF_SCENARIO": scenario,
       "HARNESS_MONITOR_PREVIEW_SCENARIO": expectedPreviewScenario(for: scenario),
       "HARNESS_MONITOR_PERF_STEP_DELAY_MS": "120",
