@@ -137,11 +137,13 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
 
     let connection_relay = Arc::clone(&connection);
     let replay_buffer = Arc::clone(&state.replay_buffer);
+    let relay_state = state.clone();
     let relay_task = tokio::spawn(relay_broadcast(
         broadcast_rx,
         bulk_tx,
         connection_relay,
         replay_buffer,
+        relay_state,
     ));
 
     let priority_tx_dispatch = priority_tx.clone();
@@ -317,8 +319,10 @@ async fn relay_broadcast(
     outbound_tx: mpsc::Sender<Message>,
     connection: Arc<Mutex<ConnectionState>>,
     replay_buffer: Arc<Mutex<ReplayBuffer>>,
+    state: DaemonHttpState,
 ) {
-    while let Some(frames) = next_relay_frames(&mut broadcast_rx, &connection, &replay_buffer).await
+    while let Some(frames) =
+        next_relay_frames(&mut broadcast_rx, &connection, &replay_buffer, &state).await
     {
         for frame in frames {
             if outbound_tx.send(frame).await.is_err() {
@@ -332,27 +336,191 @@ async fn next_relay_frames(
     broadcast_rx: &mut broadcast::Receiver<StreamEvent>,
     connection: &Arc<Mutex<ConnectionState>>,
     replay_buffer: &Arc<Mutex<ReplayBuffer>>,
+    state: &DaemonHttpState,
 ) -> Option<Vec<Message>> {
     loop {
-        let event = recv_broadcast_event(broadcast_rx).await?;
-        if let Some(frames) = prepare_push_frames(&event, connection, replay_buffer) {
-            return Some(frames);
+        match recv_broadcast_event(broadcast_rx, connection, state).await? {
+            RelayBatch::Live(event) => {
+                if let Some(frames) = prepare_push_frames(&event, connection, replay_buffer) {
+                    return Some(frames);
+                }
+            }
+            RelayBatch::Recovery(events) => {
+                let frames = prepare_recovery_frames(&events, connection, replay_buffer);
+                if !frames.is_empty() {
+                    return Some(frames);
+                }
+            }
         }
     }
 }
 
-/// Try to receive a single broadcast event, skipping lag errors.
+enum RelayBatch {
+    Live(StreamEvent),
+    Recovery(Vec<StreamEvent>),
+}
+
+/// Try to receive a single relay batch.
 /// Returns `None` only when the channel is closed.
 async fn recv_broadcast_event(
     receiver: &mut broadcast::Receiver<StreamEvent>,
-) -> Option<StreamEvent> {
+    connection: &Arc<Mutex<ConnectionState>>,
+    state: &DaemonHttpState,
+) -> Option<RelayBatch> {
     loop {
-        return match receiver.recv().await {
-            Ok(event) => Some(event),
+        let batch = match receiver.recv().await {
+            Ok(event) => Some(RelayBatch::Live(event)),
             Err(broadcast::error::RecvError::Closed) => None,
-            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                lagged_relay_batch(skipped, connection, state).await
+            }
         };
+        if let Some(batch) = batch {
+            return Some(batch);
+        }
     }
+}
+
+async fn lagged_relay_batch(
+    skipped: u64,
+    connection: &Arc<Mutex<ConnectionState>>,
+    state: &DaemonHttpState,
+) -> Option<RelayBatch> {
+    let events = recovery_events_for_connection(connection, state).await;
+    warn_lagged_recovery(skipped, events.len());
+    (!events.is_empty()).then_some(RelayBatch::Recovery(events))
+}
+
+#[derive(Clone, Debug, Default)]
+struct RelayRecoveryPlan {
+    include_sessions_updated: bool,
+    session_ids: Vec<String>,
+}
+
+impl RelayRecoveryPlan {
+    fn is_empty(&self) -> bool {
+        !self.include_sessions_updated && self.session_ids.is_empty()
+    }
+}
+
+fn recovery_plan_for_connection(connection: &Arc<Mutex<ConnectionState>>) -> RelayRecoveryPlan {
+    let state = connection.lock().expect("connection lock");
+    let mut session_ids: Vec<_> = state.session_subscriptions.iter().cloned().collect();
+    session_ids.sort();
+    RelayRecoveryPlan {
+        include_sessions_updated: state.global_subscription,
+        session_ids,
+    }
+}
+
+async fn recovery_events_for_connection(
+    connection: &Arc<Mutex<ConnectionState>>,
+    state: &DaemonHttpState,
+) -> Vec<StreamEvent> {
+    let plan = recovery_plan_for_connection(connection);
+    if plan.is_empty() {
+        return Vec::new();
+    }
+
+    run_preferred_db_read(
+        &state.db,
+        "websocket recovery snapshot",
+        {
+            let plan = plan.clone();
+            move |db| Ok(build_recovery_events(&plan, Some(db)))
+        },
+        move || Ok(build_recovery_events(&plan, None)),
+    )
+    .await
+    .unwrap_or_else(|error| recovery_events_on_error(&error))
+}
+
+fn recovery_events_on_error(error: &CliError) -> Vec<StreamEvent> {
+    warn_recovery_snapshot_failure(error);
+    Vec::new()
+}
+
+fn build_recovery_events(
+    plan: &RelayRecoveryPlan,
+    db: Option<&super::db::DaemonDb>,
+) -> Vec<StreamEvent> {
+    let mut events = Vec::new();
+    if plan.include_sessions_updated {
+        append_recovery_event(
+            &mut events,
+            service::sessions_updated_event(db),
+            "sessions_updated",
+            None,
+        );
+    }
+    for session_id in &plan.session_ids {
+        append_recovery_event(
+            &mut events,
+            service::session_updated_core_event(session_id, db),
+            "session_updated",
+            Some(session_id),
+        );
+    }
+    events
+}
+
+fn append_recovery_event(
+    events: &mut Vec<StreamEvent>,
+    event: Result<StreamEvent, CliError>,
+    event_name: &str,
+    session_id: Option<&str>,
+) {
+    match event {
+        Ok(event) => events.push(event),
+        Err(error) => warn_recovery_event_failure(&error, event_name, session_id),
+    }
+}
+
+fn prepare_recovery_frames(
+    events: &[StreamEvent],
+    connection: &Arc<Mutex<ConnectionState>>,
+    replay_buffer: &Arc<Mutex<ReplayBuffer>>,
+) -> Vec<Message> {
+    let mut frames = Vec::new();
+    for event in events {
+        if let Some(event_frames) = prepare_push_frames(event, connection, replay_buffer) {
+            frames.extend(event_frames);
+        }
+    }
+    frames
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_lagged_recovery(skipped: u64, recovery_events: usize) {
+    tracing::warn!(
+        skipped,
+        recovery_events,
+        "websocket relay lagged; sending recovery snapshot"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_recovery_snapshot_failure(error: &CliError) {
+    tracing::warn!(%error, "failed to build websocket recovery snapshot");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_recovery_event_failure(error: &CliError, event_name: &str, session_id: Option<&str>) {
+    tracing::warn!(
+        %error,
+        event = event_name,
+        session_id = session_id.unwrap_or("-"),
+        "failed to build websocket recovery event"
+    );
 }
 
 #[expect(
@@ -1223,6 +1391,151 @@ mod tests {
         state.global_subscription = true;
         assert!(state.should_relay(&global_event));
         assert!(state.should_relay(&session_event));
+    }
+
+    #[tokio::test]
+    async fn next_relay_frames_emits_sessions_updated_after_global_lag() {
+        let state = test_http_state_with_db();
+        let connection = Arc::new(Mutex::new(ConnectionState::new()));
+        connection
+            .lock()
+            .expect("connection lock")
+            .global_subscription = true;
+
+        let (sender, _) = broadcast::channel::<StreamEvent>(1);
+        let mut receiver = sender.subscribe();
+        sender
+            .send(StreamEvent {
+                event: "session_updated".into(),
+                recorded_at: "2026-04-13T19:00:00Z".into(),
+                session_id: Some("sess-test-1".into()),
+                payload: json!({}),
+            })
+            .expect("send first event");
+        sender
+            .send(StreamEvent {
+                event: "session_updated".into(),
+                recorded_at: "2026-04-13T19:00:01Z".into(),
+                session_id: Some("sess-test-1".into()),
+                payload: json!({}),
+            })
+            .expect("send second event");
+
+        let frames =
+            next_relay_frames(&mut receiver, &connection, &state.replay_buffer, &state).await;
+        let Message::Text(text) = &frames.expect("recovery frames")[0] else {
+            panic!("expected inline websocket push frame");
+        };
+        let push: WsPushEvent =
+            serde_json::from_str(text).expect("deserialize websocket push frame");
+
+        assert_eq!(push.event, "sessions_updated");
+        assert!(push.session_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn next_relay_frames_emits_session_snapshot_after_session_lag() {
+        let state = test_http_state_with_db();
+        {
+            use std::collections::BTreeMap;
+
+            use crate::agents::runtime::RuntimeCapabilities;
+            use crate::daemon::index::DiscoveredProject;
+            use crate::session::types::{
+                AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState,
+                SessionStatus,
+            };
+
+            let db = state.db.get().expect("db slot").clone();
+            let db = db.lock().expect("db lock");
+            let project = DiscoveredProject {
+                project_id: "project-abc123".into(),
+                name: "harness".into(),
+                project_dir: Some("/tmp/harness".into()),
+                repository_root: Some("/tmp/harness".into()),
+                checkout_id: "checkout-abc123".into(),
+                checkout_name: "Repository".into(),
+                context_root: "/tmp/data/projects/project-abc123".into(),
+                is_worktree: false,
+                worktree_name: None,
+            };
+            let mut agents = BTreeMap::new();
+            agents.insert(
+                "codex-worker".into(),
+                AgentRegistration {
+                    agent_id: "codex-worker".into(),
+                    name: "Codex Worker".into(),
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec!["general".into()],
+                    joined_at: "2026-04-13T19:00:00Z".into(),
+                    updated_at: "2026-04-13T19:00:00Z".into(),
+                    status: AgentStatus::Active,
+                    agent_session_id: None,
+                    last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+                    current_task_id: None,
+                    runtime_capabilities: RuntimeCapabilities::default(),
+                    persona: None,
+                },
+            );
+            let session_state = SessionState {
+                schema_version: 3,
+                state_version: 1,
+                session_id: "sess-test-1".into(),
+                title: "sess-test-1".into(),
+                context: "websocket lag recovery fixture".into(),
+                status: SessionStatus::Active,
+                created_at: "2026-04-13T19:00:00Z".into(),
+                updated_at: "2026-04-13T19:00:00Z".into(),
+                agents,
+                tasks: BTreeMap::new(),
+                leader_id: None,
+                archived_at: None,
+                last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+                observe_id: None,
+                pending_leader_transfer: None,
+                metrics: SessionMetrics::default(),
+            };
+            db.sync_project(&project).expect("sync project");
+            db.save_session_state(&project.project_id, &session_state)
+                .expect("save session state");
+        }
+        let connection = Arc::new(Mutex::new(ConnectionState::new()));
+        connection
+            .lock()
+            .expect("connection lock")
+            .session_subscriptions
+            .insert("sess-test-1".into());
+
+        let (sender, _) = broadcast::channel::<StreamEvent>(1);
+        let mut receiver = sender.subscribe();
+        sender
+            .send(StreamEvent {
+                event: "sessions_updated".into(),
+                recorded_at: "2026-04-13T19:00:00Z".into(),
+                session_id: None,
+                payload: json!({}),
+            })
+            .expect("send first event");
+        sender
+            .send(StreamEvent {
+                event: "sessions_updated".into(),
+                recorded_at: "2026-04-13T19:00:01Z".into(),
+                session_id: None,
+                payload: json!({}),
+            })
+            .expect("send second event");
+
+        let frames =
+            next_relay_frames(&mut receiver, &connection, &state.replay_buffer, &state).await;
+        let Message::Text(text) = &frames.expect("recovery frames")[0] else {
+            panic!("expected inline websocket push frame");
+        };
+        let push: WsPushEvent =
+            serde_json::from_str(text).expect("deserialize websocket push frame");
+
+        assert_eq!(push.event, "session_updated");
+        assert_eq!(push.session_id.as_deref(), Some("sess-test-1"));
     }
 
     #[test]
