@@ -249,10 +249,6 @@ extension HarnessMonitorStore {
     let requestID = beginSessionLoad()
     let loadTask = startSessionLoad(using: client, sessionID: sessionID, requestID: requestID)
     await loadTask.value
-
-    guard !Task.isCancelled else { return }
-    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-    startSessionStream(using: client, sessionID: sessionID)
   }
 
   public func inspect(taskID: String) { inspectorSelection = .task(taskID) }
@@ -353,9 +349,30 @@ extension HarnessMonitorStore {
         }
       }
       await self.loadSession(using: client, sessionID: sessionID, requestID: requestID)
+      guard !Task.isCancelled else {
+        return
+      }
+      guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
+      self.ensureSelectedSessionStream(using: client, sessionID: sessionID)
     }
     sessionLoadTask = task
     return task
+  }
+
+  private func ensureSelectedSessionStream(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) {
+    guard selectedSessionID == sessionID else {
+      return
+    }
+    let expectedSubscriptions = Set([sessionID])
+    guard sessionStreamTask == nil || subscribedSessionIDs != expectedSubscriptions else {
+      return
+    }
+    startSessionStream(using: client, sessionID: sessionID)
   }
 
   func cancelSessionLoad() {
