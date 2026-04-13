@@ -588,7 +588,8 @@ extension HarnessMonitorStore {
         else {
           return
         }
-        if selectedAgentTui != baseline {
+        // Keep the corrective GET alive for stale equal-or-older streaming snapshots.
+        if (selectedAgentTui?.updatedAt ?? "") > baseline.updatedAt {
           return
         }
         let updated = await refreshAgentTuiAfterAction(using: client, baseline: baseline)
