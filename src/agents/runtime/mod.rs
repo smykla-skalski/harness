@@ -46,6 +46,8 @@ pub struct RuntimeCapabilities {
     pub supports_context_injection: bool,
     pub typical_signal_latency_seconds: u64,
     #[serde(default)]
+    pub supports_readiness_signal: bool,
+    #[serde(default)]
     pub hook_points: Vec<HookIntegrationDescriptor>,
 }
 
@@ -120,6 +122,14 @@ pub trait AgentRuntime: Send + Sync {
         true
     }
 
+    /// Byte pattern emitted on the PTY when this runtime is ready to accept input.
+    ///
+    /// Returns `None` for runtimes where the startup marker is unknown; the
+    /// caller falls back to a configurable timeout in that case.
+    fn readiness_pattern(&self) -> Option<&'static str> {
+        None
+    }
+
     /// Serializable capability snapshot for UI and daemon clients.
     fn capabilities(&self) -> RuntimeCapabilities {
         let hook_points: Vec<HookIntegrationDescriptor> = self
@@ -146,6 +156,7 @@ pub trait AgentRuntime: Send + Sync {
             supports_signal_delivery: true,
             supports_context_injection,
             typical_signal_latency_seconds,
+            supports_readiness_signal: self.readiness_pattern().is_some(),
             hook_points,
         }
     }
@@ -238,5 +249,61 @@ mod tests {
             runtime_for_name("opencode").map(crate::agents::runtime::AgentRuntime::name),
             Some("opencode")
         );
+    }
+
+    #[test]
+    fn readiness_pattern_returns_valid_pattern_for_claude() {
+        use super::runtime_for;
+        let runtime = runtime_for(HookAgent::Claude);
+        let pattern = runtime.readiness_pattern();
+        assert!(
+            pattern.is_some(),
+            "claude runtime should provide a readiness pattern"
+        );
+        assert!(
+            !pattern.unwrap().is_empty(),
+            "claude readiness pattern should not be empty"
+        );
+    }
+
+    #[test]
+    fn readiness_pattern_returns_none_for_unknown_runtimes() {
+        use super::runtime_for;
+        // Runtimes without a known startup marker return None (timeout fallback).
+        for agent in [
+            HookAgent::Codex,
+            HookAgent::Gemini,
+            HookAgent::Copilot,
+            HookAgent::OpenCode,
+        ] {
+            let runtime = runtime_for(agent);
+            assert!(
+                runtime.readiness_pattern().is_none(),
+                "{} should return None for readiness_pattern",
+                runtime.name()
+            );
+        }
+    }
+
+    #[test]
+    fn runtime_capabilities_includes_readiness_signal_field() {
+        use super::runtime_for;
+        let claude_caps = runtime_for(HookAgent::Claude).capabilities();
+        assert!(
+            claude_caps.supports_readiness_signal,
+            "claude capabilities should indicate readiness signal support"
+        );
+
+        let codex_caps = runtime_for(HookAgent::Codex).capabilities();
+        assert!(
+            !codex_caps.supports_readiness_signal,
+            "codex capabilities should not indicate readiness signal support"
+        );
+
+        // Verify the field round-trips through serde.
+        let json = serde_json::to_string(&claude_caps).expect("serialize");
+        let deser: super::RuntimeCapabilities =
+            serde_json::from_str(&json).expect("deserialize");
+        assert!(deser.supports_readiness_signal);
     }
 }
