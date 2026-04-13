@@ -1512,7 +1512,13 @@ fn compute_agent_transition(
         return None;
     }
 
-    let new_status = match liveness_from_timestamp(record.last_activity.as_deref(), config) {
+    // Use the more recent of last_activity and joined_at for liveness.
+    // Agents that just joined may not have produced activity yet.
+    let effective_activity = record
+        .last_activity
+        .as_deref()
+        .or(Some(agent.joined_at.as_str()));
+    let new_status = match liveness_from_timestamp(effective_activity, config) {
         LivenessStatus::Active => AgentStatus::Active,
         LivenessStatus::Idle => AgentStatus::Idle,
         LivenessStatus::Unresponsive => AgentStatus::Disconnected,

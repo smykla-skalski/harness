@@ -329,4 +329,31 @@ mod tests {
         let deser: super::RuntimeCapabilities = serde_json::from_str(&json).expect("deserialize");
         assert!(deser.supports_readiness_signal);
     }
+
+    #[test]
+    fn initial_prompt_delivery_covers_all_runtimes() {
+        use super::{InitialPromptDelivery, runtime_for};
+
+        let cases = [
+            (HookAgent::Claude, InitialPromptDelivery::CliPositional),
+            (HookAgent::Codex, InitialPromptDelivery::CliPositional),
+            (
+                HookAgent::Gemini,
+                InitialPromptDelivery::CliFlag("--prompt-interactive"),
+            ),
+            (HookAgent::Copilot, InitialPromptDelivery::PtySend),
+            (HookAgent::OpenCode, InitialPromptDelivery::PtySend),
+            (HookAgent::Vibe, InitialPromptDelivery::CliPositional),
+        ];
+        for (agent, expected) in cases {
+            let runtime = runtime_for(agent);
+            assert_eq!(
+                runtime.initial_prompt_delivery(),
+                expected,
+                "{} should return {:?}",
+                runtime.name(),
+                expected
+            );
+        }
+    }
 }

@@ -722,16 +722,6 @@ fn liveness_project_dir(
     Ok(Some(project_dir))
 }
 
-fn resolve_session_for_read(
-    session_id: &str,
-    db: Option<&super::db::DaemonDb>,
-) -> Result<Option<ResolvedSession>, CliError> {
-    if let Some(db) = db {
-        return db.resolve_session(session_id);
-    }
-    Ok(Some(index::resolve_session(session_id)?))
-}
-
 /// Create a task through the shared session service.
 ///
 /// # Errors

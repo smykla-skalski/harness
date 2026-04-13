@@ -50,11 +50,21 @@ fn signal_tui_readiness_if_managed() {
     if tui_id.is_empty() {
         return;
     }
-    let Some(client) = crate::daemon::client::DaemonClient::try_connect() else {
+    signal_tui_readiness(&tui_id);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn signal_tui_readiness(tui_id: &str) {
+    use crate::daemon::client::DaemonClient;
+
+    let Some(client) = DaemonClient::try_connect() else {
         tracing::debug!(tui_id = %tui_id, "no daemon client for TUI readiness signal");
         return;
     };
-    match client.signal_tui_ready(&tui_id) {
+    match client.signal_tui_ready(tui_id) {
         Ok(_) => tracing::info!(tui_id = %tui_id, "TUI readiness signaled to daemon"),
         Err(error) => tracing::warn!(%error, tui_id = %tui_id, "failed to signal TUI readiness"),
     }
