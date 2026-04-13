@@ -233,7 +233,7 @@ impl DaemonDb {
                     state.session_id,
                     project_id,
                     state.schema_version,
-                    state.state_version,
+                    i64_from_u64(state.state_version),
                     state.title,
                     state.context,
                     format!("{:?}", state.status).to_lowercase(),
@@ -273,7 +273,7 @@ impl DaemonDb {
                 .query_row(
                     "SELECT COALESCE(MAX(sequence), 0) + 1 FROM session_log WHERE session_id = ?1",
                     [&entry.session_id],
-                    |row| row.get::<_, u64>(0),
+                    |row| row.get::<_, i64>(0).map(u64_from_i64),
                 )
                 .map_err(|error| db_error(format!("next log sequence: {error}")))?
         } else {
@@ -288,7 +288,7 @@ impl DaemonDb {
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     entry.session_id,
-                    sequence,
+                    i64_from_u64(sequence),
                     entry.recorded_at,
                     transition_kind,
                     transition_json,
@@ -493,9 +493,9 @@ impl DaemonDb {
                 [],
                 |row| {
                     Ok((
-                        row.get::<_, usize>(0)?,
-                        row.get::<_, usize>(1)?,
-                        row.get::<_, usize>(2)?,
+                        row.get::<_, i64>(0)? as usize,
+                        row.get::<_, i64>(1)? as usize,
+                        row.get::<_, i64>(2)? as usize,
                     ))
                 },
             )
@@ -536,8 +536,8 @@ impl DaemonDb {
                     checkout_name: row.get(6)?,
                     is_worktree: row.get(7)?,
                     worktree_name: row.get(8)?,
-                    active_session_count: row.get(9)?,
-                    total_session_count: row.get(10)?,
+                    active_session_count: row.get::<_, i64>(9)? as usize,
+                    total_session_count: row.get::<_, i64>(10)? as usize,
                 })
             })
             .map_err(|error| db_error(format!("query project summaries: {error}")))?;
@@ -777,7 +777,7 @@ impl DaemonDb {
             .query_map([session_id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, u64>(1)?,
+                    u64_from_i64(row.get::<_, i64>(1)?),
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
                     row.get::<_, Option<String>>(4)?,
@@ -1039,7 +1039,7 @@ impl DaemonDb {
                         agent_id,
                         runtime,
                         event.timestamp,
-                        event.sequence,
+                        i64_from_u64(event.sequence),
                         kind,
                         json,
                     ])
@@ -1242,7 +1242,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("prepare daemon events: {error}")))?;
 
         let rows = statement
-            .query_map([limit], |row| {
+            .query_map([limit as i64], |row| {
                 Ok(super::state::DaemonAuditEvent {
                     recorded_at: row.get(0)?,
                     level: row.get(1)?,
@@ -2159,6 +2159,27 @@ fn extract_transition_kind(json: &str) -> String {
 
 fn db_error(detail: impl Into<Cow<'static, str>>) -> CliError {
     CliError::from(CliErrorKind::workflow_io(detail))
+}
+
+/// Lossless `u64` -> `i64` reinterpretation for SQLite storage.
+///
+/// SQLite stores integers as signed 64-bit; these helpers preserve the full
+/// `u64` range by treating the bit pattern as `i64` on write and reversing
+/// it on read.
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "intentional bit-pattern reinterpretation for SQLite storage"
+)]
+const fn i64_from_u64(value: u64) -> i64 {
+    value as i64
+}
+
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "intentional bit-pattern reinterpretation for SQLite storage"
+)]
+const fn u64_from_i64(value: i64) -> u64 {
+    value as u64
 }
 
 fn replace_agents(
@@ -3661,7 +3682,7 @@ mod tests {
                     "claude-leader",
                     "claude",
                     event.timestamp.clone(),
-                    event.sequence,
+                    i64_from_u64(event.sequence),
                     "AssistantText",
                     event_json.clone(),
                 ],

@@ -18,7 +18,7 @@ use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, Hoo
 use harness::run::workflow as runner_workflow;
 use harness::run::{RunCounts, RunStatus, Verdict};
 use harness::run::{RunLayout, RunMetadata};
-use jsonschema::{Registry, Resource, Validator, options as jsonschema_options};
+use jsonschema::{Registry, Resource, Validator, options as jsonschema_options, uri};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 
 // ---------------------------------------------------------------------------
@@ -875,7 +875,7 @@ struct SchemaFragment {
 }
 
 struct SchemaStore {
-    registry: Registry,
+    registry: Registry<'static>,
     openapi: SchemaDocument,
     crds: BTreeMap<String, SchemaDocument>,
 }
@@ -925,7 +925,11 @@ impl SchemaStore {
             }
         }
 
-        let registry = Registry::try_from_resources(resources).expect("build schema registry");
+        let registry = Registry::new()
+            .extend(resources)
+            .expect("add schema resources to registry")
+            .prepare()
+            .expect("build schema registry");
 
         Self {
             registry,
@@ -934,7 +938,7 @@ impl SchemaStore {
         }
     }
 
-    fn registry(&self) -> &Registry {
+    fn registry(&self) -> &Registry<'static> {
         &self.registry
     }
 
@@ -1189,28 +1193,28 @@ fn schema_accepts(
         .is_some_and(|validator| validator.is_valid(instance))
 }
 
-fn try_compile_schema_validator(
-    schema: &JsonValue,
-    registry: &Registry,
+fn try_compile_schema_validator<'a>(
+    schema: &'a JsonValue,
+    registry: &'a Registry<'a>,
     base_uri: &str,
 ) -> Option<Validator> {
     jsonschema_options()
         .with_base_uri(base_uri.to_string())
-        .with_registry(registry.clone())
+        .with_registry(registry)
         .build(schema)
         .ok()
 }
 
-fn compile_schema_validator(
-    schema: &JsonValue,
-    registry: &Registry,
+fn compile_schema_validator<'a>(
+    schema: &'a JsonValue,
+    registry: &'a Registry<'a>,
     base_uri: &str,
     kind: &str,
     target: PolicySchemaTarget,
 ) -> Validator {
     jsonschema_options()
         .with_base_uri(base_uri.to_string())
-        .with_registry(registry.clone())
+        .with_registry(registry)
         .build(schema)
         .unwrap_or_else(|error| {
             panic!("compile {target:?} schema validator for {kind} from {base_uri}: {error}")
@@ -1247,9 +1251,9 @@ fn resolve_schema(schema: &JsonValue, registry: &Registry, base_uri: &str) -> Sc
         };
     };
 
-    let ref_resolver = registry
-        .try_resolver(base_uri)
-        .unwrap_or_else(|error| panic!("build schema resolver for {base_uri}: {error}"));
+    let parsed_uri = uri::from_str(base_uri)
+        .unwrap_or_else(|error| panic!("parse base URI {base_uri}: {error}"));
+    let ref_resolver = registry.resolver(parsed_uri);
     let lookup_result = ref_resolver.lookup(reference).unwrap_or_else(|error| {
         panic!("resolve schema ref {reference} against {base_uri}: {error}")
     });
