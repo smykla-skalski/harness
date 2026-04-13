@@ -21,34 +21,15 @@ struct SidebarView: View {
   @State private var sidebarWidth: CGFloat = 260
   @State private var sidebarVisibilityPhase = 1.0
   @State private var selectionTapBridge = SidebarSelectionTapBridge()
-  @State private var searchDraftText: String
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
   private static let filterToolbarFadeVisibleWidth: CGFloat = 220
-  private static let searchCommitDebounceNanoseconds: UInt64 = 250_000_000
-
-  init(
-    store: HarnessMonitorStore,
-    controls: HarnessMonitorStore.SessionControlsSlice,
-    projection: HarnessMonitorStore.SessionProjectionSlice,
-    searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
-    sidebarUI: HarnessMonitorStore.SidebarUISlice,
-    sidebarVisible: Bool
-  ) {
-    self.store = store
-    self.controls = controls
-    self.projection = projection
-    self.searchResults = searchResults
-    self.sidebarUI = sidebarUI
-    self.sidebarVisible = sidebarVisible
-    _searchDraftText = State(initialValue: controls.searchText)
-  }
 
   private var sidebarSearchText: Binding<String> {
     Binding(
-      get: { searchDraftText },
-      set: { searchDraftText = $0 }
+      get: { store.searchText },
+      set: { store.searchText = $0 }
     )
   }
 
@@ -98,20 +79,10 @@ struct SidebarView: View {
         visibilityProgress: filterToolbarVisibilityProgress
       )
     }
-    .task(id: searchDraftText) {
-      guard searchDraftText != controls.searchText else {
-        return
-      }
-      try? await Task.sleep(nanoseconds: Self.searchCommitDebounceNanoseconds)
-      guard !Task.isCancelled, searchDraftText != controls.searchText else {
-        return
-      }
-      commitSearchDraft(flushProjection: true)
-    }
     .onSubmit(of: .search) {
-      commitSearchDraft(flushProjection: true)
+      store.flushPendingSearchRebuild()
       if sidebarUI.isPersistenceAvailable {
-        _ = store.recordSearch(controls.searchText)
+        _ = store.recordSearch(store.searchText)
       }
     }
     .onGeometryChange(for: CGFloat.self) { proxy in
@@ -130,12 +101,6 @@ struct SidebarView: View {
     }
     .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
       isSearchFocused = true
-    }
-    .onChange(of: controls.searchText, initial: true) { _, newValue in
-      guard searchDraftText != newValue else {
-        return
-      }
-      searchDraftText = newValue
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
@@ -182,20 +147,10 @@ struct SidebarView: View {
   }
 
   private func applyRecentSearch(_ query: String) {
-    searchDraftText = query
-    commitSearchDraft(flushProjection: true)
+    store.searchText = query
+    store.flushPendingSearchRebuild()
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(query)
-    }
-  }
-
-  private func commitSearchDraft(flushProjection: Bool) {
-    guard controls.searchText != searchDraftText else {
-      return
-    }
-    store.searchText = searchDraftText
-    if flushProjection {
-      store.flushPendingSearchRebuild()
     }
   }
 }

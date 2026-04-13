@@ -35,19 +35,29 @@ public struct DatabaseStatistics: Sendable {
   public let appCacheStorePath: String
   public let daemonDatabasePath: String
 
-  public var appCacheSizeFormatted: String {
-    ByteCountFormatter.string(fromByteCount: appCacheSizeBytes, countStyle: .file)
-  }
-
-  public var daemonDatabaseSizeFormatted: String {
-    ByteCountFormatter.string(fromByteCount: Int64(daemonDatabaseSizeBytes), countStyle: .file)
-  }
+  @MainActor private static let byteCountFormatter: ByteCountFormatter = {
+    let formatter = ByteCountFormatter()
+    formatter.countStyle = .file
+    return formatter
+  }()
 
   @MainActor private static let relativeDateFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
     return formatter
   }()
+
+  @MainActor public static func formatByteCount(_ byteCount: Int64) -> String {
+    byteCountFormatter.string(fromByteCount: byteCount)
+  }
+
+  @MainActor public var appCacheSizeFormatted: String {
+    Self.formatByteCount(appCacheSizeBytes)
+  }
+
+  @MainActor public var daemonDatabaseSizeFormatted: String {
+    Self.formatByteCount(Int64(daemonDatabaseSizeBytes))
+  }
 
   @MainActor public var lastCachedFormatted: String {
     guard let lastCachedAt else { return "Never" }
