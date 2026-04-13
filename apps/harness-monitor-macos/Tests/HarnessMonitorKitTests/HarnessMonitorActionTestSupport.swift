@@ -127,6 +127,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _sessionDetailErrorsByID: [String: any Error] = [:]
   private var _sessionDetailScopesByID: [String: [String?]] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
+  private var _timelineScopesBySessionID: [String: [TimelineScope]] = [:]
   private var _timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
   private var _timelineBatchDelaysBySessionID: [String: Duration] = [:]
@@ -422,6 +423,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredTimeline(for sessionID: String) -> [TimelineEntry]? {
     lock.withLock { _timelinesBySessionID[sessionID] }
   }
+  func timelineScopes(for sessionID: String) -> [TimelineScope] {
+    lock.withLock { _timelineScopesBySessionID[sessionID] ?? [] }
+  }
   func configuredTimelineBatches(for sessionID: String) -> [[TimelineEntry]]? {
     lock.withLock { _timelineBatchesBySessionID[sessionID] }
   }
@@ -550,6 +554,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
         _timelineBatchDelaysBySessionID.removeValue(forKey: sessionID)
       }
       _timelinesBySessionID[sessionID] = batches.flatMap(\.self)
+    }
+  }
+
+  func recordTimelineScope(sessionID: String, scope: TimelineScope) {
+    lock.withLock {
+      _timelineScopesBySessionID[sessionID, default: []].append(scope)
     }
   }
 

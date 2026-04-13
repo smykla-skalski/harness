@@ -6,7 +6,8 @@ struct AgentTuiSidebar: View {
   let agentTuis: [AgentTuiSnapshot]
   let sessionTitlesByID: [String: String]
   let refresh: () -> Void
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.fontScale)
+  private var fontScale
 
   private var rowPadding: CGFloat {
     HarnessMonitorTheme.spacingXS * fontScale

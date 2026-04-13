@@ -119,11 +119,12 @@ extension HarnessMonitorStore {
 
         do {
           let detailScope = self.activeTransport == .webSocket ? "core" : nil
+          let timelineScope: TimelineScope = self.activeTransport == .webSocket ? .summary : .full
           let measuredDetail = try await Self.measureOperation {
             try await client.sessionDetail(id: summary.sessionId, scope: detailScope)
           }
           let measuredTimeline = try await Self.measureOperation {
-            try await client.timeline(sessionID: summary.sessionId)
+            try await client.timeline(sessionID: summary.sessionId, scope: timelineScope)
           }
           self.recordRequestSuccess()
           self.recordRequestSuccess()

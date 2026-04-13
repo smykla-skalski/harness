@@ -46,8 +46,7 @@ private struct InspectorPrimaryContentBridge: View {
   let store: HarnessMonitorStore
   let primaryContent: HarnessMonitorStore.InspectorPrimaryContentState
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     switch primaryContent {
     case .empty:
       InspectorPrimaryEmptyState()
@@ -87,8 +86,7 @@ private struct InspectorActionSectionsBridge: View {
   let store: HarnessMonitorStore
   let actionContext: HarnessMonitorStore.InspectorActionContext?
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     if let actionContext {
       InspectorActionSections(
         store: store,

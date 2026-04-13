@@ -4,7 +4,8 @@ import SwiftUI
 struct AgentTuiSidebarRow: View {
   let snapshot: AgentTuiSnapshot
   let title: String
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.fontScale)
+  private var fontScale
 
   private var brandSymbol: ProviderBrandSymbol? {
     ProviderBrandSymbol(runtimeString: snapshot.runtime)

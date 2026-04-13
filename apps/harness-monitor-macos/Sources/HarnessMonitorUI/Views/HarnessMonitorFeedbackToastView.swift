@@ -82,8 +82,10 @@ private struct HarnessMonitorFeedbackToastRow: View {
 
 private struct HarnessMonitorFeedbackToastStrip: View {
   let tint: Color
-  @ScaledMetric(relativeTo: .body) private var stripHeight = 18.0
-  @ScaledMetric(relativeTo: .body) private var stripWidth = 6.0
+  @ScaledMetric(relativeTo: .body)
+  private var stripHeight = 18.0
+  @ScaledMetric(relativeTo: .body)
+  private var stripWidth = 6.0
 
   var body: some View {
     RoundedRectangle(cornerRadius: stripWidth / 2, style: .continuous)
@@ -94,8 +96,10 @@ private struct HarnessMonitorFeedbackToastStrip: View {
 }
 
 private struct HarnessMonitorFeedbackToastDismissGlass: ViewModifier {
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
 
   private var fallbackFillOpacity: Double {
     if reduceTransparency {

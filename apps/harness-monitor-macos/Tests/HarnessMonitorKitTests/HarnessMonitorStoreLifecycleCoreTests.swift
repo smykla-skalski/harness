@@ -134,6 +134,28 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == [nil])
   }
 
+  @Test("Session selection prefers summary timeline scope on websocket transport")
+  func sessionSelectionPrefersSummaryTimelineScopeOnWebsocketTransport() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .webSocket
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary])
+  }
+
+  @Test("Session selection keeps full timeline scope on HTTP transport")
+  func sessionSelectionKeepsFullTimelineScopeOnHTTPTransport() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .httpSSE
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.full])
+  }
+
   @Test("Refresh diagnostics without client falls back to daemon status")
   func refreshDiagnosticsWithoutClientFallsBackToDaemonStatus() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

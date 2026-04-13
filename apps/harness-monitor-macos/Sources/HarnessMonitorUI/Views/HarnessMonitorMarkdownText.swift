@@ -56,8 +56,7 @@ struct HarnessMonitorMarkdownText: View {
       .textual.overflowMode(.wrap)
   }
 
-  @ViewBuilder
-  private var content: some View {
+  @ViewBuilder private var content: some View {
     switch rendering {
     case .rich:
       switch textSelection {
