@@ -185,7 +185,7 @@ struct ContentDetailColumn: View {
   let onDetailColumnWidthChange: (CGFloat) -> Void
 
   private var navigationTitleText: String {
-    contentSessionDetail.selectedSessionDetail != nil ? "Cockpit" : "Dashboard"
+    contentSessionDetail.presentedSessionDetail != nil ? "Cockpit" : "Dashboard"
   }
 
   var body: some View {
@@ -227,9 +227,9 @@ struct ContentDetailColumn: View {
       store: store,
       dashboardUI: dashboardUI,
       state: SessionContentState(
-        detail: contentSessionDetail.selectedSessionDetail,
+        detail: contentSessionDetail.presentedSessionDetail,
         summary: contentSession.selectedSessionSummary,
-        timeline: contentSessionDetail.timeline,
+        timeline: contentSessionDetail.presentedTimeline,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isExtensionsLoading: contentSession.isExtensionsLoading
       )
@@ -241,7 +241,7 @@ struct ContentDetailColumn: View {
         toast.dismiss(id: feedbackID)
         return .handled
       }
-      if contentSessionDetail.selectedSessionDetail != nil {
+      if contentSessionDetail.presentedSessionDetail != nil {
         store.inspectorSelection = .none
         return .handled
       }
