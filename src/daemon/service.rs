@@ -689,26 +689,37 @@ fn reconcile_session_liveness_for_read(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<(), CliError> {
-    let Some(resolved) = resolve_session_for_read(session_id, db)? else {
+    // Only reconcile when a daemon DB is available. Without a running daemon
+    // there is no liveness data to compare against.
+    let Some(db) = db else {
         return Ok(());
     };
-    if resolved.state.status != SessionStatus::Active {
-        return Ok(());
-    }
-    let Some(project_dir) = resolved.project.project_dir.as_deref() else {
-        return Ok(());
-    };
-    if session_storage::load_state(project_dir, session_id)?.is_none() {
-        return Ok(());
-    }
-
-    let result = session_service::sync_agent_liveness(session_id, project_dir)?;
-    if let Some(db) = db
-        && (!result.disconnected.is_empty() || !result.idled.is_empty())
-    {
-        db.resync_session(session_id)?;
+    if let Some(project_dir) = liveness_project_dir(session_id, db)? {
+        let result = session_service::sync_agent_liveness(session_id, &project_dir)?;
+        if !result.disconnected.is_empty() || !result.idled.is_empty() {
+            db.resync_session(session_id)?;
+        }
     }
     Ok(())
+}
+
+fn liveness_project_dir(
+    session_id: &str,
+    db: &super::db::DaemonDb,
+) -> Result<Option<PathBuf>, CliError> {
+    let Some(resolved) = db.resolve_session(session_id)? else {
+        return Ok(None);
+    };
+    if resolved.state.status != SessionStatus::Active {
+        return Ok(None);
+    }
+    let Some(project_dir) = resolved.project.project_dir else {
+        return Ok(None);
+    };
+    if session_storage::load_state(&project_dir, session_id)?.is_none() {
+        return Ok(None);
+    }
+    Ok(Some(project_dir))
 }
 
 fn resolve_session_for_read(
@@ -2546,12 +2557,7 @@ exit 1
         };
         let script = format!(
             r#"#!/bin/sh
-lines=0
 while IFS= read -r _line; do
-  lines=$((lines + 1))
-  if [ "$lines" -eq 1 ]; then
-    continue
-  fi
   {wake_behavior}
 done
 "#
@@ -3106,6 +3112,10 @@ done
                     },
                 )
                 .expect("start agent tui");
+            // Simulate the SessionStart hook callback.
+            manager
+                .signal_ready(&snapshot.tui_id)
+                .expect("signal ready");
 
             let joined =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
@@ -3223,6 +3233,9 @@ done
                     },
                 )
                 .expect("start agent tui");
+            manager
+                .signal_ready(&snapshot.tui_id)
+                .expect("signal ready");
 
             let joined =
                 temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
