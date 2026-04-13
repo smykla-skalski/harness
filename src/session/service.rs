@@ -5256,6 +5256,17 @@ mod tests {
 
             let state = session_status("sync-legacy", project).expect("status");
             let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+            storage::update_state(project, "sync-legacy", |state| {
+                state
+                    .agents
+                    .get_mut(&worker_id)
+                    .expect("worker")
+                    .agent_session_id = None;
+                Ok(())
+            })
+            .expect("clear worker runtime session id for legacy fixture");
+
+            let state = session_status("sync-legacy", project).expect("status");
             let worker = state.agents.get(&worker_id).expect("worker");
             assert!(worker.agent_session_id.is_none());
 

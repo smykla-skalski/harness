@@ -28,6 +28,7 @@ use super::protocol::{
 };
 use super::read_cache::run_preferred_db_read;
 use super::service;
+use super::timeline::TimelinePayloadScope;
 
 const MAX_INLINE_WS_TEXT_BYTES: usize = 256 * 1024;
 const MAX_SEMANTIC_WS_ARRAY_BATCH_BYTES: usize = 128 * 1024;
@@ -629,7 +630,9 @@ async fn dispatch_inner(
     match request.method.as_str() {
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
         "health" | "diagnostics" | "daemon.stop" | "daemon.log_level" | "projects" | "sessions"
-        | "session.detail" | "session.timeline" => dispatch_read_query(request, state).await,
+        | "session.detail" | "session.timeline" | "session.agent_tuis" | "agent_tui.detail" => {
+            dispatch_read_query(request, state).await
+        }
         "daemon.set_log_level" => {
             let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
                 Ok(body) => body,
@@ -733,6 +736,8 @@ async fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> Ws
         "sessions" => dispatch_sessions_query(&request.id, state).await,
         "session.detail" => dispatch_session_detail_query(request, state).await,
         "session.timeline" => dispatch_session_timeline_query(request, state).await,
+        "session.agent_tuis" => dispatch_session_agent_tuis_query(request, state),
+        "agent_tui.detail" => dispatch_agent_tui_detail_query(request, state),
         _ => error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method"),
     }
 }
@@ -817,6 +822,10 @@ async fn dispatch_session_timeline_query(
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
+    let payload_scope = match extract_string_param(&request.params, "scope").as_deref() {
+        Some("summary") => TimelinePayloadScope::Summary,
+        _ => TimelinePayloadScope::Full,
+    };
 
     dispatch_query_result(
         &request.id,
@@ -825,12 +834,34 @@ async fn dispatch_session_timeline_query(
             "session timeline",
             {
                 let session_id = session_id.clone();
-                move |db| service::session_timeline(&session_id, Some(db))
+                move |db| service::session_timeline_with_scope(&session_id, payload_scope, Some(db))
             },
-            || service::session_timeline(&session_id, None),
+            || service::session_timeline_with_scope(&session_id, payload_scope, None),
         )
         .await,
     )
+}
+
+fn dispatch_session_agent_tuis_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Some(session_id) = extract_session_id(&request.params) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    };
+
+    dispatch_query_result(
+        &request.id,
+        state
+            .agent_tui_manager
+            .list(&session_id)
+            .map(|response| response.tuis),
+    )
+}
+
+fn dispatch_agent_tui_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Some(tui_id) = extract_string_param(&request.params, "tui_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing tui_id");
+    };
+
+    dispatch_query_result(&request.id, state.agent_tui_manager.get(&tui_id))
 }
 
 fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
@@ -1264,7 +1295,11 @@ fn serialize_error_response_frames(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::daemon::agent_tui::AgentTuiManagerHandle;
+    use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+    use crate::daemon::agent_tui::{
+        AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus,
+        TerminalScreenSnapshot,
+    };
     use crate::daemon::codex_controller::CodexControllerHandle;
     use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
     use crate::session::types::CONTROL_PLANE_ACTOR_ID;
@@ -1746,6 +1781,106 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn dispatch_read_query_session_agent_tuis_returns_snapshot_array() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        {
+            let db = db.lock().expect("db lock");
+            let project = sample_project();
+            db.sync_project(&project).expect("sync project");
+            db.save_session_state(&project.project_id, &sample_session_state())
+                .expect("save session state");
+            db.save_agent_tui(&sample_agent_tui("tui-1", "2026-04-13T19:10:00Z"))
+                .expect("save agent tui");
+        }
+        let request = WsRequest {
+            id: "req-agent-tuis".into(),
+            method: "session.agent_tuis".into(),
+            params: serde_json::json!({ "session_id": "sess-test-1" }),
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert!(response.error.is_none());
+        let result = response.result.expect("agent tui list response");
+        let Value::Array(entries) = result else {
+            panic!("expected websocket agent tui list result to be an array");
+        };
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["tui_id"].as_str(), Some("tui-1"));
+    }
+
+    #[tokio::test]
+    async fn dispatch_read_query_agent_tui_detail_returns_snapshot() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        {
+            let db = db.lock().expect("db lock");
+            let project = sample_project();
+            db.sync_project(&project).expect("sync project");
+            db.save_session_state(&project.project_id, &sample_session_state())
+                .expect("save session state");
+            db.save_agent_tui(&sample_agent_tui("tui-2", "2026-04-13T19:11:00Z"))
+                .expect("save agent tui");
+        }
+        let request = WsRequest {
+            id: "req-agent-tui".into(),
+            method: "agent_tui.detail".into(),
+            params: serde_json::json!({ "tui_id": "tui-2" }),
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert!(response.error.is_none());
+        let result = response.result.expect("agent tui response");
+        assert_eq!(result["tui_id"].as_str(), Some("tui-2"));
+        assert_eq!(result["session_id"].as_str(), Some("sess-test-1"));
+    }
+
+    #[tokio::test]
+    async fn dispatch_read_query_session_timeline_summary_scope_omits_payloads() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        {
+            let db = db.lock().expect("db lock");
+            let project = sample_project();
+            db.sync_project(&project).expect("sync project");
+            db.save_session_state(&project.project_id, &sample_session_state())
+                .expect("save session state");
+            db.sync_conversation_events(
+                "sess-test-1",
+                "codex-worker",
+                "codex",
+                &[sample_tool_result_event()],
+            )
+            .expect("sync conversation events");
+        }
+        let request = WsRequest {
+            id: "req-timeline-summary".into(),
+            method: "session.timeline".into(),
+            params: serde_json::json!({
+                "session_id": "sess-test-1",
+                "scope": "summary",
+            }),
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert!(response.error.is_none());
+        let result = response.result.expect("timeline response");
+        let Value::Array(entries) = result else {
+            panic!("expected timeline array response");
+        };
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["kind"].as_str(), Some("tool_result"));
+        assert_eq!(
+            entries[0]["summary"].as_str(),
+            Some("codex-worker received a result from Bash")
+        );
+        assert_eq!(entries[0]["payload"], serde_json::json!({}));
+    }
+
     fn test_http_state() -> DaemonHttpState {
         let (sender, _) = broadcast::channel(8);
         let db = Arc::new(OnceLock::new());
@@ -1809,6 +1944,117 @@ mod tests {
             agent_tui_manager: crate::daemon::agent_tui::AgentTuiManagerHandle::new(
                 sender, db, false,
             ),
+        }
+    }
+
+    fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapshot {
+        AgentTuiSnapshot {
+            tui_id: tui_id.into(),
+            session_id: "sess-test-1".into(),
+            agent_id: "codex-worker".into(),
+            runtime: "codex".into(),
+            status: AgentTuiStatus::Running,
+            argv: vec!["codex".into()],
+            project_dir: "/tmp/harness".into(),
+            size: AgentTuiSize {
+                rows: 30,
+                cols: 120,
+            },
+            screen: TerminalScreenSnapshot {
+                rows: 30,
+                cols: 120,
+                cursor_row: 1,
+                cursor_col: 5,
+                text: "ready".into(),
+            },
+            transcript_path: "/tmp/harness/agent-tui.log".into(),
+            exit_code: None,
+            signal: None,
+            error: None,
+            created_at: "2026-04-13T19:00:00Z".into(),
+            updated_at: updated_at.into(),
+        }
+    }
+
+    fn sample_project() -> crate::daemon::index::DiscoveredProject {
+        crate::daemon::index::DiscoveredProject {
+            project_id: "project-abc123".into(),
+            name: "harness".into(),
+            project_dir: Some("/tmp/harness".into()),
+            repository_root: Some("/tmp/harness".into()),
+            checkout_id: "checkout-abc123".into(),
+            checkout_name: "Repository".into(),
+            context_root: "/tmp/data/projects/project-abc123".into(),
+            is_worktree: false,
+            worktree_name: None,
+        }
+    }
+
+    fn sample_session_state() -> crate::session::types::SessionState {
+        use std::collections::BTreeMap;
+
+        use crate::agents::runtime::RuntimeCapabilities;
+        use crate::session::types::{
+            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState,
+            SessionStatus,
+        };
+
+        let mut agents = BTreeMap::new();
+        agents.insert(
+            "codex-worker".into(),
+            AgentRegistration {
+                agent_id: "codex-worker".into(),
+                name: "Codex Worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec!["general".into()],
+                joined_at: "2026-04-13T19:00:00Z".into(),
+                updated_at: "2026-04-13T19:00:00Z".into(),
+                status: AgentStatus::Active,
+                agent_session_id: None,
+                last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
+            },
+        );
+
+        SessionState {
+            schema_version: 3,
+            state_version: 1,
+            session_id: "sess-test-1".into(),
+            title: "sess-test-1".into(),
+            context: "agent tui websocket fixture".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-04-13T19:00:00Z".into(),
+            updated_at: "2026-04-13T19:00:00Z".into(),
+            agents,
+            tasks: BTreeMap::new(),
+            leader_id: None,
+            archived_at: None,
+            last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+            observe_id: None,
+            pending_leader_transfer: None,
+            metrics: SessionMetrics::default(),
+        }
+    }
+
+    fn sample_tool_result_event() -> ConversationEvent {
+        ConversationEvent {
+            timestamp: Some("2026-04-13T19:02:00Z".into()),
+            sequence: 1,
+            kind: ConversationEventKind::ToolResult {
+                tool_name: "Bash".into(),
+                invocation_id: Some("call-bash-1".into()),
+                output: serde_json::json!({
+                    "stdout": "x".repeat(8_192),
+                    "exit_code": 0,
+                }),
+                is_error: false,
+                duration_ms: Some(125),
+            },
+            agent: "codex-worker".into(),
+            session_id: "sess-test-1".into(),
         }
     }
 }
