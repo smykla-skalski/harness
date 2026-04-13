@@ -36,4 +36,29 @@ struct SmartZoomTests {
     #expect(containerWidth * scale == 1800)
     #expect(containerHeight * scale == 1200)
   }
+
+  @MainActor
+  @Test("Assigning the same navigation availability does not invalidate observers")
+  func assigningSameNavigationAvailabilityDoesNotInvalidateObservers() async {
+    let state = WindowNavigationState()
+
+    let invalidated = await didInvalidate({ state.canGoBack }) {
+      state.canGoBack = false
+    }
+
+    #expect(invalidated == false)
+  }
+
+  @MainActor
+  @Test("Updating navigation handlers does not invalidate availability observers")
+  func updatingNavigationHandlersDoesNotInvalidateAvailabilityObservers() async {
+    let state = WindowNavigationState()
+
+    let invalidated = await didInvalidate({ (state.canGoBack, state.canGoForward) }) {
+      state.backHandler = { await Task.yield() }
+      state.forwardHandler = { await Task.yield() }
+    }
+
+    #expect(invalidated == false)
+  }
 }

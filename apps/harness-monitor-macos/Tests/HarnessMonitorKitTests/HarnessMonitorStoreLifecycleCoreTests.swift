@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 
 @testable import HarnessMonitorKit
@@ -132,6 +133,197 @@ struct HarnessMonitorStoreLifecycleCoreTests {
 
     #expect(store.subscribedSessionIDs.isEmpty)
     #expect(store.selectedSessionID == nil)
+  }
+
+  @Test("Superseded selected-session refresh cancels the stale load before timeline fetch")
+  func supersededSelectedSessionRefreshCancelsStaleLoadBeforeTimelineFetch() async {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-refresh-cancel",
+        context: "Refresh cancellation",
+        status: .active,
+        leaderId: "leader-refresh-cancel",
+        observeId: nil,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-refresh-cancel",
+      workerName: "Worker Refresh Cancel"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-refresh-cancel",
+      summary: "Refresh cancellation timeline"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: timeline],
+      detail: detail
+    )
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(summary.sessionId)
+
+    let baselineDetailCount = client.readCallCount(.sessionDetail(summary.sessionId))
+    let baselineTimelineCount = client.readCallCount(.timeline(summary.sessionId))
+
+    client.configureDetailDelay(.milliseconds(200), for: summary.sessionId)
+
+    let firstUpdate = makeUpdatedSession(
+      summary,
+      context: "Refresh cancellation first",
+      updatedAt: "2026-03-28T15:05:00Z",
+      agentCount: 2
+    )
+    let secondUpdate = makeUpdatedSession(
+      summary,
+      context: "Refresh cancellation second",
+      updatedAt: "2026-03-28T15:06:00Z",
+      agentCount: 3
+    )
+
+    store.refreshSelectedSessionIfSummaryChanged(sessions: [firstUpdate])
+    try? await Task.sleep(for: .milliseconds(40))
+    store.refreshSelectedSessionIfSummaryChanged(sessions: [secondUpdate])
+    try? await Task.sleep(for: .milliseconds(500))
+
+    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCount + 2)
+    #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCount + 1)
+  }
+
+  @Test("Refresh skips selected session during persisted snapshot hydration")
+  func refreshSkipsSelectedSessionDuringPersistedSnapshotHydration() async throws {
+    let selectedSummary = makeSession(
+      .init(
+        sessionId: "sess-selected-hydration",
+        context: "Selected hydration",
+        status: .active,
+        leaderId: "leader-selected-hydration",
+        observeId: nil,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let backgroundSummary = makeSession(
+      .init(
+        sessionId: "sess-background-hydration",
+        context: "Background hydration",
+        status: .active,
+        leaderId: "leader-background-hydration",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        activeAgentCount: 2,
+        lastActivityAt: "2026-03-28T14:17:00Z"
+      )
+    )
+    let selectedDetail = makeSessionDetail(
+      summary: selectedSummary,
+      workerID: "worker-selected-hydration",
+      workerName: "Worker Selected Hydration"
+    )
+    let backgroundDetail = makeSessionDetail(
+      summary: backgroundSummary,
+      workerID: "worker-background-hydration",
+      workerName: "Worker Background Hydration"
+    )
+    let selectedTimeline = makeTimelineEntries(
+      sessionID: selectedSummary.sessionId,
+      agentID: "worker-selected-hydration",
+      summary: "Selected hydration timeline"
+    )
+    let backgroundTimeline = makeTimelineEntries(
+      sessionID: backgroundSummary.sessionId,
+      agentID: "worker-background-hydration",
+      summary: "Background hydration timeline"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [selectedSummary, backgroundSummary],
+      detailsByID: [
+        selectedSummary.sessionId: selectedDetail,
+        backgroundSummary.sessionId: backgroundDetail,
+      ],
+      timelinesBySessionID: [
+        selectedSummary.sessionId: selectedTimeline,
+        backgroundSummary.sessionId: backgroundTimeline,
+      ],
+      detail: selectedDetail
+    )
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContainer: container
+    )
+    await store.bootstrap()
+    await store.selectSession(selectedSummary.sessionId)
+    await store.cacheSessionDetail(selectedDetail, timeline: selectedTimeline)
+    await store.cacheSessionDetail(backgroundDetail, timeline: [])
+
+    let updatedSelectedSummary = makeUpdatedSession(
+      selectedSummary,
+      context: "Selected hydration updated",
+      updatedAt: "2026-03-28T15:10:00Z",
+      agentCount: 2
+    )
+    let updatedBackgroundSummary = makeUpdatedSession(
+      backgroundSummary,
+      context: "Background hydration updated",
+      updatedAt: "2026-03-28T15:11:00Z",
+      agentCount: 2
+    )
+    let updatedSelectedDetail = makeSessionDetail(
+      summary: updatedSelectedSummary,
+      workerID: "worker-selected-hydration",
+      workerName: "Worker Selected Hydration"
+    )
+    let updatedBackgroundDetail = makeSessionDetail(
+      summary: updatedBackgroundSummary,
+      workerID: "worker-background-hydration",
+      workerName: "Worker Background Hydration"
+    )
+
+    client.configureSessions(
+      summaries: [updatedSelectedSummary, updatedBackgroundSummary],
+      detailsByID: [
+        updatedSelectedSummary.sessionId: updatedSelectedDetail,
+        updatedBackgroundSummary.sessionId: updatedBackgroundDetail,
+      ],
+      timelinesBySessionID: [
+        updatedSelectedSummary.sessionId: selectedTimeline,
+        updatedBackgroundSummary.sessionId: backgroundTimeline,
+      ]
+    )
+
+    let baselineSelectedDetailCount = client.readCallCount(.sessionDetail(selectedSummary.sessionId))
+    let baselineSelectedTimelineCount = client.readCallCount(.timeline(selectedSummary.sessionId))
+    let baselineBackgroundDetailCount = client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
+    let baselineBackgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
+
+    await store.refresh(using: client, preserveSelection: true)
+
+    for _ in 0..<50 {
+      let selectedTimelineCount = client.readCallCount(.timeline(selectedSummary.sessionId))
+      let backgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
+      if selectedTimelineCount > baselineSelectedTimelineCount
+        && backgroundTimelineCount > baselineBackgroundTimelineCount
+      {
+        break
+      }
+      try? await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(client.readCallCount(.sessionDetail(selectedSummary.sessionId)) == baselineSelectedDetailCount + 1)
+    #expect(client.readCallCount(.timeline(selectedSummary.sessionId)) == baselineSelectedTimelineCount + 1)
+    #expect(client.readCallCount(.sessionDetail(backgroundSummary.sessionId)) == baselineBackgroundDetailCount + 1)
+    #expect(client.readCallCount(.timeline(backgroundSummary.sessionId)) == baselineBackgroundTimelineCount + 1)
   }
 
   @Test("Replacing the session snapshot clears removed selection across UI slices")

@@ -31,9 +31,7 @@ public struct ContentView: View {
   private var persistedShowInspector = true
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
-  @State private var hasAppliedInitialInspectorVisibility = false
-  @State private var hasCapturedInitialInspectorWidth = false
-  @State private var showInspector = false
+  @State private var showInspector = Self.initialInspectorVisibility()
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var pendingDetailColumnWidth: CGFloat?
   @State private var windowNavigation = WindowNavigationState()
@@ -73,6 +71,7 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
   }
 
+  @MainActor
   public init(
     store: HarnessMonitorStore,
     cornerAnimationContent: (() -> AnyView)? = nil
@@ -87,6 +86,13 @@ public struct ContentView: View {
     self.contentDashboard = store.contentUI.dashboard
     self.toast = store.toast
     self.auditBuildState = Self.resolveAuditBuildState()
+
+    let initialWindowNavigation = WindowNavigationState()
+    initialWindowNavigation.backHandler = { await store.navigateBack() }
+    initialWindowNavigation.forwardHandler = { await store.navigateForward() }
+    initialWindowNavigation.canGoBack = store.contentUI.toolbar.canNavigateBack
+    initialWindowNavigation.canGoForward = store.contentUI.toolbar.canNavigateForward
+    _windowNavigation = State(initialValue: initialWindowNavigation)
   }
 
   public var body: some View {
@@ -125,18 +131,6 @@ public struct ContentView: View {
         availableDetailWidth: toolbarLayoutWidth
       )
     }
-    .task {
-      windowNavigation.backHandler = { await store.navigateBack() }
-      windowNavigation.forwardHandler = { await store.navigateForward() }
-      windowNavigation.canGoBack = contentToolbar.canNavigateBack
-      windowNavigation.canGoForward = contentToolbar.canNavigateForward
-      guard !hasAppliedInitialInspectorVisibility else {
-        return
-      }
-      hasAppliedInitialInspectorVisibility = true
-      await Task.yield()
-      showInspector = persistedShowInspector
-    }
     .onChange(of: contentToolbar.canNavigateBack) { _, newValue in
       windowNavigation.canGoBack = newValue
     }
@@ -144,9 +138,6 @@ public struct ContentView: View {
       windowNavigation.canGoForward = newValue
     }
     .onChange(of: persistedShowInspector) { _, newValue in
-      guard hasAppliedInitialInspectorVisibility else {
-        return
-      }
       if showInspector != newValue {
         showInspector = newValue
       }
@@ -301,10 +292,6 @@ public struct ContentView: View {
   }
 
   private func updateInspectorWidth(_ width: CGFloat) {
-    guard hasCapturedInitialInspectorWidth else {
-      hasCapturedInitialInspectorWidth = true
-      return
-    }
     guard !isLayoutAnimating,
       showInspector,
       width >= HarnessMonitorInspectorLayout.minWidth,
@@ -385,6 +372,10 @@ public struct ContentView: View {
       let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
     }
+  }
+
+  private static func initialInspectorVisibility() -> Bool {
+    UserDefaults.standard.object(forKey: "showInspector") as? Bool ?? true
   }
 }
 

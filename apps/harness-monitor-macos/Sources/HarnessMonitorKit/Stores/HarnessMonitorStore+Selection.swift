@@ -141,6 +141,10 @@ extension HarnessMonitorStore {
   public func primeSessionSelection(_ sessionID: String?) {
     let isChangingSelectedSession = selectedSession?.session.sessionId != sessionID
 
+    if isChangingSelectedSession {
+      cancelSessionLoad()
+    }
+
     withUISyncBatch {
       recordNavigation(to: sessionID)
       cancelSessionPushFallback()
@@ -243,7 +247,8 @@ extension HarnessMonitorStore {
     guard !Task.isCancelled else { return }
 
     let requestID = beginSessionLoad()
-    await loadSession(using: client, sessionID: sessionID, requestID: requestID)
+    let loadTask = startSessionLoad(using: client, sessionID: sessionID, requestID: requestID)
+    await loadTask.value
 
     guard !Task.isCancelled else { return }
     guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
@@ -327,6 +332,35 @@ extension HarnessMonitorStore {
       }
     }
     return sessionLoadSequence
+  }
+
+  @discardableResult
+  func startSessionLoad(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    requestID: UInt64
+  ) -> Task<Void, Never> {
+    cancelSessionLoad()
+    sessionLoadTaskToken &+= 1
+    let token = sessionLoadTaskToken
+    let task = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      defer {
+        if self.sessionLoadTaskToken == token {
+          self.sessionLoadTask = nil
+        }
+      }
+      await self.loadSession(using: client, sessionID: sessionID, requestID: requestID)
+    }
+    sessionLoadTask = task
+    return task
+  }
+
+  func cancelSessionLoad() {
+    sessionLoadTask?.cancel()
+    sessionLoadTask = nil
   }
 
   func completeSessionLoad(_ requestID: UInt64) {
