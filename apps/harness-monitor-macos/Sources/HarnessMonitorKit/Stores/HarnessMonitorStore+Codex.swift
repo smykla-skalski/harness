@@ -339,6 +339,11 @@ extension HarnessMonitorStore {
     return await refreshAgentTui(using: client, tuiID: tuiID)
   }
 
+  public func fetchPersonas() async -> [AgentPersona] {
+    guard let client else { return [] }
+    return (try? await client.personas()) ?? []
+  }
+
   @discardableResult
   public func startAgentTui(
     runtime: AgentTuiRuntime,
