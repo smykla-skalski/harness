@@ -28,6 +28,13 @@ extension WebSocketTransport {
 
 @Suite("WebSocket protocol wire format")
 struct WebSocketProtocolTests {
+  private static let testEndpoint: URL = {
+    guard let url = URL(string: "http://127.0.0.1:8080") else {
+      preconditionFailure("Invalid test endpoint URL literal")
+    }
+    return url
+  }()
+
   private let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -40,10 +47,12 @@ struct WebSocketProtocolTests {
     return decoder
   }()
 
-  private func makeTransport() -> WebSocketTransport {
+  private func makeTransport(
+    endpoint: URL = WebSocketProtocolTests.testEndpoint
+  ) -> WebSocketTransport {
     WebSocketTransport(
       connection: HarnessMonitorConnection(
-        endpoint: URL(string: "http://127.0.0.1:8080")!,
+        endpoint: endpoint,
         token: "test-token"
       )
     )
@@ -150,8 +159,10 @@ struct WebSocketProtocolTests {
   func malformedPushFramesDoNotTerminateActiveStreams() async throws {
     let transport = makeTransport()
     let sessionID = "sess-1"
-    let (globalStream, globalContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
-    let (sessionStream, sessionContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
+    let (globalStream, globalContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>
+      .makeStream()
+    let (sessionStream, sessionContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>
+      .makeStream()
 
     await transport.installTestGlobalStreamContinuation(globalContinuation)
     await transport.installTestSessionStreamContinuation(sessionContinuation, sessionID: sessionID)
@@ -211,6 +222,24 @@ struct WebSocketProtocolTests {
       #expect(payload == .object(["ok": .bool(true)]))
     } else {
       Issue.record("expected unknown session push event after malformed frame")
+    }
+  }
+
+  @Test("Agent TUI list reads require a live WebSocket connection")
+  func agentTuiListReadsRequireWebSocketConnection() async {
+    let transport = makeTransport(endpoint: URL(string: "http://127.0.0.1:1")!)
+
+    await #expect(throws: WebSocketTransportError.self) {
+      let _: AgentTuiListResponse = try await transport.agentTuis(sessionID: "sess-1")
+    }
+  }
+
+  @Test("Agent TUI detail reads require a live WebSocket connection")
+  func agentTuiDetailReadsRequireWebSocketConnection() async {
+    let transport = makeTransport(endpoint: URL(string: "http://127.0.0.1:1")!)
+
+    await #expect(throws: WebSocketTransportError.self) {
+      let _: AgentTuiSnapshot = try await transport.agentTui(tuiID: "tui-1")
     }
   }
 

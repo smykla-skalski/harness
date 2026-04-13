@@ -70,7 +70,8 @@ public struct SystemVoiceTextInsertionService: Sendable {
   }
 
   private static func defaultAccessibilityTrustCheck(prompt: Bool) -> Bool {
-    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt] as CFDictionary
+    let options =
+      [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt] as CFDictionary
     return AXIsProcessTrustedWithOptions(options)
   }
 
@@ -88,10 +89,11 @@ public struct SystemVoiceTextInsertionService: Sendable {
       return false
     }
 
-    guard CFGetTypeID(focusedElement) == AXUIElementGetTypeID() else {
+    guard CFGetTypeID(focusedElement) == AXUIElementGetTypeID(),
+      let element = focusedElement as? AXUIElement
+    else {
       return false
     }
-    let element = focusedElement as! AXUIElement
     let result = AXUIElementSetAttributeValue(
       element,
       kAXValueAttribute as CFString,
