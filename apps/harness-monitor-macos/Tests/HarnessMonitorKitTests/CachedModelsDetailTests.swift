@@ -80,6 +80,7 @@ struct CachedModelsDetailTests {
           code: "E001",
           summary: "Missing error handling",
           severity: "high",
+          category: "data_integrity",
           fingerprint: "abc123",
           firstSeenLine: 42,
           lastSeenLine: 42,
