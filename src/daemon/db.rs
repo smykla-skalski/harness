@@ -23,6 +23,23 @@ use crate::workspace::{project_context_dir, project_context_id, utc_now};
 
 use super::state;
 
+pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
+    if scope == "global" || scope.starts_with("session:") {
+        Cow::Borrowed(scope)
+    } else {
+        Cow::Owned(format!("session:{scope}"))
+    }
+}
+
+pub(crate) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
+    if scope == "global" {
+        None
+    } else {
+        Some(scope.strip_prefix("session:").unwrap_or(scope))
+            .filter(|session_id| !session_id.is_empty())
+    }
+}
+
 /// `SQLite`-backed storage for the harness daemon. Replaces the file-based
 /// discovery layer with indexed queries while keeping file writes for
 /// backward compatibility with CLI offline access and agent runtimes.
@@ -377,14 +394,15 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub fn bump_change(&self, scope: &str) -> Result<(), CliError> {
+        let normalized_scope = normalize_change_scope(scope);
         self.conn
             .execute(
                 "INSERT INTO change_tracking (scope, version, updated_at)
                  VALUES (?1, 1, ?2)
                  ON CONFLICT(scope) DO UPDATE SET
-                    version = version + 1,
-                    updated_at = excluded.updated_at",
-                rusqlite::params![scope, utc_now()],
+                     version = version + 1,
+                     updated_at = excluded.updated_at",
+                rusqlite::params![normalized_scope.as_ref(), utc_now()],
             )
             .map_err(|error| db_error(format!("bump change: {error}")))?;
         Ok(())
@@ -3690,6 +3708,22 @@ mod tests {
     fn bump_change_creates_new_scope() {
         let db = DaemonDb::open_in_memory().expect("open db");
         db.bump_change("session:test-1").expect("bump");
+
+        let version: i64 = db
+            .conn
+            .query_row(
+                "SELECT version FROM change_tracking WHERE scope = 'session:test-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("version");
+        assert_eq!(version, 1);
+    }
+
+    #[test]
+    fn bump_change_normalizes_raw_session_scope() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        db.bump_change("test-1").expect("bump");
 
         let version: i64 = db
             .conn
