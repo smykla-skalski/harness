@@ -16,7 +16,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
 use crate::session::types::{
-    SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
+    AgentRegistration, AgentStatus, SessionSignalRecord, SessionSignalStatus, SessionState,
+    SessionStatus,
 };
 
 type SessionCounts = (usize, usize);
@@ -190,7 +191,7 @@ fn build_session_detail(
     resolved: &ResolvedSession,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let mut agents: Vec<_> = resolved.state.agents.values().cloned().collect();
+    let mut agents = visible_session_agents(&resolved.state);
     sort_session_agents(&mut agents);
 
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
@@ -220,7 +221,7 @@ fn build_session_detail(
 /// and agent activity are left empty for deferred loading.
 #[must_use]
 pub fn build_session_detail_core(resolved: &ResolvedSession) -> SessionDetail {
-    let mut agents: Vec<_> = resolved.state.agents.values().cloned().collect();
+    let mut agents = visible_session_agents(&resolved.state);
     sort_session_agents(&mut agents);
 
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
@@ -234,6 +235,23 @@ pub fn build_session_detail_core(resolved: &ResolvedSession) -> SessionDetail {
         observer: None,
         agent_activity: vec![],
     }
+}
+
+fn visible_session_agents(state: &SessionState) -> Vec<AgentRegistration> {
+    state
+        .agents
+        .values()
+        .filter(|agent| agent.status.is_alive())
+        .cloned()
+        .map(normalize_protocol_agent_status)
+        .collect()
+}
+
+fn normalize_protocol_agent_status(mut agent: AgentRegistration) -> AgentRegistration {
+    if agent.status == AgentStatus::Idle {
+        agent.status = AgentStatus::Active;
+    }
+    agent
 }
 
 /// Build the expensive session detail extensions (signals, observer, activity).

@@ -1550,6 +1550,7 @@ fn apply_single_transition(
 
     if new_status == AgentStatus::Disconnected {
         release_agent_tasks(state, &record.agent_id, now);
+        clear_leader_if_matching(state, &record.agent_id);
         clear_pending_leader_transfer(state, &record.agent_id);
         result.disconnected.push(record.agent_id.clone());
         tracing::info!(
@@ -1583,6 +1584,7 @@ pub(crate) fn apply_agent_disconnected(
     }
 
     release_agent_tasks(state, agent_id, now);
+    clear_leader_if_matching(state, agent_id);
     clear_pending_leader_transfer(state, agent_id);
     refresh_session(state, now);
     true
@@ -1987,6 +1989,7 @@ pub(crate) fn apply_end_session(
             agent.last_activity_at = Some(now.to_string());
         }
     }
+    state.leader_id = None;
     state.pending_leader_transfer = None;
     state.status = SessionStatus::Ended;
     state.archived_at = Some(now.to_string());
@@ -3272,6 +3275,12 @@ fn clear_pending_leader_transfer(state: &mut SessionState, agent_id: &str) {
         })
     {
         state.pending_leader_transfer = None;
+    }
+}
+
+fn clear_leader_if_matching(state: &mut SessionState, agent_id: &str) {
+    if state.leader_id.as_deref() == Some(agent_id) {
+        state.leader_id = None;
     }
 }
 
@@ -5120,6 +5129,60 @@ mod tests {
     }
 
     #[test]
+    fn sync_liveness_clears_dead_leader_and_marks_session_leaderless() {
+        with_temp_project(|project| {
+            let _state = start_session("test", "", project, Some("claude"), Some("sync-leader"))
+                .expect("start");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("leaderless-worker"), || {
+                join_session(
+                    "sync-leader",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            });
+
+            let state = session_status("sync-leader", project).expect("status");
+            let leader_id = state.leader_id.clone().expect("leader");
+            let leader = state.agents.get(&leader_id).expect("leader agent");
+            let worker = find_agent_by_runtime(&state, "codex");
+
+            let leader_log = write_agent_log_file(
+                project,
+                "claude",
+                leader.agent_session_id.as_deref().expect("leader session"),
+            );
+            set_log_mtime_seconds_ago(&leader_log, 600);
+            write_agent_log_file(
+                project,
+                "codex",
+                worker.agent_session_id.as_deref().expect("worker session"),
+            );
+
+            let result = sync_agent_liveness("sync-leader", project).expect("sync");
+
+            assert_eq!(result.disconnected, vec![leader_id.clone()]);
+
+            let updated = session_status("sync-leader", project).expect("updated status");
+            assert!(
+                updated.leader_id.is_none(),
+                "dead leader should clear leader_id"
+            );
+            assert_eq!(
+                updated.agents.get(&leader_id).expect("leader agent").status,
+                AgentStatus::Disconnected
+            );
+            assert_eq!(updated.metrics.agent_count, 1);
+            assert_eq!(updated.metrics.active_agent_count, 1);
+        });
+    }
+
+    #[test]
     fn sync_liveness_returns_dead_agent_task_to_open() {
         with_temp_project(|project| {
             let state =
@@ -5219,7 +5282,7 @@ mod tests {
 
             let state = session_status("sync-4", project).expect("status");
             assert_eq!(state.metrics.active_agent_count, 1);
-            assert_eq!(state.metrics.agent_count, 7);
+            assert_eq!(state.metrics.agent_count, 1);
         });
     }
 
