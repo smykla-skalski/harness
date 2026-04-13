@@ -500,20 +500,40 @@ fn emit_watch_changes(
     changes: WatchChanges,
     db: Option<&Arc<Mutex<DaemonDb>>>,
 ) {
+    emit_watch_changes_with(
+        changes,
+        db,
+        |db_ref| service::broadcast_sessions_updated(sender, db_ref),
+        |session_id, db_ref| service::broadcast_session_updated_core(sender, session_id, db_ref),
+        |session_id, db_ref| service::broadcast_session_extensions(sender, session_id, db_ref),
+    );
+}
+
+fn emit_watch_changes_with<SessionsUpdated, SessionUpdatedCore, SessionExtensions>(
+    changes: WatchChanges,
+    db: Option<&Arc<Mutex<DaemonDb>>>,
+    mut broadcast_sessions_updated: SessionsUpdated,
+    mut broadcast_session_updated_core: SessionUpdatedCore,
+    mut broadcast_session_extensions: SessionExtensions,
+) where
+    SessionsUpdated: FnMut(Option<&DaemonDb>),
+    SessionUpdatedCore: FnMut(&str, Option<&DaemonDb>),
+    SessionExtensions: FnMut(&str, Option<&DaemonDb>),
+{
     let db_guard = db.and_then(|db| db.lock().ok());
     let db_ref = db_guard.as_deref();
     if changes.sessions_updated {
-        service::broadcast_sessions_updated(sender, db_ref);
+        broadcast_sessions_updated(db_ref);
     }
 
     for session_id in &changes.session_ids {
-        service::broadcast_session_updated_core(sender, session_id, db_ref);
+        broadcast_session_updated_core(session_id, db_ref);
     }
 
-    // Extensions are computed after releasing the DB lock used for core
-    // broadcasts, reducing contention on the hot polling path.
+    drop(db_guard);
+
     for session_id in changes.session_ids {
-        service::broadcast_session_extensions(sender, &session_id, db_ref);
+        broadcast_session_extensions(&session_id, None);
     }
 }
 
@@ -641,6 +661,50 @@ mod tests {
             poll_change_tracking(&db, &mut last_global_version, &mut last_session_versions);
 
         assert!(changes.session_ids.contains("watch-sess"));
+    }
+
+    #[test]
+    fn emit_watch_changes_releases_db_lock_before_extensions() {
+        let db = Arc::new(Mutex::new(DaemonDb::open_in_memory().expect("open db")));
+        let mut sessions_updated = false;
+        let mut session_updated_core = false;
+        let mut session_extensions = false;
+
+        emit_watch_changes_with(
+            WatchChanges {
+                sessions_updated: true,
+                session_ids: BTreeSet::from([String::from("watch-sess")]),
+            },
+            Some(&db),
+            |db_ref| {
+                sessions_updated = true;
+                assert!(
+                    db_ref.is_some(),
+                    "core broadcasts should receive the DB view"
+                );
+            },
+            |session_id, db_ref| {
+                session_updated_core = true;
+                assert_eq!(session_id, "watch-sess");
+                assert!(db_ref.is_some(), "core updates should receive the DB view");
+            },
+            |session_id, db_ref| {
+                session_extensions = true;
+                assert_eq!(session_id, "watch-sess");
+                assert!(
+                    db_ref.is_none(),
+                    "extensions should run after releasing the DB lock"
+                );
+                assert!(
+                    db.try_lock().is_ok(),
+                    "extensions should not inherit the core DB lock"
+                );
+            },
+        );
+
+        assert!(sessions_updated);
+        assert!(session_updated_core);
+        assert!(session_extensions);
     }
 
     #[test]
