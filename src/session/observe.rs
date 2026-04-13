@@ -340,9 +340,7 @@ fn scan_all_agents(
         let Some(agent_runtime) = resolve_agent_runtime(&agent.runtime) else {
             continue;
         };
-        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
-            continue;
-        };
+        let agent_session_id = service::agent_runtime_session_id(session_id, agent);
         let role_label = format!("{:?}", agent.role).to_lowercase();
         let target = AgentLogScanTarget {
             agent_runtime,
@@ -371,9 +369,7 @@ fn scan_all_agents_incremental(
         let Some(agent_runtime) = resolve_agent_runtime(&agent.runtime) else {
             continue;
         };
-        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
-            continue;
-        };
+        let agent_session_id = service::agent_runtime_session_id(session_id, agent);
         let role_label = format!("{:?}", agent.role).to_lowercase();
         let target = AgentLogScanTarget {
             agent_runtime,
@@ -745,6 +741,54 @@ mod tests {
             assert!(
                 !issues.is_empty(),
                 "expected observe to find transcript issues"
+            );
+        });
+    }
+
+    #[test]
+    fn observe_scans_logs_via_legacy_session_fallback() {
+        with_temp_project(|project| {
+            let state = service::start_session(
+                "observe test",
+                "",
+                project,
+                Some("claude"),
+                Some("sess-legacy"),
+            )
+            .expect("start session");
+
+            let joined = service::join_session(
+                &state.session_id,
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join codex worker");
+            let worker = joined
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("codex worker should be registered");
+            assert!(worker.agent_session_id.is_none());
+
+            write_agent_log(
+                project,
+                HookAgent::Codex,
+                &state.session_id,
+                "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+            );
+
+            let state =
+                service::session_status("sess-legacy", project).expect("load session status");
+            let issues =
+                scan_all_agents(&state, "sess-legacy", project).expect("scan legacy session logs");
+
+            assert!(
+                !issues.is_empty(),
+                "expected observe to find transcript issues for legacy sessions"
             );
         });
     }
