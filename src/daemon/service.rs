@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::id as process_id;
 use std::slice;
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::agents::runtime as agents_runtime;
 use crate::agents::runtime::signal::{
@@ -13,7 +14,9 @@ use crate::agents::runtime::signal::{
 use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
-use crate::session::types::{SessionLogEntry, SessionState, SessionTransition, TaskSource};
+use crate::session::types::{
+    AgentRegistration, SessionLogEntry, SessionState, SessionTransition, TaskSource,
+};
 use crate::session::{
     observe as session_observe, service as session_service, storage as session_storage,
 };
@@ -24,6 +27,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
 
+use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
 use super::codex_controller::CodexControllerHandle;
 use super::codex_transport::{self, CodexTransportKind};
@@ -54,6 +58,23 @@ struct DaemonObserveRuntime {
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
 static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
+const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
+const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+struct ActiveSignalDelivery<'a> {
+    session_id: &'a str,
+    agent_id: &'a str,
+    signal: &'a agents_runtime::signal::Signal,
+    runtime: &'a dyn agents_runtime::AgentRuntime,
+    project_dir: &'a Path,
+    signal_session_id: &'a str,
+    db: Option<&'a super::db::DaemonDb>,
+}
+
+struct ManagedTuiWake<'a> {
+    tui_id: &'a str,
+    manager: &'a AgentTuiManagerHandle,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonStatusReport {
@@ -1142,6 +1163,7 @@ pub fn send_signal(
     session_id: &str,
     request: &SignalSendRequest,
     db: Option<&super::db::DaemonDb>,
+    agent_tui_manager: Option<&AgentTuiManagerHandle>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
@@ -1155,6 +1177,11 @@ pub fn send_signal(
             &request.actor,
             &now,
         )?;
+        let target_tui_id = state
+            .agents
+            .get(&request.agent_id)
+            .and_then(agent_tui_id_for_registration)
+            .map(ToString::to_string);
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
@@ -1188,6 +1215,18 @@ pub fn send_signal(
             Some(&request.actor),
             None,
         ))?;
+        attempt_active_signal_delivery(
+            &ActiveSignalDelivery {
+                session_id,
+                agent_id: &request.agent_id,
+                signal: &signal,
+                runtime,
+                project_dir: &project_dir,
+                signal_session_id,
+                db: Some(db),
+            },
+            managed_tui_wake(target_tui_id.as_deref(), agent_tui_manager),
+        );
         refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
@@ -1208,6 +1247,227 @@ pub fn send_signal(
     )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
+}
+
+fn managed_tui_wake<'a>(
+    tui_id: Option<&'a str>,
+    agent_tui_manager: Option<&'a AgentTuiManagerHandle>,
+) -> Option<ManagedTuiWake<'a>> {
+    Some(ManagedTuiWake {
+        tui_id: tui_id?,
+        manager: agent_tui_manager?,
+    })
+}
+
+fn attempt_active_signal_delivery(
+    delivery: &ActiveSignalDelivery<'_>,
+    managed_tui: Option<ManagedTuiWake<'_>>,
+) {
+    let Some(managed_tui) = managed_tui else {
+        return;
+    };
+
+    let Some(woke_tui) = handled_active_signal_wake_result(
+        delivery,
+        wake_tui_for_signal(&managed_tui, delivery.signal),
+    ) else {
+        return;
+    };
+
+    if woke_tui {
+        process_active_signal_ack(delivery);
+    }
+}
+
+fn wake_tui_for_signal(
+    managed_tui: &ManagedTuiWake<'_>,
+    signal: &agents_runtime::signal::Signal,
+) -> Result<bool, CliError> {
+    let prompt = build_active_signal_prompt(signal);
+    managed_tui.manager.prompt_tui(managed_tui.tui_id, &prompt)
+}
+
+fn handled_active_signal_wake_result(
+    delivery: &ActiveSignalDelivery<'_>,
+    wake_result: Result<bool, CliError>,
+) -> Option<bool> {
+    match wake_result {
+        Ok(woke_tui) => Some(woke_tui),
+        Err(error) => {
+            warn_active_signal_wake_failure(delivery, &error);
+            None
+        }
+    }
+}
+
+fn process_active_signal_ack(delivery: &ActiveSignalDelivery<'_>) {
+    let Some(ack) = handled_active_signal_ack_wait_result(
+        delivery,
+        wait_for_signal_ack(
+            delivery.runtime,
+            delivery.project_dir,
+            delivery.signal_session_id,
+            &delivery.signal.signal_id,
+        ),
+    ) else {
+        return;
+    };
+
+    record_active_signal_ack(delivery, &ack);
+}
+
+fn handled_active_signal_ack_wait_result(
+    delivery: &ActiveSignalDelivery<'_>,
+    ack_result: Result<Option<SignalAck>, CliError>,
+) -> Option<SignalAck> {
+    match ack_result {
+        Ok(Some(ack)) => Some(ack),
+        Ok(None) => {
+            warn_active_signal_delivery_timeout(
+                delivery.session_id,
+                delivery.agent_id,
+                &delivery.signal.signal_id,
+            );
+            None
+        }
+        Err(error) => {
+            warn_active_signal_ack_wait_failure(delivery, &error);
+            None
+        }
+    }
+}
+
+fn record_active_signal_ack(delivery: &ActiveSignalDelivery<'_>, ack: &SignalAck) {
+    let Err(error) = record_signal_ack(
+        delivery.session_id,
+        delivery.agent_id,
+        &delivery.signal.signal_id,
+        ack.result,
+        delivery.project_dir,
+        delivery.db,
+    ) else {
+        return;
+    };
+
+    warn_active_signal_ack_record_failure(delivery, &error);
+}
+
+fn build_active_signal_prompt(signal: &agents_runtime::signal::Signal) -> String {
+    match signal.payload.action_hint.as_deref() {
+        Some(action_hint) => format!(
+            "[Harness signal] {}: {} ({action_hint})",
+            signal.command, signal.payload.message
+        ),
+        None => format!(
+            "[Harness signal] {}: {}",
+            signal.command, signal.payload.message
+        ),
+    }
+}
+
+fn wait_for_signal_ack(
+    runtime: &dyn agents_runtime::AgentRuntime,
+    project_dir: &Path,
+    signal_session_id: &str,
+    signal_id: &str,
+) -> Result<Option<SignalAck>, CliError> {
+    let deadline = Instant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
+    loop {
+        if let Some(ack) = runtime
+            .read_acknowledgments(project_dir, signal_session_id)?
+            .into_iter()
+            .find(|ack| ack.signal_id == signal_id)
+        {
+            return Ok(Some(ack));
+        }
+        if Instant::now() >= deadline {
+            return Ok(None);
+        }
+        thread::sleep(ACTIVE_SIGNAL_ACK_POLL_INTERVAL);
+    }
+}
+
+fn warn_active_signal_delivery_timeout(session_id: &str, agent_id: &str, signal_id: &str) {
+    state::append_event_best_effort(
+        "warn",
+        &active_signal_delivery_timeout_message(session_id, agent_id, signal_id),
+    );
+    log_active_signal_delivery_timeout(session_id, agent_id, signal_id);
+}
+
+fn active_signal_delivery_timeout_message(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+) -> String {
+    format!(
+        "session '{session_id}' signal '{signal_id}' to agent '{agent_id}' stayed pending after active TUI wake-up for {} ms",
+        ACTIVE_SIGNAL_ACK_TIMEOUT.as_millis()
+    )
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "structured tracing macro expansion inflates this simple logging helper"
+)]
+fn warn_active_signal_wake_failure(delivery: &ActiveSignalDelivery<'_>, error: &CliError) {
+    tracing::warn!(
+        %error,
+        session_id = delivery.session_id,
+        agent_id = delivery.agent_id,
+        signal_id = %delivery.signal.signal_id,
+        "failed to wake managed TUI for active signal delivery"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "structured tracing macro expansion inflates this simple logging helper"
+)]
+fn warn_active_signal_ack_wait_failure(delivery: &ActiveSignalDelivery<'_>, error: &CliError) {
+    tracing::warn!(
+        %error,
+        session_id = delivery.session_id,
+        agent_id = delivery.agent_id,
+        signal_id = %delivery.signal.signal_id,
+        "failed while waiting for active signal acknowledgment"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "structured tracing macro expansion inflates this simple logging helper"
+)]
+fn warn_active_signal_ack_record_failure(delivery: &ActiveSignalDelivery<'_>, error: &CliError) {
+    tracing::warn!(
+        %error,
+        session_id = delivery.session_id,
+        agent_id = delivery.agent_id,
+        signal_id = %delivery.signal.signal_id,
+        "failed to record actively delivered signal acknowledgment"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "structured tracing macro expansion inflates this simple logging helper"
+)]
+fn log_active_signal_delivery_timeout(session_id: &str, agent_id: &str, signal_id: &str) {
+    tracing::warn!(
+        session_id,
+        agent_id,
+        signal_id,
+        timeout_ms = ACTIVE_SIGNAL_ACK_TIMEOUT.as_millis(),
+        "active TUI signal delivery timed out"
+    );
+}
+
+fn agent_tui_id_for_registration(agent: &AgentRegistration) -> Option<&str> {
+    agent.capabilities.iter().find_map(|capability| {
+        capability
+            .strip_prefix("agent-tui:")
+            .filter(|value| !value.trim().is_empty())
+    })
 }
 
 /// Cancel a pending signal by writing a rejected acknowledgment.
@@ -2032,13 +2292,17 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
 mod tests {
     use super::*;
 
+    use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
     use std::process::Command;
+    use std::sync::{Arc, Mutex, OnceLock};
 
     use fs_err as fs;
     use tempfile::tempdir;
+    use tokio::sync::broadcast;
 
     use crate::agents::runtime;
+    use crate::daemon::agent_tui::{AgentTuiManagerHandle, AgentTuiStartRequest};
     use crate::daemon::protocol::{SessionUpdatedPayload, SessionsUpdatedPayload};
     use crate::hooks::adapters::HookAgent;
     use crate::session::{
@@ -2096,6 +2360,71 @@ mod tests {
             ),
         )
         .expect("write log");
+    }
+
+    #[derive(Clone, Copy)]
+    enum IdleSignalScriptBehavior {
+        AckOnWake,
+        IgnoreWake,
+    }
+
+    fn write_idle_signal_script(
+        project: &Path,
+        signal_dir: &Path,
+        runtime_session_id: &str,
+        orchestration_session_id: &str,
+        behavior: IdleSignalScriptBehavior,
+    ) -> std::path::PathBuf {
+        let script_path = project.join(match behavior {
+            IdleSignalScriptBehavior::AckOnWake => "idle-signal-ack.sh",
+            IdleSignalScriptBehavior::IgnoreWake => "idle-signal-ignore.sh",
+        });
+        let wake_behavior = match behavior {
+            IdleSignalScriptBehavior::AckOnWake => format!(
+                r#"attempt=0
+while [ "$attempt" -lt 20 ]; do
+  for signal_file in "{signal_dir}/pending"/*.json; do
+    if [ -e "$signal_file" ]; then
+      signal_id=$(basename "$signal_file" .json)
+      ack_dir="{signal_dir}/acknowledged"
+      mkdir -p "$ack_dir"
+      cat > "$ack_dir/$signal_id.ack.json" <<EOF
+{{"signal_id":"$signal_id","acknowledged_at":"2026-04-13T00:00:00Z","result":"accepted","agent":"{runtime_session_id}","session_id":"{orchestration_session_id}"}}
+EOF
+      mv "$signal_file" "$ack_dir/$signal_id.json"
+      exit 0
+    fi
+  done
+  attempt=$((attempt + 1))
+  sleep 0.1
+done
+exit 1
+"#,
+                signal_dir = signal_dir.display(),
+                runtime_session_id = runtime_session_id,
+                orchestration_session_id = orchestration_session_id
+            ),
+            IdleSignalScriptBehavior::IgnoreWake => "sleep 2\nexit 0\n".to_string(),
+        };
+        let script = format!(
+            r#"#!/bin/sh
+lines=0
+while IFS= read -r _line; do
+  lines=$((lines + 1))
+  if [ "$lines" -eq 1 ]; then
+    continue
+  fi
+  {wake_behavior}
+done
+"#
+        );
+        fs::write(&script_path, script).expect("write idle signal script");
+        let mut permissions = fs::metadata(&script_path)
+            .expect("script metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script_path, permissions).expect("set script executable");
+        script_path
     }
 
     #[test]
@@ -2398,6 +2727,7 @@ mod tests {
                     action_hint: Some("task:signal".into()),
                 },
                 None,
+                None,
             )
             .expect("send signal");
 
@@ -2413,6 +2743,241 @@ mod tests {
             assert_eq!(
                 detail.signals[0].signal.payload.action_hint.as_deref(),
                 Some("task:signal")
+            );
+        });
+    }
+
+    #[test]
+    fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
+        with_temp_project(|project| {
+            use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+
+            let db = Arc::new(Mutex::new(setup_db_with_project(project)));
+            let db_slot = Arc::new(OnceLock::new());
+            db_slot.set(Arc::clone(&db)).expect("db slot");
+            let (sender, _) = broadcast::channel(8);
+            let manager = AgentTuiManagerHandle::new(sender, db_slot, false);
+
+            {
+                let db_guard = db.lock().expect("db lock");
+                start_session_direct(
+                    &SessionStartRequest {
+                        title: "daemon active signal".into(),
+                        context: "wake idle tui".into(),
+                        runtime: "claude".into(),
+                        session_id: Some("daemon-active-signal".into()),
+                        project_dir: project.to_string_lossy().into(),
+                    },
+                    Some(&db_guard),
+                )
+                .expect("start session");
+            }
+
+            let worker_session_id = "daemon-active-signal-worker";
+            let signal_dir = runtime::runtime_for_name("codex")
+                .expect("codex runtime")
+                .signal_dir(project, worker_session_id);
+            let script_path = write_idle_signal_script(
+                project,
+                &signal_dir,
+                worker_session_id,
+                "daemon-active-signal",
+                IdleSignalScriptBehavior::AckOnWake,
+            );
+
+            let snapshot = manager
+                .start(
+                    "daemon-active-signal",
+                    &AgentTuiStartRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: Some("idle worker".into()),
+                        prompt: None,
+                        project_dir: Some(project.to_string_lossy().into()),
+                        argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
+                        rows: 5,
+                        cols: 40,
+                    },
+                )
+                .expect("start agent tui");
+
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
+                    let db_guard = db.lock().expect("db lock");
+                    join_session_direct(
+                        "daemon-active-signal",
+                        &SessionJoinRequest {
+                            runtime: "codex".into(),
+                            role: SessionRole::Worker,
+                            capabilities: vec![
+                                "agent-tui".into(),
+                                format!("agent-tui:{}", snapshot.tui_id),
+                            ],
+                            name: Some("idle worker".into()),
+                            project_dir: project.to_string_lossy().into(),
+                        },
+                        Some(&db_guard),
+                    )
+                    .expect("join worker")
+                });
+            let worker_id = joined
+                .agents
+                .values()
+                .find(|agent| agent.role == SessionRole::Worker)
+                .expect("worker agent")
+                .agent_id
+                .clone();
+
+            let detail = {
+                let db_guard = db.lock().expect("db lock");
+                send_signal(
+                    "daemon-active-signal",
+                    &SignalSendRequest {
+                        actor: joined.leader_id.clone().expect("leader id"),
+                        agent_id: worker_id.clone(),
+                        command: "inject_context".into(),
+                        message: "deliver immediately".into(),
+                        action_hint: Some("task:active".into()),
+                    },
+                    Some(&db_guard),
+                    Some(&manager),
+                )
+                .expect("send signal")
+            };
+
+            let signal = detail
+                .signals
+                .iter()
+                .find(|signal| {
+                    signal.agent_id == worker_id
+                        && signal.signal.payload.message == "deliver immediately"
+                })
+                .expect("delivered signal");
+            assert_eq!(signal.status, SessionSignalStatus::Delivered);
+            assert_eq!(
+                signal.acknowledgment.as_ref().map(|ack| ack.result),
+                Some(AckResult::Accepted)
+            );
+        });
+    }
+
+    #[test]
+    fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
+        with_temp_project(|project| {
+            use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+
+            let db = Arc::new(Mutex::new(setup_db_with_project(project)));
+            let db_slot = Arc::new(OnceLock::new());
+            db_slot.set(Arc::clone(&db)).expect("db slot");
+            let (sender, _) = broadcast::channel(8);
+            let manager = AgentTuiManagerHandle::new(sender, db_slot, false);
+
+            {
+                let db_guard = db.lock().expect("db lock");
+                start_session_direct(
+                    &SessionStartRequest {
+                        title: "daemon timed signal".into(),
+                        context: "warn when idle tui ignores wake".into(),
+                        runtime: "claude".into(),
+                        session_id: Some("daemon-timed-signal".into()),
+                        project_dir: project.to_string_lossy().into(),
+                    },
+                    Some(&db_guard),
+                )
+                .expect("start session");
+            }
+
+            let worker_session_id = "daemon-timed-signal-worker";
+            let signal_dir = runtime::runtime_for_name("codex")
+                .expect("codex runtime")
+                .signal_dir(project, worker_session_id);
+            let script_path = write_idle_signal_script(
+                project,
+                &signal_dir,
+                worker_session_id,
+                "daemon-timed-signal",
+                IdleSignalScriptBehavior::IgnoreWake,
+            );
+
+            let snapshot = manager
+                .start(
+                    "daemon-timed-signal",
+                    &AgentTuiStartRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: Some("sleepy worker".into()),
+                        prompt: None,
+                        project_dir: Some(project.to_string_lossy().into()),
+                        argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
+                        rows: 5,
+                        cols: 40,
+                    },
+                )
+                .expect("start agent tui");
+
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
+                    let db_guard = db.lock().expect("db lock");
+                    join_session_direct(
+                        "daemon-timed-signal",
+                        &SessionJoinRequest {
+                            runtime: "codex".into(),
+                            role: SessionRole::Worker,
+                            capabilities: vec![
+                                "agent-tui".into(),
+                                format!("agent-tui:{}", snapshot.tui_id),
+                            ],
+                            name: Some("sleepy worker".into()),
+                            project_dir: project.to_string_lossy().into(),
+                        },
+                        Some(&db_guard),
+                    )
+                    .expect("join worker")
+                });
+            let worker_id = joined
+                .agents
+                .values()
+                .find(|agent| agent.role == SessionRole::Worker)
+                .expect("worker agent")
+                .agent_id
+                .clone();
+
+            let detail = {
+                let db_guard = db.lock().expect("db lock");
+                send_signal(
+                    "daemon-timed-signal",
+                    &SignalSendRequest {
+                        actor: joined.leader_id.clone().expect("leader id"),
+                        agent_id: worker_id.clone(),
+                        command: "inject_context".into(),
+                        message: "stay pending".into(),
+                        action_hint: Some("task:warn".into()),
+                    },
+                    Some(&db_guard),
+                    Some(&manager),
+                )
+                .expect("send signal")
+            };
+
+            let signal = detail
+                .signals
+                .iter()
+                .find(|signal| {
+                    signal.agent_id == worker_id && signal.signal.payload.message == "stay pending"
+                })
+                .expect("pending signal");
+            assert_eq!(signal.status, SessionSignalStatus::Pending);
+
+            let events = state::read_recent_events(1).expect("read daemon events");
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].level, "warn");
+            assert!(
+                events[0].message.contains("daemon-timed-signal")
+                    && events[0].message.contains(&worker_id),
+                "warning should mention session and agent: {}",
+                events[0].message
             );
         });
     }
@@ -2457,6 +3022,7 @@ mod tests {
                     message: "Investigate the stuck signal lane".into(),
                     action_hint: Some("task:signal".into()),
                 },
+                None,
                 None,
             )
             .expect("send signal");
@@ -2742,6 +3308,7 @@ mod tests {
                     action_hint: None,
                 },
                 Some(&db),
+                None,
             )
             .expect("first signal");
             assert_eq!(first.signals.len(), 1);
@@ -2756,6 +3323,7 @@ mod tests {
                     action_hint: None,
                 },
                 Some(&db),
+                None,
             )
             .expect("second signal");
 
