@@ -11,6 +11,18 @@ struct SessionCockpitHeaderCard: View {
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
+  private struct SupplementalSummaryVisibility: Equatable {
+    let hasObserver: Bool
+    let hasPendingLeaderTransfer: Bool
+  }
+
+  private var supplementalSummaryVisibility: SupplementalSummaryVisibility {
+    SupplementalSummaryVisibility(
+      hasObserver: detail.observer != nil,
+      hasPendingLeaderTransfer: detail.session.pendingLeaderTransfer != nil
+    )
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       HStack(alignment: .top) {
@@ -57,8 +69,7 @@ struct SessionCockpitHeaderCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .animation(.spring(duration: 0.3), value: detail.observer != nil)
-    .animation(.spring(duration: 0.3), value: detail.session.pendingLeaderTransfer != nil)
+    .animation(.spring(duration: 0.3), value: supplementalSummaryVisibility)
   }
 
   private var observeButton: some View {
