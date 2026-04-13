@@ -6,6 +6,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+#[cfg(test)]
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -14,7 +17,7 @@ use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
 pub use crate::infra::persistence::flock::FlockGuard;
 use crate::infra::persistence::flock::{
     FlockErrorContext, TryAcquireFlockError, flock_is_held_at as shared_flock_is_held_at,
-    try_acquire_exclusive_flock,
+    try_acquire_exclusive_flock, with_exclusive_flock,
 };
 use crate::workspace::{dirs_home, harness_data_root, host_home_dir, utc_now};
 
@@ -23,6 +26,7 @@ const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
 const LEGACY_LAUNCH_AGENT_PLIST: &str = "io.harness.monitor.daemon.plist";
 pub(crate) const DAEMON_LOCK_FILE: &str = "daemon.lock";
 pub(crate) const BRIDGE_LOCK_FILE: &str = "bridge.lock";
+const MANIFEST_LOCK_FILE: &str = "manifest.lock";
 pub(crate) const APP_GROUP_ID_ENV: &str = "HARNESS_APP_GROUP_ID";
 pub(crate) const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
 
@@ -37,6 +41,12 @@ pub(crate) const DAEMON_DATA_HOME_ENV: &str = "HARNESS_DAEMON_DATA_HOME";
 /// [`std::env::set_var`] keeps us sound under the Rust 2024 multithreaded
 /// environment rules.
 static DAEMON_ROOT_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+#[cfg(test)]
+type ManifestWriteHook = dyn Fn() + Send + Sync + 'static;
+
+#[cfg(test)]
+static MANIFEST_WRITE_HOOK: Mutex<Option<Arc<ManifestWriteHook>>> = Mutex::new(None);
 
 /// Install a process-local override so every subsequent [`daemon_root`] call
 /// returns `path`. Passing `None` clears the override.
@@ -187,6 +197,11 @@ fn context_scope_value(name: &str) -> Option<String> {
 #[must_use]
 pub fn manifest_path() -> PathBuf {
     daemon_root().join("manifest.json")
+}
+
+#[must_use]
+fn manifest_lock_path() -> PathBuf {
+    daemon_root().join(MANIFEST_LOCK_FILE)
 }
 
 #[must_use]
@@ -356,14 +371,39 @@ pub fn load_running_manifest() -> Result<Option<DaemonManifest>, CliError> {
 /// Returns `CliError` on filesystem failures.
 pub fn write_manifest(manifest: &DaemonManifest) -> Result<DaemonManifest, CliError> {
     ensure_daemon_dirs()?;
-    let previous_revision = load_manifest().ok().flatten().map_or(0, |m| m.revision);
-    let next = DaemonManifest {
-        revision: previous_revision.saturating_add(1),
-        updated_at: utc_now(),
-        ..manifest.clone()
-    };
-    write_json_pretty(&manifest_path(), &next)?;
-    Ok(next)
+    with_exclusive_flock(
+        &manifest_lock_path(),
+        FlockErrorContext::new("daemon manifest"),
+        || {
+            let previous_revision = load_manifest().ok().flatten().map_or(0, |m| m.revision);
+            run_manifest_write_hook();
+            let next = DaemonManifest {
+                revision: previous_revision.saturating_add(1),
+                updated_at: utc_now(),
+                ..manifest.clone()
+            };
+            write_json_pretty(&manifest_path(), &next)?;
+            Ok(next)
+        },
+    )
+}
+
+#[cfg(test)]
+fn set_manifest_write_hook(hook: Option<Arc<ManifestWriteHook>>) {
+    *MANIFEST_WRITE_HOOK
+        .lock()
+        .expect("manifest write hook mutex poisoned") = hook;
+}
+
+fn run_manifest_write_hook() {
+    #[cfg(test)]
+    if let Some(hook) = MANIFEST_WRITE_HOOK
+        .lock()
+        .expect("manifest write hook mutex poisoned")
+        .clone()
+    {
+        hook();
+    }
 }
 
 /// Remove the daemon manifest when it still belongs to `pid`.
@@ -514,8 +554,22 @@ fn latest_event() -> Result<Option<DaemonAuditEvent>, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
     use fs2::FileExt;
     use tempfile::tempdir;
+
+    struct ManifestWriteHookReset;
+
+    impl Drop for ManifestWriteHookReset {
+        fn drop(&mut self) {
+            set_manifest_write_hook(None);
+        }
+    }
 
     #[test]
     fn ensure_auth_token_writes_strict_permissions() {
@@ -852,6 +906,79 @@ mod tests {
                 set_daemon_root_override(None);
                 assert_eq!(daemon_root(), default_daemon_root());
                 reset_override_for_tests();
+            },
+        );
+    }
+
+    #[test]
+    fn write_manifest_serializes_concurrent_writers_before_loading_next_revision() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let base = DaemonManifest {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    pid: 4242,
+                    endpoint: "http://127.0.0.1:4242".into(),
+                    started_at: "2026-04-13T18:00:00Z".into(),
+                    token_path: auth_token_path().display().to_string(),
+                    sandboxed: false,
+                    host_bridge: HostBridgeManifest::default(),
+                    revision: 0,
+                    updated_at: String::new(),
+                };
+                let (event_tx, event_rx) = mpsc::channel();
+                let released = Arc::new(AtomicBool::new(false));
+                let call_index = Arc::new(AtomicUsize::new(0));
+                let _hook_reset = ManifestWriteHookReset;
+
+                set_manifest_write_hook(Some(Arc::new({
+                    let released = Arc::clone(&released);
+                    let call_index = Arc::clone(&call_index);
+                    move || {
+                        let current = call_index.fetch_add(1, Ordering::SeqCst);
+                        event_tx.send(current).expect("send manifest hook event");
+                        if current == 0 {
+                            while !released.load(Ordering::SeqCst) {
+                                thread::yield_now();
+                            }
+                        }
+                    }
+                })));
+
+                let first_manifest = base.clone();
+                let first = thread::spawn(move || write_manifest(&first_manifest));
+                assert_eq!(
+                    event_rx
+                        .recv_timeout(Duration::from_secs(2))
+                        .expect("first hook"),
+                    0
+                );
+
+                let second_manifest = base.clone();
+                let second = thread::spawn(move || write_manifest(&second_manifest));
+                let second_before_release = event_rx.recv_timeout(Duration::from_millis(200)).ok();
+
+                released.store(true, Ordering::SeqCst);
+
+                let first_written = first.join().expect("join first").expect("first write");
+                let second_hook = second_before_release
+                    .or_else(|| event_rx.recv_timeout(Duration::from_secs(2)).ok());
+                let second_written = second.join().expect("join second").expect("second write");
+
+                assert!(
+                    second_before_release.is_none(),
+                    "second writer should block until the first write completes"
+                );
+                assert_eq!(second_hook, Some(1));
+                assert_eq!(first_written.revision, 1);
+                assert_eq!(second_written.revision, 2);
+
+                let loaded = load_manifest().expect("load").expect("manifest");
+                assert_eq!(loaded.revision, 2);
             },
         );
     }
