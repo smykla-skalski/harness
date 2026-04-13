@@ -33,8 +33,8 @@ use crate::workspace::utc_now;
 
 use super::agent_tui::{
     AgentTuiInputRequest, AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiResizeRequest,
-    AgentTuiSize, AgentTuiSnapshot, AgentTuiSnapshotContext, AgentTuiStatus, send_initial_prompt,
-    snapshot_from_process, spawn_agent_tui_process, wait_for_readiness,
+    AgentTuiSize, AgentTuiSnapshot, AgentTuiSnapshotContext, AgentTuiStatus,
+    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 use super::discovery::{self, AdoptionOutcome};
 use super::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
@@ -930,10 +930,9 @@ impl BridgeServer {
             &spec.project_dir,
             spec.size,
         )?;
-        wait_for_readiness(&process, &spec.profile.runtime, &spec.tui_id);
-        if let Some(prompt) = spec.prompt.as_deref().filter(|prompt| !prompt.is_empty()) {
-            send_initial_prompt(&process, prompt)?;
-        }
+        let deferred_prompt = spec.prompt.clone();
+        let deferred_runtime = spec.profile.runtime.clone();
+        let deferred_tui_id = spec.tui_id.clone();
         let process = Arc::new(process);
         let context = BridgeSnapshotContext {
             session_id: spec.session_id,
@@ -954,6 +953,25 @@ impl BridgeServer {
             },
         );
         self.update_agent_tui_metadata()?;
+
+        // Send prompt in background so the bridge response returns immediately.
+        {
+            let process = Arc::clone(&self.active_tui(&deferred_tui_id)?.process);
+            let prompt = deferred_prompt
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .map(ToString::to_string);
+            thread::spawn(move || {
+                deliver_deferred_prompts(
+                    &process,
+                    &deferred_runtime,
+                    &deferred_tui_id,
+                    prompt.as_deref().unwrap_or(""),
+                    None,
+                );
+            });
+        }
+
         Ok(snapshot)
     }
 

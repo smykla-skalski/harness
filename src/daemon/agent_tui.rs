@@ -567,49 +567,61 @@ impl AgentTuiManagerHandle {
             size,
         )?;
 
-        wait_for_readiness(&process, &profile.runtime, &tui_id);
-        self.send_auto_join_and_user_prompt(&process, &snapshot_context, size, request)?;
+        // Activate immediately so the HTTP response returns without blocking.
+        // The join message is sent in a background thread after readiness.
         let result = self.activate_tui(process, &snapshot_context);
         if let Ok(snapshot) = &result {
-            let _ = self.save_and_broadcast("agent_tui_ready", snapshot);
+            self.spawn_deferred_join(snapshot.clone(), profile.runtime.clone(), request);
         }
         result
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion; tokio-rs/tracing#553"
-    )]
-    fn send_auto_join_and_user_prompt(
+    /// Spawn a background thread that waits for the runtime readiness signal,
+    /// then sends the auto-join and optional user prompt. This keeps the HTTP
+    /// response from blocking while the agent initializes.
+    fn spawn_deferred_join(
         &self,
-        process: &AgentTuiProcess,
-        context: &AgentTuiSnapshotContext<'_>,
-        size: AgentTuiSize,
+        snapshot: AgentTuiSnapshot,
+        runtime: String,
         request: &AgentTuiStartRequest,
-    ) -> Result<(), CliError> {
+    ) {
         let auto_join = build_auto_join_prompt(
-            &context.profile.runtime,
-            context.session_id,
+            &runtime,
+            &snapshot.session_id,
             request.role,
             &request.capabilities,
-            context.tui_id,
+            &snapshot.tui_id,
             request.name.as_deref(),
             request.persona.as_deref(),
         );
-        if let Err(error) = send_initial_prompt(process, &auto_join) {
-            let _ = process.kill();
-            let snapshot = failed_snapshot(context, size, error.to_string());
-            let _ = self.save_and_broadcast("agent_tui_failed", &snapshot);
-            return Err(error);
-        }
+        let user_prompt = request
+            .prompt
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+        let tui_id = snapshot.tui_id.clone();
+        let manager = self.clone();
 
-        if let Some(prompt) = request.prompt.as_deref().filter(|value| !value.is_empty())
-            && let Err(error) = send_initial_prompt(process, prompt)
-        {
-            tracing::warn!(%error, "failed to send user prompt after auto-join");
-        }
-
-        Ok(())
+        thread::spawn(
+            #[expect(
+                clippy::cognitive_complexity,
+                reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+            )]
+            move || {
+                let Ok(process) = manager.active_process(&tui_id) else {
+                    tracing::warn!(tui_id = %tui_id, "deferred join: TUI no longer active");
+                    return;
+                };
+                deliver_deferred_prompts(
+                    &process,
+                    &runtime,
+                    &tui_id,
+                    &auto_join,
+                    user_prompt.as_deref(),
+                );
+                let _ = manager.save_and_broadcast("agent_tui_ready", &snapshot);
+            },
+        );
     }
 
     fn activate_tui(
@@ -1394,6 +1406,31 @@ pub(super) fn wait_for_readiness(process: &AgentTuiProcess, runtime: &str, tui_i
     }
 }
 
+/// Wait for readiness, then send the auto-join prompt and optional user prompt.
+/// Used by both the direct and bridge deferred-join background threads.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub(super) fn deliver_deferred_prompts(
+    process: &AgentTuiProcess,
+    runtime: &str,
+    tui_id: &str,
+    auto_join: &str,
+    user_prompt: Option<&str>,
+) {
+    wait_for_readiness(process, runtime, tui_id);
+    if let Err(error) = send_initial_prompt(process, auto_join) {
+        tracing::warn!(%error, tui_id = %tui_id, "deferred join: failed to send auto-join");
+        return;
+    }
+    if let Some(prompt) = user_prompt
+        && let Err(error) = send_initial_prompt(process, prompt)
+    {
+        tracing::warn!(%error, "failed to send user prompt after auto-join");
+    }
+}
+
 pub(super) fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Result<(), CliError> {
     process.send_input(&AgentTuiInput::Text {
         text: prompt.to_string(),
@@ -1421,32 +1458,6 @@ fn write_transcript(path: &Path, transcript: &[u8]) -> Result<(), CliError> {
     fs_err::write(path, transcript).map_err(|error| {
         CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}")).into()
     })
-}
-
-fn failed_snapshot(
-    context: &AgentTuiSnapshotContext<'_>,
-    size: AgentTuiSize,
-    error: String,
-) -> AgentTuiSnapshot {
-    let screen = TerminalScreenParser::new(size).snapshot();
-    let now = utc_now();
-    AgentTuiSnapshot {
-        tui_id: context.tui_id.to_string(),
-        session_id: context.session_id.to_string(),
-        agent_id: context.agent_id.to_string(),
-        runtime: context.profile.runtime.clone(),
-        status: AgentTuiStatus::Failed,
-        argv: context.profile.argv.clone(),
-        project_dir: context.project_dir.display().to_string(),
-        size,
-        screen,
-        transcript_path: context.transcript_path.display().to_string(),
-        exit_code: None,
-        signal: None,
-        error: Some(error),
-        created_at: now.clone(),
-        updated_at: now,
-    }
 }
 
 /// Build the skill invocation string that the daemon sends as the first PTY
@@ -2108,8 +2119,12 @@ mod tests {
             started_event.session_id.as_deref(),
             Some("sess-tui-manager")
         );
-        let ready_event = receiver.try_recv().expect("ready event");
-        assert_eq!(ready_event.event, "agent_tui_ready");
+        // The ready event arrives asynchronously from the deferred join thread.
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            receiver
+                .try_recv()
+                .is_ok_and(|event| event.event == "agent_tui_ready")
+        });
 
         // Agent should NOT be pre-registered in session state
         {
@@ -2389,8 +2404,11 @@ mod tests {
 
         let started_event = receiver.try_recv().expect("started event");
         assert_eq!(started_event.event, "agent_tui_started");
-        let ready_event = receiver.try_recv().expect("ready event");
-        assert_eq!(ready_event.event, "agent_tui_ready");
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            receiver
+                .try_recv()
+                .is_ok_and(|event| event.event == "agent_tui_ready")
+        });
 
         let mut updated_snapshot = None;
         wait_until(DEFAULT_WAIT_TIMEOUT, || {
