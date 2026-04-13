@@ -151,6 +151,8 @@ public final class HarnessMonitorStore {
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
+  var sessionPushFallbackDelay: Duration = .milliseconds(900)
+  var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
 
   let daemonController: any DaemonControlling
   public let daemonOwnership: DaemonOwnership
@@ -178,6 +180,7 @@ public final class HarnessMonitorStore {
   var sessionPushFallbackSequence: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshSequence: UInt64 = 0
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
+  @ObservationIgnored var lastSessionPushFallbackAt: [String: ContinuousClock.Instant] = [:]
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false

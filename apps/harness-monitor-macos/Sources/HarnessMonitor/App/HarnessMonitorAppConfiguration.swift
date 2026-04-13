@@ -44,36 +44,10 @@ struct HarnessMonitorAppConfiguration {
     let resolvedEnvironment = perfScenario?.applyingDefaults(to: environment) ?? environment
     let isUITesting = resolvedEnvironment.values[uiTestsEnvironmentKey] == "1"
     let launchMode = HarnessMonitorLaunchMode(environment: resolvedEnvironment)
-    let initialThemeMode =
-      isUITesting
-      ? (HarnessMonitorThemeMode(
-        rawValue: resolvedEnvironment.values["HARNESS_MONITOR_THEME_MODE_OVERRIDE"] ?? ""
-      ) ?? .auto)
-      : .auto
-    let initialTextSizeIndex =
-      isUITesting
-      ? (HarnessMonitorTextSize.uiTestOverrideIndex(
-        from: resolvedEnvironment.values[HarnessMonitorTextSize.uiTestOverrideKey]
-      ) ?? HarnessMonitorTextSize.defaultIndex)
-      : HarnessMonitorTextSize.defaultIndex
-    let initialBackdropMode =
-      isUITesting
-      ? (HarnessMonitorBackdropMode(
-        rawValue: resolvedEnvironment.values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] ?? ""
-      ) ?? .none)
-      : .none
-    let initialBackgroundImage =
-      isUITesting
-      ? HarnessMonitorBackgroundSelection.decode(
-        resolvedEnvironment.values["HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"] ?? ""
-      )
-      : .defaultSelection
-    let initialShowInspector =
-      isUITesting
-      ? uiTestBoolOverride(
-        from: resolvedEnvironment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]
-      ) ?? true
-      : true
+    let uiTestOverrides = resolveUITestOverrides(
+      isUITesting: isUITesting,
+      environment: resolvedEnvironment
+    )
     let persistenceSetup = HarnessMonitorPersistenceSetup.resolve(
       environment: resolvedEnvironment,
       launchMode: launchMode
@@ -91,16 +65,7 @@ struct HarnessMonitorAppConfiguration {
         successFeedbackDismissDelay: toastDismissDelay,
         failureFeedbackDismissDelay: toastDismissDelay
       )
-      applyUITestDefaults(
-        environment: resolvedEnvironment,
-        overrides: UITestOverrides(
-          themeMode: initialThemeMode,
-          textSizeIndex: initialTextSizeIndex,
-          backdropMode: initialBackdropMode,
-          backgroundImage: initialBackgroundImage,
-          showInspector: initialShowInspector
-        )
-      )
+      applyUITestDefaults(environment: resolvedEnvironment, overrides: uiTestOverrides)
       seedTestToasts(environment: resolvedEnvironment, store: store)
     }
 
@@ -108,7 +73,7 @@ struct HarnessMonitorAppConfiguration {
       container: persistenceSetup.container,
       store: store,
       launchMode: launchMode,
-      initialThemeMode: initialThemeMode,
+      initialThemeMode: uiTestOverrides.themeMode,
       isUITesting: isUITesting,
       mainWindowDefaultSize: HarnessMonitorUITestWindowDefaults.mainWindowSize(
         environment: resolvedEnvironment,
@@ -116,6 +81,38 @@ struct HarnessMonitorAppConfiguration {
       ),
       perfScenario: perfScenario,
       preferencesInitialSection: perfScenario?.initialPreferencesSection ?? .general
+    )
+  }
+
+  private static func resolveUITestOverrides(
+    isUITesting: Bool,
+    environment: HarnessMonitorEnvironment
+  ) -> UITestOverrides {
+    guard isUITesting else {
+      return UITestOverrides(
+        themeMode: .auto,
+        textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        backdropMode: .none,
+        backgroundImage: .defaultSelection,
+        showInspector: true
+      )
+    }
+    return UITestOverrides(
+      themeMode: HarnessMonitorThemeMode(
+        rawValue: environment.values["HARNESS_MONITOR_THEME_MODE_OVERRIDE"] ?? ""
+      ) ?? .auto,
+      textSizeIndex: HarnessMonitorTextSize.uiTestOverrideIndex(
+        from: environment.values[HarnessMonitorTextSize.uiTestOverrideKey]
+      ) ?? HarnessMonitorTextSize.defaultIndex,
+      backdropMode: HarnessMonitorBackdropMode(
+        rawValue: environment.values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] ?? ""
+      ) ?? .none,
+      backgroundImage: HarnessMonitorBackgroundSelection.decode(
+        environment.values["HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"] ?? ""
+      ),
+      showInspector: uiTestBoolOverride(
+        from: environment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]
+      ) ?? true
     )
   }
 
@@ -334,42 +331,32 @@ struct HarnessMonitorAppConfiguration {
         ) ?? HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
       )
 
-    UserDefaults.standard.set(
-      localeIdentifier,
-      forKey: HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey
-    )
-    UserDefaults.standard.set(
-      localDaemonSinkEnabled,
-      forKey: HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey
-    )
-    UserDefaults.standard.set(
-      agentBridgeSinkEnabled,
-      forKey: HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey
-    )
-    UserDefaults.standard.set(
-      remoteProcessorSinkEnabled,
-      forKey: HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey
-    )
-    UserDefaults.standard.set(
-      remoteProcessorURL,
-      forKey: HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey
-    )
-    UserDefaults.standard.set(
-      transcriptInsertionMode.rawValue,
-      forKey: HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey
-    )
-    UserDefaults.standard.set(
-      deliversAudioChunks,
-      forKey: HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey
-    )
-    UserDefaults.standard.set(
-      pendingAudioChunkLimit,
-      forKey: HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey
-    )
-    UserDefaults.standard.set(
-      pendingTranscriptSegmentLimit,
-      forKey: HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey
-    )
+    applyVoiceDefaultPairs([
+      (localeIdentifier, HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey),
+      (localDaemonSinkEnabled, HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey),
+      (agentBridgeSinkEnabled, HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey),
+      (
+        remoteProcessorSinkEnabled,
+        HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey
+      ),
+      (remoteProcessorURL, HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey),
+      (
+        transcriptInsertionMode.rawValue,
+        HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey
+      ),
+      (deliversAudioChunks, HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey),
+      (pendingAudioChunkLimit, HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey),
+      (
+        pendingTranscriptSegmentLimit,
+        HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey
+      ),
+    ])
+  }
+
+  private static func applyVoiceDefaultPairs(_ pairs: [(Any, String)]) {
+    for (value, key) in pairs {
+      UserDefaults.standard.set(value, forKey: key)
+    }
   }
 
   private static func uiTestIntOverride(from rawValue: String?) -> Int? {

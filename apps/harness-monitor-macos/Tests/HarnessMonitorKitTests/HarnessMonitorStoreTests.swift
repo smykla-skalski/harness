@@ -408,11 +408,24 @@ struct HarnessMonitorStoreTests {
       diagnostics: status.diagnostics
     )
 
+    let (projects, sessions) = makeToolbarCountFixtures()
+    store.applySessionIndexSnapshot(projects: projects, sessions: sessions)
+
+    #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
+    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 2)
+    #expect(store.contentUI.toolbar.toolbarMetrics.sessionCount == 3)
+  }
+
+  private func makeToolbarCountFixtures() -> (
+    projects: [ProjectSummary],
+    sessions: [SessionSummary]
+  ) {
+    let ctxRoot = "/Users/example/Library/Application Support/harness/projects"
     let project1 = ProjectSummary(
       projectId: "project-a",
       name: "harness",
       projectDir: "/Users/example/Projects/harness",
-      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-a",
+      contextRoot: "\(ctxRoot)/project-a",
       activeSessionCount: 2,
       totalSessionCount: 2,
       worktrees: [
@@ -420,7 +433,7 @@ struct HarnessMonitorStoreTests {
           checkoutId: "checkout-a",
           name: "session-title",
           checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
-          contextRoot: "/Users/example/Library/Application Support/harness/projects/checkout-a",
+          contextRoot: "\(ctxRoot)/checkout-a",
           activeSessionCount: 2,
           totalSessionCount: 2
         )
@@ -430,7 +443,7 @@ struct HarnessMonitorStoreTests {
       projectId: "project-b",
       name: "kuma",
       projectDir: "/Users/example/Projects/kuma",
-      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-b",
+      contextRoot: "\(ctxRoot)/project-b",
       activeSessionCount: 1,
       totalSessionCount: 1,
       worktrees: [
@@ -438,7 +451,7 @@ struct HarnessMonitorStoreTests {
           checkoutId: "checkout-b",
           name: "fix-motb",
           checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
-          contextRoot: "/Users/example/Library/Application Support/harness/projects/checkout-b",
+          contextRoot: "\(ctxRoot)/checkout-b",
           activeSessionCount: 1,
           totalSessionCount: 1
         )
@@ -448,7 +461,7 @@ struct HarnessMonitorStoreTests {
       projectId: "project-orphan",
       name: "scratch",
       projectDir: "/Users/example/Projects/scratch",
-      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-orphan",
+      contextRoot: "\(ctxRoot)/project-orphan",
       activeSessionCount: 0,
       totalSessionCount: 0,
       worktrees: [
@@ -456,20 +469,29 @@ struct HarnessMonitorStoreTests {
           checkoutId: "checkout-orphan",
           name: "old-worktree",
           checkoutRoot: "/Users/example/Projects/scratch/.claude/worktrees/old-worktree",
-          contextRoot:
-            "/Users/example/Library/Application Support/harness/projects/checkout-orphan",
+          contextRoot: "\(ctxRoot)/checkout-orphan",
           activeSessionCount: 0,
           totalSessionCount: 0
         )
       ]
     )
+    let sessions = makeToolbarCountSessions(project1: project1, project2: project2)
+    return ([project1, project2, orphanProject], sessions)
+  }
+
+  private func makeToolbarCountSessions(
+    project1: ProjectSummary,
+    project2: ProjectSummary
+  ) -> [SessionSummary] {
+    let rootA = "/Users/example/Projects/harness/.claude/worktrees/session-title"
+    let rootB = "/Users/example/Projects/kuma/.claude/worktrees/fix-motb"
     let session1 = SessionSummary(
       projectId: project1.projectId,
       projectName: project1.name,
       projectDir: project1.projectDir,
       contextRoot: project1.contextRoot,
       checkoutId: "checkout-a",
-      checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+      checkoutRoot: rootA,
       isWorktree: true,
       worktreeName: "session-title",
       sessionId: "sess-a-1",
@@ -497,7 +519,7 @@ struct HarnessMonitorStoreTests {
       projectDir: project1.projectDir,
       contextRoot: project1.contextRoot,
       checkoutId: "checkout-a",
-      checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
+      checkoutRoot: rootA,
       isWorktree: true,
       worktreeName: "session-title",
       sessionId: "sess-a-2",
@@ -525,7 +547,7 @@ struct HarnessMonitorStoreTests {
       projectDir: project2.projectDir,
       contextRoot: project2.contextRoot,
       checkoutId: "checkout-b",
-      checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
+      checkoutRoot: rootB,
       isWorktree: true,
       worktreeName: "fix-motb",
       sessionId: "sess-b-1",
@@ -547,14 +569,7 @@ struct HarnessMonitorStoreTests {
         completedTaskCount: 0
       )
     )
-    store.applySessionIndexSnapshot(
-      projects: [project1, project2, orphanProject],
-      sessions: [session1, session2, session3]
-    )
-
-    #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
-    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 2)
-    #expect(store.contentUI.toolbar.toolbarMetrics.sessionCount == 3)
+    return [session1, session2, session3]
   }
 
   @Test("Confirm pending remove-agent action executes the mutation")
