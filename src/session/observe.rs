@@ -8,6 +8,7 @@ use crate::agents::runtime;
 use crate::errors::{CliError, CliErrorKind};
 use crate::observe::classifier::classify_line;
 use crate::observe::types::{Issue, IssueSeverity, ScanState};
+use tokio::time::sleep;
 
 use super::service;
 use super::types::{SessionState, TaskSeverity, TaskSource};
@@ -112,6 +113,68 @@ pub fn execute_session_watch(
         }
 
         thread::sleep(Duration::from_secs(poll_interval_seconds));
+    }
+
+    Ok(i32::from(total_issues > 0))
+}
+
+/// Run the continuous multi-agent observation loop on an async task.
+///
+/// # Errors
+/// Returns `CliError` if the session is not found or on I/O failures.
+pub async fn execute_session_watch_async(
+    session_id: &str,
+    project_dir: &Path,
+    poll_interval_seconds: u64,
+    json: bool,
+    actor_id: Option<&str>,
+) -> Result<i32, CliError> {
+    let mut realtime_seen: HashSet<String> = HashSet::new();
+    let mut total_issues = 0_usize;
+    let mut cycle_count = 0_u64;
+
+    loop {
+        let Ok(state) = service::session_status(session_id, project_dir) else {
+            break;
+        };
+        if state.status != super::types::SessionStatus::Active {
+            break;
+        }
+
+        // Sync agent liveness each cycle so dead agents are detected promptly
+        let _ = service::sync_agent_liveness(session_id, project_dir);
+
+        // Re-read state after sync since agent statuses may have changed
+        let Ok(state) = service::session_status(session_id, project_dir) else {
+            break;
+        };
+
+        let issues = scan_all_agents(&state, session_id, project_dir)?;
+        let new_issues: Vec<Issue> = issues
+            .into_iter()
+            .filter(|issue| realtime_seen.insert(issue.fingerprint.clone()))
+            .collect();
+
+        if !new_issues.is_empty() {
+            total_issues += new_issues.len();
+            create_work_items_for_issues(&new_issues, session_id, &state, project_dir, actor_id)?;
+            emit_watch_issues(&new_issues, json);
+        }
+
+        cycle_count += 1;
+        if cycle_count.is_multiple_of(SWEEP_CYCLE_COUNT) {
+            run_periodic_sweep(
+                session_id,
+                project_dir,
+                &state,
+                &realtime_seen,
+                &mut total_issues,
+                json,
+                actor_id,
+            )?;
+        }
+
+        sleep(Duration::from_secs(poll_interval_seconds)).await;
     }
 
     Ok(i32::from(total_issues > 0))

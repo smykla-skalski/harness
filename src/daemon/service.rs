@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::env;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::process::id as process_id;
 use std::slice;
@@ -2634,23 +2635,14 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
     let project_dir = project_dir.to_path_buf();
     let actor_id = actor_id.map(ToString::to_string);
     tokio::spawn(async move {
-        let poll_interval_seconds = runtime.poll_interval.as_secs().max(1);
-        let session_id_for_watch = session_id.clone();
-        let project_dir_for_watch = project_dir.clone();
-        let actor_id_for_watch = actor_id.clone();
-        let result = spawn_blocking(move || {
-            session_observe::execute_session_watch(
-                &session_id_for_watch,
-                &project_dir_for_watch,
-                poll_interval_seconds,
-                false,
-                actor_id_for_watch.as_deref(),
-            )
-        })
+        let result = run_daemon_observe_task(
+            session_id.clone(),
+            project_dir.clone(),
+            runtime.poll_interval,
+            actor_id.clone(),
+        )
         .await;
         if let Err(error) = result {
-            tracing::warn!(%error, session_id, "daemon observe loop task failed");
-        } else if let Ok(Err(error)) = result {
             tracing::warn!(%error, session_id, "daemon observe loop exited with error");
         }
         if let Ok(mut running_sessions) = runtime.running_sessions.lock() {
@@ -2662,6 +2654,45 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
         broadcast_session_snapshot(&runtime.sender, &session_id, db_ref);
     });
     true
+}
+
+async fn run_daemon_observe_task(
+    session_id: String,
+    project_dir: PathBuf,
+    poll_interval: Duration,
+    actor_id: Option<String>,
+) -> Result<i32, CliError> {
+    run_daemon_observe_task_with(
+        session_id,
+        project_dir,
+        poll_interval,
+        actor_id,
+        |session_id, project_dir, poll_interval, actor_id| async move {
+            session_observe::execute_session_watch_async(
+                &session_id,
+                &project_dir,
+                poll_interval.as_secs().max(1),
+                false,
+                actor_id.as_deref(),
+            )
+            .await
+        },
+    )
+    .await
+}
+
+async fn run_daemon_observe_task_with<F, Fut>(
+    session_id: String,
+    project_dir: PathBuf,
+    poll_interval: Duration,
+    actor_id: Option<String>,
+    observe_task: F,
+) -> Result<i32, CliError>
+where
+    F: FnOnce(String, PathBuf, Duration, Option<String>) -> Fut + Send,
+    Fut: Future<Output = Result<i32, CliError>> + Send,
+{
+    observe_task(session_id, project_dir, poll_interval, actor_id).await
 }
 
 #[cfg(test)]
@@ -4526,6 +4557,40 @@ done
                 Ok(Ok(())) => panic!("serve should reject remote sandboxed codex endpoints"),
                 Err(_) => panic!("serve should fail before starting"),
             }
+        });
+    }
+
+    #[test]
+    fn run_daemon_observe_task_does_not_consume_blocking_pool_threads() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .max_blocking_threads(1)
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let observe_task = tokio::spawn(async {
+                run_daemon_observe_task_with(
+                    "session-a".into(),
+                    PathBuf::from("/tmp/project"),
+                    Duration::from_secs(1),
+                    None,
+                    |_session_id, _project_dir, _poll_interval, _actor_id| async {
+                        tokio::time::sleep(Duration::from_millis(200)).await;
+                        Ok(0)
+                    },
+                )
+                .await
+            });
+
+            let blocking_result =
+                tokio::time::timeout(Duration::from_millis(50), tokio::task::spawn_blocking(|| 7))
+                    .await
+                    .expect("observe loop should leave the blocking pool available")
+                    .expect("blocking task join");
+
+            assert_eq!(blocking_result, 7);
+            let observe_result = observe_task.await.expect("observe join");
+            assert_eq!(observe_result.expect("observe result"), 0);
         });
     }
 
