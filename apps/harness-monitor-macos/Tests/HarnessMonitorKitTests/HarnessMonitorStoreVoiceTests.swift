@@ -130,3 +130,84 @@ struct HarnessMonitorStoreVoiceTests {
     return store
   }
 }
+
+@MainActor
+@Suite("System voice text insertion")
+struct SystemVoiceTextInsertionServiceTests {
+  @Test("Insert keeps text in-app when Accessibility permission is missing")
+  func insertConfirmedTextKeepsTextInAppWhenAccessibilityPermissionIsMissing() {
+    let pasteboard = PasteboardSpy()
+    let insertion = AccessibilityInsertionSpy()
+    let service = SystemVoiceTextInsertionService(
+      accessibilityTrustCheck: { _ in false },
+      accessibilityInserter: { text in
+        insertion.record(text)
+        return false
+      },
+      pasteboardWriter: { text in
+        pasteboard.record(text)
+      }
+    )
+
+    let result = service.insertConfirmedText(" dictated text ", promptForAccessibility: false)
+
+    #expect(result == .accessibilityPermissionRequired)
+    #expect(insertion.insertedTexts.isEmpty)
+    #expect(pasteboard.copiedTexts.isEmpty)
+  }
+
+  @Test("Insert keeps text in-app when direct insertion fails")
+  func insertConfirmedTextKeepsTextInAppWhenDirectInsertionFails() {
+    let pasteboard = PasteboardSpy()
+    let insertion = AccessibilityInsertionSpy()
+    let service = SystemVoiceTextInsertionService(
+      accessibilityTrustCheck: { _ in true },
+      accessibilityInserter: { text in
+        insertion.record(text)
+        return false
+      },
+      pasteboardWriter: { text in
+        pasteboard.record(text)
+      }
+    )
+
+    let result = service.insertConfirmedText(" dictated text ")
+
+    #expect(result == .manualInsertionRequired)
+    #expect(insertion.insertedTexts == ["dictated text"])
+    #expect(pasteboard.copiedTexts.isEmpty)
+  }
+
+  @Test("Copy to pasteboard requires explicit user action")
+  func copyTextToPasteboardRequiresExplicitUserAction() {
+    let pasteboard = PasteboardSpy()
+    let service = SystemVoiceTextInsertionService(
+      accessibilityTrustCheck: { _ in true },
+      accessibilityInserter: { _ in true },
+      pasteboardWriter: { text in
+        pasteboard.record(text)
+      }
+    )
+
+    let copied = service.copyTextToPasteboard(" dictated text ")
+
+    #expect(copied)
+    #expect(pasteboard.copiedTexts == ["dictated text"])
+  }
+}
+
+private final class PasteboardSpy: @unchecked Sendable {
+  private(set) var copiedTexts: [String] = []
+
+  func record(_ text: String) {
+    copiedTexts.append(text)
+  }
+}
+
+private final class AccessibilityInsertionSpy: @unchecked Sendable {
+  private(set) var insertedTexts: [String] = []
+
+  func record(_ text: String) {
+    insertedTexts.append(text)
+  }
+}
