@@ -34,6 +34,9 @@ public struct AgentTuiWindowView: View {
   @State private var selection: AgentTuiSheetSelection = .create
   @State private var hasInitializedSelection = false
   @State private var wrapLines = false
+  @State private var selectedPersona: String?
+  @State private var availablePersonas: [AgentPersona] = []
+  @State private var showPersonaPicker = false
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -187,7 +190,10 @@ public struct AgentTuiWindowView: View {
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .task {
-      await store.refreshSelectedAgentTuis()
+      async let tuiRefresh = store.refreshSelectedAgentTuis()
+      async let personas = store.fetchPersonas()
+      availablePersonas = await personas
+      _ = await tuiRefresh
       reconcileSheetState(afterRefresh: true)
     }
     .onChange(of: store.selectedAgentTuis) { _, _ in
@@ -263,7 +269,20 @@ public struct AgentTuiWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
+  @ViewBuilder
   private var launchSection: some View {
+    if showPersonaPicker {
+      PersonaPickerView(personas: availablePersonas) { identifier in
+        selectedPersona = identifier
+        showPersonaPicker = false
+        startTui()
+      }
+    } else {
+      launchForm
+    }
+  }
+
+  private var launchForm: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("New agent")
         .scaledFont(.caption.bold())
@@ -313,7 +332,11 @@ public struct AgentTuiWindowView: View {
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
             fillsWidth: true
           ) {
-            startTui()
+            if availablePersonas.isEmpty {
+              startTui()
+            } else {
+              showPersonaPicker = true
+            }
           }
           .keyboardShortcut(.defaultAction)
           .disabled(!canStart)
@@ -693,6 +716,7 @@ public struct AgentTuiWindowView: View {
         name: name,
         prompt: prompt,
         projectDir: trimmedProjectDir,
+        persona: selectedPersona,
         argv: parsedArgvOverride,
         rows: rows,
         cols: cols
@@ -703,6 +727,7 @@ public struct AgentTuiWindowView: View {
         projectDir = ""
         argvOverride = ""
         inputText = ""
+        selectedPersona = nil
         selection = .session(startedTuiID)
         focusedField = .input
       }
