@@ -618,6 +618,16 @@ public final class HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  func disconnectActiveConnection(
+    resetSubscriptions: Bool = true
+  ) -> (any HarnessMonitorClientProtocol)? {
+    stopAllStreams(resetSubscriptions: resetSubscriptions)
+    let disconnectedClient = client
+    client = nil
+    return disconnectedClient
+  }
+
   func stopAllStreams(resetSubscriptions: Bool = true) {
     stopGlobalStream()
     stopSessionStream(resetSubscriptions: resetSubscriptions)

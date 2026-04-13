@@ -14,8 +14,7 @@ extension HarnessMonitorStore {
 
     await refresh(using: client, preserveSelection: true)
     guard connectionState == .online else {
-      self.client = nil
-      stopAllStreams()
+      _ = disconnectActiveConnection()
       await restorePersistedSessionState()
       return
     }
@@ -108,7 +107,7 @@ extension HarnessMonitorStore {
         }
       }
     } catch {
-      self.client = nil
+      _ = disconnectActiveConnection()
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
     }
