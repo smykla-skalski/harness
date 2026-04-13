@@ -19,6 +19,7 @@
 		03C8E02F7EFD6423C3E4EA02 /* AgentTuiPreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4A9FC820839A4AD3436EFD /* AgentTuiPreviewSupport.swift */; };
 		0514CD1B194FC2AC5754C2E4 /* ContentAuditBuildBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE24A88839B38EAD08DFD86 /* ContentAuditBuildBadge.swift */; };
 		05224CB3D0DE355DDD46A178 /* HarnessMonitorStatusChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3045C89B1BC1652E855063 /* HarnessMonitorStatusChrome.swift */; };
+		064C5D3E2B74BFE698EF5885 /* SmartZoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0C133402EFE2B2BB7DFB69 /* SmartZoomTests.swift */; };
 		09D2A943D27B09C713587065 /* PreferencesViewPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2794A60BA36F69DD0EFCA0D3 /* PreferencesViewPreviews.swift */; };
 		0C36F4CDDC06F57582B3D38D /* ObserverSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0143A1BACAAE538108C311B0 /* ObserverSummaryTests.swift */; };
 		0D94EDF049C1E216A1A9CAD6 /* HarnessMonitorStore+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0D11A80FACDE6DC5A420C8 /* HarnessMonitorStore+Actions.swift */; };
@@ -277,6 +278,7 @@
 		D64520907F51696F34B698E7 /* ToastSlice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B1CDF4D57BD9CA4718F0C5 /* ToastSlice.swift */; };
 		D73289C620FD42CF5544F516 /* SessionAgentDropFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA0499F8E012A774A3E1A88 /* SessionAgentDropFeedback.swift */; };
 		D85634A20382E4D0D351B9CD /* InspectorColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7245EA277463F0D7F3626366 /* InspectorColumnView.swift */; };
+		D955ACC3FC4AE64252297346 /* SmartZoomModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FEEC1ED037D6080606E1CC3 /* SmartZoomModifier.swift */; };
 		DA1310EB195A0B7D7557A50C /* HarnessMonitorStoreFilteringTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B4EED250D445935919798D /* HarnessMonitorStoreFilteringTestSupport.swift */; };
 		DB8414A0B4C6D9FFD7434317 /* HarnessMonitorVoicePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA89EB6BB454EF4293F1B2D0 /* HarnessMonitorVoicePreferences.swift */; };
 		DBD4C95E1E445C5EF3068A5E /* PreviewFixtures+Cockpit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2447F124535B2753426DF2ED /* PreviewFixtures+Cockpit.swift */; };
@@ -508,6 +510,7 @@
 		3C2F5BCB5C06C21DA21FE7B5 /* BackgroundThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundThumbnailCache.swift; sourceTree = "<group>"; };
 		3D430D67245DF0E20127DADE /* AgentTuiRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTuiRuntimeTests.swift; sourceTree = "<group>"; };
 		3DA47F9FCD2431269990873D /* PreferencesBackgroundGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesBackgroundGallery.swift; sourceTree = "<group>"; };
+		3FEEC1ED037D6080606E1CC3 /* SmartZoomModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartZoomModifier.swift; sourceTree = "<group>"; };
 		4201860129D4E526A5B17B60 /* SessionsBoardRecentSessionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsBoardRecentSessionsSection.swift; sourceTree = "<group>"; };
 		42D72D61C86CBECA82C8D45A /* InstantFocusRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstantFocusRing.swift; sourceTree = "<group>"; };
 		4469D7A4AF48AE54407B2E39 /* HarnessMonitorSidebarRowChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorSidebarRowChrome.swift; sourceTree = "<group>"; };
@@ -576,6 +579,7 @@
 		7C50373172AFC22A0DD94523 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7CEB8AC51482C0857B0B39D0 /* NativeVoiceCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeVoiceCaptureService.swift; sourceTree = "<group>"; };
 		7D97578BFF8057D6E37550F3 /* PreviewDaemonController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewDaemonController.swift; sourceTree = "<group>"; };
+		7E0C133402EFE2B2BB7DFB69 /* SmartZoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartZoomTests.swift; sourceTree = "<group>"; };
 		7EB8A57271F23E44948C4245 /* HarnessMonitorSettingsUITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorSettingsUITestSupport.swift; sourceTree = "<group>"; };
 		7EDDE062C0FC0FA9478D11A2 /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
 		7F59C999ECAD7F2E0886BD04 /* HarnessMonitorTaskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTaskModels.swift; sourceTree = "<group>"; };
@@ -860,6 +864,7 @@
 				E5F89B81DCA5EE62B3CF4B73 /* HarnessMonitorAccessibilitySupport.swift */,
 				70EDD380EDACF9010F427743 /* HarnessMonitorWindowIDs.swift */,
 				42D72D61C86CBECA82C8D45A /* InstantFocusRing.swift */,
+				3FEEC1ED037D6080606E1CC3 /* SmartZoomModifier.swift */,
 				9DB653985EC81D63BC08FB71 /* ToolbarGlassStateMonitor.swift */,
 			);
 			path = Support;
@@ -1006,6 +1011,7 @@
 				541F279DF1DE77AC4B2261E0 /* SessionCacheMemoryTestHarness.swift */,
 				A407ECD22B6A4855C317A3AD /* SessionCacheTimelineMemoryTests.swift */,
 				CA5760DB1F7075280BCFD221 /* SessionSignalRecordEffectiveStatusTests.swift */,
+				7E0C133402EFE2B2BB7DFB69 /* SmartZoomTests.swift */,
 				1D05F38F9A7796CF061AB4B7 /* ToastSliceTests.swift */,
 				D132863ED39E0A2BF26A8FF4 /* WebSocketProtocolTests.swift */,
 			);
@@ -1704,6 +1710,7 @@
 				ABAA0783B7517D357D3D79BA /* SessionCacheMemoryTestHarness.swift in Sources */,
 				A3853D8232839E5A31EFB276 /* SessionCacheTimelineMemoryTests.swift in Sources */,
 				4968CA2149810A1585F00601 /* SessionSignalRecordEffectiveStatusTests.swift in Sources */,
+				064C5D3E2B74BFE698EF5885 /* SmartZoomTests.swift in Sources */,
 				5D6E0AD523D51EFD80A48396 /* ToastSliceTests.swift in Sources */,
 				BB31BEA9ECB346EC0DCDB06D /* WebSocketProtocolTests.swift in Sources */,
 			);
@@ -1809,6 +1816,7 @@
 				BC06B598A29D541CD4553545 /* SidebarToolbarFilterMenu.swift in Sources */,
 				FBFB651173368A0F5FAA17E3 /* SidebarView+Sections.swift in Sources */,
 				68A556985FA7EFB3C82B9FF1 /* SidebarView.swift in Sources */,
+				D955ACC3FC4AE64252297346 /* SmartZoomModifier.swift in Sources */,
 				2DFC68DA98CE51D7299BB121 /* ToolbarCenterpieceComponents.swift in Sources */,
 				3FAB7505042ABDE41ABAB916 /* ToolbarCenterpiecePreviews.swift in Sources */,
 				E514BFCF933790043BB87453 /* ToolbarCenterpieceView.swift in Sources */,
