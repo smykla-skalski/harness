@@ -36,6 +36,7 @@ public struct ContentView: View {
   @State private var showInspector = false
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var pendingDetailColumnWidth: CGFloat?
+  @State private var windowNavigation = WindowNavigationState()
   @State private var isLayoutAnimating = false
   @State private var layoutSuppressionTask: Task<Void, Never>?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -111,6 +112,7 @@ public struct ContentView: View {
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
+    .focusedSceneValue(\.windowNavigation, windowNavigation)
     .toolbar {
       ContentNavigationToolbarItems(
         store: store,
@@ -124,12 +126,22 @@ public struct ContentView: View {
       )
     }
     .task {
+      windowNavigation.backHandler = { await store.navigateBack() }
+      windowNavigation.forwardHandler = { await store.navigateForward() }
+      windowNavigation.canGoBack = contentToolbar.canNavigateBack
+      windowNavigation.canGoForward = contentToolbar.canNavigateForward
       guard !hasAppliedInitialInspectorVisibility else {
         return
       }
       hasAppliedInitialInspectorVisibility = true
       await Task.yield()
       showInspector = persistedShowInspector
+    }
+    .onChange(of: contentToolbar.canNavigateBack) { _, newValue in
+      windowNavigation.canGoBack = newValue
+    }
+    .onChange(of: contentToolbar.canNavigateForward) { _, newValue in
+      windowNavigation.canGoForward = newValue
     }
     .onChange(of: persistedShowInspector) { _, newValue in
       guard hasAppliedInitialInspectorVisibility else {

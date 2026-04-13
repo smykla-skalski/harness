@@ -100,81 +100,28 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testPersonaPickerAppearsBeforeTuiStart() throws {
+  func testPersonaPickerVisibleInCreatePane() throws {
     let app = launchInCockpitPreview()
 
     openAgentTuiWindow(in: app)
 
-    // Select runtime and tap start without using the startAgentTui helper
-    tapButton(in: app, title: "Codex")
-    revealCreateAction(in: app, startTitle: "Start Codex")
-    if button(in: app, title: "Start Codex").exists || element(in: app, title: "Start Codex").exists {
-      tapButton(in: app, title: "Start Codex")
-    } else {
-      tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
-    }
-
-    let picker = element(in: app, identifier: Accessibility.personaPicker)
+    let picker = element(in: app, identifier: Accessibility.agentTuiPersonaPicker)
     XCTAssertTrue(
       waitForElement(picker, timeout: Self.actionTimeout),
-      "Persona picker should appear after tapping Start"
+      "Persona picker should be visible in create pane"
     )
   }
 
-  func testSkippingPersonaStartsTuiWithoutPersona() throws {
+  func testStartingWithDefaultPersonaStartsTui() throws {
     let app = launchInCockpitPreview()
 
     openAgentTuiWindow(in: app)
-
-    tapButton(in: app, title: "Codex")
-    revealCreateAction(in: app, startTitle: "Start Codex")
-    if button(in: app, title: "Start Codex").exists || element(in: app, title: "Start Codex").exists {
-      tapButton(in: app, title: "Start Codex")
-    } else {
-      tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
-    }
-
-    let skipButton = element(in: app, identifier: Accessibility.personaSkipButton)
-    XCTAssertTrue(
-      waitForElement(skipButton, timeout: Self.actionTimeout),
-      "Skip button should appear in persona picker"
-    )
-    skipButton.tap()
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "no persona test")
 
     let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
     XCTAssertTrue(
       waitForElement(sessionPane, timeout: Self.actionTimeout),
-      "TUI should start after skipping persona"
-    )
-  }
-
-  func testSelectingPersonaDismissesPickerAndStartsTui() throws {
-    let app = launchInCockpitPreview()
-
-    openAgentTuiWindow(in: app)
-
-    tapButton(in: app, title: "Codex")
-    revealCreateAction(in: app, startTitle: "Start Codex")
-    if button(in: app, title: "Start Codex").exists || element(in: app, title: "Start Codex").exists {
-      tapButton(in: app, title: "Start Codex")
-    } else {
-      tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
-    }
-
-    let codeReviewerCard = element(
-      in: app,
-      identifier: Accessibility.personaCard("code-reviewer")
-    )
-    XCTAssertTrue(
-      waitForElement(codeReviewerCard, timeout: Self.actionTimeout),
-      "Code Reviewer persona card should appear"
-    )
-    codeReviewerCard.tap()
-
-    let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
-    XCTAssertTrue(
-      waitForElement(sessionPane, timeout: Self.actionTimeout),
-      "TUI should start after selecting persona"
+      "TUI should start with default persona (None)"
     )
   }
 
@@ -291,12 +238,6 @@ private extension AgentTuiWindowUITests {
       tapButton(in: app, title: startTitle)
     } else {
       tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
-    }
-
-    // Skip persona picker if it appears
-    let skipButton = element(in: app, identifier: Accessibility.personaSkipButton)
-    if waitForElement(skipButton, timeout: Self.fastPollInterval) {
-      skipButton.tap()
     }
 
     XCTAssertTrue(
