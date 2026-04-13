@@ -319,6 +319,7 @@ extension HarnessMonitorStore {
       return
     }
 
+    cancelSelectedSessionRefreshFallback(for: sessionID)
     withUISyncBatch {
       selectedSession = detail
       self.timeline = timeline
@@ -360,6 +361,7 @@ extension HarnessMonitorStore {
       return
     }
 
+    cancelSelectedSessionRefreshFallback(for: sessionID)
     guard let detail = selectedSession else {
       pendingExtensions = extensions
       return

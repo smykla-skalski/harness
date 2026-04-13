@@ -142,6 +142,7 @@ extension HarnessMonitorStore {
     let isChangingSelectedSession = selectedSession?.session.sessionId != sessionID
 
     if isChangingSelectedSession {
+      cancelSelectedSessionRefreshFallback()
       cancelSessionLoad()
     }
 
