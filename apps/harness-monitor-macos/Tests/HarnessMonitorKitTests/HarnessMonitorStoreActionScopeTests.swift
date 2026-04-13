@@ -148,11 +148,14 @@ struct HarnessMonitorStoreActionScopeTests {
   @Test("Mutating inFlightActionID does not invalidate timeline observers")
   func mutatingInFlightDoesNotInvalidateTimeline() async {
     let store = await makeBootstrappedStore()
-    let invalidations = await invalidationCount({ store.timeline.count }) {
-      await MainActor.run {
-        store.inFlightActionID = "sess-1/createTask"
+    let invalidations = await invalidationCount(
+      { store.timeline.count },
+      after: {
+        await MainActor.run {
+          store.inFlightActionID = "sess-1/createTask"
+        }
       }
-    }
+    )
     #expect(invalidations == 0)
   }
 
@@ -161,11 +164,14 @@ struct HarnessMonitorStoreActionScopeTests {
     let store = await makeBootstrappedStore()
     store.inFlightActionID = nil
 
-    let invalidations = await invalidationCount({ store.toast.activeFeedback.count }) {
-      await MainActor.run {
-        store.inFlightActionID = "foo"
+    let invalidations = await invalidationCount(
+      { store.toast.activeFeedback.count },
+      after: {
+        await MainActor.run {
+          store.inFlightActionID = "foo"
+        }
       }
-    }
+    )
 
     #expect(invalidations == 0)
   }

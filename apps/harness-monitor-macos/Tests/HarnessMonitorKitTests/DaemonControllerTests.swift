@@ -6,7 +6,8 @@ import Testing
 
 @Suite("Daemon controller service management")
 struct DaemonControllerTests {
-  @Test("awaitManifestWarmUp returns stale manifest immediately for external daemon when pid is dead")
+  @Test(
+    "awaitManifestWarmUp returns stale manifest immediately for external daemon when pid is dead")
   func awaitManifestWarmUpReturnsExternalStaleManifestImmediately() async throws {
     try await withTempDaemonFixture(pid: 999_999) { environment in
       let controller = DaemonController(
@@ -31,7 +32,8 @@ struct DaemonControllerTests {
     }
   }
 
-  @Test("awaitManifestWarmUp returns daemonDidNotStart promptly for managed daemon when pid is dead")
+  @Test(
+    "awaitManifestWarmUp returns daemonDidNotStart promptly for managed daemon when pid is dead")
   func awaitManifestWarmUpReturnsManagedDaemonDidNotStartPromptly() async throws {
     try await withTempDaemonFixture(pid: 999_999) { environment in
       let controller = DaemonController(
@@ -198,28 +200,29 @@ struct DaemonControllerTests {
         let symlinkURL = daemonRoot.appendingPathComponent("auth-token-link")
         try FileManager.default.createSymbolicLink(at: symlinkURL, withDestinationURL: outsideToken)
         return symlinkURL
-      }
-    ) { environment in
-      let controller = DaemonController(
-        environment: environment,
-        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
-        ownership: .managed,
-        sessionFactory: { _ in PreviewHarnessClient() }
-      )
+      },
+      perform: { environment in
+        let controller = DaemonController(
+          environment: environment,
+          launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+          ownership: .managed,
+          sessionFactory: { _ in PreviewHarnessClient() }
+        )
 
-      do {
-        _ = try await controller.bootstrapClient()
-        Issue.record("Expected invalidManifest")
-      } catch let error as DaemonControlError {
-        guard case .invalidManifest(let reason) = error else {
-          Issue.record("Expected invalidManifest, got \(error)")
-          return
+        do {
+          _ = try await controller.bootstrapClient()
+          Issue.record("Expected invalidManifest")
+        } catch let error as DaemonControlError {
+          guard case .invalidManifest(let reason) = error else {
+            Issue.record("Expected invalidManifest, got \(error)")
+            return
+          }
+          #expect(reason.contains("symlink"))
+        } catch {
+          Issue.record("Expected DaemonControlError, got \(error)")
         }
-        #expect(reason.contains("symlink"))
-      } catch {
-        Issue.record("Expected DaemonControlError, got \(error)")
       }
-    }
+    )
   }
 
   @Test("bootstrapClient rejects group-readable token files")
@@ -230,28 +233,29 @@ struct DaemonControllerTests {
         let tokenURL = daemonRoot.appendingPathComponent("auth-token")
         try writeTokenFixture(to: tokenURL, permissions: 0o644)
         return tokenURL
-      }
-    ) { environment in
-      let controller = DaemonController(
-        environment: environment,
-        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
-        ownership: .managed,
-        sessionFactory: { _ in PreviewHarnessClient() }
-      )
+      },
+      perform: { environment in
+        let controller = DaemonController(
+          environment: environment,
+          launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+          ownership: .managed,
+          sessionFactory: { _ in PreviewHarnessClient() }
+        )
 
-      do {
-        _ = try await controller.bootstrapClient()
-        Issue.record("Expected invalidManifest")
-      } catch let error as DaemonControlError {
-        guard case .invalidManifest(let reason) = error else {
-          Issue.record("Expected invalidManifest, got \(error)")
-          return
+        do {
+          _ = try await controller.bootstrapClient()
+          Issue.record("Expected invalidManifest")
+        } catch let error as DaemonControlError {
+          guard case .invalidManifest(let reason) = error else {
+            Issue.record("Expected invalidManifest, got \(error)")
+            return
+          }
+          #expect(reason.contains("permissions"))
+        } catch {
+          Issue.record("Expected DaemonControlError, got \(error)")
         }
-        #expect(reason.contains("permissions"))
-      } catch {
-        Issue.record("Expected DaemonControlError, got \(error)")
       }
-    }
+    )
   }
 
   @Test("Installing launch agent registers the bundled service")
@@ -366,7 +370,8 @@ private func withTempDaemonFixture(
   let root = FileManager.default.temporaryDirectory
     .appendingPathComponent("daemon-controller-tests-\(UUID().uuidString)", isDirectory: true)
   let daemonHome = root.appendingPathComponent("data-home", isDirectory: true)
-  let daemonRoot = daemonHome
+  let daemonRoot =
+    daemonHome
     .appendingPathComponent("harness", isDirectory: true)
     .appendingPathComponent("daemon", isDirectory: true)
   try FileManager.default.createDirectory(at: daemonRoot, withIntermediateDirectories: true)
