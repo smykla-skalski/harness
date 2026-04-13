@@ -1658,14 +1658,25 @@ pub fn disconnect_agent_direct(
     };
 
     let now = utc_now();
-    if !session_service::apply_agent_disconnected(&mut state, agent_id, &now)? {
+    if !session_service::apply_agent_disconnected(&mut state, agent_id, &now) {
         return Ok(false);
     }
 
+    persist_disconnect(db, session_id, agent_id, reason, &state)?;
+    Ok(true)
+}
+
+fn persist_disconnect(
+    db: &super::db::DaemonDb,
+    session_id: &str,
+    agent_id: &str,
+    reason: &str,
+    state: &SessionState,
+) -> Result<(), CliError> {
     let project_id = db
         .project_id_for_session(session_id)?
         .ok_or_else(|| session_not_found(session_id))?;
-    db.save_session_state(&project_id, &state)?;
+    db.save_session_state(&project_id, state)?;
     db.append_log_entry(&build_log_entry(
         session_id,
         session_service::log_agent_disconnected(agent_id, reason),
@@ -1674,7 +1685,7 @@ pub fn disconnect_agent_direct(
     ))?;
     db.bump_change(session_id)?;
     db.bump_change("global")?;
-    Ok(true)
+    Ok(())
 }
 
 /// Record a signal acknowledgment, delegating to the session service.
