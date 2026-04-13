@@ -52,7 +52,8 @@ public enum HarnessMonitorVoiceLocaleSupport {
       for: localeIdentifier,
       currentLocale: currentLocale
     ) {
-      guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: candidate) else {
+      guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: candidate)
+      else {
         continue
       }
 
@@ -88,7 +89,8 @@ public enum HarnessMonitorVoiceLocaleSupport {
     for localeIdentifier: String,
     currentLocale: Locale = .current
   ) -> [Locale] {
-    let requestedLocale = Locale(identifier: sanitizedLocaleIdentifier(localeIdentifier, currentLocale: currentLocale))
+    let requestedLocale = Locale(
+      identifier: sanitizedLocaleIdentifier(localeIdentifier, currentLocale: currentLocale))
     var identifiers = [requestedLocale.identifier]
     if let languageIdentifier = requestedLocale.language.languageCode?.identifier {
       identifiers.append(languageIdentifier)

@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorKit
+import SwiftUI
 
 struct PersonaSymbolView: View {
   let symbol: PersonaSymbol

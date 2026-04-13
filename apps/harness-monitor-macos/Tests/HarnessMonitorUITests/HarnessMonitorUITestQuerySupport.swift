@@ -53,6 +53,23 @@ extension HarnessMonitorUITestCase {
       .firstMatch
   }
 
+  func descendantElement(in container: XCUIElement, identifier: String) -> XCUIElement {
+    let candidates = container.descendants(matching: .any)
+      .matching(identifier: identifier)
+      .allElementsBoundByIndex
+
+    if let candidate = candidates.last(where: { candidate in
+      candidate.exists
+        && (!candidate.label.isEmpty || !candidate.frame.isEmpty)
+    }) {
+      return candidate
+    }
+
+    return container.descendants(matching: .any)
+      .matching(identifier: identifier)
+      .firstMatch
+  }
+
   func button(in app: XCUIApplication, identifier: String) -> XCUIElement {
     let roles: [XCUIElement.ElementType] = [
       .button,
@@ -148,6 +165,22 @@ extension HarnessMonitorUITestCase {
 
   func frameElement(in app: XCUIApplication, identifier: String) -> XCUIElement {
     app.otherElements.matching(identifier: identifier).firstMatch
+  }
+
+  func descendantFrameElement(in container: XCUIElement, identifier: String) -> XCUIElement {
+    let candidates = container.descendants(matching: .any)
+      .matching(identifier: identifier)
+      .allElementsBoundByIndex
+
+    if let candidate = candidates.last(where: { candidate in
+      candidate.exists && !candidate.frame.isEmpty
+    }) {
+      return candidate
+    }
+
+    return container.descendants(matching: .any)
+      .matching(identifier: identifier)
+      .firstMatch
   }
 
   func toolbarButton(in app: XCUIApplication, identifier: String) -> XCUIElement {

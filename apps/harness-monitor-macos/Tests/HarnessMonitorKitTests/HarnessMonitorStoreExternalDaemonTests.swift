@@ -85,29 +85,29 @@ struct HarnessMonitorStoreExternalDaemonTests {
   @Test("Ownership init reads HARNESS_MONITOR_EXTERNAL_DAEMON")
   func ownershipInitReadsEnvironmentFlag() {
     #if DEBUG
-    #expect(DaemonOwnership(environment: [:]) == .managed)
-    #expect(
-      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
-        == .external
-    )
-    #expect(
-      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "true"])
-        == .external
-    )
-    #expect(
-      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "0"])
-        == .managed
-    )
-    #expect(
-      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "false"])
-        == .managed
-    )
+      #expect(DaemonOwnership(environment: [:]) == .managed)
+      #expect(
+        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
+          == .external
+      )
+      #expect(
+        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "true"])
+          == .external
+      )
+      #expect(
+        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "0"])
+          == .managed
+      )
+      #expect(
+        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "false"])
+          == .managed
+      )
     #else
-    // Release builds ignore the flag entirely.
-    #expect(
-      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
-        == .managed
-    )
+      // Release builds ignore the flag entirely.
+      #expect(
+        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
+          == .managed
+      )
     #endif
   }
 
@@ -245,7 +245,8 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherFiresOnFirstWrite() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir = tempRoot
+    let daemonDir =
+      tempRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
     try FileManager.default.createDirectory(
@@ -258,7 +259,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     let environment = HarnessMonitorEnvironment(
       values: [
-        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path,
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path
       ]
     )
 
@@ -315,7 +316,8 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherFiresWhenStartedAtChanges() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir = tempRoot
+    let daemonDir =
+      tempRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
     try FileManager.default.createDirectory(
@@ -328,7 +330,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     let environment = HarnessMonitorEnvironment(
       values: [
-        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path,
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path
       ]
     )
 
@@ -392,7 +394,8 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherFiresInPlaceUpdateWhenRevisionBumps() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir = tempRoot
+    let daemonDir =
+      tempRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
     try FileManager.default.createDirectory(
@@ -405,7 +408,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     let environment = HarnessMonitorEnvironment(
       values: [
-        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path,
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path
       ]
     )
 
@@ -472,7 +475,8 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func manifestWatcherIgnoresRewritesThatKeepFieldsStable() async throws {
     let tempRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-watcher-\(UUID().uuidString)", isDirectory: true)
-    let daemonDir = tempRoot
+    let daemonDir =
+      tempRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
     try FileManager.default.createDirectory(
@@ -485,7 +489,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     let environment = HarnessMonitorEnvironment(
       values: [
-        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path,
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: tempRoot.path
       ]
     )
 

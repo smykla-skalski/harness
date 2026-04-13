@@ -128,7 +128,8 @@ struct HarnessMonitorStoreCodexTests {
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 
-  @Test("Sandboxed 503 refreshes bridge state and retries Codex start once when the bridge is healthy")
+  @Test(
+    "Sandboxed 503 refreshes bridge state and retries Codex start once when the bridge is healthy")
   func startCodexRunRetriesOnceAfterSandboxed503WhenBridgeRefreshesHealthy() async {
     let client = RecordingHarnessClient()
     client.configureCodexStartErrors([
@@ -235,7 +236,8 @@ struct HarnessMonitorStoreCodexTests {
     )
     #expect(store.codexUnavailable == true)
     #expect(store.hostBridgeCapabilityState(for: "codex") == .unavailable)
-    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
+    #expect(
+      store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 
@@ -431,7 +433,8 @@ struct HarnessMonitorStoreAgentTuiTests {
     let sent = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: .text("status"))
 
     #expect(sent)
-    #expect(client.recordedCalls() == [.sendAgentTuiInput(tuiID: tui.tuiId, input: .text("status"))])
+    #expect(
+      client.recordedCalls() == [.sendAgentTuiInput(tuiID: tui.tuiId, input: .text("status"))])
     #expect(store.selectedAgentTui?.screen.text.contains("status") == true)
   }
 
@@ -716,7 +719,8 @@ struct HarnessMonitorStoreHostBridgeTests {
       )
     )
 
-    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
+    #expect(
+      store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
   }
 
   @Test("Host bridge start command falls back to bridge start when the bridge is absent")
@@ -782,7 +786,9 @@ struct HarnessMonitorStoreHostBridgeTests {
     store.markHostBridgeIssue(for: "agent-tui", statusCode: 501)
 
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
-    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge reconfigure --enable agent-tui")
+    #expect(
+      store.hostBridgeStartCommand(for: "agent-tui")
+        == "harness bridge reconfigure --enable agent-tui")
   }
 
   @Test("Host bridge enable updates manifest and clears excluded issue")
@@ -834,7 +840,9 @@ struct HarnessMonitorStoreHostBridgeTests {
     )
     #expect(store.hostBridgeCapabilityIssues["codex"] == nil)
     #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
-    #expect(store.daemonStatus?.manifest?.hostBridge.capabilities["codex"]?.endpoint == "ws://127.0.0.1:4500")
+    #expect(
+      store.daemonStatus?.manifest?.hostBridge.capabilities["codex"]?.endpoint
+        == "ws://127.0.0.1:4500")
     #expect(store.currentSuccessFeedbackMessage == "Enabled Codex host bridge")
   }
 
@@ -905,7 +913,8 @@ struct HarnessMonitorStoreHostBridgeTests {
     client.configureHostBridgeReconfigureError(
       HarnessMonitorAPIError.server(
         code: 409,
-        message: "agent-tui capability has 1 active session(s); rerun with --force to stop them first"
+        message:
+          "agent-tui capability has 1 active session(s); rerun with --force to stop them first"
       )
     )
     let store = await makeBootstrappedStore(client: client)
@@ -960,7 +969,9 @@ struct HarnessMonitorStoreHostBridgeTests {
     let result = await store.setHostBridgeCapability("agent-tui", enabled: true)
 
     #expect(result == .failed)
-    #expect(store.currentFailureFeedbackMessage?.contains("Restart `harness daemon dev` and try again.") == true)
+    #expect(
+      store.currentFailureFeedbackMessage?.contains("Restart `harness daemon dev` and try again.")
+        == true)
     #expect(await daemon.recordedOperations() == ["warm-up"])
   }
 
@@ -983,7 +994,9 @@ struct HarnessMonitorStoreHostBridgeTests {
     let result = await store.setHostBridgeCapability("agent-tui", enabled: true)
 
     #expect(result == .failed)
-    #expect(store.currentFailureFeedbackMessage == "The shared host bridge is not running. Start it and try again.")
+    #expect(
+      store.currentFailureFeedbackMessage
+        == "The shared host bridge is not running. Start it and try again.")
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .unavailable)
     #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
     #expect(store.daemonStatus?.manifest?.hostBridge.running == false)

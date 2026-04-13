@@ -14,14 +14,13 @@ extension HarnessMonitorUITestCase {
       coordinate.tap()
     } else {
       let frameMarker = frameElement(in: app, identifier: "\(controlIdentifier).frame")
-      if frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
+      guard frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
         let coordinate = centerCoordinate(in: app, for: frameMarker)
-      {
-        coordinate.tap()
-      } else {
+      else {
         XCTFail("Failed to open pop-up button \(controlIdentifier)")
         return
       }
+      coordinate.tap()
     }
 
     let menuItem = presentedMenuOption(in: app, title: optionTitle)

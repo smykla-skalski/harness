@@ -16,18 +16,18 @@ public enum DaemonOwnership: String, Equatable, Sendable, CaseIterable {
 
   public init(environment: [String: String]) {
     #if DEBUG
-    let raw = environment[Self.environmentKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased()
-    switch raw {
-    case "1", "true", "yes", "on":
-      self = .external
-    default:
-      self = .managed
-    }
+      let raw = environment[Self.environmentKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+      switch raw {
+      case "1", "true", "yes", "on":
+        self = .external
+      default:
+        self = .managed
+      }
     #else
-    _ = environment
-    self = .managed
+      _ = environment
+      self = .managed
     #endif
   }
 

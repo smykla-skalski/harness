@@ -87,10 +87,9 @@ final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
     )
     let leadingToolbarButton = settingsToolbar.buttons.element(boundBy: 0)
     XCTAssertTrue(leadingToolbarButton.exists)
-    let generalSection = sidebarSectionElement(
+    let generalSection = element(
       in: app,
-      title: "General",
-      within: settingsWindow
+      identifier: Accessibility.preferencesSectionButton("general")
     )
     XCTAssertTrue(generalSection.waitForExistence(timeout: Self.actionTimeout))
     let toolbarLeadingInset = leadingToolbarButton.frame.minX - settingsWindow.frame.minX
@@ -112,4 +111,5 @@ final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
       "Sidebar content should stay visually close to the toolbar"
     )
   }
+
 }

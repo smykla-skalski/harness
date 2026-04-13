@@ -389,7 +389,8 @@ struct HarnessMonitorStoreSelectionFlowTests {
     store.selectSessionFromList(PreviewFixtures.summary.sessionId)
 
     #expect(store.inspectorSelection == .none)
-    #expect(client.readCallCount(.sessionDetail(PreviewFixtures.summary.sessionId)) == detailCallCount)
+    #expect(
+      client.readCallCount(.sessionDetail(PreviewFixtures.summary.sessionId)) == detailCallCount)
     #expect(client.readCallCount(.timeline(PreviewFixtures.summary.sessionId)) == timelineCallCount)
   }
 
