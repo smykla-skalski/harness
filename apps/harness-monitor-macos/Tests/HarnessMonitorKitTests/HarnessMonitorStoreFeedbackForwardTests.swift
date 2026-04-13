@@ -42,11 +42,14 @@ struct HarnessMonitorStoreFeedbackForwardTests {
     let store = await makeBootstrappedStore()
     store.toast.dismissAll()
 
-    let invalidations = await invalidationCount({ store.selectedSessionID }) {
-      _ = await MainActor.run {
-        store.toast.presentSuccess("isolated mutation")
+    let invalidations = await invalidationCount(
+      { store.selectedSessionID },
+      after: {
+        _ = await MainActor.run {
+          store.toast.presentSuccess("isolated mutation")
+        }
       }
-    }
+    )
 
     #expect(invalidations == 0)
   }

@@ -121,9 +121,10 @@ struct HarnessMonitorStoreNavigationTests {
   func assigningSameNavigationAvailabilityDoesNotInvalidateObservers() async {
     let state = WindowNavigationState()
 
-    let invalidated = await didInvalidate({ state.canGoBack }) {
-      state.canGoBack = false
-    }
+    let invalidated = await didInvalidate(
+      { state.canGoBack },
+      after: { state.canGoBack = false }
+    )
 
     #expect(invalidated == false)
   }
@@ -132,10 +133,13 @@ struct HarnessMonitorStoreNavigationTests {
   func updatingNavigationHandlersDoesNotInvalidateAvailabilityObservers() async {
     let state = WindowNavigationState()
 
-    let invalidated = await didInvalidate({ (state.canGoBack, state.canGoForward) }) {
-      state.backHandler = { await Task.yield() }
-      state.forwardHandler = { await Task.yield() }
-    }
+    let invalidated = await didInvalidate(
+      { (state.canGoBack, state.canGoForward) },
+      after: {
+        state.backHandler = { await Task.yield() }
+        state.forwardHandler = { await Task.yield() }
+      }
+    )
 
     #expect(invalidated == false)
   }
