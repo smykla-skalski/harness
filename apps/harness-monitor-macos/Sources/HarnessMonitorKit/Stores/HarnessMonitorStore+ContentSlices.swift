@@ -1,6 +1,20 @@
 import Foundation
 import Observation
 
+private struct SessionDetailIdentity: Equatable {
+  let sessionID: String
+  let updatedAt: String
+
+  init?(_ detail: SessionDetail?) {
+    guard let detail else {
+      return nil
+    }
+
+    sessionID = detail.session.sessionId
+    updatedAt = detail.session.updatedAt
+  }
+}
+
 extension HarnessMonitorStore {
   @MainActor
   @Observable
@@ -41,15 +55,47 @@ extension HarnessMonitorStore {
   public final class ContentSessionDetailSlice {
     public var selectedSessionDetail: SessionDetail?
     public var timeline: [TimelineEntry] = []
+    public var presentedSessionDetail: SessionDetail?
+    public var presentedTimeline: [TimelineEntry] = []
+    private var selectedSessionDetailIdentity: SessionDetailIdentity?
+    private var presentedSessionDetailIdentity: SessionDetailIdentity?
 
     public init() {}
 
-    internal func apply(_ state: ContentSessionDetailState) {
-      if selectedSessionDetail != state.selectedSessionDetail {
+    internal func apply(
+      _ state: ContentSessionDetailState,
+      selectedSessionSummary: SessionSummary?
+    ) {
+      let nextSelectedIdentity = SessionDetailIdentity(state.selectedSessionDetail)
+
+      if selectedSessionDetailIdentity != nextSelectedIdentity {
         selectedSessionDetail = state.selectedSessionDetail
+        selectedSessionDetailIdentity = nextSelectedIdentity
       }
       if timeline != state.timeline {
         timeline = state.timeline
+      }
+
+      if let detail = state.selectedSessionDetail {
+        if presentedSessionDetailIdentity != nextSelectedIdentity {
+          presentedSessionDetail = detail
+          presentedSessionDetailIdentity = nextSelectedIdentity
+        }
+        if presentedTimeline != state.timeline {
+          presentedTimeline = state.timeline
+        }
+        return
+      }
+
+      guard presentedSessionDetail?.session.sessionId == selectedSessionSummary?.sessionId else {
+        if presentedSessionDetail != nil {
+          presentedSessionDetail = nil
+          presentedSessionDetailIdentity = nil
+        }
+        if !presentedTimeline.isEmpty {
+          presentedTimeline = []
+        }
+        return
       }
     }
   }

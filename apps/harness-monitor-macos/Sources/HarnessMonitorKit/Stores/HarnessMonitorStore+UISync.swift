@@ -249,11 +249,13 @@ extension HarnessMonitorStore {
   }
 
   private func syncContentSessionDetailUI() {
+    let selectedSessionSummary = sessionIndex.sessionSummary(for: selection.selectedSessionID)
     contentUI.sessionDetail.apply(
       ContentSessionDetailState(
         selectedSessionDetail: selection.matchedSelectedSession,
         timeline: selection.timeline
-      )
+      ),
+      selectedSessionSummary: selectedSessionSummary
     )
   }
 

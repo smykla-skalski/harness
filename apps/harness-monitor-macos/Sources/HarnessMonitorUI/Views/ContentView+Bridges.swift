@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private struct ContentFloatingOverlay: View {
+struct ContentFloatingOverlay: View {
   let toast: ToastSlice
   let auditBuildBadgeState: AuditBuildDisplayState?
 
@@ -28,7 +28,7 @@ private struct ContentFloatingOverlay: View {
   }
 }
 
-private struct ContentEscapeCommandBridge: View {
+struct ContentEscapeCommandBridge: View {
   let store: HarnessMonitorStore
   let toast: ToastSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
@@ -38,7 +38,7 @@ private struct ContentEscapeCommandBridge: View {
       toast.dismiss(id: feedbackID)
       return .handled
     }
-    if contentSessionDetail.selectedSessionDetail != nil {
+    if contentSessionDetail.presentedSessionDetail != nil {
       store.inspectorSelection = .none
       return .handled
     }
@@ -48,7 +48,7 @@ private struct ContentEscapeCommandBridge: View {
   private func handleExitCommand() {
     if let feedbackID = toast.activeFeedback.first?.id {
       toast.dismiss(id: feedbackID)
-    } else if contentSessionDetail.selectedSessionDetail != nil {
+    } else if contentSessionDetail.presentedSessionDetail != nil {
       store.inspectorSelection = .none
     }
   }
@@ -61,7 +61,7 @@ private struct ContentEscapeCommandBridge: View {
   }
 }
 
-private struct ContentAccessibilityOverlayBridge: View {
+struct ContentAccessibilityOverlayBridge: View {
   let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
@@ -98,7 +98,7 @@ private struct ContentAccessibilityOverlayBridge: View {
   }
 }
 
-private struct ContentSceneRestorationBridge: View {
+struct ContentSceneRestorationBridge: View {
   let store: HarnessMonitorStore
   let selection: HarnessMonitorStore.SelectionSlice
   @SceneStorage("selectedSessionID")
@@ -141,7 +141,7 @@ private struct ContentToolbarChromeAccessibilityMarker: View {
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
 
   private var windowTitle: String {
-    contentSessionDetail.selectedSessionDetail != nil ? "Cockpit" : "Dashboard"
+    contentSessionDetail.presentedSessionDetail != nil ? "Cockpit" : "Dashboard"
   }
 
   var body: some View {
