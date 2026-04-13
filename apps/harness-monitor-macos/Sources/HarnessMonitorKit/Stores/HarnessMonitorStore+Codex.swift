@@ -345,6 +345,7 @@ extension HarnessMonitorStore {
     name: String?,
     prompt: String?,
     projectDir: String? = nil,
+    persona: String? = nil,
     argv: [String] = [],
     rows: Int,
     cols: Int
@@ -375,6 +376,7 @@ extension HarnessMonitorStore {
           name: trimmedName?.isEmpty == false ? trimmedName : nil,
           prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
           projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,
+          persona: persona,
           argv: normalizedArgv,
           rows: rows,
           cols: cols

@@ -123,7 +123,8 @@ struct HarnessMonitorStoreInspectorTests {
           agentSessionId: "\(leaderID)-session",
           lastActivityAt: summary.lastActivityAt,
           currentTaskId: nil,
-          runtimeCapabilities: capabilities
+          runtimeCapabilities: capabilities,
+          persona: nil
         ),
         AgentRegistration(
           agentId: workerID,
@@ -137,7 +138,8 @@ struct HarnessMonitorStoreInspectorTests {
           agentSessionId: "\(workerID)-session",
           lastActivityAt: summary.lastActivityAt,
           currentTaskId: nil,
-          runtimeCapabilities: capabilities
+          runtimeCapabilities: capabilities,
+          persona: nil
         ),
       ],
       tasks: [],

@@ -265,7 +265,8 @@ extension RecordingHarnessClient {
         agentSessionId: agent.agentSessionId,
         lastActivityAt: agent.lastActivityAt,
         currentTaskId: agent.currentTaskId,
-        runtimeCapabilities: agent.runtimeCapabilities
+        runtimeCapabilities: agent.runtimeCapabilities,
+        persona: agent.persona
       )
     }
     return detail
