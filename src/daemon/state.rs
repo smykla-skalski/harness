@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::env;
 use std::fs;
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt;
@@ -19,7 +18,9 @@ use crate::infra::persistence::flock::{
     FlockErrorContext, TryAcquireFlockError, flock_is_held_at as shared_flock_is_held_at,
     try_acquire_exclusive_flock, with_exclusive_flock,
 };
-use crate::workspace::{dirs_home, harness_data_root, host_home_dir, utc_now};
+use crate::workspace::{
+    dirs_home, harness_data_root, host_home_dir, normalized_env_value, utc_now,
+};
 
 const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
 const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
@@ -165,10 +166,10 @@ pub fn daemon_root() -> PathBuf {
 /// override itself when no override is active.
 #[must_use]
 pub fn default_daemon_root() -> PathBuf {
-    if let Some(value) = context_scope_value(DAEMON_DATA_HOME_ENV) {
+    if let Some(value) = normalized_env_value(DAEMON_DATA_HOME_ENV) {
         return PathBuf::from(value).join("harness").join("daemon");
     }
-    if let Some(value) = context_scope_value(APP_GROUP_ID_ENV) {
+    if let Some(value) = normalized_env_value(APP_GROUP_ID_ENV) {
         return host_home_dir()
             .join("Library")
             .join("Group Containers")
@@ -177,21 +178,6 @@ pub fn default_daemon_root() -> PathBuf {
             .join("daemon");
     }
     harness_data_root().join("daemon")
-}
-
-fn context_scope_value(name: &str) -> Option<String> {
-    let value = env::var(name).unwrap_or_default();
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    if trimmed.starts_with("${") && trimmed.ends_with('}') {
-        return None;
-    }
-    if trimmed.eq_ignore_ascii_case("unset") {
-        return None;
-    }
-    Some(trimmed.to_string())
 }
 
 #[must_use]
