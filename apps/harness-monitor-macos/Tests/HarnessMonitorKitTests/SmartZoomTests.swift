@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 
 @testable import HarnessMonitorUI
@@ -25,5 +26,14 @@ struct SmartZoomTests {
   func animationDuration() {
     #expect(SmartZoomConfiguration.animationDuration > 0)
     #expect(SmartZoomConfiguration.animationDuration <= 1.0)
+  }
+
+  @Test("Scrollable content size is zoom scale times container size")
+  func scrollableContentSize() {
+    let containerWidth: CGFloat = 900
+    let containerHeight: CGFloat = 600
+    let scale = SmartZoomConfiguration.zoomScale
+    #expect(containerWidth * scale == 1800)
+    #expect(containerHeight * scale == 1200)
   }
 }

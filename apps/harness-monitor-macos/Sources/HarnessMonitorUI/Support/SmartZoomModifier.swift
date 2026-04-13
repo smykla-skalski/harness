@@ -20,10 +20,24 @@ public struct SmartZoomModifier: ViewModifier {
   public init() {}
 
   public func body(content: Content) -> some View {
-    content
-      .scaleEffect(SmartZoomConfiguration.effectiveScale(isActive: isZoomed), anchor: .center)
-      .animation(.spring(duration: SmartZoomConfiguration.animationDuration), value: isZoomed)
-      .background(SmartZoomConfigurator(isZoomed: $isZoomed))
+    GeometryReader { proxy in
+      if isZoomed {
+        ScrollView([.horizontal, .vertical]) {
+          content
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .scaleEffect(SmartZoomConfiguration.zoomScale, anchor: .topLeading)
+            .frame(
+              width: proxy.size.width * SmartZoomConfiguration.zoomScale,
+              height: proxy.size.height * SmartZoomConfiguration.zoomScale
+            )
+        }
+        .scrollIndicators(.visible)
+      } else {
+        content
+      }
+    }
+    .animation(.spring(duration: SmartZoomConfiguration.animationDuration), value: isZoomed)
+    .background(SmartZoomConfigurator(isZoomed: $isZoomed))
   }
 }
 
