@@ -4,29 +4,26 @@ use crate::hooks::protocol::context::NormalizedEvent;
 pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     let mut registrations = Vec::new();
 
-    if matches!(
-        agent,
-        HookAgent::Claude | HookAgent::Gemini | HookAgent::Copilot
-    ) {
-        registrations.push(command_registration(
-            "session-start",
-            lifecycle_command(agent, "session-start"),
-            NormalizedEvent::SessionStart,
-            None,
-        ));
-        registrations.push(command_registration(
-            "pre-compact",
-            lifecycle_command(agent, "pre-compact"),
-            NormalizedEvent::BeforeCompaction,
-            None,
-        ));
-        registrations.push(command_registration(
-            "session-stop",
-            lifecycle_command(agent, "session-stop"),
-            NormalizedEvent::SessionEnd,
-            None,
-        ));
-    }
+    // Lifecycle hooks registered for all runtimes. The session-start hook
+    // also signals TUI readiness when HARNESS_AGENT_TUI_ID is set.
+    registrations.push(command_registration(
+        "session-start",
+        lifecycle_command(agent, "session-start"),
+        NormalizedEvent::SessionStart,
+        None,
+    ));
+    registrations.push(command_registration(
+        "pre-compact",
+        lifecycle_command(agent, "pre-compact"),
+        NormalizedEvent::BeforeCompaction,
+        None,
+    ));
+    registrations.push(command_registration(
+        "session-stop",
+        lifecycle_command(agent, "session-stop"),
+        NormalizedEvent::SessionEnd,
+        None,
+    ));
 
     match agent {
         HookAgent::Claude => registrations.extend(claude_hooks(agent)),
