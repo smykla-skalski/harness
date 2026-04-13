@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 
@@ -30,9 +31,31 @@ struct DaemonControllerTests {
     }
   }
 
-  @Test("awaitManifestWarmUp waits for managed manifest rewrite when the stale endpoint is dead")
-  func awaitManifestWarmUpWaitsForManagedManifestRewrite() async throws {
+  @Test("awaitManifestWarmUp returns daemonDidNotStart promptly for managed daemon when pid is dead")
+  func awaitManifestWarmUpReturnsManagedDaemonDidNotStartPromptly() async throws {
     try await withTempDaemonFixture(pid: 999_999) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        endpointProbe: { _ in false },
+        managedStaleManifestGracePeriod: .seconds(2)
+      )
+      let clock = ContinuousClock()
+      let start = clock.now
+
+      await #expect(throws: DaemonControlError.daemonDidNotStart) {
+        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
+      }
+
+      let elapsed = start.duration(to: clock.now)
+      #expect(elapsed < .seconds(1))
+    }
+  }
+
+  @Test("awaitManifestWarmUp waits for managed manifest rewrite while the stale pid is still alive")
+  func awaitManifestWarmUpWaitsForManagedManifestRewriteWhilePidIsAlive() async throws {
+    try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
       let client = PreviewHarnessClient()
       let controller = DaemonController(
         environment: environment,
