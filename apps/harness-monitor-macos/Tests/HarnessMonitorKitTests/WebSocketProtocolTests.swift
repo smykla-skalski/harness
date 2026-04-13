@@ -24,6 +24,10 @@ extension WebSocketTransport {
   func hasTestSessionStreamContinuation(sessionID: String) -> Bool {
     sessionStreamContinuations[sessionID] != nil
   }
+
+  func installTestGlobalSubscriptionActive(_ active: Bool) {
+    globalSubscriptionActive = active
+  }
 }
 
 @Suite("WebSocket protocol wire format")
@@ -222,6 +226,38 @@ struct WebSocketProtocolTests {
       #expect(payload == .object(["ok": .bool(true)]))
     } else {
       Issue.record("expected unknown session push event after malformed frame")
+    }
+  }
+
+  @Test("Reconnect ready events reach active global and session streams")
+  func reconnectReadyEventsReachActiveStreams() async throws {
+    let transport = makeTransport()
+    let sessionID = "sess-reconnect-ready"
+    let (globalStream, globalContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>
+      .makeStream()
+    let (sessionStream, sessionContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>
+      .makeStream()
+
+    await transport.installTestGlobalStreamContinuation(globalContinuation)
+    await transport.installTestSessionStreamContinuation(sessionContinuation, sessionID: sessionID)
+    await transport.installTestGlobalSubscriptionActive(true)
+
+    await transport.emitReconnectReadyEvents()
+
+    var globalIterator = globalStream.makeAsyncIterator()
+    let globalEvent = try await #require(globalIterator.next())
+    if case .ready = globalEvent.kind {
+      #expect(globalEvent.sessionId == nil)
+    } else {
+      Issue.record("expected reconnect-ready global event")
+    }
+
+    var sessionIterator = sessionStream.makeAsyncIterator()
+    let sessionEvent = try await #require(sessionIterator.next())
+    if case .ready = sessionEvent.kind {
+      #expect(sessionEvent.sessionId == sessionID)
+    } else {
+      Issue.record("expected reconnect-ready session event")
     }
   }
 
