@@ -3,6 +3,29 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+extension WebSocketTransport {
+  func installTestGlobalStreamContinuation(
+    _ continuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation
+  ) {
+    globalStreamContinuation = continuation
+  }
+
+  func installTestSessionStreamContinuation(
+    _ continuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation,
+    sessionID: String
+  ) {
+    sessionStreamContinuations[sessionID] = continuation
+  }
+
+  func hasTestGlobalStreamContinuation() -> Bool {
+    globalStreamContinuation != nil
+  }
+
+  func hasTestSessionStreamContinuation(sessionID: String) -> Bool {
+    sessionStreamContinuations[sessionID] != nil
+  }
+}
+
 @Suite("WebSocket protocol wire format")
 struct WebSocketProtocolTests {
   private let encoder: JSONEncoder = {
@@ -16,6 +39,15 @@ struct WebSocketProtocolTests {
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
   }()
+
+  private func makeTransport() -> WebSocketTransport {
+    WebSocketTransport(
+      connection: HarnessMonitorConnection(
+        endpoint: URL(string: "http://127.0.0.1:8080")!,
+        token: "test-token"
+      )
+    )
+  }
 
   @Test("WsRequest encodes with snake_case keys")
   func requestEncoding() throws {
@@ -112,6 +144,74 @@ struct WebSocketProtocolTests {
     #expect(event == "session_updated")
     #expect(sessionId == "sess-1")
     #expect(seq == 42)
+  }
+
+  @Test("Malformed push frames do not terminate active streams")
+  func malformedPushFramesDoNotTerminateActiveStreams() async throws {
+    let transport = makeTransport()
+    let sessionID = "sess-1"
+    let (globalStream, globalContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
+    let (sessionStream, sessionContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
+
+    await transport.installTestGlobalStreamContinuation(globalContinuation)
+    await transport.installTestSessionStreamContinuation(sessionContinuation, sessionID: sessionID)
+
+    let malformedFrame = WsFrame(
+      id: nil,
+      result: nil,
+      error: nil,
+      batchIndex: nil,
+      batchCount: nil,
+      event: "session_updated",
+      recordedAt: "2026-04-13T17:30:00Z",
+      sessionId: nil,
+      payload: .object([:]),
+      seq: 1,
+      chunkId: nil,
+      chunkIndex: nil,
+      chunkCount: nil,
+      chunkBase64: nil
+    )
+    try await transport.handleFrame(malformedFrame)
+
+    #expect(await transport.hasTestGlobalStreamContinuation())
+    #expect(await transport.hasTestSessionStreamContinuation(sessionID: sessionID))
+
+    let validFrame = WsFrame(
+      id: nil,
+      result: nil,
+      error: nil,
+      batchIndex: nil,
+      batchCount: nil,
+      event: "mystery_event",
+      recordedAt: "2026-04-13T17:31:00Z",
+      sessionId: sessionID,
+      payload: .object(["ok": .bool(true)]),
+      seq: 2,
+      chunkId: nil,
+      chunkIndex: nil,
+      chunkCount: nil,
+      chunkBase64: nil
+    )
+    try await transport.handleFrame(validFrame)
+
+    var globalIterator = globalStream.makeAsyncIterator()
+    let globalEvent = try await #require(globalIterator.next())
+    if case .unknown(let eventName, let payload) = globalEvent.kind {
+      #expect(eventName == "mystery_event")
+      #expect(payload == .object(["ok": .bool(true)]))
+    } else {
+      Issue.record("expected unknown global push event after malformed frame")
+    }
+
+    var sessionIterator = sessionStream.makeAsyncIterator()
+    let sessionEvent = try await #require(sessionIterator.next())
+    if case .unknown(let eventName, let payload) = sessionEvent.kind {
+      #expect(eventName == "mystery_event")
+      #expect(payload == .object(["ok": .bool(true)]))
+    } else {
+      Issue.record("expected unknown session push event after malformed frame")
+    }
   }
 
   @Test("WsFrame returns unknown for empty object")
