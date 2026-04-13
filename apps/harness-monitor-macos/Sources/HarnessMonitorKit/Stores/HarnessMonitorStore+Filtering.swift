@@ -25,8 +25,8 @@ extension HarnessMonitorStore {
     @ObservationIgnored var orderedSessionIDsBySortOrder: [SessionSortOrder: [String]] = [:]
     @ObservationIgnored var queryTokens: [String] = []
     @ObservationIgnored var searchRebuildTask: Task<Void, Never>?
-    @ObservationIgnored private(set) var debugCatalogRebuildCount = 0
-    @ObservationIgnored private(set) var debugProjectionRebuildCount = 0
+    @ObservationIgnored var debugCatalogRebuildCount = 0
+    @ObservationIgnored var debugProjectionRebuildCount = 0
 
     static let searchRebuildDebounceNanoseconds: UInt64 = 150_000_000
 

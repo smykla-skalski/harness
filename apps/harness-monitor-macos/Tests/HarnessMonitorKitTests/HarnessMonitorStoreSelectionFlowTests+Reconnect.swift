@@ -4,8 +4,6 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-
-@MainActor
 extension HarnessMonitorStoreSelectionFlowTests {
   @Test("Reconnect restores the selected session stream subscription")
   func reconnectRestoresSelectedSessionStreamSubscription() async {

@@ -5,14 +5,14 @@ import SwiftUI
 extension AgentTuiWindowView {
   func refreshDisplayState() {
     let nextState = AgentTuiDisplayState(store: store)
-    guard displayState != nextState else {
+    guard viewModel.displayState != nextState else {
       return
     }
-    displayState = nextState
+    viewModel.displayState = nextState
   }
 
   func resolvedTitle(for tui: AgentTuiSnapshot) -> String {
-    displayState.sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
+    viewModel.displayState.sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
   }
 
   func resolvedRuntimeTitle(for tui: AgentTuiSnapshot) -> String {
@@ -46,14 +46,14 @@ extension AgentTuiWindowView {
   }
 
   func selectCreateTab() {
-    selection = .create
+    viewModel.selection = .create
   }
 
   func refresh() {
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
-      if selection.sessionID != nil,
-        store.selectedAgentTui?.tuiId == selection.sessionID
+      if viewModel.selection.sessionID != nil,
+        store.selectedAgentTui?.tuiId == viewModel.selection.sessionID
       {
         _ = await store.refreshSelectedAgentTui()
       } else {
@@ -61,85 +61,85 @@ extension AgentTuiWindowView {
       }
       reconcileSheetState(afterRefresh: false)
       syncTerminalSize()
-      isSubmitting = false
+      viewModel.isSubmitting = false
     }
   }
 
   func startTui() {
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
       let success = await store.startAgentTui(
-        runtime: runtime,
-        name: name,
-        prompt: prompt,
+        runtime: viewModel.runtime,
+        name: viewModel.name,
+        prompt: viewModel.prompt,
         projectDir: trimmedProjectDir,
-        persona: selectedPersona,
+        persona: viewModel.selectedPersona,
         argv: parsedArgvOverride,
-        rows: rows,
-        cols: cols
+        rows: viewModel.rows,
+        cols: viewModel.cols
       )
       if success, let startedTuiID = store.selectedAgentTui?.tuiId {
-        name = ""
-        prompt = ""
-        projectDir = ""
-        argvOverride = ""
-        inputText = ""
-        selectedPersona = nil
-        selection = .session(startedTuiID)
+        viewModel.name = ""
+        viewModel.prompt = ""
+        viewModel.projectDir = ""
+        viewModel.argvOverride = ""
+        viewModel.inputText = ""
+        viewModel.selectedPersona = nil
+        viewModel.selection = .session(startedTuiID)
         focusedField = .input
       }
-      isSubmitting = false
+      viewModel.isSubmitting = false
     }
   }
 
   func sendInput(to tui: AgentTuiSnapshot) {
     let payload: AgentTuiInput =
-      switch inputMode {
+      switch viewModel.inputMode {
       case .text:
         .text(trimmedInput)
       case .paste:
         .paste(trimmedInput)
       }
 
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
       let success = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: payload)
       if success {
-        inputText = ""
+        viewModel.inputText = ""
       }
-      isSubmitting = false
+      viewModel.isSubmitting = false
     }
   }
 
   func sendKey(_ key: AgentTuiKey, to tui: AgentTuiSnapshot) {
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
       _ = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: .key(key))
-      isSubmitting = false
+      viewModel.isSubmitting = false
     }
   }
 
   func sendControl(_ key: Character, to tui: AgentTuiSnapshot) {
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
       _ = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: .control(key))
-      isSubmitting = false
+      viewModel.isSubmitting = false
     }
   }
 
   func resizeTui(_ tui: AgentTuiSnapshot) {
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
-      _ = await store.resizeAgentTui(tuiID: tui.tuiId, rows: rows, cols: cols)
-      isSubmitting = false
+      _ = await store.resizeAgentTui(tuiID: tui.tuiId, rows: viewModel.rows, cols: viewModel.cols)
+      viewModel.isSubmitting = false
     }
   }
 
   func stopTui(_ tui: AgentTuiSnapshot) {
-    isSubmitting = true
+    viewModel.isSubmitting = true
     Task {
       _ = await store.stopAgentTui(tuiID: tui.tuiId)
-      isSubmitting = false
+      viewModel.isSubmitting = false
     }
   }
 
@@ -148,7 +148,7 @@ extension AgentTuiWindowView {
   }
 
   func updateViewportGeometry(_ viewportSize: CGSize, for tui: AgentTuiSnapshot) {
-    guard selection.sessionID == tui.tuiId, tui.status.isActive else {
+    guard viewModel.selection.sessionID == tui.tuiId, tui.status.isActive else {
       return
     }
     guard
@@ -159,30 +159,32 @@ extension AgentTuiWindowView {
     else {
       return
     }
-    if rows != terminalSize.rows {
-      rows = terminalSize.rows
+    if viewModel.rows != terminalSize.rows {
+      viewModel.rows = terminalSize.rows
     }
-    if cols != terminalSize.cols {
-      cols = terminalSize.cols
+    if viewModel.cols != terminalSize.cols {
+      viewModel.cols = terminalSize.cols
     }
-    guard terminalSize != tui.size, terminalSize != pendingViewportResizeTarget else {
+    guard terminalSize != tui.size,
+      terminalSize != viewModel.pendingViewportResizeTarget
+    else {
       return
     }
 
-    pendingViewportResizeTarget = terminalSize
-    viewportResizeTask?.cancel()
+    viewModel.pendingViewportResizeTarget = terminalSize
+    viewModel.viewportResizeTask?.cancel()
     let tuiID = tui.tuiId
-    viewportResizeTask = Task { @MainActor in
+    viewModel.viewportResizeTask = Task { @MainActor in
       try? await Task.sleep(for: TerminalViewportSizing.debounce)
       guard !Task.isCancelled else {
         return
       }
       guard
-        selection.sessionID == tuiID,
+        viewModel.selection.sessionID == tuiID,
         selectedSessionTui?.status.isActive == true
       else {
-        if pendingViewportResizeTarget == terminalSize {
-          pendingViewportResizeTarget = nil
+        if viewModel.pendingViewportResizeTarget == terminalSize {
+          viewModel.pendingViewportResizeTarget = nil
         }
         return
       }
@@ -193,10 +195,10 @@ extension AgentTuiWindowView {
         cols: terminalSize.cols,
         feedback: .silent
       )
-      guard pendingViewportResizeTarget == terminalSize else {
+      guard viewModel.pendingViewportResizeTarget == terminalSize else {
         return
       }
-      pendingViewportResizeTarget = nil
+      viewModel.pendingViewportResizeTarget = nil
       if !resized {
         syncTerminalSize()
       }
@@ -204,29 +206,29 @@ extension AgentTuiWindowView {
   }
 
   func cancelPendingViewportResize() {
-    viewportResizeTask?.cancel()
-    viewportResizeTask = nil
-    pendingViewportResizeTarget = nil
+    viewModel.viewportResizeTask?.cancel()
+    viewModel.viewportResizeTask = nil
+    viewModel.pendingViewportResizeTarget = nil
   }
 
   func syncTerminalSize() {
     guard let selectedSessionTui else {
       return
     }
-    if pendingViewportResizeTarget == selectedSessionTui.size {
-      pendingViewportResizeTarget = nil
+    if viewModel.pendingViewportResizeTarget == selectedSessionTui.size {
+      viewModel.pendingViewportResizeTarget = nil
     }
-    if rows != selectedSessionTui.size.rows {
-      rows = selectedSessionTui.size.rows
+    if viewModel.rows != selectedSessionTui.size.rows {
+      viewModel.rows = selectedSessionTui.size.rows
     }
-    if cols != selectedSessionTui.size.cols {
-      cols = selectedSessionTui.size.cols
+    if viewModel.cols != selectedSessionTui.size.cols {
+      viewModel.cols = selectedSessionTui.size.cols
     }
   }
 
   func reconcileSheetState(afterRefresh: Bool) {
     let preferredSelection = Self.initialSelection(
-      displayState: displayState,
+      displayState: viewModel.displayState,
       selectedTuiID: store.selectedAgentTui?.tuiId
     )
 
@@ -235,7 +237,7 @@ extension AgentTuiWindowView {
       return
     }
 
-    guard let selectedTuiID = selection.sessionID else {
+    guard let selectedTuiID = viewModel.selection.sessionID else {
       return
     }
 
@@ -248,39 +250,39 @@ extension AgentTuiWindowView {
   }
 
   func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
-    guard selection != nextSelection else {
+    guard viewModel.selection != nextSelection else {
       if nextSelection.sessionID != nil {
         syncTerminalSize()
       }
       return
     }
-    suppressHistoryRecording = true
-    selection = nextSelection
+    viewModel.suppressHistoryRecording = true
+    viewModel.selection = nextSelection
     if nextSelection.sessionID != nil {
       syncTerminalSize()
     }
   }
 
   func navigateHistoryBack() {
-    guard !navigationBackStack.isEmpty else { return }
-    let destination = navigationBackStack.removeLast()
-    navigationForwardStack.append(selection)
-    suppressHistoryRecording = true
-    selection = destination
+    guard !viewModel.navigationBackStack.isEmpty else { return }
+    let destination = viewModel.navigationBackStack.removeLast()
+    viewModel.navigationForwardStack.append(viewModel.selection)
+    viewModel.suppressHistoryRecording = true
+    viewModel.selection = destination
     updateNavigationState()
   }
 
   func navigateHistoryForward() {
-    guard !navigationForwardStack.isEmpty else { return }
-    let destination = navigationForwardStack.removeLast()
-    navigationBackStack.append(selection)
-    suppressHistoryRecording = true
-    selection = destination
+    guard !viewModel.navigationForwardStack.isEmpty else { return }
+    let destination = viewModel.navigationForwardStack.removeLast()
+    viewModel.navigationBackStack.append(viewModel.selection)
+    viewModel.suppressHistoryRecording = true
+    viewModel.selection = destination
     updateNavigationState()
   }
 
   func updateNavigationState() {
-    windowNavigation.canGoBack = !navigationBackStack.isEmpty
-    windowNavigation.canGoForward = !navigationForwardStack.isEmpty
+    viewModel.windowNavigation.canGoBack = !viewModel.navigationBackStack.isEmpty
+    viewModel.windowNavigation.canGoForward = !viewModel.navigationForwardStack.isEmpty
   }
 }

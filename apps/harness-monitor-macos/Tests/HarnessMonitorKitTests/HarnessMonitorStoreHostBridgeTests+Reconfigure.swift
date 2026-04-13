@@ -3,7 +3,6 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-
 @MainActor
 extension HarnessMonitorStoreHostBridgeTests {
   @Test("Host bridge enable updates manifest and clears excluded issue")

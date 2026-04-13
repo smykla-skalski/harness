@@ -4,7 +4,6 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-
 @MainActor
 extension HarnessMonitorStoreLifecycleCoreTests {
   @Test("Refresh skips selected session during persisted snapshot hydration")

@@ -9,46 +9,37 @@ struct HarnessVoiceInputButton: View {
   let accessibilityIdentifier: String
 
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey)
-  private var localeIdentifier = HarnessMonitorVoicePreferences.defaultLocaleIdentifier
+  var localeIdentifier = HarnessMonitorVoicePreferences.defaultLocaleIdentifier
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey)
-  private var localDaemonSinkEnabled = true
+  var localDaemonSinkEnabled = true
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey)
-  private var agentBridgeSinkEnabled = true
+  var agentBridgeSinkEnabled = true
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey)
-  private var remoteProcessorSinkEnabled = false
+  var remoteProcessorSinkEnabled = false
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey)
-  private var remoteProcessorURLText = ""
+  var remoteProcessorURLText = ""
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey)
-  private var transcriptInsertionModeRawValue =
+  var transcriptInsertionModeRawValue =
     HarnessMonitorVoiceTranscriptInsertionMode.manualConfirm.rawValue
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey)
-  private var deliversAudioChunks = true
+  var deliversAudioChunks = true
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey)
-  private var pendingAudioChunkLimit = HarnessMonitorVoicePreferences.defaultPendingAudioChunkLimit
+  var pendingAudioChunkLimit = HarnessMonitorVoicePreferences.defaultPendingAudioChunkLimit
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey)
-  private var pendingTranscriptSegmentLimit =
+  var pendingTranscriptSegmentLimit =
     HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
-  @State private var isPopoverPresented = false
-  @State private var isRecording = false
-  @State private var statusText = "Ready"
-  @State private var partialTranscript = ""
-  @State private var finalTranscript = ""
-  @State private var voiceSessionID: String?
-  @State private var captureTask: Task<Void, Never>?
-  @State private var processingSessionTask: Task<VoiceSessionStartResponse?, Never>?
-  @State private var pendingAudioChunks: [VoiceAudioChunk] = []
-  @State private var pendingTranscriptSegments: [VoiceTranscriptSegment] = []
-  @State private var pendingAutoInsert = false
-  @State private var failurePresentation: VoiceCaptureFailurePresentation?
+  @State private var _model = ViewModel()
 
-  private var completeTranscript: String {
-    [finalTranscript, partialTranscript]
+  var model: ViewModel { _model }
+
+  var completeTranscript: String {
+    [model.finalTranscript, model.partialTranscript]
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
       .joined(separator: " ")
   }
 
-  private var voicePreferences: HarnessMonitorVoicePreferences {
+  var voicePreferences: HarnessMonitorVoicePreferences {
     HarnessMonitorVoicePreferences(
       localeIdentifier: localeIdentifier,
       localDaemonSinkEnabled: localDaemonSinkEnabled,
@@ -63,19 +54,20 @@ struct HarnessVoiceInputButton: View {
   }
 
   var body: some View {
-    Button {
-      isPopoverPresented.toggle()
+    @Bindable var model = model
+    return Button {
+      model.isPopoverPresented.toggle()
     } label: {
       Label(label, systemImage: "mic.fill")
         .labelStyle(.iconOnly)
     }
-    .help(isRecording ? "Stop voice capture" : label)
+    .help(model.isRecording ? "Stop voice capture" : label)
     .accessibilityLabel(label)
     .accessibilityIdentifier(accessibilityIdentifier)
-    .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
+    .popover(isPresented: $model.isPopoverPresented, arrowEdge: .bottom) {
       popoverContent
     }
-    .onChange(of: isPopoverPresented) { _, isPresented in
+    .onChange(of: model.isPopoverPresented) { _, isPresented in
       if !isPresented {
         cancelVoiceInteraction()
       }
@@ -88,11 +80,11 @@ struct HarnessVoiceInputButton: View {
   private var popoverContent: some View {
     ZStack {
       popoverControls
-        .blur(radius: failurePresentation == nil ? 0 : 2)
-        .allowsHitTesting(failurePresentation == nil)
-        .accessibilityHidden(failurePresentation != nil)
+        .blur(radius: model.failurePresentation == nil ? 0 : 2)
+        .allowsHitTesting(model.failurePresentation == nil)
+        .accessibilityHidden(model.failurePresentation != nil)
 
-      if let failurePresentation {
+      if let failurePresentation = model.failurePresentation {
         VoiceCaptureFailureOverlay(
           presentation: failurePresentation,
           retry: retryAfterFailure,
@@ -104,7 +96,7 @@ struct HarnessVoiceInputButton: View {
     .frame(width: VoiceCapturePopoverMetrics.width, alignment: .topLeading)
     .frame(minHeight: VoiceCapturePopoverMetrics.minimumHeight, alignment: .topLeading)
     .clipShape(RoundedRectangle(cornerRadius: 8))
-    .animation(.easeInOut(duration: 0.12), value: failurePresentation)
+    .animation(.easeInOut(duration: 0.12), value: model.failurePresentation)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputPopover)
   }
@@ -112,14 +104,14 @@ struct HarnessVoiceInputButton: View {
   private var popoverControls: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-        Label(statusText, systemImage: isRecording ? "waveform" : "mic")
+        Label(model.statusText, systemImage: model.isRecording ? "waveform" : "mic")
           .scaledFont(.headline)
           .lineLimit(1)
         Spacer()
         ProgressView()
           .controlSize(.small)
           .frame(width: 16, height: 16)
-          .opacity(isRecording ? 1 : 0)
+          .opacity(model.isRecording ? 1 : 0)
       }
       .frame(height: 22)
 
@@ -143,7 +135,7 @@ struct HarnessVoiceInputButton: View {
   }
 
   @ViewBuilder private var captureControl: some View {
-    if isRecording {
+    if model.isRecording {
       captureButton
         .harnessActionButtonStyle(variant: .bordered)
         .tint(.red)
@@ -155,7 +147,7 @@ struct HarnessVoiceInputButton: View {
 
   private var captureButton: some View {
     Button {
-      if isRecording {
+      if model.isRecording {
         stopCaptureOnly()
       } else {
         startCapture()
@@ -177,298 +169,19 @@ struct HarnessVoiceInputButton: View {
     .buttonStyle(.borderedProminent)
     .controlSize(.regular)
     .frame(maxWidth: .infinity)
-    .disabled(completeTranscript.isEmpty || isRecording)
+    .disabled(completeTranscript.isEmpty || model.isRecording)
     .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputInsertButton)
   }
 
   private var captureButtonTitle: String {
-    isRecording ? "Stop" : "Record"
+    model.isRecording ? "Stop" : "Record"
   }
 
   private var captureButtonSystemImage: String {
-    isRecording ? "stop.fill" : "record.circle"
+    model.isRecording ? "stop.fill" : "record.circle"
   }
 
   private var configurationSummary: some View {
     VoicePopoverConfigurationSummary(preferences: voicePreferences)
-  }
-
-  private func startCapture() {
-    guard !isRecording else { return }
-    failurePresentation = nil
-    if remoteProcessorSinkEnabled, voicePreferences.remoteProcessorURL == nil {
-      statusText = "Remote processor endpoint must be HTTPS."
-      failurePresentation = VoiceCaptureFailurePresentation(
-        title: "Remote Processor Unavailable",
-        message: "Remote processor endpoint must be a full HTTPS URL.",
-        recoverySuggestion:
-          "Open Preferences > Voice, turn off Remote processor or save a full HTTPS endpoint, then try again."
-      )
-      return
-    }
-
-    finalTranscript = ""
-    partialTranscript = ""
-    statusText = "Preparing microphone"
-    isRecording = true
-    pendingAutoInsert = voicePreferences.shouldAutoInsertTranscript
-    captureTask?.cancel()
-    processingSessionTask?.cancel()
-    voiceSessionID = nil
-    pendingAudioChunks.removeAll(keepingCapacity: true)
-    pendingTranscriptSegments.removeAll(keepingCapacity: true)
-
-    let voicePreferences = self.voicePreferences
-    let localeIdentifier = voicePreferences.effectiveLocaleIdentifier
-    let routeTarget = routeTarget()
-    let sinks = voicePreferences.requestedSinks
-    let remoteURL = voicePreferences.remoteProcessorURL
-    let processingSessionTask = Task { @MainActor in
-      let response = await store.startVoiceProcessingSession(
-        localeIdentifier: localeIdentifier,
-        requestedSinks: sinks,
-        routeTarget: routeTarget,
-        remoteProcessorURL: remoteURL,
-        requiresConfirmation: voicePreferences.transcriptInsertionMode.requiresConfirmation
-      )
-      guard !Task.isCancelled else { return response }
-      voiceSessionID = response?.voiceSessionId
-      if let voiceSessionID = response?.voiceSessionId {
-        await flushPendingVoiceEvents(voiceSessionID: voiceSessionID)
-      } else {
-        pendingAudioChunks.removeAll(keepingCapacity: true)
-        pendingTranscriptSegments.removeAll(keepingCapacity: true)
-        if isRecording {
-          statusText = "Listening locally"
-        }
-      }
-      return response
-    }
-    self.processingSessionTask = processingSessionTask
-
-    captureTask = Task { @MainActor in
-      do {
-        for try await event in store.voiceCaptureStream(
-          configuration: voicePreferences.captureConfiguration
-        ) {
-          await handle(event)
-        }
-        if pendingAutoInsert,
-          !completeTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        {
-          isRecording = false
-          insertTranscript()
-          return
-        }
-        if isRecording {
-          isRecording = false
-        }
-        statusText = "Stopped"
-      } catch {
-        statusText = "Voice capture failed"
-        isRecording = false
-        pendingAutoInsert = false
-        processingSessionTask.cancel()
-        finishFailedVoiceSession()
-        failurePresentation = VoiceCaptureFailurePresentation(error: error)
-      }
-    }
-  }
-
-  private func handle(_ event: VoiceCaptureEvent) async {
-    switch event {
-    case .state(let state):
-      statusText = title(for: state)
-      if state == .cancelled || state == .failed {
-        isRecording = false
-      }
-    case .audio(let chunk):
-      if let voiceSessionID {
-        await store.appendVoiceAudioChunk(voiceSessionID: voiceSessionID, chunk: chunk)
-      } else {
-        appendPendingAudioChunk(chunk)
-      }
-    case .transcript(let segment):
-      if segment.isFinal {
-        appendFinalTranscript(segment.text)
-        partialTranscript = ""
-      } else {
-        partialTranscript = segment.text
-      }
-      if let voiceSessionID {
-        await store.appendVoiceTranscript(voiceSessionID: voiceSessionID, segment: segment)
-      } else {
-        appendPendingTranscriptSegment(segment)
-      }
-    }
-  }
-
-  private func stopCaptureOnly() {
-    guard isRecording else { return }
-    statusText = "Finishing"
-    isRecording = false
-    Task {
-      await store.stopVoiceCapture()
-    }
-  }
-
-  private func cancelVoiceInteraction() {
-    let voiceSessionID = voiceSessionID
-    captureTask?.cancel()
-    processingSessionTask?.cancel()
-    captureTask = nil
-    processingSessionTask = nil
-    self.voiceSessionID = nil
-    pendingAutoInsert = false
-    failurePresentation = nil
-    pendingAudioChunks.removeAll(keepingCapacity: true)
-    pendingTranscriptSegments.removeAll(keepingCapacity: true)
-    if isRecording {
-      isRecording = false
-      statusText = "Stopped"
-    }
-    Task {
-      await store.stopVoiceCapture()
-      if let voiceSessionID {
-        await store.finishVoiceProcessingSession(
-          voiceSessionID: voiceSessionID,
-          reason: .cancelled,
-          confirmedText: nil
-        )
-      }
-    }
-  }
-
-  private func insertTranscript() {
-    let transcript = completeTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !transcript.isEmpty else { return }
-    let bufferedAudioChunks = pendingAudioChunks
-    let bufferedTranscriptSegments = pendingTranscriptSegments
-    let activeProcessingSessionTask = processingSessionTask
-    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      text = transcript
-    } else {
-      text += "\n\n\(transcript)"
-    }
-    if let voiceSessionID {
-      Task {
-        await store.finishVoiceProcessingSession(
-          voiceSessionID: voiceSessionID,
-          reason: .completed,
-          confirmedText: transcript
-        )
-      }
-      self.voiceSessionID = nil
-    } else if let activeProcessingSessionTask {
-      Task { @MainActor in
-        guard let response = await activeProcessingSessionTask.value else { return }
-        for chunk in bufferedAudioChunks {
-          await store.appendVoiceAudioChunk(voiceSessionID: response.voiceSessionId, chunk: chunk)
-        }
-        for segment in bufferedTranscriptSegments {
-          await store.appendVoiceTranscript(
-            voiceSessionID: response.voiceSessionId,
-            segment: segment
-          )
-        }
-        await store.finishVoiceProcessingSession(
-          voiceSessionID: response.voiceSessionId,
-          reason: .completed,
-          confirmedText: transcript
-        )
-      }
-    }
-    captureTask?.cancel()
-    captureTask = nil
-    processingSessionTask = nil
-    pendingAutoInsert = false
-    failurePresentation = nil
-    pendingAudioChunks.removeAll(keepingCapacity: true)
-    pendingTranscriptSegments.removeAll(keepingCapacity: true)
-    statusText = "Inserted"
-    isPopoverPresented = false
-  }
-
-  private func flushPendingVoiceEvents(voiceSessionID: String) async {
-    let audioChunks = pendingAudioChunks
-    let transcriptSegments = pendingTranscriptSegments
-    pendingAudioChunks.removeAll(keepingCapacity: true)
-    pendingTranscriptSegments.removeAll(keepingCapacity: true)
-
-    for chunk in audioChunks {
-      await store.appendVoiceAudioChunk(voiceSessionID: voiceSessionID, chunk: chunk)
-    }
-    for segment in transcriptSegments {
-      await store.appendVoiceTranscript(voiceSessionID: voiceSessionID, segment: segment)
-    }
-  }
-
-  private func appendPendingAudioChunk(_ chunk: VoiceAudioChunk) {
-    if pendingAudioChunks.count >= voicePreferences.pendingAudioChunkLimit {
-      pendingAudioChunks.removeFirst()
-    }
-    pendingAudioChunks.append(chunk)
-  }
-
-  private func appendPendingTranscriptSegment(_ segment: VoiceTranscriptSegment) {
-    if pendingTranscriptSegments.count >= voicePreferences.pendingTranscriptSegmentLimit {
-      pendingTranscriptSegments.removeFirst()
-    }
-    pendingTranscriptSegments.append(segment)
-  }
-
-  private func finishFailedVoiceSession() {
-    let failedVoiceSessionID = voiceSessionID
-    voiceSessionID = nil
-    pendingAudioChunks.removeAll(keepingCapacity: true)
-    pendingTranscriptSegments.removeAll(keepingCapacity: true)
-    guard let failedVoiceSessionID else { return }
-    Task {
-      await store.finishVoiceProcessingSession(
-        voiceSessionID: failedVoiceSessionID,
-        reason: .cancelled,
-        confirmedText: nil
-      )
-    }
-  }
-
-  private func retryAfterFailure() {
-    failurePresentation = nil
-    startCapture()
-  }
-
-  private func closeFailure() {
-    failurePresentation = nil
-    pendingAutoInsert = false
-    isPopoverPresented = false
-  }
-
-  private func appendFinalTranscript(_ text: String) {
-    let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmedText.isEmpty else { return }
-    if finalTranscript.isEmpty {
-      finalTranscript = trimmedText
-    } else if !finalTranscript.hasSuffix(trimmedText) {
-      finalTranscript += " \(trimmedText)"
-    }
-  }
-
-  private func title(for state: VoiceCaptureState) -> String {
-    switch state {
-    case .idle:
-      "Ready"
-    case .requestingPermission:
-      "Requesting microphone access"
-    case .preparingAssets:
-      "Preparing speech assets"
-    case .recording:
-      "Listening"
-    case .finishing:
-      "Finishing"
-    case .cancelled:
-      "Stopped"
-    case .failed:
-      "Voice capture failed"
-    }
   }
 }

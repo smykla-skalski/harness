@@ -2,7 +2,6 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-
 @MainActor
 extension HarnessMonitorStoreProjectionTests {
   @Test("Summary-only updates skip projection rebuilds")

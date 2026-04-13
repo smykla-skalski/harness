@@ -4,14 +4,6 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-@Suite("Persistence snapshot integration")
-struct PersistenceSnapshotIntegrationTests {
-  let harness: PersistenceIntegrationTestHarness
-
-  init() throws {
-    harness = try PersistenceIntegrationTestHarness()
-
-@MainActor
 extension PersistenceSnapshotIntegrationTests {
   @Test("Persistence keeps all cached sessions instead of evicting older snapshots")
   func persistenceKeepsAllCachedSessions() async throws {

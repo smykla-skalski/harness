@@ -4,7 +4,8 @@ import SwiftUI
 
 extension AgentTuiWindowView {
   func terminalHeader(_ tui: AgentTuiSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+    @Bindable var viewModel = viewModel
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(resolvedTitle(for: tui))
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
       HStack(alignment: .firstTextBaseline) {
@@ -12,7 +13,7 @@ extension AgentTuiWindowView {
           .scaledFont(.caption.monospacedDigit())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Spacer()
-        Toggle("Wrap lines", isOn: $wrapLines)
+        Toggle("Wrap lines", isOn: $viewModel.wrapLines)
           .toggleStyle(ClickableSwitchStyle())
           .scaledFont(.caption)
           .controlSize(.mini)
@@ -23,7 +24,7 @@ extension AgentTuiWindowView {
   }
 
   func terminalViewport(_ tui: AgentTuiSnapshot) -> some View {
-    ScrollView(wrapLines ? .vertical : [.horizontal, .vertical]) {
+    ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
       Text(tui.screen.text.isEmpty ? "No terminal output yet." : tui.screen.text)
         .scaledFont(.system(.body, design: .monospaced))
         .textSelection(.enabled)
@@ -79,11 +80,12 @@ extension AgentTuiWindowView {
   }
 
   func terminalInputControls(_ tui: AgentTuiSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    @Bindable var viewModel = viewModel
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("Input")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Picker("Input mode", selection: $inputMode) {
+      Picker("Input mode", selection: $viewModel.inputMode) {
         ForEach(AgentTuiInputMode.allCases) { mode in
           Text(mode.title).tag(mode)
         }
@@ -93,7 +95,7 @@ extension AgentTuiWindowView {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         multilineEditor(
           placeholder: "Text to send to the TUI",
-          text: $inputText,
+          text: $viewModel.inputText,
           field: .input,
           minHeight: 72,
           accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputField
@@ -134,7 +136,7 @@ extension AgentTuiWindowView {
           }
           .harnessActionButtonStyle(variant: .bordered, tint: nil)
           .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-          .disabled(!tui.status.isActive || isSubmitting)
+          .disabled(!tui.status.isActive || viewModel.isSubmitting)
           .accessibilityLabel(key.title)
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiKeyButton(key.rawValue))
           .help(key.title)
@@ -149,7 +151,7 @@ extension AgentTuiWindowView {
         }
         .harnessActionButtonStyle(variant: .bordered, tint: nil)
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .disabled(!tui.status.isActive || isSubmitting)
+        .disabled(!tui.status.isActive || viewModel.isSubmitting)
         .accessibilityLabel("Control-C")
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiKeyButton("ctrl-c"))
         .help("Control-C")
@@ -159,7 +161,8 @@ extension AgentTuiWindowView {
   }
 
   func terminalResizeControls() -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    @Bindable var viewModel = viewModel
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("Viewport")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -168,8 +171,13 @@ extension AgentTuiWindowView {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .fixedSize(horizontal: false, vertical: true)
       HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-        Stepper("Rows \(rows)", value: $rows, in: TerminalViewportSizing.rowRange)
-        Stepper("Cols \(cols)", value: $cols, in: TerminalViewportSizing.colRange, step: 10)
+        Stepper("Rows \(viewModel.rows)", value: $viewModel.rows, in: TerminalViewportSizing.rowRange)
+        Stepper(
+          "Cols \(viewModel.cols)",
+          value: $viewModel.cols,
+          in: TerminalViewportSizing.colRange,
+          step: 10
+        )
         Spacer()
         if let selectedSessionTui {
           HarnessMonitorActionButton(
@@ -240,7 +248,7 @@ extension AgentTuiWindowView {
           }
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(store.isDaemonActionInFlight || isSubmitting)
+        .disabled(store.isDaemonActionInFlight || viewModel.isSubmitting)
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiEnableBridgeButton)
       }
       CopyableCommandBox(

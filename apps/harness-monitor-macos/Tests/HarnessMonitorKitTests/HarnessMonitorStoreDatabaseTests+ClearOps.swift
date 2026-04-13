@@ -8,7 +8,6 @@ private enum CacheWriteFailure: Error {
   case saveFailed
 }
 
-
 @MainActor
 extension HarnessMonitorStoreDatabaseTests {
   @Test("cacheSessionList removes orphaned cached projects and sessions")

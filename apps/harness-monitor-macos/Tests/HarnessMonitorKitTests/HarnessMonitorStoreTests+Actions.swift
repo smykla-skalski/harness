@@ -3,8 +3,6 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-
-@MainActor
 extension HarnessMonitorStoreTests {
   @Test("Refresh failure tears down active background streams")
   func refreshFailureTearsDownActiveBackgroundStreams() async {
