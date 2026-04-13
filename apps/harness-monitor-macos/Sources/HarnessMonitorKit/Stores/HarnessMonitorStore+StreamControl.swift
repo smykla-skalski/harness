@@ -28,6 +28,7 @@ extension HarnessMonitorStore {
     stopGlobalStream()
     stopSessionStream(resetSubscriptions: resetSubscriptions)
     stopConnectionProbe()
+    cancelSelectedSessionRefreshFallback()
     cancelSessionPushFallback()
     cancelSessionLoad()
     cancelPendingCacheWrite()
