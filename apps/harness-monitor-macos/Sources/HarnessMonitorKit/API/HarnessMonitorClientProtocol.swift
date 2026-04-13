@@ -4,6 +4,11 @@ public typealias DaemonPushEventStream = AsyncThrowingStream<DaemonPushEvent, Er
 public typealias TimelineBatchHandler =
   @Sendable (_ entries: [TimelineEntry], _ batchIndex: Int, _ batchCount: Int) async -> Void
 
+public enum TimelineScope: String, Codable, Equatable, Sendable {
+  case full
+  case summary
+}
+
 public protocol HarnessMonitorClientProtocol: Sendable {
   func health() async throws -> HealthResponse
   func transportLatencyMs() async throws -> Int?
@@ -19,6 +24,12 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func timeline(sessionID: String) async throws -> [TimelineEntry]
   func timeline(
     sessionID: String,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry]
+  func timeline(sessionID: String, scope: TimelineScope) async throws -> [TimelineEntry]
+  func timeline(
+    sessionID: String,
+    scope: TimelineScope,
     onBatch: @escaping TimelineBatchHandler
   ) async throws -> [TimelineEntry]
   func globalStream() async -> DaemonPushEventStream
@@ -153,6 +164,20 @@ extension HarnessMonitorClientProtocol {
     onBatch: @escaping TimelineBatchHandler
   ) async throws -> [TimelineEntry] {
     let entries = try await timeline(sessionID: sessionID)
+    await onBatch(entries, 0, 1)
+    return entries
+  }
+
+  public func timeline(sessionID: String, scope _: TimelineScope) async throws -> [TimelineEntry] {
+    try await timeline(sessionID: sessionID)
+  }
+
+  public func timeline(
+    sessionID: String,
+    scope: TimelineScope,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry] {
+    let entries = try await timeline(sessionID: sessionID, scope: scope)
     await onBatch(entries, 0, 1)
     return entries
   }

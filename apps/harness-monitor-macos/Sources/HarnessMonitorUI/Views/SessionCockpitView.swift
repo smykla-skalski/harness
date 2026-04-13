@@ -7,7 +7,8 @@ struct SessionCockpitView: View {
   let timeline: [TimelineEntry]
   let isSessionReadOnly: Bool
   let isExtensionsLoading: Bool
-  @Environment(\.openWindow) private var openWindow
+  @Environment(\.openWindow)
+  private var openWindow
 
   private var tuiStatusByAgent: [String: AgentTuiStatus] {
     var snapshotStatus: [String: AgentTuiStatus] = [:]

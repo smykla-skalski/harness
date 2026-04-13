@@ -107,14 +107,27 @@ extension RecordingHarnessClient {
   }
 
   func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    try await timeline(sessionID: sessionID) { _, _, _ in }
+    try await timeline(sessionID: sessionID, scope: .full)
   }
 
   func timeline(
     sessionID: String,
     onBatch: @escaping TimelineBatchHandler
   ) async throws -> [TimelineEntry] {
+    try await timeline(sessionID: sessionID, scope: .full, onBatch: onBatch)
+  }
+
+  func timeline(sessionID: String, scope: TimelineScope) async throws -> [TimelineEntry] {
+    try await timeline(sessionID: sessionID, scope: scope) { _, _, _ in }
+  }
+
+  func timeline(
+    sessionID: String,
+    scope: TimelineScope,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry] {
     recordReadCall(.timeline(sessionID))
+    recordTimelineScope(sessionID: sessionID, scope: scope)
     try await sleepIfNeeded(configuredTimelineDelay(for: sessionID))
     if let error = configuredTimelineError(for: sessionID) {
       throw error

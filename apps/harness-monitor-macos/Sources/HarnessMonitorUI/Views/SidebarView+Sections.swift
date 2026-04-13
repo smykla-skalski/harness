@@ -73,8 +73,7 @@ struct SidebarSessionListContent: View {
     sidebarRows
   }
 
-  @ViewBuilder
-  private var sidebarRows: some View {
+  @ViewBuilder private var sidebarRows: some View {
     switch renderState.emptyState {
     case .noSessions:
       SidebarEmptyState(
@@ -107,8 +106,7 @@ struct SidebarSessionListContent: View {
     }
   }
 
-  @ViewBuilder
-  private var flatSearchResults: some View {
+  @ViewBuilder private var flatSearchResults: some View {
     ForEach(renderState.searchVisibleSessionIDs, id: \.self) { sessionID in
       if let session = renderState.sessionSummary(for: sessionID) {
         sessionRow(session)

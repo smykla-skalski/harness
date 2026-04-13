@@ -3,10 +3,8 @@ import SwiftUI
 @Observable
 @MainActor
 public final class WindowNavigationState {
-  @ObservationIgnored
-  private var storedCanGoBack = false
-  @ObservationIgnored
-  private var storedCanGoForward = false
+  @ObservationIgnored private var storedCanGoBack = false
+  @ObservationIgnored private var storedCanGoForward = false
 
   public var canGoBack: Bool {
     get {
@@ -38,10 +36,8 @@ public final class WindowNavigationState {
     }
   }
 
-  @ObservationIgnored
-  var backHandler: (@MainActor () async -> Void)?
-  @ObservationIgnored
-  var forwardHandler: (@MainActor () async -> Void)?
+  @ObservationIgnored var backHandler: (@MainActor () async -> Void)?
+  @ObservationIgnored var forwardHandler: (@MainActor () async -> Void)?
 
   public init() {}
 

@@ -52,7 +52,8 @@ public struct AgentTuiWindowView: View {
   @State private var windowNavigation = WindowNavigationState()
   @State private var pendingViewportResizeTarget: AgentTuiSize?
   @State private var viewportResizeTask: Task<Void, Never>?
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.fontScale)
+  private var fontScale
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -353,8 +354,7 @@ public struct AgentTuiWindowView: View {
     }
   }
 
-  @ViewBuilder
-  private var detailColumnContent: some View {
+  @ViewBuilder private var detailColumnContent: some View {
     if usesLiveViewportSplitLayout, let selectedSessionTui {
       sessionPane(selectedSessionTui)
         .padding(HarnessMonitorTheme.spacingLG)
@@ -375,8 +375,7 @@ public struct AgentTuiWindowView: View {
     }
   }
 
-  @ViewBuilder
-  private var paneContent: some View {
+  @ViewBuilder private var paneContent: some View {
     switch selection {
     case .create:
       createPane
@@ -610,8 +609,7 @@ public struct AgentTuiWindowView: View {
     }
   }
 
-  @ToolbarContentBuilder
-  private var agentTuiNavigationToolbarItems: some ToolbarContent {
+  @ToolbarContentBuilder private var agentTuiNavigationToolbarItems: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
       Button {
         navigateHistoryBack()
@@ -633,8 +631,7 @@ public struct AgentTuiWindowView: View {
     }
   }
 
-  @ToolbarContentBuilder
-  private var sessionToolbarItems: some ToolbarContent {
+  @ToolbarContentBuilder private var sessionToolbarItems: some ToolbarContent {
     if let selectedSessionTui {
       ToolbarItem(placement: .primaryAction) {
         Button {

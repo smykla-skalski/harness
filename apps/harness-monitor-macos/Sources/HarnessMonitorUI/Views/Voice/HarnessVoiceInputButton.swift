@@ -142,8 +142,7 @@ struct HarnessVoiceInputButton: View {
     .padding(HarnessMonitorTheme.spacingLG)
   }
 
-  @ViewBuilder
-  private var captureControl: some View {
+  @ViewBuilder private var captureControl: some View {
     if isRecording {
       captureButton
         .buttonStyle(.bordered)

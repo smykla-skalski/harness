@@ -157,8 +157,10 @@ extension HarnessMonitorStore {
         showingCachedData: preserveVisibleTimeline
       )
 
+      let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
       let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: sessionID) { batch, batchIndex, _ in
+        try await client.timeline(sessionID: sessionID, scope: timelineScope) {
+          batch, batchIndex, _ in
           await MainActor.run {
             guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
               return

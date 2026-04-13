@@ -146,8 +146,9 @@ extension HarnessMonitorStore {
     sessionID: String
   ) async {
     do {
+      let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
       let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: sessionID)
+        try await client.timeline(sessionID: sessionID, scope: timelineScope)
       }
       recordRequestSuccess()
       guard selectedSessionID == sessionID else {
