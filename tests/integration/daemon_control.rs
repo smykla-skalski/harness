@@ -1013,7 +1013,7 @@ fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusReport {
         let retry_reason = match try_daemon_status(home, xdg) {
             Ok(status) => {
                 if let Some(manifest) = status.manifest.as_ref()
-                    && endpoint_is_healthy(&manifest.endpoint)
+                    && endpoint_is_healthy(&manifest.endpoint, &manifest.token_path)
                     && session_api_is_ready(home, xdg)
                 {
                     return status;
@@ -1040,7 +1040,8 @@ fn wait_for_app_group_daemon_ready(home: &Path) -> Value {
         if let Ok(data) = std::fs::read_to_string(&manifest_path)
             && let Ok(manifest) = serde_json::from_str::<Value>(&data)
             && let Some(endpoint) = manifest.get("endpoint").and_then(Value::as_str)
-            && endpoint_is_healthy(endpoint)
+            && let Some(token_path) = manifest.get("token_path").and_then(Value::as_str)
+            && endpoint_is_healthy(endpoint, token_path)
         {
             return manifest;
         }
@@ -1129,11 +1130,19 @@ fn try_daemon_status(home: &Path, xdg: &Path) -> Result<DaemonStatusReport, Stri
     })
 }
 
-fn endpoint_is_healthy(endpoint: &str) -> bool {
+fn endpoint_is_healthy(endpoint: &str, token_path: &str) -> bool {
     let url = format!("{}/v1/health", endpoint.trim_end_matches('/'));
+    let Ok(token) = std::fs::read_to_string(token_path) else {
+        return false;
+    };
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return false;
+    }
     Runtime::new().expect("runtime").block_on(async {
         reqwest::Client::new()
             .get(&url)
+            .bearer_auth(token)
             .timeout(DAEMON_HTTP_TIMEOUT)
             .send()
             .await

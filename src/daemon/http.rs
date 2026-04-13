@@ -239,6 +239,9 @@ fn voice_routes() -> Router<DaemonHttpState> {
 async fn get_health(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let db_guard = try_db_guard(&state);
     let db_ref = db_guard.as_deref();
     timed_json(
@@ -1422,6 +1425,15 @@ mod tests {
         (status, json)
     }
 
+    fn auth_headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            "Bearer token".parse().expect("authorization header"),
+        );
+        headers
+    }
+
     fn test_http_state_with_db() -> DaemonHttpState {
         let (sender, _) = broadcast::channel(8);
         let db_slot = Arc::new(OnceLock::new());
@@ -1491,12 +1503,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_health_requires_auth() {
+        let response = get_health(HeaderMap::new(), State(test_http_state_with_db())).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
     async fn get_health_responds_when_db_lock_is_held() {
         let state = test_http_state_with_db();
         let db = state.db.get().expect("db slot").clone();
         let _db_guard = db.lock().expect("db lock");
 
-        let response = get_health(HeaderMap::new(), State(state)).await;
+        let response = get_health(auth_headers(), State(state)).await;
 
         assert_eq!(response.status(), StatusCode::OK);
     }
@@ -1506,13 +1525,8 @@ mod tests {
         let state = test_http_state_with_db();
         let db = state.db.get().expect("db slot").clone();
         let _db_guard = db.lock().expect("db lock");
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            AUTHORIZATION,
-            "Bearer token".parse().expect("authorization header"),
-        );
 
-        let response = get_diagnostics(headers, State(state)).await;
+        let response = get_diagnostics(auth_headers(), State(state)).await;
 
         assert_eq!(response.status(), StatusCode::OK);
     }
@@ -1520,16 +1534,12 @@ mod tests {
     #[test]
     fn authorize_control_request_rebinds_client_actor() {
         let state = test_http_state_with_db();
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            AUTHORIZATION,
-            "Bearer token".parse().expect("authorization header"),
-        );
         let mut request = SessionEndRequest {
             actor: "spoofed-leader".into(),
         };
 
-        authorize_control_request(&headers, &state, &mut request).expect("authorize request");
+        authorize_control_request(&auth_headers(), &state, &mut request)
+            .expect("authorize request");
 
         assert_eq!(request.actor, CONTROL_PLANE_ACTOR_ID);
     }

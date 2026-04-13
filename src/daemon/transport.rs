@@ -149,7 +149,7 @@ impl Execute for DaemonRestartArgs {
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonServeArgs {
-    /// Host interface to bind.
+    /// Loopback host interface to bind.
     #[arg(long, default_value = "127.0.0.1")]
     pub host: String,
     /// TCP port to bind. Use 0 for an ephemeral port.
@@ -169,7 +169,8 @@ pub struct DaemonServeArgs {
     pub sandboxed: bool,
     /// WebSocket URL of a user-launched `codex app-server --listen ws://...`.
     /// Overrides the transport selected by sandbox mode; equivalent to
-    /// setting `HARNESS_CODEX_WS_URL`.
+    /// setting `HARNESS_CODEX_WS_URL`. Sandboxed daemon flows require a
+    /// loopback endpoint.
     #[arg(long, value_name = "URL")]
     pub codex_ws_url: Option<String>,
 }
@@ -482,25 +483,17 @@ fn request_shutdown_if_running() -> Result<bool, CliError> {
     let Some(manifest) = try_load_manifest()? else {
         return Ok(false);
     };
-    if !daemon_is_healthy(&manifest.endpoint) {
+    let token = load_daemon_token(&manifest.token_path)?;
+    if !daemon_is_healthy(&manifest.endpoint, &token) {
         return Ok(false);
     }
-
-    let token = fs_err::read_to_string(&manifest.token_path)
-        .map(|value| value.trim().to_string())
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "read daemon token {}: {error}",
-                manifest.token_path
-            )))
-        })?;
 
     match post_stop_request(&manifest.endpoint, &token) {
         Ok(()) => {
             wait_for_daemon_shutdown(&manifest.endpoint)?;
             Ok(true)
         }
-        Err(_error) if !daemon_is_healthy(&manifest.endpoint) => {
+        Err(_error) if !daemon_is_healthy(&manifest.endpoint, &token) => {
             wait_for_daemon_shutdown(&manifest.endpoint)?;
             Ok(true)
         }
@@ -593,7 +586,8 @@ fn wait_for_healthy_daemon(mut child: Option<&mut Child>) -> Result<String, CliE
         let Some(manifest) = try_load_manifest()? else {
             return Ok(None);
         };
-        if daemon_is_healthy(&manifest.endpoint) {
+        let token = load_daemon_token(&manifest.token_path)?;
+        if daemon_is_healthy(&manifest.endpoint, &token) {
             tracing::info!(endpoint = %manifest.endpoint, "daemon healthy");
             return Ok(Some(manifest.endpoint));
         }
@@ -639,16 +633,32 @@ fn wait_for_value(
     }
 }
 
-fn daemon_is_healthy(endpoint: &str) -> bool {
+fn daemon_is_healthy(endpoint: &str, token: &str) -> bool {
     let url = daemon_url(endpoint, "/v1/health");
     RUNTIME.block_on(async {
         DAEMON_HTTP_CLIENT
             .get(&url)
+            .bearer_auth(token)
             .timeout(DAEMON_HTTP_TIMEOUT)
             .send()
             .await
             .is_ok_and(|response| response.status().is_success())
     })
+}
+
+fn load_daemon_token(token_path: &str) -> Result<String, CliError> {
+    let token = fs::read_to_string(token_path).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "read daemon token {token_path}: {error}"
+        )))
+    })?;
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+            "daemon token {token_path} is empty"
+        ))));
+    }
+    Ok(token)
 }
 
 fn try_load_manifest() -> Result<Option<super::state::DaemonManifest>, CliError> {
