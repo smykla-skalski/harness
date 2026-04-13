@@ -8,6 +8,12 @@ extension HarnessMonitorStore {
   func awaitManagedDaemonWarmUpWithRecovery() async throws
     -> any HarnessMonitorClientProtocol
   {
+    // Warm-up can lag behind app launch during daemon restarts; surface the
+    // last persisted snapshot immediately without blocking the live connect.
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      await self.restorePersistedSessionStateWhileConnecting()
+    }
     do {
       return try await daemonController.awaitManifestWarmUp(
         timeout: bootstrapWarmUpTimeout

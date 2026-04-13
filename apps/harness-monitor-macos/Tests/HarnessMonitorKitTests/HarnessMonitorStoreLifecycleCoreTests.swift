@@ -179,8 +179,8 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.selectedSessionID == nil)
   }
 
-  @Test("Superseded selected-session refresh cancels the stale load before timeline fetch")
-  func supersededSelectedSessionRefreshCancelsStaleLoadBeforeTimelineFetch() async {
+  @Test("Superseded selected-session refreshes coalesce into one fallback load")
+  func supersededSelectedSessionRefreshesCoalesceIntoOneFallbackLoad() async {
     let summary = makeSession(
       .init(
         sessionId: "sess-refresh-cancel",
@@ -211,6 +211,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
       detail: detail
     )
     let store = await makeBootstrappedStore(client: client)
+    store.selectedSessionRefreshFallbackDelay = .milliseconds(120)
     await store.selectSession(summary.sessionId)
 
     let baselineDetailCount = client.readCallCount(.sessionDetail(summary.sessionId))
@@ -234,9 +235,10 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     store.refreshSelectedSessionIfSummaryChanged(sessions: [firstUpdate])
     try? await Task.sleep(for: .milliseconds(40))
     store.refreshSelectedSessionIfSummaryChanged(sessions: [secondUpdate])
-    try? await Task.sleep(for: .milliseconds(500))
+    try? await Task.sleep(for: .milliseconds(360))
 
-    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCount + 2)
+    #expect(store.selectedSession?.session.context == secondUpdate.context)
+    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCount + 1)
     #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCount + 1)
   }
 

@@ -1,6 +1,78 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  func restorePersistedSessionStateWhileConnecting() async {
+    guard connectionState == .connecting else { return }
+
+    await refreshPersistedSessionMetadata()
+    guard connectionState == .connecting else { return }
+
+    if sessions.isEmpty, let cached = await loadCachedSessionList() {
+      guard connectionState == .connecting else { return }
+      withUISyncBatch {
+        sessionIndex.replaceSnapshot(
+          projects: cached.projects,
+          sessions: cached.sessions
+        )
+      }
+    }
+
+    guard connectionState == .connecting else { return }
+
+    withUISyncBatch {
+      isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+    }
+
+    if let selectedSessionID,
+      selectedSession?.session.sessionId != selectedSessionID
+    {
+      await restorePersistedSessionSelectionWhileConnecting(sessionID: selectedSessionID)
+    } else {
+      withUISyncBatch {
+        activeSessionLoadRequest = 0
+        isSelectionLoading = false
+      }
+    }
+
+    synchronizeActionActor()
+  }
+
+  private func restorePersistedSessionSelectionWhileConnecting(
+    sessionID: String
+  ) async {
+    guard connectionState == .connecting else { return }
+
+    if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
+      guard connectionState == .connecting, selectedSessionID == sessionID else {
+        return
+      }
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: cached.detail,
+        timeline: cached.timeline,
+        showingCachedData: true
+      )
+    } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
+      guard connectionState == .connecting else { return }
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: summaryOnlySessionDetail(for: summary),
+        timeline: [],
+        showingCachedData: true
+      )
+    } else {
+      guard connectionState == .connecting else { return }
+      withUISyncBatch {
+        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+      }
+    }
+
+    withUISyncBatch {
+      activeSessionLoadRequest = 0
+      isSelectionLoading = false
+    }
+  }
+
   func applyCachedSessionIfAvailable(sessionID: String) async {
     guard selectedSessionID == sessionID, selectedSession == nil else { return }
 
