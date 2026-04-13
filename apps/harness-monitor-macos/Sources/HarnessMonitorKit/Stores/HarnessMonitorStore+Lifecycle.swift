@@ -192,9 +192,10 @@ extension HarnessMonitorStore {
       _ = await refreshAgentTuis(using: client, sessionID: sessionID)
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
-          let insertedCount = await service.cacheSessionDetail(
-            detail, timeline: measuredTimeline.value)
-          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+          await service.cacheSessionDetail(
+            detail,
+            timeline: measuredTimeline.value
+          )
         }
       }
     } catch is CancellationError {
@@ -267,8 +268,7 @@ extension HarnessMonitorStore {
     }
     if didChange {
       scheduleCacheWrite { service in
-        _ = await service.cacheSessionList(sessions, projects: projects)
-        await self.refreshPersistedSessionMetadata()
+        await service.cacheSessionList(sessions, projects: projects)
       }
     }
 
@@ -285,10 +285,7 @@ extension HarnessMonitorStore {
     }
     let project = sessionIndex.projects.first { $0.projectId == summary.projectId }
     scheduleCacheWrite { service in
-      let isInsert = await service.cacheSessionSummary(summary, project: project)
-      if isInsert {
-        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: 1)
-      }
+      await service.cacheSessionSummary(summary, project: project)
     }
   }
 
@@ -358,8 +355,7 @@ extension HarnessMonitorStore {
 
     let currentTimeline = timeline
     scheduleCacheWrite { service in
-      let insertedCount = await service.cacheSessionDetail(merged, timeline: currentTimeline)
-      self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+      await service.cacheSessionDetail(merged, timeline: currentTimeline)
     }
   }
 
