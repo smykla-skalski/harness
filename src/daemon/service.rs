@@ -166,6 +166,7 @@ fn log_sandbox_startup(sandboxed: bool) {
 /// # Errors
 /// Returns `CliError` on bind or filesystem failures.
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
+    validate_serve_config(&config)?;
     log_sandbox_startup(config.sandboxed);
 
     state::ensure_daemon_dirs()?;
@@ -239,6 +240,26 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
+}
+
+fn validate_serve_config(config: &DaemonServeConfig) -> Result<(), CliError> {
+    if !super::is_loopback_host(&config.host) {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "daemon host must be loopback-only: {}",
+            config.host
+        ))
+        .into());
+    }
+    if let CodexTransportKind::WebSocket { endpoint } = &config.codex_transport
+        && config.sandboxed
+        && !super::is_local_websocket_endpoint(endpoint)
+    {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "sandboxed Codex websocket endpoint must be loopback-only: {endpoint}"
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 #[expect(
@@ -4455,6 +4476,55 @@ done
                     endpoint: "ws://10.0.0.5:7000".to_string(),
                 }
             );
+        });
+    }
+
+    #[test]
+    fn serve_rejects_non_loopback_bind_host() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            let result = runtime.block_on(async {
+                tokio::time::timeout(
+                    std::time::Duration::from_millis(200),
+                    serve(DaemonServeConfig {
+                        host: "0.0.0.0".into(),
+                        ..DaemonServeConfig::default()
+                    }),
+                )
+                .await
+            });
+            match result {
+                Ok(Err(error)) => assert!(error.to_string().contains("loopback")),
+                Ok(Ok(())) => panic!("serve should reject non-loopback hosts"),
+                Err(_) => panic!("serve should fail before starting"),
+            }
+        });
+    }
+
+    #[test]
+    fn serve_rejects_nonlocal_sandboxed_codex_websocket() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            let result = runtime.block_on(async {
+                tokio::time::timeout(
+                    std::time::Duration::from_millis(200),
+                    serve(DaemonServeConfig {
+                        sandboxed: true,
+                        codex_transport: CodexTransportKind::WebSocket {
+                            endpoint: "ws://10.0.0.5:7000".into(),
+                        },
+                        ..DaemonServeConfig::default()
+                    }),
+                )
+                .await
+            });
+            match result {
+                Ok(Err(error)) => assert!(error.to_string().contains("loopback")),
+                Ok(Ok(())) => panic!("serve should reject remote sandboxed codex endpoints"),
+                Err(_) => panic!("serve should fail before starting"),
+            }
         });
     }
 
