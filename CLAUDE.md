@@ -74,7 +74,7 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 
 ## Versioning
 
-Every feature change must evaluate semver and bump the version in the same change. Do not ship feature work without updating the version surfaces that track the release.
+Every feature change must evaluate semver and bump the version. When working on `main` directly, bump in the same change. When working in a worktree or feature branch, never bump the version there - version bumps happen on `main` after the branch merges, because parallel worktrees would create conflicting version changes. The `/do` skill gates this behind user approval automatically.
 
 - `major` - any breaking change to CLI commands or flags, hook payload contracts, persisted state/schema/artifact formats, machine-consumed output, or behavior that user scripts or suites can reasonably rely on
 - `minor` - backward-compatible new functionality such as a new command, flag, output field, hook capability, report surface, or materially expanded behavior
