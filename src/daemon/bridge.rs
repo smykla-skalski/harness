@@ -34,7 +34,7 @@ use crate::workspace::utc_now;
 use super::agent_tui::{
     AgentTuiInputRequest, AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiResizeRequest,
     AgentTuiSize, AgentTuiSnapshot, AgentTuiSnapshotContext, AgentTuiStatus, send_initial_prompt,
-    snapshot_from_process, spawn_agent_tui_process,
+    snapshot_from_process, spawn_agent_tui_process, wait_for_readiness,
 };
 use super::discovery::{self, AdoptionOutcome};
 use super::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
@@ -930,13 +930,7 @@ impl BridgeServer {
             &spec.project_dir,
             spec.size,
         )?;
-        if !process.wait_ready(super::agent_tui::READINESS_TIMEOUT) {
-            tracing::warn!(
-                runtime = %spec.profile.runtime,
-                tui_id = %spec.tui_id,
-                "agent TUI readiness timeout in bridge, sending prompt anyway"
-            );
-        }
+        wait_for_readiness(&process, &spec.profile.runtime, &spec.tui_id);
         if let Some(prompt) = spec.prompt.as_deref().filter(|prompt| !prompt.is_empty()) {
             send_initial_prompt(&process, prompt)?;
         }
