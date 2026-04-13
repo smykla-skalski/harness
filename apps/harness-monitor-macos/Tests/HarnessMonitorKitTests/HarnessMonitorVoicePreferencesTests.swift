@@ -86,7 +86,8 @@ struct HarnessMonitorVoicePreferencesTests {
     )
 
     #expect(invalidPreferences.remoteProcessorURL == nil)
-    #expect(validPreferences.remoteProcessorURL?.absoluteString == "https://processor.example/voice")
+    #expect(
+      validPreferences.remoteProcessorURL?.absoluteString == "https://processor.example/voice")
   }
 
   @Test("Pending limits clamp to the supported range")
@@ -127,7 +128,9 @@ struct HarnessMonitorVoicePreferencesTests {
 
   private func makeIsolatedDefaults() -> (UserDefaults, String) {
     let suiteName = "HarnessMonitorVoicePreferencesTests.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suiteName)!
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+      preconditionFailure("UserDefaults(suiteName:) returned nil for suite: \(suiteName)")
+    }
     defaults.removePersistentDomain(forName: suiteName)
     return (defaults, suiteName)
   }
