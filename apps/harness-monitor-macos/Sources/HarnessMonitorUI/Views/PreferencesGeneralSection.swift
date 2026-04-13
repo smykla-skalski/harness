@@ -122,8 +122,76 @@ enum BackgroundCollection {
   case native
 }
 
+struct PreferencesGeneralOverviewState {
+  enum SandboxState: Equatable {
+    case enabled
+    case off
+    case unknown
+  }
+
+  let endpoint: String
+  let version: String
+  let launchAgentState: String
+  let launchAgentCaption: String
+  let sandboxState: SandboxState
+  let databaseSize: String
+  let sessionCount: Int
+  let startedAt: String?
+  let daemonModeLabel: String
+  let isExternalDaemon: Bool
+  let externalDaemonManifestPath: String
+  let externalDaemonProcessSummary: String?
+  let showsLaunchAgent: Bool
+
+  @MainActor
+  init(store: HarnessMonitorStore) {
+    let effectiveHealth = store.diagnostics?.health ?? store.health
+    let launchAgent = store.daemonStatus?.launchAgent
+    let manifest = store.daemonStatus?.manifest
+    let databaseSizeBytes =
+      store.diagnostics?.workspace.databaseSizeBytes
+      ?? store.daemonStatus?.diagnostics.databaseSizeBytes
+      ?? 0
+
+    endpoint = effectiveHealth?.endpoint ?? manifest?.endpoint ?? "Unavailable"
+    version = effectiveHealth?.version ?? manifest?.version ?? "Unavailable"
+    launchAgentState = launchAgent?.lifecycleTitle ?? "Manual"
+    let launchAgentFallback = launchAgent?.label ?? "Launch agent"
+    let launchAgentCaption = launchAgent?.lifecycleCaption ?? launchAgentFallback
+    self.launchAgentCaption = launchAgentCaption.isEmpty ? launchAgentFallback : launchAgentCaption
+    databaseSize = DatabaseStatistics.formatByteCount(Int64(databaseSizeBytes))
+    sessionCount = store.daemonStatus?.sessionCount ?? store.sessions.count
+    startedAt = effectiveHealth?.startedAt ?? manifest?.startedAt
+    externalDaemonManifestPath = HarnessMonitorPaths.manifestURL().path
+    externalDaemonProcessSummary =
+      if let manifest {
+        "pid \(manifest.pid) · \(manifest.endpoint)"
+      } else {
+        nil
+      }
+
+    switch store.daemonOwnership {
+    case .managed:
+      daemonModeLabel = "Managed (SMAppService)"
+      isExternalDaemon = false
+      showsLaunchAgent = true
+    case .external:
+      daemonModeLabel = "External (CLI)"
+      isExternalDaemon = true
+      showsLaunchAgent = false
+    }
+
+    if let sandboxed = manifest?.sandboxed {
+      sandboxState = sandboxed ? .enabled : .off
+    } else {
+      sandboxState = .unknown
+    }
+  }
+}
+
 struct PreferencesGeneralSection: View {
   let store: HarnessMonitorStore
+  let overview: PreferencesGeneralOverviewState
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
@@ -131,90 +199,24 @@ struct PreferencesGeneralSection: View {
     .defaultCustomTimeZoneIdentifier
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
-  private var effectiveHealth: HealthResponse? {
-    store.diagnostics?.health ?? store.health
-  }
-
-  private var endpoint: String {
-    effectiveHealth?.endpoint
-      ?? store.daemonStatus?.manifest?.endpoint ?? "Unavailable"
-  }
-
-  private var version: String {
-    effectiveHealth?.version
-      ?? store.daemonStatus?.manifest?.version ?? "Unavailable"
-  }
-
-  private var launchAgentState: String {
-    store.daemonStatus?.launchAgent.lifecycleTitle ?? "Manual"
-  }
-
-  private var launchAgentCaption: String {
-    let agent = store.daemonStatus?.launchAgent
-    let fallback = agent?.label ?? "Launch agent"
-    let caption = agent?.lifecycleCaption ?? fallback
-    return caption.isEmpty ? fallback : caption
-  }
-
-  private var sandboxManifest: DaemonManifest? {
-    store.daemonStatus?.manifest
-  }
-
-  private var databaseSize: String {
-    let bytes =
-      store.diagnostics?.workspace.databaseSizeBytes
-      ?? store.daemonStatus?.diagnostics.databaseSizeBytes ?? 0
-    return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
-  }
-
-  private var sessionCount: Int {
-    store.daemonStatus?.sessionCount ?? store.sessions.count
-  }
-
-  private var startedAt: String? {
-    effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt
-  }
-
-  private var daemonModeLabel: String {
-    switch store.daemonOwnership {
-    case .managed:
-      "Managed (SMAppService)"
-    case .external:
-      "External (CLI)"
-    }
-  }
-
-  private var externalDaemonCommand: String {
-    "harness daemon dev"
-  }
-
-  private var externalDaemonManifestPath: String {
-    HarnessMonitorPaths.manifestURL().path
-  }
-
-  private var externalDaemonProcessSummary: String? {
-    guard let manifest = store.daemonStatus?.manifest else {
-      return nil
-    }
-    return "pid \(manifest.pid) · \(manifest.endpoint)"
-  }
+  private static let externalDaemonCommand = "harness daemon dev"
 
   @ViewBuilder
   private var daemonModeRow: some View {
     LabeledContent("Daemon mode") {
       VStack(alignment: .trailing, spacing: 2) {
-        Text(daemonModeLabel)
-        if store.daemonOwnership == .external {
-          Text("Run `\(externalDaemonCommand)` in a terminal")
+        Text(overview.daemonModeLabel)
+        if overview.isExternalDaemon {
+          Text("Run `\(Self.externalDaemonCommand)` in a terminal")
             .scaledFont(.caption)
             .foregroundStyle(.secondary)
         }
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Daemon Mode"))
-    if store.daemonOwnership == .external {
+    if overview.isExternalDaemon {
       LabeledContent("Dev manifest") {
-        Text(externalDaemonManifestPath)
+        Text(overview.externalDaemonManifestPath)
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
@@ -223,7 +225,7 @@ struct PreferencesGeneralSection: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.preferencesMetricCard("Dev Manifest")
       )
-      if let summary = externalDaemonProcessSummary {
+      if let summary = overview.externalDaemonProcessSummary {
         LabeledContent("Dev daemon") {
           Text(summary)
             .scaledFont(.caption)
@@ -328,18 +330,18 @@ struct PreferencesGeneralSection: View {
       }
 
       Section {
-        LabeledContent("Endpoint", value: endpoint)
+        LabeledContent("Endpoint", value: overview.endpoint)
           .textSelection(.enabled)
           .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Endpoint"))
-        LabeledContent("Version", value: version)
+        LabeledContent("Version", value: overview.version)
           .textSelection(.enabled)
           .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Version"))
         daemonModeRow
-        if store.daemonOwnership == .managed {
+        if overview.showsLaunchAgent {
           LabeledContent("Launchd") {
             VStack(alignment: .trailing, spacing: 2) {
-              Text(launchAgentState)
-              Text(launchAgentCaption)
+              Text(overview.launchAgentState)
+              Text(overview.launchAgentCaption)
                 .scaledFont(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -347,7 +349,7 @@ struct PreferencesGeneralSection: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Launchd"))
         }
         LabeledContent("Sandbox") {
-          if sandboxManifest?.sandboxed == true {
+          if overview.sandboxState == .enabled {
             Text("Enabled")
               .scaledFont(.caption)
               .padding(.horizontal, 8)
@@ -355,24 +357,24 @@ struct PreferencesGeneralSection: View {
               .background(HarnessMonitorTheme.accent.opacity(0.18), in: Capsule())
               .foregroundStyle(HarnessMonitorTheme.accent)
           } else {
-            Text(sandboxManifest == nil ? "Unknown" : "Off")
+            Text(overview.sandboxState == .unknown ? "Unknown" : "Off")
               .foregroundStyle(.secondary)
           }
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Sandbox"))
         LabeledContent("Database Size") {
-          Text(databaseSize)
+          Text(overview.databaseSize)
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Database Size"))
         LabeledContent("Live Sessions") {
-          Text("\(sessionCount)")
+          Text("\(overview.sessionCount)")
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Live Sessions"))
       } header: {
         Text("Overview")
       }
 
-      PreferencesStatusSection(startedAt: startedAt)
+      PreferencesStatusSection(startedAt: overview.startedAt)
     }
     .preferencesDetailFormStyle()
     .confirmationDialog(
@@ -398,8 +400,11 @@ struct PreferencesGeneralSection: View {
 }
 
 #Preview("Preferences General Section") {
+  let store = PreferencesPreviewSupport.makeStore()
+
   PreferencesGeneralSection(
-    store: PreferencesPreviewSupport.makeStore()
+    store: store,
+    overview: PreferencesGeneralOverviewState(store: store)
   )
   .frame(width: 720)
 }

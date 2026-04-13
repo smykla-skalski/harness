@@ -32,7 +32,8 @@ public struct PreferencesView: View {
       Group {
         switch selectedSection {
         case .general:
-          PreferencesGeneralSection(store: store)
+          let overview = PreferencesGeneralOverviewState(store: store)
+          PreferencesGeneralSection(store: store, overview: overview)
         case .appearance:
           PreferencesAppearanceSection(themeMode: $themeMode)
         case .notifications:
@@ -40,11 +41,12 @@ public struct PreferencesView: View {
         case .voice:
           PreferencesVoiceSection()
         case .connection:
+          let snapshot = PreferencesConnectionSnapshot(store: store)
           PreferencesConnectionSection(
-            connectionState: store.connectionState,
-            isDiagnosticsRefreshInFlight: store.isDiagnosticsRefreshInFlight,
-            metrics: store.connectionMetrics,
-            events: store.connectionEvents,
+            connectionState: snapshot.connectionState,
+            isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
+            metrics: snapshot.metrics,
+            events: snapshot.events,
             reconnect: { await store.reconnect() },
             refreshDiagnostics: { await store.refreshDiagnostics() }
           )
@@ -53,7 +55,8 @@ public struct PreferencesView: View {
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:
-          PreferencesDiagnosticsSection(store: store)
+          let snapshot = PreferencesDiagnosticsSnapshot(store: store)
+          PreferencesDiagnosticsSection(snapshot: snapshot)
         }
       }
     }
@@ -70,5 +73,20 @@ public struct PreferencesView: View {
       )
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.preferencesPanel)
+  }
+}
+
+private struct PreferencesConnectionSnapshot {
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let isDiagnosticsRefreshInFlight: Bool
+  let metrics: ConnectionMetrics
+  let events: [ConnectionEvent]
+
+  @MainActor
+  init(store: HarnessMonitorStore) {
+    connectionState = store.connectionState
+    isDiagnosticsRefreshInFlight = store.isDiagnosticsRefreshInFlight
+    metrics = store.connectionMetrics
+    events = store.connectionEvents
   }
 }
