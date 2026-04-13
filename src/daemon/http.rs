@@ -1141,7 +1141,9 @@ async fn post_session_start(
         }
         Err(error) => Err(error),
     };
-    if result.is_ok() && let Ok(db) = super::db::ensure_shared_db(&state.db) {
+    if result.is_ok()
+        && let Ok(db) = super::db::ensure_shared_db(&state.db)
+    {
         let db_guard = db.lock().expect("db lock");
         service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
     }
@@ -1170,7 +1172,9 @@ async fn post_session_join(
         }
         Err(error) => Err(error),
     };
-    if result.is_ok() && let Ok(db) = super::db::ensure_shared_db(&state.db) {
+    if result.is_ok()
+        && let Ok(db) = super::db::ensure_shared_db(&state.db)
+    {
         let db_guard = db.lock().expect("db lock");
         service::broadcast_session_snapshot(&state.sender, &session_id, Some(&db_guard));
     }
