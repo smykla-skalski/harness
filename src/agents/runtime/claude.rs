@@ -79,6 +79,11 @@ impl AgentRuntime for ClaudeRuntime {
     fn hook_integration_points(&self) -> &[HookIntegrationPoint] {
         HOOK_POINTS
     }
+
+    fn readiness_pattern(&self) -> Option<&'static str> {
+        // Claude Code renders a box-drawing border when its TUI prompt is ready.
+        Some("\u{256d}")
+    }
 }
 
 /// Parse a JSONL line using the common transcript format shared by all runtimes.
