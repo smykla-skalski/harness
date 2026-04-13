@@ -4,7 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-private func withTempDaemonFixture(
+func withTempDaemonFixture(
   pid: UInt32,
   endpoint: String = "http://127.0.0.1:65534",
   tokenPathFactory: ((URL) throws -> URL)? = nil,
@@ -50,7 +50,7 @@ private func withTempDaemonFixture(
   try await perform(environment)
 }
 
-private func writeTokenFixture(
+func writeTokenFixture(
   _ value: String = "test-token",
   to url: URL,
   permissions: Int = 0o600
@@ -59,7 +59,7 @@ private func writeTokenFixture(
   try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: url.path)
 }
 
-private func rewriteTempDaemonFixtureManifest(
+func rewriteTempDaemonFixtureManifest(
   environment: HarnessMonitorEnvironment,
   pid: UInt32,
   endpoint: String,
@@ -82,7 +82,7 @@ private func rewriteTempDaemonFixtureManifest(
   try manifestData.write(to: HarnessMonitorPaths.manifestURL(using: environment))
 }
 
-private final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {
+final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {
   private let lock = NSLock()
   private var protectedState: DaemonLaunchAgentRegistrationState
   private let registerResult: DaemonLaunchAgentRegistrationState

@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 extension AgentTuiWindowUITests {
-  fileprivate func launchInCockpitPreview(
+  func launchInCockpitPreview(
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {
     var environment = [
@@ -18,7 +18,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  fileprivate func openAgentTuiWindow(in app: XCUIApplication) {
+  func openAgentTuiWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
     XCTAssertTrue(
       waitForElement(
@@ -28,7 +28,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  fileprivate func reopenAgentTuiWindow(in app: XCUIApplication) {
+  func reopenAgentTuiWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
@@ -38,7 +38,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  fileprivate func closeAgentTuiWindow(in app: XCUIApplication) {
+  func closeAgentTuiWindow(in app: XCUIApplication) {
     app.typeKey("w", modifierFlags: .command)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
@@ -48,7 +48,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  fileprivate func startAgentTui(
+  func startAgentTui(
     in app: XCUIApplication,
     runtimeTitle: String,
     prompt: String
@@ -87,7 +87,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  fileprivate func tapDockButton(
+  func tapDockButton(
     in app: XCUIApplication,
     identifier: String,
     label: String
@@ -109,7 +109,7 @@ extension AgentTuiWindowUITests {
     }
   }
 
-  fileprivate func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
+  func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
     guard let coordinate = centerCoordinate(in: app, for: element) else {
       XCTFail("Failed to resolve coordinate for \(element)")
       return
@@ -117,7 +117,7 @@ extension AgentTuiWindowUITests {
     coordinate.tap()
   }
 
-  fileprivate func revealCreateAction(in app: XCUIApplication, startTitle: String) {
+  func revealCreateAction(in app: XCUIApplication, startTitle: String) {
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
 
     for _ in 0..<4 {
@@ -137,7 +137,7 @@ extension AgentTuiWindowUITests {
     }
   }
 
-  fileprivate func agentTuiActionExists(
+  func agentTuiActionExists(
     in app: XCUIApplication,
     title: String,
     identifier: String
@@ -149,7 +149,7 @@ extension AgentTuiWindowUITests {
       || element(in: app, title: title).exists
   }
 
-  fileprivate func dragViewportDivider(
+  func dragViewportDivider(
     in app: XCUIApplication,
     viewport: XCUIElement,
     controls: XCUIElement,
@@ -169,7 +169,7 @@ extension AgentTuiWindowUITests {
     start.press(forDuration: 0.01, thenDragTo: end)
   }
 
-  fileprivate func agentTuiSize(from label: String) -> (rows: Int, cols: Int)? {
+  func agentTuiSize(from label: String) -> (rows: Int, cols: Int)? {
     guard let markerRange = label.range(of: "size=") else {
       return nil
     }

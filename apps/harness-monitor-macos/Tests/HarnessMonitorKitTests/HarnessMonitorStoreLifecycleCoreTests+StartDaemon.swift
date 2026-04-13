@@ -117,7 +117,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.shutdownCallCount() == 1)
   }
 
-  private struct HydrationSkipFixtures {
+  struct HydrationSkipFixtures {
     let client: RecordingHarnessClient
     let store: HarnessMonitorStore
     let selectedSummary: SessionSummary
@@ -128,7 +128,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     let backgroundTimeline: [TimelineEntry]
   }
 
-  private func makeHydrationSkipFixtures() async throws -> HydrationSkipFixtures {
+  func makeHydrationSkipFixtures() async throws -> HydrationSkipFixtures {
     let selectedSummary = makeSession(
       .init(
         sessionId: "sess-selected-hydration",

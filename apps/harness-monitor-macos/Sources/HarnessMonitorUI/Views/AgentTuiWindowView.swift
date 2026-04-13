@@ -16,8 +16,7 @@ struct ClickableSwitchStyle: ToggleStyle {
 
 public struct AgentTuiWindowView: View {
   let store: HarnessMonitorStore
-  @State private var _viewModel: ViewModel
-  var viewModel: ViewModel { _viewModel }
+  @State var viewModel: ViewModel
   @Environment(\.fontScale)
   var fontScale
   @FocusState var focusedField: Field?

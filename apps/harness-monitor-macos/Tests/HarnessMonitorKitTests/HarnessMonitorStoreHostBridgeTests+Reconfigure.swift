@@ -275,7 +275,7 @@ extension HarnessMonitorStoreHostBridgeTests {
 
 }
 
-private func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
+func sandboxedStatus(hostBridge: HostBridgeManifest) -> DaemonStatusReport {
   DaemonStatusReport(
     manifest: DaemonManifest(
       version: "19.3.0",
