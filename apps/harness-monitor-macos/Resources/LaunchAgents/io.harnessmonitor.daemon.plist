@@ -13,7 +13,7 @@
 		<key>HARNESS_APP_GROUP_ID</key>
 		<string>Q498EB36N4.io.harnessmonitor</string>
 		<key>RUST_LOG</key>
-		<string>harness=trace</string>
+		<string>harness=info</string>
 		<key>HARNESS_SANDBOXED</key>
 		<string>1</string>
 	</dict>

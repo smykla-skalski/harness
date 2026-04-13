@@ -1353,7 +1353,8 @@ fn timed_json<T: serde::Serialize>(
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 fn log_request(method: &str, path: &str, status: u16, duration_ms: u64, request_id: &str) {
-    tracing::info!(
+    tracing::event!(
+        request_activity_log_level(),
         method,
         path,
         status,
@@ -1361,6 +1362,10 @@ fn log_request(method: &str, path: &str, status: u16, duration_ms: u64, request_
         request_id,
         "daemon request"
     );
+}
+
+const fn request_activity_log_level() -> tracing::Level {
+    crate::DAEMON_ACTIVITY_LOG_LEVEL
 }
 
 fn extract_request_id(headers: &HeaderMap) -> String {
@@ -1401,7 +1406,7 @@ pub(super) fn require_auth(
 mod tests {
     use super::{
         DaemonHttpState, StatusCode, authorize_control_request, get_diagnostics, get_health,
-        map_json,
+        map_json, request_activity_log_level,
     };
     use crate::daemon::agent_tui::AgentTuiManagerHandle;
     use crate::daemon::codex_controller::CodexControllerHandle;
@@ -1472,6 +1477,11 @@ mod tests {
         assert_eq!(body["error"], "codex-unavailable");
         assert_eq!(body["endpoint"], "ws://127.0.0.1:4500");
         assert_eq!(body["hint"], "run: harness bridge start");
+    }
+
+    #[test]
+    fn request_logging_uses_debug_activity_level() {
+        assert_eq!(request_activity_log_level(), tracing::Level::DEBUG);
     }
 
     #[tokio::test]

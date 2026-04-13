@@ -887,15 +887,31 @@ pub fn session_timeline(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<Vec<TimelineEntry>, CliError> {
+    session_timeline_with_scope(session_id, timeline::TimelinePayloadScope::Full, db)
+}
+
+/// Load a merged session timeline with caller-selected payload detail.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or timeline sources fail.
+pub(crate) fn session_timeline_with_scope(
+    session_id: &str,
+    payload_scope: timeline::TimelinePayloadScope,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<Vec<TimelineEntry>, CliError> {
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
-        return timeline::session_timeline_from_resolved_with_db(&resolved, db);
+        return timeline::session_timeline_from_resolved_with_db_scope(
+            &resolved,
+            db,
+            payload_scope,
+        );
     }
-    timeline::session_timeline(session_id)
+    timeline::session_timeline_with_scope(session_id, payload_scope)
 }
 
 /// Load a lightweight session detail with only in-memory fields.
@@ -4967,7 +4983,7 @@ done
     }
 
     #[test]
-    fn current_log_level_defaults_to_trace_when_handle_is_unavailable() {
+    fn current_log_level_defaults_to_info_when_handle_is_unavailable() {
         assert_eq!(current_log_level(), crate::DEFAULT_LOG_LEVEL);
     }
 

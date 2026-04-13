@@ -222,7 +222,7 @@ fn repo_version_surfaces_stay_in_sync() {
 }
 
 #[test]
-fn monitor_and_daemon_logging_defaults_stay_verbose() {
+fn monitor_and_daemon_logging_defaults_stay_production_safe() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let app_info = read_repo_file(
         root,
@@ -242,16 +242,16 @@ fn monitor_and_daemon_logging_defaults_stay_verbose() {
     );
     assert!(
         launch_agent.contains("<key>RUST_LOG</key>")
-            && launch_agent.contains("<string>harness=trace</string>"),
-        "bundled launch agent should pin the daemon default filter to harness=trace"
+            && launch_agent.contains("<string>harness=info</string>"),
+        "bundled launch agent should pin the daemon default filter to harness=info"
     );
     assert!(
-        agents.contains("Default filter: `RUST_LOG=harness=trace`"),
-        "AGENTS.md should document the trace default filter"
+        agents.contains("Default filter: `RUST_LOG=harness=info`"),
+        "AGENTS.md should document the info default filter"
     );
     assert!(
-        claude.contains("Default filter: `RUST_LOG=harness=trace`"),
-        "CLAUDE.md should document the trace default filter"
+        claude.contains("Default filter: `RUST_LOG=harness=info`"),
+        "CLAUDE.md should document the info default filter"
     );
 }
 
