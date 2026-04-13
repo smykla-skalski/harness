@@ -1009,7 +1009,7 @@ impl AgentTuiManagerHandle {
         snapshot.screen = process.screen()?;
         snapshot.size = snapshot.screen.size();
         snapshot.updated_at = utc_now();
-        write_transcript(Path::new(&snapshot.transcript_path), &process.transcript()?)?;
+        process.persist_transcript(Path::new(&snapshot.transcript_path))?;
 
         if snapshot.agent_id.is_empty() {
             self.try_resolve_agent_id(&mut snapshot);
@@ -1191,7 +1191,7 @@ pub(super) fn snapshot_from_process(
     status: AgentTuiStatus,
 ) -> Result<AgentTuiSnapshot, CliError> {
     let screen = process.screen()?;
-    write_transcript(context.transcript_path, &process.transcript()?)?;
+    process.persist_transcript(context.transcript_path)?;
     let now = utc_now();
     Ok(AgentTuiSnapshot {
         tui_id: context.tui_id.to_string(),
@@ -1228,6 +1228,7 @@ pub struct AgentTuiProcess {
     child: Shared<Box<dyn Child + Send + Sync>>,
     writer: Shared<Box<dyn Write + Send>>,
     transcript: Shared<Vec<u8>>,
+    persisted_transcript_len: Shared<usize>,
     screen: Shared<TerminalScreenParser>,
     reader_thread: Option<JoinHandle<()>>,
     readiness: ReadinessSignal,
@@ -1257,6 +1258,7 @@ impl AgentTuiProcess {
         })?;
 
         let transcript = Arc::new(Mutex::new(Vec::new()));
+        let persisted_transcript_len = Arc::new(Mutex::new(0_usize));
         let screen = Arc::new(Mutex::new(TerminalScreenParser::new(spec.size)));
         let readiness: ReadinessSignal = Arc::new((
             Mutex::new(ReadinessState {
@@ -1279,6 +1281,7 @@ impl AgentTuiProcess {
             child: Arc::new(Mutex::new(child)),
             writer: Arc::new(Mutex::new(writer)),
             transcript,
+            persisted_transcript_len,
             screen,
             reader_thread: Some(reader_thread),
             readiness,
@@ -1334,6 +1337,19 @@ impl AgentTuiProcess {
     /// Returns a workflow I/O error when internal state is poisoned.
     pub fn transcript(&self) -> Result<Vec<u8>, CliError> {
         Ok(lock(&self.transcript, "agent TUI transcript")?.clone())
+    }
+
+    /// Persist newly captured transcript bytes without rewriting the full file.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when internal state is poisoned or the file write fails.
+    pub fn persist_transcript(&self, path: &Path) -> Result<(), CliError> {
+        let transcript = lock(&self.transcript, "agent TUI transcript")?;
+        let mut persisted_len = lock(
+            &self.persisted_transcript_len,
+            "agent TUI persisted transcript length",
+        )?;
+        persist_transcript(path, transcript.as_slice(), &mut persisted_len)
     }
 
     /// Poll the child process for exit status without blocking.
@@ -1573,15 +1589,54 @@ fn transcript_path(context_root: &Path, runtime: &str, tui_id: &str) -> PathBuf 
         .join("output.raw")
 }
 
-fn write_transcript(path: &Path, transcript: &[u8]) -> Result<(), CliError> {
+fn persist_transcript(
+    path: &Path,
+    transcript: &[u8],
+    persisted_len: &mut usize,
+) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
         fs_err::create_dir_all(parent).map_err(|error| {
             CliErrorKind::workflow_io(format!("create agent TUI transcript dir: {error}"))
         })?;
     }
-    fs_err::write(path, transcript).map_err(|error| {
-        CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}")).into()
-    })
+
+    if transcript.len() < *persisted_len {
+        fs_err::write(path, transcript).map_err(|error| {
+            CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}"))
+        })?;
+        *persisted_len = transcript.len();
+        return Ok(());
+    }
+
+    if transcript.len() == *persisted_len {
+        if *persisted_len == 0 && !path.exists() {
+            fs_err::write(path, transcript).map_err(|error| {
+                CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}"))
+            })?;
+        }
+        return Ok(());
+    }
+
+    if *persisted_len == 0 || !path.exists() {
+        fs_err::write(path, transcript).map_err(|error| {
+            CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}"))
+        })?;
+    } else {
+        let mut file = fs_err::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(path)
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("open agent TUI transcript: {error}"))
+            })?;
+        file.write_all(&transcript[*persisted_len..])
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("append agent TUI transcript: {error}"))
+            })?;
+    }
+
+    *persisted_len = transcript.len();
+    Ok(())
 }
 
 /// Build the skill invocation string that the daemon sends as the first PTY
@@ -2345,6 +2400,100 @@ mod tests {
             super::InitialPromptDelivery::CliPositional,
             "codex should use CliPositional delivery"
         );
+    }
+
+    #[test]
+    fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-transcript-refresh".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-transcript-refresh".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "transcript refresh test",
+            "managed tui",
+            "sess-tui-transcript-refresh",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = manager
+            .start(
+                "sess-tui-transcript-refresh",
+                &AgentTuiStartRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec![],
+                    name: Some("Transcript refresh".into()),
+                    prompt: None,
+                    project_dir: None,
+                    persona: None,
+                    argv: vec![
+                        "sh".into(),
+                        "-c".into(),
+                        "printf 'steady\\n'; sleep 1".into(),
+                    ],
+                    rows: 5,
+                    cols: 40,
+                },
+            )
+            .expect("start manager TUI");
+
+        wait_until(DEFAULT_WAIT_TIMEOUT, || {
+            manager
+                .refresh_local_snapshot(snapshot.clone())
+                .expect("refresh snapshot")
+                .screen
+                .text
+                .contains("steady")
+        });
+
+        let refreshed = manager
+            .refresh_local_snapshot(snapshot)
+            .expect("refresh snapshot");
+        assert!(refreshed.screen.text.contains("steady"));
+
+        let transcript_path = PathBuf::from(&refreshed.transcript_path);
+        let baseline_modified = fs_err::metadata(&transcript_path)
+            .expect("transcript metadata")
+            .modified()
+            .expect("transcript modified time");
+
+        std::thread::sleep(Duration::from_millis(20));
+
+        let second_refresh = manager
+            .refresh_local_snapshot(refreshed)
+            .expect("refresh unchanged snapshot");
+        assert!(second_refresh.screen.text.contains("steady"));
+
+        let after_modified = fs_err::metadata(&transcript_path)
+            .expect("transcript metadata after second refresh")
+            .modified()
+            .expect("transcript modified time after second refresh");
+        assert_eq!(after_modified, baseline_modified);
+
+        manager.stop(&second_refresh.tui_id).expect("stop");
     }
 
     #[test]
