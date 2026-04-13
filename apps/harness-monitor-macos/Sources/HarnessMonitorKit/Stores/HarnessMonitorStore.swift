@@ -377,7 +377,7 @@ public final class HarnessMonitorStore {
     case .daemonDidNotStart, .daemonOffline, .manifestMissing, .manifestUnreadable:
       return true
     case .harnessBinaryNotFound, .externalDaemonOffline, .externalDaemonManifestStale,
-      .commandFailed:
+      .invalidManifest, .commandFailed:
       return false
     }
   }
