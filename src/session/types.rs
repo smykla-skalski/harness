@@ -82,7 +82,13 @@ pub struct SessionMetrics {
 impl SessionMetrics {
     #[must_use]
     pub fn recalculate(state: &SessionState) -> Self {
-        let agent_count = saturating_len(state.agents.len());
+        let agent_count = saturating_len(
+            state
+                .agents
+                .values()
+                .filter(|agent| agent.status.is_alive())
+                .count(),
+        );
         let active_agent_count = saturating_len(
             state
                 .agents
@@ -775,7 +781,7 @@ mod tests {
         };
 
         let metrics = SessionMetrics::recalculate(&state);
-        assert_eq!(metrics.agent_count, 3);
+        assert_eq!(metrics.agent_count, 2);
         assert_eq!(
             metrics.active_agent_count, 1,
             "only Active counts, not Idle"

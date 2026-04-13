@@ -2665,29 +2665,33 @@ done
     }
 
     #[test]
-    fn session_detail_reconciles_stale_agent_liveness_before_serving() {
+    fn session_detail_marks_dead_leader_leaderless_and_hides_dead_agents() {
         with_temp_project(|project| {
             let state = session_service::start_session(
-                "daemon stale detail",
+                "daemon leaderless detail",
                 "",
                 project,
                 Some("claude"),
-                Some("daemon-stale-detail"),
+                Some("daemon-leaderless-detail"),
             )
             .expect("start session");
 
-            temp_env::with_var("CODEX_SESSION_ID", Some("stale-worker-session"), || {
-                session_service::join_session(
-                    &state.session_id,
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join worker");
-            });
+            temp_env::with_var(
+                "CODEX_SESSION_ID",
+                Some("leaderless-worker-session"),
+                || {
+                    session_service::join_session(
+                        &state.session_id,
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                        None,
+                    )
+                    .expect("join worker");
+                },
+            );
 
             let status =
                 session_service::session_status(&state.session_id, project).expect("status");
@@ -2702,55 +2706,68 @@ done
                 .find(|agent| agent.runtime == "codex")
                 .expect("worker agent");
 
-            let leader_session_id = leader
-                .agent_session_id
-                .as_deref()
-                .expect("leader session id");
-            let worker_session_id = worker
-                .agent_session_id
-                .as_deref()
-                .expect("worker session id");
-
-            write_agent_log_file(project, "claude", leader_session_id);
-            let worker_log = write_agent_log_file(project, "codex", worker_session_id);
-            set_log_mtime_seconds_ago(&worker_log, 600);
+            let leader_log = write_agent_log_file(
+                project,
+                "claude",
+                leader
+                    .agent_session_id
+                    .as_deref()
+                    .expect("leader session id"),
+            );
+            set_log_mtime_seconds_ago(&leader_log, 600);
+            write_agent_log_file(
+                project,
+                "codex",
+                worker
+                    .agent_session_id
+                    .as_deref()
+                    .expect("worker session id"),
+            );
 
             let detail = session_detail(&state.session_id, None).expect("session detail");
-            let worker = detail
-                .agents
-                .iter()
-                .find(|agent| agent.runtime == "codex")
-                .expect("worker detail");
-
-            assert_eq!(worker.status, AgentStatus::Disconnected);
+            assert!(
+                detail.session.leader_id.is_none(),
+                "dead leader should clear leader_id"
+            );
+            assert_eq!(detail.session.metrics.agent_count, 1);
             assert_eq!(detail.session.metrics.active_agent_count, 1);
+            assert_eq!(
+                detail.agents.len(),
+                1,
+                "only the live worker should remain visible"
+            );
+            assert_eq!(detail.agents[0].runtime, "codex");
         });
     }
 
     #[test]
-    fn list_sessions_db_reconciles_stale_agent_liveness_before_serving() {
+    fn list_sessions_db_marks_dead_leader_leaderless_and_excludes_dead_members() {
         with_temp_project(|project| {
             let state = session_service::start_session(
-                "daemon stale summaries",
+                "daemon leaderless summaries",
                 "",
                 project,
                 Some("claude"),
-                Some("daemon-stale-summaries"),
+                Some("daemon-leaderless-summaries"),
             )
             .expect("start session");
 
-            temp_env::with_var("CODEX_SESSION_ID", Some("stale-db-worker-session"), || {
-                session_service::join_session(
-                    &state.session_id,
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join worker");
-            });
+            temp_env::with_var(
+                "CODEX_SESSION_ID",
+                Some("leaderless-db-worker-session"),
+                || {
+                    session_service::join_session(
+                        &state.session_id,
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                        None,
+                    )
+                    .expect("join worker");
+                },
+            );
 
             let status =
                 session_service::session_status(&state.session_id, project).expect("status");
@@ -2765,18 +2782,23 @@ done
                 .find(|agent| agent.runtime == "codex")
                 .expect("worker agent");
 
-            let leader_session_id = leader
-                .agent_session_id
-                .as_deref()
-                .expect("leader session id");
-            let worker_session_id = worker
-                .agent_session_id
-                .as_deref()
-                .expect("worker session id");
-
-            write_agent_log_file(project, "claude", leader_session_id);
-            let worker_log = write_agent_log_file(project, "codex", worker_session_id);
-            set_log_mtime_seconds_ago(&worker_log, 600);
+            let leader_log = write_agent_log_file(
+                project,
+                "claude",
+                leader
+                    .agent_session_id
+                    .as_deref()
+                    .expect("leader session id"),
+            );
+            set_log_mtime_seconds_ago(&leader_log, 600);
+            write_agent_log_file(
+                project,
+                "codex",
+                worker
+                    .agent_session_id
+                    .as_deref()
+                    .expect("worker session id"),
+            );
 
             let db = setup_db_with_session(project, &state.session_id);
 
@@ -2785,18 +2807,24 @@ done
                 .into_iter()
                 .find(|summary| summary.session_id == state.session_id)
                 .expect("summary");
+            assert!(
+                summary.leader_id.is_none(),
+                "dead leader should clear leader_id"
+            );
+            assert_eq!(summary.metrics.agent_count, 1);
             assert_eq!(summary.metrics.active_agent_count, 1);
 
             let synced_state = db
                 .load_session_state(&state.session_id)
                 .expect("load state")
                 .expect("session present");
-            let worker = synced_state
-                .agents
-                .values()
-                .find(|agent| agent.runtime == "codex")
-                .expect("worker");
-            assert_eq!(worker.status, AgentStatus::Disconnected);
+            assert!(
+                synced_state.leader_id.is_none(),
+                "db state should persist leaderless session"
+            );
+            let leader_id = state.leader_id.as_ref().expect("leader id");
+            let dead_leader = synced_state.agents.get(leader_id).expect("leader agent");
+            assert_eq!(dead_leader.status, AgentStatus::Disconnected);
         });
     }
 
@@ -3511,11 +3539,10 @@ done
 
             assert_eq!(detail.session.status, SessionStatus::Ended);
             assert_eq!(detail.session.metrics.active_agent_count, 0);
+            assert!(detail.session.leader_id.is_none());
             assert!(
-                detail
-                    .agents
-                    .iter()
-                    .all(|agent| agent.status == AgentStatus::Disconnected)
+                detail.agents.is_empty(),
+                "ended sessions should not expose dead agents"
             );
             assert_eq!(detail.signals.len(), 2);
             assert!(
@@ -3558,12 +3585,13 @@ done
             )
             .expect("remove via db");
 
-            let worker = detail
-                .agents
-                .iter()
-                .find(|agent| agent.agent_id == worker_id)
-                .expect("worker");
-            assert_eq!(worker.status, AgentStatus::Removed);
+            assert!(
+                detail
+                    .agents
+                    .iter()
+                    .all(|agent| agent.agent_id != worker_id),
+                "removed agents should disappear from session detail"
+            );
             assert_eq!(detail.signals.len(), 1);
             assert_eq!(detail.signals[0].agent_id, worker_id);
             assert_eq!(detail.signals[0].signal.command, "abort");
