@@ -19,13 +19,30 @@ use crate::session::types::{
 use super::index;
 use super::protocol::TimelineEntry;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TimelinePayloadScope {
+    Full,
+    Summary,
+}
+
 /// Build a merged session timeline from session transitions and task checkpoints.
 ///
 /// # Errors
 /// Returns `CliError` on discovery or parse failures.
 pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError> {
+    session_timeline_with_scope(session_id, TimelinePayloadScope::Full)
+}
+
+/// Build a timeline with caller-selected payload detail.
+///
+/// # Errors
+/// Returns [`CliError`] on discovery or parse failures.
+pub(crate) fn session_timeline_with_scope(
+    session_id: &str,
+    payload_scope: TimelinePayloadScope,
+) -> Result<Vec<TimelineEntry>, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    session_timeline_from_resolved(&resolved)
+    session_timeline_from_resolved_with_scope(&resolved, payload_scope)
 }
 
 /// Build a timeline from a pre-resolved session (avoids full discovery).
@@ -35,7 +52,14 @@ pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError
 pub fn session_timeline_from_resolved(
     resolved: &index::ResolvedSession,
 ) -> Result<Vec<TimelineEntry>, CliError> {
-    build_timeline(resolved, None)
+    session_timeline_from_resolved_with_scope(resolved, TimelinePayloadScope::Full)
+}
+
+fn session_timeline_from_resolved_with_scope(
+    resolved: &index::ResolvedSession,
+    payload_scope: TimelinePayloadScope,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    build_timeline(resolved, None, payload_scope)
 }
 
 /// Build timeline using the DB for log entries and checkpoints when available.
@@ -46,12 +70,25 @@ pub fn session_timeline_from_resolved_with_db(
     resolved: &index::ResolvedSession,
     db: &super::db::DaemonDb,
 ) -> Result<Vec<TimelineEntry>, CliError> {
-    build_timeline(resolved, Some(db))
+    session_timeline_from_resolved_with_db_scope(resolved, db, TimelinePayloadScope::Full)
+}
+
+/// Build timeline using the DB for log entries and checkpoints with caller-selected payload detail.
+///
+/// # Errors
+/// Returns [`CliError`] on parse failures.
+pub(crate) fn session_timeline_from_resolved_with_db_scope(
+    resolved: &index::ResolvedSession,
+    db: &super::db::DaemonDb,
+    payload_scope: TimelinePayloadScope,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    build_timeline(resolved, Some(db), payload_scope)
 }
 
 fn build_timeline(
     resolved: &index::ResolvedSession,
     db: Option<&super::db::DaemonDb>,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     let session_id = &resolved.state.session_id;
     let mut entries = Vec::new();
@@ -78,7 +115,7 @@ fn build_timeline(
             );
         }
         let (kind, task_id, summary) = transition_summary(&log_entry.transition);
-        let payload = timeline_payload(&log_entry.transition, "session transition")?;
+        let payload = timeline_payload(&log_entry.transition, "session transition", payload_scope)?;
         entries.push(TimelineEntry {
             entry_id: format!("log-{}", log_entry.sequence),
             recorded_at: log_entry.recorded_at,
@@ -95,12 +132,13 @@ fn build_timeline(
         db,
         &resolved.project,
         &resolved.state,
+        payload_scope,
     )?);
 
     for task_id in resolved.state.tasks.keys() {
         let checkpoints = load_checkpoints_hybrid(db, &resolved.project, session_id, task_id)?;
         for checkpoint in checkpoints {
-            entries.push(checkpoint_entry(session_id, &checkpoint)?);
+            entries.push(checkpoint_entry(session_id, &checkpoint, payload_scope)?);
         }
     }
 
@@ -109,11 +147,14 @@ fn build_timeline(
         &resolved.project.context_root,
         &sent_signals,
         &logged_signal_acks,
+        payload_scope,
     )?);
 
-    if let Some(observer_entry) =
-        observer_snapshot_entry(&resolved.state, &resolved.project.context_root)?
-    {
+    if let Some(observer_entry) = observer_snapshot_entry(
+        &resolved.state,
+        &resolved.project.context_root,
+        payload_scope,
+    )? {
         entries.push(observer_entry);
     }
 
@@ -148,24 +189,30 @@ fn load_conversation_entries_hybrid(
     db: Option<&super::db::DaemonDb>,
     project: &index::DiscoveredProject,
     state: &SessionState,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     if let Some(db) = db {
-        return conversation_entries_from_db(db, state);
+        return conversation_entries_from_db(db, state, payload_scope);
     }
-    conversation_entries(project, state)
+    conversation_entries(project, state, payload_scope)
 }
 
 fn conversation_entries_from_db(
     db: &super::db::DaemonDb,
     state: &SessionState,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     let mut entries = Vec::new();
     for (agent_id, agent) in &state.agents {
         let events = db.load_conversation_events(&state.session_id, agent_id)?;
         for event in events {
-            if let Some(entry) =
-                conversation_entry(&state.session_id, agent_id, &agent.runtime, &event)?
-            {
+            if let Some(entry) = conversation_entry(
+                &state.session_id,
+                agent_id,
+                &agent.runtime,
+                &event,
+                payload_scope,
+            )? {
                 entries.push(entry);
             }
         }
@@ -176,6 +223,7 @@ fn conversation_entries_from_db(
 fn conversation_entries(
     project: &index::DiscoveredProject,
     state: &SessionState,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     let mut entries = Vec::new();
     for (agent_id, agent) in &state.agents {
@@ -186,9 +234,13 @@ fn conversation_entries(
         let events =
             index::load_conversation_events(project, &agent.runtime, session_key, agent_id)?;
         for event in events {
-            if let Some(entry) =
-                conversation_entry(&state.session_id, agent_id, &agent.runtime, &event)?
-            {
+            if let Some(entry) = conversation_entry(
+                &state.session_id,
+                agent_id,
+                &agent.runtime,
+                &event,
+                payload_scope,
+            )? {
                 entries.push(entry);
             }
         }
@@ -199,8 +251,9 @@ fn conversation_entries(
 fn checkpoint_entry(
     session_id: &str,
     checkpoint: &TaskCheckpoint,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<TimelineEntry, CliError> {
-    let payload = timeline_payload(checkpoint, "task checkpoint")?;
+    let payload = timeline_payload(checkpoint, "task checkpoint", payload_scope)?;
     Ok(TimelineEntry {
         entry_id: checkpoint.checkpoint_id.clone(),
         recorded_at: checkpoint.recorded_at.clone(),
@@ -221,6 +274,7 @@ fn conversation_entry(
     agent_id: &str,
     runtime: &str,
     event: &ConversationEvent,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Option<TimelineEntry>, CliError> {
     let Some(recorded_at) = event.timestamp.clone() else {
         return Ok(None);
@@ -276,6 +330,7 @@ fn conversation_entry(
             "event": event.kind,
         }),
         "agent conversation event",
+        payload_scope,
     )?;
 
     Ok(Some(TimelineEntry {
@@ -295,6 +350,7 @@ fn signal_ack_entries(
     context_root: &Path,
     sent_signals: &BTreeMap<String, LoggedSignal>,
     logged_signal_acks: &HashSet<String>,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     let mut entries = Vec::new();
     let signals_root = index::signals_root(context_root);
@@ -331,6 +387,7 @@ fn signal_ack_entries(
             logged_signal,
             signal,
             &acknowledgment,
+            payload_scope,
         )?);
     }
 
@@ -343,6 +400,7 @@ fn signal_ack_entry(
     logged_signal: Option<&LoggedSignal>,
     signal: Option<&Signal>,
     acknowledgment: &SignalAck,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<TimelineEntry, CliError> {
     let payload = timeline_payload(
         &serde_json::json!({
@@ -351,6 +409,7 @@ fn signal_ack_entry(
             "acknowledgment": acknowledgment,
         }),
         "signal acknowledgment",
+        payload_scope,
     )?;
     let agent_id = logged_signal.map_or(runtime, |logged_signal| logged_signal.agent_id.as_str());
     let command = signal
@@ -378,6 +437,7 @@ fn signal_ack_entry(
 fn observer_snapshot_entry(
     state: &SessionState,
     context_root: &Path,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Option<TimelineEntry>, CliError> {
     let Some(observe_id) = state.observe_id.as_deref() else {
         return Ok(None);
@@ -397,7 +457,7 @@ fn observer_snapshot_entry(
         return Ok(None);
     }
 
-    let payload = timeline_payload(&observer, "observer snapshot")?;
+    let payload = timeline_payload(&observer, "observer snapshot", payload_scope)?;
     Ok(Some(TimelineEntry {
         entry_id: format!("observe-snapshot-{observe_id}"),
         recorded_at: observer.last_scan_time.clone(),
@@ -424,7 +484,11 @@ struct LoggedSignal {
 fn timeline_payload(
     value: &impl serde::Serialize,
     label: &str,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<serde_json::Value, CliError> {
+    if payload_scope == TimelinePayloadScope::Summary {
+        return Ok(serde_json::Value::Object(serde_json::Map::new()));
+    }
     to_value(value).map_err(|error| {
         CliError::from(CliErrorKind::workflow_serialize(format!(
             "serialize {label} for timeline: {error}"
@@ -1032,6 +1096,163 @@ mod tests {
                 );
                 assert_eq!(entries[5].kind, "signal_sent");
                 assert_eq!(entries[6].kind, "task_created");
+            },
+        );
+    }
+
+    #[test]
+    fn session_timeline_summary_scope_keeps_entries_but_omits_payloads() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-alpha");
+                let session_id = "sess-summary";
+                let state_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("state.json");
+                write_json(&state_path, &sample_state(session_id));
+
+                let log_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("log.jsonl");
+                write_json_line(
+                    &log_path,
+                    &crate::session::types::SessionLogEntry {
+                        sequence: 1,
+                        recorded_at: "2026-03-28T14:01:00Z".into(),
+                        session_id: session_id.into(),
+                        transition: SessionTransition::TaskCreated {
+                            task_id: "task-1".into(),
+                            title: "finish cockpit".into(),
+                            severity: TaskSeverity::High,
+                        },
+                        actor_id: Some("leader-claude".into()),
+                        reason: None,
+                    },
+                );
+                write_json_line(
+                    &log_path,
+                    &crate::session::types::SessionLogEntry {
+                        sequence: 2,
+                        recorded_at: "2026-03-28T14:03:00Z".into(),
+                        session_id: session_id.into(),
+                        transition: SessionTransition::SignalSent {
+                            signal_id: "sig-acked".into(),
+                            agent_id: "codex-worker".into(),
+                            command: "inject_context".into(),
+                        },
+                        actor_id: Some("leader-claude".into()),
+                        reason: None,
+                    },
+                );
+
+                let checkpoint_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("tasks")
+                    .join("task-1")
+                    .join("checkpoints.jsonl");
+                write_json_line(
+                    &checkpoint_path,
+                    &TaskCheckpoint {
+                        checkpoint_id: "task-1-cp-1".into(),
+                        task_id: "task-1".into(),
+                        recorded_at: "2026-03-28T14:06:00Z".into(),
+                        actor_id: Some("worker-codex".into()),
+                        summary: "timeline rows are live-backed".into(),
+                        progress: 70,
+                    },
+                );
+
+                let signal_dir = context_root.join("agents/signals/codex/sess-summary");
+                write_signal_file(&signal_dir, &sample_signal("sig-acked", "merged timeline"))
+                    .expect("write acked signal");
+                acknowledge_signal(
+                    &signal_dir,
+                    &SignalAck {
+                        signal_id: "sig-acked".into(),
+                        acknowledged_at: "2026-03-28T14:03:10Z".into(),
+                        result: AckResult::Accepted,
+                        agent: "codex".into(),
+                        session_id: session_id.into(),
+                        details: Some("loaded".into()),
+                    },
+                )
+                .expect("ack signal");
+
+                write_json(
+                    &context_root.join("agents/observe/observe-sess-merge/snapshot.json"),
+                    &observer_state(session_id),
+                );
+
+                let transcript_path = context_root
+                    .join("agents")
+                    .join("sessions")
+                    .join("codex")
+                    .join("codex-session-1")
+                    .join("raw.jsonl");
+                write_json_line(
+                    &transcript_path,
+                    &serde_json::json!({
+                        "timestamp": "2026-03-28T14:05:30Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_use",
+                                "name": "Read",
+                                "input": {"path": "src/daemon/timeline.rs"},
+                                "id": "call-read-1"
+                            }]
+                        }
+                    }),
+                );
+                write_json_line(
+                    &transcript_path,
+                    &serde_json::json!({
+                        "timestamp": "2026-03-28T14:05:45Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_name": "Read",
+                                "tool_use_id": "call-read-1",
+                                "content": {"line_count": 48},
+                                "is_error": false
+                            }]
+                        }
+                    }),
+                );
+
+                let full_entries = session_timeline(session_id).expect("full timeline");
+                let summary_entries =
+                    session_timeline_with_scope(session_id, TimelinePayloadScope::Summary)
+                        .expect("summary timeline");
+
+                assert_eq!(summary_entries.len(), full_entries.len());
+                assert!(
+                    summary_entries
+                        .iter()
+                        .all(|entry| entry.payload == serde_json::json!({}))
+                );
+                assert_eq!(
+                    summary_entries
+                        .iter()
+                        .map(|entry| (&entry.entry_id, &entry.kind, &entry.summary))
+                        .collect::<Vec<_>>(),
+                    full_entries
+                        .iter()
+                        .map(|entry| (&entry.entry_id, &entry.kind, &entry.summary))
+                        .collect::<Vec<_>>()
+                );
             },
         );
     }
