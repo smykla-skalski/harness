@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
+use std::io::{Read, Seek, SeekFrom};
 use std::mem;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
@@ -12,6 +13,44 @@ use tokio::time::sleep;
 
 use super::service;
 use super::types::{SessionState, TaskSeverity, TaskSource};
+
+#[derive(Debug)]
+struct AgentLogTailState {
+    log_path: PathBuf,
+    offset: u64,
+    next_line_index: usize,
+    scan_state: ScanState,
+}
+
+struct AgentLogScanTarget<'a> {
+    agent_runtime: &'a dyn runtime::AgentRuntime,
+    agent_id: &'a str,
+    agent_session_id: &'a str,
+    session_id: &'a str,
+    agent_role: Option<&'a str>,
+    project_dir: &'a Path,
+}
+
+impl AgentLogTailState {
+    fn new(log_path: PathBuf, agent_id: &str, agent_role: Option<&str>, session_id: &str) -> Self {
+        Self {
+            log_path,
+            offset: 0,
+            next_line_index: 0,
+            scan_state: agent_scan_state(agent_id, agent_role, session_id),
+        }
+    }
+
+    fn reset(
+        &mut self,
+        log_path: PathBuf,
+        agent_id: &str,
+        agent_role: Option<&str>,
+        session_id: &str,
+    ) {
+        *self = Self::new(log_path, agent_id, agent_role, session_id);
+    }
+}
 
 /// Run a one-shot multi-agent observation scan.
 ///
@@ -70,6 +109,8 @@ pub fn execute_session_watch(
     let mut realtime_seen: HashSet<String> = HashSet::new();
     let mut total_issues = 0_usize;
     let mut cycle_count = 0_u64;
+    let mut tail_states: HashMap<String, AgentLogTailState> = HashMap::new();
+    let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
 
     loop {
         let Ok(state) = service::session_status(session_id, project_dir) else {
@@ -87,7 +128,13 @@ pub fn execute_session_watch(
             break;
         };
 
-        let issues = scan_all_agents(&state, session_id, project_dir)?;
+        let issues = scan_all_agents_incremental(
+            &state,
+            session_id,
+            project_dir,
+            &mut tail_states,
+            &mut shared_cross_agent_editors,
+        )?;
         let new_issues: Vec<Issue> = issues
             .into_iter()
             .filter(|issue| realtime_seen.insert(issue.fingerprint.clone()))
@@ -132,6 +179,8 @@ pub async fn execute_session_watch_async(
     let mut realtime_seen: HashSet<String> = HashSet::new();
     let mut total_issues = 0_usize;
     let mut cycle_count = 0_u64;
+    let mut tail_states: HashMap<String, AgentLogTailState> = HashMap::new();
+    let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
 
     loop {
         let Ok(state) = service::session_status(session_id, project_dir) else {
@@ -149,7 +198,13 @@ pub async fn execute_session_watch_async(
             break;
         };
 
-        let issues = scan_all_agents(&state, session_id, project_dir)?;
+        let issues = scan_all_agents_incremental(
+            &state,
+            session_id,
+            project_dir,
+            &mut tail_states,
+            &mut shared_cross_agent_editors,
+        )?;
         let new_issues: Vec<Issue> = issues
             .into_iter()
             .filter(|issue| realtime_seen.insert(issue.fingerprint.clone()))
@@ -289,15 +344,46 @@ fn scan_all_agents(
             continue;
         };
         let role_label = format!("{:?}", agent.role).to_lowercase();
-        let issues = scan_agent_log(
+        let target = AgentLogScanTarget {
             agent_runtime,
-            &agent.agent_id,
+            agent_id: &agent.agent_id,
             agent_session_id,
             session_id,
-            Some(&role_label),
+            agent_role: Some(&role_label),
             project_dir,
-            &mut shared_cross_agent_editors,
-        )?;
+        };
+        let issues = scan_agent_log(&target, &mut shared_cross_agent_editors)?;
+        all_issues.extend(issues);
+    }
+    dedup_issues(&mut all_issues);
+    Ok(all_issues)
+}
+
+fn scan_all_agents_incremental(
+    state: &SessionState,
+    session_id: &str,
+    project_dir: &Path,
+    tail_states: &mut HashMap<String, AgentLogTailState>,
+    shared_cross_agent_editors: &mut HashMap<String, HashSet<String>>,
+) -> Result<Vec<Issue>, CliError> {
+    let mut all_issues: Vec<Issue> = Vec::new();
+    for agent in state.agents.values() {
+        let Some(agent_runtime) = resolve_agent_runtime(&agent.runtime) else {
+            continue;
+        };
+        let Some(agent_session_id) = agent.agent_session_id.as_deref() else {
+            continue;
+        };
+        let role_label = format!("{:?}", agent.role).to_lowercase();
+        let target = AgentLogScanTarget {
+            agent_runtime,
+            agent_id: &agent.agent_id,
+            agent_session_id,
+            session_id,
+            agent_role: Some(&role_label),
+            project_dir,
+        };
+        let issues = scan_agent_log_incremental(&target, tail_states, shared_cross_agent_editors)?;
         all_issues.extend(issues);
     }
     dedup_issues(&mut all_issues);
@@ -324,39 +410,144 @@ fn resolve_agent_runtime(runtime_name: &str) -> Option<&'static dyn runtime::Age
     runtime::runtime_for_name(runtime_name)
 }
 
+fn agent_scan_state(agent_id: &str, agent_role: Option<&str>, session_id: &str) -> ScanState {
+    ScanState {
+        agent_id: Some(agent_id.to_string()),
+        agent_role: agent_role.map(ToString::to_string),
+        orchestration_session_id: Some(session_id.to_string()),
+        ..ScanState::default()
+    }
+}
+
 fn scan_agent_log(
-    agent_runtime: &dyn runtime::AgentRuntime,
-    agent_id: &str,
-    agent_session_id: &str,
-    session_id: &str,
-    agent_role: Option<&str>,
-    project_dir: &Path,
+    target: &AgentLogScanTarget<'_>,
     shared_cross_agent_editors: &mut HashMap<String, HashSet<String>>,
 ) -> Result<Vec<Issue>, CliError> {
-    let Some(log_path) = agent_runtime.discover_native_log(agent_session_id, project_dir)? else {
+    let Some(log_path) = target
+        .agent_runtime
+        .discover_native_log(target.agent_session_id, target.project_dir)?
+    else {
         return Ok(Vec::new());
     };
     let content = fs_err::read_to_string(&log_path).map_err(|error| {
         CliErrorKind::workflow_io(format!("read agent log {}: {error}", log_path.display()))
     })?;
 
-    let mut scan_state = ScanState {
-        agent_id: Some(agent_id.to_string()),
-        agent_role: agent_role.map(ToString::to_string),
-        orchestration_session_id: Some(session_id.to_string()),
-        ..ScanState::default()
-    };
+    let mut scan_state = agent_scan_state(target.agent_id, target.agent_role, target.session_id);
     scan_state.cross_agent_editors = mem::take(shared_cross_agent_editors);
 
+    let mut next_line_index = 0;
+    let issues = scan_log_content(&content, &mut next_line_index, &mut scan_state);
+    *shared_cross_agent_editors = scan_state.cross_agent_editors;
+    Ok(issues)
+}
+
+fn scan_agent_log_incremental(
+    target: &AgentLogScanTarget<'_>,
+    tail_states: &mut HashMap<String, AgentLogTailState>,
+    shared_cross_agent_editors: &mut HashMap<String, HashSet<String>>,
+) -> Result<Vec<Issue>, CliError> {
+    let Some(log_path) = target
+        .agent_runtime
+        .discover_native_log(target.agent_session_id, target.project_dir)?
+    else {
+        tail_states.remove(target.agent_id);
+        return Ok(Vec::new());
+    };
+    let tail_state = tail_states
+        .entry(target.agent_id.to_string())
+        .or_insert_with(|| {
+            AgentLogTailState::new(
+                log_path.clone(),
+                target.agent_id,
+                target.agent_role,
+                target.session_id,
+            )
+        });
+    sync_tail_state(
+        tail_state,
+        &log_path,
+        target.agent_id,
+        target.agent_role,
+        target.session_id,
+    )?;
+
+    let content = read_agent_log_delta(&log_path, tail_state)?;
+    tail_state.scan_state.cross_agent_editors = mem::take(shared_cross_agent_editors);
+    let issues = scan_log_content(
+        &content,
+        &mut tail_state.next_line_index,
+        &mut tail_state.scan_state,
+    );
+    *shared_cross_agent_editors = mem::take(&mut tail_state.scan_state.cross_agent_editors);
+    Ok(issues)
+}
+
+fn sync_tail_state(
+    tail_state: &mut AgentLogTailState,
+    log_path: &Path,
+    agent_id: &str,
+    agent_role: Option<&str>,
+    session_id: &str,
+) -> Result<(), CliError> {
+    let metadata = fs_err::metadata(log_path).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "read agent log metadata {}: {error}",
+            log_path.display()
+        ))
+    })?;
+    if tail_state.log_path != log_path || metadata.len() < tail_state.offset {
+        tail_state.reset(log_path.to_path_buf(), agent_id, agent_role, session_id);
+        return Ok(());
+    }
+
+    tail_state.scan_state.agent_id = Some(agent_id.to_string());
+    tail_state.scan_state.agent_role = agent_role.map(ToString::to_string);
+    tail_state.scan_state.orchestration_session_id = Some(session_id.to_string());
+    Ok(())
+}
+
+fn read_agent_log_delta(
+    log_path: &Path,
+    tail_state: &mut AgentLogTailState,
+) -> Result<String, CliError> {
+    let mut file = fs_err::File::open(log_path).map_err(|error| {
+        CliErrorKind::workflow_io(format!("open agent log {}: {error}", log_path.display()))
+    })?;
+    file.seek(SeekFrom::Start(tail_state.offset))
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("seek agent log {}: {error}", log_path.display()))
+        })?;
+    let mut content = String::new();
+    file.read_to_string(&mut content).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "read agent log delta {}: {error}",
+            log_path.display()
+        ))
+    })?;
+    tail_state.offset = file.stream_position().map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "read agent log position {}: {error}",
+            log_path.display()
+        ))
+    })?;
+    Ok(content)
+}
+
+fn scan_log_content(
+    content: &str,
+    next_line_index: &mut usize,
+    scan_state: &mut ScanState,
+) -> Vec<Issue> {
     let mut issues = Vec::new();
-    for (index, line) in content.lines().enumerate() {
+    for (offset, line) in content.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
-        issues.extend(classify_line(index, line, &mut scan_state));
+        issues.extend(classify_line(*next_line_index + offset, line, scan_state));
     }
-    *shared_cross_agent_editors = scan_state.cross_agent_editors;
-    Ok(issues)
+    *next_line_index += content.lines().count();
+    issues
 }
 
 fn dedup_issues(issues: &mut Vec<Issue>) {
@@ -405,6 +596,8 @@ fn create_work_items_for_issues(
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use fs_err as fs;
     use harness_testkit::with_isolated_harness_env;
 
@@ -467,6 +660,32 @@ mod tests {
         );
     }
 
+    fn append_agent_log_lines(
+        project_dir: &Path,
+        runtime: HookAgent,
+        session_id: &str,
+        lines: &[serde_json::Value],
+    ) {
+        let log_path = project_context_dir(project_dir)
+            .join("agents/sessions")
+            .join(runtime::runtime_for(runtime).name())
+            .join(session_id)
+            .join("raw.jsonl");
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .expect("open agent log for append");
+        let content = lines
+            .iter()
+            .map(serde_json::Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        file.write_all(content.as_bytes())
+            .expect("append agent log lines");
+    }
+
     fn infrastructure_issue(fingerprint: &str) -> Issue {
         Issue {
             id: format!("issue-{fingerprint}"),
@@ -526,6 +745,150 @@ mod tests {
             assert!(
                 !issues.is_empty(),
                 "expected observe to find transcript issues"
+            );
+        });
+    }
+
+    #[test]
+    fn incremental_scan_skips_previously_consumed_log_bytes() {
+        with_temp_project(|project| {
+            let state = service::start_session(
+                "observe test",
+                "",
+                project,
+                Some("claude"),
+                Some("sess-incremental-1"),
+            )
+            .expect("start session");
+            let leader = state
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "claude")
+                .expect("leader agent should exist");
+
+            write_agent_log(
+                project,
+                HookAgent::Claude,
+                "leader-session",
+                "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+            );
+
+            let observed = service::session_status("sess-incremental-1", project)
+                .expect("load session status");
+            let mut tail_states: HashMap<String, AgentLogTailState> = HashMap::new();
+            let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
+
+            let first_issues = scan_all_agents_incremental(
+                &observed,
+                "sess-incremental-1",
+                project,
+                &mut tail_states,
+                &mut shared_cross_agent_editors,
+            )
+            .expect("scan new log content");
+            assert_eq!(first_issues.len(), 1);
+            let first_offset = tail_states
+                .get(&leader.agent_id)
+                .expect("tail state should be recorded")
+                .offset;
+
+            let second_issues = scan_all_agents_incremental(
+                &observed,
+                "sess-incremental-1",
+                project,
+                &mut tail_states,
+                &mut shared_cross_agent_editors,
+            )
+            .expect("skip already scanned bytes");
+
+            assert!(
+                second_issues.is_empty(),
+                "second incremental scan should not reread old log content",
+            );
+            assert_eq!(
+                tail_states
+                    .get(&leader.agent_id)
+                    .expect("tail state should remain present")
+                    .offset,
+                first_offset,
+                "cursor should stay at the previous end of file when nothing new was appended",
+            );
+        });
+    }
+
+    #[test]
+    fn incremental_scan_detects_appended_log_lines() {
+        with_temp_project(|project| {
+            let state = service::start_session(
+                "observe test",
+                "",
+                project,
+                Some("claude"),
+                Some("sess-incremental-2"),
+            )
+            .expect("start session");
+            let leader = state
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "claude")
+                .expect("leader agent should exist");
+
+            write_agent_log(
+                project,
+                HookAgent::Claude,
+                "leader-session",
+                "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+            );
+
+            let observed = service::session_status("sess-incremental-2", project)
+                .expect("load session status");
+            let mut tail_states: HashMap<String, AgentLogTailState> = HashMap::new();
+            let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
+
+            let first_issues = scan_all_agents_incremental(
+                &observed,
+                "sess-incremental-2",
+                project,
+                &mut tail_states,
+                &mut shared_cross_agent_editors,
+            )
+            .expect("scan initial log content");
+            assert_eq!(first_issues.len(), 1);
+            let first_offset = tail_states
+                .get(&leader.agent_id)
+                .expect("tail state should be recorded")
+                .offset;
+
+            append_agent_log_lines(
+                project,
+                HookAgent::Claude,
+                "leader-session",
+                &[serde_json::json!({
+                    "timestamp": "2026-03-28T12:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "content": "The bootstrap is missing the KUMA_MULTIZONE environment variable",
+                    }
+                })],
+            );
+
+            let second_issues = scan_all_agents_incremental(
+                &observed,
+                "sess-incremental-2",
+                project,
+                &mut tail_states,
+                &mut shared_cross_agent_editors,
+            )
+            .expect("scan appended log content");
+
+            assert_eq!(second_issues.len(), 1);
+            assert!(
+                tail_states
+                    .get(&leader.agent_id)
+                    .expect("tail state should remain present")
+                    .offset
+                    > first_offset,
+                "cursor should advance after new bytes are appended",
             );
         });
     }
