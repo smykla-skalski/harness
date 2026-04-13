@@ -26,98 +26,81 @@ extension HarnessMonitorStore {
 
   func bindUISlices() {
     connection.onChanged = { [weak self] change in
-      switch change {
-      case .connectionState:
-        self?.scheduleUISync([
-          .contentShell,
-          .contentToolbar,
-          .contentChrome,
-          .contentSession,
-          .contentDashboard,
-          .inspector,
-        ])
-      case .daemonStatus:
-        self?.scheduleUISync([
-          .contentToolbar,
-          .contentDashboard,
-        ])
-      case .refreshState, .daemonActivity:
-        self?.scheduleUISync([
-          .contentToolbar,
-          .contentDashboard,
-        ])
-      case .persistedDataAvailability:
-        self?.scheduleUISync([
-          .contentToolbar,
-          .contentChrome,
-        ])
-      case .metrics:
-        self?.scheduleUISync([.sidebar])
-      }
+      self?.handleConnectionChange(change)
     }
     selection.onChanged = { [weak self] change in
-      switch change {
-      case .selectedSessionID:
-        var areas: Set<UISyncArea> = [
-          .contentSession,
-          .sidebar,
-        ]
-        if self?.selection.selectedSessionID == nil {
-          areas.insert(.inspector)
-        }
-        self?.scheduleUISync(areas)
-      case .selectedSession:
-        self?.scheduleUISync([
-          .contentChrome,
-          .contentSessionDetail,
-          .inspector,
-        ])
-      case .timeline:
-        self?.scheduleUISync([.contentSessionDetail])
-      case .inspectorSelection, .actionActorID:
-        self?.scheduleUISync([.inspector])
-      case .selectionLoading, .extensionsLoading:
-        self?.scheduleUISync([.contentSession])
-      case .sessionAction:
-        self?.scheduleUISync([
-          .contentToolbar,
-          .contentSession,
-          .contentDashboard,
-          .inspector,
-        ])
-      case .inFlightActionID:
-        self?.scheduleUISync([.inspector])
-      }
+      self?.handleSelectionChange(change)
     }
     userData.onChanged = { [weak self] in
       self?.scheduleUISync([.sidebar])
     }
     sessionIndex.onChanged = { [weak self] change in
-      guard let self else {
+      self?.handleSessionIndexChange(change)
+    }
+  }
+
+  private func handleConnectionChange(_ change: ConnectionSlice.Change) {
+    switch change {
+    case .connectionState:
+      scheduleUISync([
+        .contentShell,
+        .contentToolbar,
+        .contentChrome,
+        .contentSession,
+        .contentDashboard,
+        .inspector,
+      ])
+    case .daemonStatus:
+      scheduleUISync([.contentToolbar, .contentDashboard])
+    case .refreshState, .daemonActivity:
+      scheduleUISync([.contentToolbar, .contentDashboard])
+    case .persistedDataAvailability:
+      scheduleUISync([.contentToolbar, .contentChrome])
+    case .metrics:
+      scheduleUISync([.sidebar])
+    }
+  }
+
+  private func handleSelectionChange(_ change: SelectionSlice.Change) {
+    switch change {
+    case .selectedSessionID:
+      var areas: Set<UISyncArea> = [.contentSession, .sidebar]
+      if selection.selectedSessionID == nil {
+        areas.insert(.inspector)
+      }
+      scheduleUISync(areas)
+    case .selectedSession:
+      scheduleUISync([.contentChrome, .contentSessionDetail, .inspector])
+    case .timeline:
+      scheduleUISync([.contentSessionDetail])
+    case .inspectorSelection, .actionActorID:
+      scheduleUISync([.inspector])
+    case .selectionLoading, .extensionsLoading:
+      scheduleUISync([.contentSession])
+    case .sessionAction:
+      scheduleUISync([.contentToolbar, .contentSession, .contentDashboard, .inspector])
+    case .inFlightActionID:
+      scheduleUISync([.inspector])
+    }
+  }
+
+  private func handleSessionIndexChange(_ change: SessionIndexSlice.Change) {
+    switch change {
+    case .snapshot:
+      scheduleUISync([.contentToolbar, .contentChrome, .contentSession, .inspector])
+    case .summaryProjection(let sessionID):
+      var areas: Set<UISyncArea> = [.contentToolbar]
+      if shouldSyncSelectedSessionLoadingChrome(for: sessionID) {
+        areas.insert(.contentSession)
+      }
+      scheduleUISync(areas)
+    case .summaryMetadata(let sessionID):
+      guard shouldSyncSelectedSessionLoadingChrome(for: sessionID) else {
         return
       }
-      switch change {
-      case .snapshot:
-        self.scheduleUISync([
-          .contentToolbar,
-          .contentChrome,
-          .contentSession,
-          .inspector,
-        ])
-      case .summaryProjection(let sessionID):
-        var areas: Set<UISyncArea> = [.contentToolbar]
-        if self.shouldSyncSelectedSessionLoadingChrome(for: sessionID) {
-          areas.insert(.contentSession)
-        }
-        self.scheduleUISync(areas)
-      case .summaryMetadata(let sessionID):
-        guard self.shouldSyncSelectedSessionLoadingChrome(for: sessionID) else {
-          return
-        }
-        self.scheduleUISync([.contentSession])
-      case .projection:
-        break
-      }
+      scheduleUISync([.contentSession])
+    case .projection:
+      break
     }
   }
 

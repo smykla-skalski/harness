@@ -135,10 +135,7 @@ extension HarnessMonitorStore {
         try await client.sessionDetail(id: sessionID, scope: detailScope)
       }
       try Task.checkCancellation()
-      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-        return
-      }
-
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
       recordRequestSuccess()
 
       var detail = measuredDetail.value
@@ -162,28 +159,16 @@ extension HarnessMonitorStore {
         try await client.timeline(
           sessionID: sessionID,
           scope: timelineScope
-        ) { batch, batchIndex, _ in
+        ) { [weak self] batch, batchIndex, _ in
           await MainActor.run {
-            guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-              return
-            }
-
-            if batchIndex == 0 {
-              self.timeline = batch
-            } else {
-              var updatedTimeline = self.timeline
-              updatedTimeline.append(contentsOf: batch)
-              self.timeline = updatedTimeline
-            }
-            self.isShowingCachedData = false
+            self?.applyTimelineBatch(
+              batch, index: batchIndex, requestID: requestID, sessionID: sessionID
+            )
           }
         }
       }
       try Task.checkCancellation()
-      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-        return
-      }
-
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
       recordRequestSuccess()
 
       applySelectedSessionSnapshot(
@@ -196,59 +181,76 @@ extension HarnessMonitorStore {
       _ = await refreshAgentTuis(using: client, sessionID: sessionID)
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
-          await service.cacheSessionDetail(
-            detail,
-            timeline: measuredTimeline.value
-          )
+          await service.cacheSessionDetail(detail, timeline: measuredTimeline.value)
         }
       }
     } catch is CancellationError {
       return
     } catch {
-      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-        return
-      }
+      await handleSessionLoadError(error, requestID: requestID, sessionID: sessionID)
+    }
+  }
 
-      if selectedSession?.session.sessionId == sessionID {
-        return
-      }
+  private func applyTimelineBatch(
+    _ batch: [TimelineEntry],
+    index batchIndex: Int,
+    requestID: UInt64,
+    sessionID: String
+  ) {
+    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
+    if batchIndex == 0 {
+      timeline = batch
+    } else {
+      var updated = timeline
+      updated.append(contentsOf: batch)
+      timeline = updated
+    }
+    isShowingCachedData = false
+  }
 
-      // Background hydration: log silently. The fallback to cached/index data
-      // below is the user-visible recovery; we do not surface a toast for an
-      // automatic load the user did not explicitly invoke.
-      let err = error.localizedDescription
-      HarnessMonitorLogger.store.warning(
-        "session detail hydration failed for \(sessionID, privacy: .public): \(err, privacy: .public)"
+  private func handleSessionLoadError(
+    _ error: any Error,
+    requestID: UInt64,
+    sessionID: String
+  ) async {
+    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
+    guard selectedSession?.session.sessionId != sessionID else { return }
+
+    // Background hydration: log silently. The fallback to cached/index data
+    // below is the user-visible recovery; we do not surface a toast for an
+    // automatic load the user did not explicitly invoke.
+    let err = error.localizedDescription
+    HarnessMonitorLogger.store.warning(
+      "session detail hydration failed for \(sessionID, privacy: .public): \(err, privacy: .public)"
+    )
+    withUISyncBatch {
+      isExtensionsLoading = false
+    }
+
+    if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: cached.detail,
+        timeline: cached.timeline,
+        showingCachedData: true
       )
+    } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: SessionDetail(
+          session: summary,
+          agents: [],
+          tasks: [],
+          signals: [],
+          observer: nil,
+          agentActivity: []
+        ),
+        timeline: [],
+        showingCachedData: true
+      )
+    } else {
       withUISyncBatch {
-        isExtensionsLoading = false
-      }
-
-      if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
-        applySelectedSessionSnapshot(
-          sessionID: sessionID,
-          detail: cached.detail,
-          timeline: cached.timeline,
-          showingCachedData: true
-        )
-      } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
-        applySelectedSessionSnapshot(
-          sessionID: sessionID,
-          detail: SessionDetail(
-            session: summary,
-            agents: [],
-            tasks: [],
-            signals: [],
-            observer: nil,
-            agentActivity: []
-          ),
-          timeline: [],
-          showingCachedData: true
-        )
-      } else {
-        withUISyncBatch {
-          isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
-        }
+        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
   }

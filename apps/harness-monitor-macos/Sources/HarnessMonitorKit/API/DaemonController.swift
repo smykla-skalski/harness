@@ -259,100 +259,21 @@ public struct DaemonController: DaemonControlling {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
+    let timeoutDesc = String(describing: timeout)
     HarnessMonitorLogger.lifecycle.trace(
-      "Waiting up to \(String(describing: timeout), privacy: .public) for daemon manifest warm-up"
+      "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
     )
     let deadline = ContinuousClock.now + timeout
-    var lastError: (any Error)?
-    var sawUnreachableManifest = false
-    var immediateError: (any Error)?
-    var managedStaleManifestTracker = ManagedStaleManifestTracker()
+    var state = WarmUpLoopState()
     while ContinuousClock.now < deadline {
-      do {
-        let manifest = try loadManifest()
-        let manifestPid = manifest.pid
-        let connection = try connection(from: manifest)
-        let endpoint = connection.endpoint.absoluteString
-        HarnessMonitorLogger.lifecycle.trace(
-          "Warm-up observed manifest pid=\(manifestPid, privacy: .public)"
-        )
-        HarnessMonitorLogger.lifecycle.trace(
-          "  endpoint=\(endpoint, privacy: .public)"
-        )
-        if await endpointProbe(connection.endpoint) {
-          HarnessMonitorLogger.lifecycle.trace(
-            "Warm-up confirmed live daemon endpoint \(endpoint, privacy: .public)"
-          )
-          return try await bootstrap(connection: connection)
-        }
-        let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
-        let path = manifestPath
-        HarnessMonitorLogger.lifecycle.error(
-          "Warm-up found stale daemon manifest at \(path, privacy: .public)"
-        )
-        HarnessMonitorLogger.lifecycle.error(
-          "  stale endpoint: \(endpoint, privacy: .public)"
-        )
-        if ownership == .external {
-          immediateError = DaemonControlError.externalDaemonManifestStale(
-            manifestPath: manifestPath
-          )
-          sawUnreachableManifest = true
-          break
-        } else {
-          if Self.processIsAlive(pid: manifest.pid) == false {
-            lastError = DaemonControlError.daemonDidNotStart
-            let pid = manifest.pid
-            HarnessMonitorLogger.lifecycle.error(
-              "Warm-up detected dead managed daemon pid \(pid, privacy: .public)"
-            )
-            HarnessMonitorLogger.lifecycle.error(
-              "  stale manifest at \(path, privacy: .public)"
-            )
-            sawUnreachableManifest = true
-            break
-          }
-          lastError = DaemonControlError.daemonDidNotStart
-          let staleSignature = Self.managedStaleManifestSignature(for: manifest)
-          let gracePeriod = String(describing: managedStaleManifestGracePeriod)
-          if managedStaleManifestTracker.expired(
-            signature: staleSignature,
-            now: ContinuousClock.now,
-            gracePeriod: managedStaleManifestGracePeriod
-          ) {
-            HarnessMonitorLogger.lifecycle.error(
-              "Warm-up aborting managed stale manifest wait at \(path, privacy: .public)"
-            )
-            HarnessMonitorLogger.lifecycle.error(
-              "  grace period elapsed: \(gracePeriod, privacy: .public)"
-            )
-            break
-          }
-          HarnessMonitorLogger.lifecycle.trace(
-            "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
-          )
-        }
-        sawUnreachableManifest = true
-      } catch let error as DaemonControlError {
-        managedStaleManifestTracker.reset()
-        if case .invalidManifest = error, ownership == .external {
-          immediateError = error
-          break
-        }
-        lastError = error
-        HarnessMonitorLogger.lifecycle.trace(
-          "Warm-up retry after \(error.localizedDescription, privacy: .public)"
-        )
-      } catch {
-        managedStaleManifestTracker.reset()
-        lastError = error
-        HarnessMonitorLogger.lifecycle.trace(
-          "Warm-up retry after \(error.localizedDescription, privacy: .public)"
-        )
+      let shouldBreak = try await warmUpIteration(state: &state)
+      if let client = shouldBreak.liveClient {
+        return client
       }
+      if shouldBreak.stop { break }
       try await Task.sleep(for: .milliseconds(250))
     }
-    if let immediateError {
+    if let immediateError = state.immediateError {
       throw immediateError
     }
     if let client = try? await bootstrapClient() {
@@ -360,7 +281,7 @@ public struct DaemonController: DaemonControlling {
     }
     if ownership == .external {
       let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
-      if sawUnreachableManifest {
+      if state.sawUnreachableManifest {
         // Manifest existed throughout the warm-up but nothing bound to its
         // endpoint. Classic crash-without-cleanup: SIGKILL'd dev daemon.
         throw DaemonControlError.externalDaemonManifestStale(manifestPath: manifestPath)
@@ -368,7 +289,117 @@ public struct DaemonController: DaemonControlling {
       // No manifest ever appeared; the dev daemon was never started.
       throw DaemonControlError.externalDaemonOffline(manifestPath: manifestPath)
     }
-    throw lastError ?? DaemonControlError.daemonDidNotStart
+    throw state.lastError ?? DaemonControlError.daemonDidNotStart
+  }
+
+  private struct WarmUpLoopState {
+    var lastError: (any Error)?
+    var sawUnreachableManifest = false
+    var immediateError: (any Error)?
+    var managedStaleManifestTracker = ManagedStaleManifestTracker()
+  }
+
+  private struct WarmUpIterationOutcome {
+    var liveClient: (any HarnessMonitorClientProtocol)?
+    var stop: Bool
+
+    static let continueLoop = Self(liveClient: nil, stop: false)
+    static let stopLoop = Self(liveClient: nil, stop: true)
+  }
+
+  private func warmUpIteration(
+    state: inout WarmUpLoopState
+  ) async throws -> WarmUpIterationOutcome {
+    do {
+      let manifest = try loadManifest()
+      let connection = try connection(from: manifest)
+      let endpoint = connection.endpoint.absoluteString
+      let manifestPid = manifest.pid
+      HarnessMonitorLogger.lifecycle.trace(
+        "Warm-up observed manifest pid=\(manifestPid, privacy: .public)"
+      )
+      HarnessMonitorLogger.lifecycle.trace("  endpoint=\(endpoint, privacy: .public)")
+      if await endpointProbe(connection.endpoint) {
+        HarnessMonitorLogger.lifecycle.trace(
+          "Warm-up confirmed live daemon endpoint \(endpoint, privacy: .public)"
+        )
+        let client = try await bootstrap(connection: connection)
+        return WarmUpIterationOutcome(liveClient: client, stop: true)
+      }
+      return handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
+    } catch let error as DaemonControlError {
+      state.managedStaleManifestTracker.reset()
+      if case .invalidManifest = error, ownership == .external {
+        state.immediateError = error
+        return .stopLoop
+      }
+      state.lastError = error
+      HarnessMonitorLogger.lifecycle.trace(
+        "Warm-up retry after \(error.localizedDescription, privacy: .public)"
+      )
+    } catch {
+      state.managedStaleManifestTracker.reset()
+      state.lastError = error
+      HarnessMonitorLogger.lifecycle.trace(
+        "Warm-up retry after \(error.localizedDescription, privacy: .public)"
+      )
+    }
+    return .continueLoop
+  }
+
+  private func handleStaleManifest(
+    manifest: DaemonManifest,
+    endpoint: String,
+    state: inout WarmUpLoopState
+  ) -> WarmUpIterationOutcome {
+    let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+    HarnessMonitorLogger.lifecycle.error(
+      "Warm-up found stale daemon manifest at \(manifestPath, privacy: .public)"
+    )
+    HarnessMonitorLogger.lifecycle.error("  stale endpoint: \(endpoint, privacy: .public)")
+    state.sawUnreachableManifest = true
+    if ownership == .external {
+      state.immediateError = DaemonControlError.externalDaemonManifestStale(
+        manifestPath: manifestPath
+      )
+      return .stopLoop
+    }
+    return handleManagedStaleManifest(manifest: manifest, path: manifestPath, state: &state)
+  }
+
+  private func handleManagedStaleManifest(
+    manifest: DaemonManifest,
+    path: String,
+    state: inout WarmUpLoopState
+  ) -> WarmUpIterationOutcome {
+    state.lastError = DaemonControlError.daemonDidNotStart
+    if Self.processIsAlive(pid: manifest.pid) == false {
+      let pid = manifest.pid
+      HarnessMonitorLogger.lifecycle.error(
+        "Warm-up detected dead managed daemon pid \(pid, privacy: .public)"
+      )
+      HarnessMonitorLogger.lifecycle.error("  stale manifest at \(path, privacy: .public)")
+      return .stopLoop
+    }
+    let staleSignature = Self.managedStaleManifestSignature(for: manifest)
+    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
+    if state.managedStaleManifestTracker.expired(
+      signature: staleSignature,
+      now: ContinuousClock.now,
+      gracePeriod: managedStaleManifestGracePeriod
+    ) {
+      HarnessMonitorLogger.lifecycle.error(
+        "Warm-up aborting managed stale manifest wait at \(path, privacy: .public)"
+      )
+      HarnessMonitorLogger.lifecycle.error(
+        "  grace period elapsed: \(gracePeriod, privacy: .public)"
+      )
+      return .stopLoop
+    }
+    HarnessMonitorLogger.lifecycle.trace(
+      "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
+    )
+    return .continueLoop
   }
 
   private func connection(from manifest: DaemonManifest) throws -> HarnessMonitorConnection {

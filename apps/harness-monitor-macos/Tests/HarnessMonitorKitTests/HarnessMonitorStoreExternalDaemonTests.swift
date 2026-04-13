@@ -755,6 +755,12 @@ private final class ManifestChangeRecorder: @unchecked Sendable {
     return changes.count
   }
 
+  var isEmpty: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return changes.isEmpty
+  }
+
   var snapshot: [ManifestChange] {
     lock.lock()
     defer { lock.unlock() }
