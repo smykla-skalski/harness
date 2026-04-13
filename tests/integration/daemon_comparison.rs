@@ -48,7 +48,7 @@ fn seed_workspace(tmp: &std::path::Path) {
         Some("cmp1"),
     )
     .expect("start cmp1");
-    session_service::join_session("cmp1", SessionRole::Worker, "codex", &[], None, &project_a)
+    session_service::join_session("cmp1", SessionRole::Worker, "codex", &[], None, &project_a, None)
         .expect("join cmp1");
 
     let state_b = session_service::start_session(

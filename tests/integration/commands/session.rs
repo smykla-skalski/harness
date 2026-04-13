@@ -48,6 +48,7 @@ fn session_lifecycle_start_join_task_end() {
             &["general".into()],
             None,
             &project,
+            None,
         )
         .unwrap();
         assert_eq!(state.agents.len(), 2);
@@ -223,6 +224,7 @@ fn session_assign_supports_reason_via_cli_command() {
                 &[],
                 None,
                 &project,
+                None,
             )
             .unwrap()
         });
@@ -276,6 +278,7 @@ fn cannot_end_session_with_active_tasks() {
             &[],
             None,
             &project,
+            None,
         )
         .unwrap();
         let worker_id = joined
@@ -318,9 +321,16 @@ fn concurrent_task_creation_from_multiple_agents() {
         .unwrap();
         let leader_id = state.leader_id.unwrap();
 
-        let joined1 =
-            service::join_session("conc-1", SessionRole::Worker, "codex", &[], None, &project)
-                .unwrap();
+        let joined1 = service::join_session(
+            "conc-1",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            &project,
+            None,
+        )
+        .unwrap();
         let worker1 = joined1
             .agents
             .keys()
@@ -335,6 +345,7 @@ fn concurrent_task_creation_from_multiple_agents() {
             &[],
             None,
             &project,
+            None,
         )
         .unwrap();
         let reviewer = joined2
@@ -400,7 +411,16 @@ fn multi_agent_observation_merges_issues() {
                 .unwrap();
         let _leader_id = state.leader_id.unwrap();
 
-        service::join_session("obs-1", SessionRole::Worker, "codex", &[], None, &project).unwrap();
+        service::join_session(
+            "obs-1",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            &project,
+            None,
+        )
+        .unwrap();
 
         // The observe command will try to find agent logs via runtime
         // adapters. With no actual logs, it should return 0 issues.
@@ -434,6 +454,7 @@ fn transfer_leader_and_role_reassignment() {
             &[],
             None,
             &project,
+            None,
         )
         .unwrap();
         let observer_id = joined
@@ -463,5 +484,118 @@ fn transfer_leader_and_role_reassignment() {
         // New leader is now Leader
         let new_leader = state.agents.get(&observer_id).unwrap();
         assert_eq!(new_leader.role, SessionRole::Leader);
+    });
+}
+
+#[test]
+fn join_session_with_persona_stores_resolved_persona() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-persona-resolve", || {
+        let project = tmp.path().join("project");
+
+        service::start_session(
+            "persona test",
+            "",
+            &project,
+            Some("claude"),
+            Some("persona-1"),
+        )
+        .unwrap();
+
+        let state = service::join_session(
+            "persona-1",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            &project,
+            Some("code-reviewer"),
+        )
+        .unwrap();
+
+        let worker = state
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("codex worker should exist");
+        let persona = worker.persona.as_ref().expect("persona should be set");
+        assert_eq!(persona.identifier, "code-reviewer");
+        assert_eq!(persona.name, "Code Reviewer");
+    });
+}
+
+#[test]
+fn join_session_with_unknown_persona_stores_none() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-persona-unknown", || {
+        let project = tmp.path().join("project");
+
+        service::start_session(
+            "persona test",
+            "",
+            &project,
+            Some("claude"),
+            Some("persona-2"),
+        )
+        .unwrap();
+
+        let state = service::join_session(
+            "persona-2",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            &project,
+            Some("nonexistent-persona"),
+        )
+        .unwrap();
+
+        let worker = state
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("codex worker should exist");
+        assert!(
+            worker.persona.is_none(),
+            "unknown persona should resolve to None"
+        );
+    });
+}
+
+#[test]
+fn join_session_without_persona_backward_compat() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-persona-none", || {
+        let project = tmp.path().join("project");
+
+        service::start_session(
+            "persona test",
+            "",
+            &project,
+            Some("claude"),
+            Some("persona-3"),
+        )
+        .unwrap();
+
+        let state = service::join_session(
+            "persona-3",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            &project,
+            None,
+        )
+        .unwrap();
+
+        let worker = state
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("codex worker should exist");
+        assert!(
+            worker.persona.is_none(),
+            "no persona passed should mean None"
+        );
     });
 }
