@@ -3,7 +3,6 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 private let textSizeOverrideKey = "HARNESS_MONITOR_TEXT_SIZE_OVERRIDE"
 
-
 @MainActor
 extension HarnessMonitorUITests {
   func testSessionActionsExposeActorPickerAndRemoveAgentFlow() throws {
@@ -212,4 +211,4 @@ extension HarnessMonitorUITests {
     XCTAssertTrue(transferSection.exists, "Leader transfer section should be in the tree")
     XCTAssertFalse(transferSection.isEnabled, "Section should be disabled with only one agent")
   }
-
+}

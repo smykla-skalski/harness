@@ -1,6 +1,6 @@
 import Foundation
 
-private actor PreviewHarnessClientState {
+actor PreviewHarnessClientState {
   fileprivate static let mutationTimestamp = "2026-03-28T14:20:30Z"
 
   private var sessionSummaries: [SessionSummary]
