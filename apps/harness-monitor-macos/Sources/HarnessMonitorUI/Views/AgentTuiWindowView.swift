@@ -503,7 +503,7 @@ public struct AgentTuiWindowView: View {
   @ToolbarContentBuilder
   private var sessionToolbarItems: some ToolbarContent {
     if let selectedSessionTui {
-      ToolbarItemGroup(placement: .primaryAction) {
+      ToolbarItem(placement: .primaryAction) {
         Button {
           revealTranscript(selectedSessionTui)
         } label: {
@@ -511,8 +511,12 @@ public struct AgentTuiWindowView: View {
         }
         .help("Reveal transcript in Finder")
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRevealTranscriptButton)
+      }
 
-        if selectedSessionTui.status.isActive {
+      if selectedSessionTui.status.isActive {
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        ToolbarItem(placement: .primaryAction) {
           Button {
             stopTui(selectedSessionTui)
           } label: {
