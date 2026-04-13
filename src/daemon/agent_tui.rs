@@ -2532,6 +2532,7 @@ mod tests {
                 last_activity_at: Some("2026-04-12T09:00:00Z".into()),
                 current_task_id: None,
                 runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                persona: None,
             },
         );
         db.sync_session(&project.project_id, &state)

@@ -624,6 +624,7 @@ mod tests {
                 last_activity_at: Some("2026-03-28T14:05:00Z".into()),
                 current_task_id: None,
                 runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                persona: None,
             },
         );
 
@@ -966,6 +967,7 @@ mod tests {
                         current_task_id: None,
                         runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(
                         ),
+                        persona: None,
                     },
                 );
                 state.agents.insert(
@@ -984,6 +986,7 @@ mod tests {
                         current_task_id: None,
                         runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(
                         ),
+                        persona: None,
                     },
                 );
                 state.leader_id = Some("leader-1".into());

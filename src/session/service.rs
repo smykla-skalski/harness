@@ -1834,6 +1834,7 @@ pub(crate) fn apply_join_session(
             last_activity_at: Some(now.to_string()),
             current_task_id: None,
             runtime_capabilities: runtime_capabilities(runtime_name),
+            persona: None,
         },
     );
     refresh_session(state, now);
@@ -2893,6 +2894,7 @@ fn build_initial_state(
             last_activity_at: Some(now.to_string()),
             current_task_id: None,
             runtime_capabilities: runtime_capabilities(runtime_name),
+            persona: None,
         },
     );
 

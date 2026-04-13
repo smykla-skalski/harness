@@ -767,6 +767,7 @@ mod tests {
                 last_activity_at: Some("2026-03-28T14:05:00Z".into()),
                 current_task_id: Some("task-1".into()),
                 runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
             },
         );
         let mut tasks = BTreeMap::new();
