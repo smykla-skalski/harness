@@ -52,7 +52,8 @@ public enum PreviewFixtures {
             supportsContextInjection: true
           )
         ]
-      )
+      ),
+      persona: nil
     ),
     AgentRegistration(
       agentId: "worker-codex",
@@ -79,7 +80,8 @@ public enum PreviewFixtures {
             supportsContextInjection: true
           )
         ]
-      )
+      ),
+      persona: nil
     ),
   ]
 

@@ -386,6 +386,10 @@ extension WebSocketTransport {
     try await httpFallbackClient.stopAgentTui(tuiID: tuiID)
   }
 
+  public func personas() async throws -> [AgentPersona] {
+    try await httpFallbackClient.personas()
+  }
+
   public func logLevel() async throws -> LogLevelResponse {
     let value = try await send(method: "daemon.log_level")
     return try decode(value)

@@ -223,7 +223,8 @@ struct CachedModelsDetailTests {
         supportsContextInjection: false,
         typicalSignalLatencySeconds: 0,
         hookPoints: []
-      )
+      ),
+      persona: nil
     )
 
     let cachedAgent = agent.toCachedAgent()

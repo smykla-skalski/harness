@@ -153,7 +153,8 @@ struct CachedModelsTests {
       agentSessionId: "asess-1",
       lastActivityAt: "2026-03-28T14:00:00Z",
       currentTaskId: "task-5",
-      runtimeCapabilities: capabilities
+      runtimeCapabilities: capabilities,
+      persona: nil
     )
 
     let cached = original.toCachedAgent()
