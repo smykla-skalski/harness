@@ -856,6 +856,7 @@ mod tests {
                 category: IssueCategory::AgentCoordination,
                 summary: "worker stalled".into(),
                 fix_safety: FixSafety::TriageRequired,
+                evidence_excerpt: Some("No checkpoint for 12 minutes.".into()),
             }],
             resolved_issue_ids: vec!["issue-0".into()],
             issue_attempts: Vec::new(),

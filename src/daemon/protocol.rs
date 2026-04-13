@@ -154,6 +154,7 @@ pub struct ObserverOpenIssue {
     pub occurrence_count: usize,
     pub last_seen_line: usize,
     pub fix_safety: FixSafety,
+    pub evidence_excerpt: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

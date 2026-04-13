@@ -61,6 +61,7 @@ pub struct OpenIssue {
     pub category: IssueCategory,
     pub summary: String,
     pub fix_safety: FixSafety,
+    pub evidence_excerpt: Option<String>,
 }
 
 /// A fix attempt record.
