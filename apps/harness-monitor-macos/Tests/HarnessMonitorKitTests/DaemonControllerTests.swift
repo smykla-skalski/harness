@@ -59,6 +59,28 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test("awaitManifestWarmUp caps managed stale manifest waits before the full timeout")
+  func awaitManifestWarmUpCapsManagedStaleManifestWaits() async throws {
+    try await withTempDaemonFixture(pid: 999_999) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        endpointProbe: { _ in false },
+        managedStaleManifestGracePeriod: .milliseconds(200)
+      )
+      let clock = ContinuousClock()
+      let start = clock.now
+
+      await #expect(throws: DaemonControlError.daemonDidNotStart) {
+        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(2))
+      }
+
+      let elapsed = start.duration(to: clock.now)
+      #expect(elapsed < .seconds(1))
+    }
+  }
+
   @Test("awaitManifestWarmUp reports external offline when no manifest appears")
   func awaitManifestWarmUpReportsExternalOfflineWhenManifestMissing() async throws {
     let root = FileManager.default.temporaryDirectory

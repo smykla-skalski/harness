@@ -110,6 +110,63 @@ struct HarnessMonitorStoreSelectionFlowTests {
     #expect(store.isSelectionLoading == false)
   }
 
+  @Test("Selecting a session applies timeline batches before the full load completes")
+  func selectingSessionAppliesTimelineBatchesProgressively() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-progressive",
+        context: "Progressive timeline lane",
+        status: .active,
+        leaderId: "leader-progressive",
+        observeId: "observe-progressive",
+        openTaskCount: 1,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-progressive",
+      workerName: "Worker Progressive"
+    )
+    let firstBatch = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-progressive",
+      summary: "Timeline batch one"
+    )
+    let secondBatch = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-progressive",
+      summary: "Timeline batch two"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      detail: detail
+    )
+    client.configureTimelineBatches(
+      [firstBatch, secondBatch],
+      batchDelay: .milliseconds(200),
+      for: summary.sessionId
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    let selectionTask = Task {
+      await store.selectSession(summary.sessionId)
+    }
+    try await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.selectedSession?.session.sessionId == summary.sessionId)
+    #expect(store.timeline == firstBatch)
+    #expect(store.isSelectionLoading)
+
+    await selectionTask.value
+
+    #expect(store.timeline == firstBatch + secondBatch)
+    #expect(store.isSelectionLoading == false)
+  }
+
   @Test("Selecting a new session replaces subscribed session IDs")
   func selectingNewSessionReplacesSubscribedSessionIDs() async {
     let firstSummary = makeSession(

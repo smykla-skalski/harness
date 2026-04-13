@@ -111,7 +111,38 @@ public enum TransportPreference: Sendable {
   case http
 }
 
+private struct ManagedStaleManifestTracker {
+  private var signature: String?
+  private var firstObservedAt: ContinuousClock.Instant?
+
+  mutating func reset() {
+    signature = nil
+    firstObservedAt = nil
+  }
+
+  mutating func expired(
+    signature: String,
+    now: ContinuousClock.Instant,
+    gracePeriod: Duration
+  ) -> Bool {
+    if self.signature != signature {
+      self.signature = signature
+      firstObservedAt = now
+      return false
+    }
+
+    guard let firstObservedAt else {
+      self.firstObservedAt = now
+      return false
+    }
+
+    return now - firstObservedAt >= gracePeriod
+  }
+}
+
 public struct DaemonController: DaemonControlling {
+  private static let managedStaleManifestGracePeriod: Duration = .seconds(5)
+
   private let environment: HarnessMonitorEnvironment
   private let sessionFactory:
     @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
@@ -119,6 +150,7 @@ public struct DaemonController: DaemonControlling {
   private let launchAgentManager: any DaemonLaunchAgentManaging
   private let ownership: DaemonOwnership
   private let endpointProbe: @Sendable (URL) async -> Bool
+  private let managedStaleManifestGracePeriod: Duration
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -132,7 +164,8 @@ public struct DaemonController: DaemonControlling {
       },
     endpointProbe: @escaping @Sendable (URL) async -> Bool = {
       await Self.defaultEndpointProbe($0)
-    }
+    },
+    managedStaleManifestGracePeriod: Duration = .seconds(5)
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
@@ -140,6 +173,7 @@ public struct DaemonController: DaemonControlling {
     self.ownership = ownership
     self.sessionFactory = sessionFactory
     self.endpointProbe = endpointProbe
+    self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -232,6 +266,7 @@ public struct DaemonController: DaemonControlling {
     var lastError: (any Error)?
     var sawUnreachableManifest = false
     var immediateError: (any Error)?
+    var managedStaleManifestTracker = ManagedStaleManifestTracker()
     while ContinuousClock.now < deadline {
       do {
         let manifest = try loadManifest()
@@ -257,12 +292,24 @@ public struct DaemonController: DaemonControlling {
           break
         } else {
           lastError = DaemonControlError.daemonDidNotStart
+          let staleSignature = Self.managedStaleManifestSignature(for: manifest)
+          if managedStaleManifestTracker.expired(
+            signature: staleSignature,
+            now: ContinuousClock.now,
+            gracePeriod: managedStaleManifestGracePeriod
+          ) {
+            HarnessMonitorLogger.lifecycle.error(
+              "Warm-up aborting managed stale manifest wait at \(manifestPath, privacy: .public) after \(String(describing: managedStaleManifestGracePeriod), privacy: .public)"
+            )
+            break
+          }
           HarnessMonitorLogger.lifecycle.trace(
             "Warm-up waiting for managed daemon to rewrite stale manifest at \(manifestPath, privacy: .public)"
           )
         }
         sawUnreachableManifest = true
       } catch let error as DaemonControlError {
+        managedStaleManifestTracker.reset()
         if case .invalidManifest = error, ownership == .external {
           immediateError = error
           break
@@ -272,6 +319,7 @@ public struct DaemonController: DaemonControlling {
           "Warm-up retry after \(error.localizedDescription, privacy: .public)"
         )
       } catch {
+        managedStaleManifestTracker.reset()
         lastError = error
         HarnessMonitorLogger.lifecycle.trace(
           "Warm-up retry after \(error.localizedDescription, privacy: .public)"
@@ -317,6 +365,10 @@ public struct DaemonController: DaemonControlling {
         timeout: .milliseconds(200)
       )
     }.value
+  }
+
+  private static func managedStaleManifestSignature(for manifest: DaemonManifest) -> String {
+    "\(manifest.pid)|\(manifest.endpoint)|\(manifest.startedAt)"
   }
 
   public func stopDaemon() async throws -> String {

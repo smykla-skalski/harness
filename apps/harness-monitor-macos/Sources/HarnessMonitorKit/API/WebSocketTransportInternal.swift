@@ -4,6 +4,8 @@ import Foundation
 
 private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
 private typealias IntPingContinuation = CheckedContinuation<Int, Error>
+typealias ResponseBatchHandler =
+  @Sendable (_ batchIndex: Int, _ batchCount: Int, _ result: JSONValue?) async throws -> Void
 
 extension WebSocketTransport {
   func sendPing() async throws {
@@ -44,7 +46,11 @@ extension WebSocketTransport {
   }
 
   @discardableResult
-  func send(method: String, params: JSONValue? = nil) async throws -> JSONValue {
+  func send(
+    method: String,
+    params: JSONValue? = nil,
+    onSemanticBatch: ResponseBatchHandler? = nil
+  ) async throws -> JSONValue {
     guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
@@ -54,10 +60,14 @@ extension WebSocketTransport {
     let text = String(data: data, encoding: .utf8) ?? "{}"
     let task = webSocketTask
     let store = pending
+    if let onSemanticBatch {
+      responseBatchHandlers[id] = onSemanticBatch
+    }
     return try await withCheckedThrowingContinuation { continuation in
       store.register(id: id, continuation: continuation)
       task.send(.string(text)) { error in
         if let error {
+          Task { await self.clearResponseBatchHandler(for: id) }
           store.fail(id: id, error: error)
         }
       }
@@ -79,10 +89,12 @@ extension WebSocketTransport {
         do {
           let message = try await webSocketTask.receive()
           attempt = 0
-          await self.handleMessage(message)
+          try await self.handleMessage(message)
         } catch {
           if Task.isCancelled { return }
           self.pending.failAll(error: error)
+          await self.clearResponseBatchHandlers()
+          await self.clearPartialFrames()
           await self.terminateAllStreams()
           if attempt >= Self.maxReconnectAttempts {
             HarnessMonitorLogger.websocket.warning(
@@ -115,6 +127,8 @@ extension WebSocketTransport {
     // spurious `nw_socket_output_finished ... shutdown(21, SHUT_WR)` warning.
     webSocketTask?.cancel()
     webSocketTask = nil
+    responseBatchHandlers.removeAll()
+    partialFrames.removeAll()
     let wsURL = wsEndpoint()
     var request = URLRequest(url: wsURL)
     request.setValue(
@@ -143,14 +157,25 @@ extension WebSocketTransport {
     }
   }
 
-  func handleMessage(_ message: URLSessionWebSocketTask.Message) {
+  func handleMessage(_ message: URLSessionWebSocketTask.Message) async throws {
     guard case .string(let text) = message else { return }
-    guard let data = text.data(using: .utf8) else { return }
-    guard let frame = try? decoder.decode(WsFrame.self, from: data) else { return }
+    guard let data = text.data(using: .utf8) else {
+      throw WebSocketTransportError.unexpectedResponse
+    }
+    let frame = try decoder.decode(WsFrame.self, from: data)
+    try await handleFrame(frame)
+  }
 
+  func handleFrame(_ frame: WsFrame) async throws {
     switch frame.kind {
-    case .response(let id, let result, let error):
-      handleResponseFrame(id: id, result: result, error: error)
+    case .response(let id, let result, let error, let batchIndex, let batchCount):
+      await handleResponseFrame(
+        id: id,
+        result: result,
+        error: error,
+        batchIndex: batchIndex,
+        batchCount: batchCount
+      )
     case .push(let event, let recordedAt, let sessionId, let payload, _):
       handlePushFrame(
         event: event,
@@ -158,17 +183,61 @@ extension WebSocketTransport {
         sessionId: sessionId,
         payload: payload
       )
+    case .chunk(let chunkID, let chunkIndex, let chunkCount, let chunkBase64):
+      guard
+        let assembled = try appendChunk(
+          id: chunkID,
+          index: chunkIndex,
+          count: chunkCount,
+          base64: chunkBase64
+        )
+      else {
+        return
+      }
+      let frame = try decoder.decode(WsFrame.self, from: assembled)
+      try await handleFrame(frame)
     case .unknown:
       break
     }
   }
 
+  func appendChunk(
+    id: String,
+    index: Int,
+    count: Int,
+    base64: String
+  ) throws -> Data? {
+    var pendingFrame = partialFrames[id] ?? PendingFrameChunks(expectedCount: count)
+    let assembled = try pendingFrame.append(index: index, count: count, base64: base64)
+    if assembled == nil {
+      partialFrames[id] = pendingFrame
+    } else {
+      partialFrames.removeValue(forKey: id)
+    }
+    return assembled
+  }
+
+  func clearPartialFrames() {
+    partialFrames.removeAll()
+  }
+
+  func clearResponseBatchHandler(for id: String) {
+    responseBatchHandlers[id] = nil
+  }
+
+  func clearResponseBatchHandlers() {
+    responseBatchHandlers.removeAll()
+  }
+
   private func handleResponseFrame(
     id: String,
     result: JSONValue?,
-    error: WsErrorPayload?
-  ) {
+    error: WsErrorPayload?,
+    batchIndex: Int?,
+    batchCount: Int?
+  ) async {
     if let error {
+      clearResponseBatchHandler(for: id)
       pending.fail(
         id: id,
         error: WebSocketTransportError.serverError(
@@ -176,7 +245,32 @@ extension WebSocketTransport {
           message: error.message
         )
       )
-    } else if let result {
+      return
+    }
+
+    if let batchIndex, let batchCount {
+      do {
+        if let handler = responseBatchHandlers[id] {
+          try await handler(batchIndex, batchCount, result)
+        }
+        let completed = try pending.resumeBatch(
+          id: id,
+          index: batchIndex,
+          count: batchCount,
+          result: result
+        )
+        if completed {
+          clearResponseBatchHandler(for: id)
+        }
+      } catch {
+        clearResponseBatchHandler(for: id)
+        pending.fail(id: id, error: error)
+      }
+      return
+    }
+
+    clearResponseBatchHandler(for: id)
+    if let result {
       pending.resume(id: id, result: result)
     } else {
       pending.resume(id: id, result: .null)
@@ -233,6 +327,8 @@ extension WebSocketTransport {
       continuation.finish()
     }
     sessionStreamContinuations.removeAll()
+    responseBatchHandlers.removeAll()
+    partialFrames.removeAll()
   }
 
   func cancelWebSocketTaskIfNeeded(closeCode: URLSessionWebSocketTask.CloseCode) {
