@@ -4,6 +4,10 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+private enum CacheWriteFailure: Error {
+  case saveFailed
+}
+
 @MainActor
 @Suite("Database management")
 struct HarnessMonitorStoreDatabaseTests {
@@ -13,10 +17,13 @@ struct HarnessMonitorStoreDatabaseTests {
     container = try HarnessMonitorModelContainer.preview()
   }
 
-  private func makeStore() -> HarnessMonitorStore {
+  private func makeStore(
+    cacheService: SessionCacheService? = nil
+  ) -> HarnessMonitorStore {
     HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContainer: container
+      modelContainer: container,
+      cacheService: cacheService
     )
   }
 
@@ -117,6 +124,77 @@ struct HarnessMonitorStoreDatabaseTests {
     #expect(stats.bookmarkCount == 0)
     #expect(stats.noteCount == 0)
     #expect(stats.searchCount == 0)
+  }
+
+  // MARK: - Cache write reliability
+
+  @Test("Failed cache writes do not advance persisted metadata")
+  func failedCacheWritesDoNotAdvancePersistedMetadata() async throws {
+    let failingCacheService = SessionCacheService(
+      modelContainer: container,
+      saveChanges: { _ in
+        throw CacheWriteFailure.saveFailed
+      }
+    )
+    let store = makeStore(cacheService: failingCacheService)
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-save-failure",
+        context: "Save failure",
+        status: .active,
+        leaderId: "leader-save-failure",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-save-failure",
+      workerName: "Worker Save Failure"
+    )
+
+    await store.cacheSessionDetail(detail, timeline: [])
+
+    #expect(store.persistedSessionCount == 0)
+    #expect(store.lastPersistedSnapshotAt == nil)
+    if case .some = await store.loadCachedSessionDetail(sessionID: summary.sessionId) {
+      Issue.record("Expected failed cache save to leave persisted detail unchanged")
+    }
+  }
+
+  @Test("Stopping streams cancels pending cache writes before they persist")
+  func stoppingStreamsCancelsPendingCacheWrites() async throws {
+    let delayedCacheService = SessionCacheService(
+      modelContainer: container,
+      beforeSave: {
+        try await Task.sleep(for: .seconds(5))
+      }
+    )
+    let store = makeStore(cacheService: delayedCacheService)
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-pending-cache-write",
+        context: "Pending cache write",
+        status: .active,
+        leaderId: "leader-pending-cache-write",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+
+    store.applySessionSummaryUpdate(summary)
+    #expect(store.pendingCacheWriteTask != nil)
+
+    store.stopAllStreams()
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.pendingCacheWriteTask == nil)
+    #expect(store.persistedSessionCount == 0)
+    if case .some = await store.loadCachedSessionList() {
+      Issue.record("Expected cancelled cache write task to leave the cache unchanged")
+    }
   }
 
   // MARK: - Clear session cache
