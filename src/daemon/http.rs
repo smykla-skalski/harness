@@ -18,12 +18,13 @@ use crate::session::persona;
 use super::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use super::protocol::{
     AgentRemoveRequest, CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest,
-    HostBridgeReconfigureRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SessionJoinRequest, SessionMutationResponse, SessionStartRequest,
-    SetLogLevelRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
-    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
+    ControlPlaneActorRequest, HostBridgeReconfigureRequest, LeaderTransferRequest,
+    ObserveSessionRequest, RoleChangeRequest, SessionEndRequest, SessionJoinRequest,
+    SessionMutationResponse, SessionStartRequest, SetLogLevelRequest, SignalAckRequest,
+    SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest,
+    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    VoiceTranscriptUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -85,6 +86,16 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
 
 fn try_db_guard(state: &DaemonHttpState) -> Option<MutexGuard<'_, super::db::DaemonDb>> {
     state.db.get().and_then(|db| db.try_lock().ok())
+}
+
+fn authorize_control_request<T: ControlPlaneActorRequest>(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+    request: &mut T,
+) -> Result<(), Box<Response>> {
+    require_auth(headers, state)?;
+    request.bind_control_plane_actor();
+    Ok(())
 }
 
 fn core_routes() -> Router<DaemonHttpState> {
@@ -432,11 +443,11 @@ async fn post_task_create(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskCreateRequest>,
+    Json(mut request): Json<TaskCreateRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -452,11 +463,11 @@ async fn post_task_assign(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskAssignRequest>,
+    Json(mut request): Json<TaskAssignRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -478,11 +489,11 @@ async fn post_task_drop(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskDropRequest>,
+    Json(mut request): Json<TaskDropRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -504,11 +515,11 @@ async fn post_task_queue_policy(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskQueuePolicyRequest>,
+    Json(mut request): Json<TaskQueuePolicyRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -530,11 +541,11 @@ async fn post_task_update(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskUpdateRequest>,
+    Json(mut request): Json<TaskUpdateRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -556,11 +567,11 @@ async fn post_task_checkpoint(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskCheckpointRequest>,
+    Json(mut request): Json<TaskCheckpointRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -582,11 +593,11 @@ async fn post_role_change(
     Path((session_id, agent_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<RoleChangeRequest>,
+    Json(mut request): Json<RoleChangeRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -608,11 +619,11 @@ async fn post_remove_agent(
     Path((session_id, agent_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<AgentRemoveRequest>,
+    Json(mut request): Json<AgentRemoveRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -634,11 +645,11 @@ async fn post_transfer_leader(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<LeaderTransferRequest>,
+    Json(mut request): Json<LeaderTransferRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -808,11 +819,11 @@ async fn post_end_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<SessionEndRequest>,
+    Json(mut request): Json<SessionEndRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -828,11 +839,11 @@ async fn post_send_signal(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<SignalSendRequest>,
+    Json(mut request): Json<SignalSendRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -859,11 +870,11 @@ async fn post_cancel_signal(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<SignalCancelRequest>,
+    Json(mut request): Json<SignalCancelRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
@@ -894,7 +905,10 @@ async fn post_observe_session(
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let request = request.map(|Json(request)| request);
+    let mut request = request.map(|Json(request)| request);
+    if let Some(request) = request.as_mut() {
+        request.bind_control_plane_actor();
+    }
     let result = service::observe_session(&session_id, request.as_ref(), db_ref);
     if result.is_ok() {
         service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
@@ -931,11 +945,11 @@ async fn post_codex_run(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<CodexRunRequest>,
+    Json(mut request): Json<CodexRunRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     timed_json(
@@ -1031,11 +1045,11 @@ async fn post_voice_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<VoiceSessionStartRequest>,
+    Json(mut request): Json<VoiceSessionStartRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     timed_json(
@@ -1051,11 +1065,11 @@ async fn post_voice_audio_chunk(
     Path(voice_session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<VoiceAudioChunkRequest>,
+    Json(mut request): Json<VoiceAudioChunkRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     timed_json(
@@ -1071,11 +1085,11 @@ async fn post_voice_transcript(
     Path(voice_session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<VoiceTranscriptUpdateRequest>,
+    Json(mut request): Json<VoiceTranscriptUpdateRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     timed_json(
@@ -1091,11 +1105,11 @@ async fn post_voice_finish(
     Path(voice_session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<VoiceSessionFinishRequest>,
+    Json(mut request): Json<VoiceSessionFinishRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
     timed_json(
@@ -1382,12 +1396,17 @@ pub(super) fn require_auth(
 
 #[cfg(test)]
 mod tests {
-    use super::{DaemonHttpState, StatusCode, get_diagnostics, get_health, map_json};
+    use super::{
+        DaemonHttpState, StatusCode, authorize_control_request, get_diagnostics, get_health,
+        map_json,
+    };
     use crate::daemon::agent_tui::AgentTuiManagerHandle;
     use crate::daemon::codex_controller::CodexControllerHandle;
     use crate::daemon::db::DaemonDb;
+    use crate::daemon::protocol::SessionEndRequest;
     use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
     use crate::errors::CliErrorKind;
+    use crate::session::types::CONTROL_PLANE_ACTOR_ID;
     use axum::body::to_bytes;
     use axum::extract::State;
     use axum::http::{HeaderMap, header::AUTHORIZATION};
@@ -1496,5 +1515,22 @@ mod tests {
         let response = get_diagnostics(headers, State(state)).await;
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn authorize_control_request_rebinds_client_actor() {
+        let state = test_http_state_with_db();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            "Bearer token".parse().expect("authorization header"),
+        );
+        let mut request = SessionEndRequest {
+            actor: "spoofed-leader".into(),
+        };
+
+        authorize_control_request(&headers, &state, &mut request).expect("authorize request");
+
+        assert_eq!(request.actor, CONTROL_PLANE_ACTOR_ID);
     }
 }

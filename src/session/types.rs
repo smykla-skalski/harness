@@ -9,6 +9,14 @@ use crate::agents::runtime::signal::{AckResult, Signal, SignalAck};
 /// Current schema version for session state files.
 pub const CURRENT_VERSION: u32 = 6;
 
+/// Server-derived principal for daemon-authenticated control-plane mutations.
+///
+/// The monitor daemon authenticates a shared bearer token, so HTTP and
+/// websocket request payloads must not treat client-supplied actor IDs as an
+/// authenticated identity. Daemon transports rebind actor-bearing mutations to
+/// this control-plane principal server-side.
+pub const CONTROL_PLANE_ACTOR_ID: &str = "harness-app";
+
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionState {

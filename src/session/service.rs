@@ -26,10 +26,10 @@ use crate::workspace::utc_now;
 use super::roles::{SessionAction, is_permitted};
 use super::storage;
 use super::types::{
-    AgentRegistration, AgentStatus, CURRENT_VERSION, PendingLeaderTransfer, SessionMetrics,
-    SessionRole, SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
-    SessionTransition, TaskCheckpoint, TaskCheckpointSummary, TaskNote, TaskQueuePolicy,
-    TaskSeverity, TaskSource, TaskStatus, WorkItem,
+    AgentRegistration, AgentStatus, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, PendingLeaderTransfer,
+    SessionMetrics, SessionRole, SessionSignalRecord, SessionSignalStatus, SessionState,
+    SessionStatus, SessionTransition, TaskCheckpoint, TaskCheckpointSummary, TaskNote,
+    TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
 
 const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
@@ -2850,6 +2850,9 @@ fn require_permission(
     actor_id: &str,
     action: SessionAction,
 ) -> Result<(), CliError> {
+    if actor_id == CONTROL_PLANE_ACTOR_ID {
+        return Ok(());
+    }
     let agent = state.agents.get(actor_id).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "agent '{actor_id}' not registered in session '{}'",
