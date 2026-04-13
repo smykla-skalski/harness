@@ -112,6 +112,10 @@ struct SessionAgentSummaryCard: View {
     }
   }
 
+  private var personaTint: Color {
+    Color(red: 0.82, green: 0.68, blue: 0.21)
+  }
+
   private var taskDropAction: AgentTaskDropAction {
     AgentTaskDropAction(
       agent: agent,
@@ -144,6 +148,15 @@ struct SessionAgentSummaryCard: View {
               .harnessPillPadding()
               .background(roleTint, in: Capsule())
               .foregroundStyle(roleForeground)
+          }
+          if let persona = agent.persona {
+            HStack(spacing: HarnessMonitorTheme.spacingXS) {
+              PersonaSymbolView(symbol: persona.symbol, size: 14)
+              Text(persona.name)
+                .scaledFont(.caption.weight(.semibold))
+            }
+            .foregroundStyle(personaTint)
+            .accessibilityLabel("Persona: \(persona.name)")
           }
           Text(metadataLine)
             .scaledFont(.caption.monospaced())
