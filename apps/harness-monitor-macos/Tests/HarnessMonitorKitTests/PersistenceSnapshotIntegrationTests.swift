@@ -104,7 +104,8 @@ struct PersistenceSnapshotIntegrationTests {
           agentSessionId: "worker-1-session",
           lastActivityAt: "2026-04-12T10:05:00Z",
           currentTaskId: nil,
-          runtimeCapabilities: runtimeCapabilities
+          runtimeCapabilities: runtimeCapabilities,
+          persona: nil
         ),
         AgentRegistration(
           agentId: "leader-1",
@@ -118,7 +119,8 @@ struct PersistenceSnapshotIntegrationTests {
           agentSessionId: "leader-1-session",
           lastActivityAt: "2026-04-12T10:05:00Z",
           currentTaskId: nil,
-          runtimeCapabilities: runtimeCapabilities
+          runtimeCapabilities: runtimeCapabilities,
+          persona: nil
         ),
         AgentRegistration(
           agentId: "reviewer-1",
@@ -132,7 +134,8 @@ struct PersistenceSnapshotIntegrationTests {
           agentSessionId: "reviewer-1-session",
           lastActivityAt: "2026-04-12T10:05:00Z",
           currentTaskId: nil,
-          runtimeCapabilities: runtimeCapabilities
+          runtimeCapabilities: runtimeCapabilities,
+          persona: nil
         ),
       ],
       tasks: [

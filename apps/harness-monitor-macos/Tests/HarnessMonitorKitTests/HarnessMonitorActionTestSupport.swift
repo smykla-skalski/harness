@@ -43,6 +43,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       name: String?,
       prompt: String?,
       projectDir: String?,
+      persona: String?,
       argv: [String],
       rows: Int,
       cols: Int

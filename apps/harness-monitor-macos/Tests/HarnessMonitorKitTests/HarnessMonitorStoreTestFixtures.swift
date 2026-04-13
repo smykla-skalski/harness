@@ -46,7 +46,8 @@ func makeSessionDetail(
     agentSessionId: "\(leaderID)-session",
     lastActivityAt: summary.lastActivityAt,
     currentTaskId: nil,
-    runtimeCapabilities: capabilities
+    runtimeCapabilities: capabilities,
+    persona: nil
   )
   let worker = AgentRegistration(
     agentId: workerID,
@@ -60,7 +61,8 @@ func makeSessionDetail(
     agentSessionId: "\(workerID)-session",
     lastActivityAt: summary.lastActivityAt,
     currentTaskId: nil,
-    runtimeCapabilities: capabilities
+    runtimeCapabilities: capabilities,
+    persona: nil
   )
 
   return SessionDetail(

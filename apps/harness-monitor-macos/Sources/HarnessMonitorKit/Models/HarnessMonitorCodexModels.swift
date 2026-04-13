@@ -338,6 +338,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
   public let name: String?
   public let prompt: String?
   public let projectDir: String?
+  public let persona: String?
   public let argv: [String]
   public let rows: Int
   public let cols: Int
@@ -349,6 +350,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     name: String? = nil,
     prompt: String? = nil,
     projectDir: String? = nil,
+    persona: String? = nil,
     argv: [String] = [],
     rows: Int = 32,
     cols: Int = 120
@@ -359,6 +361,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     self.name = name
     self.prompt = prompt
     self.projectDir = projectDir
+    self.persona = persona
     self.argv = argv
     self.rows = rows
     self.cols = cols

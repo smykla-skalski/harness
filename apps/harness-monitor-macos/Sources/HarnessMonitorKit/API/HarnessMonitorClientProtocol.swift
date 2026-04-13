@@ -120,6 +120,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     voiceSessionID: String,
     request: VoiceSessionFinishRequest
   ) async throws -> VoiceSessionMutationResponse
+  func personas() async throws -> [AgentPersona]
   func logLevel() async throws -> LogLevelResponse
   func setLogLevel(_ level: String) async throws -> LogLevelResponse
 }
@@ -139,6 +140,10 @@ extension HarnessMonitorClientProtocol {
 
   public func sessionDetail(id: String) async throws -> SessionDetail {
     try await sessionDetail(id: id, scope: nil)
+  }
+
+  public func personas() async throws -> [AgentPersona] {
+    []
   }
 
   public func codexRuns(sessionID _: String) async throws -> CodexRunListResponse {

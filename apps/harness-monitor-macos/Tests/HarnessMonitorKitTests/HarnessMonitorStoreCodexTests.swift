@@ -313,6 +313,7 @@ struct HarnessMonitorStoreAgentTuiTests {
             name: "Copilot TUI",
             prompt: "Investigate the latest failure.",
             projectDir: nil,
+            persona: nil,
             argv: [],
             rows: 30,
             cols: 110
@@ -374,6 +375,7 @@ struct HarnessMonitorStoreAgentTuiTests {
             name: "Vibe TUI",
             prompt: "Run the UI spec.",
             projectDir: nil,
+            persona: nil,
             argv: [],
             rows: 32,
             cols: 120
@@ -408,6 +410,7 @@ struct HarnessMonitorStoreAgentTuiTests {
             name: "Claude TUI",
             prompt: "Boot in bare mode.",
             projectDir: "/tmp/alt-worktree",
+            persona: nil,
             argv: ["claude", "--bare"],
             rows: 24,
             cols: 90

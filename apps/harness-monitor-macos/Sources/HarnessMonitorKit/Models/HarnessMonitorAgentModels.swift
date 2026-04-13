@@ -57,6 +57,54 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
   }
 }
 
+/// Icon source for a persona, supporting system SF Symbols or bundled assets.
+public enum PersonaSymbol: Codable, Equatable, Sendable {
+  case sfSymbol(name: String)
+  case asset(name: String)
+
+  enum CodingKeys: String, CodingKey {
+    case `type`
+    case name
+  }
+
+  enum SymbolType: String, Codable {
+    case sfSymbol = "sf_symbol"
+    case asset
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let symbolType = try container.decode(SymbolType.self, forKey: .type)
+    let name = try container.decode(String.self, forKey: .name)
+    switch symbolType {
+    case .sfSymbol:
+      self = .sfSymbol(name: name)
+    case .asset:
+      self = .asset(name: name)
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .sfSymbol(let name):
+      try container.encode(SymbolType.sfSymbol, forKey: .type)
+      try container.encode(name, forKey: .name)
+    case .asset(let name):
+      try container.encode(SymbolType.asset, forKey: .type)
+      try container.encode(name, forKey: .name)
+    }
+  }
+}
+
+/// A predefined agent definition that shapes an agent's role and focus.
+public struct AgentPersona: Codable, Equatable, Sendable {
+  public let identifier: String
+  public let name: String
+  public let symbol: PersonaSymbol
+  public let description: String
+}
+
 public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   public let agentId: String
   public let name: String
@@ -70,6 +118,7 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   public let lastActivityAt: String?
   public let currentTaskId: String?
   public let runtimeCapabilities: RuntimeCapabilities
+  public let persona: AgentPersona?
 
   public var id: String { agentId }
 }

@@ -162,8 +162,16 @@ fn seed_workspace(tmp: &std::path::Path) {
     let state_a =
         session_service::start_session("perf-test", "", &project_a, Some("claude"), Some("s1"))
             .expect("start s1");
-    session_service::join_session("s1", SessionRole::Worker, "codex", &[], None, &project_a, None)
-        .expect("join s1");
+    session_service::join_session(
+        "s1",
+        SessionRole::Worker,
+        "codex",
+        &[],
+        None,
+        &project_a,
+        None,
+    )
+    .expect("join s1");
 
     let state_b =
         session_service::start_session("perf-test-2", "", &project_b, Some("claude"), Some("s2"))

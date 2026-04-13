@@ -153,6 +153,7 @@ extension RecordingHarnessClient {
         name: request.name,
         prompt: request.prompt,
         projectDir: request.projectDir,
+        persona: request.persona,
         argv: request.argv,
         rows: request.rows,
         cols: request.cols

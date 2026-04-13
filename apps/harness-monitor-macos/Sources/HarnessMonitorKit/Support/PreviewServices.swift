@@ -950,6 +950,23 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return updatedTui
   }
 
+  public func personas() async throws -> [AgentPersona] {
+    [
+      AgentPersona(
+        identifier: "reviewer",
+        name: "Reviewer",
+        symbol: .sfSymbol(name: "checkmark.seal"),
+        description: "Reviews code changes for correctness and style."
+      ),
+      AgentPersona(
+        identifier: "architect",
+        name: "Architect",
+        symbol: .sfSymbol(name: "building.columns"),
+        description: "Focuses on system design and architecture decisions."
+      ),
+    ]
+  }
+
   public func logLevel() async throws -> LogLevelResponse {
     LogLevelResponse(
       level: HarnessMonitorLogger.defaultDaemonLogLevel,
@@ -1342,7 +1359,8 @@ extension AgentRegistration {
       agentSessionId: agentSessionId,
       lastActivityAt: lastActivityAt,
       currentTaskId: taskID,
-      runtimeCapabilities: runtimeCapabilities
+      runtimeCapabilities: runtimeCapabilities,
+      persona: persona
     )
   }
 }

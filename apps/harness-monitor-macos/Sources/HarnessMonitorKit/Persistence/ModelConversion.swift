@@ -186,7 +186,8 @@ extension CachedAgent {
       agentSessionId: agentSessionId,
       lastActivityAt: lastActivityAt,
       currentTaskId: currentTaskId,
-      runtimeCapabilities: runtimeCapabilities
+      runtimeCapabilities: runtimeCapabilities,
+      persona: nil
     )
   }
 
