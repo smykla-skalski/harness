@@ -57,6 +57,7 @@ struct HarnessMonitorWindowRootView: View {
         appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
       )
     )
+    .modifier(PinchToZoomTextSizeModifier())
     .modifier(
       HarnessMonitorWindowBackdropModifier(
         mode: backdropMode,
@@ -213,6 +214,7 @@ struct HarnessMonitorSettingsRootView: View {
         appliesPreferredColorScheme: true
       )
     )
+    .modifier(PinchToZoomTextSizeModifier())
     .modifier(HarnessMonitorUITestAnimationModifier())
   }
 }
@@ -251,6 +253,7 @@ struct AgentTuiWindowRootView: View {
           appliesPreferredColorScheme: true
         )
       )
+      .modifier(PinchToZoomTextSizeModifier())
       .modifier(HarnessMonitorUITestAnimationModifier())
   }
 }
@@ -323,6 +326,26 @@ private struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
         )
       )
       .tint(HarnessMonitorTheme.accent)
+  }
+}
+
+private struct PinchToZoomTextSizeModifier: ViewModifier {
+  @AppStorage(HarnessMonitorTextSize.storageKey)
+  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+
+  func body(content: Content) -> some View {
+    content.gesture(
+      MagnifyGesture(minimumScaleDelta: 0.05)
+        .onEnded { value in
+          let delta = HarnessMonitorTextSize.indexDelta(
+            forMagnification: value.magnification,
+            currentIndex: textSizeIndex
+          )
+          if delta != 0 {
+            textSizeIndex += delta
+          }
+        }
+    )
   }
 }
 
