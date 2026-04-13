@@ -1,5 +1,5 @@
 use std::collections::{HashSet, VecDeque};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
 use axum::extract::State;
@@ -468,7 +468,7 @@ fn dispatch_inner(
 }
 
 fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(state);
     let db_ref = db_guard.as_deref();
 
     match request.method.as_str() {
@@ -503,6 +503,10 @@ fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsRespon
         },
         _ => error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method"),
     }
+}
+
+fn try_db_guard(state: &DaemonHttpState) -> Option<MutexGuard<'_, super::db::DaemonDb>> {
+    state.db.get().and_then(|db| db.try_lock().ok())
 }
 
 /// Schedule an asynchronous push of session extensions through the broadcast channel.
@@ -546,7 +550,7 @@ fn handle_session_subscribe(
         state.session_subscriptions.insert(session_id.clone());
     }
 
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(state);
     let db_ref = db_guard.as_deref();
     service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
 
@@ -908,9 +912,69 @@ mod tests {
         }
     }
 
+    #[test]
+    fn dispatch_read_query_health_succeeds_when_db_lock_is_held() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        let _db_guard = db.lock().expect("db lock");
+        let request = WsRequest {
+            id: "req-1".into(),
+            method: "health".into(),
+            params: serde_json::json!({}),
+        };
+
+        let response = dispatch_read_query(&request, &state);
+
+        assert_eq!(response.id, "req-1");
+        assert!(response.error.is_none());
+        assert_eq!(
+            response
+                .result
+                .expect("health response")
+                .get("status")
+                .and_then(serde_json::Value::as_str),
+            Some("ok")
+        );
+    }
+
     fn test_http_state() -> DaemonHttpState {
         let (sender, _) = broadcast::channel(8);
         let db = Arc::new(OnceLock::new());
+        DaemonHttpState {
+            token: "token".into(),
+            sender: sender.clone(),
+            manifest: super::super::state::DaemonManifest {
+                version: "18.2.3".into(),
+                pid: 1,
+                endpoint: "http://127.0.0.1:0".into(),
+                started_at: "2026-04-04T00:00:00Z".into(),
+                token_path: "/tmp/token".into(),
+                sandboxed: false,
+                host_bridge: super::super::state::HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
+            },
+            daemon_epoch: "epoch".into(),
+            replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
+            db: db.clone(),
+            codex_controller: crate::daemon::codex_controller::CodexControllerHandle::new(
+                sender.clone(),
+                db.clone(),
+                false,
+            ),
+            agent_tui_manager: crate::daemon::agent_tui::AgentTuiManagerHandle::new(
+                sender, db, false,
+            ),
+        }
+    }
+
+    fn test_http_state_with_db() -> DaemonHttpState {
+        let (sender, _) = broadcast::channel(8);
+        let db = Arc::new(OnceLock::new());
+        db.set(Arc::new(Mutex::new(
+            super::super::db::DaemonDb::open_in_memory().expect("open in-memory db"),
+        )))
+        .expect("install db");
         DaemonHttpState {
             token: "token".into(),
             sender: sender.clone(),

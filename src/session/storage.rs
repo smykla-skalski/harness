@@ -171,6 +171,44 @@ where
         })
 }
 
+/// Load, modify, and save session state only when the closure reports a
+/// meaningful change.
+///
+/// The closure returns `true` when the state should be persisted. No-op updates
+/// return the current state without rewriting the file.
+///
+/// # Errors
+/// Returns `CliError` on I/O, parse, or serialization failures, or if state is missing.
+pub(crate) fn update_state_if_changed<F>(
+    project_dir: &Path,
+    session_id: &str,
+    update: F,
+) -> Result<SessionState, CliError>
+where
+    F: FnOnce(&mut SessionState) -> Result<bool, CliError>,
+{
+    state_repository(project_dir, session_id)?
+        .update(|state| {
+            let Some(mut state) = state else {
+                return Err(CliErrorKind::session_not_active(format!(
+                    "session '{session_id}' not found"
+                ))
+                .into());
+            };
+            let changed = update(&mut state)?;
+            if changed {
+                state.state_version += 1;
+                state.updated_at = utc_now();
+            }
+            Ok(Some(state))
+        })
+        .and_then(|result| {
+            result.ok_or_else(|| {
+                CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
+            })
+        })
+}
+
 /// Append a transition entry to the session's audit log.
 ///
 /// # Errors
