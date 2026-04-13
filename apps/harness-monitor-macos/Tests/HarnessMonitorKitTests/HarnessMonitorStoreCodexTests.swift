@@ -512,6 +512,30 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTuis.first?.size.rows == 48)
   }
 
+  @Test("Silent Agent TUI resize skips success feedback")
+  func silentResizeAgentTuiSkipsSuccessFeedback() async {
+    let client = RecordingHarnessClient()
+    let running = client.agentTuiFixture(rows: 32, cols: 120)
+    client.configureAgentTuis([running], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedStore(client: client)
+
+    let resized = await store.resizeAgentTui(
+      tuiID: running.tuiId,
+      rows: 44,
+      cols: 132,
+      feedback: .silent
+    )
+
+    #expect(resized)
+    #expect(
+      client.recordedCalls().contains(
+        .resizeAgentTui(tuiID: running.tuiId, rows: 44, cols: 132)
+      )
+    )
+    #expect(store.selectedAgentTui?.size == AgentTuiSize(rows: 44, cols: 132))
+    #expect(store.currentSuccessFeedbackMessage == nil)
+  }
+
   @Test("Agent TUI stream update refreshes selected TUI")
   func agentTuiStreamUpdateRefreshesSelectedTui() async {
     let client = RecordingHarnessClient()

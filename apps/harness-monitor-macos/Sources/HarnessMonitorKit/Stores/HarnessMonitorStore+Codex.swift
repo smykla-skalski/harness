@@ -325,6 +325,13 @@ extension HarnessMonitorStore {
 }
 
 extension HarnessMonitorStore {
+  public enum AgentTuiResizeFeedback: Sendable {
+    case visible
+    case silent
+  }
+}
+
+extension HarnessMonitorStore {
   @discardableResult
   public func refreshSelectedAgentTuis() async -> Bool {
     cancelAgentTuiActionRefresh()
@@ -410,7 +417,8 @@ extension HarnessMonitorStore {
   public func resizeAgentTui(
     tuiID: String,
     rows: Int,
-    cols: Int
+    cols: Int,
+    feedback: AgentTuiResizeFeedback = .visible
   ) async -> Bool {
     guard guardSessionActionsAvailable() else { return false }
     guard let client else { return false }
@@ -419,7 +427,15 @@ extension HarnessMonitorStore {
       return false
     }
 
-    return await mutateAgentTui(using: client, actionName: "Agent TUI resized") {
+    let actionName: String? =
+      switch feedback {
+      case .visible:
+        "Agent TUI resized"
+      case .silent:
+        nil
+      }
+
+    return await mutateAgentTui(using: client, actionName: actionName) {
       try await client.resizeAgentTui(
         tuiID: tuiID,
         request: AgentTuiResizeRequest(rows: rows, cols: cols)

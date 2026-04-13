@@ -42,6 +42,9 @@ public struct AgentTuiWindowView: View {
   @State private var navigationForwardStack: [AgentTuiSheetSelection] = []
   @State private var suppressHistoryRecording = false
   @State private var windowNavigation = WindowNavigationState()
+  @State private var pendingViewportResizeTarget: AgentTuiSize?
+  @State private var viewportResizeTask: Task<Void, Never>?
+  @Environment(\.fontScale) private var fontScale
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -114,6 +117,55 @@ public struct AgentTuiWindowView: View {
     }
   }
 
+  private struct TerminalViewportSizing {
+    static let rowRange = 8 ... 240
+    static let colRange = 20 ... 400
+    static let minimumViewportHeight: CGFloat = 220
+    static let idealViewportHeight: CGFloat = 320
+    static let minimumControlsHeight: CGFloat = 220
+    static let minimumMeasuredContentWidth: CGFloat = 160
+    static let minimumMeasuredContentHeight: CGFloat = 96
+    static let debounce = Duration.milliseconds(120)
+    static let contentInsets = CGSize(
+      width: HarnessMonitorTheme.spacingMD * 2,
+      height: HarnessMonitorTheme.spacingMD * 2
+    )
+
+    @MainActor
+    static func terminalSize(for viewportSize: CGSize, fontScale: CGFloat) -> AgentTuiSize? {
+      let cellSize = measuredCellSize(for: fontScale)
+      let usableWidth = max(
+        viewportSize.width - contentInsets.width,
+        minimumMeasuredContentWidth
+      )
+      let usableHeight = max(
+        viewportSize.height - contentInsets.height,
+        minimumMeasuredContentHeight
+      )
+      let rawRows = Int(floor(usableHeight / cellSize.height))
+      let rawCols = Int(floor(usableWidth / cellSize.width))
+      guard rawRows > 0, rawCols > 0 else {
+        return nil
+      }
+      return AgentTuiSize(
+        rows: min(max(rawRows, rowRange.lowerBound), rowRange.upperBound),
+        cols: min(max(rawCols, colRange.lowerBound), colRange.upperBound)
+      )
+    }
+
+    @MainActor
+    private static func measuredCellSize(for fontScale: CGFloat) -> CGSize {
+      let pointSize = 13 * max(fontScale, 0.78)
+      let font = NSFont.monospacedSystemFont(ofSize: pointSize, weight: .regular)
+      let width = max(
+        ceil(("W" as NSString).size(withAttributes: [.font: font]).width),
+        1
+      )
+      let height = max(ceil(font.ascender - font.descender + font.leading), 1)
+      return CGSize(width: width, height: height)
+    }
+  }
+
   private let commonKeys: [AgentTuiKey] = [
     .enter, .tab, .escape, .backspace, .arrowUp, .arrowDown, .arrowLeft, .arrowRight,
   ]
@@ -173,13 +225,23 @@ public struct AgentTuiWindowView: View {
     displayState.sortedAgentTuis.map(\.tuiId)
   }
 
+  private var usesLiveViewportSplitLayout: Bool {
+    selectedSessionTui?.status.isActive == true
+  }
+
   private var currentStateMarker: String {
     switch selection {
     case .create:
       return "selection=create"
     case .session(let sessionID):
       let status = selectedSessionTui?.status.rawValue ?? "missing"
-      return "selection=session:\(sessionID),status=\(status),wrap=\(wrapLines)"
+      let sizeLabel =
+        if let selectedSessionTui {
+          "size=\(selectedSessionTui.size.rows)x\(selectedSessionTui.size.cols)"
+        } else {
+          "size=missing"
+        }
+      return "selection=session:\(sessionID),status=\(status),wrap=\(wrapLines),\(sizeLabel)"
     }
   }
 
@@ -207,11 +269,7 @@ public struct AgentTuiWindowView: View {
       )
       .toolbarBaselineFrame(.sidebar)
     } detail: {
-      ScrollView {
-        paneContent
-          .padding(HarnessMonitorTheme.spacingLG)
-      }
-      .id(scrollContainerIdentity)
+      detailColumnContent
       .toolbar {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
@@ -253,6 +311,9 @@ public struct AgentTuiWindowView: View {
       }
     }
     .onChange(of: selection) { oldValue, newValue in
+      if oldValue != newValue {
+        cancelPendingViewportResize()
+      }
       if suppressHistoryRecording {
         suppressHistoryRecording = false
       } else if oldValue != newValue {
@@ -265,6 +326,9 @@ public struct AgentTuiWindowView: View {
       store.selectAgentTui(tuiID: sessionID)
       syncTerminalSize()
     }
+    .onDisappear {
+      cancelPendingViewportResize()
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
     .overlay {
@@ -274,6 +338,22 @@ public struct AgentTuiWindowView: View {
           text: currentStateMarker
         )
       }
+    }
+  }
+
+  @ViewBuilder
+  private var detailColumnContent: some View {
+    if usesLiveViewportSplitLayout, let selectedSessionTui {
+      sessionPane(selectedSessionTui)
+        .padding(HarnessMonitorTheme.spacingLG)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .id(scrollContainerIdentity)
+    } else {
+      ScrollView {
+        paneContent
+          .padding(HarnessMonitorTheme.spacingLG)
+      }
+      .id(scrollContainerIdentity)
     }
   }
 
@@ -369,8 +449,8 @@ public struct AgentTuiWindowView: View {
           Text("Terminal size")
             .scaledFont(.caption.bold())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          Stepper("Rows \(rows)", value: $rows, in: 16 ... 80)
-          Stepper("Cols \(cols)", value: $cols, in: 60 ... 220, step: 10)
+          Stepper("Rows \(rows)", value: $rows, in: TerminalViewportSizing.rowRange)
+          Stepper("Cols \(cols)", value: $cols, in: TerminalViewportSizing.colRange, step: 10)
           Spacer(minLength: 0)
           HarnessMonitorActionButton(
             title: "Start \(runtime.title)",
@@ -463,18 +543,48 @@ public struct AgentTuiWindowView: View {
   private func sessionPane(_ tui: AgentTuiSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       terminalHeader(tui)
+      if tui.status.isActive {
+        liveSessionLayout(tui)
+      } else {
+        terminalViewport(tui)
+        if let error = tui.error, !error.isEmpty {
+          terminalError(error)
+        }
+        terminalOutcome(tui)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: tui.status.isActive ? .infinity : nil, alignment: .topLeading)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
+  }
+
+  private func liveSessionLayout(_ tui: AgentTuiSnapshot) -> some View {
+    VSplitView {
       terminalViewport(tui)
+        .frame(
+          minHeight: TerminalViewportSizing.minimumViewportHeight,
+          idealHeight: TerminalViewportSizing.idealViewportHeight
+        )
+
+      ScrollView {
+        liveSessionControls(tui)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.top, HarnessMonitorTheme.spacingXS)
+      }
+      .frame(minHeight: TerminalViewportSizing.minimumControlsHeight)
+      .accessibilityIdentifier("harness.sheet.agent-tui.controls")
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private func liveSessionControls(_ tui: AgentTuiSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
       }
-      terminalOutcome(tui)
-      if tui.status.isActive {
-        terminalInputControls(tui)
-        terminalKeyControls(tui)
-        terminalResizeControls()
-      }
+      terminalInputControls(tui)
+      terminalKeyControls(tui)
+      terminalResizeControls()
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
   @ToolbarContentBuilder
@@ -557,8 +667,18 @@ public struct AgentTuiWindowView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HarnessMonitorTheme.spacingMD)
     }
-    .frame(minHeight: 220, maxHeight: 320)
+    .frame(
+      maxWidth: .infinity,
+      minHeight: TerminalViewportSizing.minimumViewportHeight,
+      idealHeight: TerminalViewportSizing.idealViewportHeight,
+      maxHeight: tui.status.isActive ? .infinity : TerminalViewportSizing.idealViewportHeight
+    )
     .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+    .onGeometryChange(for: CGSize.self) { proxy in
+      proxy.size
+    } action: { viewportSize in
+      updateViewportGeometry(viewportSize, for: tui)
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiViewport)
   }
 
@@ -680,9 +800,13 @@ public struct AgentTuiWindowView: View {
       Text("Viewport")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text("Drag the divider below the output or resize the window to sync the live TUI.")
+        .scaledFont(.footnote)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
       HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-        Stepper("Rows \(rows)", value: $rows, in: 16 ... 80)
-        Stepper("Cols \(cols)", value: $cols, in: 60 ... 220, step: 10)
+        Stepper("Rows \(rows)", value: $rows, in: TerminalViewportSizing.rowRange)
+        Stepper("Cols \(cols)", value: $cols, in: TerminalViewportSizing.colRange, step: 10)
         Spacer()
         if let selectedSessionTui {
           HarnessMonitorActionButton(
@@ -939,12 +1063,79 @@ public struct AgentTuiWindowView: View {
     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: tui.transcriptPath)])
   }
 
+  private func updateViewportGeometry(_ viewportSize: CGSize, for tui: AgentTuiSnapshot) {
+    guard selection.sessionID == tui.tuiId, tui.status.isActive else {
+      return
+    }
+    guard let terminalSize = TerminalViewportSizing.terminalSize(
+      for: viewportSize,
+      fontScale: fontScale
+    ) else {
+      return
+    }
+    if rows != terminalSize.rows {
+      rows = terminalSize.rows
+    }
+    if cols != terminalSize.cols {
+      cols = terminalSize.cols
+    }
+    guard terminalSize != tui.size, terminalSize != pendingViewportResizeTarget else {
+      return
+    }
+
+    pendingViewportResizeTarget = terminalSize
+    viewportResizeTask?.cancel()
+    let tuiID = tui.tuiId
+    viewportResizeTask = Task { @MainActor in
+      try? await Task.sleep(for: TerminalViewportSizing.debounce)
+      guard !Task.isCancelled else {
+        return
+      }
+      guard
+        selection.sessionID == tuiID,
+        selectedSessionTui?.status.isActive == true
+      else {
+        if pendingViewportResizeTarget == terminalSize {
+          pendingViewportResizeTarget = nil
+        }
+        return
+      }
+
+      let resized = await store.resizeAgentTui(
+        tuiID: tuiID,
+        rows: terminalSize.rows,
+        cols: terminalSize.cols,
+        feedback: .silent
+      )
+      guard pendingViewportResizeTarget == terminalSize else {
+        return
+      }
+      pendingViewportResizeTarget = nil
+      if !resized {
+        syncTerminalSize()
+      }
+    }
+  }
+
+  private func cancelPendingViewportResize() {
+    viewportResizeTask?.cancel()
+    viewportResizeTask = nil
+    pendingViewportResizeTarget = nil
+  }
+
   private func syncTerminalSize() {
     guard let selectedSessionTui else {
       return
     }
-    rows = selectedSessionTui.size.rows
-    cols = selectedSessionTui.size.cols
+    if pendingViewportResizeTarget == selectedSessionTui.size {
+      pendingViewportResizeTarget = nil
+    }
+    if rows != selectedSessionTui.size.rows {
+      rows = selectedSessionTui.size.rows
+    }
+    if cols != selectedSessionTui.size.cols {
+      cols = selectedSessionTui.size.cols
+    }
   }
 
   private func reconcileSheetState(afterRefresh: Bool) {
