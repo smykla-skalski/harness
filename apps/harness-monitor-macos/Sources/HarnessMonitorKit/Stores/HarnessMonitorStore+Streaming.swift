@@ -1,7 +1,6 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private static let sessionPushFallbackDelay = Duration.milliseconds(900)
   private static let streamReconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
   ]
@@ -119,12 +118,13 @@ extension HarnessMonitorStore {
     let token = sessionPushFallbackSequence
     pendingSessionPushFallback = (sessionID: sessionID, token: token)
     sessionPushFallbackTask?.cancel()
+    let delay = sessionPushFallbackDelayForSession(sessionID)
     sessionPushFallbackTask = Task { @MainActor [weak self] in
       guard let self else {
         return
       }
 
-      try? await Task.sleep(for: Self.sessionPushFallbackDelay)
+      try? await Task.sleep(for: delay)
       guard !Task.isCancelled else {
         return
       }
@@ -145,6 +145,7 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
   ) async {
+    lastSessionPushFallbackAt[sessionID] = ContinuousClock.now
     do {
       let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
       let measuredTimeline = try await Self.measureOperation {
@@ -170,6 +171,22 @@ extension HarnessMonitorStore {
         "push fallback timeline refresh failed: \(error.localizedDescription, privacy: .public)"
       )
     }
+  }
+
+  private func sessionPushFallbackDelayForSession(_ sessionID: String) -> Duration {
+    let baseDelay = sessionPushFallbackDelay
+    guard let lastRefreshAt = lastSessionPushFallbackAt[sessionID] else {
+      return baseDelay
+    }
+
+    let now = ContinuousClock.now
+    let throttleUntil = lastRefreshAt.advanced(by: sessionPushFallbackMinimumInterval)
+    guard throttleUntil > now else {
+      return baseDelay
+    }
+
+    let remaining = now.duration(to: throttleUntil)
+    return remaining > baseDelay ? remaining : baseDelay
   }
 
   func cancelSessionPushFallback(for sessionID: String? = nil) {
@@ -368,4 +385,5 @@ extension HarnessMonitorStore {
     manifestWatcher?.stop()
     manifestWatcher = nil
   }
+
 }

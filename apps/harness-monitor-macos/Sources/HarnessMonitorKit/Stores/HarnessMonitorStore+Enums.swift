@@ -1,0 +1,75 @@
+import Foundation
+
+extension HarnessMonitorStore {
+  public enum ConnectionState: Equatable {
+    case idle
+    case connecting
+    case online
+    case offline(String)
+  }
+
+  public enum SessionFilter: String, CaseIterable, Identifiable {
+    case all
+    case active
+    case ended
+
+    public var id: String { rawValue }
+
+    public var title: String {
+      rawValue.capitalized
+    }
+
+    func includes(_ status: SessionStatus) -> Bool {
+      switch self {
+      case .active:
+        status != .ended
+      case .all:
+        true
+      case .ended:
+        status == .ended
+      }
+    }
+  }
+
+  public enum InspectorSelection: Equatable {
+    case none
+    case task(String)
+    case agent(String)
+    case signal(String)
+    case observer
+  }
+
+  public enum PendingConfirmation: Equatable {
+    case endSession(sessionID: String, actorID: String)
+    case removeAgent(sessionID: String, agentID: String, actorID: String)
+  }
+
+  public enum HostBridgeCapabilityIssue: Equatable {
+    case unavailable
+    case excluded
+  }
+
+  public enum HostBridgeCapabilityState: Equatable {
+    case ready
+    case unavailable
+    case excluded
+  }
+
+  public enum HostBridgeCapabilityMutationResult: Equatable {
+    case success
+    case requiresForce(String)
+    case failed
+  }
+
+  public enum PresentedSheet: Identifiable, Equatable {
+    case codexFlow
+    case sendSignal(agentID: String)
+
+    public var id: String {
+      switch self {
+      case .codexFlow: "codexFlow"
+      case .sendSignal(let agentID): "sendSignal:\(agentID)"
+      }
+    }
+  }
+}
