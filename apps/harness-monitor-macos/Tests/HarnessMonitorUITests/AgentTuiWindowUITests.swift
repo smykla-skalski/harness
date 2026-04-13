@@ -100,6 +100,50 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testDraggingViewportDividerResizesLiveTerminal() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "resize with divider")
+
+    let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
+    let controls = element(in: app, identifier: Accessibility.agentTuiControls)
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+
+    XCTAssertTrue(waitForElement(viewport, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(controls, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))
+
+    guard let initialSize = agentTuiSize(from: state.label) else {
+      XCTFail("Expected the agent TUI state marker to expose the live size")
+      return
+    }
+    let initialHeight = viewport.frame.height
+
+    dragViewportDivider(in: app, viewport: viewport, controls: controls, verticalOffset: 120)
+
+    let didResize = waitUntil(timeout: Self.actionTimeout) {
+      guard let updatedSize = self.agentTuiSize(from: state.label) else {
+        return false
+      }
+      return viewport.frame.height >= initialHeight + 24
+        && updatedSize.rows > initialSize.rows
+    }
+
+    let finalHeight = viewport.frame.height
+    let finalState = state.label
+    XCTAssertTrue(
+      didResize,
+      """
+      Dragging the viewport divider should resize the output pane and propagate the new terminal rows.
+      Initial height: \(initialHeight)
+      Final height: \(finalHeight)
+      Initial size: \(initialSize.rows)x\(initialSize.cols)
+      Final state: \(finalState)
+      """
+    )
+  }
+
   func testPersonaPickerVisibleInCreatePane() throws {
     let app = launchInCockpitPreview()
 
@@ -307,5 +351,45 @@ private extension AgentTuiWindowUITests {
       || element(in: app, identifier: "\(identifier).frame").exists
       || button(in: app, title: title).exists
       || element(in: app, title: title).exists
+  }
+
+  func dragViewportDivider(
+    in app: XCUIApplication,
+    viewport: XCUIElement,
+    controls: XCUIElement,
+    verticalOffset: CGFloat
+  ) {
+    let window = window(in: app, containing: viewport)
+    XCTAssertTrue(waitForElement(window, timeout: Self.fastActionTimeout))
+
+    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+    let start = origin.withOffset(
+      CGVector(
+        dx: viewport.frame.midX - window.frame.minX,
+        dy: controls.frame.minY - window.frame.minY - 2
+      )
+    )
+    let end = start.withOffset(CGVector(dx: 0, dy: verticalOffset))
+    start.press(forDuration: 0.01, thenDragTo: end)
+  }
+
+  func agentTuiSize(from label: String) -> (rows: Int, cols: Int)? {
+    guard let markerRange = label.range(of: "size=") else {
+      return nil
+    }
+    let sizeText = label[markerRange.upperBound...]
+      .split(separator: ",", maxSplits: 1)
+      .first
+    guard let sizeText else {
+      return nil
+    }
+    let components = sizeText.split(separator: "x", maxSplits: 1)
+    guard components.count == 2,
+      let rows = Int(components[0]),
+      let cols = Int(components[1])
+    else {
+      return nil
+    }
+    return (rows, cols)
   }
 }
