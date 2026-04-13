@@ -726,19 +726,39 @@ extension HarnessMonitorStore {
   /// host bridge state changed. This is the 10s fallback for when the
   /// DispatchSource watcher stops firing.
   ///
-  /// No-op when the manifest is absent, undecodable, or bridge state is
-  /// identical to what the store already has. Decoder is allocated once per
-  /// call - this method only runs in the background probe task, never in a
-  /// view body.
+  /// Missing manifests remain a no-op. Read and decode failures append one
+  /// visible `.error` breadcrumb so stale host-bridge state does not fail
+  /// silently. Decoder is allocated once per call - this method only runs in
+  /// the background probe task, never in a view body.
   func refreshBridgeStateFromManifest(at manifestURL: URL = HarnessMonitorPaths.manifestURL()) {
-    guard
-      let data = FileManager.default.contents(atPath: manifestURL.path)
-    else { return }
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: manifestURL.path) else { return }
+    guard let data = fileManager.contents(atPath: manifestURL.path) else {
+      recordManifestRefreshFailure(
+        "Failed to read daemon manifest at \(manifestURL.path)"
+      )
+      return
+    }
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
-    guard let manifest = try? decoder.decode(DaemonManifest.self, from: data) else { return }
+    let manifest: DaemonManifest
+    do {
+      manifest = try decoder.decode(DaemonManifest.self, from: data)
+    } catch {
+      recordManifestRefreshFailure(
+        "Failed to decode daemon manifest at \(manifestURL.path): \(error.localizedDescription)"
+      )
+      return
+    }
     guard daemonStatus?.manifest?.hostBridge != manifest.hostBridge else { return }
     applyManifestRevision(manifest)
+  }
+
+  private func recordManifestRefreshFailure(_ detail: String) {
+    guard connectionEvents.last?.detail != detail else {
+      return
+    }
+    appendConnectionEvent(kind: .error, detail: detail)
   }
 
   private func mutateHostBridgeCapability(
