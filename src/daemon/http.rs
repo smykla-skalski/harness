@@ -1,5 +1,5 @@
 use std::convert::Infallible;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
 use async_stream::stream;
@@ -81,6 +81,10 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(signal_routes())
         .merge(codex_routes())
         .merge(voice_routes())
+}
+
+fn try_db_guard(state: &DaemonHttpState) -> Option<MutexGuard<'_, super::db::DaemonDb>> {
+    state.db.get().and_then(|db| db.try_lock().ok())
 }
 
 fn core_routes() -> Router<DaemonHttpState> {
@@ -224,7 +228,7 @@ fn voice_routes() -> Router<DaemonHttpState> {
 async fn get_health(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(&state);
     let db_ref = db_guard.as_deref();
     timed_json(
         "GET",
@@ -241,7 +245,7 @@ async fn get_diagnostics(headers: HeaderMap, State(state): State<DaemonHttpState
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(&state);
     timed_json(
         "GET",
         "/v1/diagnostics",
@@ -341,7 +345,7 @@ async fn get_projects(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(&state);
     timed_json(
         "GET",
         "/v1/projects",
@@ -357,7 +361,7 @@ async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(&state);
     timed_json(
         "GET",
         "/v1/sessions",
@@ -384,7 +388,7 @@ async fn get_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(&state);
     let db_ref = db_guard.as_deref();
     if query.scope.as_deref() == Some("core") {
         return timed_json(
@@ -414,7 +418,7 @@ async fn get_timeline(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = try_db_guard(&state);
     timed_json(
         "GET",
         "/v1/sessions/{id}/timeline",
@@ -1378,10 +1382,18 @@ pub(super) fn require_auth(
 
 #[cfg(test)]
 mod tests {
-    use super::{StatusCode, map_json};
+    use super::{DaemonHttpState, StatusCode, get_diagnostics, get_health, map_json};
+    use crate::daemon::agent_tui::AgentTuiManagerHandle;
+    use crate::daemon::codex_controller::CodexControllerHandle;
+    use crate::daemon::db::DaemonDb;
+    use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
     use crate::errors::CliErrorKind;
     use axum::body::to_bytes;
+    use axum::extract::State;
+    use axum::http::{HeaderMap, header::AUTHORIZATION};
     use serde_json::Value;
+    use std::sync::{Arc, Mutex, OnceLock};
+    use tokio::sync::broadcast;
 
     async fn response_body(result: Result<Value, crate::errors::CliError>) -> (StatusCode, Value) {
         let response = map_json(result);
@@ -1389,6 +1401,35 @@ mod tests {
         let bytes = to_bytes(response.into_body(), 4096).await.expect("body");
         let json: Value = serde_json::from_slice(&bytes).expect("json body");
         (status, json)
+    }
+
+    fn test_http_state_with_db() -> DaemonHttpState {
+        let (sender, _) = broadcast::channel(8);
+        let db_slot = Arc::new(OnceLock::new());
+        let db = Arc::new(Mutex::new(
+            DaemonDb::open_in_memory().expect("open in-memory db"),
+        ));
+        db_slot.set(db).expect("install db");
+        DaemonHttpState {
+            token: "token".into(),
+            sender: sender.clone(),
+            manifest: DaemonManifest {
+                version: "20.6.0".into(),
+                pid: 1,
+                endpoint: "http://127.0.0.1:0".into(),
+                started_at: "2026-04-13T00:00:00Z".into(),
+                token_path: "/tmp/token".into(),
+                sandboxed: false,
+                host_bridge: HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
+            },
+            daemon_epoch: "epoch".into(),
+            replay_buffer: Arc::new(Mutex::new(super::super::websocket::ReplayBuffer::new(8))),
+            db: db_slot.clone(),
+            codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+            agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+        }
     }
 
     #[tokio::test]
@@ -1428,5 +1469,32 @@ mod tests {
 
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body["error"]["code"], "KSRCLI092");
+    }
+
+    #[tokio::test]
+    async fn get_health_responds_when_db_lock_is_held() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        let _db_guard = db.lock().expect("db lock");
+
+        let response = get_health(HeaderMap::new(), State(state)).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn get_diagnostics_responds_when_db_lock_is_held() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        let _db_guard = db.lock().expect("db lock");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            "Bearer token".parse().expect("authorization header"),
+        );
+
+        let response = get_diagnostics(headers, State(state)).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

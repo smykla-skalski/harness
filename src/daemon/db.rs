@@ -36,6 +36,28 @@ pub(crate) struct AgentTuiLiveRefreshState {
     pub(crate) updated_at: String,
 }
 
+#[derive(Debug)]
+pub(crate) struct PreparedSessionResync {
+    resolved: super::index::ResolvedSession,
+    log_entries: Vec<SessionLogEntry>,
+    task_checkpoints: Vec<PreparedTaskCheckpointImport>,
+    signals: Vec<SessionSignalRecord>,
+    activities: Vec<super::protocol::AgentToolActivitySummary>,
+    conversation_events: Vec<PreparedConversationEventImport>,
+}
+
+#[derive(Debug)]
+struct PreparedTaskCheckpointImport {
+    checkpoints: Vec<TaskCheckpoint>,
+}
+
+#[derive(Debug)]
+struct PreparedConversationEventImport {
+    agent_id: String,
+    runtime: String,
+    events: Vec<ConversationEvent>,
+}
+
 impl fmt::Debug for DaemonDb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DaemonDb").finish_non_exhaustive()
@@ -1271,14 +1293,101 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on resolution, I/O, or SQL failures.
     pub fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
+        let prepared = Self::prepare_session_resync(session_id)?;
+        self.apply_prepared_session_resync(&prepared)
+    }
+
+    /// Prepare a session re-sync by loading all file-backed data before any
+    /// caller takes the shared daemon database lock.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery, I/O, or parse failures.
+    pub(crate) fn prepare_session_resync(
+        session_id: &str,
+    ) -> Result<PreparedSessionResync, CliError> {
         let resolved = super::index::resolve_session(session_id)?;
-        self.sync_session(&resolved.project.project_id, &resolved.state)?;
-        import_session_log(self, &resolved.project, &resolved.state.session_id)?;
-        import_session_checkpoints(self, &resolved.project, &resolved.state)?;
-        import_session_signals(self, &resolved)?;
-        import_session_activity(self, &resolved)?;
-        import_conversation_events(self, &resolved)?;
-        self.bump_change(&resolved.state.session_id)?;
+        let log_entries =
+            super::index::load_log_entries(&resolved.project, &resolved.state.session_id)?;
+
+        let mut task_checkpoints = Vec::new();
+        for task_id in resolved.state.tasks.keys() {
+            let checkpoints = super::index::load_task_checkpoints(
+                &resolved.project,
+                &resolved.state.session_id,
+                task_id,
+            )?;
+            task_checkpoints.push(PreparedTaskCheckpointImport { checkpoints });
+        }
+
+        let signals = super::snapshot::load_signals_for(&resolved.project, &resolved.state)?;
+        let activities =
+            super::snapshot::load_agent_activity_for(&resolved.project, &resolved.state)?;
+
+        let mut conversation_events = Vec::new();
+        for (agent_id, agent) in &resolved.state.agents {
+            let session_key = agent
+                .agent_session_id
+                .as_deref()
+                .unwrap_or(&resolved.state.session_id);
+            let events = super::index::load_conversation_events(
+                &resolved.project,
+                &agent.runtime,
+                session_key,
+                agent_id,
+            )?;
+            conversation_events.push(PreparedConversationEventImport {
+                agent_id: agent_id.clone(),
+                runtime: agent.runtime.clone(),
+                events,
+            });
+        }
+
+        Ok(PreparedSessionResync {
+            resolved,
+            log_entries,
+            task_checkpoints,
+            signals,
+            activities,
+            conversation_events,
+        })
+    }
+
+    /// Apply a previously prepared session re-sync to the daemon database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub(crate) fn apply_prepared_session_resync(
+        &self,
+        prepared: &PreparedSessionResync,
+    ) -> Result<(), CliError> {
+        self.sync_session(
+            &prepared.resolved.project.project_id,
+            &prepared.resolved.state,
+        )?;
+
+        for entry in &prepared.log_entries {
+            self.append_log_entry(entry)?;
+        }
+        for import in &prepared.task_checkpoints {
+            for checkpoint in &import.checkpoints {
+                self.append_checkpoint(&prepared.resolved.state.session_id, checkpoint)?;
+            }
+        }
+
+        self.sync_signal_index(&prepared.resolved.state.session_id, &prepared.signals)?;
+        self.sync_agent_activity(&prepared.resolved.state.session_id, &prepared.activities)?;
+
+        clear_session_conversation_events(&self.conn, &prepared.resolved.state.session_id)?;
+        for import in &prepared.conversation_events {
+            self.sync_conversation_events(
+                &prepared.resolved.state.session_id,
+                &import.agent_id,
+                &import.runtime,
+                &import.events,
+            )?;
+        }
+
+        self.bump_change(&prepared.resolved.state.session_id)?;
         self.bump_change("global")?;
         Ok(())
     }
