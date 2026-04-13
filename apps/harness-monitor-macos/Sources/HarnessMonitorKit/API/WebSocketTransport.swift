@@ -1,5 +1,9 @@
 import Foundation
 
+private final class SemanticBatchDeliveryTracker: @unchecked Sendable {
+  var delivered = false
+}
+
 public actor WebSocketTransport: HarnessMonitorClientProtocol {
   let connection: HarnessMonitorConnection
   let encoder: JSONEncoder
@@ -13,6 +17,8 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   var globalStreamContinuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation?
   var sessionStreamContinuations:
     [String: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation] = [:]
+  var responseBatchHandlers: [String: ResponseBatchHandler] = [:]
+  var partialFrames: [String: PendingFrameChunks] = [:]
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
   var isShutDown = false
@@ -68,6 +74,8 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     heartbeatTask?.cancel()
     cancelWebSocketTaskIfNeeded(closeCode: .normalClosure)
     webSocketTask = nil
+    responseBatchHandlers.removeAll()
+    partialFrames.removeAll()
     pending.failAll(error: WebSocketTransportError.connectionClosed)
     terminateAllStreams()
   }
@@ -118,16 +126,39 @@ extension WebSocketTransport {
   }
 
   public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    var params: [String: JSONValue] = ["session_id": .string(id)]
     if let scope {
-      let params: [String: JSONValue] = ["session_id": .string(id), "scope": .string(scope)]
-      let value = try await send(method: "session.detail", params: .object(params))
-      return try decode(value)
+      params["scope"] = .string(scope)
     }
-    return try await httpFallbackClient.sessionDetail(id: id, scope: nil)
+    let value = try await send(method: "session.detail", params: .object(params))
+    return try decode(value)
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    try await httpFallbackClient.timeline(sessionID: sessionID)
+    try await timeline(sessionID: sessionID) { _, _, _ in }
+  }
+
+  public func timeline(
+    sessionID: String,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry] {
+    let params: [String: JSONValue] = ["session_id": .string(sessionID)]
+    let deliveryTracker = SemanticBatchDeliveryTracker()
+    let value = try await send(
+      method: "session.timeline",
+      params: .object(params),
+      onSemanticBatch: { [weak self] batchIndex, batchCount, result in
+        guard let self else { return }
+        let entries: [TimelineEntry] = try self.decode(result ?? .array([]))
+        deliveryTracker.delivered = true
+        await onBatch(entries, batchIndex, batchCount)
+      }
+    )
+    let entries: [TimelineEntry] = try decode(value)
+    if deliveryTracker.delivered == false {
+      await onBatch(entries, 0, 1)
+    }
+    return entries
   }
 }
 

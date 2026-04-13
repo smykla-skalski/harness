@@ -36,13 +36,16 @@ struct WebSocketProtocolTests {
       {"id":"req-1","result":{"status":"ok"},"error":null}
       """
     let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
-    guard case .response(let id, let result, let error) = frame.kind else {
+    guard case .response(let id, let result, let error, let batchIndex, let batchCount) = frame.kind
+    else {
       Issue.record("Expected response frame kind, got \(frame.kind)")
       return
     }
     #expect(id == "req-1")
     #expect(result != nil)
     #expect(error == nil)
+    #expect(batchIndex == nil)
+    #expect(batchCount == nil)
   }
 
   @Test("WsFrame decodes response with error")
@@ -51,7 +54,7 @@ struct WebSocketProtocolTests {
       {"id":"req-2","result":null,"error":{"code":"NOT_FOUND","message":"session not found","details":[]}}
       """
     let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
-    guard case .response(let id, _, let error) = frame.kind else {
+    guard case .response(let id, _, let error, let batchIndex, let batchCount) = frame.kind else {
       Issue.record("Expected response frame kind, got \(frame.kind)")
       return
     }
@@ -59,6 +62,40 @@ struct WebSocketProtocolTests {
     let resolvedError = try #require(error)
     #expect(resolvedError.code == "NOT_FOUND")
     #expect(resolvedError.message == "session not found")
+    #expect(batchIndex == nil)
+    #expect(batchCount == nil)
+  }
+
+  @Test("WsFrame decodes semantic response batch metadata")
+  func responseBatchDecoding() throws {
+    let json = """
+      {
+        "id":"req-batch",
+        "batch_index":1,
+        "batch_count":3,
+        "result":[{"entry_id":"entry-1","summary":"hello"}]
+      }
+      """
+    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    guard case .response(let id, let result, let error, let batchIndex, let batchCount) = frame.kind
+    else {
+      Issue.record("Expected response batch frame kind, got \(frame.kind)")
+      return
+    }
+
+    #expect(id == "req-batch")
+    #expect(error == nil)
+    #expect(batchIndex == 1)
+    #expect(batchCount == 3)
+    guard let resolvedResult = result else {
+      Issue.record("Expected response batch array payload, got nil")
+      return
+    }
+    guard case .array(let entries) = resolvedResult else {
+      Issue.record("Expected response batch array payload, got \(String(describing: result))")
+      return
+    }
+    #expect(entries.count == 1)
   }
 
   @Test("WsFrame decodes push event")
@@ -85,6 +122,29 @@ struct WebSocketProtocolTests {
       Issue.record("Expected unknown frame kind, got \(frame.kind)")
       return
     }
+  }
+
+  @Test("WsFrame decodes chunk frame metadata")
+  func chunkFrameDecoding() throws {
+    let json = """
+      {
+        "chunk_id":"response:req-1",
+        "chunk_index":0,
+        "chunk_count":2,
+        "chunk_base64":"e30="
+      }
+      """
+    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    guard case .chunk(let chunkID, let chunkIndex, let chunkCount, let chunkBase64) = frame.kind
+    else {
+      Issue.record("Expected chunk frame kind, got \(frame.kind)")
+      return
+    }
+
+    #expect(chunkID == "response:req-1")
+    #expect(chunkIndex == 0)
+    #expect(chunkCount == 2)
+    #expect(chunkBase64 == "e30=")
   }
 
   @Test("SessionUpdatedPayload decodes when timeline is omitted")
@@ -152,6 +212,28 @@ struct WebSocketProtocolTests {
           )
         }
     }
+  }
+
+  @Test("PendingRequestStore assembles semantic response batches")
+  func pendingStoreResumeBatch() async throws {
+    let store = PendingRequestStore()
+    let result: JSONValue = try await withCheckedThrowingContinuation { continuation in
+      store.register(id: "batched", continuation: continuation)
+      _ = try? store.resumeBatch(
+        id: "batched",
+        index: 1,
+        count: 2,
+        result: .array([.string("beta")])
+      )
+      _ = try? store.resumeBatch(
+        id: "batched",
+        index: 0,
+        count: 2,
+        result: .array([.string("alpha")])
+      )
+    }
+
+    #expect(result == .array([.string("alpha"), .string("beta")]))
   }
 
   @Test("PendingRequestStore failAll clears all pending")

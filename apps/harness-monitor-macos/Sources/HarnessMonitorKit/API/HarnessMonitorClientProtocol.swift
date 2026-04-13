@@ -1,6 +1,8 @@
 import Foundation
 
 public typealias DaemonPushEventStream = AsyncThrowingStream<DaemonPushEvent, Error>
+public typealias TimelineBatchHandler =
+  @Sendable (_ entries: [TimelineEntry], _ batchIndex: Int, _ batchCount: Int) async -> Void
 
 public protocol HarnessMonitorClientProtocol: Sendable {
   func health() async throws -> HealthResponse
@@ -15,6 +17,10 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
   func timeline(sessionID: String) async throws -> [TimelineEntry]
+  func timeline(
+    sessionID: String,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry]
   func globalStream() async -> DaemonPushEventStream
   func sessionStream(sessionID: String) async -> DaemonPushEventStream
   func createTask(sessionID: String, request: TaskCreateRequest) async throws -> SessionDetail
@@ -140,6 +146,15 @@ extension HarnessMonitorClientProtocol {
 
   public func sessionDetail(id: String) async throws -> SessionDetail {
     try await sessionDetail(id: id, scope: nil)
+  }
+
+  public func timeline(
+    sessionID: String,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry] {
+    let entries = try await timeline(sessionID: sessionID)
+    await onBatch(entries, 0, 1)
+    return entries
   }
 
   public func personas() async throws -> [AgentPersona] {
