@@ -284,8 +284,8 @@ fn spawn_background_reconciliation(db: Option<Arc<Mutex<super::db::DaemonDb>>>) 
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
-    let projects = match index::discover_projects() {
-        Ok(projects) => projects,
+    let (projects, sessions) = match discover_background_reconciliation_inputs() {
+        Ok(inputs) => inputs,
         Err(error) => {
             tracing::warn!(%error, "background file reconciliation failed");
             let _ = state::append_event(
@@ -295,7 +295,14 @@ fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
             return;
         }
     };
-    let mut sessions = match index::discover_sessions_for(&projects, true) {
+
+    let mut result = super::db::ReconcileResult::default();
+    let sessions_to_prepare = match sync_background_projects_and_collect_candidates(
+        db,
+        &projects,
+        &sessions,
+        &mut result,
+    ) {
         Ok(sessions) => sessions,
         Err(error) => {
             tracing::warn!(%error, "background file reconciliation failed");
@@ -306,6 +313,31 @@ fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
             return;
         }
     };
+
+    for resolved in &sessions_to_prepare {
+        match apply_background_session_import(db, resolved) {
+            BackgroundSessionImportOutcome::Imported => result.sessions_imported += 1,
+            BackgroundSessionImportOutcome::Skipped => result.sessions_skipped += 1,
+            BackgroundSessionImportOutcome::Failed => {}
+        }
+    }
+    let message = format!(
+        "background reconciliation: {} projects, {} sessions imported, {} skipped",
+        result.projects, result.sessions_imported, result.sessions_skipped
+    );
+    tracing::info!("{message}");
+    let _ = state::append_event("info", &message);
+}
+
+fn discover_background_reconciliation_inputs() -> Result<
+    (
+        Vec<super::index::DiscoveredProject>,
+        Vec<super::index::ResolvedSession>,
+    ),
+    CliError,
+> {
+    let projects = index::discover_projects()?;
+    let mut sessions = index::discover_sessions_for(&projects, true)?;
     sessions.sort_by(|left, right| {
         let left_active = left.state.status == SessionStatus::Active;
         let right_active = right.state.status == SessionStatus::Active;
@@ -314,75 +346,190 @@ fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
             .then(right.state.updated_at.cmp(&left.state.updated_at))
             .then(left.state.session_id.cmp(&right.state.session_id))
     });
+    Ok((projects, sessions))
+}
 
-    let mut result = super::db::ReconcileResult::default();
-    {
-        let Ok(db_guard) = db.lock() else {
-            return;
-        };
-        for project in &projects {
-            if let Err(error) = db_guard.sync_project(project) {
-                tracing::warn!(%error, project_id = %project.project_id, "background project sync failed");
-                let _ = state::append_event(
-                    "warn",
-                    &format!(
-                        "background file reconciliation failed while syncing project {}: {error}",
-                        project.project_id
-                    ),
-                );
-                return;
+fn sync_background_projects_and_collect_candidates(
+    db: &Arc<Mutex<super::db::DaemonDb>>,
+    projects: &[super::index::DiscoveredProject],
+    sessions: &[super::index::ResolvedSession],
+    result: &mut super::db::ReconcileResult,
+) -> Result<Vec<super::index::ResolvedSession>, CliError> {
+    let Ok(db_guard) = db.lock() else {
+        return Ok(Vec::new());
+    };
+    sync_background_projects(&db_guard, projects, result)?;
+    Ok(collect_background_session_candidates(
+        &db_guard, sessions, result,
+    ))
+}
+
+enum BackgroundSessionImportOutcome {
+    Failed,
+    Imported,
+    Skipped,
+}
+
+enum BackgroundSessionCandidate {
+    Failed,
+    Prepare,
+    Skip,
+}
+
+fn apply_background_session_import(
+    db: &Arc<Mutex<super::db::DaemonDb>>,
+    resolved: &super::index::ResolvedSession,
+) -> BackgroundSessionImportOutcome {
+    let Some(prepared) = prepare_background_session_import(resolved) else {
+        return BackgroundSessionImportOutcome::Failed;
+    };
+    let Ok(db_guard) = db.lock() else {
+        return BackgroundSessionImportOutcome::Failed;
+    };
+    apply_prepared_background_session_import(&db_guard, &prepared)
+}
+
+fn sync_background_projects(
+    db: &super::db::DaemonDb,
+    projects: &[super::index::DiscoveredProject],
+    result: &mut super::db::ReconcileResult,
+) -> Result<(), CliError> {
+    for project in projects {
+        db.sync_project(project).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "sync project {}: {error}",
+                project.project_id
+            )))
+        })?;
+        result.projects += 1;
+    }
+    Ok(())
+}
+
+fn collect_background_session_candidates(
+    db: &super::db::DaemonDb,
+    sessions: &[super::index::ResolvedSession],
+    result: &mut super::db::ReconcileResult,
+) -> Vec<super::index::ResolvedSession> {
+    let mut sessions_to_prepare = Vec::new();
+    for resolved in sessions {
+        match background_session_candidate(db, resolved) {
+            BackgroundSessionCandidate::Prepare => sessions_to_prepare.push(resolved.clone()),
+            BackgroundSessionCandidate::Skip | BackgroundSessionCandidate::Failed => {
+                result.sessions_skipped += 1;
             }
-            result.projects += 1;
         }
     }
+    sessions_to_prepare
+}
 
-    for resolved in &sessions {
-        let prepared = match super::db::DaemonDb::prepare_session_import_from_resolved(resolved) {
-            Ok(prepared) => prepared,
-            Err(error) => {
-                tracing::warn!(
-                    %error,
-                    session_id = %resolved.state.session_id,
-                    "background session prepare failed"
-                );
-                continue;
-            }
-        };
-        let Ok(db_guard) = db.lock() else {
-            return;
-        };
-        let db_version = match db_guard.session_state_version(&prepared.resolved.state.session_id) {
-            Ok(version) => version,
-            Err(error) => {
-                tracing::warn!(
-                    %error,
-                    session_id = %prepared.resolved.state.session_id,
-                    "background session version check failed"
-                );
-                continue;
-            }
-        };
-        let file_version = i64::try_from(prepared.resolved.state.state_version).unwrap_or(i64::MAX);
-        if db_version.is_some_and(|version| version >= file_version) {
-            result.sessions_skipped += 1;
-            continue;
-        }
-        if let Err(error) = db_guard.apply_prepared_session_resync(&prepared) {
-            tracing::warn!(
-                %error,
-                session_id = %prepared.resolved.state.session_id,
-                "background session import failed"
-            );
-            continue;
-        }
-        result.sessions_imported += 1;
+fn prepare_background_session_import(
+    resolved: &super::index::ResolvedSession,
+) -> Option<super::db::PreparedSessionResync> {
+    super::db::DaemonDb::prepare_session_import_from_resolved(resolved)
+        .inspect_err(|error| log_background_session_prepare_error(error, resolved))
+        .ok()
+}
+
+fn apply_prepared_background_session_import(
+    db: &super::db::DaemonDb,
+    prepared: &super::db::PreparedSessionResync,
+) -> BackgroundSessionImportOutcome {
+    let Some(import_required) = prepared_session_import_required(db, prepared) else {
+        return BackgroundSessionImportOutcome::Failed;
+    };
+    if !import_required {
+        return BackgroundSessionImportOutcome::Skipped;
     }
-    let message = format!(
-        "background reconciliation: {} projects, {} sessions imported, {} skipped",
-        result.projects, result.sessions_imported, result.sessions_skipped
+    import_prepared_background_session(db, prepared)
+}
+
+fn session_import_required(
+    db: &super::db::DaemonDb,
+    resolved: &super::index::ResolvedSession,
+) -> Result<bool, CliError> {
+    let db_version = db.session_state_version(&resolved.state.session_id)?;
+    let file_version = i64::try_from(resolved.state.state_version).unwrap_or(i64::MAX);
+    Ok(db_version.is_none_or(|version| version < file_version))
+}
+
+fn background_session_candidate(
+    db: &super::db::DaemonDb,
+    resolved: &super::index::ResolvedSession,
+) -> BackgroundSessionCandidate {
+    match session_import_required(db, resolved) {
+        Ok(false) => BackgroundSessionCandidate::Skip,
+        Ok(true) => BackgroundSessionCandidate::Prepare,
+        Err(error) => {
+            log_background_session_version_check_error(&error, resolved);
+            BackgroundSessionCandidate::Failed
+        }
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_background_session_prepare_error(
+    error: &CliError,
+    resolved: &super::index::ResolvedSession,
+) {
+    tracing::warn!(
+        %error,
+        session_id = %resolved.state.session_id,
+        "background session prepare failed"
     );
-    tracing::info!("{message}");
-    let _ = state::append_event("info", &message);
+}
+
+fn prepared_session_import_required(
+    db: &super::db::DaemonDb,
+    prepared: &super::db::PreparedSessionResync,
+) -> Option<bool> {
+    session_import_required(db, &prepared.resolved)
+        .inspect_err(|error| log_background_session_version_check_error(error, &prepared.resolved))
+        .ok()
+}
+
+fn import_prepared_background_session(
+    db: &super::db::DaemonDb,
+    prepared: &super::db::PreparedSessionResync,
+) -> BackgroundSessionImportOutcome {
+    if let Err(error) = db.apply_prepared_session_resync(prepared) {
+        log_background_session_import_error(&error, prepared);
+        return BackgroundSessionImportOutcome::Failed;
+    }
+    BackgroundSessionImportOutcome::Imported
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_background_session_version_check_error(
+    error: &CliError,
+    resolved: &super::index::ResolvedSession,
+) {
+    tracing::warn!(
+        %error,
+        session_id = %resolved.state.session_id,
+        "background session version check failed"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_background_session_import_error(
+    error: &CliError,
+    prepared: &super::db::PreparedSessionResync,
+) {
+    tracing::warn!(
+        %error,
+        session_id = %prepared.resolved.state.session_id,
+        "background session import failed"
+    );
 }
 
 fn spawn_background_diagnostics(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
@@ -2578,6 +2725,89 @@ mod tests {
             .expect("open for mtime")
             .set_times(std::fs::FileTimes::new().set_modified(old_time))
             .expect("set mtime");
+    }
+
+    #[test]
+    fn session_import_required_skips_matching_db_versions() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon version skip",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-version-skip"),
+            )
+            .expect("start session");
+
+            append_project_ledger_entry(project);
+            let db_root = tempdir().expect("db root");
+            let db = crate::daemon::db::DaemonDb::open(&db_root.path().join("harness.db"))
+                .expect("open db");
+            let projects = crate::daemon::index::discover_projects().expect("discover projects");
+            let sessions = crate::daemon::index::discover_sessions_for(&projects, true)
+                .expect("discover sessions");
+            db.reconcile_sessions(&projects, &sessions)
+                .expect("reconcile sessions");
+            let resolved = sessions
+                .into_iter()
+                .find(|resolved| resolved.state.session_id == state.session_id)
+                .expect("resolved session");
+
+            assert!(
+                !session_import_required(&db, &resolved).expect("version check"),
+                "already indexed session should not require prepare"
+            );
+        });
+    }
+
+    #[test]
+    fn session_import_required_detects_newer_file_versions() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon version refresh",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-version-refresh"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.clone().expect("leader id");
+
+            append_project_ledger_entry(project);
+            let db_root = tempdir().expect("db root");
+            let db = crate::daemon::db::DaemonDb::open(&db_root.path().join("harness.db"))
+                .expect("open db");
+            let projects = crate::daemon::index::discover_projects().expect("discover projects");
+            let sessions = crate::daemon::index::discover_sessions_for(&projects, true)
+                .expect("discover sessions");
+            db.reconcile_sessions(&projects, &sessions)
+                .expect("reconcile sessions");
+
+            session_service::create_task(
+                &state.session_id,
+                "refresh daemon cache",
+                None,
+                crate::session::types::TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("create task");
+
+            let refreshed_projects =
+                crate::daemon::index::discover_projects().expect("rediscover projects");
+            let refreshed_sessions =
+                crate::daemon::index::discover_sessions_for(&refreshed_projects, true)
+                    .expect("rediscover sessions");
+            let resolved = refreshed_sessions
+                .into_iter()
+                .find(|resolved| resolved.state.session_id == state.session_id)
+                .expect("resolved session");
+
+            assert!(
+                session_import_required(&db, &resolved).expect("version check"),
+                "newer file state should still prepare for import"
+            );
+        });
     }
 
     #[derive(Clone, Copy)]
