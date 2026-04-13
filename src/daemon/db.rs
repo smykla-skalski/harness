@@ -38,7 +38,7 @@ pub(crate) struct AgentTuiLiveRefreshState {
 
 #[derive(Debug)]
 pub(crate) struct PreparedSessionResync {
-    resolved: super::index::ResolvedSession,
+    pub(crate) resolved: super::index::ResolvedSession,
     log_entries: Vec<SessionLogEntry>,
     task_checkpoints: Vec<PreparedTaskCheckpointImport>,
     signals: Vec<SessionSignalRecord>,
@@ -416,8 +416,7 @@ impl DaemonDb {
             import_session_log(self, &resolved.project, &resolved.state.session_id)?;
             import_session_checkpoints(self, &resolved.project, &resolved.state)?;
             import_session_signals(self, resolved)?;
-            import_session_activity(self, resolved)?;
-            import_conversation_events(self, resolved)?;
+            import_session_activity_and_conversation_events(self, resolved)?;
         }
 
         import_daemon_events(self)?;
@@ -458,8 +457,7 @@ impl DaemonDb {
             import_session_log(self, &resolved.project, &resolved.state.session_id)?;
             import_session_checkpoints(self, &resolved.project, &resolved.state)?;
             import_session_signals(self, resolved)?;
-            import_session_activity(self, resolved)?;
-            import_conversation_events(self, resolved)?;
+            import_session_activity_and_conversation_events(self, resolved)?;
             result.sessions_imported += 1;
         }
 
@@ -1306,6 +1304,16 @@ impl DaemonDb {
         session_id: &str,
     ) -> Result<PreparedSessionResync, CliError> {
         let resolved = super::index::resolve_session(session_id)?;
+        Self::prepare_session_import_from_resolved(&resolved)
+    }
+
+    /// Prepare a session import from a pre-discovered resolved session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on I/O or parse failures.
+    pub(crate) fn prepare_session_import_from_resolved(
+        resolved: &super::index::ResolvedSession,
+    ) -> Result<PreparedSessionResync, CliError> {
         let log_entries =
             super::index::load_log_entries(&resolved.project, &resolved.state.session_id)?;
 
@@ -1320,30 +1328,20 @@ impl DaemonDb {
         }
 
         let signals = super::snapshot::load_signals_for(&resolved.project, &resolved.state)?;
-        let activities =
-            super::snapshot::load_agent_activity_for(&resolved.project, &resolved.state)?;
-
-        let mut conversation_events = Vec::new();
-        for (agent_id, agent) in &resolved.state.agents {
-            let session_key = agent
-                .agent_session_id
-                .as_deref()
-                .unwrap_or(&resolved.state.session_id);
-            let events = super::index::load_conversation_events(
-                &resolved.project,
-                &agent.runtime,
-                session_key,
-                agent_id,
-            )?;
-            conversation_events.push(PreparedConversationEventImport {
-                agent_id: agent_id.clone(),
-                runtime: agent.runtime.clone(),
-                events,
-            });
-        }
+        let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
+            &resolved.state,
+            |agent_id, runtime, session_key| {
+                super::index::load_conversation_events(
+                    &resolved.project,
+                    runtime,
+                    session_key,
+                    agent_id,
+                )
+            },
+        )?;
 
         Ok(PreparedSessionResync {
-            resolved,
+            resolved: resolved.clone(),
             log_entries,
             task_checkpoints,
             signals,
@@ -1778,6 +1776,44 @@ impl DaemonDb {
     }
 }
 
+fn prepare_agent_conversation_imports_and_activity<F>(
+    state: &SessionState,
+    mut load_events: F,
+) -> Result<
+    (
+        Vec<super::protocol::AgentToolActivitySummary>,
+        Vec<PreparedConversationEventImport>,
+    ),
+    CliError,
+>
+where
+    F: FnMut(&str, &str, &str) -> Result<Vec<ConversationEvent>, CliError>,
+{
+    let mut activities = Vec::with_capacity(state.agents.len());
+    let mut conversation_events = Vec::with_capacity(state.agents.len());
+
+    for (agent_id, agent) in &state.agents {
+        let session_key = agent
+            .agent_session_id
+            .as_deref()
+            .unwrap_or(&state.session_id);
+        let events = load_events(agent_id, &agent.runtime, session_key)?;
+        activities.push(super::snapshot::agent_activity_summary_from_events(
+            agent_id,
+            &agent.runtime,
+            agent.last_activity_at.as_deref(),
+            &events,
+        ));
+        conversation_events.push(PreparedConversationEventImport {
+            agent_id: agent_id.clone(),
+            runtime: agent.runtime.clone(),
+            events,
+        });
+    }
+
+    Ok((activities, conversation_events))
+}
+
 pub(crate) fn ensure_shared_db(
     db_slot: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
 ) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
@@ -1953,35 +1989,29 @@ fn import_session_signals(
     db.sync_signal_index(&resolved.state.session_id, &signals)
 }
 
-fn import_session_activity(
+fn import_session_activity_and_conversation_events(
     db: &DaemonDb,
     resolved: &super::index::ResolvedSession,
 ) -> Result<(), CliError> {
-    let activities = super::snapshot::load_agent_activity_for(&resolved.project, &resolved.state)?;
-    db.sync_agent_activity(&resolved.state.session_id, &activities)
-}
-
-fn import_conversation_events(
-    db: &DaemonDb,
-    resolved: &super::index::ResolvedSession,
-) -> Result<(), CliError> {
+    let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
+        &resolved.state,
+        |agent_id, runtime, session_key| {
+            super::index::load_conversation_events(
+                &resolved.project,
+                runtime,
+                session_key,
+                agent_id,
+            )
+        },
+    )?;
+    db.sync_agent_activity(&resolved.state.session_id, &activities)?;
     clear_session_conversation_events(&db.conn, &resolved.state.session_id)?;
-    for (agent_id, agent) in &resolved.state.agents {
-        let session_key = agent
-            .agent_session_id
-            .as_deref()
-            .unwrap_or(&resolved.state.session_id);
-        let events = super::index::load_conversation_events(
-            &resolved.project,
-            &agent.runtime,
-            session_key,
-            agent_id,
-        )?;
+    for import in &conversation_events {
         db.sync_conversation_events(
             &resolved.state.session_id,
-            agent_id,
-            &agent.runtime,
-            &events,
+            &import.agent_id,
+            &import.runtime,
+            &import.events,
         )?;
     }
     Ok(())
@@ -3786,6 +3816,117 @@ mod tests {
             )
             .expect("count worker conversation events");
         assert_eq!(worker_count, 0);
+    }
+
+    #[test]
+    fn prepare_agent_conversation_imports_and_activity_loads_each_agent_once() {
+        use crate::agents::runtime::RuntimeCapabilities;
+        use crate::session::types::{AgentRegistration, AgentStatus, SessionRole};
+
+        let mut state = sample_session_state();
+        state.agents.insert(
+            "codex-worker".into(),
+            AgentRegistration {
+                agent_id: "codex-worker".into(),
+                name: "Codex Worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec!["general".into()],
+                joined_at: "2026-04-03T12:01:00Z".into(),
+                updated_at: "2026-04-03T12:05:30Z".into(),
+                status: AgentStatus::Active,
+                agent_session_id: Some("codex-session-1".into()),
+                last_activity_at: Some("2026-04-03T12:05:30Z".into()),
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
+            },
+        );
+        let session_id = state.session_id.clone();
+
+        let mut calls = Vec::new();
+        let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
+            &state,
+            |agent_id, runtime, session_key| {
+                calls.push((
+                    agent_id.to_string(),
+                    runtime.to_string(),
+                    session_key.to_string(),
+                ));
+                let events = match agent_id {
+                    "claude-leader" => vec![
+                        ConversationEvent {
+                            timestamp: Some("2026-04-03T12:00:01Z".into()),
+                            sequence: 1,
+                            kind: ConversationEventKind::ToolInvocation {
+                                tool_name: "Read".into(),
+                                category: "fs".into(),
+                                input: serde_json::json!({"path": "README.md"}),
+                                invocation_id: Some("call-1".into()),
+                            },
+                            agent: agent_id.to_string(),
+                            session_id: session_id.clone(),
+                        },
+                        ConversationEvent {
+                            timestamp: Some("2026-04-03T12:00:02Z".into()),
+                            sequence: 2,
+                            kind: ConversationEventKind::ToolResult {
+                                tool_name: "Read".into(),
+                                invocation_id: Some("call-1".into()),
+                                output: serde_json::json!({"lines": 12}),
+                                is_error: false,
+                                duration_ms: Some(5),
+                            },
+                            agent: agent_id.to_string(),
+                            session_id: session_id.clone(),
+                        },
+                    ],
+                    "codex-worker" => vec![ConversationEvent {
+                        timestamp: Some("2026-04-03T12:00:03Z".into()),
+                        sequence: 1,
+                        kind: ConversationEventKind::Error {
+                            code: Some("tool_error".into()),
+                            message: "boom".into(),
+                            recoverable: true,
+                        },
+                        agent: agent_id.to_string(),
+                        session_id: session_id.clone(),
+                    }],
+                    other => panic!("unexpected agent: {other}"),
+                };
+                Ok(events)
+            },
+        )
+        .expect("prepare conversation imports");
+
+        assert_eq!(
+            calls,
+            vec![
+                (
+                    "claude-leader".to_string(),
+                    "claude".to_string(),
+                    "claude-session-1".to_string(),
+                ),
+                (
+                    "codex-worker".to_string(),
+                    "codex".to_string(),
+                    "codex-session-1".to_string(),
+                ),
+            ]
+        );
+        assert_eq!(conversation_events.len(), 2);
+        assert_eq!(conversation_events[0].events.len(), 2);
+        assert_eq!(conversation_events[1].events.len(), 1);
+        assert_eq!(activities.len(), 2);
+        assert_eq!(activities[0].agent_id, "claude-leader");
+        assert_eq!(activities[0].tool_invocation_count, 1);
+        assert_eq!(activities[0].tool_result_count, 1);
+        assert_eq!(activities[0].tool_error_count, 0);
+        assert_eq!(activities[0].latest_tool_name.as_deref(), Some("Read"));
+        assert_eq!(activities[1].agent_id, "codex-worker");
+        assert_eq!(activities[1].tool_invocation_count, 0);
+        assert_eq!(activities[1].tool_result_count, 0);
+        assert_eq!(activities[1].tool_error_count, 1);
     }
 
     #[test]
