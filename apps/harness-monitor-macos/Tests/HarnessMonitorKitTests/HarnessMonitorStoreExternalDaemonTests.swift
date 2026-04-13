@@ -335,7 +335,7 @@ private final class FireCounter: @unchecked Sendable {
 /// the watcher's dispatch source. Uses `NSLock` (same pattern as
 /// `FireCounter` in this file) rather than `Mutex` so the helper works
 /// from `@Sendable` closures in the watcher callback.
-private final class ManifestChangeRecorder: @unchecked Sendable {
+final class ManifestChangeRecorder: @unchecked Sendable {
   private let lock = NSLock()
   private var changes: [ManifestChange] = []
 

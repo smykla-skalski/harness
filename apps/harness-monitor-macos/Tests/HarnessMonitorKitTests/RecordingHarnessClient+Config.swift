@@ -259,7 +259,7 @@ extension RecordingHarnessClient {
     lock.withLock { _timelinesBySessionID[sessionID] }
   }
   func timelineScopes(for sessionID: String) -> [TimelineScope] {
-    lock.withLock { _timelineScopesBySessionID[sessionID] ?? [] }
+    lock.withLock { _timelineScopesByID[sessionID] ?? [] }
   }
   func configuredTimelineBatches(for sessionID: String) -> [[TimelineEntry]]? {
     lock.withLock { _timelineBatchesBySessionID[sessionID] }

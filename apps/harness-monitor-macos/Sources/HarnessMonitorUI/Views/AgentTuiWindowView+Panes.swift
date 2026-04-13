@@ -9,7 +9,7 @@ extension AgentTuiWindowView {
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .id(scrollContainerIdentity)
-    } else if case .create = selection {
+    } else if case .create = viewModel.selection {
       ScrollView {
         createPane
           .padding(HarnessMonitorTheme.spacingLG)
@@ -25,7 +25,7 @@ extension AgentTuiWindowView {
   }
 
   @ViewBuilder var paneContent: some View {
-    switch selection {
+    switch viewModel.selection {
     case .create:
       createPane
     case .session:
@@ -38,7 +38,7 @@ extension AgentTuiWindowView {
   }
 
   var createPaneDescription: String {
-    if displayState.hasAgentTuis {
+    if viewModel.displayState.hasAgentTuis {
       "Open Agent TUI sessions stay pinned in the sidebar so you can launch "
         + "another agent without losing the active terminal."
     } else {
@@ -48,7 +48,7 @@ extension AgentTuiWindowView {
 
   var createPane: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      if displayState.agentTuiUnavailable {
+      if viewModel.displayState.agentTuiUnavailable {
         agentTuiUnavailableBanner
       }
       launchSection
@@ -77,40 +77,41 @@ extension AgentTuiWindowView {
   }
 
   var launchForm: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    @Bindable var formModel = viewModel
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("New agent")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          Picker("Runtime", selection: $runtime) {
+          Picker("Runtime", selection: $formModel.runtime) {
             ForEach(AgentTuiRuntime.allCases) { runtime in
               Text(runtime.title).tag(runtime)
             }
           }
           .pickerStyle(.segmented)
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
-          if !availablePersonas.isEmpty {
+          if !formModel.availablePersonas.isEmpty {
             inlinePersonaGrid
           }
-          TextField("Optional display name", text: $name)
+          TextField("Optional display name", text: $formModel.name)
             .harnessNativeFormControl()
             .focused($focusedField, equals: .name)
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNameField)
           multilineEditor(
             placeholder: "Optional first prompt to submit inside the TUI",
-            text: $prompt,
+            text: $formModel.prompt,
             field: .prompt,
             minHeight: 72,
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPromptField
           )
-          TextField("Optional project directory override", text: $projectDir)
+          TextField("Optional project directory override", text: $formModel.projectDir)
             .harnessNativeFormControl()
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiProjectDirField)
           multilineEditor(
             placeholder:
               "Optional argv override (one argument per line; first line is the executable)",
-            text: $argvOverride,
+            text: $formModel.argvOverride,
             field: .argv,
             minHeight: 88,
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
@@ -121,11 +122,20 @@ extension AgentTuiWindowView {
           Text("Terminal size")
             .scaledFont(.caption.bold())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          Stepper("Rows \(rows)", value: $rows, in: TerminalViewportSizing.rowRange)
-          Stepper("Cols \(cols)", value: $cols, in: TerminalViewportSizing.colRange, step: 10)
+          Stepper(
+            "Rows \(formModel.rows)",
+            value: $formModel.rows,
+            in: TerminalViewportSizing.rowRange
+          )
+          Stepper(
+            "Cols \(formModel.cols)",
+            value: $formModel.cols,
+            in: TerminalViewportSizing.colRange,
+            step: 10
+          )
           Spacer(minLength: 0)
           HarnessMonitorActionButton(
-            title: "Start \(runtime.title)",
+            title: "Start \(formModel.runtime.title)",
             variant: .prominent,
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
             fillsWidth: true
@@ -136,7 +146,7 @@ extension AgentTuiWindowView {
           .disabled(!canStart)
           .accessibilityTestProbe(
             HarnessMonitorAccessibility.agentTuiStartButton,
-            label: "Start \(runtime.title)"
+            label: "Start \(formModel.runtime.title)"
           )
         }
         .frame(width: 240, alignment: .topLeading)
@@ -154,7 +164,7 @@ extension AgentTuiWindowView {
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       LazyVGrid(columns: Self.personaColumns, spacing: HarnessMonitorTheme.spacingMD) {
-        ForEach(availablePersonas, id: \.identifier) { persona in
+        ForEach(viewModel.availablePersonas, id: \.identifier) { persona in
           personaCardButton(persona)
         }
       }
@@ -164,9 +174,9 @@ extension AgentTuiWindowView {
   }
 
   func personaCardButton(_ persona: AgentPersona) -> some View {
-    let isSelected = selectedPersona == persona.identifier
+    let isSelected = viewModel.selectedPersona == persona.identifier
     return Button {
-      selectedPersona = isSelected ? nil : persona.identifier
+      viewModel.selectedPersona = isSelected ? nil : persona.identifier
     } label: {
       VStack(spacing: HarnessMonitorTheme.spacingSM) {
         PersonaSymbolView(symbol: persona.symbol, size: 40)
@@ -193,8 +203,8 @@ extension AgentTuiWindowView {
     .accessibilityAddTraits(isSelected ? .isSelected : [])
     .popover(
       isPresented: Binding(
-        get: { expandedPersonaInfo == persona.identifier },
-        set: { if !$0 { expandedPersonaInfo = nil } }
+        get: { viewModel.expandedPersonaInfo == persona.identifier },
+        set: { if !$0 { viewModel.expandedPersonaInfo = nil } }
       )
     ) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -209,7 +219,7 @@ extension AgentTuiWindowView {
     }
     .contextMenu {
       Button("Learn more") {
-        expandedPersonaInfo = persona.identifier
+        viewModel.expandedPersonaInfo = persona.identifier
       }
     }
   }
@@ -270,7 +280,7 @@ extension AgentTuiWindowView {
       } label: {
         Label("Back", systemImage: "chevron.backward")
       }
-      .disabled(!windowNavigation.canGoBack)
+      .disabled(!viewModel.windowNavigation.canGoBack)
       .help("Go back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateBackButton)
 
@@ -279,7 +289,7 @@ extension AgentTuiWindowView {
       } label: {
         Label("Forward", systemImage: "chevron.forward")
       }
-      .disabled(!windowNavigation.canGoForward)
+      .disabled(!viewModel.windowNavigation.canGoForward)
       .help("Go forward")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateForwardButton)
     }
