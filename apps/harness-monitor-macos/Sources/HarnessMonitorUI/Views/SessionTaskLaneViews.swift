@@ -202,8 +202,8 @@ struct SessionTaskSummaryCard: View {
     task: PreviewFixtures.tasks[0],
     inspectTask: { _ in }
   )
-    .padding()
-    .frame(width: 320)
+  .padding()
+  .frame(width: 320)
 }
 
 private struct TaskDraggingOverlay: View {
@@ -221,7 +221,9 @@ private struct TaskDraggingOverlay: View {
       TaskDragGestureIcon(size: 44)
         .foregroundStyle(HarnessMonitorTheme.accent)
     }
-    .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous))
+    .clipShape(
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+    )
     .allowsHitTesting(false)
     .accessibilityHidden(true)
   }
@@ -264,8 +266,8 @@ private struct TaskDragGestureIcon: View {
   }
 }
 
-private extension WorkItem {
-  var assignmentStateTitle: String {
+extension WorkItem {
+  fileprivate var assignmentStateTitle: String {
     if isPendingDelivery {
       return "Pending delivery"
     }
@@ -275,7 +277,8 @@ private extension WorkItem {
     return status.title
   }
 
-  var assignmentStateColor: Color {
-    (isPendingDelivery || isQueuedForWorker) ? HarnessMonitorTheme.caution : taskStatusColor(for: status)
+  fileprivate var assignmentStateColor: Color {
+    (isPendingDelivery || isQueuedForWorker)
+      ? HarnessMonitorTheme.caution : taskStatusColor(for: status)
   }
 }

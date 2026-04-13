@@ -112,6 +112,28 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.isSelectionLoading == false)
   }
 
+  @Test("Session selection prefers core detail scope on websocket transport")
+  func sessionSelectionPrefersCoreDetailScopeOnWebsocketTransport() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .webSocket
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == ["core"])
+  }
+
+  @Test("Session selection keeps full detail scope on HTTP transport")
+  func sessionSelectionKeepsFullDetailScopeOnHTTPTransport() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .httpSSE
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == [nil])
+  }
+
   @Test("Refresh diagnostics without client falls back to daemon status")
   func refreshDiagnosticsWithoutClientFallsBackToDaemonStatus() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -263,6 +285,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
       modelContainer: container
     )
     await store.bootstrap()
+    store.activeTransport = .webSocket
     await store.selectSession(selectedSummary.sessionId)
     await store.cacheSessionDetail(selectedDetail, timeline: selectedTimeline)
     await store.cacheSessionDetail(backgroundDetail, timeline: [])
@@ -301,13 +324,25 @@ struct HarnessMonitorStoreLifecycleCoreTests {
         updatedBackgroundSummary.sessionId: backgroundTimeline,
       ]
     )
+    client.configureDetailDelay(.milliseconds(200), for: selectedSummary.sessionId)
 
-    let baselineSelectedDetailCount = client.readCallCount(.sessionDetail(selectedSummary.sessionId))
+    let baselineSelectedDetailCount = client.readCallCount(
+      .sessionDetail(selectedSummary.sessionId))
     let baselineSelectedTimelineCount = client.readCallCount(.timeline(selectedSummary.sessionId))
-    let baselineBackgroundDetailCount = client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
-    let baselineBackgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
+    let baselineBackgroundDetailCount = client.readCallCount(
+      .sessionDetail(backgroundSummary.sessionId))
+    let baselineBackgroundTimelineCount = client.readCallCount(
+      .timeline(backgroundSummary.sessionId))
 
     await store.refresh(using: client, preserveSelection: true)
+    try? await Task.sleep(for: .milliseconds(40))
+
+    #expect(
+      client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
+        == baselineBackgroundDetailCount)
+    #expect(
+      client.readCallCount(.timeline(backgroundSummary.sessionId))
+        == baselineBackgroundTimelineCount)
 
     for _ in 0..<50 {
       let selectedTimelineCount = client.readCallCount(.timeline(selectedSummary.sessionId))
@@ -320,10 +355,20 @@ struct HarnessMonitorStoreLifecycleCoreTests {
       try? await Task.sleep(for: .milliseconds(10))
     }
 
-    #expect(client.readCallCount(.sessionDetail(selectedSummary.sessionId)) == baselineSelectedDetailCount + 1)
-    #expect(client.readCallCount(.timeline(selectedSummary.sessionId)) == baselineSelectedTimelineCount + 1)
-    #expect(client.readCallCount(.sessionDetail(backgroundSummary.sessionId)) == baselineBackgroundDetailCount + 1)
-    #expect(client.readCallCount(.timeline(backgroundSummary.sessionId)) == baselineBackgroundTimelineCount + 1)
+    #expect(
+      client.readCallCount(.sessionDetail(selectedSummary.sessionId)) == baselineSelectedDetailCount
+        + 1)
+    #expect(
+      client.readCallCount(.timeline(selectedSummary.sessionId)) == baselineSelectedTimelineCount
+        + 1)
+    #expect(
+      client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
+        == baselineBackgroundDetailCount + 1)
+    #expect(
+      client.readCallCount(.timeline(backgroundSummary.sessionId))
+        == baselineBackgroundTimelineCount + 1)
+    #expect(client.sessionDetailScopes(for: selectedSummary.sessionId).last == "core")
+    #expect(client.sessionDetailScopes(for: backgroundSummary.sessionId).last == "core")
   }
 
   @Test("Replacing the session snapshot clears removed selection across UI slices")
@@ -487,7 +532,8 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.manifestWatcher != nil)
     #expect(
       store.connectionEvents.contains { event in
-        event.detail.contains("Managed daemon did not become healthy; refreshing the bundled launch agent")
+        event.detail.contains(
+          "Managed daemon did not become healthy; refreshing the bundled launch agent")
       }
     )
   }

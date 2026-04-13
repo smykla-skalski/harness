@@ -83,6 +83,58 @@ struct SessionCacheHydrationMemoryTests {
     #expect(!queue.isEmpty)
   }
 
+  @Test("Hydration queue skips sessions with cached timeline even when summaries advance")
+  func hydrationQueueSkipsStaleSummariesWhenTimelineExists() async throws {
+    let store = harness.makeStore()
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let session = makeSession(
+      .init(
+        sessionId: "sess-stale-summary",
+        context: "Stale summary",
+        status: .active,
+        leaderId: "leader-stale-summary",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+
+    await store.cacheSessionList([session], projects: [project])
+
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-stale-summary",
+      workerName: "Worker"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: session.leaderId ?? "",
+      summary: "Cached entry"
+    )
+    await store.cacheSessionDetail(detail, timeline: timeline)
+
+    let updatedSession = SessionSummary(
+      projectId: session.projectId,
+      projectName: session.projectName,
+      projectDir: session.projectDir,
+      contextRoot: session.contextRoot,
+      sessionId: session.sessionId,
+      title: session.title,
+      context: "Stale summary updated",
+      status: session.status,
+      createdAt: session.createdAt,
+      updatedAt: "2026-04-03T00:00:00Z",
+      lastActivityAt: "2026-04-03T00:00:00Z",
+      leaderId: session.leaderId,
+      observeId: session.observeId,
+      pendingLeaderTransfer: session.pendingLeaderTransfer,
+      metrics: session.metrics
+    )
+
+    let queue = await store.persistedSnapshotHydrationQueue(for: [updatedSession])
+    #expect(queue.isEmpty)
+  }
+
   @Test("Hydration queue only checks sessions matching input")
   func hydrationQueueScopedToInput() async throws {
     let store = harness.makeStore()

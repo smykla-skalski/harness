@@ -34,7 +34,9 @@ struct HarnessMonitorPathsTests {
     )
   }
 
-  @Test("External daemon mode defaults to the shared monitor data root when no explicit data home is set")
+  @Test(
+    "External daemon mode defaults to the shared monitor data root when no explicit data home is set"
+  )
   func externalDaemonModeDefaultsToSharedMonitorDataRoot() {
     let environment = HarnessMonitorEnvironment(
       values: [DaemonOwnership.environmentKey: "1"],
@@ -44,7 +46,8 @@ struct HarnessMonitorPathsTests {
     if let containerURL = FileManager.default.containerURL(
       forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
     ) {
-      expectedRoot = containerURL
+      expectedRoot =
+        containerURL
         .appendingPathComponent("harness", isDirectory: true)
         .appendingPathComponent("daemon", isDirectory: true)
         .path

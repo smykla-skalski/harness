@@ -351,8 +351,8 @@ struct SessionAgentSummaryCard: View {
   .frame(width: 320)
 }
 
-private extension [WorkItem] {
-  func queued(for agentID: String) -> [WorkItem] {
+extension [WorkItem] {
+  fileprivate func queued(for agentID: String) -> [WorkItem] {
     filter { task in
       task.assignedTo == agentID && task.isQueuedForWorker
     }

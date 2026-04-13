@@ -76,8 +76,8 @@ struct HarnessMonitorMarkdownText: View {
   }
 }
 
-private extension InlineStyle {
-  static var harnessMonitorMarkdown: InlineStyle {
+extension InlineStyle {
+  fileprivate static var harnessMonitorMarkdown: InlineStyle {
     InlineStyle()
       .code(
         .monospaced,

@@ -87,10 +87,6 @@ extension HarnessMonitorStore {
         projects: measuredProjects.value,
         sessions: measuredSessions.value
       )
-      schedulePersistedSnapshotHydration(
-        using: client,
-        sessions: measuredSessions.value
-      )
 
       if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
         let requestID = beginSessionLoad()
@@ -106,6 +102,11 @@ extension HarnessMonitorStore {
           }
         }
       }
+
+      schedulePersistedSnapshotHydration(
+        using: client,
+        sessions: measuredSessions.value
+      )
     } catch {
       _ = disconnectActiveConnection()
       markConnectionOffline(error.localizedDescription)

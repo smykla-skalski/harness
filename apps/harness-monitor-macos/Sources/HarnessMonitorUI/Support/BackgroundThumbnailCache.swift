@@ -236,9 +236,11 @@ public actor BackgroundThumbnailCache {
       kCGImageSourceShouldCacheImmediately: true,
     ]
 
-    guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
-      source, 0, thumbnailOptions as CFDictionary
-    ) else {
+    guard
+      let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+        source, 0, thumbnailOptions as CFDictionary
+      )
+    else {
       return nil
     }
 
@@ -365,7 +367,8 @@ public actor BackgroundThumbnailCache {
     let targetSize = targetPixelSize(for: image, maxPixelSize: maxPixelSize)
     guard targetSize.width > 0, targetSize.height > 0 else { return nil }
 
-    let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)
+    let colorSpace =
+      image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)
       ?? CGColorSpaceCreateDeviceRGB()
     guard
       let context = CGContext(
@@ -394,7 +397,8 @@ public actor BackgroundThumbnailCache {
     return context.makeImage()
   }
 
-  private func targetPixelSize(for image: CGImage, maxPixelSize: Int?) -> (width: Int, height: Int) {
+  private func targetPixelSize(for image: CGImage, maxPixelSize: Int?) -> (width: Int, height: Int)
+  {
     let sourceSize = (width: image.width, height: image.height)
     guard let maxPixelSize, maxPixelSize > 0 else { return sourceSize }
 

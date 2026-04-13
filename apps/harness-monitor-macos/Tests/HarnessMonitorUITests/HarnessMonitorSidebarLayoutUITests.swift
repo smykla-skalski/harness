@@ -8,13 +8,24 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
     let window = mainWindow(in: app)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
+    let toolbar = window.toolbars.firstMatch
 
     XCTAssertTrue(waitForElement(window, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(sidebarContent, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(toolbar, timeout: Self.fastActionTimeout))
 
     let toolbarOffset = sidebarContent.frame.minY - window.frame.minY
+    let diagnostics = """
+      window: \(window.frame)
+      toolbar: \(toolbar.frame)
+      sidebar: \(sidebarContent.frame)
+      searchField: \(searchField.frame)
+      toolbarOffset: \(toolbarOffset)
+      """
     XCTAssertGreaterThan(toolbarOffset, 40)
-    XCTAssertLessThan(toolbarOffset, 84)
+    XCTAssertLessThan(toolbarOffset, 84, diagnostics)
   }
 
   func testMainWindowUsesNativeToolbarChromeWithoutCustomBaselineDivider() throws {

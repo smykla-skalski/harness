@@ -283,8 +283,8 @@ public struct AgentTuiSnapshot: Codable, Equatable, Identifiable, Sendable {
   public var id: String { tuiId }
 }
 
-public extension AgentTuiListResponse {
-  func canonicallySorted(roleByAgent: [String: SessionRole]) -> Self {
+extension AgentTuiListResponse {
+  public func canonicallySorted(roleByAgent: [String: SessionRole]) -> Self {
     Self(
       tuis: tuis.sorted { left, right in
         if left.roleSortPriority(roleByAgent: roleByAgent)
@@ -310,8 +310,8 @@ public extension AgentTuiListResponse {
   }
 }
 
-public extension AgentTuiStatus {
-  var sortPriority: Int {
+extension AgentTuiStatus {
+  public var sortPriority: Int {
     switch self {
     case .running:
       0
@@ -325,8 +325,8 @@ public extension AgentTuiStatus {
   }
 }
 
-private extension AgentTuiSnapshot {
-  func roleSortPriority(roleByAgent: [String: SessionRole]) -> Int {
+extension AgentTuiSnapshot {
+  fileprivate func roleSortPriority(roleByAgent: [String: SessionRole]) -> Int {
     roleByAgent[agentId]?.sortPriority ?? SessionRole.worker.sortPriority
   }
 }

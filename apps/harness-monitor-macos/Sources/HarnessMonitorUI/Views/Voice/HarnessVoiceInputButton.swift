@@ -254,7 +254,9 @@ struct HarnessVoiceInputButton: View {
         ) {
           await handle(event)
         }
-        if pendingAutoInsert, !completeTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if pendingAutoInsert,
+          !completeTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
           isRecording = false
           insertTranscript()
           return

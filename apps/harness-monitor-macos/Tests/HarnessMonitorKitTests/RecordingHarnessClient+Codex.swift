@@ -318,7 +318,8 @@ extension RecordingHarnessClient {
       runtime: runtime,
       status: status,
       argv: argv ?? [runtime],
-      projectDir: projectDir ?? PreviewFixtures.summary.projectDir ?? PreviewFixtures.summary.contextRoot,
+      projectDir: projectDir ?? PreviewFixtures.summary.projectDir
+        ?? PreviewFixtures.summary.contextRoot,
       size: AgentTuiSize(rows: rows, cols: cols),
       screen: AgentTuiScreenSnapshot(
         rows: rows,

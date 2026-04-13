@@ -238,7 +238,8 @@ extension HarnessMonitorStore {
     guard let actor = actionActor(for: actor) else { return false }
     return await mutateSelectedSession(
       actionName: "Transfer leader",
-      actionID: InspectorActionID.transferLeader(sessionID: sessionID, newLeaderID: newLeaderID).key,
+      actionID: InspectorActionID.transferLeader(sessionID: sessionID, newLeaderID: newLeaderID)
+        .key,
       using: client,
       sessionID: sessionID,
       mutation: {

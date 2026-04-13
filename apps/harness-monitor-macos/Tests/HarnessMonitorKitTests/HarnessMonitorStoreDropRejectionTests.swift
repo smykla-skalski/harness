@@ -28,6 +28,7 @@ struct HarnessMonitorStoreDropRejectionTests {
 
     store.reportDropRejection("Cannot assign task: observer cannot take tasks.")
 
-    #expect(store.currentFailureFeedbackMessage == "Cannot assign task: observer cannot take tasks.")
+    #expect(
+      store.currentFailureFeedbackMessage == "Cannot assign task: observer cannot take tasks.")
   }
 }

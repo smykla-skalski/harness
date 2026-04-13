@@ -82,12 +82,18 @@ extension HarnessMonitorStore {
     }
 
     sessionSnapshotHydrationTask?.cancel()
-    sessionSnapshotHydrationTask = Task { @MainActor [weak self] in
+    sessionSnapshotHydrationTask = Task(priority: .utility) { @MainActor [weak self] in
       guard let self else {
         return
       }
 
       defer { self.sessionSnapshotHydrationTask = nil }
+
+      await Task.yield()
+      while let sessionLoadTask = self.sessionLoadTask {
+        await sessionLoadTask.value
+        guard !Task.isCancelled, self.connectionState == .online else { return }
+      }
 
       let prioritySessions: [SessionSummary]
       if let cacheService = self.cacheService {
@@ -112,8 +118,9 @@ extension HarnessMonitorStore {
         }
 
         do {
+          let detailScope = self.activeTransport == .webSocket ? "core" : nil
           let measuredDetail = try await Self.measureOperation {
-            try await client.sessionDetail(id: summary.sessionId)
+            try await client.sessionDetail(id: summary.sessionId, scope: detailScope)
           }
           let measuredTimeline = try await Self.measureOperation {
             try await client.timeline(sessionID: summary.sessionId)

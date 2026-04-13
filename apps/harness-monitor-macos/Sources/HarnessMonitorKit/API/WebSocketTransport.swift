@@ -385,11 +385,20 @@ extension WebSocketTransport {
   }
 
   public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
-    try await httpFallbackClient.agentTuis(sessionID: sessionID)
+    let value = try await send(
+      method: "session.agent_tuis",
+      params: .object(["session_id": .string(sessionID)])
+    )
+    let tuis: [AgentTuiSnapshot] = try decode(value)
+    return AgentTuiListResponse(tuis: tuis)
   }
 
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
-    try await httpFallbackClient.agentTui(tuiID: tuiID)
+    let value = try await send(
+      method: "agent_tui.detail",
+      params: .object(["tui_id": .string(tuiID)])
+    )
+    return try decode(value)
   }
 
   public func startAgentTui(

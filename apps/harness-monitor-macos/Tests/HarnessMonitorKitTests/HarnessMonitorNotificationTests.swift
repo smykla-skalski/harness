@@ -114,25 +114,29 @@ struct HarnessMonitorNotificationTests {
 
   @Test("Notification controls do not expose restricted alert modes")
   func notificationControlsDoNotExposeRestrictedAlertModes() {
-    #expect(HarnessMonitorNotificationAuthorizationProfile.allCases.map(\.rawValue) == [
-      "standard",
-      "provisional",
-    ])
-    #expect(HarnessMonitorNotificationSoundMode.allCases.map(\.rawValue) == [
-      "none",
-      "systemDefault",
-    ])
-    #expect(HarnessMonitorNotificationInterruptionMode.allCases.map(\.rawValue) == [
-      "passive",
-      "active",
-      "timeSensitive",
-    ])
-    #expect(HarnessMonitorNotificationPreset.allCases.map(\.rawValue) == [
-      "basic",
-      "sessionFinished",
-      "actionRequest",
-      "richImage",
-    ])
+    #expect(
+      HarnessMonitorNotificationAuthorizationProfile.allCases.map(\.rawValue) == [
+        "standard",
+        "provisional",
+      ])
+    #expect(
+      HarnessMonitorNotificationSoundMode.allCases.map(\.rawValue) == [
+        "none",
+        "systemDefault",
+      ])
+    #expect(
+      HarnessMonitorNotificationInterruptionMode.allCases.map(\.rawValue) == [
+        "passive",
+        "active",
+        "timeSensitive",
+      ])
+    #expect(
+      HarnessMonitorNotificationPreset.allCases.map(\.rawValue) == [
+        "basic",
+        "sessionFinished",
+        "actionRequest",
+        "richImage",
+      ])
   }
 
   private func temporaryEnvironment() throws -> HarnessMonitorEnvironment {

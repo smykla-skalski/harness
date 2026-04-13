@@ -65,6 +65,7 @@ extension RecordingHarnessClient {
         actor: request.actor
       )
     )
-    return VoiceSessionMutationResponse(voiceSessionId: voiceSessionID, status: request.reason.rawValue)
+    return VoiceSessionMutationResponse(
+      voiceSessionId: voiceSessionID, status: request.reason.rawValue)
   }
 }
