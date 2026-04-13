@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::env::{current_exe, split_paths, var, var_os};
 use std::fmt;
-use std::fs::File;
 use std::fs::Permissions;
+use std::fs::{File, Metadata};
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
 use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio, id as process_id};
@@ -2891,6 +2891,86 @@ fn remove_if_exists(path: &Path) -> Result<(), CliError> {
     }
 }
 
+fn remove_owned_legacy_socket_if_exists(socket_path: &Path) -> Result<(), CliError> {
+    let Some(canonical_socket_path) = legacy_socket_cleanup_target(socket_path)? else {
+        return Ok(());
+    };
+    remove_if_exists(&canonical_socket_path)
+}
+
+fn canonicalize_existing_path(path: &Path) -> Result<Option<PathBuf>, CliError> {
+    match fs::canonicalize(path) {
+        Ok(canonical_path) => Ok(Some(canonical_path)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(CliErrorKind::workflow_io(format!(
+            "canonicalize {}: {error}",
+            path.display()
+        ))
+        .into()),
+    }
+}
+
+fn legacy_socket_cleanup_target(socket_path: &Path) -> Result<Option<PathBuf>, CliError> {
+    let Some(canonical_socket_path) = canonicalize_existing_path(socket_path)? else {
+        return Ok(None);
+    };
+    if !path_is_under_daemon_root(&canonical_socket_path)? {
+        return Ok(None);
+    }
+    if !path_is_socket(&canonical_socket_path)? {
+        return Ok(None);
+    }
+    Ok(Some(canonical_socket_path))
+}
+
+fn path_is_under_daemon_root(path: &Path) -> Result<bool, CliError> {
+    let Some(canonical_root) = canonicalize_existing_path(&state::daemon_root())? else {
+        return Ok(false);
+    };
+    Ok(report_root_membership(path, &canonical_root))
+}
+
+fn path_is_socket(path: &Path) -> Result<bool, CliError> {
+    let is_socket = read_path_metadata(path)?.file_type().is_socket();
+    Ok(report_socket_kind(path, is_socket))
+}
+
+fn read_path_metadata(path: &Path) -> Result<Metadata, CliError> {
+    fs::metadata(path).map_err(|error| {
+        CliErrorKind::workflow_io(format!("read metadata for {}: {error}", path.display())).into()
+    })
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn report_root_membership(path: &Path, root: &Path) -> bool {
+    let is_under_root = path.starts_with(root);
+    if !is_under_root {
+        tracing::warn!(
+            path = %path.display(),
+            root = %root.display(),
+            "skipping legacy bridge cleanup outside daemon root"
+        );
+    }
+    is_under_root
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn report_socket_kind(path: &Path, is_socket: bool) -> bool {
+    if !is_socket {
+        tracing::warn!(
+            path = %path.display(),
+            "skipping legacy bridge cleanup for non-socket path"
+        );
+    }
+    is_socket
+}
+
 fn resolve_codex_binary(explicit: Option<&Path>) -> Result<PathBuf, CliError> {
     if let Some(path) = explicit {
         if path.is_file() {
@@ -3094,7 +3174,7 @@ fn cleanup_legacy_bridge_artifacts() {
         && let Ok(value) = serde_json::from_str::<Value>(&data)
         && let Some(socket_path) = value.get("socket_path").and_then(Value::as_str)
     {
-        let _ = remove_if_exists(Path::new(socket_path));
+        let _ = remove_owned_legacy_socket_if_exists(Path::new(socket_path));
     }
     let _ = remove_if_exists(&legacy_agent_tui_state);
     let _ = remove_if_exists(&state::daemon_root().join("agent-tui-bridge.sock"));
@@ -3130,6 +3210,50 @@ mod tests {
             ],
             f,
         );
+    }
+
+    #[test]
+    fn cleanup_legacy_bridge_artifacts_keeps_external_socket_path() {
+        with_temp_daemon_root(|| {
+            state::ensure_daemon_dirs().expect("dirs");
+            let outside = tempdir().expect("tempdir");
+            let victim = outside.path().join("victim.sock");
+            fs::write(&victim, "sensitive").expect("write victim");
+            fs::write(
+                state::daemon_root().join("agent-tui-bridge.json"),
+                serde_json::to_string(&serde_json::json!({
+                    "socket_path": victim.display().to_string(),
+                }))
+                .expect("serialize state"),
+            )
+            .expect("write legacy state");
+
+            cleanup_legacy_bridge_artifacts();
+
+            assert!(victim.exists(), "cleanup removed external file");
+        });
+    }
+
+    #[test]
+    fn cleanup_legacy_bridge_artifacts_removes_owned_legacy_socket() {
+        with_temp_daemon_root(|| {
+            state::ensure_daemon_dirs().expect("dirs");
+            let socket_path = state::daemon_root().join("legacy-agent-tui.sock");
+            let _listener =
+                StdUnixListener::bind(&socket_path).expect("bind legacy agent tui socket");
+            fs::write(
+                state::daemon_root().join("agent-tui-bridge.json"),
+                serde_json::to_string(&serde_json::json!({
+                    "socket_path": socket_path.display().to_string(),
+                }))
+                .expect("serialize state"),
+            )
+            .expect("write legacy state");
+
+            cleanup_legacy_bridge_artifacts();
+
+            assert!(!socket_path.exists(), "cleanup kept daemon-owned socket");
+        });
     }
 
     #[test]
