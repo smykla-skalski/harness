@@ -47,7 +47,8 @@ public struct DatabaseStatistics: Sendable {
     return formatter
   }()
 
-  @MainActor public static func formatByteCount(_ byteCount: Int64) -> String {
+  @MainActor
+  public static func formatByteCount(_ byteCount: Int64) -> String {
     byteCountFormatter.string(fromByteCount: byteCount)
   }
 

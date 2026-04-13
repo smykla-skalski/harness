@@ -29,8 +29,7 @@ struct HarnessMonitorSheetRouter: View {
       )
   }
 
-  @ViewBuilder
-  private var sheetContent: some View {
+  @ViewBuilder private var sheetContent: some View {
     switch sheet {
     case .codexFlow:
       CodexFlowSheetView(store: store)

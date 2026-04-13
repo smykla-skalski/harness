@@ -135,14 +135,29 @@ extension WebSocketTransport {
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    try await timeline(sessionID: sessionID) { _, _, _ in }
+    try await timeline(sessionID: sessionID, scope: .full) { _, _, _ in }
   }
 
   public func timeline(
     sessionID: String,
     onBatch: @escaping TimelineBatchHandler
   ) async throws -> [TimelineEntry] {
-    let params: [String: JSONValue] = ["session_id": .string(sessionID)]
+    try await timeline(sessionID: sessionID, scope: .full, onBatch: onBatch)
+  }
+
+  public func timeline(sessionID: String, scope: TimelineScope) async throws -> [TimelineEntry] {
+    try await timeline(sessionID: sessionID, scope: scope) { _, _, _ in }
+  }
+
+  public func timeline(
+    sessionID: String,
+    scope: TimelineScope,
+    onBatch: @escaping TimelineBatchHandler
+  ) async throws -> [TimelineEntry] {
+    var params: [String: JSONValue] = ["session_id": .string(sessionID)]
+    if scope == .summary {
+      params["scope"] = .string(scope.rawValue)
+    }
     let deliveryTracker = SemanticBatchDeliveryTracker()
     let value = try await send(
       method: "session.timeline",

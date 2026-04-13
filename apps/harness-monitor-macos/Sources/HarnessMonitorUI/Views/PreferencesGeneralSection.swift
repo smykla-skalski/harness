@@ -201,8 +201,7 @@ struct PreferencesGeneralSection: View {
 
   private static let externalDaemonCommand = "harness daemon dev"
 
-  @ViewBuilder
-  private var daemonModeRow: some View {
+  @ViewBuilder private var daemonModeRow: some View {
     LabeledContent("Daemon mode") {
       VStack(alignment: .trailing, spacing: 2) {
         Text(overview.daemonModeLabel)
