@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fs::OpenOptions;
-use std::io::Write as _;
+use std::io::{BufRead, BufReader, Read as _, Seek as _, SeekFrom, Write as _};
+use std::mem;
 use std::path::{Path, PathBuf};
 
 use crate::agents::runtime::{
@@ -316,20 +317,18 @@ fn load_native_conversation_events(
         return Ok(Vec::new());
     }
 
-    let content = fs::read_to_string(&path).map_err(|error| {
-        CliErrorKind::workflow_io(format!("read agent transcript {}: {error}", path.display()))
+    let mut events = Vec::new();
+    for_each_nonempty_line(&path, "agent transcript", |line, line_number| {
+        let Some(mut event) = adapter.parse_log_entry(line) else {
+            return Ok(());
+        };
+        event.sequence = u64::try_from(line_number).unwrap_or(u64::MAX);
+        event.agent = agent_id.to_string();
+        event.session_id = session_id.to_string();
+        events.push(event);
+        Ok(())
     })?;
-    Ok(content
-        .lines()
-        .enumerate()
-        .filter_map(|(index, line)| {
-            let mut event = adapter.parse_log_entry(line)?;
-            event.sequence = u64::try_from(index.saturating_add(1)).unwrap_or(u64::MAX);
-            event.agent = agent_id.to_string();
-            event.session_id = session_id.to_string();
-            Some(event)
-        })
-        .collect())
+    Ok(events)
 }
 
 fn load_ledger_conversation_events(
@@ -347,11 +346,9 @@ fn load_ledger_conversation_events(
         return Ok(Vec::new());
     }
 
-    Ok(fs::read_to_string(&path)
-        .map_err(|error| CliErrorKind::workflow_io(format!("read agent ledger: {error}")))?
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .filter_map(|line| {
+    let mut events = Vec::new();
+    for_each_nonempty_line(&path, "agent ledger", |line, _line_number| {
+        let Some(event) = (|| {
             let entry = serde_json::from_str::<LedgerEventLine>(line).ok()?;
             if entry.agent != runtime || entry.session_id != session_id {
                 return None;
@@ -365,8 +362,13 @@ fn load_ledger_conversation_events(
             event.agent = agent_id.to_string();
             event.session_id = session_id.to_string();
             Some(event)
-        })
-        .collect())
+        })() else {
+            return Ok(());
+        };
+        events.push(event);
+        Ok(())
+    })?;
+    Ok(events)
 }
 
 #[must_use]
@@ -729,12 +731,10 @@ fn infer_ledger_cwd(context_root: &Path) -> Option<PathBuf> {
         .join("agents")
         .join("ledger")
         .join("events.jsonl");
-    let content = fs::read_to_string(ledger_path).ok()?;
-    content
-        .lines()
-        .rev()
-        .find(|line| !line.trim().is_empty())
-        .and_then(|line| serde_json::from_str::<Value>(line).ok())
+    read_last_nonempty_line(&ledger_path, "agent ledger")
+        .ok()
+        .flatten()
+        .and_then(|line| serde_json::from_str::<Value>(&line).ok())
         .and_then(|entry| entry.get("cwd").and_then(Value::as_str).map(PathBuf::from))
 }
 
@@ -1026,15 +1026,98 @@ where
     if !path.is_file() {
         return Ok(Vec::new());
     }
-    fs::read_to_string(path)
+    let mut values = Vec::new();
+    for_each_nonempty_line(path, label, |line, _line_number| {
+        let value = serde_json::from_str(line).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_parse(format!("{label}: {error}")))
+        })?;
+        values.push(value);
+        Ok(())
+    })?;
+    Ok(values)
+}
+
+fn for_each_nonempty_line<F>(path: &Path, label: &str, mut visitor: F) -> Result<(), CliError>
+where
+    F: FnMut(&str, usize) -> Result<(), CliError>,
+{
+    let file = fs::File::open(path)
+        .map_err(|error| CliErrorKind::workflow_io(format!("read {label}: {error}")))?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    let mut line_number = 0usize;
+
+    loop {
+        line.clear();
+        let bytes_read = reader
+            .read_line(&mut line)
+            .map_err(|error| CliErrorKind::workflow_io(format!("read {label}: {error}")))?;
+        if bytes_read == 0 {
+            return Ok(());
+        }
+        line_number = line_number.saturating_add(1);
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        if trimmed.trim().is_empty() {
+            continue;
+        }
+        visitor(trimmed, line_number)?;
+    }
+}
+
+fn read_last_nonempty_line(path: &Path, label: &str) -> Result<Option<String>, CliError> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+
+    let mut file = fs::File::open(path)
+        .map_err(|error| CliErrorKind::workflow_io(format!("read {label}: {error}")))?;
+    let mut position = file
+        .metadata()
         .map_err(|error| CliErrorKind::workflow_io(format!("read {label}: {error}")))?
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            serde_json::from_str(line)
-                .map_err(|error| CliErrorKind::workflow_parse(format!("{label}: {error}")).into())
-        })
-        .collect()
+        .len();
+    if position == 0 {
+        return Ok(None);
+    }
+
+    let mut chunk = vec![0_u8; 8 * 1024];
+    let mut line_bytes = Vec::new();
+    while position > 0 {
+        let read_len = usize::try_from(position.min(chunk.len() as u64)).unwrap_or(chunk.len());
+        position = position.saturating_sub(u64::try_from(read_len).unwrap_or(0));
+        file.seek(SeekFrom::Start(position))
+            .map_err(|error| CliErrorKind::workflow_io(format!("read {label}: {error}")))?;
+        file.read_exact(&mut chunk[..read_len])
+            .map_err(|error| CliErrorKind::workflow_io(format!("read {label}: {error}")))?;
+        for &byte in chunk[..read_len].iter().rev() {
+            if byte == b'\n' {
+                if let Some(line) = decode_tail_line(&mut line_bytes, label)? {
+                    return Ok(Some(line));
+                }
+                continue;
+            }
+            line_bytes.push(byte);
+        }
+    }
+
+    decode_tail_line(&mut line_bytes, label)
+}
+
+fn decode_tail_line(line_bytes: &mut Vec<u8>, label: &str) -> Result<Option<String>, CliError> {
+    if line_bytes.is_empty() {
+        return Ok(None);
+    }
+
+    line_bytes.reverse();
+    let line = String::from_utf8(mem::take(line_bytes)).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_parse(format!(
+            "{label}: invalid utf-8 line: {error}"
+        )))
+    })?;
+    let trimmed = line.trim_end_matches('\r');
+    if trimmed.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(trimmed.to_string()))
 }
 
 #[cfg(test)]
@@ -1246,5 +1329,23 @@ mod tests {
                 ..
             } if tool_name == "Read"
         ));
+    }
+
+    #[test]
+    fn infer_ledger_cwd_uses_last_nonempty_line() {
+        let tmp = tempdir().expect("tempdir");
+        let context_root = tmp.path().join("context");
+        let ledger_path = context_root.join("agents/ledger/events.jsonl");
+        write_text(
+            &ledger_path,
+            concat!(
+                "{\"sequence\":1,\"cwd\":\"/tmp/first\"}\n",
+                "{\"sequence\":2,\"cwd\":\"/tmp/second\"}\n\n"
+            ),
+        );
+
+        let cwd = infer_ledger_cwd(&context_root).expect("cwd");
+
+        assert_eq!(cwd, PathBuf::from("/tmp/second"));
     }
 }
