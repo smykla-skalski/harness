@@ -430,6 +430,22 @@ const fn default_agent_tui_cols() -> u16 {
     DEFAULT_COLS
 }
 
+/// Strip leading lines that are empty or contain only whitespace.
+///
+/// Textual-based TUIs (like Vibe) write spaces to clear screen rows before
+/// positioning content mid-screen. `vt100::Screen::contents()` returns those
+/// as full-width space lines. Stripping only bare `\n` misses them.
+fn strip_leading_blank_lines(text: &str) -> String {
+    let mut offset = 0;
+    for line in text.split('\n') {
+        if line.bytes().any(|b| !b.is_ascii_whitespace()) {
+            return text[offset..].to_string();
+        }
+        offset += line.len() + 1;
+    }
+    String::new()
+}
+
 /// Incremental terminal parser that keeps a `vt100` screen model.
 pub struct TerminalScreenParser {
     parser: vt100::Parser,
@@ -461,7 +477,7 @@ impl TerminalScreenParser {
             cols,
             cursor_row,
             cursor_col,
-            text: screen.contents().trim_start_matches('\n').to_string(),
+            text: strip_leading_blank_lines(&screen.contents()),
         }
     }
 }
@@ -723,7 +739,10 @@ impl AgentTuiManagerHandle {
     ///
     /// # Errors
     /// Returns [`CliError`] when the TUI is missing or process termination fails.
-    #[expect(clippy::cognitive_complexity, reason = "bridge fallback adds one branch")]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "bridge fallback adds one branch"
+    )]
     pub fn stop(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.load_snapshot(tui_id)?;
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
@@ -1640,24 +1659,36 @@ mod tests {
     }
 
     #[test]
-    fn terminal_parser_trims_leading_newlines() {
+    fn terminal_parser_trims_leading_blank_rows() {
         let mut parser = TerminalScreenParser::new(AgentTuiSize { rows: 5, cols: 40 });
-        // Position cursor at row 3, col 1 and print "hello"
-        // Row 1: empty
-        // Row 2: empty
-        // Row 3: hello
+        // Content at row 3, rows 0-1 are empty newlines
         parser.process(b"\x1b[3;1Hhello");
 
         let snapshot = parser.snapshot();
-        // vt100's screen.contents() will have leading newlines for the empty rows.
-        // We want them gone.
-        assert!(
-            !snapshot.text.starts_with('\n'),
-            "should not start with newline"
-        );
         assert!(
             snapshot.text.starts_with("hello"),
-            "should start with hello"
+            "should start with content, got: {:?}",
+            &snapshot.text[..snapshot.text.len().min(40)]
+        );
+    }
+
+    #[test]
+    fn terminal_parser_trims_space_filled_rows() {
+        // Textual-based TUIs (like vibe) write spaces to clear screen rows.
+        // vt100's screen.contents() returns those as full-width space lines.
+        let mut parser = TerminalScreenParser::new(AgentTuiSize { rows: 32, cols: 80 });
+        parser.process(b"\x1b[?1049h");
+        for row in 1..=19 {
+            let cmd = format!("\x1b[{row};1H{}", " ".repeat(80));
+            parser.process(cmd.as_bytes());
+        }
+        parser.process(b"\x1b[20;1HMistral Vibe v2.7.4");
+
+        let snapshot = parser.snapshot();
+        assert!(
+            snapshot.text.starts_with("Mistral Vibe"),
+            "should start with content, got: {:?}",
+            &snapshot.text[..snapshot.text.len().min(40)]
         );
     }
 
