@@ -311,6 +311,46 @@ struct HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("Push fallback timeline refresh applies websocket summary batches progressively")
+  func pushFallbackTimelineRefreshAppliesWebsocketSummaryBatchesProgressively() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .webSocket
+    store.sessionPushFallbackDelay = .milliseconds(20)
+
+    let firstBatch = makeTimelineEntries(
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentID: "worker-progressive-fallback",
+      summary: "Fallback batch one"
+    )
+    let secondBatch = makeTimelineEntries(
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentID: "worker-progressive-fallback",
+      summary: "Fallback batch two"
+    )
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    client.configureTimelineBatches(
+      [firstBatch, secondBatch],
+      batchDelay: .milliseconds(200),
+      for: PreviewFixtures.summary.sessionId
+    )
+
+    store.scheduleSessionPushFallback(
+      using: client,
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+    try? await Task.sleep(for: .milliseconds(60))
+
+    #expect(store.timeline == firstBatch)
+
+    try? await Task.sleep(for: .milliseconds(220))
+
+    #expect(store.timeline == firstBatch + secondBatch)
+
+    store.stopAllStreams()
+  }
+
   @Test("Selected session update with deferred extensions preserves visible signals")
   func selectedSessionUpdateWithDeferredExtensionsPreservesVisibleSignals() async {
     let client = RecordingHarnessClient()

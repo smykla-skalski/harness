@@ -198,14 +198,26 @@ extension HarnessMonitorStore {
     sessionID: String
   ) {
     guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-    if batchIndex == 0 {
-      timeline = batch
-    } else {
-      var updated = timeline
-      updated.append(contentsOf: batch)
-      timeline = updated
+    applySelectedTimelineBatch(batch, index: batchIndex, sessionID: sessionID)
+  }
+
+  func applySelectedTimelineBatch(
+    _ batch: [TimelineEntry],
+    index batchIndex: Int,
+    sessionID: String
+  ) {
+    guard selectedSessionID == sessionID else { return }
+
+    withUISyncBatch {
+      if batchIndex == 0 {
+        timeline = batch
+      } else {
+        var updated = timeline
+        updated.append(contentsOf: batch)
+        timeline = updated
+      }
+      isShowingCachedData = false
     }
-    isShowingCachedData = false
   }
 
   private func handleSessionLoadError(

@@ -189,6 +189,70 @@ extension PersistenceSnapshotIntegrationTests {
     #expect(store.isShowingCachedData == false)
   }
 
+  @Test("Websocket hydration applies selected timeline batches before final completion")
+  func websocketHydrationAppliesSelectedTimelineBatchesBeforeFinalCompletion() async throws {
+    let session = makeSession(
+      .init(
+        sessionId: "sess-hydrate-progressive",
+        context: "Hydrate progressive",
+        status: .active,
+        leaderId: "leader-hydrate-progressive",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-hydrate-progressive",
+      workerName: "Hydration Progressive Worker"
+    )
+    let firstBatch = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Hydrated batch one"
+    )
+    let secondBatch = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Hydrated batch two"
+    )
+    let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: [session],
+      detailsByID: [session.sessionId: detail]
+    )
+    client.configureTimelineBatches(
+      [firstBatch, secondBatch],
+      batchDelay: .milliseconds(200),
+      for: session.sessionId
+    )
+
+    let store = harness.makeStore()
+    store.activeTransport = .webSocket
+    store.applySessionIndexSnapshot(projects: [project], sessions: [session])
+    store.connectionState = .online
+    store.primeSessionSelection(session.sessionId)
+    await store.restorePersistedSessionSelection(sessionID: session.sessionId)
+
+    #expect(store.selectedSession?.session == session)
+    #expect(store.selectedSession?.agents.isEmpty == true)
+    #expect(store.timeline.isEmpty)
+    #expect(store.isShowingCachedData)
+
+    store.schedulePersistedSnapshotHydration(using: client, sessions: [session])
+    try? await Task.sleep(for: .milliseconds(60))
+
+    #expect(store.selectedSession == detail)
+    #expect(store.timeline == firstBatch)
+    #expect(store.isShowingCachedData == false)
+
+    try? await Task.sleep(for: .milliseconds(220))
+
+    #expect(store.timeline == firstBatch + secondBatch)
+  }
+
   @Test("Hydration helper detects when a persisted detail snapshot is missing")
   func persistedSnapshotNeedsHydrationReflectsSnapshotState() async {
     let store = harness.makeStore()
