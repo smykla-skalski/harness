@@ -929,6 +929,7 @@ impl BridgeServer {
             spec.profile.clone(),
             &spec.project_dir,
             spec.size,
+            spec.prompt.clone(),
         )?;
         let deferred_prompt = spec.prompt.clone();
         let deferred_runtime = spec.profile.runtime.clone();

@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::agents::runtime::{AgentRuntime, runtime_for_name};
+use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::{dirs_home, project_context_dir, utc_now};
@@ -165,6 +165,11 @@ pub struct AgentTuiSpawnSpec {
     /// Optional byte pattern that indicates the runtime is ready for input.
     /// Set from `AgentRuntime::readiness_pattern()`.
     pub readiness_pattern: Option<&'static str>,
+    /// How the initial prompt is delivered to this runtime.
+    pub prompt_delivery: InitialPromptDelivery,
+    /// Join prompt to inject into the CLI argv for `CliPositional`/`CliFlag`
+    /// delivery. `None` for `PtySend` runtimes (sent via PTY after readiness).
+    pub cli_prompt: Option<String>,
 }
 
 impl AgentTuiSpawnSpec {
@@ -185,6 +190,8 @@ impl AgentTuiSpawnSpec {
             env,
             size: size.validate()?,
             readiness_pattern: None,
+            prompt_delivery: InitialPromptDelivery::PtySend,
+            cli_prompt: None,
         })
     }
 }
@@ -568,41 +575,56 @@ impl AgentTuiManagerHandle {
             project_dir: &project.project_dir,
             transcript_path: &transcript_path,
         };
+        let auto_join = build_auto_join_prompt(
+            &profile.runtime,
+            session_id,
+            request.role,
+            &request.capabilities,
+            &tui_id,
+            request.name.as_deref(),
+            request.persona.as_deref(),
+        );
         let process = spawn_agent_tui_process(
             session_id,
             &tui_id,
             profile.clone(),
             &project.project_dir,
             size,
+            Some(auto_join.clone()),
         )?;
 
         // Activate immediately so the HTTP response returns without blocking.
-        // The join message is sent in a background thread after readiness.
         let result = self.activate_tui(process, &snapshot_context);
         if let Ok(snapshot) = &result {
-            self.spawn_deferred_join(snapshot.clone(), profile.runtime.clone(), request);
+            self.spawn_deferred_join(
+                snapshot.clone(),
+                profile.runtime.clone(),
+                &auto_join,
+                request,
+            );
         }
         result
     }
 
-    /// Spawn a background thread that waits for the runtime readiness signal,
-    /// then sends the auto-join and optional user prompt. This keeps the HTTP
-    /// response from blocking while the agent initializes.
+    /// Spawn a background thread that waits for the readiness callback (or
+    /// timeout), then delivers any PTY-based prompts and broadcasts the
+    /// `agent_tui_ready` event.
+    ///
+    /// For `CliPositional`/`CliFlag` runtimes the join prompt was already
+    /// injected into the CLI argv, so the thread only waits + broadcasts.
+    /// For `PtySend` runtimes it also sends the join via PTY after readiness.
     fn spawn_deferred_join(
         &self,
         snapshot: AgentTuiSnapshot,
         runtime: String,
+        auto_join: &str,
         request: &AgentTuiStartRequest,
     ) {
-        let auto_join = build_auto_join_prompt(
-            &runtime,
-            &snapshot.session_id,
-            request.role,
-            &request.capabilities,
-            &snapshot.tui_id,
-            request.name.as_deref(),
-            request.persona.as_deref(),
-        );
+        let delivery = runtime_for_name(&runtime).map_or(InitialPromptDelivery::PtySend, |rt| {
+            rt.initial_prompt_delivery()
+        });
+        let pty_auto_join =
+            matches!(delivery, InitialPromptDelivery::PtySend).then(|| auto_join.to_string());
         let user_prompt = request
             .prompt
             .as_deref()
@@ -621,13 +643,22 @@ impl AgentTuiManagerHandle {
                     tracing::warn!(tui_id = %tui_id, "deferred join: TUI no longer active");
                     return;
                 };
-                deliver_deferred_prompts(
-                    &process,
-                    &runtime,
-                    &tui_id,
-                    &auto_join,
-                    user_prompt.as_deref(),
-                );
+                wait_for_readiness(&process, &runtime, &tui_id);
+                if let Some(join_prompt) = &pty_auto_join {
+                    deliver_deferred_prompts(
+                        &process,
+                        &runtime,
+                        &tui_id,
+                        join_prompt,
+                        user_prompt.as_deref(),
+                    );
+                } else if let Some(prompt) = &user_prompt {
+                    // CLI-arg runtimes: join was in argv, but user prompt
+                    // still needs PTY delivery after readiness.
+                    if let Err(error) = send_initial_prompt(&process, prompt) {
+                        tracing::warn!(%error, "failed to send user prompt");
+                    }
+                }
                 let _ = manager.save_and_broadcast("agent_tui_ready", &snapshot);
             },
         );
@@ -892,6 +923,26 @@ impl AgentTuiManagerHandle {
                 CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' is not active"))
                     .into()
             })
+    }
+
+    /// Signal that an agent TUI is ready to accept input.
+    ///
+    /// Called by the `SessionStart` hook callback. Sets the readiness condvar
+    /// so the deferred join thread can proceed. Idempotent - calling twice is
+    /// a no-op.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the TUI is not active or the snapshot cannot
+    /// be loaded.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    pub fn signal_ready(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        let process = self.active_process(tui_id)?;
+        signal_readiness_ready(&process.readiness);
+        tracing::info!(tui_id = %tui_id, "agent TUI readiness signaled via callback");
+        self.get(tui_id)
     }
 
     fn remove_active(&self, tui_id: &str) -> Result<Option<Arc<AgentTuiProcess>>, CliError> {
@@ -1433,14 +1484,27 @@ pub(super) fn spawn_agent_tui_process(
     profile: AgentTuiLaunchProfile,
     project_dir: &Path,
     size: AgentTuiSize,
+    auto_join_prompt: Option<String>,
 ) -> Result<AgentTuiProcess, CliError> {
     let mut env = BTreeMap::new();
     env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
-    let readiness_pattern =
-        runtime_for_name(&profile.runtime).and_then(AgentRuntime::readiness_pattern);
+    let runtime = runtime_for_name(&profile.runtime);
+    let readiness_pattern = runtime.and_then(AgentRuntime::readiness_pattern);
+    let prompt_delivery = runtime.map_or(
+        InitialPromptDelivery::PtySend,
+        AgentRuntime::initial_prompt_delivery,
+    );
+    let cli_prompt = match prompt_delivery {
+        InitialPromptDelivery::CliPositional | InitialPromptDelivery::CliFlag(_) => {
+            auto_join_prompt
+        }
+        InitialPromptDelivery::PtySend => None,
+    };
     let mut spec = AgentTuiSpawnSpec::new(profile, project_dir.to_path_buf(), env, size)?;
     spec.readiness_pattern = readiness_pattern;
+    spec.prompt_delivery = prompt_delivery;
+    spec.cli_prompt = cli_prompt;
     PortablePtyAgentTuiBackend.spawn(spec)
 }
 
@@ -1576,7 +1640,7 @@ fn skill_directory_flags(runtime: &str, project_dir: &Path) -> Vec<String> {
 }
 
 fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
-    let argv = resolved_command_argv(&spec.profile, &spec.project_dir);
+    let argv = resolved_command_argv(spec);
     let mut cmd = CommandBuilder::from_argv(argv);
     cmd.cwd(spec.project_dir.as_os_str());
     cmd.env("TERM", "xterm-256color");
@@ -1589,16 +1653,34 @@ fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
     cmd
 }
 
-fn resolved_command_argv(profile: &AgentTuiLaunchProfile, project_dir: &Path) -> Vec<OsString> {
-    let mut argv = profile.argv.iter().map(OsString::from).collect::<Vec<_>>();
-    let Some(program) = profile.argv.first() else {
+fn resolved_command_argv(spec: &AgentTuiSpawnSpec) -> Vec<OsString> {
+    let mut argv = spec
+        .profile
+        .argv
+        .iter()
+        .map(OsString::from)
+        .collect::<Vec<_>>();
+    let Some(program) = spec.profile.argv.first() else {
         return argv;
     };
-    if let Some(resolved) = resolve_agent_tui_program(&profile.runtime, program) {
+    if let Some(resolved) = resolve_agent_tui_program(&spec.profile.runtime, program) {
         argv[0] = resolved.into_os_string();
     }
-    for flag in skill_directory_flags(&profile.runtime, project_dir) {
+    for flag in skill_directory_flags(&spec.profile.runtime, &spec.project_dir) {
         argv.push(OsString::from(flag));
+    }
+    // Inject the initial prompt into the CLI argv when the runtime supports it.
+    if let Some(prompt) = &spec.cli_prompt {
+        match spec.prompt_delivery {
+            InitialPromptDelivery::CliPositional => {
+                argv.push(OsString::from(prompt));
+            }
+            InitialPromptDelivery::CliFlag(flag) => {
+                argv.push(OsString::from(flag));
+                argv.push(OsString::from(prompt));
+            }
+            InitialPromptDelivery::PtySend => {}
+        }
     }
     argv
 }
@@ -1699,11 +1781,14 @@ fn spawn_reader_thread(
     readiness_pattern: Option<&'static str>,
     readiness: ReadinessSignal,
 ) -> JoinHandle<()> {
+    // Pattern-based readiness detection (Claude). For runtimes without a
+    // pattern, readiness is signaled via the daemon callback endpoint when
+    // the SessionStart hook fires - no output-based heuristic needed.
     let pattern_bytes: Option<Vec<u8>> =
         readiness_pattern.map(|pattern| pattern.as_bytes().to_vec());
 
     thread::spawn(move || {
-        let mut signaled = false;
+        let mut pattern_matched = false;
         let mut buffer = [0_u8; 8192];
         loop {
             match reader.read(&mut buffer) {
@@ -1712,15 +1797,9 @@ fn spawn_reader_thread(
                     let bytes = &buffer[..read];
                     if let Ok(mut transcript) = transcript.lock() {
                         transcript.extend_from_slice(bytes);
-                        if !signaled {
-                            signaled = if let Some(pattern) = &pattern_bytes {
-                                check_readiness_pattern(&transcript, read, pattern, &readiness)
-                            } else {
-                                // No marker configured: any output means the process
-                                // started and its terminal is initializing.
-                                signal_readiness_ready(&readiness);
-                                true
-                            };
+                        if !pattern_matched && let Some(pattern) = &pattern_bytes {
+                            pattern_matched =
+                                check_readiness_pattern(&transcript, read, pattern, &readiness);
                         }
                     }
                     if let Ok(mut screen) = screen.lock() {

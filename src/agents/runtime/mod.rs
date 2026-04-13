@@ -63,6 +63,17 @@ pub struct HookIntegrationDescriptor {
     pub supports_context_injection: bool,
 }
 
+/// How the daemon delivers the initial join prompt to an agent TUI process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitialPromptDelivery {
+    /// Append the prompt as a positional CLI argument (claude, codex, vibe).
+    CliPositional,
+    /// Append the prompt via a named CLI flag (gemini: `--prompt-interactive`).
+    CliFlag(&'static str),
+    /// Send the prompt via PTY input after a readiness callback (copilot, opencode).
+    PtySend,
+}
+
 /// Per-agent runtime adapter for session-level concerns: log discovery,
 /// conversation parsing, signal delivery, and liveness detection.
 pub trait AgentRuntime: Send + Sync {
@@ -132,6 +143,15 @@ pub trait AgentRuntime: Send + Sync {
     /// caller falls back to a configurable timeout in that case.
     fn readiness_pattern(&self) -> Option<&'static str> {
         None
+    }
+
+    /// How the daemon should deliver the initial join prompt to this runtime.
+    ///
+    /// Runtimes that accept an initial prompt via CLI argument avoid the PTY
+    /// race entirely. Runtimes that don't support this fall back to PTY send
+    /// after the `SessionStart` hook signals readiness.
+    fn initial_prompt_delivery(&self) -> InitialPromptDelivery {
+        InitialPromptDelivery::PtySend
     }
 
     /// Serializable capability snapshot for UI and daemon clients.

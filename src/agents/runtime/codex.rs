@@ -71,4 +71,8 @@ impl AgentRuntime for CodexRuntime {
     fn hook_integration_points(&self) -> &[HookIntegrationPoint] {
         HOOK_POINTS
     }
+
+    fn initial_prompt_delivery(&self) -> super::InitialPromptDelivery {
+        super::InitialPromptDelivery::CliPositional
+    }
 }
