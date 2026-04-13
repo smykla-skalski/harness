@@ -145,7 +145,7 @@ struct HarnessVoiceInputButton: View {
   @ViewBuilder private var captureControl: some View {
     if isRecording {
       captureButton
-        .buttonStyle(.bordered)
+        .harnessActionButtonStyle(variant: .bordered)
         .tint(.red)
     } else {
       captureButton
@@ -614,52 +614,47 @@ private struct VoiceCaptureFailureOverlay: View {
   let close: () -> Void
 
   var body: some View {
-    ZStack(alignment: .topLeading) {
-      Rectangle()
-        .fill(.regularMaterial)
-        .accessibilityHidden(true)
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
+        .scaledFont(.headline)
+        .foregroundStyle(.primary)
 
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
-          .scaledFont(.headline)
-          .foregroundStyle(.primary)
+      Text(presentation.message)
+        .scaledFont(.body)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(presentation.message)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureMessage)
 
-        Text(presentation.message)
+      Divider()
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        Text("How to fix it")
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text(presentation.recoverySuggestion)
           .scaledFont(.body)
           .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: .infinity, alignment: .leading)
           .accessibilityElement(children: .ignore)
-          .accessibilityLabel(presentation.message)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureMessage)
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          Text("How to fix it")
-            .scaledFont(.caption.bold())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          Text(presentation.recoverySuggestion)
-            .scaledFont(.body)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(presentation.recoverySuggestion)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureInstructions)
-        }
-
-        Spacer(minLength: HarnessMonitorTheme.itemSpacing)
-
-        HStack {
-          Spacer()
-          Button("Close", action: close)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureCloseButton)
-          Button("Try Again", action: retry)
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureRetryButton)
-        }
+          .accessibilityLabel(presentation.recoverySuggestion)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureInstructions)
       }
-      .padding(HarnessMonitorTheme.spacingLG)
+
+      Spacer(minLength: HarnessMonitorTheme.itemSpacing)
+
+      HStack {
+        Spacer()
+        Button("Close", action: close)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureCloseButton)
+        Button("Try Again", action: retry)
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.voiceInputFailureRetryButton)
+      }
     }
+    .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .harnessPanelGlass()
     .overlay {
       RoundedRectangle(cornerRadius: 8)
         .stroke(.quaternary)

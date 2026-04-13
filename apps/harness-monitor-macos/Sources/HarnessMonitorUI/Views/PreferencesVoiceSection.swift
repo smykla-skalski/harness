@@ -143,7 +143,7 @@ private struct PreferencesVoiceTranscriptionSection: View {
     } footer: {
       Text(
         "Harness Monitor tries the selected locale first, then falls back to the current macOS locale "
-        + "and English (US) when Speech can map the language."
+          + "and English (US) when Speech can map the language."
       )
     }
   }
@@ -172,7 +172,7 @@ private struct PreferencesVoiceProcessingSection: View {
     } footer: {
       Text(
         "If every sink is turned off, Harness Monitor still keeps the local daemon enabled "
-        + "so the recording session remains routable."
+          + "so the recording session remains routable."
       )
     }
   }
@@ -300,7 +300,7 @@ private struct PreferencesVoiceStatusSection: View {
     } footer: {
       Text(
         "Microphone permission is still enforced when recording starts. If speech assets are missing, "
-        + "Harness Monitor surfaces the same System Settings recovery path from the voice popover."
+          + "Harness Monitor surfaces the same System Settings recovery path from the voice popover."
       )
     }
     .accessibilityElement(children: .contain)

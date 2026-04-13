@@ -77,7 +77,7 @@ final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
         banner.exists && unavailableTitle.exists && startCommand.exists
       },
       "Stopped host bridge recovery should keep the banner visible, "
-      + "switch it to the unavailable copy, and show the start command"
+        + "switch it to the unavailable copy, and show the start command"
     )
     XCTAssertFalse(enableButton.exists)
     XCTAssertTrue(copyButton.exists)

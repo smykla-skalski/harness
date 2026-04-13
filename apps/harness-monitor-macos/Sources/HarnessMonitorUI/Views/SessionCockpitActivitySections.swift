@@ -248,7 +248,8 @@ private struct SignalHoverActionStrip: View {
     .padding(.vertical, HarnessMonitorTheme.cardPadding)
     .background {
       Rectangle()
-        .fill(.thinMaterial)
+        .fill(.clear)
+        .harnessPanelGlass()
         .overlay {
           LinearGradient(
             colors: [
