@@ -726,6 +726,47 @@ impl AgentTuiManagerHandle {
         self.get(tui_id)
     }
 
+    /// Send a prompt directly to a managed TUI without refreshing DB state.
+    ///
+    /// Returns `Ok(false)` when the target TUI is no longer active.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the TUI input transport fails.
+    pub fn prompt_tui(&self, tui_id: &str, prompt: &str) -> Result<bool, CliError> {
+        if !self.is_tui_active(tui_id)? {
+            return Ok(false);
+        }
+        if self.state.sandboxed {
+            let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
+            let _ = bridge.agent_tui_input(
+                tui_id,
+                &AgentTuiInputRequest {
+                    input: AgentTuiInput::Text {
+                        text: prompt.to_string(),
+                    },
+                },
+            )?;
+            let _ = bridge.agent_tui_input(
+                tui_id,
+                &AgentTuiInputRequest {
+                    input: AgentTuiInput::Key {
+                        key: AgentTuiKey::Enter,
+                    },
+                },
+            )?;
+            return Ok(true);
+        }
+
+        let process = self.active_process(tui_id)?;
+        process.send_input(&AgentTuiInput::Text {
+            text: prompt.to_string(),
+        })?;
+        process.send_input(&AgentTuiInput::Key {
+            key: AgentTuiKey::Enter,
+        })?;
+        Ok(true)
+    }
+
     /// Resize an active TUI.
     ///
     /// # Errors
@@ -833,6 +874,17 @@ impl AgentTuiManagerHandle {
         lock_db(&db)?.agent_tui(tui_id)?.ok_or_else(|| {
             CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' not found")).into()
         })
+    }
+
+    fn is_tui_active(&self, tui_id: &str) -> Result<bool, CliError> {
+        let active = self.active()?;
+        if self.state.sandboxed {
+            return Ok(active.contains_key(tui_id));
+        }
+        Ok(active
+            .get(tui_id)
+            .and_then(|entry| entry.process.as_ref())
+            .is_some())
     }
 
     fn refresh_live_snapshot(

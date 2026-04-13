@@ -448,7 +448,8 @@ fn dispatch_inner(
         }),
         "signal.send" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: SignalSendRequest = serde_json::from_value(params)?;
-            service::send_signal(&session_id, &body, db).map_err(Into::into)
+            service::send_signal(&session_id, &body, db, Some(&state.agent_tui_manager))
+                .map_err(Into::into)
         }),
         "signal.cancel" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: SignalCancelRequest = serde_json::from_value(params)?;

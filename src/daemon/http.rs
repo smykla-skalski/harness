@@ -795,7 +795,12 @@ async fn post_send_signal(
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let result = service::send_signal(&session_id, &request, db_ref);
+    let result = service::send_signal(
+        &session_id,
+        &request,
+        db_ref,
+        Some(&state.agent_tui_manager),
+    );
     if result.is_ok() {
         service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
