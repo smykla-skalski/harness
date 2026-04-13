@@ -89,11 +89,11 @@ public struct SystemVoiceTextInsertionService: Sendable {
       return false
     }
 
-    guard CFGetTypeID(focusedElement) == AXUIElementGetTypeID(),
-      let element = focusedElement as? AXUIElement
-    else {
+    guard CFGetTypeID(focusedElement) == AXUIElementGetTypeID() else {
       return false
     }
+    // The type ID check above guarantees the CF object is an AXUIElement.
+    let element = unsafeDowncast(focusedElement, to: AXUIElement.self)
     let result = AXUIElementSetAttributeValue(
       element,
       kAXValueAttribute as CFString,
