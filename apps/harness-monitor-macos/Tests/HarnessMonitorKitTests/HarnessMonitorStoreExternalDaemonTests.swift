@@ -295,7 +295,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
     // Poll briefly; the dispatch source fires on a background queue.
     var fired = false
     for _ in 0..<20 {
-      if recorder.count > 0 {
+      if !recorder.isEmpty {
         fired = true
         break
       }
@@ -372,7 +372,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     var fired = false
     for _ in 0..<20 {
-      if recorder.count > 0 {
+      if !recorder.isEmpty {
         fired = true
         break
       }
@@ -452,7 +452,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     var fired = false
     for _ in 0..<20 {
-      if recorder.count > 0 {
+      if !recorder.isEmpty {
         fired = true
         break
       }
@@ -530,7 +530,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
     try await Task.sleep(for: .milliseconds(500))
 
     #expect(
-      recorder.count == 0,
+      recorder.isEmpty,
       "ManifestWatcher should stay silent when endpoint/startedAt/revision are unchanged"
     )
   }

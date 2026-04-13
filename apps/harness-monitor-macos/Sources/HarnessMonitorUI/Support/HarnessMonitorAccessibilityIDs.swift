@@ -95,9 +95,9 @@ public enum HarnessMonitorAccessibility {
     "harness.preferences.voice.remote-processor-url"
   static let preferencesVoiceInsertionModePicker = "harness.preferences.voice.insertion-mode"
   static let preferencesVoiceAudioChunksToggle = "harness.preferences.voice.audio-chunks"
-  static let preferencesVoicePendingAudioChunkLimitField =
+  static let preferencesVoicePendingAudioField =
     "harness.preferences.voice.pending-audio-limit"
-  static let preferencesVoicePendingTranscriptLimitField =
+  static let preferencesVoicePendingTranscriptField =
     "harness.preferences.voice.pending-transcript-limit"
   static let preferencesVoiceStatus = "harness.preferences.voice.status"
   static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
