@@ -191,6 +191,31 @@ extension HarnessMonitorStore {
     }
   }
 
+  func recoverSelectedCodexRunsAfterReconnect(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async {
+    do {
+      let measuredRuns = try await Self.measureOperation {
+        try await client.codexRuns(sessionID: sessionID)
+      }
+      recordRequestSuccess()
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      selectedCodexRuns = measuredRuns.value.runs
+      selectedCodexRun = preferredCodexRun(from: measuredRuns.value.runs)
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      let err = error.localizedDescription
+      HarnessMonitorLogger.store.warning(
+        "websocket reconnect codex refresh failed: \(err, privacy: .public)"
+      )
+    }
+  }
+
   private func mutateCodexRun(
     actionName: String,
     mutation: @escaping @Sendable () async throws -> CodexRunSnapshot

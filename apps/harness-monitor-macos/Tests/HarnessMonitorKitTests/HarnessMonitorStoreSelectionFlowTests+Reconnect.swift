@@ -41,6 +41,65 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(store.subscribedSessionIDs == Set([summary.sessionId]))
   }
 
+  @Test("Reconnect-ready events refresh push-only global and session state")
+  func reconnectReadyEventsRefreshPushOnlyGlobalAndSessionState() async throws {
+    let client = RecordingHarnessClient()
+    let staleRun = client.codexRunFixture(
+      runID: "codex-run-reconnect",
+      mode: .approval,
+      status: .running,
+      latestSummary: "Still running."
+    )
+    let recoveredApproval = client.codexApprovalFixture(approvalID: "approval-reconnect")
+    let recoveredRun = client.codexRunFixture(
+      runID: staleRun.runId,
+      mode: .approval,
+      status: .waitingApproval,
+      latestSummary: "Waiting for approval.",
+      pendingApprovals: [recoveredApproval]
+    )
+    let staleTui = client.agentTuiFixture(
+      tuiID: "agent-tui-reconnect",
+      screenText: "copilot> stale"
+    )
+    let recoveredTui = client.agentTuiFixture(
+      tuiID: staleTui.tuiId,
+      screenText: "copilot> recovered"
+    )
+
+    client.configureCodexRuns([staleRun], for: PreviewFixtures.summary.sessionId)
+    client.configureAgentTuis([staleTui], for: PreviewFixtures.summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.stopAllStreams()
+
+    store.daemonLogLevel = "debug"
+    client.configureCodexRuns([recoveredRun], for: PreviewFixtures.summary.sessionId)
+    client.configureAgentTuis([recoveredTui], for: PreviewFixtures.summary.sessionId)
+    client.configureGlobalStream(
+      events: [.ready(recordedAt: "2026-04-13T21:00:00Z")]
+    )
+    client.configureSessionStream(
+      events: [
+        .ready(
+          recordedAt: "2026-04-13T21:00:01Z",
+          sessionId: PreviewFixtures.summary.sessionId
+        )
+      ],
+      for: PreviewFixtures.summary.sessionId
+    )
+
+    store.startGlobalStream(using: client)
+    store.startSessionStream(using: client, sessionID: PreviewFixtures.summary.sessionId)
+    try await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.daemonLogLevel == HarnessMonitorLogger.defaultDaemonLogLevel)
+    #expect(store.selectedCodexRun?.pendingApprovals == [recoveredApproval])
+    #expect(store.selectedAgentTui?.screen.text == "copilot> recovered")
+
+    store.stopAllStreams()
+  }
+
   @Test("Selected task observation tracks inspector selection changes")
   func selectedTaskObservationTracksInspectorSelectionChanges() async throws {
     let store = await makeBootstrappedStore()
