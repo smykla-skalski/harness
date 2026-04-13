@@ -293,6 +293,25 @@ struct HarnessMonitorStoreTests {
     #expect(store.currentFailureFeedbackMessage != nil)
   }
 
+  @Test("Refresh failure tears down active background streams")
+  func refreshFailureTearsDownActiveBackgroundStreams() async {
+    let store = await makeBootstrappedStore(client: RecordingHarnessClient())
+    defer { store.stopAllStreams() }
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    #expect(store.globalStreamTask != nil)
+    #expect(store.sessionStreamTask != nil)
+
+    let refreshError = HarnessMonitorAPIError.server(code: 500, message: "refresh failed")
+    await store.refresh(
+      using: FailingHarnessClient(error: refreshError),
+      preserveSelection: true
+    )
+
+    #expect(store.globalStreamTask == nil)
+    #expect(store.sessionStreamTask == nil)
+  }
+
   @Test("Manual refresh completes even when transport ping would stall")
   func manualRefreshCompletesWithoutTransportPing() async {
     let client = RecordingHarnessClient()
