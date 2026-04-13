@@ -2,6 +2,7 @@ import Observation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUI
 
 @MainActor
 @Suite("Harness Monitor store navigation history")
@@ -114,6 +115,29 @@ struct HarnessMonitorStoreNavigationTests {
     }
 
     #expect(!store.navigationBackStack.isEmpty)
+  }
+
+  @Test("Assigning the same navigation availability does not invalidate observers")
+  func assigningSameNavigationAvailabilityDoesNotInvalidateObservers() async {
+    let state = WindowNavigationState()
+
+    let invalidated = await didInvalidate({ state.canGoBack }) {
+      state.canGoBack = false
+    }
+
+    #expect(invalidated == false)
+  }
+
+  @Test("Updating navigation handlers does not invalidate availability observers")
+  func updatingNavigationHandlersDoesNotInvalidateAvailabilityObservers() async {
+    let state = WindowNavigationState()
+
+    let invalidated = await didInvalidate({ (state.canGoBack, state.canGoForward) }) {
+      state.backHandler = { await Task.yield() }
+      state.forwardHandler = { await Task.yield() }
+    }
+
+    #expect(invalidated == false)
   }
 
   // MARK: - Fixtures
