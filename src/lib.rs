@@ -2,6 +2,7 @@
 
 use std::sync::OnceLock;
 
+use tracing::Level;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::reload;
 
@@ -28,10 +29,13 @@ pub mod workspace;
 pub type LogFilterHandle = reload::Handle<EnvFilter, tracing_subscriber::Registry>;
 
 /// Default log level for harness runtime diagnostics.
-pub const DEFAULT_LOG_LEVEL: &str = "trace";
+pub const DEFAULT_LOG_LEVEL: &str = "info";
 
 /// Default filter directive used when `RUST_LOG` is not set.
-pub const DEFAULT_LOG_FILTER_DIRECTIVE: &str = "harness=trace";
+pub const DEFAULT_LOG_FILTER_DIRECTIVE: &str = "harness=info";
+
+/// Default level for high-volume daemon activity logs such as requests and pushes.
+pub const DAEMON_ACTIVITY_LOG_LEVEL: Level = Level::DEBUG;
 
 static LOG_FILTER_HANDLE: OnceLock<LogFilterHandle> = OnceLock::new();
 
@@ -68,20 +72,23 @@ mod logging_tests {
     use super::*;
 
     #[test]
-    fn default_log_filter_uses_trace() {
-        assert_eq!(
-            default_log_filter().to_string(),
-            DEFAULT_LOG_FILTER_DIRECTIVE
-        );
+    fn default_log_filter_uses_info() {
+        assert_eq!(default_log_filter().to_string(), "harness=info");
     }
 
     #[test]
-    fn resolved_log_filter_falls_back_to_trace_when_rust_log_is_unset() {
+    fn resolved_log_filter_falls_back_to_info_when_rust_log_is_unset() {
         temp_env::with_var_unset("RUST_LOG", || {
-            assert_eq!(
-                resolved_log_filter_from_env().to_string(),
-                DEFAULT_LOG_FILTER_DIRECTIVE
-            );
+            assert_eq!(resolved_log_filter_from_env().to_string(), "harness=info");
         });
+    }
+
+    #[test]
+    fn bundled_launch_agent_uses_info_default_log_filter() {
+        const LAUNCH_AGENT: &str = include_str!(
+            "../apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"
+        );
+
+        assert!(LAUNCH_AGENT.contains("<string>harness=info</string>"));
     }
 }
