@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -92,6 +92,9 @@ enum ObserveLoopState {
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
 static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
+static SESSION_LIVENESS_REFRESH_CACHE: OnceLock<Mutex<BTreeMap<String, Instant>>> = OnceLock::new();
+
+const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -940,31 +943,66 @@ pub fn session_extensions(
 }
 
 fn reconcile_active_session_liveness_for_reads(
-    include_all: bool,
+    _include_all: bool,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<(), CliError> {
-    if let Some(db) = db {
-        let session_ids: Vec<_> = db
-            .list_session_summaries()?
-            .into_iter()
-            .filter(|state| state.status == SessionStatus::Active)
-            .map(|state| state.session_id)
-            .collect();
-        for session_id in session_ids {
-            reconcile_session_liveness_for_read(&session_id, Some(db))?;
-        }
+    let Some(db) = db else {
         return Ok(());
-    }
-
-    let session_ids: Vec<_> = index::discover_sessions(include_all)?
+    };
+    let session_ids: BTreeSet<_> = db
+        .list_session_summaries()?
         .into_iter()
-        .filter(|resolved| resolved.state.status == SessionStatus::Active)
-        .map(|resolved| resolved.state.session_id)
+        .filter(|state| state.status == SessionStatus::Active)
+        .map(|state| state.session_id)
         .collect();
-    for session_id in session_ids {
-        reconcile_session_liveness_for_read(&session_id, None)?;
+    let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
+    for session_id in stale_session_ids {
+        if let Err(error) = reconcile_session_liveness_for_read(&session_id, Some(db)) {
+            clear_session_liveness_refresh_cache_entry(&session_id);
+            return Err(error);
+        }
     }
     Ok(())
+}
+
+fn stale_session_ids_for_liveness_refresh(
+    cache: &mut BTreeMap<String, Instant>,
+    session_ids: BTreeSet<String>,
+    now: Instant,
+) -> Vec<String> {
+    cache.retain(|session_id, _| session_ids.contains(session_id));
+    let mut stale_session_ids = Vec::new();
+    for session_id in session_ids {
+        let should_refresh = cache.get(&session_id).is_none_or(|last_refresh| {
+            now.saturating_duration_since(*last_refresh) >= SESSION_LIVENESS_REFRESH_TTL
+        });
+        if should_refresh {
+            cache.insert(session_id.clone(), now);
+            stale_session_ids.push(session_id);
+        }
+    }
+    stale_session_ids
+}
+
+fn stale_session_ids_for_liveness_refresh_now(
+    session_ids: BTreeSet<String>,
+    now: Instant,
+) -> Vec<String> {
+    let cache = SESSION_LIVENESS_REFRESH_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+    match cache.lock() {
+        Ok(mut cache) => stale_session_ids_for_liveness_refresh(&mut cache, session_ids, now),
+        Err(_) => session_ids.into_iter().collect(),
+    }
+}
+
+fn clear_session_liveness_refresh_cache_entry(session_id: &str) {
+    let Some(cache) = SESSION_LIVENESS_REFRESH_CACHE.get() else {
+        return;
+    };
+    let Ok(mut cache) = cache.lock() else {
+        return;
+    };
+    cache.remove(session_id);
 }
 
 fn reconcile_session_liveness_for_read(
@@ -3297,6 +3335,116 @@ done
             let dead_leader = synced_state.agents.get(leader_id).expect("leader agent");
             assert_eq!(dead_leader.status, AgentStatus::Disconnected);
         });
+    }
+
+    #[test]
+    fn list_sessions_reads_cached_liveness_state_within_ttl() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon cached liveness summaries",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-cached-liveness-summaries"),
+            )
+            .expect("start session");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("cached-db-worker-session"), || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            });
+
+            let status =
+                session_service::session_status(&state.session_id, project).expect("status");
+            let leader = status
+                .leader_id
+                .as_ref()
+                .and_then(|agent_id| status.agents.get(agent_id))
+                .expect("leader agent");
+            let worker = status
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("worker agent");
+
+            let leader_log = write_agent_log_file(
+                project,
+                "claude",
+                leader
+                    .agent_session_id
+                    .as_deref()
+                    .expect("leader session id"),
+            );
+            write_agent_log_file(
+                project,
+                "codex",
+                worker
+                    .agent_session_id
+                    .as_deref()
+                    .expect("worker session id"),
+            );
+
+            let db = setup_db_with_session(project, &state.session_id);
+            clear_session_liveness_refresh_cache_entry(&state.session_id);
+
+            let first_summary = list_sessions(true, Some(&db))
+                .expect("first session summaries")
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("first summary");
+            assert_eq!(first_summary.leader_id, state.leader_id);
+            assert_eq!(first_summary.metrics.agent_count, 2);
+            assert_eq!(first_summary.metrics.active_agent_count, 2);
+
+            set_log_mtime_seconds_ago(&leader_log, 600);
+
+            let second_summary = list_sessions(true, Some(&db))
+                .expect("second session summaries")
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("second summary");
+            assert_eq!(
+                second_summary.leader_id, state.leader_id,
+                "cached liveness should defer leader cleanup within the TTL"
+            );
+            assert_eq!(second_summary.metrics.agent_count, 2);
+            assert_eq!(second_summary.metrics.active_agent_count, 2);
+        });
+    }
+
+    #[test]
+    fn stale_session_ids_for_liveness_refresh_skips_recent_sessions() {
+        let now = Instant::now();
+        let mut cache = BTreeMap::new();
+
+        let first = stale_session_ids_for_liveness_refresh(
+            &mut cache,
+            BTreeSet::from([String::from("sess-1")]),
+            now,
+        );
+        assert_eq!(first, vec![String::from("sess-1")]);
+
+        let second = stale_session_ids_for_liveness_refresh(
+            &mut cache,
+            BTreeSet::from([String::from("sess-1")]),
+            now + Duration::from_secs(1),
+        );
+        assert!(second.is_empty(), "recent sessions should be skipped");
+
+        let third = stale_session_ids_for_liveness_refresh(
+            &mut cache,
+            BTreeSet::from([String::from("sess-1")]),
+            now + SESSION_LIVENESS_REFRESH_TTL + Duration::from_secs(1),
+        );
+        assert_eq!(third, vec![String::from("sess-1")]);
     }
 
     #[test]
