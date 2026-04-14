@@ -110,14 +110,6 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(anchor.waitForExistence(timeout: Self.actionTimeout))
-    if additionalEnvironment["HARNESS_MONITOR_DISABLE_CONTENT_DETAIL_CHROME"] != "1" {
-      XCTAssertTrue(
-        element(in: app, identifier: Accessibility.sessionStatusBanner).waitForExistence(
-          timeout: Self.actionTimeout
-        ),
-        "Expected the active-session banner to be visible for the cockpit glass regression"
-      )
-    }
     ensureInspectorIsVisible(in: app)
 
     Thread.sleep(forTimeInterval: 0.9)
@@ -154,11 +146,11 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let window = mainWindow(in: app)
     let toolbar = window.toolbars.firstMatch
     let sidebar = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
-    let statusBanner = element(in: app, identifier: Accessibility.sessionStatusBanner)
+    let contentRoot = frameElement(in: app, identifier: Accessibility.contentRootFrame)
 
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sidebar.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(statusBanner.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(contentRoot.waitForExistence(timeout: Self.actionTimeout))
 
     Thread.sleep(forTimeInterval: 0.6)
 
@@ -174,7 +166,7 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let windowOrigin = window.frame.origin
     let toolbarFrame = toolbar.frame
     let sidebarFrame = sidebar.frame
-    let statusFrame = statusBanner.frame
+    let contentFrame = contentRoot.frame
 
     let sidebarRect = CGRect(
       x: max(sidebarFrame.maxX - windowOrigin.x - 72, 0),
@@ -183,7 +175,7 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
       height: max(toolbarFrame.height - 16, 1)
     )
     let detailRect = CGRect(
-      x: max(statusFrame.minX - windowOrigin.x + 24, 0),
+      x: max(contentFrame.minX - windowOrigin.x + 24, 0),
       y: max(toolbarFrame.minY - windowOrigin.y + 8, 0),
       width: 56,
       height: max(toolbarFrame.height - 16, 1)
@@ -205,11 +197,7 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
   }
 
   private func toolbarMeasurementAnchor(in app: XCUIApplication) -> XCUIElement {
-    let statusBanner = element(in: app, identifier: Accessibility.sessionStatusBanner)
-    if statusBanner.exists {
-      return statusBanner
-    }
-    return frameElement(in: app, identifier: Accessibility.contentRootFrame)
+    frameElement(in: app, identifier: Accessibility.contentRootFrame)
   }
 
   private func ensureInspectorIsVisible(in app: XCUIApplication) {
@@ -249,13 +237,8 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let windowOrigin = window.frame.origin
     let toolbarFrame = toolbar.frame
     let anchorFrame = anchor.frame
-    let isStatusBanner = anchor.identifier == Accessibility.sessionStatusBanner
-    let sampleWidth =
-      isStatusBanner ? min(anchorFrame.width * 0.16, 120) : min(anchorFrame.width * 0.4, 220)
-    let sampleX =
-      isStatusBanner
-      ? anchorFrame.minX + 24
-      : anchorFrame.midX - (sampleWidth / 2)
+    let sampleWidth = min(anchorFrame.width * 0.4, 220)
+    let sampleX = anchorFrame.midX - (sampleWidth / 2)
 
     let sampleRect = CGRect(
       x: max(sampleX - windowOrigin.x, 0),
