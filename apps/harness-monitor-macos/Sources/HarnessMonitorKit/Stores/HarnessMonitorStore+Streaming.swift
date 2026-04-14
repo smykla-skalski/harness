@@ -408,7 +408,8 @@ extension HarnessMonitorStore {
   }
 
   func cancelSelectedSessionRefreshFallback(for sessionID: String? = nil) {
-    guard sessionID == nil
+    guard
+      sessionID == nil
         || pendingSelectedSessionRefreshFallback?.sessionID == sessionID
     else {
       return

@@ -375,10 +375,8 @@ extension HarnessMonitorStore {
 
     guard
       selectedSummary.updatedAt > detail.session.updatedAt
-        || (
-          selectedSummary.updatedAt == detail.session.updatedAt
-            && selectedSummary != detail.session
-        )
+        || selectedSummary.updatedAt == detail.session.updatedAt
+          && selectedSummary != detail.session
     else {
       return detail
     }

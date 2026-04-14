@@ -358,19 +358,31 @@ private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable
   }
 
   override func startLoading() {
-    Self.lock.withLock {
-      Self.requestURL = request.url
+    guard let requestURL = request.url else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+      return
     }
 
-    let response = HTTPURLResponse(
-      url: request.url!,
-      statusCode: 200,
-      httpVersion: nil,
-      headerFields: ["Content-Type": "application/json"]
-    )!
-    let data = """
+    Self.lock.withLock {
+      Self.requestURL = requestURL
+    }
+
+    guard
+      let response = HTTPURLResponse(
+        url: requestURL,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: ["Content-Type": "application/json"]
+      )
+    else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+      return
+    }
+    let data = Data(
+      """
       [{"entry_id":"entry-1","recorded_at":"2026-04-14T03:00:00Z","kind":"tool_result","session_id":"sess-http-summary","agent_id":null,"task_id":null,"summary":"Summary entry","payload":{}}]
-      """.data(using: .utf8)!
+      """.utf8
+    )
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
     client?.urlProtocol(self, didLoad: data)
     client?.urlProtocolDidFinishLoading(self)

@@ -171,7 +171,11 @@ extension AgentTuiWindowView {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .fixedSize(horizontal: false, vertical: true)
       HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-        Stepper("Rows \(viewModel.rows)", value: $viewModel.rows, in: TerminalViewportSizing.rowRange)
+        Stepper(
+          "Rows \(viewModel.rows)",
+          value: $viewModel.rows,
+          in: TerminalViewportSizing.rowRange
+        )
         Stepper(
           "Cols \(viewModel.cols)",
           value: $viewModel.cols,
