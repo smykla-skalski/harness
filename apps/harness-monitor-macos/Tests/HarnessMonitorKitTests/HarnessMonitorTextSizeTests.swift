@@ -99,4 +99,16 @@ struct SessionTimelinePaginationTests {
       ) == 1
     )
   }
+
+  @Test("Timeline growth does not request page reconciliation")
+  func timelineGrowthDoesNotRequestPageReconciliation() {
+    #expect(
+      SessionTimelinePagination.adjustedPageAfterTimelineCountChange(
+        currentPage: 3,
+        oldItemCount: 20,
+        newItemCount: 45,
+        pageSize: SessionTimelinePageSize.defaultSize.rawValue
+      ) == nil
+    )
+  }
 }

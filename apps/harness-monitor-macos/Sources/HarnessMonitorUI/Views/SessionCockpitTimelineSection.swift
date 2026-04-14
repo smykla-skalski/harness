@@ -88,8 +88,8 @@ struct SessionCockpitTimelineSection: View {
                 currentPage: resolvedCurrentPage,
                 pageCount: pageCount
               ),
-              goToPreviousPage: { changePage(to: currentPage - 1) },
-              goToNextPage: { changePage(to: currentPage + 1) },
+              goToPreviousPage: { changePage(to: resolvedCurrentPage - 1) },
+              goToNextPage: { changePage(to: resolvedCurrentPage + 1) },
               goToPage: changePage(to:)
             )
             .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
@@ -118,17 +118,6 @@ struct SessionCockpitTimelineSection: View {
             ),
             animated: true
           )
-        }
-        .onChange(of: timeline) { _, newTimeline in
-          guard let adjustedPage = SessionTimelinePagination.adjustedPage(
-            currentPage: currentPage,
-            itemCount: newTimeline.count,
-            pageSize: pageSize.rawValue
-          ) else {
-            return
-          }
-
-          updateCurrentPageIfNeeded(adjustedPage, animated: false)
         }
       }
     }
