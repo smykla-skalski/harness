@@ -97,6 +97,33 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.sessionDetailScopes(for: backgroundSummary.sessionId).last == "core")
   }
 
+  @Test("Refresh prefers summary timeline scope during HTTP persisted snapshot hydration")
+  func refreshPrefersSummaryTimelineScopeDuringHTTPPersistedSnapshotHydration() async throws {
+    let fixtures = try await makeHydrationSkipFixtures()
+    let client = fixtures.client
+    let store = fixtures.store
+    let backgroundSummary = fixtures.backgroundSummary
+
+    store.activeTransport = .httpSSE
+    let baselineBackgroundTimelineCount = client.readCallCount(
+      .timeline(backgroundSummary.sessionId))
+
+    await store.refresh(using: client, preserveSelection: true)
+
+    for _ in 0..<50 {
+      let backgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
+      if backgroundTimelineCount > baselineBackgroundTimelineCount {
+        break
+      }
+      try? await Task.sleep(for: .milliseconds(10))
+    }
+
+    let backgroundDetailScopes = client.sessionDetailScopes(for: backgroundSummary.sessionId)
+    #expect(backgroundDetailScopes.isEmpty == false)
+    #expect(backgroundDetailScopes.last! == nil)
+    #expect(client.timelineScopes(for: backgroundSummary.sessionId).last == .summary)
+  }
+
   @Test("Replacing the session snapshot clears removed selection across UI slices")
   func replacingSessionSnapshotClearsRemovedSelectionAcrossUISlices() async {
     let selectedSummary = makeSession(

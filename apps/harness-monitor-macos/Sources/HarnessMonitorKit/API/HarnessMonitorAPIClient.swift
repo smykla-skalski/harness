@@ -64,7 +64,14 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    try await get("/v1/sessions/\(sessionID)/timeline")
+    try await timeline(sessionID: sessionID, scope: .full)
+  }
+
+  public func timeline(sessionID: String, scope: TimelineScope) async throws -> [TimelineEntry] {
+    if scope == .summary {
+      return try await get("/v1/sessions/\(sessionID)/timeline?scope=\(scope.rawValue)")
+    }
+    return try await get("/v1/sessions/\(sessionID)/timeline")
   }
 
   public func shutdown() async {

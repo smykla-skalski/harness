@@ -215,7 +215,7 @@ extension HarnessMonitorStore {
   ) async {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
-      let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
+      let timelineScope: TimelineScope = .summary
       let measuredDetail = try await Self.measureOperation {
         try await client.sessionDetail(id: summary.sessionId, scope: detailScope)
       }

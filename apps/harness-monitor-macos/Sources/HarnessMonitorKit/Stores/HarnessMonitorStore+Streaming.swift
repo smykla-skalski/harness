@@ -183,7 +183,7 @@ extension HarnessMonitorStore {
   ) async {
     lastSessionPushFallbackAt[sessionID] = ContinuousClock.now
     do {
-      let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
+      let timelineScope: TimelineScope = .summary
       let measuredTimeline = try await Self.measureOperation {
         try await client.timeline(
           sessionID: sessionID,

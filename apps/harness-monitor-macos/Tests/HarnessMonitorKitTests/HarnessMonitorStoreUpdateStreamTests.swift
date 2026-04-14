@@ -549,6 +549,31 @@ struct HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("Push fallback timeline refresh prefers summary scope on HTTP transport")
+  func pushFallbackTimelineRefreshPrefersSummaryScopeOnHTTPTransport() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.activeTransport = .httpSSE
+    store.sessionPushFallbackDelay = .milliseconds(20)
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    let baselineTimelineCalls = client.readCallCount(.timeline(PreviewFixtures.summary.sessionId))
+
+    store.scheduleSessionPushFallback(
+      using: client,
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+    try? await Task.sleep(for: .milliseconds(50))
+
+    let timelineKey = RecordingHarnessClient.ReadCall.timeline(PreviewFixtures.summary.sessionId)
+    #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
+    #expect(
+      client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary, .summary]
+    )
+
+    store.stopAllStreams()
+  }
+
   @Test("Push fallback timeline refresh applies websocket summary batches progressively")
   func pushFallbackTimelineRefreshAppliesWebsocketSummaryBatchesProgressively() async {
     let client = RecordingHarnessClient()
