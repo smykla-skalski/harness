@@ -1,4 +1,30 @@
-use super::{Subcommand, json, BridgeStartArgs, BridgeStopArgs, BridgeStatusArgs, BridgeReconfigureArgs, BridgeInstallLaunchAgentArgs, BridgeRemoveLaunchAgentArgs, Execute, AppContext, CliError, discovery, AdoptionOutcome, ensure_host_context, cleanup_legacy_bridge_artifacts, matches_running_config, status_report, print_status_plain, CliErrorKind, stop_bridge, start_detached, run_bridge_server, print_json, write_bridge_config, current_exe, render_launch_agent_plist, launch_agent_plist_path, fs, write_text, best_effort_bootout, BRIDGE_LAUNCH_AGENT_LABEL, bootstrap_agent, BridgeClient, clear_bridge_state, BridgeReconfigureSpec};
+use std::env::current_exe;
+
+use clap::Subcommand;
+use fs_err as fs;
+use serde_json::json;
+
+use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::discovery::{self, AdoptionOutcome};
+use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io::write_text;
+
+use super::bridge_state::{
+    clear_bridge_state, ensure_host_context, status_report, write_bridge_config,
+};
+use super::client::BridgeClient;
+use super::control::stop_bridge;
+use super::core::BridgeReconfigureSpec;
+use super::detached::start_detached;
+use super::helpers::{
+    best_effort_bootout, bootstrap_agent, cleanup_legacy_bridge_artifacts, launch_agent_plist_path,
+    print_json, print_status_plain, render_launch_agent_plist,
+};
+use super::runtime::{matches_running_config, run_bridge_server};
+use super::types::{
+    BRIDGE_LAUNCH_AGENT_LABEL, BridgeInstallLaunchAgentArgs, BridgeReconfigureArgs,
+    BridgeRemoveLaunchAgentArgs, BridgeStartArgs, BridgeStatusArgs, BridgeStopArgs,
+};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]

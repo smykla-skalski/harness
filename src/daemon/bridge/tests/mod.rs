@@ -1,16 +1,36 @@
-use super::bridge_state::{
-    bridge_socket_path_for_root, group_container_root, unix_socket_path_fits,
-};
-use super::control::compute_bridge_manifest_update;
-use super::runtime::BridgeSocketGuard;
-use super::*;
+use std::collections::{BTreeMap, BTreeSet};
 use std::os::unix::net::UnixListener as StdUnixListener;
+use std::path::PathBuf;
+use std::process::id as process_id;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+use fs_err as fs;
 use fs2::FileExt;
 use tempfile::tempdir;
+
+use crate::daemon::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
+
+use super::bridge_state::{
+    BridgeProof, bridge_lock_path, bridge_socket_path_for_root, clear_bridge_state,
+    group_container_root, read_bridge_config, resolve_running_bridge, unix_socket_path_fits,
+    write_bridge_config, write_bridge_state,
+};
+use super::control::compute_bridge_manifest_update;
+use super::core::{BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest, BridgeResponse};
+use super::detached::{bridge_response_error, wait_until_bridge_dead};
+use super::helpers::{cleanup_legacy_bridge_artifacts, merged_persisted_config, remove_if_exists};
+use super::runtime::BridgeSocketGuard;
+use super::types::{
+    DEFAULT_BRIDGE_SOCKET_NAME, FALLBACK_BRIDGE_SOCKET_SUFFIX, PersistedBridgeConfig,
+};
+use super::{
+    BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability, BridgeClient,
+    BridgeConfigArgs, BridgeState, BridgeStatusReport, LivenessMode, acquire_bridge_lock_exclusive,
+    bridge_state_path, codex_websocket_endpoint, compiled_capabilities, host_bridge_manifest,
+    load_running_bridge_state, read_bridge_state, status_report, stop_bridge,
+};
 
 mod cleanup_and_config;
 mod legacy_server;

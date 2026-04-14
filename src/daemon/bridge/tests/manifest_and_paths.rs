@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    BRIDGE_CAPABILITY_AGENT_TUI, BTreeMap, BridgeCapability, BridgeClient, BridgeSocketGuard,
+    BridgeState, DEFAULT_BRIDGE_SOCKET_NAME, FALLBACK_BRIDGE_SOCKET_SUFFIX,
+    HostBridgeCapabilityManifest, HostBridgeManifest, PathBuf, bridge_socket_path_for_root, fs,
+    group_container_root, hold_bridge_lock, host_bridge_manifest, process_id, tempdir,
+    unix_socket_path_fits, with_temp_daemon_root, write_bridge_state,
+};
 
 #[test]
 fn host_bridge_manifest_reflects_running_bridge_state() {

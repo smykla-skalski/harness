@@ -1,4 +1,26 @@
-use super::{PathBuf, Mutex, PersistedBridgeConfig, BTreeMap, HostBridgeCapabilityManifest, BridgeActiveTui, BridgeCodexProcess, AtomicBool, process_id, utc_now, state, BridgeState, CliError, write_bridge_state, BridgeStatusReport, uptime_from_started_at, Arc, BridgeEnvelope, BridgeResponse, CliErrorKind, BridgeRequest, Ordering, BridgeReconfigureSpec, resolve_bridge_config, write_bridge_config, BTreeSet, BridgeCapability, ResolvedBridgeConfig, Value, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, AgentTuiStartSpec, parse_bridge_payload, BridgeGetRequest, BridgeInputRequest, BridgeResizeRequest};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
+use std::process::id as process_id;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
+use serde_json::Value;
+
+use crate::daemon::state::{self, HostBridgeCapabilityManifest};
+use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
+
+use super::bridge_state::{write_bridge_config, write_bridge_state};
+use super::client::{BridgeGetRequest, BridgeInputRequest, BridgeResizeRequest};
+use super::core::{
+    BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest,
+    BridgeResponse, ResolvedBridgeConfig,
+};
+use super::helpers::{parse_bridge_payload, resolve_bridge_config, uptime_from_started_at};
+use super::types::{
+    AgentTuiStartSpec, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
+    BridgeState, BridgeStatusReport, PersistedBridgeConfig,
+};
 
 pub(super) struct BridgeServer {
     pub(super) token: String,

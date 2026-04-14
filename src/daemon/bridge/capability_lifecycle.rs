@@ -1,4 +1,20 @@
-use super::{BridgeServer, BridgeCodexProcess, CliError, stringify_metadata_map, BRIDGE_CAPABILITY_CODEX, HostBridgeCapabilityManifest, state, Arc, BridgeCapability, ResolvedBridgeConfig, CliErrorKind, spawn_codex_process, spawn_codex_monitor, BRIDGE_CAPABILITY_AGENT_TUI, BTreeSet, launch_agent_plist_path, current_exe, write_text, render_launch_agent_plist, Ordering, MutexGuard, BTreeMap, BridgeActiveTui, PersistedBridgeConfig};
+use std::collections::{BTreeMap, BTreeSet};
+use std::env::current_exe;
+use std::sync::Arc;
+use std::sync::MutexGuard;
+use std::sync::atomic::Ordering;
+
+use crate::daemon::state::{self, HostBridgeCapabilityManifest};
+use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io::write_text;
+
+use super::core::{BridgeActiveTui, BridgeCodexProcess, ResolvedBridgeConfig};
+use super::helpers::{launch_agent_plist_path, render_launch_agent_plist, stringify_metadata_map};
+use super::runtime::{spawn_codex_monitor, spawn_codex_process};
+use super::server::BridgeServer;
+use super::types::{
+    BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability, PersistedBridgeConfig,
+};
 
 impl BridgeServer {
     #[expect(

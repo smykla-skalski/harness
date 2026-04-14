@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    acquire_bridge_lock_exclusive, bridge_lock_path, clear_bridge_state, state,
+    with_temp_daemon_root,
+};
 
 // --- bridge.lock unit tests ---
 

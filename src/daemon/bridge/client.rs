@@ -1,4 +1,18 @@
-use super::*;
+use std::io::{BufRead, BufReader, Write as _};
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
+
+use fs_err as fs;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+
+use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiSnapshot};
+use crate::errors::{CliError, CliErrorKind};
+
+use super::bridge_state::{LivenessMode, resolve_running_bridge};
+use super::core::{BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest, BridgeResponse};
+use super::detached::bridge_response_error;
+use super::helpers::parse_bridge_payload;
+use super::types::{AgentTuiStartSpec, BridgeCapability, BridgeState, BridgeStatusReport};
 
 #[derive(Debug, Clone)]
 pub struct BridgeClient {
