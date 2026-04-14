@@ -1,0 +1,94 @@
+use std::collections::BTreeMap;
+
+use crate::agents::runtime::RuntimeCapabilities;
+
+use super::{
+    AgentPersona, AgentRegistration, AgentStatus, CURRENT_VERSION, PersonaSymbol, SessionMetrics,
+    SessionRole, SessionState, SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource,
+    TaskStatus, WorkItem,
+};
+
+pub(super) fn agent_registration(
+    agent_id: &str,
+    runtime: &str,
+    role: SessionRole,
+    status: AgentStatus,
+) -> AgentRegistration {
+    AgentRegistration {
+        agent_id: agent_id.into(),
+        name: agent_id.into(),
+        runtime: runtime.into(),
+        role,
+        capabilities: vec![],
+        joined_at: "2026-03-28T12:00:00Z".into(),
+        updated_at: "2026-03-28T12:00:00Z".into(),
+        status,
+        agent_session_id: None,
+        last_activity_at: None,
+        current_task_id: None,
+        runtime_capabilities: RuntimeCapabilities::default(),
+        persona: None,
+    }
+}
+
+pub(super) fn persona(identifier: &str) -> AgentPersona {
+    AgentPersona {
+        identifier: identifier.into(),
+        name: "Code Reviewer".into(),
+        symbol: PersonaSymbol::SfSymbol {
+            name: "magnifyingglass.circle.fill".into(),
+        },
+        description: "Reviews code for correctness".into(),
+    }
+}
+
+pub(super) fn session_state(
+    agents: BTreeMap<String, AgentRegistration>,
+    tasks: BTreeMap<String, WorkItem>,
+) -> SessionState {
+    SessionState {
+        schema_version: CURRENT_VERSION,
+        state_version: 1,
+        session_id: "sess-1".into(),
+        title: "test title".into(),
+        context: "ctx".into(),
+        status: SessionStatus::Active,
+        created_at: "2026-03-28T12:00:00Z".into(),
+        updated_at: "2026-03-28T12:00:00Z".into(),
+        agents,
+        tasks,
+        leader_id: Some("leader".into()),
+        archived_at: None,
+        last_activity_at: None,
+        observe_id: None,
+        pending_leader_transfer: None,
+        metrics: SessionMetrics::default(),
+    }
+}
+
+pub(super) fn work_item(
+    task_id: &str,
+    title: &str,
+    severity: TaskSeverity,
+    status: TaskStatus,
+) -> WorkItem {
+    WorkItem {
+        task_id: task_id.into(),
+        title: title.into(),
+        context: None,
+        severity,
+        status,
+        assigned_to: None,
+        queue_policy: TaskQueuePolicy::Locked,
+        queued_at: None,
+        created_at: "2026-03-28T12:00:00Z".into(),
+        updated_at: "2026-03-28T12:00:00Z".into(),
+        created_by: None,
+        notes: vec![],
+        suggested_fix: None,
+        source: TaskSource::Manual,
+        blocked_reason: None,
+        completed_at: None,
+        checkpoint_summary: None,
+    }
+}
