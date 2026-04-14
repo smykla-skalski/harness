@@ -65,7 +65,7 @@ pub(crate) fn start_daemon_observe_loop(
     state
 }
 
-pub(crate) fn spawn_daemon_observe_loop(
+fn spawn_daemon_observe_loop(
     handle: &Handle,
     runtime: DaemonObserveRuntime,
     session_id: String,
