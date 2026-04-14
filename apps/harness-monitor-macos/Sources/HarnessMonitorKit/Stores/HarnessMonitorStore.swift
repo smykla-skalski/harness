@@ -79,6 +79,7 @@ public final class HarnessMonitorStore {
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
+  var managedLaunchAgentRefreshMinimumInterval: Duration = .seconds(10)
   var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
@@ -115,6 +116,7 @@ public final class HarnessMonitorStore {
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var pendingSelectedSessionRefreshFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var lastSessionPushFallbackAt: [String: ContinuousClock.Instant] = [:]
+  @ObservationIgnored var lastManagedLaunchAgentRefreshAt: ContinuousClock.Instant?
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false

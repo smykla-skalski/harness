@@ -30,6 +30,15 @@ extension HarnessMonitorStore {
       guard shouldRefreshManagedLaunchAgent(after: error) else {
         throw error
       }
+      guard shouldAttemptManagedLaunchAgentRefresh(now: ContinuousClock.now) else {
+        appendConnectionEvent(
+          kind: .reconnecting,
+          detail: "Managed daemon recovery is waiting for the previous launch-agent refresh to settle"
+        )
+        throw error
+      }
+      stopManifestWatcher()
+      lastManagedLaunchAgentRefreshAt = ContinuousClock.now
       appendConnectionEvent(
         kind: .reconnecting,
         detail: "Managed daemon did not become healthy; refreshing the bundled launch agent"
@@ -50,6 +59,16 @@ extension HarnessMonitorStore {
         timeout: bootstrapWarmUpTimeout
       )
     }
+  }
+
+  func shouldAttemptManagedLaunchAgentRefresh(now: ContinuousClock.Instant) -> Bool {
+    guard let lastManagedLaunchAgentRefreshAt else {
+      return true
+    }
+    let throttleUntil = lastManagedLaunchAgentRefreshAt.advanced(
+      by: managedLaunchAgentRefreshMinimumInterval
+    )
+    return throttleUntil <= now
   }
 
   func shouldRefreshManagedLaunchAgent(after error: any Error) -> Bool {
@@ -192,6 +211,7 @@ extension HarnessMonitorStore {
 
     repeat {
       reconnectRequestedDuringReconnect = false
+      stopManifestWatcher()
       stopAllStreams()
       let oldClient = client
       client = nil
