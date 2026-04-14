@@ -113,58 +113,58 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   }
 
   let lock = NSLock()
-  var _calls: [Call] = []
-  var _detail: SessionDetail
-  var _healthDelay: Duration?
-  var _transportLatencyMs: Int?
-  var _transportLatencyError: (any Error)?
-  var _diagnosticsDelay: Duration?
-  var _mutationDelay: Duration?
-  var _projectSummaries: [ProjectSummary]?
-  var _sessionSummaries: [SessionSummary]?
-  var _sessionDetailsByID: [String: SessionDetail] = [:]
-  var _detailDelays: [String: Duration] = [:]
-  var _sessionDetailErrorsByID: [String: any Error] = [:]
-  var _sessionDetailScopesByID: [String: [String?]] = [:]
-  var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
-  var _timelineScopesByID: [String: [TimelineScope]] = [:]
-  var _timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
-  var _timelineDelays: [String: Duration] = [:]
-  var _timelineBatchDelaysBySessionID: [String: Duration] = [:]
-  var _timelineErrorsByID: [String: any Error] = [:]
-  var _codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
-  var _agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
-  var _agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
-  var _agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
-  var _codexStartError: (any Error)?
-  var _queuedCodexStartErrors: [any Error] = []
-  var _agentTuiStartError: (any Error)?
-  var _hostBridgeReconfigureError: (any Error)?
-  var _hostBridgeStatusReport = BridgeStatusReport(running: false)
-  var _globalStreamEvents: [DaemonPushEvent] = []
-  var _globalStreamError: (any Error)?
-  var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
-  var _sessionStreamErrorsByID: [String: any Error] = [:]
-  var _shutdownCallCount = 0
-  var _healthCallCount = 0
-  var _transportLatencyCallCount = 0
-  var _diagnosticsCallCount = 0
-  var _projectsCallCount = 0
-  var _sessionsCallCount = 0
-  var _sessionDetailCallCounts: [String: Int] = [:]
-  var _timelineCallCounts: [String: Int] = [:]
+  var callsStorage: [Call] = []
+  var detailStorage: SessionDetail
+  var healthDelay: Duration?
+  var transportLatencyMsValue: Int?
+  var transportLatencyError: (any Error)?
+  var diagnosticsDelay: Duration?
+  var mutationDelay: Duration?
+  var projectSummariesStorage: [ProjectSummary]?
+  var sessionSummariesStorage: [SessionSummary]?
+  var sessionDetailsByID: [String: SessionDetail] = [:]
+  var detailDelaysBySessionID: [String: Duration] = [:]
+  var sessionDetailErrorsByID: [String: any Error] = [:]
+  var sessionDetailScopesByID: [String: [String?]] = [:]
+  var timelinesBySessionID: [String: [TimelineEntry]] = [:]
+  var timelineScopesBySessionID: [String: [TimelineScope]] = [:]
+  var timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
+  var timelineDelaysBySessionID: [String: Duration] = [:]
+  var timelineBatchDelaysBySessionID: [String: Duration] = [:]
+  var timelineErrorsBySessionID: [String: any Error] = [:]
+  var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
+  var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
+  var agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
+  var agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
+  var codexStartError: (any Error)?
+  var queuedCodexStartErrors: [any Error] = []
+  var agentTuiStartError: (any Error)?
+  var hostBridgeReconfigureError: (any Error)?
+  var hostBridgeStatusReport = BridgeStatusReport(running: false)
+  var globalStreamEvents: [DaemonPushEvent] = []
+  var globalStreamError: (any Error)?
+  var sessionStreamEventsBySessionID: [String: [DaemonPushEvent]] = [:]
+  var sessionStreamErrorsBySessionID: [String: any Error] = [:]
+  var recordedShutdownCallCount = 0
+  var recordedHealthCallCount = 0
+  var recordedTransportLatencyCallCount = 0
+  var recordedDiagnosticsCallCount = 0
+  var recordedProjectsCallCount = 0
+  var recordedSessionsCallCount = 0
+  var sessionDetailCallCountsBySessionID: [String: Int] = [:]
+  var timelineCallCountsBySessionID: [String: Int] = [:]
 
   var calls: [Call] {
-    get { lock.withLock { _calls } }
-    set { lock.withLock { _calls = newValue } }
+    get { lock.withLock { callsStorage } }
+    set { lock.withLock { callsStorage = newValue } }
   }
 
   var detail: SessionDetail {
-    get { lock.withLock { _detail } }
-    set { lock.withLock { _detail = newValue } }
+    get { lock.withLock { detailStorage } }
+    set { lock.withLock { detailStorage = newValue } }
   }
 
   init(detail: SessionDetail = PreviewFixtures.detail) {
-    self._detail = detail
+    detailStorage = detail
   }
 }

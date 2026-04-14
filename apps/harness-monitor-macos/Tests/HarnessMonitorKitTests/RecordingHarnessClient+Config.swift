@@ -9,31 +9,31 @@ extension RecordingHarnessClient {
 
   func configureHealthDelay(_ delay: Duration?) {
     lock.withLock {
-      _healthDelay = delay
+      healthDelay = delay
     }
   }
 
   func configureTransportLatencyMs(_ latencyMs: Int?) {
     lock.withLock {
-      _transportLatencyMs = latencyMs
+      transportLatencyMsValue = latencyMs
     }
   }
 
   func configureTransportLatencyError(_ error: (any Error)?) {
     lock.withLock {
-      _transportLatencyError = error
+      transportLatencyError = error
     }
   }
 
   func configureDiagnosticsDelay(_ delay: Duration?) {
     lock.withLock {
-      _diagnosticsDelay = delay
+      diagnosticsDelay = delay
     }
   }
 
   func configureMutationDelay(_ delay: Duration?) {
     lock.withLock {
-      _mutationDelay = delay
+      mutationDelay = delay
     }
   }
 
@@ -68,7 +68,7 @@ extension RecordingHarnessClient {
         projectsByID[summary.projectId] = project
       }
 
-      _projectSummaries = orderedProjectIDs.compactMap { projectID in
+      projectSummariesStorage = orderedProjectIDs.compactMap { projectID in
         guard let project = projectsByID[projectID] else {
           return nil
         }
@@ -82,18 +82,18 @@ extension RecordingHarnessClient {
           totalSessionCount: project.totalSessionCount
         )
       }
-      _sessionSummaries = summaries
-      _sessionDetailsByID = detailsByID
-      _timelinesBySessionID = timelinesBySessionID
+      sessionSummariesStorage = summaries
+      sessionDetailsByID = detailsByID
+      self.timelinesBySessionID = timelinesBySessionID
     }
   }
 
   func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {
-        _detailDelays[sessionID] = delay
+        detailDelaysBySessionID[sessionID] = delay
       } else {
-        _detailDelays.removeValue(forKey: sessionID)
+        detailDelaysBySessionID.removeValue(forKey: sessionID)
       }
     }
   }
@@ -101,37 +101,37 @@ extension RecordingHarnessClient {
   func configureSessionDetailError(_ error: (any Error)?, for sessionID: String) {
     lock.withLock {
       if let error {
-        _sessionDetailErrorsByID[sessionID] = error
+        sessionDetailErrorsByID[sessionID] = error
       } else {
-        _sessionDetailErrorsByID.removeValue(forKey: sessionID)
+        sessionDetailErrorsByID.removeValue(forKey: sessionID)
       }
     }
   }
 
   func configuredSessionDetailError(for sessionID: String) -> (any Error)? {
-    lock.withLock { _sessionDetailErrorsByID[sessionID] }
+    lock.withLock { sessionDetailErrorsByID[sessionID] }
   }
 
   func configureTimelineError(_ error: (any Error)?, for sessionID: String) {
     lock.withLock {
       if let error {
-        _timelineErrorsByID[sessionID] = error
+        timelineErrorsBySessionID[sessionID] = error
       } else {
-        _timelineErrorsByID.removeValue(forKey: sessionID)
+        timelineErrorsBySessionID.removeValue(forKey: sessionID)
       }
     }
   }
 
   func configuredTimelineError(for sessionID: String) -> (any Error)? {
-    lock.withLock { _timelineErrorsByID[sessionID] }
+    lock.withLock { timelineErrorsBySessionID[sessionID] }
   }
 
   func configureTimelineDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {
-        _timelineDelays[sessionID] = delay
+        timelineDelaysBySessionID[sessionID] = delay
       } else {
-        _timelineDelays.removeValue(forKey: sessionID)
+        timelineDelaysBySessionID.removeValue(forKey: sessionID)
       }
     }
   }
@@ -141,8 +141,8 @@ extension RecordingHarnessClient {
     error: (any Error)? = nil
   ) {
     lock.withLock {
-      _globalStreamEvents = events
-      _globalStreamError = error
+      globalStreamEvents = events
+      globalStreamError = error
     }
   }
 
@@ -152,144 +152,144 @@ extension RecordingHarnessClient {
     for sessionID: String
   ) {
     lock.withLock {
-      _sessionStreamEventsByID[sessionID] = events
+      sessionStreamEventsBySessionID[sessionID] = events
       if let error {
-        _sessionStreamErrorsByID[sessionID] = error
+        sessionStreamErrorsBySessionID[sessionID] = error
       } else {
-        _sessionStreamErrorsByID.removeValue(forKey: sessionID)
+        sessionStreamErrorsBySessionID.removeValue(forKey: sessionID)
       }
     }
   }
 
   func configureCodexRuns(_ runs: [CodexRunSnapshot], for sessionID: String) {
     lock.withLock {
-      _codexRunsBySessionID[sessionID] = runs
+      codexRunsBySessionID[sessionID] = runs
     }
   }
 
   func configureAgentTuis(_ tuis: [AgentTuiSnapshot], for sessionID: String) {
     lock.withLock {
-      _agentTuisBySessionID[sessionID] = tuis
+      agentTuisBySessionID[sessionID] = tuis
     }
   }
 
   func configureAgentTuiInputResponses(_ snapshots: [AgentTuiSnapshot], for tuiID: String) {
     lock.withLock {
-      _agentTuiInputResponsesByID[tuiID] = snapshots
+      agentTuiInputResponsesByID[tuiID] = snapshots
     }
   }
 
   func configureAgentTuiReadSnapshots(_ snapshots: [AgentTuiSnapshot], for tuiID: String) {
     lock.withLock {
-      _agentTuiReadSnapshotsByID[tuiID] = snapshots
+      agentTuiReadSnapshotsByID[tuiID] = snapshots
     }
   }
 
   func configureCodexStartError(_ error: (any Error)?) {
     lock.withLock {
-      _codexStartError = error
-      _queuedCodexStartErrors = []
+      codexStartError = error
+      queuedCodexStartErrors = []
     }
   }
 
   func configureCodexStartErrors(_ errors: [any Error]) {
     lock.withLock {
-      _queuedCodexStartErrors = errors
-      _codexStartError = nil
+      queuedCodexStartErrors = errors
+      codexStartError = nil
     }
   }
 
   func configureAgentTuiStartError(_ error: (any Error)?) {
-    lock.withLock { _agentTuiStartError = error }
+    lock.withLock { agentTuiStartError = error }
   }
 
   func configureHostBridgeReconfigureError(_ error: (any Error)?) {
-    lock.withLock { _hostBridgeReconfigureError = error }
+    lock.withLock { hostBridgeReconfigureError = error }
   }
 
   func configureHostBridgeStatusReport(_ report: BridgeStatusReport) {
-    lock.withLock { _hostBridgeStatusReport = report }
+    lock.withLock { hostBridgeStatusReport = report }
   }
 
   func configuredCodexStartError() -> (any Error)? {
-    lock.withLock { _codexStartError }
+    lock.withLock { codexStartError }
   }
 
   func dequeueConfiguredCodexStartError() -> (any Error)? {
     lock.withLock {
-      guard let error = _queuedCodexStartErrors.first else {
-        return _codexStartError
+      guard let error = queuedCodexStartErrors.first else {
+        return codexStartError
       }
-      _queuedCodexStartErrors.removeFirst()
+      queuedCodexStartErrors.removeFirst()
       return error
     }
   }
 
   func configuredAgentTuiStartError() -> (any Error)? {
-    lock.withLock { _agentTuiStartError }
+    lock.withLock { agentTuiStartError }
   }
 
   func configuredHostBridgeReconfigureError() -> (any Error)? {
-    lock.withLock { _hostBridgeReconfigureError }
+    lock.withLock { hostBridgeReconfigureError }
   }
 
   func configuredHostBridgeStatusReport() -> BridgeStatusReport {
-    lock.withLock { _hostBridgeStatusReport }
+    lock.withLock { hostBridgeStatusReport }
   }
 
-  func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
-  func configuredTransportLatencyMs() -> Int? { lock.withLock { _transportLatencyMs } }
+  func configuredHealthDelay() -> Duration? { lock.withLock { healthDelay } }
+  func configuredTransportLatencyMs() -> Int? { lock.withLock { transportLatencyMsValue } }
   func configuredTransportLatencyError() -> (any Error)? {
-    lock.withLock { _transportLatencyError }
+    lock.withLock { transportLatencyError }
   }
-  func configuredDiagnosticsDelay() -> Duration? { lock.withLock { _diagnosticsDelay } }
-  func configuredMutationDelay() -> Duration? { lock.withLock { _mutationDelay } }
-  func configuredProjects() -> [ProjectSummary]? { lock.withLock { _projectSummaries } }
-  func configuredSessions() -> [SessionSummary]? { lock.withLock { _sessionSummaries } }
+  func configuredDiagnosticsDelay() -> Duration? { lock.withLock { diagnosticsDelay } }
+  func configuredMutationDelay() -> Duration? { lock.withLock { mutationDelay } }
+  func configuredProjects() -> [ProjectSummary]? { lock.withLock { projectSummariesStorage } }
+  func configuredSessions() -> [SessionSummary]? { lock.withLock { sessionSummariesStorage } }
   func configuredSessionDetail(id: String) -> SessionDetail? {
-    lock.withLock { _sessionDetailsByID[id] }
+    lock.withLock { sessionDetailsByID[id] }
   }
   func configuredDetailDelay(for sessionID: String) -> Duration? {
-    lock.withLock { _detailDelays[sessionID] }
+    lock.withLock { detailDelaysBySessionID[sessionID] }
   }
   func sessionDetailScopes(for sessionID: String) -> [String?] {
-    lock.withLock { _sessionDetailScopesByID[sessionID] ?? [] }
+    lock.withLock { sessionDetailScopesByID[sessionID] ?? [] }
   }
   func configuredTimeline(for sessionID: String) -> [TimelineEntry]? {
-    lock.withLock { _timelinesBySessionID[sessionID] }
+    lock.withLock { timelinesBySessionID[sessionID] }
   }
   func timelineScopes(for sessionID: String) -> [TimelineScope] {
-    lock.withLock { _timelineScopesByID[sessionID] ?? [] }
+    lock.withLock { timelineScopesBySessionID[sessionID] ?? [] }
   }
   func configuredTimelineBatches(for sessionID: String) -> [[TimelineEntry]]? {
-    lock.withLock { _timelineBatchesBySessionID[sessionID] }
+    lock.withLock { timelineBatchesBySessionID[sessionID] }
   }
   func configuredTimelineDelay(for sessionID: String) -> Duration? {
-    lock.withLock { _timelineDelays[sessionID] }
+    lock.withLock { timelineDelaysBySessionID[sessionID] }
   }
   func configuredTimelineBatchDelay(for sessionID: String) -> Duration? {
-    lock.withLock { _timelineBatchDelaysBySessionID[sessionID] }
+    lock.withLock { timelineBatchDelaysBySessionID[sessionID] }
   }
   func configuredCodexRuns(for sessionID: String) -> [CodexRunSnapshot] {
-    lock.withLock { _codexRunsBySessionID[sessionID] ?? [] }
+    lock.withLock { codexRunsBySessionID[sessionID] ?? [] }
   }
   func configuredAgentTuis(for sessionID: String) -> [AgentTuiSnapshot] {
-    lock.withLock { _agentTuisBySessionID[sessionID] ?? [] }
+    lock.withLock { agentTuisBySessionID[sessionID] ?? [] }
   }
   func configuredCodexRun(id runID: String) -> CodexRunSnapshot? {
     lock.withLock {
-      _codexRunsBySessionID.values.flatMap(\.self).first { $0.runId == runID }
+      codexRunsBySessionID.values.flatMap(\.self).first { $0.runId == runID }
     }
   }
   func configuredAgentTui(id tuiID: String) -> AgentTuiSnapshot? {
     lock.withLock {
-      _agentTuisBySessionID.values.flatMap(\.self).first { $0.tuiId == tuiID }
+      agentTuisBySessionID.values.flatMap(\.self).first { $0.tuiId == tuiID }
     }
   }
   func dequeueConfiguredAgentTuiInputResponse(id tuiID: String) -> AgentTuiSnapshot? {
     lock.withLock {
       dequeueAgentTuiSnapshot(
-        from: &_agentTuiInputResponsesByID,
+        from: &agentTuiInputResponsesByID,
         tuiID: tuiID
       )
     }
@@ -297,34 +297,34 @@ extension RecordingHarnessClient {
   func dequeueConfiguredAgentTuiReadSnapshot(id tuiID: String) -> AgentTuiSnapshot? {
     lock.withLock {
       dequeueAgentTuiSnapshot(
-        from: &_agentTuiReadSnapshotsByID,
+        from: &agentTuiReadSnapshotsByID,
         tuiID: tuiID
       )
     }
   }
   func recordCodexRun(_ run: CodexRunSnapshot) {
     lock.withLock {
-      var runs = _codexRunsBySessionID[run.sessionId] ?? []
+      var runs = codexRunsBySessionID[run.sessionId] ?? []
       runs.removeAll { $0.runId == run.runId }
       runs.insert(run, at: 0)
-      _codexRunsBySessionID[run.sessionId] = runs
+      codexRunsBySessionID[run.sessionId] = runs
     }
   }
   func recordAgentTui(_ tui: AgentTuiSnapshot) {
     lock.withLock {
-      var tuis = _agentTuisBySessionID[tui.sessionId] ?? []
+      var tuis = agentTuisBySessionID[tui.sessionId] ?? []
       tuis.removeAll { $0.tuiId == tui.tuiId }
       tuis.insert(tui, at: 0)
-      _agentTuisBySessionID[tui.sessionId] = tuis
+      agentTuisBySessionID[tui.sessionId] = tuis
     }
   }
-  func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { _globalStreamEvents } }
-  func configuredGlobalStreamError() -> (any Error)? { lock.withLock { _globalStreamError } }
+  func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { globalStreamEvents } }
+  func configuredGlobalStreamError() -> (any Error)? { lock.withLock { globalStreamError } }
   func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] {
-    lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] }
+    lock.withLock { sessionStreamEventsBySessionID[sessionID] ?? [] }
   }
   func configuredSessionStreamError(for sessionID: String) -> (any Error)? {
-    lock.withLock { _sessionStreamErrorsByID[sessionID] }
+    lock.withLock { sessionStreamErrorsBySessionID[sessionID] }
   }
-  func shutdownCallCount() -> Int { lock.withLock { _shutdownCallCount } }
+  func shutdownCallCount() -> Int { lock.withLock { recordedShutdownCallCount } }
 }
