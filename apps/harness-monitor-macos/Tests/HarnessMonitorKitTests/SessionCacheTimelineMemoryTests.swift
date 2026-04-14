@@ -182,6 +182,7 @@ struct SessionCacheTimelineMemoryTests {
     let store = harness.makeStore()
     let project = makeProject(totalSessionCount: 20, activeSessionCount: 20)
 
+    var allSessions: [SessionSummary] = []
     for index in 0..<20 {
       let session = makeSession(
         .init(
@@ -212,7 +213,8 @@ struct SessionCacheTimelineMemoryTests {
         )
       }
 
-      await store.cacheSessionList([session], projects: [project])
+      allSessions.append(session)
+      await store.cacheSessionList(allSessions, projects: [project])
       await store.cacheSessionDetail(detail, timeline: timeline)
     }
 
