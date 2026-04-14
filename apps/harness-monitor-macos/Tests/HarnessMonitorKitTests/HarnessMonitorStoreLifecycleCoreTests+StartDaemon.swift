@@ -106,6 +106,47 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.manifestWatcher != nil)
   }
 
+  @Test("reconnect stops the active manifest watcher while managed bootstrap is in flight")
+  func reconnectStopsManifestWatcherDuringBootstrap() async {
+    let daemon = DelayedWarmUpDaemonController(warmUpDelay: .milliseconds(250))
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.manifestWatcher = ManifestWatcher(currentEndpoint: "http://127.0.0.1:9999") { _ in }
+
+    let reconnectTask = Task { @MainActor in
+      await store.reconnect()
+    }
+
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.isReconnecting)
+    #expect(store.manifestWatcher == nil)
+
+    await reconnectTask.value
+
+    #expect(store.connectionState == .online)
+    #expect(store.manifestWatcher != nil)
+  }
+
+  @Test("managed launch-agent refresh is throttled across repeated reconnect failures")
+  func managedLaunchAgentRefreshIsThrottledAcrossReconnectFailures() async {
+    let daemon = ManagedLaunchAgentRefreshThrottleDaemonController()
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.managedLaunchAgentRefreshMinimumInterval = .seconds(10)
+
+    await store.reconnect()
+    await store.reconnect()
+
+    if case .offline = store.connectionState {
+      // expected
+    } else {
+      Issue.record("expected offline state after repeated warm-up failures, got \(store.connectionState)")
+    }
+    #expect(
+      await daemon.recordedOperations()
+        == ["warm-up", "remove", "register", "warm-up", "warm-up"]
+    )
+  }
+
   @Test("Prepare for termination cancels background work and shuts down the client")
   func prepareForTerminationCancelsBackgroundWorkAndShutsDownClient() async {
     let client = RecordingHarnessClient()
@@ -408,6 +449,91 @@ actor ManagedDaemonVersionRecoveryDaemonController: DaemonControlling {
       )
     }
     return client
+  }
+
+  func recordedOperations() -> [String] {
+    operations
+  }
+}
+
+actor ManagedLaunchAgentRefreshThrottleDaemonController: DaemonControlling {
+  private var operations: [String] = []
+
+  func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
+    PreviewHarnessClient()
+  }
+
+  func stopDaemon() async throws -> String {
+    "stopped"
+  }
+
+  func daemonStatus() async throws -> DaemonStatusReport {
+    DaemonStatusReport(
+      manifest: DaemonManifest(
+        version: "21.0.2",
+        pid: 111,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-04-14T13:02:00Z",
+        tokenPath: "/tmp/token"
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: true,
+        loaded: true,
+        label: "io.harness.daemon",
+        path: "/tmp/io.harness.daemon.plist"
+      ),
+      projectCount: 1,
+      sessionCount: 1,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/tmp/harness/daemon",
+        manifestPath: "/tmp/harness/daemon/manifest.json",
+        authTokenPath: "/tmp/token",
+        authTokenPresent: true,
+        eventsPath: "/tmp/harness/daemon/events.jsonl",
+        databasePath: "/tmp/harness/daemon/harness.db",
+        databaseSizeBytes: 1_024,
+        lastEvent: nil
+      )
+    )
+  }
+
+  func installLaunchAgent() async throws -> String {
+    "launch agent installed"
+  }
+
+  func removeLaunchAgent() async throws -> String {
+    operations.append("remove")
+    return "launch agent removed"
+  }
+
+  func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    operations.append("register")
+    return .enabled
+  }
+
+  func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    .enabled
+  }
+
+  func launchAgentSnapshot() async -> LaunchAgentStatus {
+    LaunchAgentStatus(
+      installed: true,
+      loaded: true,
+      label: "io.harness.daemon",
+      path: "/tmp/io.harness.daemon.plist"
+    )
+  }
+
+  func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {}
+
+  func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
+    operations.append("warm-up")
+    throw DaemonControlError.daemonDidNotStart
   }
 
   func recordedOperations() -> [String] {
