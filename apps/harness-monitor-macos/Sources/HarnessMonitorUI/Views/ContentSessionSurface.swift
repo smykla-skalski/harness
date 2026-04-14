@@ -6,6 +6,7 @@ struct SessionContentState {
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
+  let isSessionStatusStale: Bool
   let isSessionReadOnly: Bool
   let isSelectionLoading: Bool
   let isTimelineLoading: Bool
@@ -42,6 +43,7 @@ struct SessionContentContainer: View {
           detail: cockpitDetail,
           timeline: state.timeline,
           timelineWindow: state.timelineWindow,
+          isSessionStatusStale: state.isSessionStatusStale,
           isSessionReadOnly: state.isSessionReadOnly,
           isTimelineLoading: state.isTimelineLoading,
           isExtensionsLoading: state.isExtensionsLoading
@@ -91,6 +93,7 @@ private struct SessionCockpitLoadingSurface: View {
       summary: nil,
       timeline: [],
       timelineWindow: nil,
+      isSessionStatusStale: false,
       isSessionReadOnly: false,
       isSelectionLoading: false,
       isTimelineLoading: false,
@@ -111,6 +114,7 @@ private struct SessionCockpitLoadingSurface: View {
       summary: store.selectedSessionSummary,
       timeline: store.timeline,
       timelineWindow: store.timelineWindow,
+      isSessionStatusStale: false,
       isSessionReadOnly: false,
       isSelectionLoading: false,
       isTimelineLoading: false,

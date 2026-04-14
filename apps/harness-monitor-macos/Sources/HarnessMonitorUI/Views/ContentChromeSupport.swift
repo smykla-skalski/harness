@@ -64,16 +64,10 @@ struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
 struct ContentDetailChrome<Content: View>: View {
   let persistenceError: String?
   let sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability
-  let sessionStatus: SessionStatus?
   @ViewBuilder let content: Content
 
   var body: some View {
-    ZStack(alignment: .topLeading) {
-      if let sessionStatus {
-        SessionStatusCornerOverlay(status: sessionStatus, isStale: isStale)
-      }
-      contentWithTopChrome
-    }
+    contentWithTopChrome
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 

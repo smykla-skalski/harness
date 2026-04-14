@@ -6,6 +6,7 @@ struct SessionCockpitView: View {
   let detail: SessionDetail
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
+  let isSessionStatusStale: Bool
   let isSessionReadOnly: Bool
   let isTimelineLoading: Bool
   let isExtensionsLoading: Bool
@@ -40,7 +41,13 @@ struct SessionCockpitView: View {
   var body: some View {
     HarnessMonitorColumnScrollView(
       verticalPadding: HarnessMonitorTheme.spacingXL,
-      constrainContentWidth: true
+      constrainContentWidth: true,
+      underlay: {
+        SessionStatusCornerOverlay(
+          status: detail.session.status,
+          isStale: isSessionStatusStale
+        )
+      }
     ) {
       VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(
@@ -61,7 +68,11 @@ struct SessionCockpitView: View {
           isCodexFlowAvailable: store.isCodexFlowAvailable,
           openCodexFlow: store.presentCodexFlowSheet
         )
-        HarnessMonitorAdaptiveGridLayout(minimumColumnWidth: 340, maximumColumns: 2, spacing: 16) {
+        HarnessMonitorAdaptiveGridLayout(
+          minimumColumnWidth: 340,
+          maximumColumns: 2,
+          spacing: 16
+        ) {
           SessionTaskListSection(
             store: store,
             sessionID: detail.session.sessionId,
@@ -95,6 +106,7 @@ struct SessionCockpitView: View {
           }
         )
       }
+      .padding(.top, SessionCockpitLayout.statusHeaderClearance)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
@@ -106,6 +118,7 @@ struct SessionCockpitView: View {
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+    isSessionStatusStale: false,
     isSessionReadOnly: false,
     isTimelineLoading: false,
     isExtensionsLoading: false
@@ -118,6 +131,7 @@ struct SessionCockpitView: View {
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+    isSessionStatusStale: false,
     isSessionReadOnly: false,
     isTimelineLoading: false,
     isExtensionsLoading: false
