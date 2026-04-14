@@ -87,7 +87,7 @@ fn cluster_topology_is_owned_by_kernel() {
         "src/platform/runtime/profile.rs",
         "src/platform/runtime/universal.rs",
         "src/hooks/verify_bash.rs",
-        "tests/integration/cluster.rs",
+        "tests/integration/cluster/mod.rs",
         "tests/integration/universal.rs",
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();

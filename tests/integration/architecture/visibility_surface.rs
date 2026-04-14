@@ -60,7 +60,8 @@ fn transport_command_modules_stay_internal_to_domains() {
     for path in [
         "src/app/cli.rs",
         "tests/integration/helpers.rs",
-        "tests/integration/cluster.rs",
+        "tests/integration/cluster/mod.rs",
+        "tests/integration/cluster/orchestration.rs",
         "tests/integration/commands/api.rs",
         "tests/integration/commands/init_run.rs",
         "tests/integration/commands/record.rs",
