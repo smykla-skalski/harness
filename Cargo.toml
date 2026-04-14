@@ -3,9 +3,23 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "21.2.0"
+version = "21.2.1"
 edition = "2024"
 rust-version = "1.94"
+include = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "LICENSE",
+  "README.md",
+  "build.rs",
+  "clippy.toml",
+  "src/**",
+  "tests/**",
+  "testkit/**",
+  "resources/universal/templates/**",
+  "agents/shared/claude-plugin-harness.sh",
+  "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
+]
 
 [dependencies]
 bollard = "0.20.2"
