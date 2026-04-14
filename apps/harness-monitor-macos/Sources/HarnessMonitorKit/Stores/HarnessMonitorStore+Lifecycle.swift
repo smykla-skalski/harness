@@ -245,17 +245,60 @@ extension HarnessMonitorStore {
         timeline: measuredTimeline.value,
         showingCachedData: false
       )
-      _ = await refreshCodexRuns(using: client, sessionID: sessionID)
-      _ = await refreshAgentTuis(using: client, sessionID: sessionID)
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
           await service.cacheSessionDetail(detail, timeline: measuredTimeline.value)
         }
       }
+      startSessionSecondaryHydration(
+        using: client,
+        sessionID: sessionID,
+        requestID: requestID
+      )
     } catch is CancellationError {
       return
     } catch {
       await handleSessionLoadError(error, requestID: requestID, sessionID: sessionID)
+    }
+  }
+
+  private func startSessionSecondaryHydration(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    requestID: UInt64
+  ) {
+    sessionSecondaryHydrationTaskToken &+= 1
+    let token = sessionSecondaryHydrationTaskToken
+    sessionSecondaryHydrationTask?.cancel()
+    sessionSecondaryHydrationTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      defer {
+        if self.sessionSecondaryHydrationTaskToken == token {
+          self.sessionSecondaryHydrationTask = nil
+        }
+      }
+
+      guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
+
+      await withTaskGroup(of: Void.self) { group in
+        group.addTask { [weak self] in
+          guard let self, !Task.isCancelled else {
+            return
+          }
+          _ = await self.refreshCodexRuns(using: client, sessionID: sessionID)
+        }
+        group.addTask { [weak self] in
+          guard let self, !Task.isCancelled else {
+            return
+          }
+          _ = await self.refreshAgentTuis(using: client, sessionID: sessionID)
+        }
+      }
     }
   }
 
