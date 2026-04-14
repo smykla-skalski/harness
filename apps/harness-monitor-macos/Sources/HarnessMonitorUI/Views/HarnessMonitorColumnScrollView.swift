@@ -14,6 +14,7 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
   let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
   private let content: Content
   private let underlay: AnyView?
+  private let overlay: AnyView?
 
   /// HIG readable content width for body text (~70 characters at body size).
   private static var readableMaxWidth: CGFloat { 680 }
@@ -33,6 +34,7 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
     underlay = nil
+    overlay = nil
   }
 
   init<Underlay: View>(
@@ -51,6 +53,27 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
     self.underlay = AnyView(underlay())
+    overlay = nil
+  }
+
+  init<Underlay: View, Overlay: View>(
+    horizontalPadding: CGFloat = 24,
+    verticalPadding: CGFloat = 24,
+    constrainContentWidth: Bool = false,
+    readableWidth: Bool = false,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    @ViewBuilder underlay: () -> Underlay,
+    @ViewBuilder overlay: () -> Overlay,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.horizontalPadding = horizontalPadding
+    self.verticalPadding = verticalPadding
+    self.constrainContentWidth = constrainContentWidth
+    self.readableWidth = readableWidth
+    self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.content = content()
+    self.underlay = AnyView(underlay())
+    self.overlay = AnyView(overlay())
   }
 
   var body: some View {
@@ -86,9 +109,14 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
+
+        if let overlay {
+          overlay
+        }
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)
     }
+    .scrollClipDisabled(underlay != nil)
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
   }
 }

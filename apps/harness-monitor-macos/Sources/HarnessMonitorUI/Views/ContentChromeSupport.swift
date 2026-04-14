@@ -113,10 +113,52 @@ struct ContentDetailChrome<Content: View>: View {
   }
 }
 
-struct SessionStatusCornerOverlay: View {
+private enum SessionStatusCornerLayout {
+  static let leadingInset: CGFloat = 24
+  static let trailingBleed: CGFloat = 240
+  static let topInset: CGFloat = HarnessMonitorTheme.spacingMD
+  static let bottomBleed: CGFloat = 200
+}
+
+private struct SessionStatusCornerLabelRow: View {
   let status: SessionStatus
   let isStale: Bool
 
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+      if isStale {
+        Image(systemName: "clock.badge.questionmark")
+          .font(.system(size: 9, weight: .bold))
+          .accessibilityHidden(true)
+      }
+      Text(status.title.uppercased())
+        .font(.system(size: 10, weight: .bold))
+        .tracking(HarnessMonitorTheme.uppercaseTracking)
+    }
+  }
+}
+
+private struct SessionStatusCornerBounds: View {
+  let status: SessionStatus
+  let isStale: Bool
+
+  var body: some View {
+    SessionStatusCornerLabelRow(status: status, isStale: isStale)
+      .hidden()
+      .accessibilityHidden(true)
+      .padding(.leading, SessionStatusCornerLayout.leadingInset)
+      .padding(.trailing, SessionStatusCornerLayout.trailingBleed)
+      .padding(.top, SessionStatusCornerLayout.topInset)
+      .padding(.bottom, SessionStatusCornerLayout.bottomBleed)
+  }
+}
+
+struct SessionStatusCornerBackdrop: View {
+  let status: SessionStatus
+  let isStale: Bool
+
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
@@ -126,12 +168,6 @@ struct SessionStatusCornerOverlay: View {
 
   private var tintOpacity: Double {
     colorSchemeContrast == .increased ? 0.55 : 0.45
-  }
-
-  private var labelColor: Color {
-    let baseColor = statusColor(for: status)
-    let opacity = colorSchemeContrast == .increased ? 0.94 : 0.82
-    return baseColor.opacity(opacity)
   }
 
   private var tintGradient: some View {
@@ -166,25 +202,47 @@ struct SessionStatusCornerOverlay: View {
       .mask { backdropMask }
   }
 
-  var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
-      if isStale {
-        Image(systemName: "clock.badge.questionmark")
-          .font(.system(size: 9, weight: .bold))
-          .accessibilityHidden(true)
-      }
-      Text(status.title.uppercased())
-        .font(.system(size: 10, weight: .bold))
-        .tracking(HarnessMonitorTheme.uppercaseTracking)
-    }
-    .foregroundStyle(labelColor)
-    .padding(.leading, 24)
-    .padding(.trailing, 240)
-    .padding(.top, HarnessMonitorTheme.spacingMD)
-    .padding(.bottom, 200)
-    .background {
+  @ViewBuilder
+  private var extendedStatusBackdrop: some View {
+    if reduceTransparency {
       statusBackdrop
+    } else {
+      statusBackdrop
+        .backgroundExtensionEffect()
     }
+  }
+
+  var body: some View {
+    SessionStatusCornerBounds(status: status, isStale: isStale)
+      .background {
+        extendedStatusBackdrop
+      }
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
+}
+
+struct SessionStatusCornerOverlay: View {
+  let status: SessionStatus
+  let isStale: Bool
+
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var labelColor: Color {
+    let baseColor = statusColor(for: status)
+    let opacity = colorSchemeContrast == .increased ? 0.94 : 0.82
+    return baseColor.opacity(opacity)
+  }
+
+  var body: some View {
+    SessionStatusCornerBounds(status: status, isStale: isStale)
+      .overlay(alignment: .topLeading) {
+        SessionStatusCornerLabelRow(status: status, isStale: isStale)
+          .foregroundStyle(labelColor)
+          .padding(.leading, SessionStatusCornerLayout.leadingInset)
+          .padding(.top, SessionStatusCornerLayout.topInset)
+      }
     .allowsHitTesting(false)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Session status")
