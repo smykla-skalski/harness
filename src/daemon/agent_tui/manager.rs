@@ -8,8 +8,10 @@ use std::time::Duration;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
+use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
 use crate::daemon::db::DaemonDb;
+use crate::daemon::ordering::sort_agent_tui_snapshots;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
@@ -157,14 +159,9 @@ impl AgentTuiManagerHandle {
         auto_join: &str,
         request: &AgentTuiStartRequest,
     ) {
-        let delivery = crate::agents::runtime::runtime_for_name(&runtime).map_or(
-            crate::agents::runtime::InitialPromptDelivery::PtySend,
-            |runtime| runtime.initial_prompt_delivery(),
-        );
-        let pty_auto_join = matches!(
-            delivery,
-            crate::agents::runtime::InitialPromptDelivery::PtySend
-        )
+        let delivery = runtime_for_name(&runtime)
+            .map_or(InitialPromptDelivery::PtySend, AgentRuntime::initial_prompt_delivery);
+        let pty_auto_join = matches!(delivery, InitialPromptDelivery::PtySend)
         .then(|| auto_join.to_string());
         let user_prompt = request
             .prompt
@@ -287,7 +284,7 @@ impl AgentTuiManagerHandle {
                     .collect::<BTreeMap<_, _>>()
             })
             .unwrap_or_default();
-        crate::daemon::ordering::sort_agent_tui_snapshots(&mut tuis, &roles_by_agent);
+        sort_agent_tui_snapshots(&mut tuis, &roles_by_agent);
         Ok(AgentTuiListResponse { tuis })
     }
 

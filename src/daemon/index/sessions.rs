@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -9,7 +10,8 @@ use crate::agents::runtime::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::storage;
-use crate::session::types::{SessionLogEntry, TaskCheckpoint};
+use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
+use crate::workspace::project_context_dir;
 
 use super::io::{for_each_nonempty_line, read_json_lines};
 use super::paths::{
@@ -87,7 +89,7 @@ pub fn resolve_session(session_id: &str) -> Result<ResolvedSession, CliError> {
 pub fn load_session_state(
     project: &DiscoveredProject,
     session_id: &str,
-) -> Result<Option<crate::session::types::SessionState>, CliError> {
+) -> Result<Option<SessionState>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref()
         && let Some(state) = storage::load_state(project_dir, session_id)?
     {
@@ -211,7 +213,7 @@ pub(super) fn list_session_ids_from_context_root(
         return Ok(Vec::new());
     }
     let mut session_ids = Vec::new();
-    for entry in std::fs::read_dir(root)
+    for entry in fs::read_dir(root)
         .map_err(|error| CliErrorKind::workflow_io(format!("read session root: {error}")))?
     {
         let Ok(entry) = entry else {
@@ -239,7 +241,7 @@ pub(super) fn list_active_session_ids_from_context_root(
 fn load_session_state_from_context_root(
     context_root: &Path,
     session_id: &str,
-) -> Result<Option<crate::session::types::SessionState>, CliError> {
+) -> Result<Option<SessionState>, CliError> {
     let path = session_state_path(context_root, session_id);
     if !path.is_file() {
         return Ok(None);
@@ -327,7 +329,7 @@ fn list_session_ids(
                 .collect())
         }?;
         if !session_ids.is_empty()
-            || crate::workspace::project_context_dir(project_dir) == project.context_root
+            || project_context_dir(project_dir) == project.context_root
         {
             return Ok(session_ids);
         }

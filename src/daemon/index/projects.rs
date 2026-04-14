@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
@@ -12,7 +12,7 @@ use super::contexts::{infer_checkout_identity, repair_context_root};
 use super::{DiscoveredProject, project_context_dir_name};
 
 #[must_use]
-pub fn projects_root() -> std::path::PathBuf {
+pub fn projects_root() -> PathBuf {
     harness_data_root().join("projects")
 }
 

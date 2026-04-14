@@ -3,6 +3,8 @@ use super::{
     SessionTransition, SignalAck, session_service, snapshot, utc_now, write_signal_ack,
 };
 use crate::agents::runtime::{runtime_for_name, signal::pending_dir};
+use crate::daemon::db::ExpiredPendingSignalIndexRecord;
+use crate::session::types::SessionState;
 
 /// Re-sync a session from files into `SQLite` after a file-based mutation.
 /// Silently ignores errors since the file write already succeeded and the
@@ -162,9 +164,9 @@ fn acknowledge_indexed_expired_signal(
     session_id: &str,
     project_dir: &Path,
     context_root: &Path,
-    state: &crate::session::types::SessionState,
+    state: &SessionState,
     db: &super::db::DaemonDb,
-    indexed_signal: &crate::daemon::db::ExpiredPendingSignalIndexRecord,
+    indexed_signal: &ExpiredPendingSignalIndexRecord,
 ) -> Result<bool, CliError> {
     let Some(agent) = state.agents.get(&indexed_signal.agent_id) else {
         return Ok(false);

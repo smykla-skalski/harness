@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::thread::{JoinHandle, sleep};
 use std::time::{Duration, Instant};
 
 use portable_pty::{Child, ExitStatus, MasterPty, native_pty_system};
@@ -203,7 +203,7 @@ impl AgentTuiProcess {
             if started.elapsed() >= timeout {
                 return Ok(None);
             }
-            std::thread::sleep(Duration::from_millis(20));
+            sleep(Duration::from_millis(20));
         }
     }
 
