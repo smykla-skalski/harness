@@ -17,6 +17,14 @@ use super::support::{create_work_items_for_issues, emit_watch_issues, map_severi
 /// With default 3s poll interval, sweep runs every ~5 minutes.
 const SWEEP_CYCLE_COUNT: u64 = 100;
 
+struct WatchCycleState {
+    realtime_seen: HashSet<String>,
+    total_issues: usize,
+    cycle_count: u64,
+    tail_states: HashMap<String, AgentLogTailState>,
+    shared_cross_agent_editors: HashMap<String, HashSet<String>>,
+}
+
 /// Run the continuous multi-agent observation loop.
 ///
 /// Two modes work together:
@@ -38,30 +46,22 @@ pub fn execute_session_watch(
     json: bool,
     actor_id: Option<&str>,
 ) -> Result<i32, CliError> {
-    let mut realtime_seen = HashSet::new();
-    let mut total_issues = 0_usize;
-    let mut cycle_count = 0_u64;
-    let mut tail_states = HashMap::new();
-    let mut shared_cross_agent_editors = HashMap::new();
+    let mut state = WatchCycleState {
+        realtime_seen: HashSet::new(),
+        total_issues: 0,
+        cycle_count: 0,
+        tail_states: HashMap::new(),
+        shared_cross_agent_editors: HashMap::new(),
+    };
 
     loop {
-        if !watch_cycle(
-            session_id,
-            project_dir,
-            json,
-            actor_id,
-            &mut realtime_seen,
-            &mut total_issues,
-            &mut cycle_count,
-            &mut tail_states,
-            &mut shared_cross_agent_editors,
-        )? {
+        if !watch_cycle(session_id, project_dir, json, actor_id, &mut state)? {
             break;
         }
         thread::sleep(Duration::from_secs(poll_interval_seconds));
     }
 
-    Ok(i32::from(total_issues > 0))
+    Ok(i32::from(state.total_issues > 0))
 }
 
 /// Run the continuous multi-agent observation loop on an async task.
@@ -75,30 +75,22 @@ pub async fn execute_session_watch_async(
     json: bool,
     actor_id: Option<&str>,
 ) -> Result<i32, CliError> {
-    let mut realtime_seen = HashSet::new();
-    let mut total_issues = 0_usize;
-    let mut cycle_count = 0_u64;
-    let mut tail_states = HashMap::new();
-    let mut shared_cross_agent_editors = HashMap::new();
+    let mut state = WatchCycleState {
+        realtime_seen: HashSet::new(),
+        total_issues: 0,
+        cycle_count: 0,
+        tail_states: HashMap::new(),
+        shared_cross_agent_editors: HashMap::new(),
+    };
 
     loop {
-        if !watch_cycle(
-            session_id,
-            project_dir,
-            json,
-            actor_id,
-            &mut realtime_seen,
-            &mut total_issues,
-            &mut cycle_count,
-            &mut tail_states,
-            &mut shared_cross_agent_editors,
-        )? {
+        if !watch_cycle(session_id, project_dir, json, actor_id, &mut state)? {
             break;
         }
         sleep(Duration::from_secs(poll_interval_seconds)).await;
     }
 
-    Ok(i32::from(total_issues > 0))
+    Ok(i32::from(state.total_issues > 0))
 }
 
 fn watch_cycle(
@@ -106,11 +98,7 @@ fn watch_cycle(
     project_dir: &Path,
     json: bool,
     actor_id: Option<&str>,
-    realtime_seen: &mut HashSet<String>,
-    total_issues: &mut usize,
-    cycle_count: &mut u64,
-    tail_states: &mut HashMap<String, AgentLogTailState>,
-    shared_cross_agent_editors: &mut HashMap<String, HashSet<String>>,
+    cycle: &mut WatchCycleState,
 ) -> Result<bool, CliError> {
     let Ok(state) = service::session_status(session_id, project_dir) else {
         return Ok(false);
@@ -129,28 +117,28 @@ fn watch_cycle(
         &state,
         session_id,
         project_dir,
-        tail_states,
-        shared_cross_agent_editors,
+        &mut cycle.tail_states,
+        &mut cycle.shared_cross_agent_editors,
     )?;
     let new_issues: Vec<Issue> = issues
         .into_iter()
-        .filter(|issue| realtime_seen.insert(issue.fingerprint.clone()))
+        .filter(|issue| cycle.realtime_seen.insert(issue.fingerprint.clone()))
         .collect();
 
     if !new_issues.is_empty() {
-        *total_issues += new_issues.len();
+        cycle.total_issues += new_issues.len();
         create_work_items_for_issues(&new_issues, session_id, &state, project_dir, actor_id)?;
         emit_watch_issues(&new_issues, json);
     }
 
-    *cycle_count += 1;
-    if cycle_count.is_multiple_of(SWEEP_CYCLE_COUNT) {
+    cycle.cycle_count += 1;
+    if cycle.cycle_count.is_multiple_of(SWEEP_CYCLE_COUNT) {
         run_periodic_sweep(
             session_id,
             project_dir,
             &state,
-            realtime_seen,
-            total_issues,
+            &cycle.realtime_seen,
+            &mut cycle.total_issues,
             json,
             actor_id,
         )?;
