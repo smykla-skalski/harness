@@ -6,10 +6,6 @@ extension HarnessMonitorStore {
   ]
   private static let streamReconnectMaxAttempts = 6
 
-  func reconnectDelay(for attempt: Int) -> Duration {
-    Self.streamReconnectDelays[min(attempt, Self.streamReconnectDelays.count - 1)]
-  }
-
   func startGlobalStream(using client: any HarnessMonitorClientProtocol) {
     stopGlobalStream()
     globalStreamTask = Task { @MainActor [weak self] in

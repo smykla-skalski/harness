@@ -349,11 +349,11 @@ private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable
     }
   }
 
-  override class func canInit(with request: URLRequest) -> Bool {
+  override static func canInit(with request: URLRequest) -> Bool {
     true
   }
 
-  override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+  override static func canonicalRequest(for request: URLRequest) -> URLRequest {
     request
   }
 
@@ -378,11 +378,22 @@ private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable
       client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
       return
     }
-    let data = Data(
+    let responseBody =
       """
-      [{"entry_id":"entry-1","recorded_at":"2026-04-14T03:00:00Z","kind":"tool_result","session_id":"sess-http-summary","agent_id":null,"task_id":null,"summary":"Summary entry","payload":{}}]
-      """.utf8
-    )
+      [
+        {
+          "entry_id": "entry-1",
+          "recorded_at": "2026-04-14T03:00:00Z",
+          "kind": "tool_result",
+          "session_id": "sess-http-summary",
+          "agent_id": null,
+          "task_id": null,
+          "summary": "Summary entry",
+          "payload": {}
+        }
+      ]
+      """
+    let data = Data(responseBody.utf8)
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
     client?.urlProtocol(self, didLoad: data)
     client?.urlProtocolDidFinishLoading(self)
