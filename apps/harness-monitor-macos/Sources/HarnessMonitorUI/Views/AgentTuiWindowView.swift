@@ -16,14 +16,19 @@ struct ClickableSwitchStyle: ToggleStyle {
 
 public struct AgentTuiWindowView: View {
   let store: HarnessMonitorStore
+  let navigationBridge: AgentTuiWindowNavigationBridge
   @State private var stateViewModel: ViewModel
   @Environment(\.fontScale)
   private var stateFontScale
   @FocusState private var stateFocusedField: Field?
 
   @MainActor
-  public init(store: HarnessMonitorStore) {
+  public init(
+    store: HarnessMonitorStore,
+    navigationBridge: AgentTuiWindowNavigationBridge = AgentTuiWindowNavigationBridge()
+  ) {
     self.store = store
+    self.navigationBridge = navigationBridge
     let initialDisplayState = AgentTuiDisplayState(store: store)
     let initialSelection = Self.initialSelection(
       displayState: initialDisplayState,
@@ -161,10 +166,13 @@ public struct AgentTuiWindowView: View {
     .toolbarBaselineOverlay()
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .focusedSceneValue(\.windowNavigation, viewModel.windowNavigation)
+    .focusedSceneValue(\.windowNavigationScope, .agentTui)
     .task {
-      viewModel.windowNavigation.backHandler = { navigateHistoryBack() }
-      viewModel.windowNavigation.forwardHandler = { navigateHistoryForward() }
+      viewModel.windowNavigation.setHandlers(
+        back: { navigateHistoryBack() },
+        forward: { navigateHistoryForward() }
+      )
+      navigationBridge.update(viewModel.windowNavigation)
       await Task.yield()
       async let tuiRefresh = store.refreshSelectedAgentTuis()
       async let personas = store.fetchPersonas()
@@ -213,6 +221,7 @@ public struct AgentTuiWindowView: View {
     }
     .onDisappear {
       cancelPendingViewportResize()
+      navigationBridge.update(WindowNavigationState())
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
