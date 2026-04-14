@@ -59,7 +59,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     let baselineBackgroundDetailCount = client.readCallCount(
       .sessionDetail(backgroundSummary.sessionId))
     let baselineBackgroundTimelineCount = client.readCallCount(
-      .timeline(backgroundSummary.sessionId))
+      .timelineWindow(backgroundSummary.sessionId))
 
     await store.refresh(using: client, preserveSelection: true)
     try? await Task.sleep(for: .milliseconds(40))
@@ -68,13 +68,14 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
         == baselineBackgroundDetailCount)
     #expect(
-      client.readCallCount(.timeline(backgroundSummary.sessionId))
+      client.readCallCount(.timelineWindow(backgroundSummary.sessionId))
         == baselineBackgroundTimelineCount)
 
     for _ in 0..<50 {
       let selectedTimelineCount = client.readCallCount(
         .timelineWindow(selectedSummary.sessionId))
-      let backgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
+      let backgroundTimelineCount = client.readCallCount(
+        .timelineWindow(backgroundSummary.sessionId))
       if selectedTimelineCount > baselineSelectedTimelineCount
         && backgroundTimelineCount > baselineBackgroundTimelineCount
       {
@@ -93,7 +94,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
         == baselineBackgroundDetailCount + 1)
     #expect(
-      client.readCallCount(.timeline(backgroundSummary.sessionId))
+      client.readCallCount(.timelineWindow(backgroundSummary.sessionId))
         == baselineBackgroundTimelineCount + 1)
     #expect(client.sessionDetailScopes(for: selectedSummary.sessionId).last == "core")
     #expect(client.sessionDetailScopes(for: backgroundSummary.sessionId).last == "core")
@@ -108,12 +109,13 @@ extension HarnessMonitorStoreLifecycleCoreTests {
 
     store.activeTransport = .httpSSE
     let baselineBackgroundTimelineCount = client.readCallCount(
-      .timeline(backgroundSummary.sessionId))
+      .timelineWindow(backgroundSummary.sessionId))
 
     await store.refresh(using: client, preserveSelection: true)
 
     for _ in 0..<50 {
-      let backgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
+      let backgroundTimelineCount = client.readCallCount(
+        .timelineWindow(backgroundSummary.sessionId))
       if backgroundTimelineCount > baselineBackgroundTimelineCount {
         break
       }
@@ -123,7 +125,10 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     let backgroundDetailScopes = client.sessionDetailScopes(for: backgroundSummary.sessionId)
     #expect(backgroundDetailScopes.isEmpty == false)
     #expect(backgroundDetailScopes.last! == nil)
-    #expect(client.timelineScopes(for: backgroundSummary.sessionId).last == .summary)
+    #expect(
+      client.recordedTimelineWindowRequests(for: backgroundSummary.sessionId).last
+        == .latest(limit: 10)
+    )
   }
 
   @Test("Replacing the session snapshot clears removed selection across UI slices")
