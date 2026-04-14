@@ -4,6 +4,7 @@ extension DaemonController {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
+    try refreshManagedLaunchAgentIfBundledHelperChanged()
     let timeoutDesc = String(describing: timeout)
     HarnessMonitorLogger.lifecycle.trace(
       "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
@@ -21,7 +22,7 @@ extension DaemonController {
     if let immediateError = state.immediateError {
       throw immediateError
     }
-    if let client = try? await bootstrapClient() {
+    if state.skipFinalBootstrapProbe == false, let client = try? await bootstrapClient() {
       return client
     }
     if ownership == .external {
@@ -41,6 +42,7 @@ extension DaemonController {
     var lastError: (any Error)?
     var sawUnreachableManifest = false
     var immediateError: (any Error)?
+    var skipFinalBootstrapProbe = false
     var managedStaleManifestTracker = ManagedStaleManifestTracker()
   }
 
@@ -122,6 +124,8 @@ extension DaemonController {
   ) -> WarmUpIterationOutcome {
     state.lastError = DaemonControlError.daemonDidNotStart
     if Self.processIsAlive(pid: manifest.pid) == false {
+      state.skipFinalBootstrapProbe = true
+      state.immediateError = DaemonControlError.daemonDidNotStart
       let pid = manifest.pid
       HarnessMonitorLogger.lifecycle.error(
         "\(Self.warmUpDeadManagedManifestMessage(pid: pid, path: path), privacy: .public)"
@@ -190,5 +194,77 @@ extension DaemonController {
     default:
       return nil
     }
+  }
+
+  func refreshManagedLaunchAgentIfBundledHelperChanged() throws {
+    guard ownership == .managed else {
+      return
+    }
+    guard launchAgentManager.registrationState() == .enabled else {
+      return
+    }
+    guard let currentStamp = try managedLaunchAgentCurrentBundleStamp() else {
+      return
+    }
+
+    let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
+    guard let persistedStamp = loadManagedLaunchAgentBundleStamp(from: stampURL) else {
+      try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
+      return
+    }
+    guard persistedStamp != currentStamp else {
+      return
+    }
+
+    HarnessMonitorLogger.lifecycle.notice(
+      "Bundled managed daemon helper changed; refreshing launch agent before warm-up"
+    )
+    try launchAgentManager.unregister()
+    clearManagedLaunchAgentBundleStamp(at: stampURL)
+    try launchAgentManager.register()
+    if launchAgentManager.registrationState() == .enabled {
+      try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
+    }
+  }
+
+  func persistCurrentManagedLaunchAgentBundleStamp() throws {
+    guard let currentStamp = try managedLaunchAgentCurrentBundleStamp() else {
+      return
+    }
+    try persistManagedLaunchAgentBundleStamp(
+      currentStamp,
+      to: HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
+    )
+  }
+
+  func loadManagedLaunchAgentBundleStamp(from url: URL) -> ManagedLaunchAgentBundleStamp? {
+    guard let data = FileManager.default.contents(atPath: url.path) else {
+      return nil
+    }
+    return try? JSONDecoder().decode(ManagedLaunchAgentBundleStamp.self, from: data)
+  }
+
+  func persistManagedLaunchAgentBundleStamp(
+    _ stamp: ManagedLaunchAgentBundleStamp,
+    to url: URL
+  ) throws {
+    try FileManager.default.createDirectory(
+      at: url.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(stamp)
+    try data.write(to: url, options: .atomic)
+  }
+
+  func clearManagedLaunchAgentBundleStamp() {
+    clearManagedLaunchAgentBundleStamp(
+      at: HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
+    )
+  }
+
+  func clearManagedLaunchAgentBundleStamp(at url: URL) {
+    try? FileManager.default.removeItem(at: url)
   }
 }
