@@ -1,4 +1,23 @@
-use super::{ResolvedBridgeConfig, CliError, current_exe, CliErrorKind, state, File, Command, write_bridge_config, Stdio, Child, Path, Instant, DETACHED_START_TIMEOUT, resolve_running_bridge, LivenessMode, thread, DETACHED_START_POLL_INTERVAL, ExitStatus, fs, Duration, STOP_POLL_INTERVAL, bridge_lock_is_held, BridgeClient, ResolvedRunningBridge, pid_alive, BridgeProof, BridgeResponse};
+use std::env::current_exe;
+use std::fs::File;
+use std::path::Path;
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
+
+use fs_err as fs;
+
+use crate::daemon::service;
+use crate::daemon::state;
+use crate::errors::{CliError, CliErrorKind};
+
+use super::bridge_state::{
+    BridgeProof, LivenessMode, ResolvedRunningBridge, bridge_lock_is_held, pid_alive,
+    resolve_running_bridge, write_bridge_config,
+};
+use super::client::BridgeClient;
+use super::core::{BridgeResponse, ResolvedBridgeConfig};
+use super::types::{DETACHED_START_POLL_INTERVAL, DETACHED_START_TIMEOUT, STOP_POLL_INTERVAL};
 
 pub(super) fn start_detached(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     let harness = current_exe().map_err(|error| {
@@ -135,7 +154,7 @@ fn force_stop_via_signal_if_possible(
     grace: Duration,
     wait_for_stop: impl Fn() -> bool,
 ) -> Result<bool, CliError> {
-    if super::service::sandboxed_from_env() || !pid_alive(running.state.pid) {
+    if service::sandboxed_from_env() || !pid_alive(running.state.pid) {
         return Ok(false);
     }
     send_sigterm(running.state.pid)?;

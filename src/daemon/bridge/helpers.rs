@@ -1,4 +1,25 @@
-use super::{DeserializeOwned, Value, CliError, CliErrorKind, Serialize, BTreeMap, BridgeStatusReport, Path, fs, ErrorKind, PathBuf, state, FileTypeExt, Metadata, var_os, split_paths, PermissionsExt, Command, Stdio, DateTime, Utc, var, BRIDGE_LAUNCH_AGENT_LABEL, BridgeConfigArgs, PersistedBridgeConfig, compiled_capabilities, ResolvedBridgeConfig, bridge_socket_path, DEFAULT_CODEX_BRIDGE_PORT, BridgeCapability};
+use std::collections::BTreeMap;
+use std::env::{split_paths, var, var_os};
+use std::fs::Metadata;
+use std::io::ErrorKind;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use chrono::{DateTime, Utc};
+use fs_err as fs;
+use serde::{Serialize, de::DeserializeOwned};
+use serde_json::Value;
+
+use crate::daemon::state;
+use crate::errors::{CliError, CliErrorKind};
+
+use super::bridge_state::bridge_socket_path;
+use super::core::ResolvedBridgeConfig;
+use super::types::{
+    BRIDGE_LAUNCH_AGENT_LABEL, BridgeCapability, BridgeConfigArgs, BridgeStatusReport,
+    DEFAULT_CODEX_BRIDGE_PORT, PersistedBridgeConfig, compiled_capabilities,
+};
 
 pub(super) fn parse_bridge_payload<T: DeserializeOwned>(payload: Value) -> Result<T, CliError> {
     serde_json::from_value(payload).map_err(|error| {
