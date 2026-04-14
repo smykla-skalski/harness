@@ -4,6 +4,12 @@ use axum::Router;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch};
 
+use crate::daemon::agent_tui::AgentTuiManagerHandle;
+use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::db::DaemonDb;
+use crate::daemon::protocol::StreamEvent;
+use crate::daemon::state::DaemonManifest;
+use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
 
 mod agents;
@@ -24,13 +30,13 @@ pub(crate) use auth::require_auth;
 #[derive(Clone)]
 pub struct DaemonHttpState {
     pub token: String,
-    pub sender: broadcast::Sender<crate::daemon::protocol::StreamEvent>,
-    pub manifest: crate::daemon::state::DaemonManifest,
+    pub sender: broadcast::Sender<StreamEvent>,
+    pub manifest: DaemonManifest,
     pub daemon_epoch: String,
-    pub replay_buffer: Arc<Mutex<crate::daemon::websocket::ReplayBuffer>>,
-    pub db: Arc<OnceLock<Arc<Mutex<crate::daemon::db::DaemonDb>>>>,
-    pub codex_controller: crate::daemon::codex_controller::CodexControllerHandle,
-    pub agent_tui_manager: crate::daemon::agent_tui::AgentTuiManagerHandle,
+    pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
+    pub db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    pub codex_controller: CodexControllerHandle,
+    pub agent_tui_manager: AgentTuiManagerHandle,
 }
 
 /// Serve the daemon's HTTP API.

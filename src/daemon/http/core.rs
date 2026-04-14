@@ -6,9 +6,12 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
+use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::protocol::{HostBridgeReconfigureRequest, SetLogLevelRequest};
 use crate::daemon::read_cache::run_preferred_db_read;
 use crate::daemon::service;
+use crate::daemon::websocket::ws_upgrade_handler;
+use crate::errors::CliError;
 use crate::session::persona;
 
 use super::DaemonHttpState;
@@ -28,7 +31,7 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
         )
         .route("/v1/personas", get(get_personas))
         .route("/v1/projects", get(get_projects))
-        .route("/v1/ws", get(crate::daemon::websocket::ws_upgrade_handler))
+        .route("/v1/ws", get(ws_upgrade_handler))
         .route("/v1/stream", get(stream_global))
 }
 
@@ -82,7 +85,7 @@ async fn get_personas(headers: HeaderMap, State(state): State<DaemonHttpState>) 
         "/v1/personas",
         &request_id,
         start,
-        Ok::<_, crate::errors::CliError>(persona::all()),
+        Ok::<_, CliError>(persona::all()),
     )
 }
 
@@ -116,7 +119,7 @@ async fn post_bridge_reconfigure(
         "/v1/bridge/reconfigure",
         &request_id,
         start,
-        crate::daemon::bridge::reconfigure_bridge(&request.enable, &request.disable, request.force),
+        reconfigure_bridge(&request.enable, &request.disable, request.force),
     )
 }
 

@@ -6,6 +6,7 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
+use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, ObserveSessionRequest, SessionEndRequest, SessionJoinRequest,
     SessionMutationResponse, SessionStartRequest, TimelineCursor, TimelineWindowRequest,
@@ -246,7 +247,7 @@ async fn post_session_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = match crate::daemon::db::ensure_shared_db(&state.db) {
+    let result = match ensure_shared_db(&state.db) {
         Ok(db) => {
             let db_guard = db.lock().expect("db lock");
             service::start_session_direct(&request, Some(&db_guard)).map(|session_state| {
@@ -258,7 +259,7 @@ async fn post_session_start(
         Err(error) => Err(error),
     };
     if result.is_ok()
-        && let Ok(db) = crate::daemon::db::ensure_shared_db(&state.db)
+        && let Ok(db) = ensure_shared_db(&state.db)
     {
         let db_guard = db.lock().expect("db lock");
         service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
@@ -277,7 +278,7 @@ async fn post_session_join(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = match crate::daemon::db::ensure_shared_db(&state.db) {
+    let result = match ensure_shared_db(&state.db) {
         Ok(db) => {
             let db_guard = db.lock().expect("db lock");
             service::join_session_direct(&session_id, &request, Some(&db_guard)).map(
@@ -289,7 +290,7 @@ async fn post_session_join(
         Err(error) => Err(error),
     };
     if result.is_ok()
-        && let Ok(db) = crate::daemon::db::ensure_shared_db(&state.db)
+        && let Ok(db) = ensure_shared_db(&state.db)
     {
         let db_guard = db.lock().expect("db lock");
         service::broadcast_session_snapshot(&state.sender, &session_id, Some(&db_guard));
