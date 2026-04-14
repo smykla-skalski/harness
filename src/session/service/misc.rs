@@ -1,4 +1,6 @@
-use super::{CliError, CliErrorKind, BTreeMap, WorkItem, AgentStatus, TaskStatus, Utc, AgentRegistration};
+use super::{
+    AgentRegistration, AgentStatus, BTreeMap, CliError, CliErrorKind, TaskStatus, Utc, WorkItem,
+};
 
 pub(crate) fn task_not_found(task_id: &str) -> CliError {
     CliErrorKind::session_not_active(format!("task '{task_id}' not found")).into()

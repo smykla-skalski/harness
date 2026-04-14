@@ -65,7 +65,6 @@ struct SidebarSessionListRenderState {
 @MainActor
 struct SidebarSessionListContent: View {
   let renderState: SidebarSessionListRenderState
-  let selectSession: (String?) -> Void
   let toggleBookmark: (String, String) -> Void
   let setCheckoutCollapsed: (String, Bool) -> Void
 
@@ -198,9 +197,6 @@ struct SidebarSessionListContent: View {
     let baseRow =
       row
       .tag(session.sessionId as String?)
-      .onTapGesture {
-        selectSession(session.sessionId)
-      }
       .contentShape(Rectangle())
       .accessibilityAddTraits(.isButton)
       .accessibilityLabel(sessionAccessibilityLabel(for: session))
@@ -318,8 +314,6 @@ private struct SidebarCheckoutDisclosureHeader: View {
   let countFont: Font
   let toggle: () -> Void
 
-  @State private var isHovered = false
-
   var body: some View {
     Button(action: toggle) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -328,6 +322,10 @@ private struct SidebarCheckoutDisclosureHeader: View {
           .foregroundStyle(.secondary)
           .frame(width: Self.leadingIconWidth, alignment: .leading)
           .accessibilityHidden(true)
+          .accessibilityTestProbe(
+            HarnessMonitorAccessibility.worktreeHeaderGlyph(group.checkoutId),
+            label: leadingIconName
+          )
         Text(verbatim: group.title)
           .font(titleFont)
           .foregroundStyle(.secondary)
@@ -339,8 +337,7 @@ private struct SidebarCheckoutDisclosureHeader: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
     }
-    .harnessDismissButtonStyle()
-    .onHover { isHovered = $0 }
+    .harnessSidebarDisclosureButtonStyle()
     .accessibilityElement(children: .combine)
     .accessibilityLabel(group.title)
     .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
@@ -350,17 +347,10 @@ private struct SidebarCheckoutDisclosureHeader: View {
     .accessibilityFrameMarker(
       HarnessMonitorAccessibility.worktreeHeaderFrame(group.checkoutId)
     )
-    .help(isExpanded ? "Collapse sessions" : "Expand sessions")
   }
 
   private var leadingIconName: String {
-    if !isExpanded {
-      return "chevron.right"
-    }
-    if isHovered {
-      return "chevron.down"
-    }
-    return group.isWorktree ? "square.3.layers.3d.down.right" : "folder"
+    isExpanded ? "chevron.down" : "chevron.right"
   }
 
   private static let leadingIconWidth: CGFloat = HarnessMonitorTheme.spacingLG

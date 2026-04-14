@@ -236,7 +236,14 @@ pub fn load_session_state(
         return Ok(Some(state));
     }
 
-    let path = session_state_path(&project.context_root, session_id);
+    load_session_state_from_context_root(&project.context_root, session_id)
+}
+
+fn load_session_state_from_context_root(
+    context_root: &Path,
+    session_id: &str,
+) -> Result<Option<SessionState>, CliError> {
+    let path = session_state_path(context_root, session_id);
     if !path.is_file() {
         return Ok(None);
     }
@@ -404,27 +411,10 @@ pub fn resolve_session_id_for_runtime_session(
         return Ok(Some(runtime_session_id.to_string()));
     }
 
-    let project = DiscoveredProject {
-        project_id: context_root
-            .file_name()
-            .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
-        name: context_root
-            .file_name()
-            .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
-        project_dir: infer_checkout_identity(context_root).map(|identity| identity.checkout_root),
-        repository_root: None,
-        checkout_id: context_root
-            .file_name()
-            .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
-        checkout_name: "Repository".to_string(),
-        context_root: context_root.to_path_buf(),
-        is_worktree: false,
-        worktree_name: None,
-    };
     let mut matches = Vec::new();
 
     for session_id in list_active_session_ids_from_context_root(context_root)? {
-        let Some(state) = load_session_state(&project, &session_id)? else {
+        let Some(state) = load_session_state_from_context_root(context_root, &session_id)? else {
             continue;
         };
         let agent_found = state.agents.values().any(|agent| {
@@ -1124,8 +1114,13 @@ fn decode_tail_line(line_bytes: &mut Vec<u8>, label: &str) -> Result<Option<Stri
 mod tests {
     use super::*;
     use std::path::Path;
+    use std::process::Command;
 
+    use crate::session::service as session_service;
+    use crate::session::types::SessionRole;
+    use crate::workspace::project_context_dir;
     use fs_err as fs;
+    use harness_testkit::with_isolated_harness_env;
     use tempfile::tempdir;
 
     fn write_text(path: &Path, contents: &str) {
@@ -1133,6 +1128,17 @@ mod tests {
             fs::create_dir_all(parent).expect("create parent");
         }
         fs::write(path, contents).expect("write file");
+    }
+
+    fn init_git_repo(path: &Path) {
+        fs::create_dir_all(path).expect("create repo dir");
+        let status = Command::new("git")
+            .arg("init")
+            .arg("-q")
+            .arg(path)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
     }
 
     #[test]
@@ -1347,5 +1353,74 @@ mod tests {
         let cwd = infer_ledger_cwd(&context_root).expect("cwd");
 
         assert_eq!(cwd, PathBuf::from("/tmp/second"));
+    }
+
+    #[test]
+    fn resolve_runtime_session_uses_context_root_state_instead_of_checkout_storage() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            let correct_project = tmp.path().join("correct-project");
+            let wrong_project = tmp.path().join("wrong-project");
+            init_git_repo(&correct_project);
+            init_git_repo(&wrong_project);
+
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
+                session_service::start_session(
+                    "correct",
+                    "",
+                    &correct_project,
+                    Some("claude"),
+                    Some("shared-session"),
+                )
+                .expect("start correct session");
+                session_service::start_session(
+                    "wrong",
+                    "",
+                    &wrong_project,
+                    Some("claude"),
+                    Some("shared-session"),
+                )
+                .expect("start wrong session");
+            });
+
+            temp_env::with_vars(
+                [
+                    ("CLAUDE_SESSION_ID", Some("leader-session")),
+                    ("CODEX_SESSION_ID", Some("worker-session")),
+                ],
+                || {
+                    session_service::join_session(
+                        "shared-session",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        &correct_project,
+                        None,
+                    )
+                    .expect("join correct worker");
+                },
+            );
+
+            let context_root = project_context_dir(&correct_project);
+            write_text(
+                &context_root.join("project-origin.json"),
+                &serde_json::json!({
+                    "recorded_from_dir": wrong_project.display().to_string(),
+                    "repository_root": wrong_project.display().to_string(),
+                    "checkout_root": wrong_project.display().to_string(),
+                    "is_worktree": false,
+                    "worktree_name": null,
+                    "recorded_at": "2026-04-14T12:00:00Z",
+                })
+                .to_string(),
+            );
+
+            assert_eq!(
+                resolve_session_id_for_runtime_session(&context_root, "codex", "worker-session",)
+                    .expect("resolve runtime session"),
+                Some("shared-session".to_string())
+            );
+        });
     }
 }

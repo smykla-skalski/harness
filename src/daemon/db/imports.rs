@@ -1,4 +1,9 @@
-use super::{DaemonDb, ImportResult, CliError, daemon_index, import_daemon_events, ReconcileResult, PreparedSessionResync, PreparedTaskCheckpointImport, daemon_snapshot, prepare_agent_conversation_imports_and_activity, clear_session_conversation_events, DiscoveredProject, SessionState};
+use super::{
+    CliError, DaemonDb, DiscoveredProject, ImportResult, PreparedRuntimeTranscriptResync,
+    PreparedSessionResync, PreparedTaskCheckpointImport, ReconcileResult, SessionState,
+    clear_session_conversation_events, daemon_index, daemon_snapshot, import_daemon_events,
+    prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
+};
 
 impl DaemonDb {
     /// Import all file-backed sessions and projects into the database.
@@ -151,6 +156,41 @@ impl DaemonDb {
         })
     }
 
+    /// Prepare a transcript-only refresh for one runtime session within an
+    /// orchestration session. Falls back to full resync when no matching agent
+    /// can be found.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery, I/O, or parse failures.
+    pub(crate) fn prepare_runtime_transcript_resync(
+        session_id: &str,
+        runtime_name: &str,
+        runtime_session_id: &str,
+    ) -> Result<Option<PreparedRuntimeTranscriptResync>, CliError> {
+        let resolved = daemon_index::resolve_session(session_id)?;
+        let agents = prepare_runtime_transcript_resync_for_agents(
+            &resolved.state,
+            runtime_name,
+            runtime_session_id,
+            |agent_id, runtime, session_key| {
+                daemon_index::load_conversation_events(
+                    &resolved.project,
+                    runtime,
+                    session_key,
+                    agent_id,
+                )
+            },
+        )?;
+        if agents.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(PreparedRuntimeTranscriptResync {
+            session_id: resolved.state.session_id.clone(),
+            agents,
+        }))
+    }
+
     /// Apply a previously prepared session re-sync to the daemon database.
     ///
     /// # Errors
@@ -190,6 +230,28 @@ impl DaemonDb {
 
         self.bump_change(&prepared.resolved.state.session_id)?;
         self.bump_change("global")?;
+        Ok(())
+    }
+
+    /// Apply a prepared transcript-only refresh for matching runtime agents.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub(crate) fn apply_prepared_runtime_transcript_resync(
+        &self,
+        prepared: &PreparedRuntimeTranscriptResync,
+    ) -> Result<(), CliError> {
+        for agent in &prepared.agents {
+            self.sync_conversation_events(
+                &prepared.session_id,
+                &agent.agent_id,
+                &agent.runtime,
+                &agent.events,
+            )?;
+            self.upsert_agent_activity(&prepared.session_id, &agent.activity)?;
+        }
+
+        self.bump_change(&prepared.session_id)?;
         Ok(())
     }
 }

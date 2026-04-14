@@ -1,4 +1,8 @@
-use super::{SessionState, env, DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS, PendingLeaderTransfer, CliError, require_active_target_agent, refresh_session, CliErrorKind, SessionRole, Path, storage, SessionTransition};
+use super::{
+    CliError, CliErrorKind, DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS, Path,
+    PendingLeaderTransfer, SessionRole, SessionState, SessionTransition, env, refresh_session,
+    require_active_target_agent, storage,
+};
 
 pub(crate) fn touch_agent(state: &mut SessionState, agent_id: &str, now: &str) {
     if let Some(agent) = state.agents.get_mut(agent_id) {
@@ -158,7 +162,12 @@ pub(crate) fn apply_leader_transfer(
     }
 }
 
-pub(crate) fn update_leader_roles(state: &mut SessionState, old_leader: &str, new_leader_id: &str, now: &str) {
+pub(crate) fn update_leader_roles(
+    state: &mut SessionState,
+    old_leader: &str,
+    new_leader_id: &str,
+    now: &str,
+) {
     if let Some(old) = state.agents.get_mut(old_leader) {
         old.role = SessionRole::Worker;
         old.updated_at = now.to_string();
@@ -215,7 +224,12 @@ pub(crate) fn append_leader_transfer_logs(
     Ok(())
 }
 
-pub(crate) fn clear_agent_current_task(state: &mut SessionState, agent_id: &str, task_id: &str, now: &str) {
+pub(crate) fn clear_agent_current_task(
+    state: &mut SessionState,
+    agent_id: &str,
+    task_id: &str,
+    now: &str,
+) {
     if let Some(agent) = state.agents.get_mut(agent_id)
         && agent.current_task_id.as_deref() == Some(task_id)
     {

@@ -1,4 +1,10 @@
-use super::{ProjectSummary, CliError, snapshot, SessionSummary, SessionDetail, reconcile_expired_pending_signals_for_db, TimelineEntry, timeline, TimelineWindowRequest, TimelineWindowResponse, CliErrorKind, TimelineCursor, index, SessionExtensionsPayload, BTreeSet, SessionStatus, Instant, BTreeMap, SESSION_LIVENESS_REFRESH_TTL, SESSION_LIVENESS_REFRESH_CACHE, Mutex, session_service, PathBuf, session_storage, SessionState};
+use super::{
+    BTreeMap, BTreeSet, CliError, CliErrorKind, Instant, Mutex, PathBuf, ProjectSummary,
+    SESSION_LIVENESS_REFRESH_CACHE, SESSION_LIVENESS_REFRESH_TTL, SessionDetail,
+    SessionExtensionsPayload, SessionState, SessionStatus, SessionSummary, TimelineCursor,
+    TimelineEntry, TimelineWindowRequest, TimelineWindowResponse, index,
+    reconcile_expired_pending_signals_for_db, session_service, session_storage, snapshot, timeline,
+};
 
 /// List discovered projects known to the daemon.
 ///

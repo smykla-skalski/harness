@@ -182,6 +182,18 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
   }
 }
 
+extension DaemonBinaryStamp {
+  var managedLaunchAgentBundleStamp: ManagedLaunchAgentBundleStamp {
+    ManagedLaunchAgentBundleStamp(
+      helperPath: helperPath,
+      deviceIdentifier: deviceIdentifier,
+      inode: inode,
+      fileSize: fileSize,
+      modificationTimeIntervalSince1970: modificationTimeIntervalSince1970
+    )
+  }
+}
+
 public struct DaemonController: DaemonControlling {
   private static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
 

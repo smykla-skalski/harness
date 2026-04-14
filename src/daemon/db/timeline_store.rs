@@ -1,4 +1,7 @@
-use super::{Connection, StoredTimelineEntry, CliError, OptionalExtension, usize_from_i64, db_error, Digest, stored_timeline_entry_from_row, utc_now, Sha256};
+use super::{
+    CliError, Connection, Digest, OptionalExtension, Sha256, StoredTimelineEntry, db_error,
+    stored_timeline_entry_from_row, usize_from_i64, utc_now,
+};
 
 pub(super) fn replace_all_session_timeline_entries(
     conn: &Connection,

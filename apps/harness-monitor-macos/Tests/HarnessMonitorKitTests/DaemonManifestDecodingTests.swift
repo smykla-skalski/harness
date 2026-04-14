@@ -50,7 +50,14 @@ struct DaemonManifestDecodingTests {
           "capabilities": {}
         },
         "revision": 7,
-        "updated_at": "2026-04-11T15:30:00Z"
+        "updated_at": "2026-04-11T15:30:00Z",
+        "binary_stamp": {
+          "helper_path": "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+          "device_identifier": 41,
+          "inode": 84,
+          "file_size": 16384,
+          "modification_time_interval_since_1970": 1713000000
+        }
       }
       """
 
@@ -62,6 +69,16 @@ struct DaemonManifestDecodingTests {
 
     #expect(manifest.revision == 7)
     #expect(manifest.updatedAt == "2026-04-11T15:30:00Z")
+    #expect(
+      manifest.binaryStamp
+        == DaemonBinaryStamp(
+          helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+          deviceIdentifier: 41,
+          inode: 84,
+          fileSize: 16_384,
+          modificationTimeIntervalSince1970: 1_713_000_000
+        )
+    )
   }
 
   @Test("Revision round-trips through encode + decode")
@@ -75,7 +92,14 @@ struct DaemonManifestDecodingTests {
       sandboxed: true,
       hostBridge: HostBridgeManifest(running: true),
       revision: 42,
-      updatedAt: "2026-04-11T15:30:00Z"
+      updatedAt: "2026-04-11T15:30:00Z",
+      binaryStamp: DaemonBinaryStamp(
+        helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+        deviceIdentifier: 41,
+        inode: 84,
+        fileSize: 16_384,
+        modificationTimeIntervalSince1970: 1_713_000_000
+      )
     )
 
     let encoder = JSONEncoder()
@@ -89,6 +113,7 @@ struct DaemonManifestDecodingTests {
     #expect(decoded == original)
     #expect(decoded.revision == 42)
     #expect(decoded.updatedAt == "2026-04-11T15:30:00Z")
+    #expect(decoded.binaryStamp == original.binaryStamp)
   }
 
   @Test("Legacy sandbox manifest decodes bridge fallback fields")

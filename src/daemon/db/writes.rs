@@ -1,4 +1,9 @@
-use super::{DaemonDb, DiscoveredProject, CliError, utc_now, db_error, SessionState, SessionStatus, i64_from_u64, SessionLogEntry, extract_transition_kind, daemon_timeline, u64_from_i64, upsert_session_timeline_entry, stored_timeline_entry, TaskCheckpoint, normalize_change_scope, Connection, BTreeMap, AgentRegistration, WorkItem};
+use super::{
+    AgentRegistration, BTreeMap, CliError, Connection, DaemonDb, DiscoveredProject,
+    SessionLogEntry, SessionState, SessionStatus, TaskCheckpoint, WorkItem, daemon_timeline,
+    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope, stored_timeline_entry,
+    u64_from_i64, upsert_session_timeline_entry, utc_now,
+};
 
 impl DaemonDb {
     /// Upsert a discovered project into the database.

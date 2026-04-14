@@ -22,6 +22,7 @@ fn seed_workspace(tmp: &std::path::Path) {
         host_bridge: HostBridgeManifest::default(),
         revision: 0,
         updated_at: String::new(),
+        binary_stamp: None,
     };
     state::write_manifest(&manifest).expect("write manifest");
     state::append_event("info", "comparison test started").expect("event");

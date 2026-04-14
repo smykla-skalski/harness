@@ -111,7 +111,7 @@ struct HarnessMonitorStoreBridgeRefreshTests {
     let data = try encoder.encode(manifest)
     try data.write(to: manifestURL)
 
-    store.refreshBridgeStateFromManifest(at: manifestURL)
+    await store.refreshBridgeStateFromManifest(at: manifestURL)
 
     #expect(store.codexUnavailable == false)
   }
@@ -144,7 +144,7 @@ struct HarnessMonitorStoreBridgeRefreshTests {
     let data = try encoder.encode(manifest)
     try data.write(to: manifestURL)
 
-    store.refreshBridgeStateFromManifest(at: manifestURL)
+    await store.refreshBridgeStateFromManifest(at: manifestURL)
 
     #expect(store.codexUnavailable == true)
     #expect(store.connectionEvents.count == eventCountBefore)
@@ -164,12 +164,61 @@ struct HarnessMonitorStoreBridgeRefreshTests {
     let manifestURL = tempDir.appendingPathComponent("manifest.json")
     try Data("{ not valid json".utf8).write(to: manifestURL)
 
-    store.refreshBridgeStateFromManifest(at: manifestURL)
+    await store.refreshBridgeStateFromManifest(at: manifestURL)
 
     #expect(store.codexUnavailable == true)
     #expect(store.connectionEvents.count == eventCountBefore + 1)
     #expect(store.connectionEvents.last?.kind == .error)
     let lastDetail = store.connectionEvents.last?.detail ?? ""
     #expect(lastDetail.contains("Failed to decode daemon manifest") == true)
+  }
+
+  @Test("Connection probe uses the store cached manifest URL for bridge refresh")
+  func connectionProbeUsesCachedManifestURLForBridgeRefresh() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTransportLatencyMs(11)
+    let store = await makeBootstrappedStore(client: client)
+    store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
+    store.hostBridgeCapabilityIssues["codex"] = .unavailable
+    store.connectionProbeInterval = .milliseconds(30)
+
+    let tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("bridge-probe-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let manifestURL = tempDir.appendingPathComponent("manifest.json")
+    let manifest = DaemonManifest(
+      version: "19.8.1",
+      pid: 42,
+      endpoint: "http://127.0.0.1:9999",
+      startedAt: "2026-04-12T10:00:00Z",
+      tokenPath: "/tmp/auth-token",
+      sandboxed: true,
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "codex": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "websocket",
+            endpoint: "ws://127.0.0.1:4500"
+          )
+        ]
+      ),
+      revision: 1
+    )
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    try encoder.encode(manifest).write(to: manifestURL)
+
+    store.manifestURL = manifestURL
+
+    try await Task.sleep(for: .milliseconds(120))
+
+    #expect(store.codexUnavailable == false)
+    #expect(client.readCallCount(.transportLatency) > 0)
+
+    store.stopAllStreams()
   }
 }

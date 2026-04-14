@@ -136,6 +136,84 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test(
+    "awaitManifestWarmUp refreshes the managed launch agent before trusting a live manifest from a replaced helper"
+  )
+  func awaitManifestWarmUpRefreshesManagedLaunchAgentBeforeTrustingMismatchedLiveHelperIdentity()
+    async throws
+  {
+    let currentStamp = ManagedLaunchAgentBundleStampFixture(
+      helperPath:
+        "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness",
+      deviceIdentifier: 99,
+      inode: 128,
+      fileSize: 32_768,
+      modificationTimeIntervalSince1970: 1_714_000_000
+    )
+    let staleManifestStamp = DaemonBinaryStampFixture(
+      helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+      deviceIdentifier: 41,
+      inode: 84,
+      fileSize: 16_384,
+      modificationTimeIntervalSince1970: 1_713_000_000
+    )
+
+    try await withTempDaemonFixture(
+      pid: UInt32(getpid()),
+      endpoint: "http://127.0.0.1:65534",
+      binaryStamp: staleManifestStamp
+    ) { environment in
+      let client = PreviewHarnessClient()
+      let liveEndpoint = "http://127.0.0.1:65533"
+      try writeManagedLaunchAgentBundleStampFixture(currentStamp, environment: environment)
+      let manager = HookedLaunchAgentManager(
+        state: .enabled,
+        onRegister: {
+          try rewriteTempDaemonFixtureManifest(
+            environment: environment,
+            pid: UInt32(getpid()),
+            endpoint: liveEndpoint,
+            startedAt: "2026-04-14T13:22:13Z",
+            binaryStamp: DaemonBinaryStampFixture(
+              helperPath: currentStamp.helperPath,
+              deviceIdentifier: currentStamp.deviceIdentifier,
+              inode: currentStamp.inode,
+              fileSize: currentStamp.fileSize,
+              modificationTimeIntervalSince1970: currentStamp.modificationTimeIntervalSince1970
+            )
+          )
+        }
+      )
+      let probedEndpoints = EndpointProbeRecorder()
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: manager,
+        ownership: .managed,
+        sessionFactory: { _ in client },
+        endpointProbe: { endpoint in
+          await probedEndpoints.record(endpoint.absoluteString)
+          return endpoint.absoluteString == liveEndpoint
+        },
+        managedLaunchAgentCurrentBundleStamp: {
+          ManagedLaunchAgentBundleStamp(
+            helperPath: currentStamp.helperPath,
+            deviceIdentifier: currentStamp.deviceIdentifier,
+            inode: currentStamp.inode,
+            fileSize: currentStamp.fileSize,
+            modificationTimeIntervalSince1970: currentStamp.modificationTimeIntervalSince1970
+          )
+        }
+      )
+
+      let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+
+      #expect(bootstrappedClient as AnyObject === client as AnyObject)
+      #expect(manager.unregisterCallCount == 1)
+      #expect(manager.registerCallCount == 1)
+      #expect(await probedEndpoints.values() == [liveEndpoint])
+    }
+  }
+
   @Test("awaitManifestWarmUp waits for managed manifest rewrite while the stale pid is still alive")
   func awaitManifestWarmUpWaitsForManagedManifestRewriteWhilePidIsAlive() async throws {
     try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in

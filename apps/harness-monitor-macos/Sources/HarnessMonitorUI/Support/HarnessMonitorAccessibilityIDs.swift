@@ -243,6 +243,10 @@ public enum HarnessMonitorAccessibility {
     "\(worktreeHeader(checkoutID)).frame"
   }
 
+  static func worktreeHeaderGlyph(_ checkoutID: String) -> String {
+    "\(worktreeHeader(checkoutID)).glyph"
+  }
+
   static func sessionFilterButton(_ filter: String) -> String {
     "harness.sidebar.filter.\(filter)"
   }

@@ -102,10 +102,13 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var sessionSecondaryHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTaskToken: UInt64 = 0
   var selectionTask: Task<Void, Never>?
+  @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
+  @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
+  @ObservationIgnored var manifestURL = HarnessMonitorPaths.manifestURL()
   var latencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0

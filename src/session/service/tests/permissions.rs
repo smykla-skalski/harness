@@ -126,8 +126,8 @@ fn assign_task_requires_active_assignee() {
 #[test]
 fn transfer_leader_requires_active_target() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("transfer"))
-            .expect("start");
+        let state =
+            start_session("test", "", project, Some("claude"), Some("transfer")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "transfer",
@@ -337,4 +337,3 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
         assert!(updated.pending_leader_transfer.is_none());
     });
 }
-

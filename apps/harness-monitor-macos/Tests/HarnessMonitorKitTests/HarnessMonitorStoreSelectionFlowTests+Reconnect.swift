@@ -209,12 +209,29 @@ extension HarnessMonitorStoreSelectionFlowTests {
     store.selectSessionFromList(summary.sessionId)
     try await Task.sleep(for: .milliseconds(20))
     store.selectSessionFromList(summary.sessionId)
+    await store.pendingListSelectionTask?.value
     await store.selectionTask?.value
 
     #expect(store.selectedSessionID == summary.sessionId)
     #expect(store.selectedSession?.session.sessionId == summary.sessionId)
     #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == 1)
     #expect(client.readCallCount(.timelineWindow(summary.sessionId)) == 1)
+  }
+
+  @Test("Sidebar selection defers store mutation until after the delegate turn")
+  func sidebarSelectionDefersStoreMutationUntilAfterDelegateTurn() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    store.selectSessionFromList(PreviewFixtures.summary.sessionId)
+
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectionTask == nil)
+
+    await store.pendingListSelectionTask?.value
+
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.selectionTask != nil)
   }
 
   @Test("Reselecting the loaded sidebar session clears inspector without reloading")
@@ -227,6 +244,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
 
     store.inspect(taskID: "task-ui")
     store.selectSessionFromList(PreviewFixtures.summary.sessionId)
+    await store.pendingListSelectionTask?.value
 
     #expect(store.inspectorSelection == .none)
     #expect(

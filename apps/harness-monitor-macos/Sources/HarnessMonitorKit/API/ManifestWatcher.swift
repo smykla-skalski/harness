@@ -56,13 +56,12 @@ final class ManifestWatcher: Sendable {
   private let state: Mutex<ManifestWatcherState>
 
   init(
-    environment: HarnessMonitorEnvironment = .current,
+    manifestURL: URL,
     currentEndpoint: String,
     currentStartedAt: String? = nil,
     currentRevision: UInt64 = 0,
     onChange: @escaping @Sendable (ManifestChange) -> Void
   ) {
-    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
     self.directoryPath = manifestURL.deletingLastPathComponent().path
     self.manifestPath = manifestURL.path
     self.onChange = onChange
@@ -77,6 +76,22 @@ final class ManifestWatcher: Sendable {
         source: nil,
         fileDescriptor: -1
       )
+    )
+  }
+
+  convenience init(
+    environment: HarnessMonitorEnvironment = .current,
+    currentEndpoint: String,
+    currentStartedAt: String? = nil,
+    currentRevision: UInt64 = 0,
+    onChange: @escaping @Sendable (ManifestChange) -> Void
+  ) {
+    self.init(
+      manifestURL: HarnessMonitorPaths.manifestURL(using: environment),
+      currentEndpoint: currentEndpoint,
+      currentStartedAt: currentStartedAt,
+      currentRevision: currentRevision,
+      onChange: onChange
     )
   }
 

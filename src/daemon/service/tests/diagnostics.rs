@@ -23,6 +23,7 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
                 host_bridge: super::state::HostBridgeManifest::default(),
                 revision: 0,
                 updated_at: String::new(),
+                binary_stamp: None,
             };
             state::write_manifest(&manifest).expect("manifest");
             state::append_event("info", "daemon booted").expect("append event");
@@ -66,6 +67,7 @@ fn diagnostics_report_returns_default_bridge_when_no_bridge_running() {
                 host_bridge: super::state::HostBridgeManifest::default(),
                 revision: 0,
                 updated_at: String::new(),
+                binary_stamp: None,
             };
             state::write_manifest(&manifest).expect("manifest");
 
@@ -109,6 +111,7 @@ fn diagnostics_report_merges_live_bridge_state() {
                 host_bridge: super::state::HostBridgeManifest::default(),
                 revision: 0,
                 updated_at: String::new(),
+                binary_stamp: None,
             };
             state::write_manifest(&manifest).expect("manifest");
 

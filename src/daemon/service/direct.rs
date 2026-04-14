@@ -1,4 +1,8 @@
-use super::{SessionState, CliError, resolve_hook_agent, CliErrorKind, Path, agents_service, utc_now, session_service, build_log_entry, session_storage, index, SessionRole, session_not_found, record_signal_ack};
+use super::{
+    CliError, CliErrorKind, Path, SessionRole, SessionState, agents_service, build_log_entry,
+    index, record_signal_ack, resolve_hook_agent, session_not_found, session_service,
+    session_storage, utc_now,
+};
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 ///

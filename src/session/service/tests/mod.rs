@@ -6,21 +6,26 @@ mod support;
 use support::*;
 
 mod basics;
-mod task_flow;
-mod signal_reconciliation;
 mod leave_signals;
-mod permissions;
-mod signals;
 mod liveness;
+mod permissions;
+mod signal_reconciliation;
+mod signals;
 mod state;
+mod task_flow;
 
 #[test]
 fn session_service_round_trip_smoke_covers_public_surface() {
     with_temp_project(|project| {
         let session_id = "service-smoke";
-        let state =
-            start_session("smoke goal", "Smoke", project, Some("claude"), Some(session_id))
-                .expect("start");
+        let state = start_session(
+            "smoke goal",
+            "Smoke",
+            project,
+            Some("claude"),
+            Some(session_id),
+        )
+        .expect("start");
         let leader_id = state.leader_id.clone().expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("smoke-worker"))], || {
             join_session(
@@ -42,10 +47,9 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             .clone();
         let worker = joined.agents.get(&worker_id).expect("worker");
         let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
-        let resolved =
-            resolve_session_agent_for_runtime_session(project, "codex", "smoke-worker")
-                .expect("resolve")
-                .expect("session mapping");
+        let resolved = resolve_session_agent_for_runtime_session(project, "codex", "smoke-worker")
+            .expect("resolve")
+            .expect("session mapping");
         assert_eq!(resolved.orchestration_session_id, session_id);
         assert_eq!(resolved.agent_id, worker_id);
 
@@ -63,8 +67,15 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             project,
         )
         .expect("create task");
-        record_task_checkpoint(session_id, &task.task_id, &leader_id, "triaged", 40, project)
-            .expect("checkpoint");
+        record_task_checkpoint(
+            session_id,
+            &task.task_id,
+            &leader_id,
+            "triaged",
+            40,
+            project,
+        )
+        .expect("checkpoint");
         drop_task(
             session_id,
             &task.task_id,
@@ -137,10 +148,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
 
         let status = session_status(session_id, project).expect("status");
         assert_eq!(status.tasks[&task.task_id].status, TaskStatus::Done);
-        assert_eq!(
-            status.agents[&worker_id].status,
-            AgentStatus::Disconnected
-        );
+        assert_eq!(status.agents[&worker_id].status, AgentStatus::Disconnected);
         assert_eq!(
             list_tasks(session_id, Some(TaskStatus::Done), project)
                 .expect("done tasks")
@@ -164,7 +172,9 @@ fn session_service_round_trip_smoke_covers_public_surface() {
 
         end_session(session_id, &leader_id, project).expect("end");
         assert_eq!(
-            session_status(session_id, project).expect("ended status").status,
+            session_status(session_id, project)
+                .expect("ended status")
+                .status,
             SessionStatus::Ended
         );
     });

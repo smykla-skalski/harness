@@ -1,4 +1,10 @@
-use super::{Path, SessionState, CliError, storage, CliErrorKind, generate_session_id, SessionStatus, TaskStatus, SessionAction, CONTROL_PLANE_ACTOR_ID, agent_status_label, is_permitted, AgentRegistration, LeaveSignalRecord, runtime, build_signal, LEAVE_SESSION_SIGNAL_COMMAND, fmt, BTreeMap, SessionRole, AgentStatus, runtime_capabilities, CURRENT_VERSION, SessionMetrics, refresh_session};
+use super::{
+    AgentRegistration, AgentStatus, BTreeMap, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, CliError,
+    CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND, LeaveSignalRecord, Path, SessionAction,
+    SessionMetrics, SessionRole, SessionState, SessionStatus, TaskStatus, agent_status_label,
+    build_signal, fmt, generate_session_id, is_permitted, refresh_session, runtime,
+    runtime_capabilities, storage,
+};
 
 pub(crate) fn create_initial_session(
     context: &str,
@@ -78,7 +84,10 @@ pub(crate) fn ensure_session_can_end(state: &SessionState) -> Result<(), CliErro
     Ok(())
 }
 
-pub(crate) fn require_removable_agent(state: &SessionState, agent_id: &str) -> Result<(), CliError> {
+pub(crate) fn require_removable_agent(
+    state: &SessionState,
+    agent_id: &str,
+) -> Result<(), CliError> {
     if state.leader_id.as_deref() == Some(agent_id) {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "cannot remove current leader '{agent_id}'; transfer leadership first"
@@ -225,7 +234,10 @@ pub(crate) fn build_initial_state(
     state
 }
 
-pub(crate) fn require_active_target_agent(state: &SessionState, agent_id: &str) -> Result<(), CliError> {
+pub(crate) fn require_active_target_agent(
+    state: &SessionState,
+    agent_id: &str,
+) -> Result<(), CliError> {
     let agent = state.agents.get(agent_id).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' not found"

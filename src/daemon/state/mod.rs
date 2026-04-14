@@ -73,6 +73,15 @@ pub struct HostBridgeManifest {
     pub capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DaemonBinaryStamp {
+    pub helper_path: String,
+    pub device_identifier: u64,
+    pub inode: u64,
+    pub file_size: u64,
+    pub modification_time_interval_since_1970: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonManifest {
     pub version: String,
@@ -88,6 +97,8 @@ pub struct DaemonManifest {
     pub revision: u64,
     #[serde(default)]
     pub updated_at: String,
+    #[serde(default)]
+    pub binary_stamp: Option<DaemonBinaryStamp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

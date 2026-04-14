@@ -1,4 +1,9 @@
-use super::{DaemonDb, ConversationEvent, CliError, daemon_timeline, stored_timeline_entry, db_error, extract_transition_kind, i64_from_u64, replace_session_timeline_entries_for_prefix, daemon_protocol, utc_now, SessionState, PreparedConversationEventImport, daemon_snapshot, Connection};
+use super::{
+    CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
+    PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_protocol,
+    daemon_snapshot, daemon_timeline, db_error, extract_transition_kind, i64_from_u64,
+    replace_session_timeline_entries_for_prefix, stored_timeline_entry, utc_now,
+};
 
 impl DaemonDb {
     /// Sync conversation events for an agent into the database.
@@ -130,27 +135,54 @@ impl DaemonDb {
             )
             .map_err(|error| db_error(format!("delete activity cache: {error}")))?;
 
-        let now = utc_now();
-        let mut statement = self
-            .conn
-            .prepare(
-                "INSERT INTO agent_activity_cache (agent_id, session_id, runtime, activity_json, cached_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-            )
-            .map_err(|error| db_error(format!("prepare activity insert: {error}")))?;
-
         for activity in activities {
-            let json = serde_json::to_string(activity).unwrap_or_default();
-            statement
-                .execute(rusqlite::params![
+            self.upsert_agent_activity(session_id, activity)?;
+        }
+        Ok(())
+    }
+
+    /// Insert or update one cached agent activity summary.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn upsert_agent_activity(
+        &self,
+        session_id: &str,
+        activity: &daemon_protocol::AgentToolActivitySummary,
+    ) -> Result<(), CliError> {
+        let json = serde_json::to_string(activity).unwrap_or_default();
+        let existing_json = self
+            .conn
+            .query_row(
+                "SELECT activity_json
+                 FROM agent_activity_cache
+                 WHERE session_id = ?1 AND agent_id = ?2",
+                rusqlite::params![session_id, activity.agent_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|error| db_error(format!("load cached activity: {error}")))?;
+        if existing_json.as_deref() == Some(json.as_str()) {
+            return Ok(());
+        }
+
+        self.conn
+            .execute(
+                "INSERT INTO agent_activity_cache (agent_id, session_id, runtime, activity_json, cached_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(session_id, agent_id) DO UPDATE SET
+                     runtime = excluded.runtime,
+                     activity_json = excluded.activity_json,
+                     cached_at = excluded.cached_at",
+                rusqlite::params![
                     activity.agent_id,
                     session_id,
                     activity.runtime,
                     json,
-                    now,
-                ])
-                .map_err(|error| db_error(format!("insert activity: {error}")))?;
-        }
+                    utc_now(),
+                ],
+            )
+            .map_err(|error| db_error(format!("upsert activity: {error}")))?;
         Ok(())
     }
 
@@ -222,7 +254,48 @@ where
 
     Ok((activities, conversation_events))
 }
-pub(super) fn clear_session_conversation_events(conn: &Connection, session_id: &str) -> Result<(), CliError> {
+
+pub(super) fn prepare_runtime_transcript_resync_for_agents<F>(
+    state: &SessionState,
+    runtime_name: &str,
+    runtime_session_id: &str,
+    mut load_events: F,
+) -> Result<Vec<PreparedAgentTranscriptResync>, CliError>
+where
+    F: FnMut(&str, &str, &str) -> Result<Vec<ConversationEvent>, CliError>,
+{
+    let mut prepared = Vec::new();
+
+    for (agent_id, agent) in &state.agents {
+        let session_key = agent
+            .agent_session_id
+            .as_deref()
+            .unwrap_or(&state.session_id);
+        if agent.runtime != runtime_name || session_key != runtime_session_id {
+            continue;
+        }
+
+        let events = load_events(agent_id, &agent.runtime, session_key)?;
+        let activity = daemon_snapshot::agent_activity_summary_from_events(
+            agent_id,
+            &agent.runtime,
+            agent.last_activity_at.as_deref(),
+            &events,
+        );
+        prepared.push(PreparedAgentTranscriptResync {
+            agent_id: agent_id.clone(),
+            runtime: agent.runtime.clone(),
+            activity,
+            events,
+        });
+    }
+
+    Ok(prepared)
+}
+pub(super) fn clear_session_conversation_events(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<(), CliError> {
     conn.execute(
         "DELETE FROM conversation_events WHERE session_id = ?1",
         [session_id],

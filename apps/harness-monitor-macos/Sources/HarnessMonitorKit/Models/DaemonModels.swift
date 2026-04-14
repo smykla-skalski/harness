@@ -71,6 +71,28 @@ public struct BridgeStatusReport: Codable, Equatable, Sendable {
   }
 }
 
+public struct DaemonBinaryStamp: Codable, Equatable, Sendable {
+  public let helperPath: String
+  public let deviceIdentifier: UInt64
+  public let inode: UInt64
+  public let fileSize: UInt64
+  public let modificationTimeIntervalSince1970: Double
+
+  public init(
+    helperPath: String,
+    deviceIdentifier: UInt64,
+    inode: UInt64,
+    fileSize: UInt64,
+    modificationTimeIntervalSince1970: Double
+  ) {
+    self.helperPath = helperPath
+    self.deviceIdentifier = deviceIdentifier
+    self.inode = inode
+    self.fileSize = fileSize
+    self.modificationTimeIntervalSince1970 = modificationTimeIntervalSince1970
+  }
+}
+
 public struct DaemonManifest: Codable, Equatable, Sendable {
   public let version: String
   public let pid: Int
@@ -87,6 +109,9 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
   /// UTC timestamp of the most recent daemon-side manifest write. Legacy
   /// manifests without the field decode as nil.
   public let updatedAt: String?
+  /// Helper identity published by the daemon so the monitor can distinguish a
+  /// still-live endpoint from a stale manifest after a rebuild.
+  public let binaryStamp: DaemonBinaryStamp?
 
   public init(
     version: String,
@@ -97,7 +122,8 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     sandboxed: Bool = false,
     hostBridge: HostBridgeManifest = .init(),
     revision: UInt64 = 0,
-    updatedAt: String? = nil
+    updatedAt: String? = nil,
+    binaryStamp: DaemonBinaryStamp? = nil
   ) {
     self.version = version
     self.pid = pid
@@ -108,12 +134,13 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     self.hostBridge = hostBridge
     self.revision = revision
     self.updatedAt = updatedAt
+    self.binaryStamp = binaryStamp
   }
 
   enum CodingKeys: String, CodingKey {
     case version, pid, endpoint, startedAt, tokenPath
     case sandboxed, hostBridge, codexTransport, codexEndpoint
-    case revision, updatedAt
+    case revision, updatedAt, binaryStamp
   }
 
   public init(from decoder: Decoder) throws {
@@ -124,6 +151,7 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
       ?? Self.legacyHostBridge(from: container)
     let revision = try container.decodeIfPresent(UInt64.self, forKey: .revision) ?? 0
     let updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+    let binaryStamp = try container.decodeIfPresent(DaemonBinaryStamp.self, forKey: .binaryStamp)
     self.init(
       version: try container.decode(String.self, forKey: .version),
       pid: try container.decode(Int.self, forKey: .pid),
@@ -133,7 +161,8 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
       sandboxed: sandboxed,
       hostBridge: hostBridge,
       revision: revision,
-      updatedAt: updatedAt
+      updatedAt: updatedAt,
+      binaryStamp: binaryStamp
     )
   }
 
@@ -169,6 +198,7 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
     try container.encode(hostBridge, forKey: .hostBridge)
     try container.encode(revision, forKey: .revision)
     try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
+    try container.encodeIfPresent(binaryStamp, forKey: .binaryStamp)
   }
 }
 
@@ -183,7 +213,8 @@ extension DaemonManifest {
       sandboxed: sandboxed,
       hostBridge: hostBridge,
       revision: revision,
-      updatedAt: updatedAt
+      updatedAt: updatedAt,
+      binaryStamp: binaryStamp
     )
   }
 }

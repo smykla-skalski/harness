@@ -1,4 +1,10 @@
-use super::{ObserveSessionRequest, SessionDetail, CliError, PathBuf, index, effective_project_dir, session_observe, start_daemon_observe_loop, sync_after_mutation, session_detail, StreamEvent, utc_now, ReadyEventPayload, SessionsUpdatedPayload, list_projects, list_sessions, SessionUpdatedPayload, session_detail_core, session_extensions, broadcast, Serialize, Value, CliErrorKind};
+use super::{
+    CliError, CliErrorKind, ObserveSessionRequest, PathBuf, ReadyEventPayload, Serialize,
+    SessionDetail, SessionUpdatedPayload, SessionsUpdatedPayload, StreamEvent, Value, broadcast,
+    effective_project_dir, index, list_projects, list_sessions, session_detail,
+    session_detail_core, session_extensions, session_observe, start_daemon_observe_loop,
+    sync_after_mutation, utc_now,
+};
 
 /// Start or refresh the daemon-owned session observation loop.
 ///

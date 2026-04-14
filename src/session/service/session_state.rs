@@ -1,4 +1,13 @@
-use super::{SessionState, build_initial_state, SessionRole, CliError, require_active, next_available_agent_id, AgentRegistration, AgentStatus, runtime_capabilities, refresh_session, LeaveSignalRecord, require_permission, SessionAction, ensure_session_can_end, build_leave_signal_record, END_SESSION_SIGNAL_MESSAGE, END_SESSION_SIGNAL_ACTION_HINT, require_removable_agent, CliErrorKind, REMOVE_AGENT_SIGNAL_MESSAGE, REMOVE_AGENT_SIGNAL_ACTION_HINT, Path, runtime, leave_signal_delivery_error, TaskStartSignalRecord, touch_agent, SessionStatus, require_active_target_agent, clear_pending_leader_transfer, TaskStatus, TaskQueuePolicy, LeaderTransferPlan, plan_leader_transfer};
+use super::{
+    AgentRegistration, AgentStatus, CliError, CliErrorKind, END_SESSION_SIGNAL_ACTION_HINT,
+    END_SESSION_SIGNAL_MESSAGE, LeaderTransferPlan, LeaveSignalRecord, Path,
+    REMOVE_AGENT_SIGNAL_ACTION_HINT, REMOVE_AGENT_SIGNAL_MESSAGE, SessionAction, SessionRole,
+    SessionState, SessionStatus, TaskQueuePolicy, TaskStartSignalRecord, TaskStatus,
+    build_initial_state, build_leave_signal_record, clear_pending_leader_transfer,
+    ensure_session_can_end, leave_signal_delivery_error, next_available_agent_id,
+    plan_leader_transfer, refresh_session, require_active, require_active_target_agent,
+    require_permission, require_removable_agent, runtime, runtime_capabilities, touch_agent,
+};
 
 // ---------------------------------------------------------------------------
 // Extracted state-mutation functions
@@ -30,7 +39,10 @@ pub(crate) fn build_new_session(
 
 /// Find an existing agent whose capabilities include the same
 /// `agent-tui:agent-tui-{uuid}` marker. Returns the agent ID if found.
-pub(crate) fn find_agent_by_tui_marker(state: &SessionState, capabilities: &[String]) -> Option<String> {
+pub(crate) fn find_agent_by_tui_marker(
+    state: &SessionState,
+    capabilities: &[String],
+) -> Option<String> {
     let marker = capabilities
         .iter()
         .find(|capability| capability.starts_with("agent-tui:agent-tui-"))?;

@@ -1,4 +1,13 @@
-use super::{TaskSeverity, Path, WorkItem, CliError, TaskSpec, TaskSource, DaemonClient, protocol, CliErrorKind, utc_now, storage, apply_create_task, log_task_created, apply_assign_task, log_task_assigned, TaskQueuePolicy, apply_drop_task, started_task_signals, write_prepared_task_start_signals, append_task_drop_effect_logs, apply_update_task_queue_policy, TaskStatus, sort_session_tasks, reconcile_expired_pending_signals, load_state_or_err, apply_update_task, apply_advance_queued_tasks, refresh_session, log_task_status_changed, TaskCheckpoint, ensure_valid_progress, generate_checkpoint_id, apply_record_checkpoint, log_checkpoint_recorded};
+use super::{
+    CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
+    TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
+    apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_drop_task,
+    apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
+    ensure_valid_progress, generate_checkpoint_id, load_state_or_err, log_checkpoint_recorded,
+    log_task_assigned, log_task_created, log_task_status_changed, protocol,
+    reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
+    storage, utc_now, write_prepared_task_start_signals,
+};
 
 /// Create a work item in the session.
 ///

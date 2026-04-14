@@ -40,6 +40,10 @@ fn manifest_deserializes_legacy_json_without_sandbox_fields() {
         manifest.updated_at.is_empty(),
         "legacy manifests default updated_at to empty"
     );
+    assert!(
+        manifest.binary_stamp.is_none(),
+        "legacy manifests default binary_stamp to None"
+    );
 }
 
 #[test]
@@ -58,8 +62,40 @@ fn manifest_round_trip() {
             assert_eq!(loaded.pid, 42);
             assert_eq!(loaded.revision, 1, "first write bumps revision to 1");
             assert!(!loaded.updated_at.is_empty(), "updated_at is populated");
+            assert_eq!(
+                loaded.binary_stamp, manifest.binary_stamp,
+                "binary_stamp should round-trip through manifest writes"
+            );
         },
     );
+}
+
+#[test]
+fn manifest_deserializes_binary_stamp_when_present() {
+    let current = r#"{
+        "version": "21.1.0",
+        "pid": 101,
+        "endpoint": "http://127.0.0.1:7070",
+        "started_at": "2026-04-14T00:00:00Z",
+        "token_path": "/tmp/current-token",
+        "binary_stamp": {
+            "helper_path": "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+            "device_identifier": 41,
+            "inode": 84,
+            "file_size": 16384,
+            "modification_time_interval_since_1970": 1713000000.0
+        }
+    }"#;
+    let manifest: DaemonManifest = serde_json::from_str(current).expect("current deserialize");
+    let stamp = manifest.binary_stamp.expect("binary stamp");
+    assert_eq!(
+        stamp.helper_path,
+        "/Applications/Harness Monitor.app/Contents/Helpers/harness"
+    );
+    assert_eq!(stamp.device_identifier, 41);
+    assert_eq!(stamp.inode, 84);
+    assert_eq!(stamp.file_size, 16_384);
+    assert_eq!(stamp.modification_time_interval_since_1970, 1_713_000_000.0);
 }
 
 #[test]

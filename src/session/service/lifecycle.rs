@@ -1,4 +1,14 @@
-use super::{Path, SessionState, CliError, CliErrorKind, ensure_known_runtime, DaemonClient, protocol, utc_now, resolve_registered_runtime, agents_service, create_initial_session, storage, log_session_started, SessionRole, apply_join_session, log_agent_joined, prepare_end_session_leave_signals, write_prepared_leave_signals, apply_end_session, append_leave_signal_logs, log_session_ended, apply_assign_role, log_role_changed, prepare_remove_agent_leave_signal, slice, apply_remove_agent, log_agent_removed, apply_transfer_leader, SessionTransition, append_leader_transfer_logs, require_active, require_removable_agent, agent_status_label, AgentStatus, release_agent_tasks, clear_pending_leader_transfer, refresh_session};
+use super::{
+    AgentStatus, CliError, CliErrorKind, DaemonClient, Path, SessionRole, SessionState,
+    SessionTransition, agent_status_label, agents_service, append_leader_transfer_logs,
+    append_leave_signal_logs, apply_assign_role, apply_end_session, apply_join_session,
+    apply_remove_agent, apply_transfer_leader, clear_pending_leader_transfer,
+    create_initial_session, ensure_known_runtime, log_agent_joined, log_agent_removed,
+    log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
+    prepare_remove_agent_leave_signal, protocol, refresh_session, release_agent_tasks,
+    require_active, require_removable_agent, resolve_registered_runtime, slice, storage, utc_now,
+    write_prepared_leave_signals,
+};
 
 /// Start a new orchestration session and register the caller as leader.
 ///

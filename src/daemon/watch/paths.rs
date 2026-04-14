@@ -5,6 +5,22 @@ use crate::errors::CliError;
 
 use super::state::{RuntimeSessionResolveCache, RuntimeSessionTarget};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum WatchPathTarget {
+    Session(String),
+    Transcript {
+        session_id: String,
+        runtime_name: String,
+        runtime_session_id: String,
+    },
+}
+
+#[cfg(test)]
+pub(super) fn watch_target_from_path(path: &Path) -> Result<Option<WatchPathTarget>, CliError> {
+    let mut resolve_cache = RuntimeSessionResolveCache::default();
+    watch_target_from_path_with_cache(path, &mut resolve_cache)
+}
+
 #[cfg(test)]
 pub(super) fn session_id_from_path(path: &Path) -> Result<Option<String>, CliError> {
     let mut resolve_cache = RuntimeSessionResolveCache::default();
@@ -15,13 +31,56 @@ pub(super) fn session_id_from_path_with_cache(
     path: &Path,
     resolve_cache: &mut RuntimeSessionResolveCache,
 ) -> Result<Option<String>, CliError> {
-    session_id_from_path_with(
+    Ok(
+        watch_target_from_path_with_cache(path, resolve_cache)?.map(|target| match target {
+            WatchPathTarget::Session(session_id)
+            | WatchPathTarget::Transcript { session_id, .. } => session_id,
+        }),
+    )
+}
+
+pub(super) fn watch_target_from_path_with_cache(
+    path: &Path,
+    resolve_cache: &mut RuntimeSessionResolveCache,
+) -> Result<Option<WatchPathTarget>, CliError> {
+    watch_target_from_path_with(
         path,
         resolve_cache,
         &mut index::resolve_session_id_for_runtime_session,
     )
 }
 
+pub(super) fn watch_target_from_path_with<F>(
+    path: &Path,
+    resolve_cache: &mut RuntimeSessionResolveCache,
+    resolver: &mut F,
+) -> Result<Option<WatchPathTarget>, CliError>
+where
+    F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
+{
+    if let Some(session_id) = orchestration_session_id_from_path(path) {
+        return Ok(Some(WatchPathTarget::Session(session_id)));
+    }
+    if let Some(target) = runtime_session_target_from_transcript(path) {
+        let runtime_name = target.runtime_name.clone();
+        let runtime_session_id = target.runtime_session_id.clone();
+        return Ok(resolve_cache
+            .resolve_with(target, resolver)?
+            .map(|session_id| WatchPathTarget::Transcript {
+                session_id,
+                runtime_name,
+                runtime_session_id,
+            }));
+    }
+    if let Some(target) = runtime_session_target_from_signal(path) {
+        return Ok(resolve_cache
+            .resolve_with(target, resolver)?
+            .map(WatchPathTarget::Session));
+    }
+    Ok(None)
+}
+
+#[cfg(test)]
 pub(super) fn session_id_from_path_with<F>(
     path: &Path,
     resolve_cache: &mut RuntimeSessionResolveCache,
@@ -30,13 +89,12 @@ pub(super) fn session_id_from_path_with<F>(
 where
     F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
 {
-    if let Some(session_id) = orchestration_session_id_from_path(path) {
-        return Ok(Some(session_id));
-    }
-    if let Some(target) = runtime_session_target_from_path(path) {
-        return resolve_cache.resolve_with(target, resolver);
-    }
-    Ok(None)
+    Ok(
+        watch_target_from_path_with(path, resolve_cache, resolver)?.map(|target| match target {
+            WatchPathTarget::Session(session_id)
+            | WatchPathTarget::Transcript { session_id, .. } => session_id,
+        }),
+    )
 }
 
 fn orchestration_session_id_from_path(path: &Path) -> Option<String> {
@@ -61,11 +119,6 @@ pub(super) fn orchestration_context_root(path: &Path) -> Option<PathBuf> {
             .then(|| ancestor.parent().map(Path::to_path_buf))
             .flatten()
     })
-}
-
-fn runtime_session_target_from_path(path: &Path) -> Option<RuntimeSessionTarget> {
-    runtime_session_target_from_transcript(path)
-        .or_else(|| runtime_session_target_from_signal(path))
 }
 
 fn runtime_session_target_from_transcript(path: &Path) -> Option<RuntimeSessionTarget> {

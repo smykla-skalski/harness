@@ -1057,6 +1057,7 @@ mod tests {
             host_bridge: state::HostBridgeManifest::default(),
             revision: 0,
             updated_at: String::new(),
+            binary_stamp: None,
         }
     }
 

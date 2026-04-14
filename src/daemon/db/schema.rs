@@ -1,5 +1,5 @@
-use super::{DaemonDb, Path, CliError, Connection, db_error, SCHEMA_VERSION};
 use super::schema_sql::{AGENT_TUIS_SCHEMA, CODEX_RUNS_SCHEMA, CREATE_SCHEMA};
+use super::{CliError, Connection, DaemonDb, Path, SCHEMA_VERSION, db_error};
 
 impl DaemonDb {
     /// Open the daemon database at `path`, applying pragmas and running any

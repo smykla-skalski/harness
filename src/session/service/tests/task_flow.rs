@@ -3,8 +3,7 @@ use super::*;
 #[test]
 fn remove_agent_returns_tasks() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("s4")).expect("start");
+        let state = start_session("test", "", project, Some("claude"), Some("s4")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session("s4", SessionRole::Worker, "codex", &[], None, project, None)
             .expect("join");
@@ -122,19 +121,18 @@ fn reassignable_drop_starts_on_free_worker() {
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
-        let first_joined =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("busy-worker"))], || {
-                join_session(
-                    "drop-reassign-free",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join busy")
-            });
+        let first_joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("busy-worker"))], || {
+            join_session(
+                "drop-reassign-free",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join busy")
+        });
         let busy_worker = first_joined
             .agents
             .keys()
@@ -231,19 +229,18 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
-        let joined =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("advance-worker"))], || {
-                join_session(
-                    "drop-advance-locked",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join")
-            });
+        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("advance-worker"))], || {
+            join_session(
+                "drop-advance-locked",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join")
+        });
         let worker_id = joined
             .agents
             .keys()
@@ -354,9 +351,8 @@ fn task_start_signal_acceptance_marks_task_in_progress() {
         )
         .expect("drop");
 
-        let signal = list_signals("drop-ack-accept", Some(&worker_id), project)
-            .expect("signals")[0]
-            .clone();
+        let signal =
+            list_signals("drop-ack-accept", Some(&worker_id), project).expect("signals")[0].clone();
         let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
         let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
         let signal_dir = runtime.signal_dir(project, &worker_session_id);

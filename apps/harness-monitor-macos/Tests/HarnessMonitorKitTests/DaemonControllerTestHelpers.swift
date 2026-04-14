@@ -8,6 +8,7 @@ func withTempDaemonFixture(
   pid: UInt32,
   version: String = "19.4.1",
   endpoint: String = "http://127.0.0.1:65534",
+  binaryStamp: DaemonBinaryStampFixture? = nil,
   tokenPathFactory: ((URL) throws -> URL)? = nil,
   perform: (HarnessMonitorEnvironment) async throws -> Void
 ) async throws {
@@ -29,14 +30,15 @@ func withTempDaemonFixture(
     try writeTokenFixture(to: tokenPath)
   }
 
-  let manifest = DaemonManifest(
+  let manifest = DaemonManifestFixture(
     version: version,
     pid: Int(pid),
     endpoint: endpoint,
     startedAt: "2026-04-11T12:00:00Z",
     tokenPath: tokenPath.path,
     sandboxed: true,
-    hostBridge: HostBridgeManifest()
+    hostBridge: HostBridgeManifest(),
+    binaryStamp: binaryStamp
   )
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -65,23 +67,70 @@ func rewriteTempDaemonFixtureManifest(
   pid: UInt32,
   version: String = "19.4.1",
   endpoint: String,
-  startedAt: String
+  startedAt: String,
+  binaryStamp: DaemonBinaryStampFixture? = nil
 ) throws {
   let tokenPath = HarnessMonitorPaths.authTokenURL(using: environment)
-  let manifest = DaemonManifest(
+  let manifest = DaemonManifestFixture(
     version: version,
     pid: Int(pid),
     endpoint: endpoint,
     startedAt: startedAt,
     tokenPath: tokenPath.path,
     sandboxed: true,
-    hostBridge: HostBridgeManifest()
+    hostBridge: HostBridgeManifest(),
+    binaryStamp: binaryStamp
   )
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
   encoder.keyEncodingStrategy = .convertToSnakeCase
   let manifestData = try encoder.encode(manifest)
   try manifestData.write(to: HarnessMonitorPaths.manifestURL(using: environment))
+}
+
+struct DaemonBinaryStampFixture: Codable, Equatable {
+  let helperPath: String
+  let deviceIdentifier: UInt64
+  let inode: UInt64
+  let fileSize: UInt64
+  let modificationTimeIntervalSince1970: Double
+}
+
+private struct DaemonManifestFixture: Codable {
+  let version: String
+  let pid: Int
+  let endpoint: String
+  let startedAt: String
+  let tokenPath: String
+  let sandboxed: Bool
+  let hostBridge: HostBridgeManifest
+  let revision: UInt64
+  let updatedAt: String?
+  let binaryStamp: DaemonBinaryStampFixture?
+
+  init(
+    version: String,
+    pid: Int,
+    endpoint: String,
+    startedAt: String,
+    tokenPath: String,
+    sandboxed: Bool,
+    hostBridge: HostBridgeManifest,
+    revision: UInt64 = 0,
+    updatedAt: String? = nil,
+    binaryStamp: DaemonBinaryStampFixture? = nil
+  ) {
+    self.version = version
+    self.pid = pid
+    self.endpoint = endpoint
+    self.startedAt = startedAt
+    self.tokenPath = tokenPath
+    self.sandboxed = sandboxed
+    self.hostBridge = hostBridge
+    self.revision = revision
+    self.updatedAt = updatedAt
+    self.binaryStamp = binaryStamp
+  }
 }
 
 final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {

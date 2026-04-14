@@ -116,8 +116,8 @@ fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
 #[test]
 fn sync_liveness_clears_dead_leader_and_marks_session_leaderless() {
     with_temp_project(|project| {
-        let _state = start_session("test", "", project, Some("claude"), Some("sync-leader"))
-            .expect("start");
+        let _state =
+            start_session("test", "", project, Some("claude"), Some("sync-leader")).expect("start");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("leaderless-worker"), || {
             join_session(
@@ -349,8 +349,7 @@ fn leave_session_leader_cannot_leave() {
             start_session("test", "", project, Some("claude"), Some("leave-2")).expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
 
-        let error =
-            leave_session("leave-2", &leader_id, project).expect_err("leader cannot leave");
+        let error = leave_session("leave-2", &leader_id, project).expect_err("leader cannot leave");
         assert_eq!(error.code(), "KSRCLI092");
     });
 }
