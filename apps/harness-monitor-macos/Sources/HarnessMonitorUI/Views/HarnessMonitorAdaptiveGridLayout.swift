@@ -3,7 +3,7 @@ import SwiftUI
 struct HarnessMonitorAdaptiveGridLayout: Layout {
   struct Cache {
     var measurement: Measurement?
-    var signature: Signature?
+    var measurementKey: MeasurementKey?
   }
 
   struct Measurement {
@@ -13,9 +13,16 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     let width: CGFloat?
   }
 
-  struct Signature: Equatable {
-    let intrinsicSizes: [CGSize]
+  struct MeasurementKey: Equatable {
+    let subviewCount: Int
     let width: CGFloat?
+
+    static func make(subviewCount: Int, width: CGFloat?) -> Self {
+      Self(
+        subviewCount: subviewCount,
+        width: HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(width)
+      )
+    }
   }
 
   let minimumColumnWidth: CGFloat
@@ -50,11 +57,35 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     return spacing
   }
 
+  static func normalizedCacheWidth(_ width: CGFloat?) -> CGFloat? {
+    guard let width, width.isFinite, width > 0 else {
+      return nil
+    }
+    return width.rounded(.down)
+  }
+
+  static func shouldInvalidateCache(
+    cachedSubviewCount: Int?,
+    newSubviewCount: Int
+  ) -> Bool {
+    guard let cachedSubviewCount else {
+      return true
+    }
+    return cachedSubviewCount != newSubviewCount
+  }
+
   func makeCache(subviews _: Subviews) -> Cache {
     Cache()
   }
 
-  func updateCache(_ cache: inout Cache, subviews _: Subviews) {
+  func updateCache(_ cache: inout Cache, subviews: Subviews) {
+    let cachedSubviewCount = cache.measurementKey?.subviewCount
+    guard Self.shouldInvalidateCache(
+      cachedSubviewCount: cachedSubviewCount,
+      newSubviewCount: subviews.count
+    ) else {
+      return
+    }
     cache = Cache()
   }
 
@@ -111,6 +142,26 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     }
   }
 
+  func explicitAlignment(
+    of _: HorizontalAlignment,
+    in _: CGRect,
+    proposal _: ProposedViewSize,
+    subviews _: Subviews,
+    cache _: inout Cache
+  ) -> CGFloat? {
+    nil
+  }
+
+  func explicitAlignment(
+    of _: VerticalAlignment,
+    in _: CGRect,
+    proposal _: ProposedViewSize,
+    subviews _: Subviews,
+    cache _: inout Cache
+  ) -> CGFloat? {
+    nil
+  }
+
   private func resolvedColumnCount(width: CGFloat?, itemCount: Int) -> Int {
     guard itemCount > 0 else {
       return 1
@@ -149,20 +200,16 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     return availableWidth / CGFloat(safeColumns)
   }
 
-  private func intrinsicSizes(for subviews: Subviews) -> [CGSize] {
-    subviews.map { $0.sizeThatFits(.unspecified) }
-  }
-
   private func measuredLayout(
     width: CGFloat?,
     subviews: Subviews,
     cache: inout Cache
   ) -> Measurement {
-    let signature = Signature(
-      intrinsicSizes: intrinsicSizes(for: subviews),
-      width: normalizedWidth(width)
+    let measurementKey = MeasurementKey.make(
+      subviewCount: subviews.count,
+      width: width
     )
-    if cache.signature == signature, let measurement = cache.measurement {
+    if cache.measurementKey == measurementKey, let measurement = cache.measurement {
       return measurement
     }
 
@@ -175,18 +222,11 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
         columns: columns
       ),
       rowRanges: rowRanges(itemCount: subviews.count, columns: columns),
-      width: normalizedWidth(width)
+      width: measurementKey.width
     )
-    cache.signature = signature
+    cache.measurementKey = measurementKey
     cache.measurement = measurement
     return measurement
-  }
-
-  private func normalizedWidth(_ width: CGFloat?) -> CGFloat? {
-    guard let width, width.isFinite, width > 0 else {
-      return nil
-    }
-    return width
   }
 
   private func rowRanges(itemCount: Int, columns: Int) -> [Range<Int>] {
