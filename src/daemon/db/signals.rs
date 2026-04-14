@@ -1,6 +1,10 @@
-use super::*;
+use super::{DaemonDb, SessionSignalRecord, CliError, db_error, utc_now, Signal, SessionSignalStatus, SessionState};
 
 impl DaemonDb {
+    /// Sync the signal index for a session from a list of signal records.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn sync_signal_index(
         &self,
         session_id: &str,
