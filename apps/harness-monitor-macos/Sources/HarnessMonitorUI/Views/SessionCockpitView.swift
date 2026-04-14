@@ -5,7 +5,9 @@ struct SessionCockpitView: View {
   let store: HarnessMonitorStore
   let detail: SessionDetail
   let timeline: [TimelineEntry]
+  let timelineWindow: TimelineWindowResponse?
   let isSessionReadOnly: Bool
+  let isTimelineLoading: Bool
   let isExtensionsLoading: Bool
   @Environment(\.openWindow)
   private var openWindow
@@ -85,7 +87,12 @@ struct SessionCockpitView: View {
         )
         SessionCockpitTimelineSection(
           sessionID: detail.session.sessionId,
-          timeline: timeline
+          timeline: timeline,
+          timelineWindow: timelineWindow,
+          isTimelineLoading: isTimelineLoading,
+          loadPage: { page, pageSize in
+            await store.loadSelectedTimelinePage(page: page, pageSize: pageSize)
+          }
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,7 +105,9 @@ struct SessionCockpitView: View {
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
+    timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
     isSessionReadOnly: false,
+    isTimelineLoading: false,
     isExtensionsLoading: false
   )
 }
@@ -108,7 +117,9 @@ struct SessionCockpitView: View {
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .agentTuiOverflow),
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
+    timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
     isSessionReadOnly: false,
+    isTimelineLoading: false,
     isExtensionsLoading: false
   )
 }

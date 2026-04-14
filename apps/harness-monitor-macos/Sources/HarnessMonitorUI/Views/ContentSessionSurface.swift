@@ -41,7 +41,9 @@ struct SessionContentContainer: View {
           store: store,
           detail: cockpitDetail,
           timeline: state.timeline,
+          timelineWindow: state.timelineWindow,
           isSessionReadOnly: state.isSessionReadOnly,
+          isTimelineLoading: state.isTimelineLoading,
           isExtensionsLoading: state.isExtensionsLoading
         )
       case .loading(let summary):

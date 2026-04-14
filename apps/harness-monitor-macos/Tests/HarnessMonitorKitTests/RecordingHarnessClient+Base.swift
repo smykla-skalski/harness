@@ -200,25 +200,62 @@ extension RecordingHarnessClient {
     request: TimelineWindowRequest
   ) -> TimelineWindowResponse {
     let totalCount = entries.count
+    let revision = Int64(totalCount)
     let limit = max(1, request.limit ?? totalCount)
-    let limitedEntries = Array(entries.prefix(limit))
-    let oldestCursor = limitedEntries.last.map {
-      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+
+    if request.knownRevision == revision
+      && request.before == nil
+      && request.after == nil
+    {
+      let latestWindowEnd = min(limit, totalCount)
+      return TimelineWindowResponse(
+        revision: revision,
+        totalCount: totalCount,
+        windowStart: 0,
+        windowEnd: latestWindowEnd,
+        hasOlder: latestWindowEnd < totalCount,
+        hasNewer: false,
+        oldestCursor: latestWindowEnd > 0 ? entries[latestWindowEnd - 1].timelineCursor : nil,
+        newestCursor: entries.first?.timelineCursor,
+        entries: nil,
+        unchanged: true
+      )
     }
-    let newestCursor = limitedEntries.first.map {
-      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+
+    let windowStart: Int
+    let windowEntries: [TimelineEntry]
+    if let before = request.before {
+      let start = entries
+        .firstIndex(where: { $0.recordedAt == before.recordedAt && $0.entryId == before.entryId })
+        .map { $0 + 1 } ?? totalCount
+      let end = min(start + limit, totalCount)
+      windowStart = start
+      windowEntries = Array(entries[start..<end])
+    } else if let after = request.after {
+      let end = entries
+        .firstIndex(where: { $0.recordedAt == after.recordedAt && $0.entryId == after.entryId })
+        ?? 0
+      let start = max(0, end - limit)
+      windowStart = start
+      windowEntries = Array(entries[start..<end])
+    } else {
+      let end = min(limit, totalCount)
+      windowStart = 0
+      windowEntries = Array(entries.prefix(end))
     }
-    let windowStart = 0
+
+    let oldestCursor = windowEntries.last?.timelineCursor
+    let newestCursor = windowEntries.first?.timelineCursor
     return TimelineWindowResponse(
-      revision: request.knownRevision ?? 1,
+      revision: revision,
       totalCount: totalCount,
       windowStart: windowStart,
-      windowEnd: windowStart + limitedEntries.count,
-      hasOlder: totalCount > limitedEntries.count,
-      hasNewer: false,
+      windowEnd: windowStart + windowEntries.count,
+      hasOlder: windowStart + windowEntries.count < totalCount,
+      hasNewer: windowStart > 0,
       oldestCursor: oldestCursor,
       newestCursor: newestCursor,
-      entries: limitedEntries,
+      entries: windowEntries,
       unchanged: false
     )
   }
@@ -404,5 +441,11 @@ extension RecordingHarnessClient {
         continuation.finish()
       }
     }
+  }
+}
+
+private extension TimelineEntry {
+  var timelineCursor: TimelineCursor {
+    TimelineCursor(recordedAt: recordedAt, entryId: entryId)
   }
 }

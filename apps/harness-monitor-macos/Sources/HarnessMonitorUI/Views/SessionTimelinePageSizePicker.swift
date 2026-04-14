@@ -322,6 +322,75 @@ enum SessionTimelinePagination {
   }
 }
 
+struct SessionTimelinePresentation {
+  let timeline: [TimelineEntry]
+  let timelineWindow: TimelineWindowResponse?
+  let currentPage: Int
+  let pageSize: Int
+  let isLoading: Bool
+
+  private var loadedCount: Int { timeline.count }
+
+  var totalCount: Int {
+    max(loadedCount, timelineWindow?.totalCount ?? 0)
+  }
+
+  var resolvedCurrentPage: Int {
+    SessionTimelinePagination.clampedPage(
+      currentPage,
+      itemCount: totalCount,
+      pageSize: pageSize
+    )
+  }
+
+  var pageCount: Int {
+    SessionTimelinePagination.pageCount(for: totalCount, pageSize: pageSize)
+  }
+
+  var rangeText: String {
+    if totalCount == 0 {
+      return isLoading ? "Loading latest activity" : "Showing 0-0 of 0"
+    }
+
+    return "Showing \(visibleRange.lowerBound + 1)-\(visibleRange.upperBound) of \(totalCount)"
+  }
+
+  var pageStatusText: String {
+    "Page \(resolvedCurrentPage + 1) of \(pageCount)"
+  }
+
+  var showsPagination: Bool {
+    pageCount > 1
+  }
+
+  var entries: [TimelineEntry] {
+    guard loadedCount > visibleRange.lowerBound else {
+      return []
+    }
+
+    let loadedUpperBound = min(visibleRange.upperBound, loadedCount)
+    return Array(timeline[visibleRange.lowerBound..<loadedUpperBound])
+  }
+
+  var placeholderCount: Int {
+    guard isLoading else {
+      return 0
+    }
+
+    if totalCount == 0 {
+      return pageSize
+    }
+
+    return max(0, visibleRange.count - entries.count)
+  }
+
+  private var visibleRange: Range<Int> {
+    let lowerBound = resolvedCurrentPage * pageSize
+    let upperBound = min(totalCount, lowerBound + pageSize)
+    return lowerBound..<upperBound
+  }
+}
+
 #Preview("Timeline Summary - Wide") {
   @Previewable @State var pageSize = SessionTimelinePageSize.ten
 

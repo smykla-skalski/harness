@@ -272,6 +272,81 @@ extension HarnessMonitorStore {
     await loadTask.value
   }
 
+  public func loadSelectedTimelinePage(page: Int, pageSize: Int) async {
+    guard pageSize > 0 else {
+      return
+    }
+    guard let sessionID = selectedSessionID, let selectedSession, connectionState == .online,
+      let client
+    else {
+      return
+    }
+
+    let totalCount = max(timeline.count, timelineWindow?.totalCount ?? 0)
+    let pageCount = max(1, Int(ceil(Double(totalCount) / Double(pageSize))))
+    let clampedPage = min(max(page, 0), pageCount - 1)
+    let targetEnd = min(totalCount, (clampedPage + 1) * pageSize)
+
+    guard targetEnd > 0, timeline.count < targetEnd else {
+      return
+    }
+
+    let currentRevision = timelineWindow?.revision
+    let missingCount = targetEnd - timeline.count
+
+    withUISyncBatch {
+      isTimelineLoading = true
+    }
+    defer {
+      if selectedSessionID == sessionID {
+        isTimelineLoading = false
+      }
+    }
+
+    do {
+      let response = try await fetchSelectedTimelinePrefix(
+        using: client,
+        sessionID: sessionID,
+        targetEnd: targetEnd,
+        missingCount: missingCount,
+        currentRevision: currentRevision
+      )
+      guard selectedSessionID == sessionID else {
+        return
+      }
+
+      let resolvedTimeline: [TimelineEntry]
+      if response.windowStart == 0 || response.revision != currentRevision {
+        resolvedTimeline = response.entries ?? timeline
+      } else if let responseEntries = response.entries {
+        resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
+      } else {
+        resolvedTimeline = timeline
+      }
+      let resolvedTimelineWindow = normalizedTimelineWindow(
+        response.metadataOnly,
+        loadedTimeline: resolvedTimeline
+      )
+
+      withUISyncBatch {
+        timeline = resolvedTimeline
+        timelineWindow = resolvedTimelineWindow
+        isShowingCachedData = false
+      }
+      scheduleCacheWrite { service in
+        await service.cacheSessionDetail(
+          selectedSession,
+          timeline: resolvedTimeline,
+          timelineWindow: resolvedTimelineWindow
+        )
+      }
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "timeline page load failed for \(sessionID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
+    }
+  }
+
   public func inspect(taskID: String) { inspectorSelection = .task(taskID) }
   public func inspect(agentID: String) { inspectorSelection = .agent(agentID) }
   public func inspect(signalID: String) { inspectorSelection = .signal(signalID) }
@@ -417,4 +492,74 @@ extension HarnessMonitorStore {
     activeSessionLoadRequest == requestID && selectedSessionID == sessionID
   }
 
+}
+
+private extension HarnessMonitorStore {
+  func fetchSelectedTimelinePrefix(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    targetEnd: Int,
+    missingCount: Int,
+    currentRevision: Int64?
+  ) async throws -> TimelineWindowResponse {
+    if let oldestCursor = timelineWindow?.oldestCursor ?? timeline.last.map({
+      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+    }) {
+      let olderPrefix = try await Self.measureOperation {
+        try await client.timelineWindow(
+          sessionID: sessionID,
+          request: TimelineWindowRequest(
+            scope: .summary,
+            limit: missingCount,
+            before: oldestCursor
+          )
+        )
+      }
+      recordRequestSuccess()
+
+      if let currentRevision, olderPrefix.value.revision != currentRevision {
+        let refreshedPrefix = try await Self.measureOperation {
+          try await client.timelineWindow(
+            sessionID: sessionID,
+            request: .latest(limit: targetEnd)
+          )
+        }
+        recordRequestSuccess()
+        return refreshedPrefix.value
+      }
+
+      return olderPrefix.value
+    }
+
+    let refreshedPrefix = try await Self.measureOperation {
+      try await client.timelineWindow(
+        sessionID: sessionID,
+        request: .latest(limit: targetEnd)
+      )
+    }
+    recordRequestSuccess()
+    return refreshedPrefix.value
+  }
+
+  func mergeTimelinePrefix(
+    _ existingEntries: [TimelineEntry],
+    olderEntries: [TimelineEntry]
+  ) -> [TimelineEntry] {
+    guard olderEntries.isEmpty == false else {
+      return existingEntries
+    }
+
+    var mergedEntries = existingEntries
+    var existingKeys = Set(existingEntries.map(\.timelineEntryKey))
+    for entry in olderEntries where existingKeys.insert(entry.timelineEntryKey).inserted {
+      mergedEntries.append(entry)
+    }
+    return mergedEntries
+  }
+}
+
+private extension TimelineEntry {
+  var timelineEntryKey: String {
+    "\(recordedAt)|\(entryId)"
+  }
 }
