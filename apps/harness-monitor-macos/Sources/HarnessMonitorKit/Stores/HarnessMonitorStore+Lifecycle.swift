@@ -158,7 +158,9 @@ extension HarnessMonitorStore {
         showingCachedData: preserveVisibleTimeline
       )
 
-      let timelineScope: TimelineScope = activeTransport == .webSocket ? .summary : .full
+      // The cockpit renders summary fields only, so fallback transports should
+      // stay on the lighter timeline payload as well.
+      let timelineScope: TimelineScope = .summary
       let measuredTimeline = try await Self.measureOperation {
         try await client.timeline(
           sessionID: sessionID,
