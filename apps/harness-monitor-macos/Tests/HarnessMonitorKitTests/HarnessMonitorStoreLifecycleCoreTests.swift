@@ -32,6 +32,30 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(probe.didInvalidate)
   }
 
+  @Test("API client timeline summary scope adds the HTTP query parameter")
+  func apiClientTimelineSummaryScopeAddsHTTPQueryParameter() async throws {
+    SummaryTimelineURLProtocol.reset()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [SummaryTimelineURLProtocol.self]
+    let session = URLSession(configuration: configuration)
+    let client = HarnessMonitorAPIClient(
+      connection: HarnessMonitorConnection(
+        endpoint: URL(string: "http://127.0.0.1:9999")!,
+        token: "token"
+      ),
+      session: session
+    )
+
+    let entries = try await client.timeline(sessionID: "sess-http-summary", scope: .summary)
+
+    #expect(entries.count == 1)
+    #expect(
+      SummaryTimelineURLProtocol.lastRequestURL?.path
+        == "/v1/sessions/sess-http-summary/timeline"
+    )
+    #expect(SummaryTimelineURLProtocol.lastRequestURL?.query == "scope=summary")
+  }
+
   @Test("bootstrapIfNeeded only bootstraps once")
   func bootstrapIfNeededOnlyBootstrapsOnce() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -145,15 +169,15 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary])
   }
 
-  @Test("Session selection keeps full timeline scope on HTTP transport")
-  func sessionSelectionKeepsFullTimelineScopeOnHTTPTransport() async {
+  @Test("Session selection prefers summary timeline scope on HTTP transport")
+  func sessionSelectionPrefersSummaryTimelineScopeOnHTTPTransport() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     store.activeTransport = .httpSSE
 
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
-    #expect(client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.full])
+    #expect(client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary])
   }
 
   @Test("Refresh diagnostics without client falls back to daemon status")
@@ -309,4 +333,48 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.sessionStreamTask != nil)
   }
 
+}
+
+private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable {
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var requestURL: URL?
+
+  static var lastRequestURL: URL? {
+    lock.withLock { requestURL }
+  }
+
+  static func reset() {
+    lock.withLock {
+      requestURL = nil
+    }
+  }
+
+  override class func canInit(with request: URLRequest) -> Bool {
+    true
+  }
+
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+    request
+  }
+
+  override func startLoading() {
+    Self.lock.withLock {
+      Self.requestURL = request.url
+    }
+
+    let response = HTTPURLResponse(
+      url: request.url!,
+      statusCode: 200,
+      httpVersion: nil,
+      headerFields: ["Content-Type": "application/json"]
+    )!
+    let data = """
+      [{"entry_id":"entry-1","recorded_at":"2026-04-14T03:00:00Z","kind":"tool_result","session_id":"sess-http-summary","agent_id":null,"task_id":null,"summary":"Summary entry","payload":{}}]
+      """.data(using: .utf8)!
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: data)
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {}
 }
