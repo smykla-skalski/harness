@@ -387,14 +387,14 @@ async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) 
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct SessionDetailQuery {
+struct SessionScopeQuery {
     #[serde(default)]
     scope: Option<String>,
 }
 
 async fn get_session(
     Path(session_id): Path<String>,
-    query: Query<SessionDetailQuery>,
+    query: Query<SessionScopeQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -437,6 +437,7 @@ async fn get_session(
 
 async fn get_timeline(
     Path(session_id): Path<String>,
+    query: Query<SessionScopeQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -445,23 +446,31 @@ async fn get_timeline(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let payload_scope = match query.scope.as_deref() {
+        Some("summary") => super::timeline::TimelinePayloadScope::Summary,
+        _ => super::timeline::TimelinePayloadScope::Full,
+    };
+    let read_name = if payload_scope == super::timeline::TimelinePayloadScope::Summary {
+        "session timeline summary"
+    } else {
+        "session timeline"
+    };
     let result = run_preferred_db_read(
         &state.db,
-        "session timeline",
+        read_name,
         {
             let session_id = session_id.clone();
-            move |db| service::session_timeline(&session_id, Some(db))
+            move |db| service::session_timeline_with_scope(&session_id, payload_scope, Some(db))
         },
-        || service::session_timeline(&session_id, None),
+        || service::session_timeline_with_scope(&session_id, payload_scope, None),
     )
     .await;
-    timed_json(
-        "GET",
-        "/v1/sessions/{id}/timeline",
-        &request_id,
-        start,
-        result,
-    )
+    let route = if payload_scope == super::timeline::TimelinePayloadScope::Summary {
+        "/v1/sessions/{id}/timeline?scope=summary"
+    } else {
+        "/v1/sessions/{id}/timeline"
+    };
+    timed_json("GET", route, &request_id, start, result)
 }
 
 async fn post_task_create(
@@ -1427,20 +1436,28 @@ pub(super) fn require_auth(
 #[cfg(test)]
 mod tests {
     use super::{
-        DaemonHttpState, StatusCode, authorize_control_request, get_diagnostics, get_health,
-        map_json, request_activity_log_level,
+        DaemonHttpState, SessionScopeQuery, StatusCode, authorize_control_request, get_diagnostics,
+        get_health, get_timeline, map_json, request_activity_log_level,
     };
+    use crate::agents::runtime::RuntimeCapabilities;
+    use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
     use crate::daemon::agent_tui::AgentTuiManagerHandle;
     use crate::daemon::codex_controller::CodexControllerHandle;
     use crate::daemon::db::DaemonDb;
+    use crate::daemon::index::DiscoveredProject;
     use crate::daemon::protocol::SessionEndRequest;
     use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
     use crate::errors::CliErrorKind;
     use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+    use crate::session::types::{
+        AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState, SessionStatus,
+    };
     use axum::body::to_bytes;
+    use axum::extract::Query;
     use axum::extract::State;
     use axum::http::{HeaderMap, header::AUTHORIZATION};
     use serde_json::Value;
+    use std::collections::BTreeMap;
     use std::sync::{Arc, Mutex, OnceLock};
     use tokio::sync::broadcast;
 
@@ -1448,6 +1465,15 @@ mod tests {
         let response = map_json(result);
         let status = response.status();
         let bytes = to_bytes(response.into_body(), 4096).await.expect("body");
+        let json: Value = serde_json::from_slice(&bytes).expect("json body");
+        (status, json)
+    }
+
+    async fn response_json(response: axum::response::Response) -> (StatusCode, Value) {
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), 4 * 1024 * 1024)
+            .await
+            .expect("body");
         let json: Value = serde_json::from_slice(&bytes).expect("json body");
         (status, json)
     }
@@ -1563,6 +1589,49 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
+    #[tokio::test]
+    async fn get_timeline_summary_scope_omits_payloads() {
+        let state = test_http_state_with_db();
+        let db = state.db.get().expect("db slot").clone();
+        {
+            let db = db.lock().expect("db lock");
+            let project = sample_project();
+            db.sync_project(&project).expect("sync project");
+            db.save_session_state(&project.project_id, &sample_session_state())
+                .expect("save session state");
+            db.sync_conversation_events(
+                "sess-test-1",
+                "codex-worker",
+                "codex",
+                &[sample_tool_result_event()],
+            )
+            .expect("sync conversation events");
+        }
+
+        let response = get_timeline(
+            axum::extract::Path("sess-test-1".to_owned()),
+            Query(SessionScopeQuery {
+                scope: Some("summary".into()),
+            }),
+            auth_headers(),
+            State(state),
+        )
+        .await;
+
+        let (status, body) = response_json(response).await;
+        assert_eq!(status, StatusCode::OK);
+        let Value::Array(entries) = body else {
+            panic!("expected timeline array response");
+        };
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["kind"].as_str(), Some("tool_result"));
+        assert_eq!(
+            entries[0]["summary"].as_str(),
+            Some("codex-worker received a result from Bash")
+        );
+        assert_eq!(entries[0]["payload"], serde_json::json!({}));
+    }
+
     #[test]
     fn authorize_control_request_rebinds_client_actor() {
         let state = test_http_state_with_db();
@@ -1574,5 +1643,79 @@ mod tests {
             .expect("authorize request");
 
         assert_eq!(request.actor, CONTROL_PLANE_ACTOR_ID);
+    }
+
+    fn sample_project() -> DiscoveredProject {
+        DiscoveredProject {
+            project_id: "project-abc123".into(),
+            name: "harness".into(),
+            project_dir: Some("/tmp/harness".into()),
+            repository_root: Some("/tmp/harness".into()),
+            checkout_id: "checkout-abc123".into(),
+            checkout_name: "Repository".into(),
+            context_root: "/tmp/data/projects/project-abc123".into(),
+            is_worktree: false,
+            worktree_name: None,
+        }
+    }
+
+    fn sample_session_state() -> SessionState {
+        let mut agents = BTreeMap::new();
+        agents.insert(
+            "codex-worker".into(),
+            AgentRegistration {
+                agent_id: "codex-worker".into(),
+                name: "Codex Worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec!["general".into()],
+                joined_at: "2026-04-13T19:00:00Z".into(),
+                updated_at: "2026-04-13T19:00:00Z".into(),
+                status: AgentStatus::Active,
+                agent_session_id: None,
+                last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
+            },
+        );
+
+        SessionState {
+            schema_version: 3,
+            state_version: 1,
+            session_id: "sess-test-1".into(),
+            title: "sess-test-1".into(),
+            context: "http timeline scope fixture".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-04-13T19:00:00Z".into(),
+            updated_at: "2026-04-13T19:00:00Z".into(),
+            agents,
+            tasks: BTreeMap::new(),
+            leader_id: None,
+            archived_at: None,
+            last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+            observe_id: None,
+            pending_leader_transfer: None,
+            metrics: SessionMetrics::default(),
+        }
+    }
+
+    fn sample_tool_result_event() -> ConversationEvent {
+        ConversationEvent {
+            timestamp: Some("2026-04-13T19:02:00Z".into()),
+            sequence: 1,
+            kind: ConversationEventKind::ToolResult {
+                tool_name: "Bash".into(),
+                invocation_id: Some("call-bash-1".into()),
+                output: serde_json::json!({
+                    "stdout": "x".repeat(8_192),
+                    "exit_code": 0,
+                }),
+                is_error: false,
+                duration_ms: Some(125),
+            },
+            agent: "codex-worker".into(),
+            session_id: "sess-test-1".into(),
+        }
     }
 }
