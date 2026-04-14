@@ -84,7 +84,7 @@ struct ObserveLoopRegistration {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ObserveLoopState {
+pub(crate) enum ObserveLoopState {
     Unavailable,
     Started,
     AlreadyRunning,

@@ -238,7 +238,7 @@ enum BackgroundSessionCandidate {
     Skip,
 }
 
-pub(crate) fn apply_background_session_import(
+fn apply_background_session_import(
     db: &Arc<Mutex<super::db::DaemonDb>>,
     resolved: &super::index::ResolvedSession,
 ) -> BackgroundSessionImportOutcome {
@@ -293,7 +293,7 @@ pub(crate) fn prepare_background_session_import(
         .ok()
 }
 
-pub(crate) fn apply_prepared_background_session_import(
+fn apply_prepared_background_session_import(
     db: &super::db::DaemonDb,
     prepared: &super::db::PreparedSessionResync,
 ) -> BackgroundSessionImportOutcome {
@@ -315,7 +315,7 @@ pub(crate) fn session_import_required(
     Ok(db_version.is_none_or(|version| version < file_version))
 }
 
-pub(crate) fn background_session_candidate(
+fn background_session_candidate(
     db: &super::db::DaemonDb,
     resolved: &super::index::ResolvedSession,
 ) -> BackgroundSessionCandidate {
@@ -353,7 +353,7 @@ pub(crate) fn prepared_session_import_required(
         .ok()
 }
 
-pub(crate) fn import_prepared_background_session(
+fn import_prepared_background_session(
     db: &super::db::DaemonDb,
     prepared: &super::db::PreparedSessionResync,
 ) -> BackgroundSessionImportOutcome {
