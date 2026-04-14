@@ -96,7 +96,7 @@ extension AgentTuiWindowView {
           }
           TextField("Optional display name", text: $formModel.name)
             .harnessNativeFormControl()
-            .focused($focusedField, equals: .name)
+            .focused(focusedFieldBinding, equals: .name)
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNameField)
           multilineEditor(
             placeholder: "Optional first prompt to submit inside the TUI",

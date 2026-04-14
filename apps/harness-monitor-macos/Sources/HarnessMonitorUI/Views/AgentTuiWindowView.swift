@@ -16,10 +16,10 @@ struct ClickableSwitchStyle: ToggleStyle {
 
 public struct AgentTuiWindowView: View {
   let store: HarnessMonitorStore
-  @State private var viewModel: ViewModel
+  @State private var stateViewModel: ViewModel
   @Environment(\.fontScale)
-  private var fontScale
-  @FocusState private var focusedField: Field?
+  private var stateFontScale
+  @FocusState private var stateFocusedField: Field?
 
   @MainActor
   public init(store: HarnessMonitorStore) {
@@ -29,7 +29,7 @@ public struct AgentTuiWindowView: View {
       displayState: initialDisplayState,
       selectedTuiID: store.selectedAgentTui?.tuiId
     )
-    _viewModel = State(
+    _stateViewModel = State(
       wrappedValue: ViewModel(displayState: initialDisplayState, selection: initialSelection)
     )
   }
@@ -37,6 +37,17 @@ public struct AgentTuiWindowView: View {
   let commonKeys: [AgentTuiKey] = [
     .enter, .tab, .escape, .backspace, .arrowUp, .arrowDown, .arrowLeft, .arrowRight,
   ]
+
+  var viewModel: ViewModel { stateViewModel }
+
+  var fontScale: CGFloat { stateFontScale }
+
+  var focusedField: Field? {
+    get { stateFocusedField }
+    nonmutating set { stateFocusedField = newValue }
+  }
+
+  var focusedFieldBinding: FocusState<Field?>.Binding { $stateFocusedField }
 
   var selectedAgentNames: [AgentNameMapping] {
     (store.selectedSession?.agents ?? []).map {
