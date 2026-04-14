@@ -134,6 +134,38 @@ struct SessionStatusCornerOverlay: View {
     return baseColor.opacity(opacity)
   }
 
+  private var tintGradient: some View {
+    LinearGradient(
+      colors: [
+        color.opacity(tintOpacity),
+        color.opacity(0),
+      ],
+      startPoint: .topLeading,
+      endPoint: .bottomTrailing
+    )
+  }
+
+  private var backdropMask: some View {
+    RadialGradient(
+      stops: [
+        .init(color: .black, location: 0),
+        .init(color: .black.opacity(0.6), location: 0.4),
+        .init(color: .clear, location: 0.75),
+      ],
+      center: .topLeading,
+      startRadius: 0,
+      endRadius: 320
+    )
+  }
+
+  private var statusBackdrop: some View {
+    Rectangle()
+      .fill(.clear)
+      .harnessPanelGlass()
+      .overlay { tintGradient }
+      .mask { backdropMask }
+  }
+
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       if isStale {
@@ -151,31 +183,7 @@ struct SessionStatusCornerOverlay: View {
     .padding(.top, HarnessMonitorTheme.spacingMD)
     .padding(.bottom, 200)
     .background {
-      Rectangle()
-        .fill(.clear)
-        .harnessPanelGlass()
-        .overlay {
-          LinearGradient(
-            colors: [
-              color.opacity(tintOpacity),
-              color.opacity(0),
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          )
-        }
-        .mask {
-          RadialGradient(
-            stops: [
-              .init(color: .black, location: 0),
-              .init(color: .black.opacity(0.6), location: 0.4),
-              .init(color: .clear, location: 0.75),
-            ],
-            center: .topLeading,
-            startRadius: 0,
-            endRadius: 320
-          )
-        }
+      statusBackdrop
     }
     .allowsHitTesting(false)
     .accessibilityElement(children: .ignore)
