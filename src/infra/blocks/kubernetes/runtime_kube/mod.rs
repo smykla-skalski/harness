@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::path::Path;
+use std::time::Duration;
 
 use chrono::Utc;
 use k8s_openapi::api::apps::v1::Deployment;
@@ -416,7 +417,7 @@ impl KubernetesRuntime for KubeRuntime {
         kubeconfig: &Path,
         namespace: &str,
         selector: &str,
-        timeout: std::time::Duration,
+        timeout: Duration,
     ) -> Result<(), BlockError> {
         let bundle = client_bundle(Some(kubeconfig))?;
         readiness::wait_for_deployments_available(bundle.client, namespace, selector, timeout)
@@ -427,7 +428,7 @@ impl KubernetesRuntime for KubeRuntime {
         kubeconfig: &Path,
         namespace: &str,
         selector: &str,
-        timeout: std::time::Duration,
+        timeout: Duration,
     ) -> Result<(), BlockError> {
         let bundle = client_bundle(Some(kubeconfig))?;
         readiness::wait_for_pods_ready(bundle.client, namespace, selector, timeout)
