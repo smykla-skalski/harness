@@ -1,6 +1,15 @@
-use super::{Path, CliError, SignalAck, utc_now, AckResult, write_signal_ack, record_signal_acknowledgment, PathBuf, Signal, load_state_or_err, SessionState, BTreeMap, runtime, read_pending_signals, signal_matches_session, project_context_dir, AgentRegistration, SessionSignalRecord, clear_agent_current_task, TaskStatus, TaskQueuePolicy, START_TASK_SIGNAL_COMMAND, read_acknowledged_signals, read_acknowledgments, SessionSignalStatus};
+use super::{
+    AckResult, AgentRegistration, BTreeMap, CliError, Path, PathBuf, START_TASK_SIGNAL_COMMAND,
+    SessionSignalRecord, SessionSignalStatus, SessionState, Signal, SignalAck, TaskQueuePolicy,
+    TaskStatus, clear_agent_current_task, load_state_or_err, project_context_dir,
+    read_acknowledged_signals, read_acknowledgments, read_pending_signals,
+    record_signal_acknowledgment, runtime, signal_matches_session, utc_now, write_signal_ack,
+};
 
-pub(crate) fn reconcile_expired_pending_signals(session_id: &str, project_dir: &Path) -> Result<(), CliError> {
+pub(crate) fn reconcile_expired_pending_signals(
+    session_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
     let expired = collect_expired_pending_signals(session_id, project_dir)?;
     for signal in expired {
         let ack = SignalAck {
@@ -359,4 +368,3 @@ pub(crate) fn signal_records_for_dirs(
         })
         .collect())
 }
-

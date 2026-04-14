@@ -1,4 +1,8 @@
-use super::{Path, SessionState, CliError, DaemonClient, detail_to_session_state, SessionMetrics, reconcile_expired_pending_signals, load_state_or_err, SessionStatus, summary_to_session_state, storage, daemon_index, PathBuf};
+use super::{
+    CliError, DaemonClient, Path, PathBuf, SessionMetrics, SessionState, SessionStatus,
+    daemon_index, detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals,
+    storage, summary_to_session_state,
+};
 
 /// Load the current session state.
 ///

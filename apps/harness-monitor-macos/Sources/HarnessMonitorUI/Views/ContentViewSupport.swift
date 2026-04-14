@@ -17,6 +17,57 @@ enum HarnessMonitorInspectorLayout {
   static let maxWidth: CGFloat = 480
 }
 
+enum ContentInspectorVisibilitySource {
+  case persistedPreference
+  case explicitUserPreference
+  case contextualAutoOpen
+  case framework
+}
+
+struct ContentInspectorVisibilityChange: Equatable {
+  let nextPresentation: Bool
+  let persistedPreference: Bool?
+  let shouldSuppressLayoutGeometry: Bool
+}
+
+enum ContentInspectorVisibilityPolicy {
+  static func resolve(
+    currentPresentation: Bool,
+    currentPersistedPreference: Bool,
+    nextPresentation: Bool,
+    source: ContentInspectorVisibilitySource
+  ) -> ContentInspectorVisibilityChange? {
+    let shouldPersistPreference: Bool
+    let shouldSuppressLayoutGeometry: Bool
+
+    switch source {
+    case .persistedPreference:
+      shouldPersistPreference = false
+      shouldSuppressLayoutGeometry = currentPresentation != nextPresentation
+    case .explicitUserPreference:
+      shouldPersistPreference = currentPersistedPreference != nextPresentation
+      shouldSuppressLayoutGeometry =
+        currentPresentation != nextPresentation || shouldPersistPreference
+    case .contextualAutoOpen:
+      shouldPersistPreference = false
+      shouldSuppressLayoutGeometry = currentPresentation != nextPresentation
+    case .framework:
+      shouldPersistPreference = false
+      shouldSuppressLayoutGeometry = false
+    }
+
+    guard currentPresentation != nextPresentation || shouldPersistPreference else {
+      return nil
+    }
+
+    return ContentInspectorVisibilityChange(
+      nextPresentation: nextPresentation,
+      persistedPreference: shouldPersistPreference ? nextPresentation : nil,
+      shouldSuppressLayoutGeometry: shouldSuppressLayoutGeometry
+    )
+  }
+}
+
 // MARK: - Commands state
 
 extension HarnessMonitorStore {
@@ -115,13 +166,15 @@ struct ContentCenterpieceToolbarItems: ToolbarContent {
 struct ContentPrimaryToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
   let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  @Binding var showInspector: Bool
+  let showInspector: Bool
+  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
 
   var body: some ToolbarContent {
     InspectorToolbarActions(
       store: store,
       toolbarUI: toolbarUI,
-      showInspector: $showInspector
+      showInspector: showInspector,
+      setInspectorVisibility: setInspectorVisibility
     )
   }
 }
@@ -180,7 +233,8 @@ struct ContentDetailColumn: View {
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
-  @Binding var showInspector: Bool
+  let showInspector: Bool
+  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
   let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   let onDetailColumnWidthChange: (CGFloat) -> Void
 
@@ -195,7 +249,7 @@ struct ContentDetailColumn: View {
       } else {
         ContentDetailChrome(
           persistenceError: contentChrome.persistenceError,
-          sessionDataAvailability: contentChrome.sessionDataAvailability,
+          sessionDataAvailability: contentChrome.sessionDataAvailability
         ) {
           sessionContent
         }
@@ -210,13 +264,14 @@ struct ContentDetailColumn: View {
       ContentPrimaryToolbarItems(
         store: store,
         toolbarUI: contentToolbar,
-        showInspector: $showInspector
+        showInspector: showInspector,
+        setInspectorVisibility: setInspectorVisibility
       )
     }
     .navigationTitle(navigationTitleText)
     .onChange(of: selection.inspectorSelection) { _, newValue in
       if newValue != .none, !showInspector {
-        showInspector = true
+        setInspectorVisibility(true, .contextualAutoOpen)
       }
     }
   }
@@ -256,7 +311,8 @@ struct ContentDetailColumn: View {
 struct InspectorToolbarActions: ToolbarContent {
   let store: HarnessMonitorStore
   let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  @Binding var showInspector: Bool
+  let showInspector: Bool
+  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
@@ -270,7 +326,7 @@ struct InspectorToolbarActions: ToolbarContent {
 
     ToolbarItem(placement: .primaryAction) {
       Button {
-        showInspector.toggle()
+        setInspectorVisibility(!showInspector, .explicitUserPreference)
       } label: {
         Label(
           showInspector ? "Hide Inspector" : "Show Inspector",

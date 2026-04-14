@@ -1,4 +1,9 @@
-use super::{Path, CliError, utc_now, storage, require_active, refresh_session, SessionTransition, load_state_or_err, runtime, agent_runtime_session_id, SessionState, LivenessConfig, AgentStatus, clear_leader_if_matching, clear_pending_leader_transfer, TaskStatus, TaskQueuePolicy, signal_context_root};
+use super::{
+    AgentStatus, CliError, LivenessConfig, Path, SessionState, SessionTransition, TaskQueuePolicy,
+    TaskStatus, agent_runtime_session_id, clear_leader_if_matching, clear_pending_leader_transfer,
+    load_state_or_err, refresh_session, require_active, runtime, signal_context_root, storage,
+    utc_now,
+};
 
 /// Result of a liveness synchronization pass.
 #[derive(Debug, Clone, Default)]
@@ -246,4 +251,3 @@ pub(crate) fn cleanup_dead_agent_signals(
         let _ = cleanup_pending_signals(&signal_dir, &record.agent_id, session_id);
     }
 }
-

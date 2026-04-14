@@ -181,6 +181,37 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
   }
 
+  func testCheckoutHeaderKeepsStableChevronDisclosureGlyph() throws {
+    let app = launch(mode: "preview")
+    let checkoutHeader = element(in: app, identifier: Accessibility.previewCheckoutHeader)
+    let glyph = element(in: app, identifier: Accessibility.previewCheckoutHeaderGlyph)
+
+    XCTAssertTrue(waitForElement(checkoutHeader, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitForElement(glyph, timeout: Self.fastActionTimeout),
+      "Checkout disclosure header should publish its glyph state for UI regression coverage"
+    )
+    XCTAssertEqual(glyph.label, "chevron.down")
+
+    toggleCheckoutDisclosure(
+      of: checkoutHeader,
+      in: app
+    ) {
+      glyph.label == "chevron.right"
+    }
+
+    XCTAssertEqual(glyph.label, "chevron.right")
+
+    toggleCheckoutDisclosure(
+      of: checkoutHeader,
+      in: app
+    ) {
+      glyph.label == "chevron.down"
+    }
+
+    XCTAssertEqual(glyph.label, "chevron.down")
+  }
+
   func testSelectedSessionChromeFillsFullSessionRowHeight() throws {
     let app = launch(mode: "preview")
     let sessionRow = previewSessionTrigger(in: app)

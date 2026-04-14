@@ -1,4 +1,8 @@
-use super::{DaemonStatusReport, CliError, state, snapshot, launchd, DaemonManifest, HealthResponse, index, DaemonDiagnosticsReport, bridge, DaemonControlResponse, SHUTDOWN_SIGNAL, CliErrorKind, LogLevelResponse, SetLogLevelRequest, broadcast, StreamEvent, utc_now};
+use super::{
+    CliError, CliErrorKind, DaemonControlResponse, DaemonDiagnosticsReport, DaemonManifest,
+    DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL, SetLogLevelRequest,
+    StreamEvent, bridge, broadcast, index, launchd, snapshot, state, utc_now,
+};
 
 /// Build a point-in-time daemon status report.
 ///

@@ -6,8 +6,8 @@ mod paths;
 use std::sync::Arc;
 
 use super::{
-    DaemonManifest, HostBridgeManifest, auth_token_path, set_daemon_root_override,
-    set_manifest_write_hook,
+    DaemonBinaryStamp, DaemonManifest, HostBridgeManifest, auth_token_path,
+    set_daemon_root_override, set_manifest_write_hook,
 };
 
 pub(super) struct ManifestWriteHookReset;
@@ -41,5 +41,12 @@ pub(super) fn sample_manifest(pid: u32, endpoint: &str) -> DaemonManifest {
         host_bridge: HostBridgeManifest::default(),
         revision: 0,
         updated_at: String::new(),
+        binary_stamp: Some(DaemonBinaryStamp {
+            helper_path: "/tmp/harness-helper".into(),
+            device_identifier: 1,
+            inode: 2,
+            file_size: 3,
+            modification_time_interval_since_1970: 4.0,
+        }),
     }
 }

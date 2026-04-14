@@ -1,4 +1,4 @@
-use super::{DaemonDb, CliError, db_error, daemon_launchd, daemon_state};
+use super::{CliError, DaemonDb, daemon_launchd, daemon_state, db_error};
 
 impl DaemonDb {
     /// Set a diagnostics cache entry by key.

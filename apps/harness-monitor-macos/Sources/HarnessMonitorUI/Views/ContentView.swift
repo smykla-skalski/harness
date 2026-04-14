@@ -71,6 +71,15 @@ public struct ContentView: View {
     ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
   }
 
+  private var inspectorPresentationBinding: Binding<Bool> {
+    Binding(
+      get: { showInspector },
+      set: { newValue in
+        applyInspectorVisibilityChange(to: newValue, source: .framework)
+      }
+    )
+  }
+
   @MainActor
   public init(
     store: HarnessMonitorStore,
@@ -129,15 +138,7 @@ public struct ContentView: View {
       windowNavigation.canGoForward = newValue
     }
     .onChange(of: persistedShowInspector) { _, newValue in
-      if showInspector != newValue {
-        showInspector = newValue
-      }
-    }
-    .onChange(of: showInspector) { _, newValue in
-      if persistedShowInspector != newValue {
-        persistedShowInspector = newValue
-      }
-      suppressLayoutGeometry()
+      applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
     }
     .onChange(of: columnVisibility) { _, _ in
       suppressLayoutGeometry()
@@ -239,11 +240,12 @@ public struct ContentView: View {
       contentSessionDetail: contentSessionDetail,
       contentToolbar: contentToolbar,
       dashboardUI: contentDashboard,
-      showInspector: $showInspector,
+      showInspector: showInspector,
+      setInspectorVisibility: applyInspectorVisibilityChange,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       onDetailColumnWidthChange: updateDetailColumnWidth
     )
-    .inspector(isPresented: $showInspector) {
+    .inspector(isPresented: inspectorPresentationBinding) {
       inspectorColumn
     }
   }
@@ -309,6 +311,34 @@ public struct ContentView: View {
       return
     }
     inspectorColumnWidth = width
+  }
+
+  private func applyInspectorVisibilityChange(
+    to newValue: Bool,
+    source: ContentInspectorVisibilitySource
+  ) {
+    guard
+      let change = ContentInspectorVisibilityPolicy.resolve(
+        currentPresentation: showInspector,
+        currentPersistedPreference: persistedShowInspector,
+        nextPresentation: newValue,
+        source: source
+      )
+    else {
+      return
+    }
+
+    if showInspector != change.nextPresentation {
+      showInspector = change.nextPresentation
+    }
+    if let persistedPreference = change.persistedPreference,
+      persistedShowInspector != persistedPreference
+    {
+      persistedShowInspector = persistedPreference
+    }
+    if change.shouldSuppressLayoutGeometry {
+      suppressLayoutGeometry()
+    }
   }
 
   private static func resolveAuditBuildState() -> AuditBuildDisplayState? {

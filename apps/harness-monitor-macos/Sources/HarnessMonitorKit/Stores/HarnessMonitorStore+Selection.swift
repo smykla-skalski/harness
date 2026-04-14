@@ -205,7 +205,8 @@ extension HarnessMonitorStore {
   }
 
   public func selectSession(_ sessionID: String?) async {
-    selectSessionFromList(sessionID)
+    cancelPendingListSelection()
+    applyListSessionSelection(sessionID)
 
     guard let selectionTask else {
       return
@@ -215,6 +216,22 @@ extension HarnessMonitorStore {
   }
 
   public func selectSessionFromList(_ sessionID: String?) {
+    cancelPendingListSelection()
+
+    pendingListSelectionTaskToken &+= 1
+    let token = pendingListSelectionTaskToken
+    let task = Task { @MainActor [weak self] in
+      await Task.yield()
+      guard let self, !Task.isCancelled, self.pendingListSelectionTaskToken == token else {
+        return
+      }
+      self.pendingListSelectionTask = nil
+      self.applyListSessionSelection(sessionID)
+    }
+    pendingListSelectionTask = task
+  }
+
+  private func applyListSessionSelection(_ sessionID: String?) {
     guard !shouldIgnoreDuplicateListSelection(for: sessionID) else {
       return
     }
@@ -252,6 +269,12 @@ extension HarnessMonitorStore {
       return true
     }
     return selectedSession?.session.sessionId == sessionID
+  }
+
+  private func cancelPendingListSelection() {
+    pendingListSelectionTask?.cancel()
+    pendingListSelectionTask = nil
+    pendingListSelectionTaskToken &+= 1
   }
 
   private func performSessionSelection(sessionID: String) async {

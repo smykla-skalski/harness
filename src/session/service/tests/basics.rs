@@ -3,8 +3,7 @@ use super::*;
 #[test]
 fn start_creates_session_with_leader() {
     with_temp_project(|project| {
-        let state =
-            start_session("test goal", "", project, Some("claude"), None).expect("start");
+        let state = start_session("test goal", "", project, Some("claude"), None).expect("start");
         assert_eq!(state.status, SessionStatus::Active);
         assert_eq!(state.agents.len(), 1);
         assert_eq!(state.metrics.agent_count, 1);
@@ -20,8 +19,7 @@ fn start_creates_session_with_leader() {
 #[test]
 fn join_adds_agent() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("s1")).expect("start");
+        let state = start_session("test", "", project, Some("claude"), Some("s1")).expect("start");
         let state = join_session(
             &state.session_id,
             SessionRole::Worker,
@@ -59,8 +57,8 @@ fn start_session_rejects_unsafe_session_id() {
         let escape_dir = tmp_root.join("unsafe-session");
         let unsafe_id = escape_dir.to_string_lossy().into_owned();
 
-        let error = start_session("goal", "", project, Some("claude"), Some(&unsafe_id))
-            .expect_err("id");
+        let error =
+            start_session("goal", "", project, Some("claude"), Some(&unsafe_id)).expect_err("id");
 
         assert_eq!(error.code(), "KSRCLI059");
         assert!(!escape_dir.join("state.json").exists());
@@ -195,8 +193,7 @@ fn join_records_runtime_session_id_when_available() {
 #[test]
 fn end_session_requires_leader() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("s2")).expect("start");
+        let state = start_session("test", "", project, Some("claude"), Some("s2")).expect("start");
         let joined = join_session(
             &state.session_id,
             SessionRole::Worker,
@@ -221,8 +218,7 @@ fn end_session_requires_leader() {
 #[test]
 fn task_lifecycle() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("s3")).expect("start");
+        let state = start_session("test", "", project, Some("claude"), Some("s3")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
 
         let item = create_task(

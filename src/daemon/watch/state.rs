@@ -104,7 +104,7 @@ pub(super) struct RuntimeSessionTarget {
 
 #[derive(Debug, Default)]
 pub(super) struct RuntimeSessionResolveCache {
-    session_ids: HashMap<RuntimeSessionTarget, String>,
+    session_ids: HashMap<RuntimeSessionTarget, Option<String>>,
 }
 
 impl RuntimeSessionResolveCache {
@@ -134,7 +134,7 @@ impl RuntimeSessionResolveCache {
         F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
     {
         if let Some(session_id) = self.session_ids.get(&target) {
-            return Ok(Some(session_id.clone()));
+            return Ok(session_id.clone());
         }
 
         let resolved_session = resolver(
@@ -142,9 +142,7 @@ impl RuntimeSessionResolveCache {
             &target.runtime_name,
             &target.runtime_session_id,
         )?;
-        if let Some(session_id) = resolved_session.as_ref() {
-            self.session_ids.insert(target, session_id.clone());
-        }
+        self.session_ids.insert(target, resolved_session.clone());
         Ok(resolved_session)
     }
 }
