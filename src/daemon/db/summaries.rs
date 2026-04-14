@@ -1,4 +1,8 @@
-use super::{daemon_protocol, DaemonDb, CliError, db_error, usize_from_i64, BTreeMap, SessionState, daemon_index, DiscoveredProject, PathBuf, SessionStatus, project_context_id, Path, project_context_dir};
+use super::{
+    BTreeMap, CliError, DaemonDb, DiscoveredProject, Path, PathBuf, SessionState, SessionStatus,
+    daemon_index, daemon_protocol, db_error, project_context_dir, project_context_id,
+    usize_from_i64,
+};
 
 impl DaemonDb {
     /// Return the number of sessions in the database.

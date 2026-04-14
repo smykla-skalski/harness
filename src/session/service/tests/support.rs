@@ -10,7 +10,10 @@ pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     });
 }
 
-pub(super) fn find_agent_by_runtime<'a>(state: &'a SessionState, runtime: &str) -> &'a AgentRegistration {
+pub(super) fn find_agent_by_runtime<'a>(
+    state: &'a SessionState,
+    runtime: &str,
+) -> &'a AgentRegistration {
     state
         .agents
         .values()

@@ -20,6 +20,25 @@ private struct SidebarRowButtonStyle: ButtonStyle {
   }
 }
 
+private struct SidebarDisclosureButtonStyle: ButtonStyle {
+  let cornerRadius: CGFloat
+  let tint: Color
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    let fillOpacity = configuration.isPressed ? 0.12 : 0.0
+    configuration.label
+      .background {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(tint.opacity(fillOpacity))
+      }
+      .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+      .opacity(isEnabled ? 1 : 0.4)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+  }
+}
+
 private struct SidebarRowHoverModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color
@@ -53,5 +72,12 @@ extension View {
     tint: Color = HarnessMonitorTheme.accent
   ) -> some View {
     modifier(SidebarRowHoverModifier(cornerRadius: cornerRadius, tint: tint))
+  }
+
+  func harnessSidebarDisclosureButtonStyle(
+    cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusLG,
+    tint: Color = HarnessMonitorTheme.accent
+  ) -> some View {
+    buttonStyle(SidebarDisclosureButtonStyle(cornerRadius: cornerRadius, tint: tint))
   }
 }

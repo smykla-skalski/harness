@@ -1,4 +1,7 @@
-use super::{protocol, SessionState, CURRENT_VERSION, BTreeMap, DaemonClient, ResolvedRuntimeSessionAgent, CliError, SessionStatus, runtime_session_matches_agent, CliErrorKind};
+use super::{
+    BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, DaemonClient, ResolvedRuntimeSessionAgent,
+    SessionState, SessionStatus, protocol, runtime_session_matches_agent,
+};
 
 pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
     let agents = detail
@@ -91,4 +94,3 @@ pub(crate) fn resolve_runtime_session_via_daemon(
         .into()),
     }
 }
-

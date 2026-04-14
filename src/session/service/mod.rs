@@ -86,21 +86,21 @@ pub(crate) struct TaskStartSignalRecord {
 
 use crate::session::persona;
 
-mod lifecycle;
-mod tasks;
-mod signals;
-mod signal_support;
-mod queries;
-mod liveness;
-mod session_state;
-mod task_state;
-mod logging;
 mod conversions;
-mod session_helpers;
-mod task_queue;
-mod runtime_support;
 mod leader_transfer;
+mod lifecycle;
+mod liveness;
+mod logging;
 mod misc;
+mod queries;
+mod runtime_support;
+mod session_helpers;
+mod session_state;
+mod signal_support;
+mod signals;
+mod task_queue;
+mod task_state;
+mod tasks;
 
 #[cfg(test)]
 mod tests;
@@ -109,7 +109,7 @@ pub use lifecycle::{
     assign_role, end_session, join_session, leave_session, remove_agent, start_session,
     transfer_leader,
 };
-pub use liveness::{sync_agent_liveness, LivenessSyncResult};
+pub use liveness::{LivenessSyncResult, sync_agent_liveness};
 pub use queries::{
     list_sessions, list_sessions_global, resolve_session_project_dir, session_status,
 };

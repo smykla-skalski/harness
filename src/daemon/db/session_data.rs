@@ -1,4 +1,6 @@
-use super::{DaemonDb, SessionState, CliError, db_error, SessionLogEntry, u64_from_i64, TaskCheckpoint};
+use super::{
+    CliError, DaemonDb, SessionLogEntry, SessionState, TaskCheckpoint, db_error, u64_from_i64,
+};
 
 impl DaemonDb {
     /// Load session state by ID.

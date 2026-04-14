@@ -3,22 +3,21 @@ use super::*;
 #[test]
 fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("end-leave"))
-            .expect("start");
+        let state =
+            start_session("test", "", project, Some("claude"), Some("end-leave")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
-        let joined =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("end-leave-worker"))], || {
-                join_session(
-                    "end-leave",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join")
-            });
+        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("end-leave-worker"))], || {
+            join_session(
+                "end-leave",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join")
+        });
         let worker_id = joined
             .agents
             .keys()

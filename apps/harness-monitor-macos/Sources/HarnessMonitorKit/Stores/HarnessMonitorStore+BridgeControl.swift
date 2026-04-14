@@ -1,6 +1,13 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private enum ManifestRefreshOutcome: Sendable {
+    case missing
+    case unchanged
+    case refreshed(DaemonManifest)
+    case failure(String)
+  }
+
   private func applyHostBridgeStatus(_ status: BridgeStatusReport) {
     guard let daemonStatus else {
       return
@@ -43,30 +50,53 @@ extension HarnessMonitorStore {
   ///
   /// Missing manifests remain a no-op. Read and decode failures append one
   /// visible `.error` breadcrumb so stale host-bridge state does not fail
-  /// silently. Decoder is allocated once per call - this method only runs in
-  /// the background probe task, never in a view body.
-  func refreshBridgeStateFromManifest(at manifestURL: URL = HarnessMonitorPaths.manifestURL()) {
-    let fileManager = FileManager.default
-    guard fileManager.fileExists(atPath: manifestURL.path) else { return }
-    guard let data = fileManager.contents(atPath: manifestURL.path) else {
-      recordManifestRefreshFailure(
-        "Failed to read daemon manifest at \(manifestURL.path)"
-      )
+  /// silently. File IO and JSON decode run on a utility task so the fallback
+  /// stays off the main actor during interaction-heavy UI frames.
+  func refreshBridgeStateFromManifest(at manifestURL: URL) async {
+    let currentHostBridge = daemonStatus?.manifest?.hostBridge
+
+    switch await Self.readManifestRefreshOutcome(
+      at: manifestURL,
+      currentHostBridge: currentHostBridge
+    ) {
+    case .missing, .unchanged:
       return
+    case .refreshed(let manifest):
+      applyManifestRevision(manifest)
+    case .failure(let detail):
+      recordManifestRefreshFailure(detail)
     }
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let manifest: DaemonManifest
-    do {
-      manifest = try decoder.decode(DaemonManifest.self, from: data)
-    } catch {
-      recordManifestRefreshFailure(
-        "Failed to decode daemon manifest at \(manifestURL.path): \(error.localizedDescription)"
-      )
-      return
-    }
-    guard daemonStatus?.manifest?.hostBridge != manifest.hostBridge else { return }
-    applyManifestRevision(manifest)
+  }
+
+  nonisolated private static func readManifestRefreshOutcome(
+    at manifestURL: URL,
+    currentHostBridge: HostBridgeManifest?
+  ) async -> ManifestRefreshOutcome {
+    await Task.detached(priority: .utility) {
+      let fileManager = FileManager.default
+      guard fileManager.fileExists(atPath: manifestURL.path) else {
+        return .missing
+      }
+      guard let data = fileManager.contents(atPath: manifestURL.path) else {
+        return .failure("Failed to read daemon manifest at \(manifestURL.path)")
+      }
+
+      let decoder = JSONDecoder()
+      decoder.keyDecodingStrategy = .convertFromSnakeCase
+      let manifest: DaemonManifest
+      do {
+        manifest = try decoder.decode(DaemonManifest.self, from: data)
+      } catch {
+        return .failure(
+          "Failed to decode daemon manifest at \(manifestURL.path): \(error.localizedDescription)"
+        )
+      }
+
+      guard currentHostBridge != manifest.hostBridge else {
+        return .unchanged
+      }
+      return .refreshed(manifest)
+    }.value
   }
 
   private func recordManifestRefreshFailure(_ detail: String) {

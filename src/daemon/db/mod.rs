@@ -43,13 +43,15 @@ mod timeline;
 mod timeline_store;
 mod writes;
 
-pub(crate) use runtime::ensure_shared_db;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
+    prepare_runtime_transcript_resync_for_agents,
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
+pub(crate) use runtime::ensure_shared_db;
+pub(crate) use signals::ExpiredPendingSignalIndexRecord;
 #[allow(unused_imports)]
 use signals::derive_effective_signal_status;
 #[allow(unused_imports)]
@@ -110,6 +112,20 @@ pub(crate) struct PreparedConversationEventImport {
     agent_id: String,
     runtime: String,
     events: Vec<ConversationEvent>,
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedAgentTranscriptResync {
+    agent_id: String,
+    runtime: String,
+    activity: daemon_protocol::AgentToolActivitySummary,
+    events: Vec<ConversationEvent>,
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedRuntimeTranscriptResync {
+    session_id: String,
+    agents: Vec<PreparedAgentTranscriptResync>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

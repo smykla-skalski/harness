@@ -9,7 +9,9 @@ use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant as TokioInstant, interval as tokio_interval, sleep_until};
 
-use super::paths::session_id_from_path_with_cache;
+use super::paths::{
+    WatchPathTarget, session_id_from_path_with_cache, watch_target_from_path_with_cache,
+};
 use super::refresh::{emit_watch_changes, refresh_watch_snapshot};
 use super::state::{
     PendingWatchPaths, RefreshScope, RuntimeSessionResolveCache, WatchChanges, WatchSnapshot,
@@ -160,7 +162,7 @@ pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> 
 
     let Ok(rows) = db
         .connection()
-        .prepare(CHANGE_TRACKING_POLL_SQL)
+        .prepare_cached(CHANGE_TRACKING_POLL_SQL)
         .and_then(|mut statement| {
             statement
                 .query_map([*last_change_seq], |row| {
@@ -198,20 +200,47 @@ fn reindex_sessions_from_paths(
     resolve_cache: &mut RuntimeSessionResolveCache,
 ) {
     resolve_cache.invalidate_paths(paths);
-    let session_ids = extract_session_ids(paths, resolve_cache);
-    if session_ids.is_empty() {
+    let work = extract_reindex_work(paths, resolve_cache);
+    if work.full_session_ids.is_empty() && work.transcript_targets.is_empty() {
         return;
     }
     tracing::debug!(
-        count = session_ids.len(),
+        full_count = work.full_session_ids.len(),
+        transcript_count = work.transcript_targets.len(),
         "reindexing sessions from file events"
     );
     let start = Instant::now();
     let prepare_start = Instant::now();
-    let mut prepared = Vec::new();
-    for session_id in &session_ids {
+    let mut prepared_sessions = Vec::new();
+    let mut prepared_transcripts = Vec::new();
+    let mut fallback_session_ids = work.full_session_ids;
+
+    for target in &work.transcript_targets {
+        match DaemonDb::prepare_runtime_transcript_resync(
+            &target.session_id,
+            &target.runtime_name,
+            &target.runtime_session_id,
+        ) {
+            Ok(Some(import)) => prepared_transcripts.push(import),
+            Ok(None) => {
+                fallback_session_ids.insert(target.session_id.clone());
+            }
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    session_id = target.session_id,
+                    runtime_name = target.runtime_name,
+                    runtime_session_id = target.runtime_session_id,
+                    "failed to prepare targeted transcript reindex; falling back to full session reindex"
+                );
+                fallback_session_ids.insert(target.session_id.clone());
+            }
+        }
+    }
+
+    for session_id in &fallback_session_ids {
         match DaemonDb::prepare_session_resync(session_id) {
-            Ok(import) => prepared.push(import),
+            Ok(import) => prepared_sessions.push(import),
             Err(error) => tracing::warn!(
                 %error,
                 session_id,
@@ -220,7 +249,7 @@ fn reindex_sessions_from_paths(
         }
     }
     let prepare_ms = u64::try_from(prepare_start.elapsed().as_millis()).unwrap_or(u64::MAX);
-    if prepared.is_empty() {
+    if prepared_sessions.is_empty() && prepared_transcripts.is_empty() {
         return;
     }
 
@@ -228,9 +257,14 @@ fn reindex_sessions_from_paths(
     let Ok(db_guard) = db.lock() else {
         return;
     };
-    for import in &prepared {
+    for import in &prepared_sessions {
         if let Err(error) = db_guard.apply_prepared_session_resync(import) {
             tracing::warn!(%error, "failed to apply prepared session reindex");
+        }
+    }
+    for import in &prepared_transcripts {
+        if let Err(error) = db_guard.apply_prepared_runtime_transcript_resync(import) {
+            tracing::warn!(%error, "failed to apply prepared transcript reindex");
         }
     }
     let apply_ms = u64::try_from(apply_start.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -239,9 +273,57 @@ fn reindex_sessions_from_paths(
         duration_ms,
         prepare_ms,
         apply_ms,
-        count = session_ids.len(),
+        full_count = prepared_sessions.len(),
+        transcript_count = prepared_transcripts.len(),
         "reindex complete"
     );
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct TranscriptRefreshTarget {
+    session_id: String,
+    runtime_name: String,
+    runtime_session_id: String,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ReindexWork {
+    full_session_ids: BTreeSet<String>,
+    transcript_targets: BTreeSet<TranscriptRefreshTarget>,
+}
+
+fn extract_reindex_work(
+    paths: &[PathBuf],
+    resolve_cache: &mut RuntimeSessionResolveCache,
+) -> ReindexWork {
+    let mut work = ReindexWork::default();
+
+    for path in paths {
+        match watch_target_from_path_with_cache(path, resolve_cache)
+            .ok()
+            .flatten()
+        {
+            Some(WatchPathTarget::Session(session_id)) => {
+                work.full_session_ids.insert(session_id);
+            }
+            Some(WatchPathTarget::Transcript {
+                session_id,
+                runtime_name,
+                runtime_session_id,
+            }) => {
+                work.transcript_targets.insert(TranscriptRefreshTarget {
+                    session_id,
+                    runtime_name,
+                    runtime_session_id,
+                });
+            }
+            None => {}
+        }
+    }
+
+    work.transcript_targets
+        .retain(|target| !work.full_session_ids.contains(&target.session_id));
+    work
 }
 
 fn create_watcher(

@@ -1,4 +1,6 @@
-use super::{HookAgent, CliError, CliErrorKind, Path, SessionState, storage, SessionMetrics, runtime};
+use super::{
+    CliError, CliErrorKind, HookAgent, Path, SessionMetrics, SessionState, runtime, storage,
+};
 
 pub(crate) fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
     match runtime_name {
@@ -12,7 +14,10 @@ pub(crate) fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent
     }
 }
 
-pub(crate) fn ensure_known_runtime(runtime_name: &str, message_prefix: &str) -> Result<(), CliError> {
+pub(crate) fn ensure_known_runtime(
+    runtime_name: &str,
+    message_prefix: &str,
+) -> Result<(), CliError> {
     if resolve_registered_runtime(runtime_name).is_some() {
         Ok(())
     } else {
@@ -22,7 +27,10 @@ pub(crate) fn ensure_known_runtime(runtime_name: &str, message_prefix: &str) -> 
     }
 }
 
-pub(crate) fn load_state_or_err(session_id: &str, project_dir: &Path) -> Result<SessionState, CliError> {
+pub(crate) fn load_state_or_err(
+    session_id: &str,
+    project_dir: &Path,
+) -> Result<SessionState, CliError> {
     storage::load_state(project_dir, session_id)?.ok_or_else(|| {
         CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
     })

@@ -8,15 +8,15 @@ mod support;
 #[allow(unused_imports)]
 use support::*;
 
-mod schema;
-mod runtime;
-mod signals;
-mod projects;
-mod sync;
 mod conversation;
-mod performance;
 mod mutations;
+mod performance;
+mod projects;
 mod reconcile;
+mod runtime;
+mod schema;
+mod signals;
+mod sync;
 
 #[test]
 fn db_round_trip_smoke_covers_public_surface() {
@@ -204,9 +204,7 @@ fn db_round_trip_smoke_covers_public_surface() {
     assert_eq!(project_summaries.len(), 1);
     assert_eq!(project_summaries[0].total_session_count, 1);
 
-    let session_summaries = db
-        .list_session_summaries_full()
-        .expect("session summaries");
+    let session_summaries = db.list_session_summaries_full().expect("session summaries");
     assert_eq!(session_summaries.len(), 1);
     assert_eq!(session_summaries[0].context, "updated context");
 

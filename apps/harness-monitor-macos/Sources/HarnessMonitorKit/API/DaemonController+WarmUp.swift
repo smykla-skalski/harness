@@ -4,13 +4,13 @@ extension DaemonController {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
-    try refreshManagedLaunchAgentIfBundledHelperChanged()
+    let refreshedManagedLaunchAgent = try refreshManagedLaunchAgentIfBundledHelperChanged()
     let timeoutDesc = String(describing: timeout)
     HarnessMonitorLogger.lifecycle.trace(
       "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
     )
     let deadline = ContinuousClock.now + timeout
-    var state = WarmUpLoopState()
+    var state = WarmUpLoopState(refreshedManagedLaunchAgentDuringWarmUp: refreshedManagedLaunchAgent)
     while ContinuousClock.now < deadline {
       let shouldBreak = try await warmUpIteration(state: &state)
       if let client = shouldBreak.liveClient {
@@ -44,6 +44,8 @@ extension DaemonController {
     var immediateError: (any Error)?
     var skipFinalBootstrapProbe = false
     var managedStaleManifestTracker = ManagedStaleManifestTracker()
+    var managedHelperMismatchTracker = ManagedStaleManifestTracker()
+    var refreshedManagedLaunchAgentDuringWarmUp = false
   }
 
   struct WarmUpIterationOutcome {
@@ -63,6 +65,12 @@ extension DaemonController {
         state.lastError = mismatch
         state.immediateError = mismatch
         return .stopLoop
+      }
+      if let mismatchOutcome = try handleManagedLiveHelperMismatch(
+        manifest: manifest,
+        state: &state
+      ) {
+        return mismatchOutcome
       }
       let connection = try daemonConnection(from: manifest)
       let endpoint = connection.endpoint.absoluteString
@@ -154,8 +162,89 @@ extension DaemonController {
     return .continueLoop
   }
 
+  func handleManagedLiveHelperMismatch(
+    manifest: DaemonManifest,
+    state: inout WarmUpLoopState
+  ) throws -> WarmUpIterationOutcome? {
+    guard ownership == .managed else {
+      state.managedHelperMismatchTracker.reset()
+      return nil
+    }
+    guard launchAgentManager.registrationState() == .enabled else {
+      state.managedHelperMismatchTracker.reset()
+      return nil
+    }
+    guard
+      let publishedStamp = manifest.binaryStamp?.managedLaunchAgentBundleStamp,
+      let currentStamp = try managedLaunchAgentCurrentBundleStamp(),
+      publishedStamp != currentStamp
+    else {
+      state.managedHelperMismatchTracker.reset()
+      return nil
+    }
+
+    let mismatchSignature = Self.managedHelperMismatchSignature(
+      for: manifest,
+      publishedStamp: publishedStamp,
+      currentStamp: currentStamp
+    )
+    let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+    state.lastError = DaemonControlError.daemonDidNotStart
+
+    if state.refreshedManagedLaunchAgentDuringWarmUp == false {
+      HarnessMonitorLogger.lifecycle.notice(
+        "Managed daemon helper identity mismatch; refreshing launch agent before trusting manifest"
+      )
+      try refreshManagedLaunchAgent(currentStamp: currentStamp)
+      state.refreshedManagedLaunchAgentDuringWarmUp = true
+      state.managedHelperMismatchTracker.reset()
+      return .continueLoop
+    }
+
+    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
+    if state.managedHelperMismatchTracker.expired(
+      signature: mismatchSignature,
+      now: ContinuousClock.now,
+      gracePeriod: managedStaleManifestGracePeriod
+    ) {
+      let timeoutMessage = Self.warmUpManagedHelperStampRewriteTimeoutMessage(
+        path: manifestPath,
+        gracePeriod: gracePeriod
+      )
+      HarnessMonitorLogger.lifecycle.error(
+        "\(timeoutMessage, privacy: .public)"
+      )
+      state.immediateError = DaemonControlError.daemonDidNotStart
+      state.skipFinalBootstrapProbe = true
+      return .stopLoop
+    }
+
+    HarnessMonitorLogger.lifecycle.trace(
+      "\(Self.warmUpWaitingForManagedHelperStampRewriteMessage(path: manifestPath), privacy: .public)"
+    )
+    return .continueLoop
+  }
+
   static func managedStaleManifestSignature(for manifest: DaemonManifest) -> String {
     "\(manifest.pid)|\(manifest.endpoint)|\(manifest.startedAt)"
+  }
+
+  static func managedHelperMismatchSignature(
+    for manifest: DaemonManifest,
+    publishedStamp: ManagedLaunchAgentBundleStamp,
+    currentStamp: ManagedLaunchAgentBundleStamp
+  ) -> String {
+    [
+      String(manifest.pid),
+      manifest.endpoint,
+      manifest.startedAt,
+      publishedStamp.helperPath,
+      String(publishedStamp.deviceIdentifier),
+      String(publishedStamp.inode),
+      currentStamp.helperPath,
+      String(currentStamp.deviceIdentifier),
+      String(currentStamp.inode),
+    ].joined(separator: "|")
   }
 
   static func warmUpObservedManifestMessage(pid: Int, endpoint: String) -> String {
@@ -177,6 +266,17 @@ extension DaemonController {
     "Warm-up aborting managed stale manifest wait at \(path) grace-period=\(gracePeriod)"
   }
 
+  static func warmUpManagedHelperStampRewriteTimeoutMessage(
+    path: String,
+    gracePeriod: String
+  ) -> String {
+    "Warm-up aborting managed helper stamp rewrite wait at \(path) grace-period=\(gracePeriod)"
+  }
+
+  static func warmUpWaitingForManagedHelperStampRewriteMessage(path: String) -> String {
+    "Warm-up waiting for managed daemon to publish refreshed helper stamp at \(path)"
+  }
+
   static func processIsAlive(pid: Int) -> Bool? {
     guard pid > 0 else {
       return nil
@@ -196,29 +296,35 @@ extension DaemonController {
     }
   }
 
-  func refreshManagedLaunchAgentIfBundledHelperChanged() throws {
+  func refreshManagedLaunchAgentIfBundledHelperChanged() throws -> Bool {
     guard ownership == .managed else {
-      return
+      return false
     }
     guard launchAgentManager.registrationState() == .enabled else {
-      return
+      return false
     }
     guard let currentStamp = try managedLaunchAgentCurrentBundleStamp() else {
-      return
+      return false
     }
 
     let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
     guard let persistedStamp = loadManagedLaunchAgentBundleStamp(from: stampURL) else {
       try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
-      return
+      return false
     }
     guard persistedStamp != currentStamp else {
-      return
+      return false
     }
 
     HarnessMonitorLogger.lifecycle.notice(
       "Bundled managed daemon helper changed; refreshing launch agent before warm-up"
     )
+    try refreshManagedLaunchAgent(currentStamp: currentStamp)
+    return true
+  }
+
+  func refreshManagedLaunchAgent(currentStamp: ManagedLaunchAgentBundleStamp) throws {
+    let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
     try launchAgentManager.unregister()
     clearManagedLaunchAgentBundleStamp(at: stampURL)
     try launchAgentManager.register()

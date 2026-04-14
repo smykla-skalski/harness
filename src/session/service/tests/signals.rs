@@ -3,8 +3,8 @@ use super::*;
 #[test]
 fn list_sessions_returns_all_when_requested() {
     with_temp_project(|project| {
-        let first = start_session("goal1", "", project, Some("claude"), Some("ls1"))
-            .expect("start one");
+        let first =
+            start_session("goal1", "", project, Some("claude"), Some("ls1")).expect("start one");
         start_session("goal2", "", project, Some("codex"), Some("ls2")).expect("start two");
         end_session("ls1", first.leader_id.as_deref().expect("leader"), project).expect("end");
 
@@ -18,8 +18,7 @@ fn list_sessions_returns_all_when_requested() {
 #[test]
 fn checkpoint_record_updates_task_summary_and_log() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("s5")).expect("start");
+        let state = start_session("test", "", project, Some("claude"), Some("s5")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let task = create_task(
             "s5",
@@ -62,8 +61,7 @@ fn checkpoint_record_updates_task_summary_and_log() {
 #[test]
 fn send_signal_lists_pending_signal_for_target_agent() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("s6")).expect("start");
+        let state = start_session("test", "", project, Some("claude"), Some("s6")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session("s6", SessionRole::Worker, "codex", &[], None, project, None)
             .expect("join");
@@ -99,19 +97,18 @@ fn list_signals_filters_shared_runtime_session_history() {
         let session_one = start_session("test", "", project, Some("claude"), Some("s6-alpha"))
             .expect("start alpha");
         let leader_one = session_one.leader_id.expect("alpha leader id");
-        let joined_one =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
-                join_session(
-                    "s6-alpha",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join alpha worker")
-            });
+        let joined_one = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
+            join_session(
+                "s6-alpha",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join alpha worker")
+        });
         let worker_one = joined_one
             .agents
             .keys()
@@ -122,19 +119,18 @@ fn list_signals_filters_shared_runtime_session_history() {
         let session_two = start_session("test", "", project, Some("claude"), Some("s6-beta"))
             .expect("start beta");
         let leader_two = session_two.leader_id.expect("beta leader id");
-        let joined_two =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
-                join_session(
-                    "s6-beta",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    project,
-                    None,
-                )
-                .expect("join beta worker")
-            });
+        let joined_two = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
+            join_session(
+                "s6-beta",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join beta worker")
+        });
         let worker_two = joined_two
             .agents
             .keys()
@@ -202,4 +198,3 @@ fn send_signal_denies_worker_actor() {
         assert_eq!(error.code(), "KSRCLI091");
     });
 }
-

@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum InteractiveCardHoverState {
+  static func resolve(current: Bool, isHovering: Bool) -> Bool? {
+    current == isHovering ? nil : isHovering
+  }
+}
+
 private struct InteractiveCardButtonStyle: ButtonStyle {
   let cornerRadius: CGFloat
   let tint: Color?
@@ -36,14 +42,17 @@ private struct InteractiveCardHoverModifier: ViewModifier {
           isHovered: isHovered || extraHoverHint
         )
       )
-      .onContinuousHover { phase in
+      .onHover { isHovering in
+        guard let nextHoverState = InteractiveCardHoverState.resolve(
+          current: isHovered,
+          isHovering: isHovering
+        )
+        else {
+          return
+        }
+
         withAnimation(.easeOut(duration: 0.15)) {
-          switch phase {
-          case .active:
-            isHovered = true
-          case .ended:
-            isHovered = false
-          }
+          isHovered = nextHoverState
         }
       }
       .harnessUITestValue("chrome=content-card")

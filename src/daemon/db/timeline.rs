@@ -1,4 +1,8 @@
-use super::{DaemonDb, TimelineWindowRequest, TimelineWindowResponse, CliError, daemon_timeline, daemon_index, replace_all_session_timeline_entries, SessionTimelineStateRow, OptionalExtension, usize_from_i64, db_error, TimelineCursor, StoredTimelineEntry, TimelineEntry};
+use super::{
+    CliError, DaemonDb, OptionalExtension, SessionTimelineStateRow, StoredTimelineEntry,
+    TimelineCursor, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse, daemon_index,
+    daemon_timeline, db_error, replace_all_session_timeline_entries, usize_from_i64,
+};
 
 impl DaemonDb {
     pub(crate) fn load_session_timeline_window(

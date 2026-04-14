@@ -1,4 +1,7 @@
-use super::{SessionTransition, SessionRole, TaskSpec, WorkItem, TaskSource, TaskStatus, AckResult, Path, LeaveSignalRecord, CliError, storage, TaskDropEffect, TaskStartSignalRecord};
+use super::{
+    AckResult, CliError, LeaveSignalRecord, Path, SessionRole, SessionTransition, TaskDropEffect,
+    TaskSource, TaskSpec, TaskStartSignalRecord, TaskStatus, WorkItem, storage,
+};
 
 pub(crate) fn log_session_started(title: &str, context: &str) -> SessionTransition {
     SessionTransition::SessionStarted {
@@ -193,4 +196,3 @@ pub(crate) fn started_task_signals(effects: &[TaskDropEffect]) -> Vec<TaskStartS
 // ---------------------------------------------------------------------------
 // Daemon response conversions
 // ---------------------------------------------------------------------------
-

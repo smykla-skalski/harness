@@ -1,4 +1,14 @@
-use super::{DaemonDb, SessionSignalRecord, CliError, db_error, utc_now, Signal, SessionSignalStatus, SessionState};
+use super::{
+    CliError, DaemonDb, SessionSignalRecord, SessionSignalStatus, SessionState, Signal, db_error,
+    utc_now,
+};
+
+#[derive(Debug, Clone)]
+pub(crate) struct ExpiredPendingSignalIndexRecord {
+    pub(crate) runtime: String,
+    pub(crate) agent_id: String,
+    pub(crate) signal: Signal,
+}
 
 impl DaemonDb {
     /// Sync the signal index for a session from a list of signal records.
@@ -119,6 +129,57 @@ impl DaemonDb {
                 acknowledgment,
             });
         }
+        Ok(signals)
+    }
+
+    /// Load only pending signals whose expiry has already passed.
+    ///
+    /// This keeps callers on the indexed fast path for the common case where a
+    /// session has no expired pending deliveries to reconcile.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query or JSON parse failure.
+    pub(crate) fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT signal_json, runtime, agent_id
+                 FROM signal_index
+                 WHERE session_id = ?1 AND status = 'pending'
+                 ORDER BY created_at DESC",
+            )
+            .map_err(|error| db_error(format!("prepare expired pending signal load: {error}")))?;
+
+        let rows = statement
+            .query_map([session_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(|error| db_error(format!("query expired pending signals: {error}")))?;
+
+        let mut signals = Vec::new();
+        for row in rows {
+            let (signal_json, runtime, agent_id) =
+                row.map_err(|error| db_error(format!("read expired pending signal row: {error}")))?;
+            let signal: Signal = serde_json::from_str(&signal_json)
+                .map_err(|error| db_error(format!("parse expired pending signal: {error}")))?;
+            if derive_effective_signal_status(SessionSignalStatus::Pending, &signal)
+                == SessionSignalStatus::Expired
+            {
+                signals.push(ExpiredPendingSignalIndexRecord {
+                    runtime,
+                    agent_id,
+                    signal,
+                });
+            }
+        }
+
         Ok(signals)
     }
 

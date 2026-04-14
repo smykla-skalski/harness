@@ -384,7 +384,7 @@ extension HarnessMonitorStore {
 
   func startManifestWatcher() {
     stopManifestWatcher()
-    let daemonRoot = HarnessMonitorPaths.daemonRoot()
+    let daemonRoot = manifestURL.deletingLastPathComponent()
     // The dispatch source opens the daemon directory; create it first so the
     // watcher still starts when the dev daemon has never run yet. This is
     // required for external daemon mode where the app may launch before the
@@ -393,7 +393,6 @@ extension HarnessMonitorStore {
       at: daemonRoot,
       withIntermediateDirectories: true
     )
-    let manifestURL = HarnessMonitorPaths.manifestURL()
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let currentEndpoint: String
@@ -413,6 +412,7 @@ extension HarnessMonitorStore {
       currentRevision = 0
     }
     let watcher = ManifestWatcher(
+      manifestURL: manifestURL,
       currentEndpoint: currentEndpoint,
       currentStartedAt: currentStartedAt,
       currentRevision: currentRevision

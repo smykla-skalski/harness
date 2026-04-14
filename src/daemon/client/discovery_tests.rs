@@ -91,6 +91,7 @@ fn try_build_client_requires_authenticated_api_readiness() {
                 host_bridge: HostBridgeManifest::default(),
                 revision: 0,
                 updated_at: String::new(),
+                binary_stamp: None,
             };
             state::write_manifest(&manifest).expect("write manifest");
 
@@ -185,6 +186,7 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
                 host_bridge: HostBridgeManifest::default(),
                 revision: 0,
                 updated_at: String::new(),
+                binary_stamp: None,
             };
             std::fs::write(
                 app_group_root.join("manifest.json"),

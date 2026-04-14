@@ -74,6 +74,7 @@ pub(super) fn fake_running_xdg_daemon(
             host_bridge: HostBridgeManifest::default(),
             revision: 0,
             updated_at: String::new(),
+            binary_stamp: None,
         })
         .expect("serialize manifest"),
     )
