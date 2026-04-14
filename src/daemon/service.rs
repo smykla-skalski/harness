@@ -968,7 +968,9 @@ fn reconcile_active_session_liveness_for_reads(
     let session_ids: BTreeSet<_> = db
         .list_session_summaries()?
         .into_iter()
-        .filter(|state| state.status == SessionStatus::Active)
+        .filter(|state| {
+            state.status == SessionStatus::Active && state.metrics.active_agent_count > 0
+        })
         .map(|state| state.session_id)
         .collect();
     let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
@@ -1049,6 +1051,9 @@ fn liveness_project_dir(
     if resolved.state.status != SessionStatus::Active {
         return Ok(None);
     }
+    if !session_has_live_agents(&resolved.state) {
+        return Ok(None);
+    }
     let Some(project_dir) = resolved.project.project_dir else {
         return Ok(None);
     };
@@ -1056,6 +1061,10 @@ fn liveness_project_dir(
         return Ok(None);
     }
     Ok(Some(project_dir))
+}
+
+fn session_has_live_agents(state: &SessionState) -> bool {
+    state.agents.values().any(|agent| agent.status.is_alive())
 }
 
 /// Create a task through the shared session service.
@@ -3433,6 +3442,88 @@ done
             );
             assert_eq!(second_summary.metrics.agent_count, 2);
             assert_eq!(second_summary.metrics.active_agent_count, 2);
+        });
+    }
+
+    #[test]
+    fn list_sessions_skips_liveness_disk_probe_when_db_session_has_no_live_agents() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon dead-session summaries",
+                "",
+                project,
+                Some("claude"),
+                Some("daemon-dead-session-summaries"),
+            )
+            .expect("start session");
+
+            temp_env::with_var("CODEX_SESSION_ID", Some("dead-db-worker-session"), || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            });
+
+            let status =
+                session_service::session_status(&state.session_id, project).expect("status");
+            let leader = status
+                .leader_id
+                .as_ref()
+                .and_then(|agent_id| status.agents.get(agent_id))
+                .expect("leader agent");
+            let worker = status
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("worker agent");
+
+            let leader_log = write_agent_log_file(
+                project,
+                "claude",
+                leader
+                    .agent_session_id
+                    .as_deref()
+                    .expect("leader session id"),
+            );
+            let worker_log = write_agent_log_file(
+                project,
+                "codex",
+                worker
+                    .agent_session_id
+                    .as_deref()
+                    .expect("worker session id"),
+            );
+            set_log_mtime_seconds_ago(&leader_log, 600);
+            set_log_mtime_seconds_ago(&worker_log, 600);
+
+            let liveness = session_service::sync_agent_liveness(&state.session_id, project)
+                .expect("sync dead liveness");
+            assert_eq!(liveness.disconnected.len(), 2);
+
+            let db = setup_db_with_session(project, &state.session_id);
+            clear_session_liveness_refresh_cache_entry(&state.session_id);
+
+            let state_path = crate::workspace::project_context_dir(project)
+                .join("orchestration")
+                .join("sessions")
+                .join(&state.session_id)
+                .join("state.json");
+            fs::write(&state_path, "{not-valid-json").expect("corrupt state");
+
+            let summary = list_sessions(true, Some(&db))
+                .expect("session summaries should stay on the db fast path")
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("summary");
+            assert!(summary.leader_id.is_none());
+            assert_eq!(summary.metrics.agent_count, 0);
+            assert_eq!(summary.metrics.active_agent_count, 0);
         });
     }
 
