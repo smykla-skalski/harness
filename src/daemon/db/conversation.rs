@@ -1,6 +1,10 @@
-use super::*;
+use super::{DaemonDb, ConversationEvent, CliError, daemon_timeline, stored_timeline_entry, db_error, extract_transition_kind, i64_from_u64, replace_session_timeline_entries_for_prefix, daemon_protocol, utc_now, SessionState, PreparedConversationEventImport, daemon_snapshot, Connection};
 
 impl DaemonDb {
+    /// Sync conversation events for an agent into the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn sync_conversation_events(
         &self,
         session_id: &str,
@@ -110,6 +114,10 @@ impl DaemonDb {
         }
         Ok(events)
     }
+    /// Sync agent tool activity summaries for a session into the cache.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn sync_agent_activity(
         &self,
         session_id: &str,

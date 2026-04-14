@@ -1,5 +1,9 @@
-use super::*;
+use super::{env, DaemonServeConfig, CliError, log_sandbox_startup, state, TcpListener, CliErrorKind, DaemonManifest, process_id, utc_now, bridge, broadcast, tokio_watch, Arc, OnceLock, Mutex, OBSERVE_RUNTIME, DaemonObserveRuntime, SHUTDOWN_SIGNAL, ReplayBuffer, CodexControllerHandle, DaemonHttpState, http, CodexTransportKind, Duration, watch, spawn_blocking, index, SessionStatus, Path};
 
+/// Start the daemon TCP server and service all incoming connections.
+///
+/// # Errors
+/// Returns [`CliError`] if the server fails to start or bind.
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     validate_serve_config(&config)?;
     log_sandbox_startup(config.sandboxed);
