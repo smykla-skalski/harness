@@ -1,5 +1,6 @@
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUI
 
 @Suite("HarnessMonitorTextSize magnification index delta")
@@ -109,6 +110,69 @@ struct SessionTimelinePaginationTests {
         newItemCount: 45,
         pageSize: SessionTimelinePageSize.defaultSize.rawValue
       ) == nil
+    )
+  }
+
+  @Test("Presentation uses authoritative total count for range and page count")
+  func presentationUsesAuthoritativeTotalCount() {
+    let timeline = makeTimelineEntries(count: 10)
+    let presentation = SessionTimelinePresentation(
+      timeline: timeline,
+      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
+      currentPage: 1,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: true
+    )
+
+    #expect(presentation.pageCount == 5)
+    #expect(presentation.rangeText == "Showing 11-20 of 42")
+    #expect(presentation.entries.isEmpty)
+    #expect(presentation.placeholderCount == 10)
+  }
+
+  @Test("Presentation fills only the unresolved slots with placeholders")
+  func presentationFillsOnlyUnresolvedSlotsWithPlaceholders() {
+    let timeline = makeTimelineEntries(count: 10)
+    let presentation = SessionTimelinePresentation(
+      timeline: timeline,
+      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.fifteen.rawValue,
+      isLoading: true
+    )
+
+    #expect(presentation.rangeText == "Showing 1-15 of 42")
+    #expect(presentation.entries.count == 10)
+    #expect(presentation.placeholderCount == 5)
+  }
+
+  private func makeTimelineEntries(count: Int) -> [TimelineEntry] {
+    (0..<count).map { index in
+      TimelineEntry(
+        entryId: "timeline-entry-\(index)",
+        recordedAt: String(format: "2026-04-14T10:%02d:00Z", 59 - index),
+        kind: "task_checkpoint",
+        sessionId: "sess-pagination",
+        agentId: "worker-pagination",
+        taskId: nil,
+        summary: "Timeline entry \(index)",
+        payload: .object([:])
+      )
+    }
+  }
+
+  private func makeTimelineWindow(totalCount: Int, loadedCount: Int) -> TimelineWindowResponse {
+    TimelineWindowResponse(
+      revision: 7,
+      totalCount: totalCount,
+      windowStart: 0,
+      windowEnd: loadedCount,
+      hasOlder: loadedCount < totalCount,
+      hasNewer: false,
+      oldestCursor: nil,
+      newestCursor: nil,
+      entries: nil,
+      unchanged: false
     )
   }
 }
