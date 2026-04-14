@@ -216,7 +216,14 @@ public final class HarnessMonitorStore {
   }
 
   private func bootstrapManagedDaemon() async {
-    let registrationState = await daemonController.launchAgentRegistrationState()
+    let registrationState: DaemonLaunchAgentRegistrationState
+    do {
+      registrationState = try await ensureManagedLaunchAgentReady()
+    } catch {
+      await applyLaunchAgentOfflineState(reason: error.localizedDescription)
+      return
+    }
+
     switch registrationState {
     case .notRegistered, .notFound:
       await applyLaunchAgentOfflineState(
