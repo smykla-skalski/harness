@@ -521,11 +521,7 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
                 prompt: None,
                 project_dir: Some(project_dir.to_string_lossy().into()),
                 persona: None,
-                argv: vec![
-                    "sh".into(),
-                    "-c".into(),
-                    "printf 'ready\\n'; cat".into(),
-                ],
+                argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                 rows: 30,
                 cols: 120,
             },
