@@ -3,7 +3,6 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const MAX_FILE_LINES: usize = 520;
 const TRACKED_RUST_TOP_LEVEL_DIRS: &[&str] = &["src", "tests", "testkit"];
@@ -39,35 +38,6 @@ fn emit_rerun_instructions(repo_root: &Path) {
 }
 
 fn tracked_rust_files(repo_root: &Path) -> io::Result<Vec<PathBuf>> {
-    tracked_rust_files_via_git(repo_root).or_else(|_| tracked_rust_files_via_walk(repo_root))
-}
-
-fn tracked_rust_files_via_git(repo_root: &Path) -> io::Result<Vec<PathBuf>> {
-    let output = Command::new("git")
-        .current_dir(repo_root)
-        .args(["ls-files", "--", "*.rs"])
-        .output()?;
-
-    if !output.status.success() {
-        return Err(io::Error::other(format!(
-            "git ls-files failed with status {}",
-            output.status
-        )));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut files = stdout
-        .lines()
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .map(|path| repo_root.join(path))
-        .collect::<Vec<_>>();
-
-    files.sort();
-    Ok(files)
-}
-
-fn tracked_rust_files_via_walk(repo_root: &Path) -> io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
     for directory in TRACKED_RUST_TOP_LEVEL_DIRS {
@@ -140,10 +110,8 @@ fn write_enforcement_module(out_dir: &Path, violations: &[(String, usize)]) -> i
     let contents = if violations.is_empty() {
         "#[cfg(clippy)] const _: () = ();\n".to_string()
     } else {
-        format!(
-            "#[cfg(clippy)] compile_error!({});\n",
-            format!("{:?}", format_violation_report(violations))
-        )
+        let report = format_violation_report(violations);
+        format!("#[cfg(clippy)] compile_error!({report:?});\n")
     };
 
     fs::write(module_path, contents)
