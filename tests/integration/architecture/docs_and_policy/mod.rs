@@ -4,6 +4,8 @@ use super::helpers::{
     assert_file_lacks_needles, collect_hits_in_paths, collect_hits_in_tree, read_repo_file,
 };
 
+mod policy_rules;
+
 #[test]
 fn setup_does_not_mutate_run_repository_directly() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -511,52 +513,6 @@ fn shared_plugin_outputs_stay_portable() {
     assert!(
         hits.is_empty(),
         "shared plugin outputs are still host-specific:\n{}",
-        hits.join("\n")
-    );
-}
-
-#[test]
-fn repo_contains_no_clippy_allow_attributes() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let needle = ["allow", "(clippy::"].concat();
-    let mut hits = Vec::new();
-
-    for start in [root.join("src"), root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_hits_in_tree(
-            &start,
-            root,
-            None,
-            &[needle.as_str()],
-            |path, matched| format!("{path} still contains forbidden Clippy allow `{matched}`"),
-        ));
-    }
-
-    assert!(
-        hits.is_empty(),
-        "found forbidden Clippy allow attributes:\n{}",
-        hits.join("\n")
-    );
-}
-
-#[test]
-fn repo_contains_no_custom_macro_rules() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut hits = Vec::new();
-    let needle = ["macro", "_rules!"].concat();
-
-    for start in [root.join("src"), root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_hits_in_tree(
-            &start,
-            root,
-            None,
-            &[needle.as_str()],
-            |path, matched| format!("{path} still contains forbidden custom macro `{matched}`"),
-        ));
-    }
-
-    assert!(
-        hits.is_empty(),
-        "found forbidden custom macros:\n{}",
         hits.join("\n")
     );
 }
