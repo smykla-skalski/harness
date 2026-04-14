@@ -25,6 +25,8 @@ pub mod setup;
 pub(crate) mod suite_defaults;
 pub mod workspace;
 
+include!(concat!(env!("OUT_DIR"), "/file_length_enforcement.rs"));
+
 /// Handle type for runtime log filter reloading.
 pub type LogFilterHandle = reload::Handle<EnvFilter, tracing_subscriber::Registry>;
 
