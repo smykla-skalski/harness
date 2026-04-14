@@ -1,6 +1,10 @@
-use super::*;
+use super::{DaemonDb, SessionState, CliError, db_error, SessionLogEntry, u64_from_i64, TaskCheckpoint};
 
 impl DaemonDb {
+    /// Load session state by ID.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
     pub fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
         let result = self.conn.query_row(
             "SELECT state_json FROM sessions WHERE session_id = ?1",
@@ -98,6 +102,10 @@ impl DaemonDb {
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|error| db_error(format!("read checkpoint row: {error}")))
     }
+    /// Load session state by ID for an in-place mutation.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
     pub fn load_session_state_for_mutation(
         &self,
         session_id: &str,

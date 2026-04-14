@@ -1,6 +1,10 @@
-use super::*;
+use super::{DaemonDb, ImportResult, CliError, daemon_index, import_daemon_events, ReconcileResult, PreparedSessionResync, PreparedTaskCheckpointImport, daemon_snapshot, prepare_agent_conversation_imports_and_activity, clear_session_conversation_events, DiscoveredProject, SessionState};
 
 impl DaemonDb {
+    /// Import all file-backed sessions and projects into the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery or SQL failures.
     pub fn import_from_files(&self) -> Result<ImportResult, CliError> {
         let projects = daemon_index::discover_projects()?;
         let sessions = daemon_index::discover_sessions_for(&projects, true)?;
@@ -83,6 +87,10 @@ impl DaemonDb {
         let sessions = daemon_index::discover_sessions_for(&projects, true)?;
         self.reconcile_sessions(&projects, &sessions)
     }
+    /// Re-sync a session from its file-backed state into the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery, I/O, or SQL failures.
     pub fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
         let prepared = Self::prepare_session_resync(session_id)?;
         self.apply_prepared_session_resync(&prepared)

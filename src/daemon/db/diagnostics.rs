@@ -1,6 +1,10 @@
-use super::*;
+use super::{DaemonDb, CliError, db_error, daemon_launchd, daemon_state};
 
 impl DaemonDb {
+    /// Set a diagnostics cache entry by key.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError> {
         self.conn
             .execute(

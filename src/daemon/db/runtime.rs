@@ -1,4 +1,4 @@
-use super::*;
+use super::{Arc, OnceLock, Mutex, DaemonDb, CliError, state, CodexRunSnapshot, db_error, AgentTuiSnapshot, AgentTuiLiveRefreshState, AgentTuiStatus, AgentTuiSize, TerminalScreenSnapshot, Type, IoError, ErrorKind, CodexRunMode, CodexRunStatus};
 
 pub(crate) fn ensure_shared_db(
     db_slot: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
@@ -14,6 +14,10 @@ pub(crate) fn ensure_shared_db(
 }
 
 impl DaemonDb {
+    /// Save or update a Codex controller run snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or serialization failures.
     pub fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
         let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
             .map_err(|error| db_error(format!("serialize codex approvals: {error}")))?;

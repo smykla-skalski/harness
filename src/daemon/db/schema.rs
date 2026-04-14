@@ -1,7 +1,12 @@
-use super::*;
+use super::{DaemonDb, Path, CliError, Connection, db_error, SCHEMA_VERSION};
 use super::schema_sql::{AGENT_TUIS_SCHEMA, CODEX_RUNS_SCHEMA, CREATE_SCHEMA};
 
 impl DaemonDb {
+    /// Open the daemon database at `path`, applying pragmas and running any
+    /// pending schema migrations.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn open(path: &Path) -> Result<Self, CliError> {
         let conn = Connection::open(path)
             .map_err(|error| db_error(format!("open daemon database: {error}")))?;

@@ -1,6 +1,10 @@
-use super::*;
+use super::{DaemonDb, DiscoveredProject, CliError, utc_now, db_error, SessionState, SessionStatus, i64_from_u64, SessionLogEntry, extract_transition_kind, daemon_timeline, u64_from_i64, upsert_session_timeline_entry, stored_timeline_entry, TaskCheckpoint, normalize_change_scope, Connection, BTreeMap, AgentRegistration, WorkItem};
 
 impl DaemonDb {
+    /// Upsert a discovered project into the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
         let now = utc_now();
         self.conn

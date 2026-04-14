@@ -1,6 +1,10 @@
-use super::*;
+use super::{daemon_protocol, DaemonDb, CliError, db_error, usize_from_i64, BTreeMap, SessionState, daemon_index, DiscoveredProject, PathBuf, SessionStatus, project_context_id, Path, project_context_dir};
 
 impl DaemonDb {
+    /// Return the number of sessions in the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     pub fn session_count(&self) -> Result<i64, CliError> {
         self.conn
             .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
