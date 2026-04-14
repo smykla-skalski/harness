@@ -196,7 +196,6 @@ struct ContentDetailColumn: View {
         ContentDetailChrome(
           persistenceError: contentChrome.persistenceError,
           sessionDataAvailability: contentChrome.sessionDataAvailability,
-          sessionStatus: contentChrome.sessionStatus
         ) {
           sessionContent
         }
@@ -231,6 +230,7 @@ struct ContentDetailColumn: View {
         summary: contentSession.selectedSessionSummary,
         timeline: contentSessionDetail.presentedTimeline,
         timelineWindow: contentSessionDetail.presentedTimelineWindow,
+        isSessionStatusStale: contentChrome.sessionDataAvailability != .live,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isSelectionLoading: contentSession.isSelectionLoading,
         isTimelineLoading: contentSessionDetail.isTimelineLoading,

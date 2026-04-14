@@ -24,6 +24,8 @@ enum HarnessMonitorUITestAccessibility {
   static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"
   static let refreshButton = "harness.toolbar.refresh"
   static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
+  static let sessionHeaderCard = "harness.session.header"
+  static let sessionHeaderCardFrame = "harness.session.header.frame"
   static let sidebarRoot = "harness.sidebar.root"
   static let previewProjectHeader = "harness.sidebar.project-header.project-6ccf8d0a"
   static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"

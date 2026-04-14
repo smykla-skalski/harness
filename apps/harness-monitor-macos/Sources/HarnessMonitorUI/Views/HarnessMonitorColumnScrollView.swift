@@ -13,6 +13,7 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
   let readableWidth: Bool
   let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
   private let content: Content
+  private let underlay: AnyView?
 
   /// HIG readable content width for body text (~70 characters at body size).
   private static var readableMaxWidth: CGFloat { 680 }
@@ -31,6 +32,25 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
+    underlay = nil
+  }
+
+  init<Underlay: View>(
+    horizontalPadding: CGFloat = 24,
+    verticalPadding: CGFloat = 24,
+    constrainContentWidth: Bool = false,
+    readableWidth: Bool = false,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    @ViewBuilder underlay: () -> Underlay,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.horizontalPadding = horizontalPadding
+    self.verticalPadding = verticalPadding
+    self.constrainContentWidth = constrainContentWidth
+    self.readableWidth = readableWidth
+    self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.content = content()
+    self.underlay = AnyView(underlay())
   }
 
   var body: some View {
@@ -49,18 +69,25 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
 
   private func scrollBody(contentWidth: CGFloat? = nil) -> some View {
     ScrollView {
-      VStack(spacing: 0) {
-        if let contentWidth {
-          content
-            .frame(width: contentWidth, alignment: .topLeading)
-        } else {
-          content
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+      ZStack(alignment: .topLeading) {
+        if let underlay {
+          underlay
         }
+
+        VStack(spacing: 0) {
+          if let contentWidth {
+            content
+              .frame(width: contentWidth, alignment: .topLeading)
+          } else {
+            content
+              .frame(maxWidth: .infinity, alignment: .topLeading)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.horizontal, horizontalPadding)
-      .padding(.vertical, verticalPadding)
     }
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
   }

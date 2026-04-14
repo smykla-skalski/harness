@@ -125,6 +125,8 @@ public enum HarnessMonitorAccessibility {
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
+  static let sessionHeaderCard = "harness.session.header"
+  static let sessionHeaderCardFrame = "\(sessionHeaderCard).frame"
   static let observeSessionButton = "harness.session.action.observe"
   static let endSessionButton = "harness.session.action.end"
   static let pendingLeaderTransferCard = "harness.session.pending-transfer"
