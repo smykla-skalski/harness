@@ -50,6 +50,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: cached.detail,
         timeline: cached.timeline,
+        timelineWindow: cached.timelineWindow,
         showingCachedData: true
       )
     } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
@@ -58,6 +59,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: summaryOnlySessionDetail(for: summary),
         timeline: [],
+        timelineWindow: nil,
         showingCachedData: true
       )
     } else {
@@ -87,6 +89,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: cached.detail,
         timeline: cached.timeline,
+        timelineWindow: cached.timelineWindow,
         showingCachedData: true,
         cancelPendingTimelineRefresh: false
       )
@@ -102,6 +105,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: cached.detail,
         timeline: cached.timeline,
+        timelineWindow: cached.timelineWindow,
         showingCachedData: true
       )
     } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
@@ -109,6 +113,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: summaryOnlySessionDetail(for: summary),
         timeline: [],
+        timelineWindow: nil,
         showingCachedData: true
       )
     } else {
@@ -185,7 +190,7 @@ extension HarnessMonitorStore {
     let hydrationQueue = await persistedSnapshotHydrationQueue(for: prioritySessions)
     guard !hydrationQueue.isEmpty else { return }
 
-    var batch: [(detail: SessionDetail, timeline: [TimelineEntry])] = []
+    var batch: [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)] = []
     batch.reserveCapacity(hydrationQueue.count)
 
     for summary in hydrationQueue {
@@ -221,11 +226,10 @@ extension HarnessMonitorStore {
   private func fetchAndApplyHydrationSnapshot(
     using client: any HarnessMonitorClientProtocol,
     summary: SessionSummary,
-    batch: inout [(detail: SessionDetail, timeline: [TimelineEntry])]
+    batch: inout [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)]
   ) async {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
-      let timelineScope: TimelineScope = .summary
       let measuredDetail = try await Self.measureOperation {
         try await client.sessionDetail(id: summary.sessionId, scope: detailScope)
       }
@@ -237,20 +241,22 @@ extension HarnessMonitorStore {
           sessionID: summary.sessionId,
           detail: measuredDetail.value,
           timeline: timeline,
+          timelineWindow: timelineWindow,
           showingCachedData: false,
           cancelPendingTimelineRefresh: false
         )
       }
 
       let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(
+        try await client.timelineWindow(
           sessionID: summary.sessionId,
-          scope: timelineScope
+          request: .latest(limit: Self.initialSelectedTimelineWindowLimit)
         ) { [weak self] batch, batchIndex, _ in
           await MainActor.run {
-            guard isSelected && needsUpdate else { return }
+            guard isSelected && needsUpdate, let entries = batch.entries else { return }
             self?.applySelectedTimelineBatch(
-              batch,
+              entries,
+              timelineWindow: batch.metadataOnly,
               index: batchIndex,
               sessionID: summary.sessionId
             )
@@ -258,14 +264,21 @@ extension HarnessMonitorStore {
         }
       }
       recordRequestSuccess()
+      let resolvedTimeline = measuredTimeline.value.entries ?? []
+      let resolvedTimelineWindow = measuredTimeline.value.metadataOnly
 
-      batch.append((detail: measuredDetail.value, timeline: measuredTimeline.value))
+      batch.append((
+        detail: measuredDetail.value,
+        timeline: resolvedTimeline,
+        timelineWindow: resolvedTimelineWindow
+      ))
 
       if isSelected && needsUpdate {
         applySelectedSessionSnapshot(
           sessionID: summary.sessionId,
           detail: measuredDetail.value,
-          timeline: measuredTimeline.value,
+          timeline: resolvedTimeline,
+          timelineWindow: resolvedTimelineWindow,
           showingCachedData: false,
           cancelPendingTimelineRefresh: false
         )

@@ -26,6 +26,14 @@ extension HarnessMonitorStore {
     }
   }
 
+  public var timelineWindow: TimelineWindowResponse? {
+    get { selection.timelineWindow }
+    set {
+      guard selection.timelineWindow != newValue else { return }
+      selection.timelineWindow = newValue
+    }
+  }
+
   public var inspectorSelection: InspectorSelection {
     get { selection.inspectorSelection }
     set {
@@ -56,6 +64,14 @@ extension HarnessMonitorStore {
     set {
       guard selection.isSelectionLoading != newValue else { return }
       selection.isSelectionLoading = newValue
+    }
+  }
+
+  public var isTimelineLoading: Bool {
+    get { selection.isTimelineLoading }
+    set {
+      guard selection.isTimelineLoading != newValue else { return }
+      selection.isTimelineLoading = newValue
     }
   }
 
@@ -165,12 +181,16 @@ extension HarnessMonitorStore {
           activeSessionLoadRequest = 0
         }
         isSelectionLoading = false
+        isTimelineLoading = false
         selectedSession = nil
         timeline = []
+        timelineWindow = nil
       } else if isChangingSelectedSession {
         isSelectionLoading = true
+        isTimelineLoading = false
         selectedSession = nil
         timeline = []
+        timelineWindow = nil
       }
     }
 
@@ -389,6 +409,7 @@ extension HarnessMonitorStore {
     }
     withUISyncBatch {
       isSelectionLoading = false
+      isTimelineLoading = false
     }
   }
 

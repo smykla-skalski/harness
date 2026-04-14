@@ -179,15 +179,20 @@ extension HarnessMonitorStore {
   ) async {
     lastSessionPushFallbackAt[sessionID] = ContinuousClock.now
     do {
-      let timelineScope: TimelineScope = .summary
+      let timelineRequest = TimelineWindowRequest.latest(
+        limit: timelineWindow?.pageSize ?? Self.initialSelectedTimelineWindowLimit,
+        knownRevision: timelineWindow?.revision
+      )
       let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(
+        try await client.timelineWindow(
           sessionID: sessionID,
-          scope: timelineScope
+          request: timelineRequest
         ) { [weak self] batch, batchIndex, _ in
           await MainActor.run {
+            guard let entries = batch.entries else { return }
             self?.applySelectedTimelineBatch(
-              batch,
+              entries,
+              timelineWindow: batch.metadataOnly,
               index: batchIndex,
               sessionID: sessionID
             )
@@ -198,11 +203,16 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else {
         return
       }
-      timeline = measuredTimeline.value
+      let resolvedTimeline = measuredTimeline.value.entries ?? timeline
+      let resolvedTimelineWindow = measuredTimeline.value.metadataOnly
+      timeline = resolvedTimeline
+      self.timelineWindow = resolvedTimelineWindow
       if let selectedSession {
         scheduleCacheWrite { service in
           await service.cacheSessionDetail(
-            selectedSession, timeline: measuredTimeline.value
+            selectedSession,
+            timeline: resolvedTimeline,
+            timelineWindow: resolvedTimelineWindow
           )
         }
       }
@@ -289,7 +299,10 @@ extension HarnessMonitorStore {
       if let timeline = payload.timeline {
         scheduleCacheWrite { service in
           await service.cacheSessionDetail(
-            detail, timeline: timeline, markViewed: false
+            detail,
+            timeline: timeline,
+            timelineWindow: TimelineWindowResponse.fallbackMetadata(for: timeline),
+            markViewed: false
           )
         }
       }
@@ -300,12 +313,18 @@ extension HarnessMonitorStore {
       sessionID: sessionID,
       detail: detail,
       timeline: timeline,
+      timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
+        ?? timelineWindow,
       showingCachedData: false,
       cancelPendingTimelineRefresh: payload.timeline != nil
     )
     if let freshTimeline = payload.timeline {
       scheduleCacheWrite { service in
-        await service.cacheSessionDetail(detail, timeline: freshTimeline)
+        await service.cacheSessionDetail(
+          detail,
+          timeline: freshTimeline,
+          timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+        )
       }
     } else if let client {
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
@@ -339,12 +358,18 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: detail,
         timeline: timeline,
+        timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
+          ?? timelineWindow,
         showingCachedData: false,
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
       if let freshTimeline = payload.timeline {
         scheduleCacheWrite { service in
-          await service.cacheSessionDetail(detail, timeline: freshTimeline)
+          await service.cacheSessionDetail(
+            detail,
+            timeline: freshTimeline,
+            timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+          )
         }
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)

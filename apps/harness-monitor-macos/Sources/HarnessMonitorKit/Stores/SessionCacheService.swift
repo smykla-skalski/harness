@@ -36,6 +36,7 @@ public actor SessionCacheService {
   struct CachedSessionSnapshot: Sendable {
     let detail: SessionDetail
     let timeline: [TimelineEntry]
+    let timelineWindow: TimelineWindowResponse?
   }
 
   func makeContext() -> ModelContext {
@@ -61,7 +62,15 @@ public actor SessionCacheService {
 
     return CachedSessionSnapshot(
       detail: cached.toSessionDetail(),
-      timeline: cached.timelineEntries.map { $0.toTimelineEntry() }
+      timeline: cached.timelineEntries
+        .map { $0.toTimelineEntry() }
+        .sorted { left, right in
+          if left.recordedAt != right.recordedAt {
+            return left.recordedAt > right.recordedAt
+          }
+          return left.entryId > right.entryId
+        },
+      timelineWindow: cached.decodedTimelineWindow()
     )
   }
 

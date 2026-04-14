@@ -71,7 +71,7 @@ extension HarnessMonitorStore {
       scheduleUISync(areas)
     case .selectedSession:
       scheduleUISync([.contentChrome, .contentSessionDetail, .inspector])
-    case .timeline:
+    case .timeline, .timelineWindow, .timelineLoading:
       scheduleUISync([.contentSessionDetail])
     case .inspectorSelection, .actionActorID:
       scheduleUISync([.inspector])
@@ -253,7 +253,9 @@ extension HarnessMonitorStore {
     contentUI.sessionDetail.apply(
       ContentSessionDetailState(
         selectedSessionDetail: selection.matchedSelectedSession,
-        timeline: selection.timeline
+        timeline: selection.timeline,
+        timelineWindow: selection.timelineWindow,
+        isTimelineLoading: selection.isTimelineLoading
       ),
       selectedSessionSummary: selectedSessionSummary
     )

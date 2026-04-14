@@ -337,6 +337,59 @@ public struct TimelineWindowResponse: Codable, Equatable, Sendable {
     self.entries = entries
     self.unchanged = unchanged
   }
+
+  public var pageSize: Int {
+    max(1, windowEnd - windowStart)
+  }
+
+  public var metadataOnly: Self {
+    Self(
+      revision: revision,
+      totalCount: totalCount,
+      windowStart: windowStart,
+      windowEnd: windowEnd,
+      hasOlder: hasOlder,
+      hasNewer: hasNewer,
+      oldestCursor: oldestCursor,
+      newestCursor: newestCursor,
+      entries: nil,
+      unchanged: unchanged
+    )
+  }
+
+  public func replacingEntries(_ entries: [TimelineEntry]?) -> Self {
+    Self(
+      revision: revision,
+      totalCount: totalCount,
+      windowStart: windowStart,
+      windowEnd: windowEnd,
+      hasOlder: hasOlder,
+      hasNewer: hasNewer,
+      oldestCursor: oldestCursor,
+      newestCursor: newestCursor,
+      entries: entries,
+      unchanged: unchanged
+    )
+  }
+
+  public static func fallbackMetadata(for entries: [TimelineEntry]) -> Self {
+    Self(
+      revision: 0,
+      totalCount: entries.count,
+      windowStart: 0,
+      windowEnd: entries.count,
+      hasOlder: false,
+      hasNewer: false,
+      oldestCursor: entries.last.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      newestCursor: entries.first.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      entries: nil,
+      unchanged: false
+    )
+  }
 }
 
 public struct LogLevelResponse: Codable, Equatable, Sendable {

@@ -230,7 +230,10 @@ struct ContentDetailColumn: View {
         detail: contentSessionDetail.presentedSessionDetail,
         summary: contentSession.selectedSessionSummary,
         timeline: contentSessionDetail.presentedTimeline,
+        timelineWindow: contentSessionDetail.presentedTimelineWindow,
         isSessionReadOnly: contentSession.isSessionReadOnly,
+        isSelectionLoading: contentSession.isSelectionLoading,
+        isTimelineLoading: contentSessionDetail.isTimelineLoading,
         isExtensionsLoading: contentSession.isExtensionsLoading
       )
     )

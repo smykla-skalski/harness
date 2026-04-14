@@ -189,6 +189,16 @@ extension SessionCacheService {
     }
   }
 
+  func syncTimelineWindow(
+    _ timelineWindow: TimelineWindowResponse?,
+    on session: CachedSession
+  ) {
+    guard let timelineWindow else {
+      return
+    }
+    session.timelineWindowData = try? Codecs.encoder.encode(timelineWindow.metadataOnly)
+  }
+
   func syncActivity(
     _ activities: [AgentToolActivitySummary],
     on session: CachedSession,

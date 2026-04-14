@@ -80,9 +80,11 @@ extension HarnessMonitorStore {
       case selectedSessionID
       case selectedSession
       case timeline
+      case timelineWindow
       case inspectorSelection
       case actionActorID
       case selectionLoading
+      case timelineLoading
       case extensionsLoading
       case sessionAction
       case inFlightActionID
@@ -107,6 +109,12 @@ extension HarnessMonitorStore {
         onChanged?(.timeline)
       }
     }
+    public var timelineWindow: TimelineWindowResponse? {
+      didSet {
+        guard oldValue != timelineWindow else { return }
+        onChanged?(.timelineWindow)
+      }
+    }
     public var inspectorSelection: InspectorSelection = .none {
       didSet {
         guard oldValue != inspectorSelection else { return }
@@ -123,6 +131,12 @@ extension HarnessMonitorStore {
       didSet {
         guard oldValue != isSelectionLoading else { return }
         onChanged?(.selectionLoading)
+      }
+    }
+    public var isTimelineLoading = false {
+      didSet {
+        guard oldValue != isTimelineLoading else { return }
+        onChanged?(.timelineLoading)
       }
     }
     public var isExtensionsLoading = false {
@@ -291,6 +305,8 @@ extension HarnessMonitorStore {
   public struct ContentSessionDetailState: Equatable {
     public var selectedSessionDetail: SessionDetail?
     public var timeline: [TimelineEntry] = []
+    public var timelineWindow: TimelineWindowResponse?
+    public var isTimelineLoading = false
   }
 
   public struct ContentDashboardState: Equatable {
