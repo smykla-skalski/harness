@@ -934,11 +934,11 @@ pub(crate) fn session_timeline_window(
         _ => timeline::TimelinePayloadScope::Full,
     };
     let entries = session_timeline_with_scope(session_id, payload_scope, db)?;
-    build_timeline_window_response(entries, request)
+    build_timeline_window_response(&entries, request)
 }
 
 fn build_timeline_window_response(
-    entries: Vec<TimelineEntry>,
+    entries: &[TimelineEntry],
     request: &TimelineWindowRequest,
 ) -> Result<TimelineWindowResponse, CliError> {
     let total_count = entries.len();
@@ -951,14 +951,18 @@ fn build_timeline_window_response(
         && request.before.is_none()
         && request.after.is_none()
     {
+        let latest_window_end = limit.min(total_count);
         return Ok(TimelineWindowResponse {
             revision,
             total_count,
             window_start: 0,
-            window_end: total_count,
-            has_older: total_count > limit,
+            window_end: latest_window_end,
+            has_older: latest_window_end < total_count,
             has_newer: false,
-            oldest_cursor: entries.last().map(cursor_from_entry),
+            oldest_cursor: latest_window_end
+                .checked_sub(1)
+                .and_then(|index| entries.get(index))
+                .map(cursor_from_entry),
             newest_cursor: entries.first().map(cursor_from_entry),
             entries: None,
             unchanged: true,
@@ -4511,6 +4515,75 @@ done
                 "claude-leader error: replacement failure"
             );
         });
+    }
+
+    #[test]
+    fn build_timeline_window_response_keeps_latest_window_bounds_when_unchanged() {
+        let entries = vec![
+            TimelineEntry {
+                entry_id: "entry-3".into(),
+                recorded_at: "2026-04-14T10:02:00Z".into(),
+                kind: "tool_result".into(),
+                session_id: "sess-test-1".into(),
+                agent_id: Some("agent-1".into()),
+                task_id: None,
+                summary: "third".into(),
+                payload: serde_json::json!({}),
+            },
+            TimelineEntry {
+                entry_id: "entry-2".into(),
+                recorded_at: "2026-04-14T10:01:00Z".into(),
+                kind: "tool_result".into(),
+                session_id: "sess-test-1".into(),
+                agent_id: Some("agent-1".into()),
+                task_id: None,
+                summary: "second".into(),
+                payload: serde_json::json!({}),
+            },
+            TimelineEntry {
+                entry_id: "entry-1".into(),
+                recorded_at: "2026-04-14T10:00:00Z".into(),
+                kind: "tool_result".into(),
+                session_id: "sess-test-1".into(),
+                agent_id: Some("agent-1".into()),
+                task_id: None,
+                summary: "first".into(),
+                payload: serde_json::json!({}),
+            },
+        ];
+
+        let response = build_timeline_window_response(
+            &entries,
+            &TimelineWindowRequest {
+                scope: Some("summary".into()),
+                limit: Some(2),
+                before: None,
+                after: None,
+                known_revision: Some(3),
+            },
+        )
+        .expect("build unchanged window");
+
+        assert!(response.unchanged);
+        assert_eq!(response.window_start, 0);
+        assert_eq!(response.window_end, 2);
+        assert!(response.has_older);
+        assert!(!response.has_newer);
+        assert_eq!(
+            response.newest_cursor,
+            Some(TimelineCursor {
+                recorded_at: "2026-04-14T10:02:00Z".into(),
+                entry_id: "entry-3".into(),
+            })
+        );
+        assert_eq!(
+            response.oldest_cursor,
+            Some(TimelineCursor {
+                recorded_at: "2026-04-14T10:01:00Z".into(),
+                entry_id: "entry-2".into(),
+            })
+        );
+        assert!(response.entries.is_none());
     }
 
     #[test]
