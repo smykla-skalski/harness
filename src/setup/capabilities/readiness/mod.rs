@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use crate::infra::blocks::BollardContainerRuntime;
+use crate::workspace::dirs_home;
 
 use super::model::{Feature, FeatureInfo, ReadinessReport};
 
@@ -36,7 +37,7 @@ impl CapabilityProbe for SystemProbe {
     }
 
     fn home_dir(&self) -> PathBuf {
-        crate::workspace::dirs_home()
+        dirs_home()
     }
 
     fn command_on_path(&self, command: &str) -> bool {
