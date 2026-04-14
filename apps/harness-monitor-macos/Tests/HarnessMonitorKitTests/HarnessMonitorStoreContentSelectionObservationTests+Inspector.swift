@@ -40,7 +40,8 @@ extension HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.sessionDetail.timeline == PreviewFixtures.timeline)
   }
 
-  @Test("Content session detail presentation retains the current cockpit during same-session reloads")
+  @Test(
+    "Content session detail presentation retains the current cockpit during same-session reloads")
   func contentSessionDetailPresentationRetainsCurrentCockpitDuringSameSessionReloads() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
@@ -48,7 +49,9 @@ extension HarnessMonitorContentSelectionTests {
     store.selectedSession = nil
     store.timeline = []
 
-    #expect(store.contentUI.session.selectedSessionSummary?.sessionId == PreviewFixtures.summary.sessionId)
+    #expect(
+      store.contentUI.session.selectedSessionSummary?.sessionId == PreviewFixtures.summary.sessionId
+    )
     #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
     #expect(store.contentUI.sessionDetail.presentedSessionDetail == PreviewFixtures.detail)
     #expect(store.contentUI.sessionDetail.presentedTimeline == PreviewFixtures.timeline)
