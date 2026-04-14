@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::{Write as _, stderr, stdout};
 use std::iter::once;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bollard::container::LogOutput;
 use bollard::exec::{CreateExecOptions, StartExecOptions};
@@ -388,7 +388,7 @@ impl ContainerRuntime for BollardContainerRuntime {
     }
 
     fn wait_healthy(&self, container: &str, timeout: Duration) -> Result<(), BlockError> {
-        let deadline = std::time::Instant::now() + timeout;
+        let deadline = Instant::now() + timeout;
         loop {
             let details = Self::block_on(
                 &format!("inspect_container {container}"),
@@ -413,7 +413,7 @@ impl ContainerRuntime for BollardContainerRuntime {
                 None if running => return Ok(()),
                 Some(_) | None => {}
             }
-            if std::time::Instant::now() >= deadline {
+            if Instant::now() >= deadline {
                 return Err(BlockError::message(
                     "docker",
                     &format!("wait_healthy {container}"),

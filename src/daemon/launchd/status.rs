@@ -6,6 +6,7 @@ use super::support::{
     launchd_service_target_for,
 };
 use super::{LAUNCH_AGENT_LABEL, LEGACY_LAUNCH_AGENT_LABEL, LaunchAgentStatus};
+use crate::errors::CliError;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct LaunchctlPrintStatus {
@@ -16,7 +17,7 @@ pub(super) struct LaunchctlPrintStatus {
 
 pub(super) fn launch_agent_status_with<F>(runner: &F) -> LaunchAgentStatus
 where
-    F: Fn(&[String]) -> Result<CommandOutput, crate::errors::CliError>,
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
     let current_path = state::launch_agent_path();
     let mut status = launch_agent_status_template(LAUNCH_AGENT_LABEL, &current_path);
@@ -66,7 +67,7 @@ fn launch_agent_status_template(label: &str, path: &Path) -> LaunchAgentStatus {
 
 fn inspect_launch_agent_status<F>(label: &str, path: &Path, runner: &F) -> LaunchAgentStatus
 where
-    F: Fn(&[String]) -> Result<CommandOutput, crate::errors::CliError>,
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
     let mut status = launch_agent_status_template(label, path);
     let args = vec!["print".to_string(), launchd_service_target_for(label)];

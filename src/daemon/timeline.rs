@@ -114,18 +114,7 @@ fn build_timeline(
                 },
             );
         }
-        let (kind, task_id, summary) = transition_summary(&log_entry.transition);
-        let payload = timeline_payload(&log_entry.transition, "session transition", payload_scope)?;
-        entries.push(TimelineEntry {
-            entry_id: format!("log-{}", log_entry.sequence),
-            recorded_at: log_entry.recorded_at,
-            kind: kind.to_string(),
-            session_id: log_entry.session_id,
-            agent_id: log_entry.actor_id,
-            task_id,
-            summary,
-            payload,
-        });
+        entries.push(log_entry_timeline_entry(&log_entry, payload_scope)?);
     }
 
     entries.extend(load_conversation_entries_hybrid(
@@ -248,7 +237,25 @@ fn conversation_entries(
     Ok(entries)
 }
 
-fn checkpoint_entry(
+pub(crate) fn log_entry_timeline_entry(
+    log_entry: &SessionLogEntry,
+    payload_scope: TimelinePayloadScope,
+) -> Result<TimelineEntry, CliError> {
+    let (kind, task_id, summary) = transition_summary(&log_entry.transition);
+    let payload = timeline_payload(&log_entry.transition, "session transition", payload_scope)?;
+    Ok(TimelineEntry {
+        entry_id: format!("log-{}", log_entry.sequence),
+        recorded_at: log_entry.recorded_at.clone(),
+        kind: kind.to_string(),
+        session_id: log_entry.session_id.clone(),
+        agent_id: log_entry.actor_id.clone(),
+        task_id,
+        summary,
+        payload,
+    })
+}
+
+pub(crate) fn checkpoint_entry(
     session_id: &str,
     checkpoint: &TaskCheckpoint,
     payload_scope: TimelinePayloadScope,
@@ -269,7 +276,7 @@ fn checkpoint_entry(
     })
 }
 
-fn conversation_entry(
+pub(crate) fn conversation_entry(
     session_id: &str,
     agent_id: &str,
     runtime: &str,

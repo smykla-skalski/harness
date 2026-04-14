@@ -43,7 +43,8 @@ use super::protocol::{
     ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionExtensionsPayload, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
     SetLogLevelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
+    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineCursor,
+    TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -912,6 +913,102 @@ pub(crate) fn session_timeline_with_scope(
         );
     }
     timeline::session_timeline_with_scope(session_id, payload_scope)
+}
+
+/// Load a session timeline window with metadata for incremental clients.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or timeline sources fail.
+pub(crate) fn session_timeline_window(
+    session_id: &str,
+    request: &TimelineWindowRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<TimelineWindowResponse, CliError> {
+    if let Some(db) = db
+        && let Some(response) = db.load_session_timeline_window(session_id, request)?
+    {
+        return Ok(response);
+    }
+    let payload_scope = match request.scope.as_deref() {
+        Some("summary") => timeline::TimelinePayloadScope::Summary,
+        _ => timeline::TimelinePayloadScope::Full,
+    };
+    let entries = session_timeline_with_scope(session_id, payload_scope, db)?;
+    build_timeline_window_response(entries, request)
+}
+
+fn build_timeline_window_response(
+    entries: Vec<TimelineEntry>,
+    request: &TimelineWindowRequest,
+) -> Result<TimelineWindowResponse, CliError> {
+    let total_count = entries.len();
+    let revision = i64::try_from(total_count).map_err(|error| {
+        CliErrorKind::workflow_parse(format!("timeline revision overflow: {error}"))
+    })?;
+    let limit = request.limit.unwrap_or(total_count).max(1);
+
+    if request.known_revision == Some(revision)
+        && request.before.is_none()
+        && request.after.is_none()
+    {
+        return Ok(TimelineWindowResponse {
+            revision,
+            total_count,
+            window_start: 0,
+            window_end: total_count,
+            has_older: total_count > limit,
+            has_newer: false,
+            oldest_cursor: entries.last().map(cursor_from_entry),
+            newest_cursor: entries.first().map(cursor_from_entry),
+            entries: None,
+            unchanged: true,
+        });
+    }
+
+    let (window_start, window_entries) = if let Some(before) = &request.before {
+        let start = entries
+            .iter()
+            .position(|entry| timeline_cursor_matches(entry, before))
+            .map_or(total_count, |index| index + 1);
+        let end = start.saturating_add(limit).min(total_count);
+        (start, entries[start..end].to_vec())
+    } else if let Some(after) = &request.after {
+        let end = entries
+            .iter()
+            .position(|entry| timeline_cursor_matches(entry, after))
+            .unwrap_or(0);
+        let start = end.saturating_sub(limit);
+        (start, entries[start..end].to_vec())
+    } else {
+        let end = limit.min(total_count);
+        (0, entries[..end].to_vec())
+    };
+
+    let window_end = window_start + window_entries.len();
+
+    Ok(TimelineWindowResponse {
+        revision,
+        total_count,
+        window_start,
+        window_end,
+        has_older: window_end < total_count,
+        has_newer: window_start > 0,
+        oldest_cursor: window_entries.last().map(cursor_from_entry),
+        newest_cursor: window_entries.first().map(cursor_from_entry),
+        entries: Some(window_entries),
+        unchanged: false,
+    })
+}
+
+fn timeline_cursor_matches(entry: &TimelineEntry, cursor: &TimelineCursor) -> bool {
+    entry.entry_id == cursor.entry_id && entry.recorded_at == cursor.recorded_at
+}
+
+fn cursor_from_entry(entry: &TimelineEntry) -> TimelineCursor {
+    TimelineCursor {
+        recorded_at: entry.recorded_at.clone(),
+        entry_id: entry.entry_id.clone(),
+    }
 }
 
 /// Load a lightweight session detail with only in-memory fields.
@@ -4339,6 +4436,79 @@ done
             assert_eq!(
                 db.load_signals(&state.session_id).expect("signals").len(),
                 2
+            );
+        });
+    }
+
+    #[test]
+    fn session_timeline_window_known_revision_reloads_when_visible_rows_change_without_count_change()
+     {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let request = TimelineWindowRequest {
+                scope: Some("summary".into()),
+                limit: Some(20),
+                ..TimelineWindowRequest::default()
+            };
+
+            let first = crate::agents::runtime::event::ConversationEvent {
+                timestamp: Some("2026-04-14T10:00:00Z".into()),
+                sequence: 1,
+                kind: crate::agents::runtime::event::ConversationEventKind::Error {
+                    code: None,
+                    message: "first failure".into(),
+                    recoverable: true,
+                },
+                agent: "claude-leader".into(),
+                session_id: state.session_id.clone(),
+            };
+            db.sync_conversation_events(&state.session_id, "claude-leader", "claude", &[first])
+                .expect("sync first event");
+
+            let initial = session_timeline_window(&state.session_id, &request, Some(&db))
+                .expect("load initial window");
+            assert_eq!(initial.total_count, 1);
+            assert!(!initial.unchanged);
+            let revision = initial.revision;
+
+            let replacement = crate::agents::runtime::event::ConversationEvent {
+                timestamp: Some("2026-04-14T10:00:00Z".into()),
+                sequence: 1,
+                kind: crate::agents::runtime::event::ConversationEventKind::Error {
+                    code: None,
+                    message: "replacement failure".into(),
+                    recoverable: true,
+                },
+                agent: "claude-leader".into(),
+                session_id: state.session_id.clone(),
+            };
+            db.sync_conversation_events(
+                &state.session_id,
+                "claude-leader",
+                "claude",
+                &[replacement],
+            )
+            .expect("sync replacement event");
+
+            let refreshed = session_timeline_window(
+                &state.session_id,
+                &TimelineWindowRequest {
+                    known_revision: Some(revision),
+                    ..request.clone()
+                },
+                Some(&db),
+            )
+            .expect("load refreshed window");
+
+            assert!(
+                !refreshed.unchanged,
+                "same-count timeline edits must not short-circuit as unchanged"
+            );
+            let entries = refreshed.entries.expect("entries");
+            assert_eq!(entries.len(), 1);
+            assert_eq!(
+                entries[0].summary,
+                "claude-leader error: replacement failure"
             );
         });
     }

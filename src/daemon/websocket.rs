@@ -23,12 +23,11 @@ use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
     SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, WsChunkFrame, WsErrorPayload, WsPushEvent,
-    WsRequest, WsResponse, bind_control_plane_actor_value,
+    TaskQueuePolicyRequest, TaskUpdateRequest, TimelineCursor, TimelineWindowRequest, WsChunkFrame,
+    WsErrorPayload, WsPushEvent, WsRequest, WsResponse, bind_control_plane_actor_value,
 };
 use super::read_cache::run_preferred_db_read;
 use super::service;
-use super::timeline::TimelinePayloadScope;
 
 const MAX_INLINE_WS_TEXT_BYTES: usize = 256 * 1024;
 const MAX_SEMANTIC_WS_ARRAY_BATCH_BYTES: usize = 128 * 1024;
@@ -822,10 +821,7 @@ async fn dispatch_session_timeline_query(
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
-    let payload_scope = match extract_string_param(&request.params, "scope").as_deref() {
-        Some("summary") => TimelinePayloadScope::Summary,
-        _ => TimelinePayloadScope::Full,
-    };
+    let timeline_request = timeline_window_request_from_ws(request);
 
     dispatch_query_result(
         &request.id,
@@ -834,12 +830,33 @@ async fn dispatch_session_timeline_query(
             "session timeline",
             {
                 let session_id = session_id.clone();
-                move |db| service::session_timeline_with_scope(&session_id, payload_scope, Some(db))
+                let timeline_request = timeline_request.clone();
+                move |db| service::session_timeline_window(&session_id, &timeline_request, Some(db))
             },
-            || service::session_timeline_with_scope(&session_id, payload_scope, None),
+            || service::session_timeline_window(&session_id, &timeline_request, None),
         )
         .await,
     )
+}
+
+fn timeline_window_request_from_ws(request: &WsRequest) -> TimelineWindowRequest {
+    TimelineWindowRequest {
+        scope: extract_string_param(&request.params, "scope"),
+        limit: extract_u64_param(&request.params, "limit")
+            .and_then(|value| usize::try_from(value).ok()),
+        before: extract_cursor_param(&request.params, "before"),
+        after: extract_cursor_param(&request.params, "after"),
+        known_revision: extract_i64_param(&request.params, "known_revision"),
+    }
+}
+
+fn extract_cursor_param(params: &Value, key: &str) -> Option<TimelineCursor> {
+    let object = params.as_object()?;
+    let cursor = object.get(key)?.as_object()?;
+    Some(TimelineCursor {
+        recorded_at: cursor.get("recorded_at")?.as_str()?.to_string(),
+        entry_id: cursor.get("entry_id")?.as_str()?.to_string(),
+    })
 }
 
 fn dispatch_session_agent_tuis_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -1147,6 +1164,14 @@ fn extract_session_id(params: &Value) -> Option<String> {
 
 fn extract_string_param(params: &Value, key: &str) -> Option<String> {
     params.get(key).and_then(Value::as_str).map(String::from)
+}
+
+fn extract_u64_param(params: &Value, key: &str) -> Option<u64> {
+    params.get(key).and_then(Value::as_u64)
+}
+
+fn extract_i64_param(params: &Value, key: &str) -> Option<i64> {
+    params.get(key).and_then(Value::as_i64)
 }
 
 fn ok_response(request_id: &str, result: Value) -> WsResponse {
@@ -1839,7 +1864,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dispatch_read_query_session_timeline_summary_scope_omits_payloads() {
+    async fn dispatch_read_query_session_timeline_summary_scope_returns_window_metadata() {
         let state = test_http_state_with_db();
         let db = state.db.get().expect("db slot").clone();
         {
@@ -1869,8 +1894,11 @@ mod tests {
 
         assert!(response.error.is_none());
         let result = response.result.expect("timeline response");
-        let Value::Array(entries) = result else {
-            panic!("expected timeline array response");
+        assert_eq!(result["revision"].as_i64(), Some(1));
+        assert_eq!(result["total_count"].as_u64(), Some(1));
+        assert_eq!(result["unchanged"].as_bool(), Some(false));
+        let Value::Array(entries) = result["entries"].clone() else {
+            panic!("expected timeline entries array response");
         };
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["kind"].as_str(), Some("tool_result"));

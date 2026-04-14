@@ -14,7 +14,7 @@ use super::refresh::{emit_watch_changes, refresh_watch_snapshot};
 use super::state::{
     PendingWatchPaths, RefreshScope, RuntimeSessionResolveCache, WatchChanges, WatchSnapshot,
 };
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{DaemonDb, session_id_from_change_scope};
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 
@@ -180,7 +180,7 @@ pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> 
         *last_change_seq = change_seq;
         if scope == "global" {
             changes.sessions_updated = true;
-        } else if let Some(session_id) = crate::daemon::db::session_id_from_change_scope(&scope) {
+        } else if let Some(session_id) = session_id_from_change_scope(&scope) {
             changes.session_ids.insert(session_id.to_string());
         }
     }

@@ -5,7 +5,8 @@ use std::io::{Error as IoError, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use rusqlite::{Connection, types::Type};
+use rusqlite::{Connection, OptionalExtension, types::Type};
+use sha2::{Digest, Sha256};
 
 use crate::agents::runtime::event::ConversationEvent;
 use crate::agents::runtime::signal::Signal;
@@ -13,7 +14,10 @@ use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
 use crate::daemon::index::DiscoveredProject;
-use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::protocol::{
+    CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineCursor, TimelineEntry,
+    TimelineWindowRequest, TimelineWindowResponse,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
@@ -75,13 +79,65 @@ struct PreparedConversationEventImport {
     events: Vec<ConversationEvent>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StoredTimelineEntry {
+    session_id: String,
+    entry_id: String,
+    source_kind: String,
+    source_key: String,
+    recorded_at: String,
+    kind: String,
+    agent_id: Option<String>,
+    task_id: Option<String>,
+    summary: String,
+    payload_json: String,
+    sort_recorded_at: String,
+    sort_tiebreaker: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SessionTimelineStateRow {
+    session_id: String,
+    revision: i64,
+    entry_count: usize,
+    newest_recorded_at: Option<String>,
+    oldest_recorded_at: Option<String>,
+    integrity_hash: String,
+    updated_at: String,
+}
+
+impl StoredTimelineEntry {
+    fn into_timeline_entry(
+        self,
+        payload_scope: super::timeline::TimelinePayloadScope,
+    ) -> Result<TimelineEntry, CliError> {
+        let payload = if payload_scope == super::timeline::TimelinePayloadScope::Summary {
+            serde_json::Value::Object(serde_json::Map::new())
+        } else {
+            serde_json::from_str(&self.payload_json).map_err(|error| {
+                db_error(format!("parse timeline payload {}: {error}", self.entry_id))
+            })?
+        };
+        Ok(TimelineEntry {
+            entry_id: self.entry_id,
+            recorded_at: self.recorded_at,
+            kind: self.kind,
+            session_id: self.session_id,
+            agent_id: self.agent_id,
+            task_id: self.task_id,
+            summary: self.summary,
+            payload,
+        })
+    }
+}
+
 impl fmt::Debug for DaemonDb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DaemonDb").finish_non_exhaustive()
     }
 }
 
-const SCHEMA_VERSION: &str = "6";
+const SCHEMA_VERSION: &str = "7";
 
 impl DaemonDb {
     /// Open (or create) the daemon database at the given path with WAL mode
@@ -154,6 +210,7 @@ impl DaemonDb {
                 migrate_v3_to_v4(&self.conn)?;
                 migrate_v4_to_v5(&self.conn)?;
                 migrate_v5_to_v6(&self.conn)?;
+                migrate_v6_to_v7(&self.conn)?;
                 reclaimed
             }
             "2" => {
@@ -161,21 +218,29 @@ impl DaemonDb {
                 migrate_v3_to_v4(&self.conn)?;
                 migrate_v4_to_v5(&self.conn)?;
                 migrate_v5_to_v6(&self.conn)?;
+                migrate_v6_to_v7(&self.conn)?;
                 reclaimed
             }
             "3" => {
                 migrate_v3_to_v4(&self.conn)?;
                 migrate_v4_to_v5(&self.conn)?;
                 migrate_v5_to_v6(&self.conn)?;
+                migrate_v6_to_v7(&self.conn)?;
                 false
             }
             "4" => {
                 migrate_v4_to_v5(&self.conn)?;
                 migrate_v5_to_v6(&self.conn)?;
+                migrate_v6_to_v7(&self.conn)?;
                 false
             }
             "5" => {
                 migrate_v5_to_v6(&self.conn)?;
+                migrate_v6_to_v7(&self.conn)?;
+                false
+            }
+            "6" => {
+                migrate_v6_to_v7(&self.conn)?;
                 false
             }
             _ => false,
@@ -306,11 +371,127 @@ impl DaemonDb {
 
         replace_agents(&transaction, &state.session_id, &state.agents)?;
         replace_tasks(&transaction, &state.session_id, &state.tasks)?;
+        transaction
+            .execute(
+                "INSERT INTO session_timeline_state (
+                    session_id, revision, entry_count, newest_recorded_at,
+                    oldest_recorded_at, integrity_hash, updated_at
+                ) VALUES (?1, 0, 0, NULL, NULL, '', ?2)
+                ON CONFLICT(session_id) DO NOTHING",
+                rusqlite::params![state.session_id, state.updated_at],
+            )
+            .map_err(|error| db_error(format!("ensure session timeline state: {error}")))?;
 
         transaction
             .commit()
             .map_err(|error| db_error(format!("commit session sync: {error}")))?;
         Ok(())
+    }
+
+    /// Load a canonical timeline window from the ledger when it has been built.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or deserialization failures.
+    pub(crate) fn load_session_timeline_window(
+        &self,
+        session_id: &str,
+        request: &TimelineWindowRequest,
+    ) -> Result<Option<TimelineWindowResponse>, CliError> {
+        let Some(state) = self.load_session_timeline_state(session_id)? else {
+            return Ok(None);
+        };
+
+        let payload_scope = match request.scope.as_deref() {
+            Some("summary") => super::timeline::TimelinePayloadScope::Summary,
+            _ => super::timeline::TimelinePayloadScope::Full,
+        };
+        let limit = request.limit.unwrap_or(state.entry_count).max(1);
+        let latest_window_end = state.entry_count.min(limit);
+
+        if request.known_revision == Some(state.revision)
+            && request.before.is_none()
+            && request.after.is_none()
+        {
+            return Ok(Some(TimelineWindowResponse {
+                revision: state.revision,
+                total_count: state.entry_count,
+                window_start: 0,
+                window_end: latest_window_end,
+                has_older: latest_window_end < state.entry_count,
+                has_newer: false,
+                oldest_cursor: self
+                    .load_timeline_cursor_at_offset(session_id, latest_window_end.checked_sub(1))?,
+                newest_cursor: self.load_timeline_cursor_at_offset(session_id, Some(0))?,
+                entries: None,
+                unchanged: true,
+            }));
+        }
+
+        let window_start = if let Some(before) = &request.before {
+            self.load_timeline_cursor_offset(session_id, before)?
+                .map_or(state.entry_count, |offset| offset.saturating_add(1))
+        } else if let Some(after) = &request.after {
+            self.load_timeline_cursor_offset(session_id, after)?
+                .unwrap_or(0)
+                .saturating_sub(limit)
+        } else {
+            0
+        };
+        let window_rows = if let Some(after) = &request.after {
+            let window_end = self
+                .load_timeline_cursor_offset(session_id, after)?
+                .unwrap_or(0);
+            let window_start = window_end.saturating_sub(limit);
+            self.load_timeline_entries_range(session_id, window_start, window_end - window_start)?
+        } else {
+            self.load_timeline_entries_range(
+                session_id,
+                window_start,
+                state.entry_count.saturating_sub(window_start).min(limit),
+            )?
+        };
+        let entries = window_rows
+            .into_iter()
+            .map(|row| row.into_timeline_entry(payload_scope))
+            .collect::<Result<Vec<_>, _>>()?;
+        let window_end = window_start + entries.len();
+
+        Ok(Some(TimelineWindowResponse {
+            revision: state.revision,
+            total_count: state.entry_count,
+            window_start,
+            window_end,
+            has_older: window_end < state.entry_count,
+            has_newer: window_start > 0,
+            oldest_cursor: entries.last().map(cursor_from_timeline_entry),
+            newest_cursor: entries.first().map(cursor_from_timeline_entry),
+            entries: Some(entries),
+            unchanged: false,
+        }))
+    }
+
+    /// Rebuild the canonical timeline ledger from the current resolved session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when timeline materialization or SQL writes fail.
+    pub(crate) fn rebuild_session_timeline_from_resolved(
+        &self,
+        resolved: &super::index::ResolvedSession,
+    ) -> Result<(), CliError> {
+        let entries = super::timeline::session_timeline_from_resolved_with_db_scope(
+            resolved,
+            self,
+            super::timeline::TimelinePayloadScope::Full,
+        )?;
+        let stored_entries = entries
+            .iter()
+            .map(stored_timeline_entry_for_rebuild)
+            .collect::<Result<Vec<_>, _>>()?;
+        replace_all_session_timeline_entries(
+            &self.conn,
+            &resolved.state.session_id,
+            &stored_entries,
+        )
     }
 
     /// Append a session log entry.
@@ -321,8 +502,16 @@ impl DaemonDb {
         let transition_json = serde_json::to_string(&entry.transition)
             .map_err(|error| db_error(format!("serialize log transition: {error}")))?;
         let transition_kind = extract_transition_kind(&transition_json);
+        let timeline_entry = super::timeline::log_entry_timeline_entry(
+            entry,
+            super::timeline::TimelinePayloadScope::Full,
+        )?;
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin append log transaction: {error}")))?;
         let sequence = if entry.sequence == 0 {
-            self.conn
+            transaction
                 .query_row(
                     "SELECT COALESCE(MAX(sequence), 0) + 1 FROM session_log WHERE session_id = ?1",
                     [&entry.session_id],
@@ -333,7 +522,7 @@ impl DaemonDb {
             entry.sequence
         };
 
-        self.conn
+        let inserted = transaction
             .execute(
                 "INSERT OR IGNORE INTO session_log (
                     session_id, sequence, recorded_at, transition_kind,
@@ -350,6 +539,15 @@ impl DaemonDb {
                 ],
             )
             .map_err(|error| db_error(format!("append log entry: {error}")))?;
+        if inserted > 0 {
+            upsert_session_timeline_entry(
+                &transaction,
+                &stored_timeline_entry("log", format!("log:{sequence}"), &timeline_entry)?,
+            )?;
+        }
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit append log transaction: {error}")))?;
         Ok(())
     }
 
@@ -362,7 +560,11 @@ impl DaemonDb {
         session_id: &str,
         checkpoint: &TaskCheckpoint,
     ) -> Result<(), CliError> {
-        self.conn
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin append checkpoint transaction: {error}")))?;
+        let inserted = transaction
             .execute(
                 "INSERT OR IGNORE INTO task_checkpoints (
                     checkpoint_id, task_id, session_id, recorded_at,
@@ -379,6 +581,24 @@ impl DaemonDb {
                 ],
             )
             .map_err(|error| db_error(format!("append checkpoint: {error}")))?;
+        if inserted > 0 {
+            let entry = super::timeline::checkpoint_entry(
+                session_id,
+                checkpoint,
+                super::timeline::TimelinePayloadScope::Full,
+            )?;
+            upsert_session_timeline_entry(
+                &transaction,
+                &stored_timeline_entry(
+                    "checkpoint",
+                    format!("checkpoint:{}", checkpoint.checkpoint_id),
+                    &entry,
+                )?,
+            )?;
+        }
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit append checkpoint transaction: {error}")))?;
         Ok(())
     }
 
@@ -1083,6 +1303,22 @@ impl DaemonDb {
         runtime: &str,
         events: &[ConversationEvent],
     ) -> Result<(), CliError> {
+        let mut timeline_rows = Vec::new();
+        for event in events {
+            if let Some(entry) = super::timeline::conversation_entry(
+                session_id,
+                agent_id,
+                runtime,
+                event,
+                super::timeline::TimelinePayloadScope::Full,
+            )? {
+                timeline_rows.push(stored_timeline_entry(
+                    "conversation",
+                    format!("conversation:{agent_id}:{}", event.sequence),
+                    &entry,
+                )?);
+            }
+        }
         let transaction = self
             .conn
             .unchecked_transaction()
@@ -1122,6 +1358,14 @@ impl DaemonDb {
             }
         }
 
+        replace_session_timeline_entries_for_prefix(
+            &transaction,
+            session_id,
+            "conversation",
+            &format!("conversation:{agent_id}:"),
+            &timeline_rows,
+        )?;
+
         transaction
             .commit()
             .map_err(|error| db_error(format!("commit conversation event sync: {error}")))?;
@@ -1160,6 +1404,124 @@ impl DaemonDb {
             }
         }
         Ok(events)
+    }
+
+    fn load_session_timeline_state(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionTimelineStateRow>, CliError> {
+        self.conn
+            .query_row(
+                "SELECT session_id, revision, entry_count, newest_recorded_at,
+                        oldest_recorded_at, integrity_hash, updated_at
+                 FROM session_timeline_state
+                 WHERE session_id = ?1",
+                [session_id],
+                |row| {
+                    Ok(SessionTimelineStateRow {
+                        session_id: row.get(0)?,
+                        revision: row.get(1)?,
+                        entry_count: row.get::<_, i64>(2).map(usize_from_i64)?,
+                        newest_recorded_at: row.get(3)?,
+                        oldest_recorded_at: row.get(4)?,
+                        integrity_hash: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| db_error(format!("load session timeline state: {error}")))
+    }
+
+    fn load_timeline_cursor_offset(
+        &self,
+        session_id: &str,
+        cursor: &TimelineCursor,
+    ) -> Result<Option<usize>, CliError> {
+        let exists = self
+            .conn
+            .query_row(
+                "SELECT 1
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1
+                   AND sort_recorded_at = ?2
+                   AND sort_tiebreaker = ?3",
+                rusqlite::params![session_id, cursor.recorded_at, cursor.entry_id],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(|error| db_error(format!("check timeline cursor: {error}")))?;
+        if exists.is_none() {
+            return Ok(None);
+        }
+
+        self.conn
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1
+                   AND (
+                       sort_recorded_at > ?2
+                       OR (sort_recorded_at = ?2 AND sort_tiebreaker > ?3)
+                   )",
+                rusqlite::params![session_id, cursor.recorded_at, cursor.entry_id],
+                |row| row.get::<_, i64>(0).map(usize_from_i64),
+            )
+            .map(Some)
+            .map_err(|error| db_error(format!("load timeline cursor offset: {error}")))
+    }
+
+    fn load_timeline_entries_range(
+        &self,
+        session_id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<StoredTimelineEntry>, CliError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                        agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1
+                 ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC
+                 LIMIT ?2 OFFSET ?3",
+            )
+            .map_err(|error| db_error(format!("prepare timeline range: {error}")))?;
+        let rows = statement
+            .query_map(
+                rusqlite::params![
+                    session_id,
+                    i64::try_from(limit).unwrap_or(i64::MAX),
+                    i64::try_from(offset).unwrap_or(i64::MAX)
+                ],
+                stored_timeline_entry_from_row,
+            )
+            .map_err(|error| db_error(format!("query timeline range: {error}")))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read timeline range row: {error}")))
+    }
+
+    fn load_timeline_cursor_at_offset(
+        &self,
+        session_id: &str,
+        offset: Option<usize>,
+    ) -> Result<Option<TimelineCursor>, CliError> {
+        let Some(offset) = offset else {
+            return Ok(None);
+        };
+        self.load_timeline_entries_range(session_id, offset, 1)
+            .map(|mut entries| {
+                entries.pop().map(|entry| TimelineCursor {
+                    recorded_at: entry.recorded_at,
+                    entry_id: entry.entry_id,
+                })
+            })
     }
 
     /// Cache agent activity summaries for a session.
@@ -1433,6 +1795,8 @@ impl DaemonDb {
                 &import.events,
             )?;
         }
+
+        self.rebuild_session_timeline_from_resolved(&prepared.resolved)?;
 
         self.bump_change(&prepared.resolved.state.session_id)?;
         self.bump_change("global")?;
@@ -2266,6 +2630,52 @@ fn migrate_v5_to_v6(conn: &Connection) -> Result<(), CliError> {
     Ok(())
 }
 
+fn migrate_v6_to_v7(conn: &Connection) -> Result<(), CliError> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS session_timeline_entries (
+             session_id       TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+             entry_id         TEXT NOT NULL,
+             source_kind      TEXT NOT NULL,
+             source_key       TEXT NOT NULL,
+             recorded_at      TEXT NOT NULL,
+             kind             TEXT NOT NULL,
+             agent_id         TEXT,
+             task_id          TEXT,
+             summary          TEXT NOT NULL,
+             payload_json     TEXT NOT NULL,
+             sort_recorded_at TEXT NOT NULL,
+             sort_tiebreaker  TEXT NOT NULL,
+             PRIMARY KEY (session_id, source_kind, source_key)
+         ) WITHOUT ROWID;
+         CREATE UNIQUE INDEX IF NOT EXISTS idx_session_timeline_entries_entry_id
+             ON session_timeline_entries(session_id, entry_id);
+         CREATE INDEX IF NOT EXISTS idx_session_timeline_entries_session_sort
+             ON session_timeline_entries(session_id, sort_recorded_at DESC, sort_tiebreaker DESC);
+         CREATE TABLE IF NOT EXISTS session_timeline_state (
+             session_id          TEXT PRIMARY KEY REFERENCES sessions(session_id) ON DELETE CASCADE,
+             revision            INTEGER NOT NULL DEFAULT 0,
+             entry_count         INTEGER NOT NULL DEFAULT 0,
+             newest_recorded_at  TEXT,
+             oldest_recorded_at  TEXT,
+             integrity_hash      TEXT NOT NULL DEFAULT '',
+             updated_at          TEXT NOT NULL
+         ) WITHOUT ROWID;
+         INSERT OR IGNORE INTO session_timeline_state (
+             session_id, revision, entry_count, newest_recorded_at,
+             oldest_recorded_at, integrity_hash, updated_at
+         )
+         SELECT session_id, 0, 0, NULL, NULL, '', updated_at
+         FROM sessions;",
+    )
+    .map_err(|error| db_error(format!("migrate v6 -> v7 timeline ledger: {error}")))?;
+    conn.execute(
+        "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
+        [SCHEMA_VERSION],
+    )
+    .map_err(|error| db_error(format!("bump schema version to v7: {error}")))?;
+    Ok(())
+}
+
 fn reclaim_unused_pages(conn: &Connection) -> Result<(), CliError> {
     conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;")
         .map_err(|error| db_error(format!("reclaim unused database pages: {error}")))
@@ -2493,6 +2903,417 @@ fn usize_from_i64(value: i64) -> usize {
     usize::try_from(value).unwrap_or(0)
 }
 
+fn stored_timeline_entry(
+    source_kind: &str,
+    source_key: String,
+    entry: &TimelineEntry,
+) -> Result<StoredTimelineEntry, CliError> {
+    Ok(StoredTimelineEntry {
+        session_id: entry.session_id.clone(),
+        entry_id: entry.entry_id.clone(),
+        source_kind: source_kind.to_string(),
+        source_key,
+        recorded_at: entry.recorded_at.clone(),
+        kind: entry.kind.clone(),
+        agent_id: entry.agent_id.clone(),
+        task_id: entry.task_id.clone(),
+        summary: entry.summary.clone(),
+        payload_json: serde_json::to_string(&entry.payload)
+            .map_err(|error| db_error(format!("serialize timeline payload: {error}")))?,
+        sort_recorded_at: entry.recorded_at.clone(),
+        sort_tiebreaker: entry.entry_id.clone(),
+    })
+}
+
+fn stored_timeline_entry_for_rebuild(
+    entry: &TimelineEntry,
+) -> Result<StoredTimelineEntry, CliError> {
+    let (source_kind, source_key) = timeline_source_identity(entry);
+    stored_timeline_entry(source_kind, source_key, entry)
+}
+
+fn timeline_source_identity(entry: &TimelineEntry) -> (&'static str, String) {
+    if let Some(sequence) = entry.entry_id.strip_prefix("log-") {
+        return ("log", format!("log:{sequence}"));
+    }
+    if entry.kind == "task_checkpoint" {
+        return ("checkpoint", format!("checkpoint:{}", entry.entry_id));
+    }
+    if let Some(signal_id) = entry.entry_id.strip_prefix("signal-ack-") {
+        return ("signal_ack", format!("signal_ack:{signal_id}"));
+    }
+    if let Some(observe_id) = entry.entry_id.strip_prefix("observe-snapshot-") {
+        return ("observe", format!("observe:{observe_id}"));
+    }
+    if matches!(
+        entry.kind.as_str(),
+        "tool_invocation"
+            | "tool_result"
+            | "tool_result_error"
+            | "agent_error"
+            | "signal_received"
+            | "agent_state_change"
+            | "file_modification"
+            | "agent_session_marker"
+    ) {
+        if let Some(agent_id) = entry.agent_id.as_deref()
+            && let Some((_, sequence)) = entry.entry_id.rsplit_once('-')
+        {
+            return (
+                "conversation",
+                format!("conversation:{agent_id}:{sequence}"),
+            );
+        }
+    }
+    ("derived", entry.entry_id.clone())
+}
+
+fn stored_timeline_entry_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<StoredTimelineEntry> {
+    Ok(StoredTimelineEntry {
+        session_id: row.get(0)?,
+        entry_id: row.get(1)?,
+        source_kind: row.get(2)?,
+        source_key: row.get(3)?,
+        recorded_at: row.get(4)?,
+        kind: row.get(5)?,
+        agent_id: row.get(6)?,
+        task_id: row.get(7)?,
+        summary: row.get(8)?,
+        payload_json: row.get(9)?,
+        sort_recorded_at: row.get(10)?,
+        sort_tiebreaker: row.get(11)?,
+    })
+}
+
+fn cursor_from_timeline_entry(entry: &TimelineEntry) -> TimelineCursor {
+    TimelineCursor {
+        recorded_at: entry.recorded_at.clone(),
+        entry_id: entry.entry_id.clone(),
+    }
+}
+
+fn replace_all_session_timeline_entries(
+    conn: &Connection,
+    session_id: &str,
+    entries: &[StoredTimelineEntry],
+) -> Result<(), CliError> {
+    let (current_revision, current_hash, current_count): (i64, String, usize) = conn
+        .query_row(
+            "SELECT revision, integrity_hash, entry_count
+             FROM session_timeline_state
+             WHERE session_id = ?1",
+            [session_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get::<_, i64>(2).map(usize_from_i64)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| db_error(format!("load timeline state for replace: {error}")))?
+        .unwrap_or((0, String::new(), 0));
+    let next_hash = timeline_integrity_hash(entries);
+    if current_hash == next_hash && current_count == entries.len() {
+        return Ok(());
+    }
+
+    let transaction = conn
+        .unchecked_transaction()
+        .map_err(|error| db_error(format!("begin timeline replace transaction: {error}")))?;
+    transaction
+        .execute(
+            "DELETE FROM session_timeline_entries WHERE session_id = ?1",
+            [session_id],
+        )
+        .map_err(|error| db_error(format!("clear timeline entries: {error}")))?;
+    insert_session_timeline_entries(&transaction, entries)?;
+    persist_session_timeline_state(
+        &transaction,
+        session_id,
+        current_revision + 1,
+        Some(next_hash),
+    )?;
+    transaction
+        .commit()
+        .map_err(|error| db_error(format!("commit timeline replace transaction: {error}")))?;
+    Ok(())
+}
+
+fn upsert_session_timeline_entry(
+    transaction: &Connection,
+    entry: &StoredTimelineEntry,
+) -> Result<(), CliError> {
+    let existing = load_timeline_entries_for_source_key(
+        transaction,
+        &entry.session_id,
+        &entry.source_kind,
+        &entry.source_key,
+    )?;
+    if existing.len() == 1 && existing[0] == *entry {
+        return Ok(());
+    }
+
+    transaction
+        .execute(
+            "INSERT INTO session_timeline_entries (
+                session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            ON CONFLICT(session_id, source_kind, source_key) DO UPDATE SET
+                entry_id = excluded.entry_id,
+                recorded_at = excluded.recorded_at,
+                kind = excluded.kind,
+                agent_id = excluded.agent_id,
+                task_id = excluded.task_id,
+                summary = excluded.summary,
+                payload_json = excluded.payload_json,
+                sort_recorded_at = excluded.sort_recorded_at,
+                sort_tiebreaker = excluded.sort_tiebreaker",
+            rusqlite::params![
+                entry.session_id,
+                entry.entry_id,
+                entry.source_kind,
+                entry.source_key,
+                entry.recorded_at,
+                entry.kind,
+                entry.agent_id,
+                entry.task_id,
+                entry.summary,
+                entry.payload_json,
+                entry.sort_recorded_at,
+                entry.sort_tiebreaker,
+            ],
+        )
+        .map_err(|error| db_error(format!("upsert timeline entry: {error}")))?;
+    let current_revision = load_session_timeline_revision(transaction, &entry.session_id)?;
+    persist_session_timeline_state(transaction, &entry.session_id, current_revision + 1, None)
+}
+
+fn replace_session_timeline_entries_for_prefix(
+    transaction: &Connection,
+    session_id: &str,
+    source_kind: &str,
+    source_prefix: &str,
+    entries: &[StoredTimelineEntry],
+) -> Result<(), CliError> {
+    let existing = load_timeline_entries_for_source_prefix(
+        transaction,
+        session_id,
+        source_kind,
+        source_prefix,
+    )?;
+    if existing == entries {
+        return Ok(());
+    }
+
+    transaction
+        .execute(
+            "DELETE FROM session_timeline_entries
+             WHERE session_id = ?1
+               AND source_kind = ?2
+               AND source_key LIKE ?3",
+            rusqlite::params![session_id, source_kind, format!("{source_prefix}%")],
+        )
+        .map_err(|error| db_error(format!("delete timeline source entries: {error}")))?;
+    insert_session_timeline_entries(transaction, entries)?;
+    let current_revision = load_session_timeline_revision(transaction, session_id)?;
+    persist_session_timeline_state(transaction, session_id, current_revision + 1, None)
+}
+
+fn insert_session_timeline_entries(
+    transaction: &Connection,
+    entries: &[StoredTimelineEntry],
+) -> Result<(), CliError> {
+    let mut statement = transaction
+        .prepare(
+            "INSERT INTO session_timeline_entries (
+                session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        )
+        .map_err(|error| db_error(format!("prepare timeline insert: {error}")))?;
+    for entry in entries {
+        statement
+            .execute(rusqlite::params![
+                entry.session_id,
+                entry.entry_id,
+                entry.source_kind,
+                entry.source_key,
+                entry.recorded_at,
+                entry.kind,
+                entry.agent_id,
+                entry.task_id,
+                entry.summary,
+                entry.payload_json,
+                entry.sort_recorded_at,
+                entry.sort_tiebreaker,
+            ])
+            .map_err(|error| db_error(format!("insert timeline entry: {error}")))?;
+    }
+    Ok(())
+}
+
+fn load_timeline_entries_for_source_prefix(
+    conn: &Connection,
+    session_id: &str,
+    source_kind: &str,
+    source_prefix: &str,
+) -> Result<Vec<StoredTimelineEntry>, CliError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                    agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+             FROM session_timeline_entries
+             WHERE session_id = ?1
+               AND source_kind = ?2
+               AND source_key LIKE ?3
+             ORDER BY source_key",
+        )
+        .map_err(|error| db_error(format!("prepare timeline source load: {error}")))?;
+    let rows = statement
+        .query_map(
+            rusqlite::params![session_id, source_kind, format!("{source_prefix}%")],
+            stored_timeline_entry_from_row,
+        )
+        .map_err(|error| db_error(format!("query timeline source load: {error}")))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| db_error(format!("read timeline source row: {error}")))
+}
+
+fn load_timeline_entries_for_source_key(
+    conn: &Connection,
+    session_id: &str,
+    source_kind: &str,
+    source_key: &str,
+) -> Result<Vec<StoredTimelineEntry>, CliError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                    agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+             FROM session_timeline_entries
+             WHERE session_id = ?1
+               AND source_kind = ?2
+               AND source_key = ?3",
+        )
+        .map_err(|error| db_error(format!("prepare timeline source key load: {error}")))?;
+    let rows = statement
+        .query_map(
+            rusqlite::params![session_id, source_kind, source_key],
+            stored_timeline_entry_from_row,
+        )
+        .map_err(|error| db_error(format!("query timeline source key load: {error}")))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| db_error(format!("read timeline source key row: {error}")))
+}
+
+fn load_session_timeline_revision(conn: &Connection, session_id: &str) -> Result<i64, CliError> {
+    conn.query_row(
+        "SELECT revision FROM session_timeline_state WHERE session_id = ?1",
+        [session_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|error| db_error(format!("load session timeline revision: {error}")))?
+    .map_or(Ok(0), Ok)
+}
+
+fn persist_session_timeline_state(
+    transaction: &Connection,
+    session_id: &str,
+    revision: i64,
+    integrity_hash: Option<String>,
+) -> Result<(), CliError> {
+    let entries = load_all_session_timeline_entries(transaction, session_id)?;
+    let integrity_hash = integrity_hash.unwrap_or_else(|| timeline_integrity_hash(&entries));
+    let entry_count = entries.len();
+    let newest_recorded_at = entries.first().map(|entry| entry.recorded_at.clone());
+    let oldest_recorded_at = entries.last().map(|entry| entry.recorded_at.clone());
+
+    transaction
+        .execute(
+            "INSERT INTO session_timeline_state (
+                session_id, revision, entry_count, newest_recorded_at,
+                oldest_recorded_at, integrity_hash, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(session_id) DO UPDATE SET
+                revision = excluded.revision,
+                entry_count = excluded.entry_count,
+                newest_recorded_at = excluded.newest_recorded_at,
+                oldest_recorded_at = excluded.oldest_recorded_at,
+                integrity_hash = excluded.integrity_hash,
+                updated_at = excluded.updated_at",
+            rusqlite::params![
+                session_id,
+                revision,
+                i64::try_from(entry_count).unwrap_or(i64::MAX),
+                newest_recorded_at,
+                oldest_recorded_at,
+                integrity_hash,
+                utc_now(),
+            ],
+        )
+        .map_err(|error| db_error(format!("persist session timeline state: {error}")))?;
+    Ok(())
+}
+
+fn load_all_session_timeline_entries(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<Vec<StoredTimelineEntry>, CliError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                    agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+             FROM session_timeline_entries
+             WHERE session_id = ?1
+             ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC",
+        )
+        .map_err(|error| db_error(format!("prepare timeline load: {error}")))?;
+    let rows = statement
+        .query_map([session_id], stored_timeline_entry_from_row)
+        .map_err(|error| db_error(format!("query timeline load: {error}")))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| db_error(format!("read timeline row: {error}")))
+}
+
+fn timeline_integrity_hash(entries: &[StoredTimelineEntry]) -> String {
+    let mut ordered = entries.to_vec();
+    ordered.sort_by(|left, right| {
+        right
+            .sort_recorded_at
+            .cmp(&left.sort_recorded_at)
+            .then_with(|| right.sort_tiebreaker.cmp(&left.sort_tiebreaker))
+    });
+    let mut hasher = Sha256::new();
+    for entry in ordered {
+        hasher.update(entry.session_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.entry_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.source_kind.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.source_key.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.recorded_at.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.kind.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.agent_id.as_deref().unwrap_or("").as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.task_id.as_deref().unwrap_or("").as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.summary.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(entry.payload_json.as_bytes());
+        hasher.update(b"\n");
+    }
+    hex::encode(hasher.finalize())
+}
+
 fn replace_agents(
     transaction: &Connection,
     session_id: &str,
@@ -2648,7 +3469,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '6');
+INSERT INTO schema_meta (key, value) VALUES ('version', '7');
 
 -- Discovered projects
 CREATE TABLE projects (
@@ -2816,6 +3637,38 @@ CREATE INDEX idx_conv_events_session ON conversation_events(session_id);
 CREATE INDEX idx_conv_events_agent ON conversation_events(session_id, agent_id);
 CREATE UNIQUE INDEX idx_conv_events_identity
     ON conversation_events(session_id, agent_id, sequence);
+
+-- Canonical session timeline ledger
+CREATE TABLE session_timeline_entries (
+    session_id       TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    entry_id         TEXT NOT NULL,
+    source_kind      TEXT NOT NULL,
+    source_key       TEXT NOT NULL,
+    recorded_at      TEXT NOT NULL,
+    kind             TEXT NOT NULL,
+    agent_id         TEXT,
+    task_id          TEXT,
+    summary          TEXT NOT NULL,
+    payload_json     TEXT NOT NULL,
+    sort_recorded_at TEXT NOT NULL,
+    sort_tiebreaker  TEXT NOT NULL,
+    PRIMARY KEY (session_id, source_kind, source_key)
+) WITHOUT ROWID;
+
+CREATE UNIQUE INDEX idx_session_timeline_entries_entry_id
+    ON session_timeline_entries(session_id, entry_id);
+CREATE INDEX idx_session_timeline_entries_session_sort
+    ON session_timeline_entries(session_id, sort_recorded_at DESC, sort_tiebreaker DESC);
+
+CREATE TABLE session_timeline_state (
+    session_id          TEXT PRIMARY KEY REFERENCES sessions(session_id) ON DELETE CASCADE,
+    revision            INTEGER NOT NULL DEFAULT 0,
+    entry_count         INTEGER NOT NULL DEFAULT 0,
+    newest_recorded_at  TEXT,
+    oldest_recorded_at  TEXT,
+    integrity_hash      TEXT NOT NULL DEFAULT '',
+    updated_at          TEXT NOT NULL
+) WITHOUT ROWID;
 
 -- Cached agent activity summaries (computed from transcript files)
 CREATE TABLE agent_activity_cache (
@@ -3023,6 +3876,89 @@ mod tests {
     }
 
     #[test]
+    fn migrates_v6_schema_to_timeline_ledger() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let path = tmp.path().join("harness.db");
+        {
+            let conn = Connection::open(&path).expect("open sqlite");
+            conn.execute_batch(
+                "CREATE TABLE schema_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                ) WITHOUT ROWID;
+                INSERT INTO schema_meta (key, value) VALUES ('version', '6');
+                CREATE TABLE projects (
+                    project_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    project_dir TEXT,
+                    repository_root TEXT,
+                    checkout_id TEXT NOT NULL,
+                    checkout_name TEXT NOT NULL,
+                    context_root TEXT NOT NULL UNIQUE,
+                    is_worktree INTEGER NOT NULL DEFAULT 0,
+                    worktree_name TEXT,
+                    origin_json TEXT,
+                    discovered_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                ) WITHOUT ROWID;
+                CREATE TABLE sessions (
+                    session_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL REFERENCES projects(project_id),
+                    schema_version INTEGER NOT NULL,
+                    state_version INTEGER NOT NULL DEFAULT 0,
+                    title TEXT NOT NULL DEFAULT '',
+                    context TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    leader_id TEXT,
+                    observe_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    last_activity_at TEXT,
+                    archived_at TEXT,
+                    pending_leader_transfer TEXT,
+                    metrics_json TEXT NOT NULL DEFAULT '{}',
+                    state_json TEXT NOT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1
+                ) WITHOUT ROWID;
+                INSERT INTO projects (
+                    project_id, name, project_dir, repository_root, checkout_id,
+                    checkout_name, context_root, is_worktree, worktree_name,
+                    origin_json, discovered_at, updated_at
+                ) VALUES (
+                    'project-1', 'harness', '/tmp/harness', '/tmp/harness', 'checkout',
+                    'Repository', '/tmp/data/project-1', 0, NULL,
+                    NULL, '2026-04-14T10:00:00Z', '2026-04-14T10:00:00Z'
+                );
+                INSERT INTO sessions (
+                    session_id, project_id, schema_version, state_version, title, context,
+                    status, leader_id, observe_id, created_at, updated_at, last_activity_at,
+                    archived_at, pending_leader_transfer, metrics_json, state_json, is_active
+                ) VALUES (
+                    'sess-test-1', 'project-1', 3, 1, 'title', 'context',
+                    'active', 'claude-leader', NULL, '2026-04-14T10:00:00Z',
+                    '2026-04-14T10:00:00Z', NULL, NULL, NULL, '{}', '{}', 1
+                );",
+            )
+            .expect("seed v6 schema");
+        }
+
+        let db = DaemonDb::open(&path).expect("open migrated db");
+        assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+
+        let state: (i64, i64) = db
+            .conn
+            .query_row(
+                "SELECT revision, entry_count
+                 FROM session_timeline_state
+                 WHERE session_id = 'sess-test-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("timeline state row");
+        assert_eq!(state, (0, 0));
+    }
+
+    #[test]
     fn all_tables_exist() {
         let db = DaemonDb::open_in_memory().expect("open db");
         let tables: Vec<String> = db
@@ -3047,6 +3983,8 @@ mod tests {
             "projects",
             "schema_meta",
             "session_log",
+            "session_timeline_entries",
+            "session_timeline_state",
             "sessions",
             "signal_index",
             "task_checkpoints",
@@ -3910,6 +4848,56 @@ mod tests {
     }
 
     #[test]
+    fn append_log_entry_updates_session_timeline_revision_and_count() {
+        use crate::session::types::SessionTransition;
+
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let entry = SessionLogEntry {
+            sequence: 1,
+            recorded_at: "2026-04-03T12:00:00Z".into(),
+            session_id: state.session_id.clone(),
+            transition: SessionTransition::SessionStarted {
+                title: "test title".into(),
+                context: "test".into(),
+            },
+            actor_id: Some("claude-leader".into()),
+            reason: None,
+        };
+        db.append_log_entry(&entry).expect("append log entry");
+
+        let (revision, entry_count): (i64, i64) = db
+            .conn
+            .query_row(
+                "SELECT revision, entry_count
+                 FROM session_timeline_state
+                 WHERE session_id = ?1",
+                [&state.session_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("load timeline state");
+        assert_eq!(revision, 1);
+        assert_eq!(entry_count, 1);
+
+        let summary: String = db
+            .conn
+            .query_row(
+                "SELECT summary
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1 AND source_kind = 'log' AND source_key = 'log:1'",
+                [&state.session_id],
+                |row| row.get(0),
+            )
+            .expect("load timeline summary");
+        assert_eq!(summary, "Session started: test title - test");
+    }
+
+    #[test]
     fn bump_change_increments() {
         let db = DaemonDb::open_in_memory().expect("open db");
         db.bump_change("global").expect("first bump");
@@ -4022,6 +5010,80 @@ mod tests {
             )
             .expect("count cleared conversation events");
         assert_eq!(cleared_count, 0);
+    }
+
+    #[test]
+    fn sync_conversation_events_only_bumps_revision_when_visible_rows_change() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let first = vec![ConversationEvent {
+            kind: ConversationEventKind::Error {
+                code: None,
+                message: "first failure".into(),
+                recoverable: true,
+            },
+            ..sample_conversation_event(1, "ignored")
+        }];
+        db.sync_conversation_events(&state.session_id, "claude-leader", "claude", &first)
+            .expect("sync first events");
+
+        let first_revision: i64 = db
+            .conn
+            .query_row(
+                "SELECT revision
+                 FROM session_timeline_state
+                 WHERE session_id = ?1",
+                [&state.session_id],
+                |row| row.get(0),
+            )
+            .expect("load first revision");
+
+        db.sync_conversation_events(&state.session_id, "claude-leader", "claude", &first)
+            .expect("resync identical events");
+        let unchanged_revision: i64 = db
+            .conn
+            .query_row(
+                "SELECT revision
+                 FROM session_timeline_state
+                 WHERE session_id = ?1",
+                [&state.session_id],
+                |row| row.get(0),
+            )
+            .expect("load unchanged revision");
+        assert_eq!(unchanged_revision, first_revision);
+
+        let replacement = vec![ConversationEvent {
+            kind: ConversationEventKind::Error {
+                code: None,
+                message: "replacement failure".into(),
+                recoverable: true,
+            },
+            ..sample_conversation_event(1, "ignored")
+        }];
+        db.sync_conversation_events(&state.session_id, "claude-leader", "claude", &replacement)
+            .expect("sync replacement events");
+
+        let (replacement_revision, summary): (i64, String) = db
+            .conn
+            .query_row(
+                "SELECT state.revision, entries.summary
+                 FROM session_timeline_state AS state
+                 JOIN session_timeline_entries AS entries
+                   ON entries.session_id = state.session_id
+                 WHERE state.session_id = ?1
+                   AND entries.source_kind = 'conversation'
+                   AND entries.source_key = 'conversation:claude-leader:1'",
+                [&state.session_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("load replacement revision and summary");
+        assert_eq!(replacement_revision, first_revision + 1);
+        assert_eq!(summary, "claude-leader error: replacement failure");
     }
 
     #[test]
