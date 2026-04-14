@@ -5,6 +5,7 @@ use tokio::runtime::Handle;
 
 use super::{API_READY_INTERVAL, API_READY_TIMEOUT, DaemonClient, HEALTH_TIMEOUT};
 use crate::daemon::{discovery, state};
+use crate::infra::exec::RUNTIME;
 use crate::infra::io::read_json_typed;
 
 impl DaemonClient {
@@ -65,7 +66,7 @@ pub(super) fn try_build_client() -> Option<DaemonClient> {
 
 fn check_daemon_health(client: &DaemonClient, endpoint: &str) -> bool {
     let start = Instant::now();
-    let health_ok = crate::infra::exec::RUNTIME.block_on(async {
+    let health_ok = RUNTIME.block_on(async {
         client
             .http
             .get(format!("{endpoint}/v1/health"))
@@ -108,7 +109,7 @@ pub(super) fn wait_for_authenticated_api(client: &DaemonClient, timeout: Duratio
 
 fn authenticated_api_ready(client: &DaemonClient) -> bool {
     let url = format!("{}/v1/sessions", client.endpoint);
-    crate::infra::exec::RUNTIME.block_on(async {
+    RUNTIME.block_on(async {
         client
             .http
             .get(&url)

@@ -192,6 +192,43 @@ pub struct TimelineEntry {
     pub payload: Value,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TimelineCursor {
+    pub recorded_at: String,
+    pub entry_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TimelineWindowRequest {
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    #[serde(default)]
+    pub before: Option<TimelineCursor>,
+    #[serde(default)]
+    pub after: Option<TimelineCursor>,
+    #[serde(default)]
+    pub known_revision: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimelineWindowResponse {
+    pub revision: i64,
+    pub total_count: usize,
+    pub window_start: usize,
+    pub window_end: usize,
+    pub has_older: bool,
+    pub has_newer: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oldest_cursor: Option<TimelineCursor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub newest_cursor: Option<TimelineCursor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entries: Option<Vec<TimelineEntry>>,
+    pub unchanged: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadyEventPayload {
     pub ok: bool,
