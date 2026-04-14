@@ -179,9 +179,29 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureCodexRunsDelay(_ delay: Duration?, for sessionID: String) {
+    lock.withLock {
+      if let delay {
+        codexRunsDelaysBySessionID[sessionID] = delay
+      } else {
+        codexRunsDelaysBySessionID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
   func configureAgentTuis(_ tuis: [AgentTuiSnapshot], for sessionID: String) {
     lock.withLock {
       agentTuisBySessionID[sessionID] = tuis
+    }
+  }
+
+  func configureAgentTuisDelay(_ delay: Duration?, for sessionID: String) {
+    lock.withLock {
+      if let delay {
+        agentTuisDelaysBySessionID[sessionID] = delay
+      } else {
+        agentTuisDelaysBySessionID.removeValue(forKey: sessionID)
+      }
     }
   }
 
@@ -287,8 +307,14 @@ extension RecordingHarnessClient {
   func configuredCodexRuns(for sessionID: String) -> [CodexRunSnapshot] {
     lock.withLock { codexRunsBySessionID[sessionID] ?? [] }
   }
+  func configuredCodexRunsDelay(for sessionID: String) -> Duration? {
+    lock.withLock { codexRunsDelaysBySessionID[sessionID] }
+  }
   func configuredAgentTuis(for sessionID: String) -> [AgentTuiSnapshot] {
     lock.withLock { agentTuisBySessionID[sessionID] ?? [] }
+  }
+  func configuredAgentTuisDelay(for sessionID: String) -> Duration? {
+    lock.withLock { agentTuisDelaysBySessionID[sessionID] }
   }
   func configuredCodexRun(id runID: String) -> CodexRunSnapshot? {
     lock.withLock {

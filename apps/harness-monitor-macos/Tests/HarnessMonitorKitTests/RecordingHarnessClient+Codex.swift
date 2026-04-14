@@ -21,7 +21,8 @@ extension RecordingHarnessClient {
   }
 
   func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
-    CodexRunListResponse(runs: configuredCodexRuns(for: sessionID))
+    try await sleepIfNeeded(configuredCodexRunsDelay(for: sessionID))
+    return CodexRunListResponse(runs: configuredCodexRuns(for: sessionID))
   }
 
   func codexRun(runID: String) async throws -> CodexRunSnapshot {
@@ -125,7 +126,8 @@ extension RecordingHarnessClient {
   }
 
   func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
-    AgentTuiListResponse(tuis: configuredAgentTuis(for: sessionID))
+    try await sleepIfNeeded(configuredAgentTuisDelay(for: sessionID))
+    return AgentTuiListResponse(tuis: configuredAgentTuis(for: sessionID))
   }
 
   func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {

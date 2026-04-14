@@ -98,6 +98,8 @@ public final class HarnessMonitorStore {
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTaskToken: UInt64 = 0
+  @ObservationIgnored var sessionSecondaryHydrationTask: Task<Void, Never>?
+  @ObservationIgnored var sessionSecondaryHydrationTaskToken: UInt64 = 0
   var selectionTask: Task<Void, Never>?
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0

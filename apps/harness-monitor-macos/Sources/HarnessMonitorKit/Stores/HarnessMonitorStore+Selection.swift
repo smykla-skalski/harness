@@ -379,6 +379,8 @@ extension HarnessMonitorStore {
   func cancelSessionLoad() {
     sessionLoadTask?.cancel()
     sessionLoadTask = nil
+    sessionSecondaryHydrationTask?.cancel()
+    sessionSecondaryHydrationTask = nil
   }
 
   func completeSessionLoad(_ requestID: UInt64) {
