@@ -68,6 +68,28 @@ final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(refresh.frame.height, 62)
   }
 
+  func testPreferencesToolbarSeparatorIsSuppressed() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.actionTimeout))
+
+    let separatorSuppressed = element(
+      in: app,
+      identifier: Accessibility.preferencesToolbarSeparatorSuppressed
+    )
+    XCTAssertTrue(
+      separatorSuppressed.waitForExistence(timeout: Self.actionTimeout),
+      "Settings window toolbar separator suppressor must be applied to prevent the seam between toolbar and content"
+    )
+    XCTAssertEqual(
+      separatorSuppressed.label,
+      "suppressed",
+      "Separator suppressor marker should report 'suppressed'"
+    )
+  }
+
   func testPreferencesSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launch(mode: "preview")
 

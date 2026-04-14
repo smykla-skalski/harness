@@ -74,6 +74,8 @@ public enum HarnessMonitorAccessibility {
   static let preferencesRoot = "harness.preferences.root"
   static let preferencesState = "harness.preferences.state"
   static let preferencesPanel = "harness.preferences.panel"
+  static let preferencesToolbarSeparatorSuppressed =
+    "harness.preferences.toolbar.separator-suppressed"
   static let preferencesSidebar = "harness.preferences.sidebar"
   static let preferencesBackButton = "harness.preferences.nav.back"
   static let preferencesForwardButton = "harness.preferences.nav.forward"
