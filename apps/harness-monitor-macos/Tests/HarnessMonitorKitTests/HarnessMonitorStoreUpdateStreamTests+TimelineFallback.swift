@@ -129,11 +129,30 @@ extension HarnessMonitorStoreUpdateStreamTests {
       agentID: "worker-selected",
       summary: "Initial timeline"
     )
-    let refreshedTimeline = makeTimelineEntries(
-      sessionID: summary.sessionId,
-      agentID: "worker-selected",
-      summary: "Refetched timeline"
-    )
+    // Two entries so revision (Int64(count)=2) differs from initialTimeline's revision (1),
+    // preventing the recording client from returning unchanged=true on the fallback fetch.
+    let refreshedTimeline = [
+      TimelineEntry(
+        entryId: "refreshed-a-\(summary.sessionId)",
+        recordedAt: "2026-03-29T10:00:00Z",
+        kind: "task_checkpoint",
+        sessionId: summary.sessionId,
+        agentId: "worker-selected",
+        taskId: nil,
+        summary: "Refetched timeline",
+        payload: .object([:])
+      ),
+      TimelineEntry(
+        entryId: "refreshed-b-\(summary.sessionId)",
+        recordedAt: "2026-03-29T10:01:00Z",
+        kind: "task_checkpoint",
+        sessionId: summary.sessionId,
+        agentId: "worker-selected",
+        taskId: nil,
+        summary: "Refetched timeline entry 2",
+        payload: .object([:])
+      ),
+    ]
 
     client.configureSessions(
       summaries: [summary],
@@ -173,7 +192,12 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(client.readCallCount(.timelineWindow(summary.sessionId)) == baselineTimelineCalls + 1)
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId).last
-        == .latest(limit: selectedWindow.pageSize, knownRevision: selectedWindow.revision)
+        == .latest(
+          limit: max(
+            HarnessMonitorStore.initialSelectedTimelineWindowLimit, selectedWindow.pageSize
+          ),
+          knownRevision: selectedWindow.revision
+        )
     )
 
     store.stopAllStreams()

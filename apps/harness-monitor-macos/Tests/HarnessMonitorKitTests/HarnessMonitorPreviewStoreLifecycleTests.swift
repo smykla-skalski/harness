@@ -177,20 +177,11 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.isShowingCachedData == false)
   }
 
-  @Test("Empty preview daemon starts offline and start daemon connects")
+  @Test("Empty preview daemon auto-registers and connects during bootstrap")
   func emptyPreviewDaemonTransitionsOnlineAfterStart() async {
     let store = HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty))
 
     await store.bootstrap()
-
-    #expect(
-      store.connectionState
-        == .offline("Launch agent not installed. Install to start the daemon.")
-    )
-    #expect(store.daemonStatus?.launchAgent.installed == false)
-    #expect(store.sessions.isEmpty)
-
-    await store.startDaemon()
 
     #expect(store.connectionState == .online)
     #expect(store.daemonStatus?.launchAgent.installed == true)
