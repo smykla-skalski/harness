@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -8,7 +8,7 @@ use harness::daemon::agent_tui::{
     AgentTuiLaunchProfile, AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot,
     AgentTuiStartRequest, AgentTuiStatus,
 };
-use harness::daemon::bridge::{AgentTuiStartSpec, BridgeClient, BridgeState, BridgeStatusReport};
+use harness::daemon::bridge::{AgentTuiStartSpec, BridgeClient, BridgeStatusReport};
 use harness::daemon::db::DaemonDb;
 use harness::daemon::protocol::{SessionStartRequest, StreamEvent};
 use harness::daemon::service as daemon_service;
@@ -17,9 +17,15 @@ use tempfile::tempdir;
 use tokio::sync::broadcast;
 
 use super::helpers::ManagedChild;
+use self::support::{
+    ensure_host_home, harness_binary, output_text, run_bridge, run_bridge_with_data_home,
+    wait_for_bridge_exit, wait_for_bridge_state,
+};
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+mod support;
 
 #[test]
 fn bridge_status_reports_not_running_when_clean() {
@@ -417,62 +423,6 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
     wait_for_bridge_exit(&mut bridge);
 }
 
-fn wait_for_bridge_state(data_home: &Path) -> BridgeState {
-    let state_path = data_home.join("harness/daemon/bridge.json");
-    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
-    loop {
-        if let Ok(data) = std::fs::read_to_string(&state_path)
-            && let Ok(state) = serde_json::from_str::<BridgeState>(&data)
-        {
-            return state;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "bridge state file did not appear at {}",
-            state_path.display()
-        );
-        thread::sleep(BRIDGE_POLL_INTERVAL);
-    }
-}
-
-fn wait_for_bridge_exit(bridge: &mut ManagedChild) {
-    let deadline = Instant::now() + BRIDGE_WAIT_TIMEOUT;
-    loop {
-        if bridge.try_wait().expect("poll bridge").is_some() {
-            return;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "bridge process did not exit before timeout"
-        );
-        thread::sleep(BRIDGE_POLL_INTERVAL);
-    }
-}
-
-fn run_bridge(tmp: &tempfile::TempDir, args: &[&str]) -> Output {
-    run_bridge_with_data_home(tmp.path(), args)
-}
-
-fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Output {
-    let host_home = ensure_host_home(data_home);
-    Command::new(harness_binary())
-        .args(args)
-        .env("HARNESS_DAEMON_DATA_HOME", data_home)
-        .env("XDG_DATA_HOME", data_home)
-        .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_SANDBOXED")
-        .output()
-        .expect("run harness")
-}
-
-fn ensure_host_home(data_home: &Path) -> PathBuf {
-    let host_home = data_home.join("host-home");
-    std::fs::create_dir_all(&host_home).expect("create host home");
-    host_home
-}
-
 /// Verify the full readiness callback flow: start a TUI, call signal_ready
 /// from a separate thread (simulating the SessionStart hook), and verify the
 /// agent_tui_ready event is broadcast.
@@ -554,14 +504,4 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
     );
 
     let _ = manager.stop(&snapshot.tui_id);
-}
-
-fn harness_binary() -> PathBuf {
-    assert_cmd::cargo::cargo_bin("harness")
-}
-
-fn output_text(output: &Output) -> String {
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    format!("stdout={stdout:?} stderr={stderr:?}")
 }
