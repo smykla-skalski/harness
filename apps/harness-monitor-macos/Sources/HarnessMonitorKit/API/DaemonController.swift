@@ -73,6 +73,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case manifestMissing
   case manifestUnreadable
   case invalidManifest(String)
+  case managedDaemonVersionMismatch(expected: String, actual: String)
   case daemonOffline
   case daemonDidNotStart
   case externalDaemonOffline(manifestPath: String)
@@ -89,6 +90,8 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
       "The harness daemon manifest could not be read."
     case .invalidManifest(let message):
       "The harness daemon manifest failed trust validation: \(message)"
+    case .managedDaemonVersionMismatch(let expected, let actual):
+      "The managed daemon is running version \(actual), but this app bundle expects \(expected)."
     case .daemonOffline:
       "The harness daemon is offline. Start the daemon to load live sessions."
     case .daemonDidNotStart:
@@ -150,6 +153,7 @@ public struct DaemonController: DaemonControlling {
   let ownership: DaemonOwnership
   let endpointProbe: @Sendable (URL) async -> Bool
   let managedStaleManifestGracePeriod: Duration
+  let expectedManagedDaemonVersion: @Sendable () -> String?
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -164,7 +168,18 @@ public struct DaemonController: DaemonControlling {
     endpointProbe: @escaping @Sendable (URL) async -> Bool = {
       await Self.defaultEndpointProbe($0)
     },
-    managedStaleManifestGracePeriod: Duration = .seconds(5)
+    managedStaleManifestGracePeriod: Duration = .seconds(5),
+    expectedManagedDaemonVersion: @escaping @Sendable () -> String? = {
+      guard
+        let bundleIdentifier = Bundle.main.bundleIdentifier,
+        bundleIdentifier == "io.harnessmonitor.app"
+          || bundleIdentifier == "io.harnessmonitor.app.ui-testing"
+      else {
+        return nil
+      }
+
+      return Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
@@ -173,6 +188,7 @@ public struct DaemonController: DaemonControlling {
     self.sessionFactory = sessionFactory
     self.endpointProbe = endpointProbe
     self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
+    self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -331,6 +347,23 @@ public struct DaemonController: DaemonControlling {
         timeout: .milliseconds(200)
       )
     }.value
+  }
+
+  func managedDaemonVersionMismatch(for manifest: DaemonManifest) -> DaemonControlError? {
+    guard ownership == .managed else {
+      return nil
+    }
+
+    guard
+      let expectedVersion = expectedManagedDaemonVersion()?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !expectedVersion.isEmpty,
+      manifest.version != expectedVersion
+    else {
+      return nil
+    }
+
+    return .managedDaemonVersionMismatch(expected: expectedVersion, actual: manifest.version)
   }
 }
 
