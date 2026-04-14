@@ -1,55 +1,92 @@
 import SwiftUI
 
-@Observable
 @MainActor
-public final class WindowNavigationState {
-  @ObservationIgnored private var storedCanGoBack = false
-  @ObservationIgnored private var storedCanGoForward = false
+public struct WindowNavigationState {
+  public let canGoBack: Bool
+  public let canGoForward: Bool
 
-  public var canGoBack: Bool {
-    get {
-      access(keyPath: \.canGoBack)
-      return storedCanGoBack
-    }
-    set {
-      guard storedCanGoBack != newValue else {
-        return
-      }
-      withMutation(keyPath: \.canGoBack) {
-        storedCanGoBack = newValue
-      }
-    }
+  private let handlers: WindowNavigationHandlers
+
+  public init(
+    canGoBack: Bool = false,
+    canGoForward: Bool = false
+  ) {
+    self.init(
+      canGoBack: canGoBack,
+      canGoForward: canGoForward,
+      handlers: WindowNavigationHandlers()
+    )
   }
 
-  public var canGoForward: Bool {
-    get {
-      access(keyPath: \.canGoForward)
-      return storedCanGoForward
-    }
-    set {
-      guard storedCanGoForward != newValue else {
-        return
-      }
-      withMutation(keyPath: \.canGoForward) {
-        storedCanGoForward = newValue
-      }
-    }
+  private init(
+    canGoBack: Bool,
+    canGoForward: Bool,
+    handlers: WindowNavigationHandlers
+  ) {
+    self.canGoBack = canGoBack
+    self.canGoForward = canGoForward
+    self.handlers = handlers
   }
 
-  @ObservationIgnored var backHandler: (@MainActor () async -> Void)?
-  @ObservationIgnored var forwardHandler: (@MainActor () async -> Void)?
+  public func updating(
+    canGoBack: Bool,
+    canGoForward: Bool
+  ) -> Self {
+    Self(
+      canGoBack: canGoBack,
+      canGoForward: canGoForward,
+      handlers: handlers
+    )
+  }
 
-  public init() {}
+  public func setHandlers(
+    back: (@MainActor () async -> Void)?,
+    forward: (@MainActor () async -> Void)?
+  ) {
+    handlers.backHandler = back
+    handlers.forwardHandler = forward
+  }
 
   public func navigateBack() async {
-    await backHandler?()
+    await handlers.backHandler?()
   }
 
   public func navigateForward() async {
-    await forwardHandler?()
+    await handlers.forwardHandler?()
   }
 }
 
+public enum WindowNavigationScope: Hashable {
+  case main
+  case agentTui
+}
+
 extension FocusedValues {
-  @Entry public var windowNavigation: WindowNavigationState?
+  @Entry public var windowNavigationScope: WindowNavigationScope?
+}
+
+@MainActor
+private final class WindowNavigationHandlers {
+  var backHandler: (@MainActor () async -> Void)?
+  var forwardHandler: (@MainActor () async -> Void)?
+}
+
+@Observable
+@MainActor
+public final class AgentTuiWindowNavigationBridge {
+  public var state = WindowNavigationState()
+
+  public init() {}
+
+  public func update(_ state: WindowNavigationState) {
+    self.state = state
+  }
+
+  public func navigateBack() async {
+    await state.navigateBack()
+  }
+
+  public func navigateForward() async {
+    await state.navigateForward()
+  }
 }

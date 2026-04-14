@@ -12,11 +12,12 @@ struct HarnessMonitorAppCommands: Commands {
 
   @Environment(\.openWindow)
   private var openWindow
-  @FocusedValue(\.windowNavigation)
-  private var windowNavigation
+  @FocusedValue(\.windowNavigationScope)
+  private var windowNavigationScope
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
+  let agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
   let increaseTextSize: () -> Void
@@ -37,6 +38,24 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var canDecreaseTextSize: Bool {
     HarnessMonitorTextSize.canDecrease(textSizeIndex)
+  }
+
+  private var canNavigateBack: Bool {
+    switch windowNavigationScope {
+    case .agentTui:
+      agentTuiNavigationBridge.state.canGoBack
+    case .main, nil:
+      displayState.canNavigateBack
+    }
+  }
+
+  private var canNavigateForward: Bool {
+    switch windowNavigationScope {
+    case .agentTui:
+      agentTuiNavigationBridge.state.canGoForward
+    case .main, nil:
+      displayState.canNavigateForward
+    }
   }
 
   var body: some Commands {
@@ -82,20 +101,16 @@ struct HarnessMonitorAppCommands: Commands {
       Divider()
 
       Button("Back") {
-        if let windowNavigation {
-          Task { await windowNavigation.navigateBack() }
-        }
+        navigateBack()
       }
       .keyboardShortcut("[", modifiers: [.command])
-      .disabled(windowNavigation?.canGoBack != true)
+      .disabled(!canNavigateBack)
 
       Button("Forward") {
-        if let windowNavigation {
-          Task { await windowNavigation.navigateForward() }
-        }
+        navigateForward()
       }
       .keyboardShortcut("]", modifiers: [.command])
-      .disabled(windowNavigation?.canGoForward != true)
+      .disabled(!canNavigateForward)
 
       Divider()
 
@@ -139,6 +154,28 @@ struct HarnessMonitorAppCommands: Commands {
         Text(showInspector ? "Hide Inspector" : "Show Inspector")
       }
       .keyboardShortcut("i", modifiers: [.command, .option])
+    }
+  }
+
+  private func navigateBack() {
+    Task {
+      switch windowNavigationScope {
+      case .agentTui:
+        await agentTuiNavigationBridge.navigateBack()
+      case .main, nil:
+        await store.navigateBack()
+      }
+    }
+  }
+
+  private func navigateForward() {
+    Task {
+      switch windowNavigationScope {
+      case .agentTui:
+        await agentTuiNavigationBridge.navigateForward()
+      case .main, nil:
+        await store.navigateForward()
+      }
     }
   }
 }

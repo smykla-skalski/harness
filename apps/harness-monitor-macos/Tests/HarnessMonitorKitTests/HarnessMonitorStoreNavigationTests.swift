@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import Testing
 
@@ -117,31 +118,60 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(!store.navigationBackStack.isEmpty)
   }
 
-  @Test("Assigning the same navigation availability does not invalidate observers")
-  func assigningSameNavigationAvailabilityDoesNotInvalidateObservers() async {
+  @Test("Updating navigation availability keeps handler routing intact")
+  func updatingNavigationAvailabilityKeepsHandlers() async {
+    let backRecorder = ConfirmationRecorder()
+    let forwardRecorder = ConfirmationRecorder()
     let state = WindowNavigationState()
-
-    let invalidated = await didInvalidate(
-      { state.canGoBack },
-      after: { state.canGoBack = false }
+    state.setHandlers(
+      back: { await backRecorder.record() },
+      forward: { await forwardRecorder.record() }
     )
 
-    #expect(invalidated == false)
+    let updated = state.updating(canGoBack: true, canGoForward: true)
+
+    #expect(updated.canGoBack)
+    #expect(updated.canGoForward)
+
+    await updated.navigateBack()
+    await updated.navigateForward()
+
+    #expect(await backRecorder.count == 1)
+    #expect(await forwardRecorder.count == 1)
   }
 
-  @Test("Updating navigation handlers does not invalidate availability observers")
-  func updatingNavigationHandlersDoesNotInvalidateAvailabilityObservers() async {
+  @Test("Updating with unchanged availability keeps the snapshot stable")
+  func updatingWithSameAvailabilityKeepsSnapshotStable() async {
     let state = WindowNavigationState()
+    let updated = state.updating(canGoBack: false, canGoForward: false)
+    #expect(updated.canGoBack == state.canGoBack)
+    #expect(updated.canGoForward == state.canGoForward)
+  }
 
-    let invalidated = await didInvalidate(
-      { (state.canGoBack, state.canGoForward) },
-      after: {
-        state.backHandler = { await Task.yield() }
-        state.forwardHandler = { await Task.yield() }
-      }
+  @Test("Launching the isolated host does not emit FocusedValue startup warnings")
+  func launchDoesNotEmitFocusedValueWarning() async throws {
+    let dataHome = FileManager.default.temporaryDirectory
+      .appendingPathComponent("HarnessMonitorFocusedValueLaunch-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: dataHome, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dataHome) }
+
+    let logStream = try startFocusedValueLogStream()
+    defer { terminate(logStream.process) }
+    try await Task.sleep(for: .milliseconds(500))
+
+    let appProcess = try launchUITestHost(dataHome: dataHome)
+    defer { terminate(appProcess) }
+
+    try await Task.sleep(for: .seconds(4))
+
+    let warningLines = capturedFocusedValueWarnings(from: logStream)
+    #expect(
+      warningLines.isEmpty,
+      """
+      Launch emitted a SwiftUI FocusedValue warning:
+      \(warningLines.joined(separator: "\n"))
+      """
     )
-
-    #expect(invalidated == false)
   }
 
   // MARK: - Fixtures
@@ -176,4 +206,131 @@ struct HarnessMonitorStoreNavigationTests {
     client.configureSessions(summaries: summaries, detailsByID: details)
     return await makeBootstrappedStore(client: client)
   }
+
+  private func launchUITestHost(dataHome: URL) throws -> Process {
+    let inherited = ProcessInfo.processInfo.environment
+    let builtProductsDir = Bundle(for: StartupLogTestBundleToken.self)
+      .bundleURL
+      .deletingLastPathComponent()
+
+    let executableURL = builtProductsDir
+      .appendingPathComponent("Harness Monitor UI Testing.app", isDirectory: true)
+      .appendingPathComponent("Contents/MacOS", isDirectory: true)
+      .appendingPathComponent("Harness Monitor UI Testing", isDirectory: false)
+
+    guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+      throw StartupLogTestError("UI-test host is not executable at \(executableURL.path)")
+    }
+
+    let process = Process()
+    process.executableURL = executableURL
+    process.arguments = ["-ApplePersistenceIgnoreState", "YES"]
+    process.environment = launchEnvironment(
+      inherited: inherited,
+      dataHome: dataHome.path
+    )
+    try process.run()
+    return process
+  }
+
+  private func launchEnvironment(
+    inherited: [String: String],
+    dataHome: String
+  ) -> [String: String] {
+    var environment: [String: String] = [:]
+    for key in [
+      "HOME",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING",
+    ] {
+      if let value = inherited[key] {
+        environment[key] = value
+      }
+    }
+    environment["HARNESS_MONITOR_UI_TESTS"] = "1"
+    environment["HARNESS_MONITOR_LAUNCH_MODE"] = "preview"
+    environment["HARNESS_DAEMON_DATA_HOME"] = dataHome
+    return environment
+  }
+
+  private func terminate(_ process: Process) {
+    guard process.isRunning else {
+      return
+    }
+    process.terminate()
+    process.waitUntilExit()
+  }
+
+  private func startFocusedValueLogStream() throws -> LogStreamCapture {
+    let logStream = Process()
+    logStream.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+    logStream.arguments = [
+      "stream",
+      "--style", "compact",
+      "--level", "debug",
+      "--predicate",
+      """
+      (process == "Harness Monitor UI Testing" OR process == "Harness Monitor")
+      AND eventMessage CONTAINS "FocusedValue update tried to update multiple times per frame"
+      """,
+    ]
+
+    let stdout = Pipe()
+    let stderr = Pipe()
+    logStream.standardOutput = stdout
+    logStream.standardError = stderr
+
+    try logStream.run()
+    return LogStreamCapture(process: logStream, stdout: stdout, stderr: stderr)
+  }
+
+  private func capturedFocusedValueWarnings(from logStream: LogStreamCapture) -> [String] {
+    terminate(logStream.process)
+
+    let output = String(
+      decoding: logStream.stdout.fileHandleForReading.readDataToEndOfFile(),
+      as: UTF8.self
+    )
+    let errorOutput = String(
+      decoding: logStream.stderr.fileHandleForReading.readDataToEndOfFile(),
+      as: UTF8.self
+    )
+
+    return [output, errorOutput]
+      .joined(separator: "\n")
+      .split(separator: "\n")
+      .map(String.init)
+      .filter {
+        $0.contains("[com.apple.SwiftUI:Invalid Configuration]")
+          && $0.contains("FocusedValue update tried to update multiple times per frame")
+      }
+  }
+}
+
+private struct StartupLogTestError: Error, CustomStringConvertible {
+  let description: String
+
+  init(_ description: String) {
+    self.description = description
+  }
+}
+
+private final class StartupLogTestBundleToken {}
+
+private actor ConfirmationRecorder {
+  private(set) var count = 0
+
+  func record() {
+    count += 1
+  }
+}
+
+private struct LogStreamCapture {
+  let process: Process
+  let stdout: Pipe
+  let stderr: Pipe
 }
