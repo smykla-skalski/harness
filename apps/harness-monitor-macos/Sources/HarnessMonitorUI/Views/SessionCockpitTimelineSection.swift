@@ -106,24 +106,29 @@ struct SessionCockpitTimelineSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: sessionID) { _, _ in
-          currentPage = 0
+          updateCurrentPageIfNeeded(0, animated: false)
         }
         .onChange(of: pageSize) { oldPageSize, newPageSize in
-          setCurrentPage(
+          updateCurrentPageIfNeeded(
             SessionTimelinePagination.rebasedPage(
               currentPage,
               itemCount: timeline.count,
               oldPageSize: oldPageSize.rawValue,
               newPageSize: newPageSize.rawValue
-            )
+            ),
+            animated: true
           )
         }
         .onChange(of: timeline) { _, newTimeline in
-          currentPage = SessionTimelinePagination.clampedPage(
-            currentPage,
+          guard let adjustedPage = SessionTimelinePagination.adjustedPage(
+            currentPage: currentPage,
             itemCount: newTimeline.count,
             pageSize: pageSize.rawValue
-          )
+          ) else {
+            return
+          }
+
+          updateCurrentPageIfNeeded(adjustedPage, animated: false)
         }
       }
     }
@@ -140,11 +145,15 @@ struct SessionCockpitTimelineSection: View {
       return
     }
 
-    setCurrentPage(clampedPage)
+    updateCurrentPageIfNeeded(clampedPage, animated: true)
   }
 
-  private func setCurrentPage(_ page: Int) {
-    if let pageChangeAnimation {
+  private func updateCurrentPageIfNeeded(_ page: Int, animated: Bool) {
+    guard page != currentPage else {
+      return
+    }
+
+    if animated, let pageChangeAnimation {
       withAnimation(pageChangeAnimation) {
         currentPage = page
       }

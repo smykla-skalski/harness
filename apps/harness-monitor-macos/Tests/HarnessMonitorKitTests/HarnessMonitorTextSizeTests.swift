@@ -1,5 +1,6 @@
-import HarnessMonitorUI
 import Testing
+
+@testable import HarnessMonitorUI
 
 @Suite("HarnessMonitorTextSize magnification index delta")
 struct HarnessMonitorTextSizeTests {
@@ -72,5 +73,30 @@ struct HarnessMonitorTextSizeTests {
   @Test("No change when magnification is exactly 1.0")
   func noChangeAtExactlyOne() {
     #expect(HarnessMonitorTextSize.indexDelta(forMagnification: 1.0, currentIndex: 3) == 0)
+  }
+}
+
+@Suite("SessionTimelinePagination page adjustment")
+struct SessionTimelinePaginationTests {
+  @Test("Adjusted page returns nil when the clamped page is unchanged")
+  func adjustedPageReturnsNilWhenUnchanged() {
+    #expect(
+      SessionTimelinePagination.adjustedPage(
+        currentPage: 0,
+        itemCount: 24,
+        pageSize: SessionTimelinePageSize.defaultSize.rawValue
+      ) == nil
+    )
+  }
+
+  @Test("Adjusted page returns corrected value when the current page becomes out of range")
+  func adjustedPageReturnsCorrectedValueWhenOutOfRange() {
+    #expect(
+      SessionTimelinePagination.adjustedPage(
+        currentPage: 3,
+        itemCount: 18,
+        pageSize: SessionTimelinePageSize.defaultSize.rawValue
+      ) == 1
+    )
   }
 }
