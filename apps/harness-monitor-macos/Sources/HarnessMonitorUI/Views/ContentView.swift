@@ -34,7 +34,6 @@ public struct ContentView: View {
   @State private var showInspector = Self.initialInspectorVisibility()
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var pendingDetailColumnWidth: CGFloat?
-  @State private var windowNavigation = WindowNavigationState()
   @State private var isLayoutAnimating = false
   @State private var layoutSuppressionTask: Task<Void, Never>?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -95,13 +94,6 @@ public struct ContentView: View {
     self.contentDashboard = store.contentUI.dashboard
     self.toast = store.toast
     self.auditBuildState = Self.resolveAuditBuildState()
-
-    let initialWindowNavigation = WindowNavigationState()
-    initialWindowNavigation.backHandler = { await store.navigateBack() }
-    initialWindowNavigation.forwardHandler = { await store.navigateForward() }
-    initialWindowNavigation.canGoBack = store.contentUI.toolbar.canNavigateBack
-    initialWindowNavigation.canGoForward = store.contentUI.toolbar.canNavigateForward
-    _windowNavigation = State(initialValue: initialWindowNavigation)
   }
 
   public var body: some View {
@@ -127,15 +119,9 @@ public struct ContentView: View {
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .focusedSceneValue(\.windowNavigation, windowNavigation)
+    .focusedSceneValue(\.windowNavigationScope, .main)
     .toolbar {
       contentToolbarItems
-    }
-    .onChange(of: contentToolbar.canNavigateBack) { _, newValue in
-      windowNavigation.canGoBack = newValue
-    }
-    .onChange(of: contentToolbar.canNavigateForward) { _, newValue in
-      windowNavigation.canGoForward = newValue
     }
     .onChange(of: persistedShowInspector) { _, newValue in
       applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
@@ -153,12 +139,6 @@ public struct ContentView: View {
       )
     }
     .background(contentBackground)
-    .modifier(
-      OptionalToolbarBaselineOverlayModifier(
-        isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
-      )
-    )
-    .suppressToolbarBaselineSeparator()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .modifier(
       HarnessMonitorConfirmationDialogModifier(
@@ -227,7 +207,6 @@ public struct ContentView: View {
       sidebarVisible: columnVisibility != .detailOnly
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
-    .toolbarBaselineFrame(.sidebar)
   }
 
   private var detailColumn: some View {

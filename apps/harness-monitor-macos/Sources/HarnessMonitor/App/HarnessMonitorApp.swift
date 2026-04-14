@@ -14,6 +14,7 @@ struct HarnessMonitorApp: App {
   private let notificationController: HarnessMonitorUserNotificationController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
+  @State private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
   @State private var preferencesSelectedSection: PreferencesSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
@@ -35,6 +36,7 @@ struct HarnessMonitorApp: App {
     self.notificationController = notificationController
     perfScenario = configuration.perfScenario
     _store = State(initialValue: configuration.store)
+    _agentTuiNavigationBridge = State(initialValue: AgentTuiWindowNavigationBridge())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
   }
 
@@ -48,6 +50,7 @@ struct HarnessMonitorApp: App {
     .commands {
       HarnessMonitorAppCommands(
         store: store,
+        agentTuiNavigationBridge: agentTuiNavigationBridge,
         displayState: store.commandsDisplayState,
         textSizeIndex: textSizeIndex,
         increaseTextSize: increaseTextSize,
@@ -77,7 +80,11 @@ struct HarnessMonitorApp: App {
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
 
     Window("Agent TUI", id: HarnessMonitorWindowID.agentTui) {
-      AgentTuiWindowRootView(store: store, themeMode: $themeMode)
+      AgentTuiWindowRootView(
+        store: store,
+        navigationBridge: agentTuiNavigationBridge,
+        themeMode: $themeMode
+      )
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 980, height: 620)

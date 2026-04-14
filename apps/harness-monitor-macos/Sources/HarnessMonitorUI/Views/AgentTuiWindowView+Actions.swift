@@ -282,7 +282,18 @@ extension AgentTuiWindowView {
   }
 
   func updateNavigationState() {
-    viewModel.windowNavigation.canGoBack = !viewModel.navigationBackStack.isEmpty
-    viewModel.windowNavigation.canGoForward = !viewModel.navigationForwardStack.isEmpty
+    let canGoBack = !viewModel.navigationBackStack.isEmpty
+    let canGoForward = !viewModel.navigationForwardStack.isEmpty
+    guard
+      viewModel.windowNavigation.canGoBack != canGoBack
+        || viewModel.windowNavigation.canGoForward != canGoForward
+    else {
+      return
+    }
+    viewModel.windowNavigation = viewModel.windowNavigation.updating(
+      canGoBack: canGoBack,
+      canGoForward: canGoForward
+    )
+    navigationBridge.update(viewModel.windowNavigation)
   }
 }

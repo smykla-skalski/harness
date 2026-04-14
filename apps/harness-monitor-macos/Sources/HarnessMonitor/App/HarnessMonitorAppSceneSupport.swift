@@ -221,6 +221,7 @@ struct HarnessMonitorSettingsRootView: View {
 
 struct AgentTuiWindowRootView: View {
   let store: HarnessMonitorStore
+  let navigationBridge: AgentTuiWindowNavigationBridge
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
@@ -237,7 +238,7 @@ struct AgentTuiWindowRootView: View {
   }
 
   var body: some View {
-    AgentTuiWindowView(store: store)
+    AgentTuiWindowView(store: store, navigationBridge: navigationBridge)
       .writingToolsBehavior(.disabled)
       .frame(minWidth: 860, minHeight: 620)
       .modifier(
