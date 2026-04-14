@@ -7,15 +7,25 @@ description: "Draft, confirm, publish, and verify small high-quality GitHub task
 
 ## Overview
 
-Create small, high-signal GitHub issues that are ready to hand to an engineer. Keep the task narrow, ground it in repository evidence, explicitly invoke the installed `$humanize` skill on the saved draft before publication, stop for explicit approval, publish only after that approval, and then verify the rendered GitHub issue page.
+Create small, high-signal GitHub issues that are ready to hand to an engineer. Keep the task narrow, explicitly invoke the installed `$humanize` skill on the saved draft before publication, stop for explicit approval, publish only after that approval, and then verify the rendered GitHub issue page.
 
 Read [references/issue-guidelines.md](references/issue-guidelines.md) before drafting or publishing. It contains the small-task quality bar, the issue template, screenshot rules, the approval contract, and the render-verification checklist.
 
-## Hard Constraints
+## Modes
+
+This skill operates in two modes.
+
+**Fast mode (default):** Format the user's input into a well-structured issue without deep code investigation. Trust the user's description - don't second-guess or verify against the codebase. Read code only when you need to fill in specific references (file paths, function names) that the user mentioned but didn't fully specify. This mode is cheap on tokens and fast.
+
+**Deep mode:** Full investigation before drafting. Read the relevant code, confirm the problem, trace root causes, verify the feature gap is real. Everything in the "Deep mode investigation" section below applies only in deep mode.
+
+To select deep mode, include `deep:` as the first word in the task prompt. For example: `deep: guard-bash lets kubectl through pipes`. If the prompt does not start with `deep:`, use fast mode.
+
+## Hard constraints
 
 - Work only on issues for the current repository.
 - Optimize for small, independently shippable work. Split broad or multi-phase work into multiple issues instead of publishing one oversized issue.
-- Ground every issue in concrete evidence: code paths, failing commands, logs, issue templates, screenshots, UX observations, or repository conventions.
+- In deep mode, ground every issue in concrete evidence: code paths, failing commands, logs, issue templates, screenshots, UX observations, or repository conventions. In fast mode, ground the issue in what the user provided.
 - Do not publish anything unless the skill explicitly invoked the installed `humanize` skill on the saved draft file. In Codex, invoke `$humanize <draft-path>`. In runtimes that expose slash-command skills, invoke `/humanize <draft-path>`. Manual cleanup, paraphrasing, or simply claiming the text was humanized does not satisfy this requirement. If the skill is unavailable, stop and report the blocker instead of publishing unreviewed prose.
 - Do not publish on implied consent, passive acknowledgment, or silence. Require an AskUserQuestion-style explicit approval gate with exactly two outcomes: publish now, or request changes.
 - If screenshots were supplied, make sure they are incorporated into the issue body itself, not left in local notes and not moved to a follow-up comment unless the user explicitly asks for that.
@@ -25,13 +35,18 @@ Read [references/issue-guidelines.md](references/issue-guidelines.md) before dra
 
 ### 0. Create workspace
 
-Every invocation gets its own temp directory so concurrent agents don't clobber each other's files. Create it at the very start and use it for all intermediate files throughout the workflow.
+Every invocation gets its own workspace directory under `./tmp/github-task-issue/` so files are organized and concurrent agents don't collide. Create it at the very start and use it for all intermediate files throughout the workflow.
+
+Derive a short slug from the issue topic - lowercase, hyphens only, no spaces or special characters, 50 characters max. Use the most descriptive 3-6 words from the user's input.
 
 ```bash
-ISSUE_WORKSPACE="$(mktemp -d "/tmp/issue-XXXXXXXX")"
+# Example: user says "guard-bash lets kubectl through pipes"
+SLUG="guard-bash-pipe-bypass"
+ISSUE_WORKSPACE="./tmp/github-task-issue/${SLUG}"
+mkdir -p "$ISSUE_WORKSPACE"
 ```
 
-All paths below reference `$ISSUE_WORKSPACE`. Never use bare `tmp/issue-drafts/` paths - those collide when multiple agents work on issues in parallel.
+All paths below reference `$ISSUE_WORKSPACE`.
 
 ### 1. Gather context and decide whether the work is issue-sized
 
@@ -42,9 +57,19 @@ Inspect the repository, the relevant files, and any evidence the user provided.
 - Decide whether the work is small enough for one issue. If the draft needs multiple unrelated outcomes, multiple subsystems, or multiple implementation phases, split it before writing.
 - If there is an existing issue or a likely duplicate, surface that before drafting a new one.
 
-### 2. Draft the issue with a small-task bias
+In fast mode, keep context gathering lightweight - use what the user provided. Move straight to drafting. In deep mode, read the relevant source files to verify the problem and ground the issue in code-level evidence.
+
+### 2. Deep mode investigation (deep mode only)
+
+Skip this step entirely in fast mode.
+
+Before writing the issue body, verify the problem or gap against the actual codebase. For bugs, find the relevant source and confirm the bug is real. For features, check whether the capability already exists. For tasks/refactors, confirm the scope matches the user's description. If the issue turns out to be invalid (already fixed, duplicate, wrong module), tell the user before drafting.
+
+### 3. Draft the issue with a small-task bias
 
 Use the template in [references/issue-guidelines.md](references/issue-guidelines.md).
+
+In deep mode, reference specific file paths, function names, and line numbers from your investigation. In fast mode, use whatever the user provided and only look up specific references if needed.
 
 - Write the title in the repository semantic format `type(scope): description` with a mandatory lowercase scope.
 - Reuse the same title taxonomy as commits and PRs from `CONTRIBUTING.md`: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `build`, or `perf`.
@@ -55,7 +80,7 @@ Use the template in [references/issue-guidelines.md](references/issue-guidelines
 - Put exact commands, file paths, flags, hook names, and config keys in backticks.
 - Keep a private render checklist of every term that must render as inline code or fenced code after publication.
 
-### 3. Incorporate screenshots correctly
+### 4. Incorporate screenshots correctly
 
 If the user supplied screenshots, treat them as first-class evidence. Validate every file path before doing any upload work - files that were accessible earlier may no longer exist (temp files cleaned up, moved, or from a previous agent context).
 
@@ -78,7 +103,7 @@ Once all paths are resolved:
 - If the user provided local image files, upload them with `scripts/upload-image.sh` and embed the returned markdown lines where they belong in the issue body. The script validates format (png, jpg, jpeg, gif, webp, svg), checks file size, and auto-optimizes images over 5MB via `sips` before uploading. It stores the files through the Git Data API, keeps them reachable via a hidden ref, and verifies that each resulting URL returns HTTP 200.
 - Ensure the issue body references GitHub-hosted image URLs, not local filesystem paths.
 
-### 4. Save the draft and explicitly invoke the mandatory `$humanize` skill
+### 5. Save the draft and explicitly invoke the mandatory `$humanize` skill
 
 Write the issue title to a real file before publication:
 
@@ -117,7 +142,7 @@ $ISSUE_WORKSPACE/render_checklist.txt
 - Keep one expected inline-code term per line in that checklist file. Use it during render verification.
 - Do not ask for approval until the title validation and `$humanize` steps have completed successfully.
 
-### 5. Gate publication with explicit user approval
+### 6. Gate publication with explicit user approval
 
 Preferred contract:
 
@@ -135,7 +160,7 @@ When the user requests changes:
 - show the revised draft
 - ask for approval again
 
-### 6. Publish using the right path
+### 7. Publish using the right path
 
 Create and edit issues through the bundled wrapper, not via ad-hoc shell interpolation:
 
@@ -158,7 +183,7 @@ scripts/publish-issue.py edit \
   --body-file "$ISSUE_WORKSPACE/draft.md"
 ```
 
-### 7. Verify the rendered GitHub issue page
+### 8. Verify the rendered GitHub issue page
 
 Verify the live issue through the GitHub rendered HTML returned by the issue API:
 
