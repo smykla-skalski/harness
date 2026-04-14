@@ -1,14 +1,26 @@
 ---
 name: issue
 description: "Create well-structured GitHub issues with semantic `type(scope): description` titles and task checklists for the harness project. Use when the user wants to file a bug, request a feature, propose a task, create a work item, track a problem, or open any kind of GitHub issue. Also use when the user says \"open an issue\", \"file a bug\", \"create a ticket\", \"track this\", or describes a problem and wants it recorded on GitHub."
-argument-hint: "[title or description of the issue]"
+argument-hint: "[--deep] [title or description of the issue]"
 allowed-tools: AskUserQuestion, Bash, Glob, Grep, Read, Skill, Write
 user-invocable: true
 ---
 
 # GitHub issue creator
 
-Create focused, high-quality GitHub issues for the `smykla-skalski/harness` repository. Every issue produced by this skill goes through code investigation, humanization, user review, and post-creation verification before it's considered done.
+Create focused, high-quality GitHub issues for the `smykla-skalski/harness` repository.
+
+## Modes
+
+This skill operates in two modes. Pick the right one based on the arguments.
+
+**Fast mode (default):** Format the user's input into a well-structured issue. Trust what the user says - don't investigate the codebase. Read code only to fill in specific references (file paths, function names) the user mentioned but didn't fully specify. Shape it into a clean issue with proper structure, semantic title, and actionable task list.
+
+**Deep mode (`--deep` flag):** Full investigation before drafting. Read the relevant code, confirm the problem, trace root causes, verify the feature gap is real. Everything in the "Investigate the code" section below applies only in deep mode.
+
+## Arguments
+
+`--deep` - Run in deep mode with full code investigation before drafting. Without this flag, the skill runs in fast mode. Parse the first token after `/issue`: if it is `--deep`, enable deep mode and treat the rest as the issue description.
 
 ## Philosophy
 
@@ -18,24 +30,28 @@ Write every issue as if you are the one who will implement it next, and the only
 
 ## Quality rules
 
-1. **Verify before writing.** Read the relevant code before drafting the issue. Confirm the bug actually exists, the feature gap is real, or the behavior matches what the user describes. Do not file issues based on assumptions.
-2. **No vague task items.** Every task list checkbox must be specific enough that someone can start and finish it in a single session without further clarification. "Fix the bug" or "implement the feature" are never acceptable. Name the file, the function, the module.
-3. **Every implementation item gets a test item.** If a task says "add X", there must be a corresponding "add test for X" item. This repo uses TDD - the issue should reflect that.
-4. **Performance-sensitive changes get a performance item.** If the issue touches hot paths, view bodies, async code, or frequently called logic, include a task item for performance verification or measurement.
-5. **Describe the proper fix, not the quick patch.** If the right solution requires refactoring a module, say so in the issue. Do not scope the task list to a band-aid fix to make it look smaller. The implementer needs to know the real scope upfront.
-6. **Root cause over symptoms.** For bugs, trace the problem to its origin. "The sidebar shows stale data" is a symptom. "The sidebar reads from a cached snapshot that is not invalidated when the source changes" is the root cause. Describe both, but frame the fix around the root cause.
+1. **No vague task items.** Every task list checkbox must be specific enough that someone can start and finish it in a single session without further clarification. "Fix the bug" or "implement the feature" are never acceptable. Name the file, the function, the module.
+2. **Every implementation item gets a test item.** If a task says "add X", there must be a corresponding "add test for X" item. This repo uses TDD - the issue should reflect that.
+3. **Performance-sensitive changes get a performance item.** If the issue touches hot paths, view bodies, async code, or frequently called logic, include a task item for performance verification or measurement.
+4. **Describe the proper fix, not the quick patch.** If the right solution requires refactoring a module, say so in the issue. Do not scope the task list to a band-aid fix to make it look smaller. The implementer needs to know the real scope upfront.
+5. **Root cause over symptoms (deep mode).** For bugs in deep mode, trace the problem to its origin. "The sidebar shows stale data" is a symptom. "The sidebar reads from a cached snapshot that is not invalidated when the source changes" is the root cause. Describe both, but frame the fix around the root cause. In fast mode, use whatever framing the user provided.
 
 ## Workflow
 
 ### 0. Create workspace
 
-Every invocation gets its own temp directory so concurrent agents don't clobber each other's files. Create it at the very start and use it for all intermediate files throughout the workflow.
+Every invocation gets its own workspace directory under `./tmp/github-task-issue/` so files are organized and concurrent agents don't collide. Create it at the very start and use it for all intermediate files throughout the workflow.
+
+Derive a short slug from the issue topic - lowercase, hyphens only, no spaces or special characters, 50 characters max. Use the most descriptive 3-6 words from the user's input.
 
 ```bash
-ISSUE_WORKSPACE="$(mktemp -d "/tmp/issue-XXXXXXXX")"
+# Example: user says "guard-bash lets kubectl through pipes"
+SLUG="guard-bash-pipe-bypass"
+ISSUE_WORKSPACE="./tmp/github-task-issue/${SLUG}"
+mkdir -p "$ISSUE_WORKSPACE"
 ```
 
-All paths below reference `$ISSUE_WORKSPACE`. Never use bare `/tmp/issue_*.md` paths - those collide when multiple agents run in parallel.
+All paths below reference `$ISSUE_WORKSPACE`.
 
 ### 1. Gather context
 
@@ -48,7 +64,11 @@ Determine:
 - Which area of the codebase is involved, if obvious
 - Whether the user has screenshots or files to attach
 
-### 2. Investigate the code
+In fast mode, you're done gathering after this step. Move straight to picking labels and drafting.
+
+### 2. Investigate the code (deep mode only)
+
+Skip this step entirely in fast mode.
 
 Before writing a single line of the issue body, verify the problem or gap against the actual codebase. This prevents filing issues that describe non-existent behavior, target the wrong module, or propose fixes that are already implemented.
 
@@ -90,7 +110,7 @@ If a standard label doesn't fit, skip it rather than forcing one.
 
 ### 4. Draft the issue
 
-Use the findings from step 2 to inform every section. Reference specific file paths, function names, and line numbers discovered during investigation.
+In deep mode, use the findings from step 2 to inform every section - reference specific file paths, function names, and line numbers discovered during investigation. In fast mode, use whatever the user provided and only look up specific references (file paths, function names) if the user mentioned something you need to pin down.
 
 Write the issue body in markdown. Structure depends on the kind:
 
@@ -154,8 +174,7 @@ Write the issue body in markdown. Structure depends on the kind:
 ```
 
 Guidelines for the body:
-- Task list items should be small, concrete, and independently checkable because vague items like "implement the feature" stall when no one knows where to start. Each one is a unit of work someone can pick up and finish in a single session. Name the specific file, function, or module in each item.
-- Every implementation task item must have a corresponding test task item. This repo uses TDD - the issue should set that expectation. Example: if a task says "Add timeout to `runner.rs`", the next item should be "Add test `timeout_triggers_verdict` in `runner::tests`".
+- Every implementation task item must have a corresponding test task item. This repo uses TDD. Example: if a task says "Add timeout to `runner.rs`", the next item should be "Add test `timeout_triggers_verdict` in `runner::tests`".
 - If the change touches performance-sensitive code (hot paths, view bodies, async handlers, frequently called functions), include a task item for performance verification. Example: "Verify no new allocations in sidebar view body via `/swiftui-performance-macos` audit".
 - If the proper fix requires a refactor, scope the task list to include the refactor. Do not shrink the task list to avoid showing the real cost - the implementer needs to know upfront.
 - Never include version bump tasks in the task list. Version bumps happen on `main` after the feature branch merges, not inside the worktree. The `/do` skill handles this separately with a user-gated step. Including a version bump task causes merge conflicts when multiple agents work in parallel.
@@ -294,9 +313,6 @@ gh issue create --title "Fix the bug" --body-file "$ISSUE_WORKSPACE/body.md"
 
 # Bad - shell expands backticks as commands
 gh issue create --body "some `code` here"
-
-# Also bad - $() is safe but backticks inside the file still get expanded
-gh issue create --body "$(cat "$ISSUE_WORKSPACE/body.md")"
 ```
 
 Always use `--body-file <path>` for both `gh issue create` and `gh issue edit` to prevent shell expansion of backticks in the markdown content.
