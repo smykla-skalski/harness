@@ -1,5 +1,6 @@
 import Observation
 import Testing
+import SwiftData
 
 @testable import HarnessMonitorKit
 
@@ -165,6 +166,68 @@ struct HarnessMonitorStoreSelectionFlowTests {
 
     #expect(store.timeline == firstBatch + secondBatch)
     #expect(store.isSelectionLoading == false)
+  }
+
+  @Test("Selecting a cached session online keeps cached timeline visible during refresh")
+  func selectingCachedSessionOnlineKeepsTimelineVisibleDuringRefresh() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-cached-visible",
+        context: "Cached timeline lane",
+        status: .active,
+        leaderId: "leader-cached-visible",
+        observeId: "observe-cached-visible",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-cached-visible",
+      workerName: "Cached Worker"
+    )
+    let cachedTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Cached timeline entry"
+    )
+    let liveTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Live timeline entry"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: liveTimeline],
+      detail: detail
+    )
+    client.configureDetailDelay(.milliseconds(20), for: summary.sessionId)
+    client.configureTimelineDelay(.milliseconds(250), for: summary.sessionId)
+    let container = try HarnessMonitorModelContainer.preview()
+    let daemon = RecordingDaemonController(client: client)
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      modelContainer: container
+    )
+    await store.bootstrap()
+    await store.cacheSessionDetail(detail, timeline: cachedTimeline, markViewed: false)
+
+    let selectionTask = Task {
+      await store.selectSession(summary.sessionId)
+    }
+    try await Task.sleep(for: .milliseconds(60))
+
+    #expect(store.selectedSession?.session.sessionId == summary.sessionId)
+    #expect(store.timeline == cachedTimeline)
+    #expect(store.isShowingCachedData)
+
+    await selectionTask.value
+
+    #expect(store.timeline == liveTimeline)
+    #expect(store.isShowingCachedData == false)
   }
 
   @Test("Selecting a session finishes before slow secondary panes hydrate")
