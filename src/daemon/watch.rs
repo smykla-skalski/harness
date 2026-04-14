@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::mem;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -109,6 +109,60 @@ impl PendingWatchPaths {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct RuntimeSessionTarget {
+    context_root: PathBuf,
+    runtime_name: String,
+    runtime_session_id: String,
+}
+
+#[derive(Debug, Default)]
+struct RuntimeSessionResolveCache {
+    session_ids: HashMap<RuntimeSessionTarget, String>,
+}
+
+impl RuntimeSessionResolveCache {
+    fn invalidate_paths(&mut self, paths: &[PathBuf]) {
+        if self.session_ids.is_empty() {
+            return;
+        }
+
+        let invalidated_contexts: BTreeSet<_> = paths
+            .iter()
+            .filter_map(|path| orchestration_context_root(path))
+            .collect();
+        if invalidated_contexts.is_empty() {
+            return;
+        }
+
+        self.session_ids
+            .retain(|target, _| !invalidated_contexts.contains(&target.context_root));
+    }
+
+    fn resolve_with<F>(
+        &mut self,
+        target: RuntimeSessionTarget,
+        resolver: &mut F,
+    ) -> Result<Option<String>, CliError>
+    where
+        F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
+    {
+        if let Some(session_id) = self.session_ids.get(&target) {
+            return Ok(Some(session_id.clone()));
+        }
+
+        let resolved_session = resolver(
+            &target.context_root,
+            &target.runtime_name,
+            &target.runtime_session_id,
+        )?;
+        if let Some(session_id) = resolved_session.as_ref() {
+            self.session_ids.insert(target, session_id.clone());
+        }
+        Ok(resolved_session)
+    }
+}
+
 /// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
 /// is available, uses `change_tracking` versions instead of full filesystem
 /// discovery. Falls back to the legacy JSON-diff approach otherwise.
@@ -144,6 +198,7 @@ fn spawn_db_watch_loop(
         let mut ticker = tokio_interval(interval);
         let mut last_change_seq: i64 = 0;
         let mut pending_paths = PendingWatchPaths::default();
+        let mut resolve_cache = RuntimeSessionResolveCache::default();
 
         loop {
             let debounce_sleep = pending_paths
@@ -165,7 +220,7 @@ fn spawn_db_watch_loop(
             }
 
             if let Some(paths) = pending_paths.take_ready_paths(Instant::now()) {
-                reindex_sessions_from_paths(&db, &paths);
+                reindex_sessions_from_paths(&db, &paths, &mut resolve_cache);
             }
 
             let Ok(db_guard) = db.lock() else {
@@ -198,6 +253,7 @@ fn spawn_legacy_watch_loop(
 
         let mut ticker = tokio_interval(interval);
         let mut snapshot = WatchSnapshot::default();
+        let mut resolve_cache = RuntimeSessionResolveCache::default();
         let _ = refresh_watch_snapshot(&mut snapshot, &BTreeSet::new(), RefreshScope::Full);
 
         loop {
@@ -210,7 +266,12 @@ fn spawn_legacy_watch_loop(
 
             tokio::select! {
                 Some(result) = event_rx.recv() => {
-                    merge_watch_event(result, &mut targeted_session_ids, &mut scope);
+                    merge_watch_event(
+                        result,
+                        &mut targeted_session_ids,
+                        &mut scope,
+                        &mut resolve_cache,
+                    );
                 }
                 _ = ticker.tick() => {
                     scope = RefreshScope::Full;
@@ -218,7 +279,12 @@ fn spawn_legacy_watch_loop(
             }
 
             while let Ok(result) = event_rx.try_recv() {
-                merge_watch_event(result, &mut targeted_session_ids, &mut scope);
+                merge_watch_event(
+                    result,
+                    &mut targeted_session_ids,
+                    &mut scope,
+                    &mut resolve_cache,
+                );
             }
 
             let Ok(changes) = refresh_watch_snapshot(&mut snapshot, &targeted_session_ids, scope)
@@ -267,8 +333,13 @@ fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> WatchChange
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-fn reindex_sessions_from_paths(db: &Arc<Mutex<DaemonDb>>, paths: &[PathBuf]) {
-    let session_ids = extract_session_ids(paths);
+fn reindex_sessions_from_paths(
+    db: &Arc<Mutex<DaemonDb>>,
+    paths: &[PathBuf],
+    resolve_cache: &mut RuntimeSessionResolveCache,
+) {
+    resolve_cache.invalidate_paths(paths);
+    let session_ids = extract_session_ids(paths, resolve_cache);
     if session_ids.is_empty() {
         return;
     }
@@ -338,13 +409,15 @@ fn merge_watch_event(
     result: notify::Result<notify::Event>,
     targeted_session_ids: &mut BTreeSet<String>,
     scope: &mut RefreshScope,
+    resolve_cache: &mut RuntimeSessionResolveCache,
 ) {
     let Ok(event) = result else {
         *scope = RefreshScope::Full;
         return;
     };
 
-    let extracted = extract_session_ids(&event.paths);
+    resolve_cache.invalidate_paths(&event.paths);
+    let extracted = extract_session_ids(&event.paths, resolve_cache);
     if extracted.is_empty() {
         *scope = RefreshScope::Full;
         return;
@@ -353,25 +426,50 @@ fn merge_watch_event(
     targeted_session_ids.extend(extracted);
 }
 
-fn extract_session_ids(paths: &[PathBuf]) -> BTreeSet<String> {
+fn extract_session_ids(
+    paths: &[PathBuf],
+    resolve_cache: &mut RuntimeSessionResolveCache,
+) -> BTreeSet<String> {
     paths
         .iter()
-        .filter_map(|path| session_id_from_path(path).ok().flatten())
+        .filter_map(|path| {
+            session_id_from_path_with_cache(path, resolve_cache)
+                .ok()
+                .flatten()
+        })
         .collect()
 }
 
+#[cfg(test)]
 fn session_id_from_path(path: &Path) -> Result<Option<String>, CliError> {
+    let mut resolve_cache = RuntimeSessionResolveCache::default();
+    session_id_from_path_with_cache(path, &mut resolve_cache)
+}
+
+fn session_id_from_path_with_cache(
+    path: &Path,
+    resolve_cache: &mut RuntimeSessionResolveCache,
+) -> Result<Option<String>, CliError> {
+    session_id_from_path_with(
+        path,
+        resolve_cache,
+        &mut index::resolve_session_id_for_runtime_session,
+    )
+}
+
+fn session_id_from_path_with<F>(
+    path: &Path,
+    resolve_cache: &mut RuntimeSessionResolveCache,
+    resolver: &mut F,
+) -> Result<Option<String>, CliError>
+where
+    F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
+{
     if let Some(session_id) = orchestration_session_id_from_path(path) {
         return Ok(Some(session_id));
     }
-    if let Some((context_root, runtime_name, runtime_session_id)) =
-        runtime_session_target_from_path(path)
-    {
-        return index::resolve_session_id_for_runtime_session(
-            &context_root,
-            &runtime_name,
-            &runtime_session_id,
-        );
+    if let Some(target) = runtime_session_target_from_path(path) {
+        return resolve_cache.resolve_with(target, resolver);
     }
     Ok(None)
 }
@@ -392,12 +490,20 @@ fn orchestration_session_id_from_path(path: &Path) -> Option<String> {
     })
 }
 
-fn runtime_session_target_from_path(path: &Path) -> Option<(PathBuf, String, String)> {
+fn orchestration_context_root(path: &Path) -> Option<PathBuf> {
+    path.ancestors().find_map(|ancestor| {
+        (ancestor.file_name().and_then(|name| name.to_str()) == Some("orchestration"))
+            .then(|| ancestor.parent().map(Path::to_path_buf))
+            .flatten()
+    })
+}
+
+fn runtime_session_target_from_path(path: &Path) -> Option<RuntimeSessionTarget> {
     runtime_session_target_from_transcript(path)
         .or_else(|| runtime_session_target_from_signal(path))
 }
 
-fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, String, String)> {
+fn runtime_session_target_from_transcript(path: &Path) -> Option<RuntimeSessionTarget> {
     if path.file_name().and_then(|name| name.to_str()) != Some("raw.jsonl") {
         return None;
     }
@@ -406,14 +512,14 @@ fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, Strin
     if !has_ancestor_names(path, 3, "sessions", "agents") {
         return None;
     }
-    Some((
-        path.ancestors().nth(5)?.to_path_buf(),
+    Some(RuntimeSessionTarget {
+        context_root: path.ancestors().nth(5)?.to_path_buf(),
         runtime_name,
         runtime_session_id,
-    ))
+    })
 }
 
-fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, String)> {
+fn runtime_session_target_from_signal(path: &Path) -> Option<RuntimeSessionTarget> {
     if !is_signal_bucket_path(path) {
         return None;
     }
@@ -422,11 +528,11 @@ fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, S
     if !has_ancestor_names(path, 4, "signals", "agents") {
         return None;
     }
-    Some((
-        path.ancestors().nth(6)?.to_path_buf(),
+    Some(RuntimeSessionTarget {
+        context_root: path.ancestors().nth(6)?.to_path_buf(),
         runtime_name,
         runtime_session_id,
-    ))
+    })
 }
 
 fn is_signal_bucket_path(path: &Path) -> bool {
@@ -606,6 +712,7 @@ fn emit_watch_changes_with<SessionsUpdated, SessionUpdatedCore, SessionExtension
 mod tests {
     use super::*;
 
+    use std::cell::Cell;
     use std::path::Path;
 
     use fs_err as fs;
@@ -713,6 +820,47 @@ mod tests {
             assert_eq!(worker.agent_session_id.as_deref(), Some("worker-session"));
             assert_eq!(state.session_id, "watch-map");
         });
+    }
+
+    #[test]
+    fn runtime_session_cache_reuses_resolution_until_orchestration_changes() {
+        let context_root = PathBuf::from("/tmp/watch-cache/context");
+        let transcript_path = context_root.join("agents/sessions/codex/worker-session/raw.jsonl");
+        let orchestration_path = context_root.join("orchestration/sessions/watch-map/state.json");
+        let mut cache = RuntimeSessionResolveCache::default();
+        let resolve_calls = Cell::new(0_usize);
+        let mut resolver = |root: &Path,
+                            runtime_name: &str,
+                            runtime_session_id: &str|
+         -> Result<Option<String>, CliError> {
+            resolve_calls.set(resolve_calls.get() + 1);
+            assert_eq!(root, context_root.as_path());
+            assert_eq!(runtime_name, "codex");
+            assert_eq!(runtime_session_id, "worker-session");
+            Ok(Some("watch-map".to_string()))
+        };
+
+        assert_eq!(
+            session_id_from_path_with(&transcript_path, &mut cache, &mut resolver)
+                .expect("first resolution"),
+            Some("watch-map".to_string())
+        );
+        assert_eq!(resolve_calls.get(), 1);
+
+        assert_eq!(
+            session_id_from_path_with(&transcript_path, &mut cache, &mut resolver)
+                .expect("cached resolution"),
+            Some("watch-map".to_string())
+        );
+        assert_eq!(resolve_calls.get(), 1);
+
+        cache.invalidate_paths(&[orchestration_path]);
+        assert_eq!(
+            session_id_from_path_with(&transcript_path, &mut cache, &mut resolver)
+                .expect("revalidated resolution"),
+            Some("watch-map".to_string())
+        );
+        assert_eq!(resolve_calls.get(), 2);
     }
 
     #[test]
