@@ -106,6 +106,35 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test("awaitManifestWarmUp rejects managed daemon version mismatches promptly")
+  func awaitManifestWarmUpRejectsManagedDaemonVersionMismatchPromptly() async throws {
+    try await withTempDaemonFixture(
+      pid: UInt32(getpid()),
+      version: "20.6.17"
+    ) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        expectedManagedDaemonVersion: { "20.6.19" }
+      )
+      let clock = ContinuousClock()
+      let start = clock.now
+
+      await #expect(
+        throws: DaemonControlError.managedDaemonVersionMismatch(
+          expected: "20.6.19",
+          actual: "20.6.17"
+        )
+      ) {
+        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(5))
+      }
+
+      let elapsed = start.duration(to: clock.now)
+      #expect(elapsed < .seconds(1))
+    }
+  }
+
   @Test("warm-up lifecycle messages keep related context in a single event")
   func warmUpLifecycleMessagesKeepRelatedContextInSingleEvent() {
     let endpoint = "http://127.0.0.1:54593"
