@@ -160,7 +160,7 @@ struct HarnessMonitorStoreTests {
 
   @Test("Installing the launch agent refreshes daemon diagnostics")
   func installLaunchAgentRefreshesDaemonDiagnostics() async {
-    let controller = RecordingDaemonController(launchAgentInstalled: false)
+    let controller = RecordingDaemonController(launchAgentInstalled: false, registrationState: .requiresApproval)
     let store = HarnessMonitorStore(daemonController: controller)
 
     await store.bootstrap()

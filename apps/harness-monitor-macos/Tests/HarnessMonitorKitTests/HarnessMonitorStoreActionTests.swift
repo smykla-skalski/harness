@@ -292,6 +292,7 @@ struct HarnessMonitorStoreActionTests {
   func mutationFallbackRefetchesOnlyTheTimeline() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
+    store.sessionPushFallbackDelay = .milliseconds(20)
     let sessionID = PreviewFixtures.summary.sessionId
 
     let baselineHealthCalls = client.readCallCount(.health)
@@ -299,7 +300,7 @@ struct HarnessMonitorStoreActionTests {
     let baselineProjectsCalls = client.readCallCount(.projects)
     let baselineSessionsCalls = client.readCallCount(.sessions)
     let baselineDetailCalls = client.readCallCount(.sessionDetail(sessionID))
-    let baselineTimelineCalls = client.readCallCount(.timeline(sessionID))
+    let baselineTimelineCalls = client.readCallCount(.timelineWindow(sessionID))
 
     let created = await store.createTask(
       title: "Fallback-only task",
@@ -315,7 +316,7 @@ struct HarnessMonitorStoreActionTests {
     #expect(client.readCallCount(.projects) == baselineProjectsCalls)
     #expect(client.readCallCount(.sessions) == baselineSessionsCalls)
     #expect(client.readCallCount(.sessionDetail(sessionID)) == baselineDetailCalls)
-    #expect(client.readCallCount(.timeline(sessionID)) == baselineTimelineCalls + 1)
+    #expect(client.readCallCount(.timelineWindow(sessionID)) == baselineTimelineCalls + 1)
 
     store.stopAllStreams()
   }

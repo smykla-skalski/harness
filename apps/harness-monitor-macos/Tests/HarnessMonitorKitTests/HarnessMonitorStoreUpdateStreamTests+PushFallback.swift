@@ -28,7 +28,12 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
     #expect(
       client.recordedTimelineWindowRequests(for: PreviewFixtures.summary.sessionId).last
-        == .latest(limit: selectedWindow.pageSize, knownRevision: selectedWindow.revision)
+        == .latest(
+          limit: max(
+            HarnessMonitorStore.initialSelectedTimelineWindowLimit, selectedWindow.pageSize
+          ),
+          knownRevision: selectedWindow.revision
+        )
     )
 
     store.scheduleSessionPushFallback(
@@ -69,7 +74,12 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
     #expect(
       client.recordedTimelineWindowRequests(for: PreviewFixtures.summary.sessionId).last
-        == .latest(limit: selectedWindow.pageSize, knownRevision: selectedWindow.revision)
+        == .latest(
+          limit: max(
+            HarnessMonitorStore.initialSelectedTimelineWindowLimit, selectedWindow.pageSize
+          ),
+          knownRevision: selectedWindow.revision
+        )
     )
 
     store.stopAllStreams()

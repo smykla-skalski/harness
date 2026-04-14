@@ -48,7 +48,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
   func managedBootstrapGatesOnRegistrationState() async {
     let daemon = RecordingDaemonController(
       launchAgentInstalled: false,
-      registrationState: .notRegistered
+      registrationState: .requiresApproval
     )
     let store = HarnessMonitorStore(daemonController: daemon)
 
@@ -58,7 +58,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    #expect(message.contains("Launch agent"))
+    #expect(message.contains("approval"))
   }
 
   @Test("External bootstrap falls through to warm-up error when warm-up fails")
