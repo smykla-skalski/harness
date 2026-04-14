@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
+use tokio::sync::broadcast::Sender;
+
 use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::{SessionSummary, StreamEvent};
 use crate::daemon::{service, snapshot, timeline};
@@ -108,7 +110,7 @@ fn prune_removed_sessions(
 }
 
 pub(super) fn emit_watch_changes(
-    sender: &tokio::sync::broadcast::Sender<StreamEvent>,
+    sender: &Sender<StreamEvent>,
     changes: WatchChanges,
     db: Option<&Arc<Mutex<DaemonDb>>>,
 ) {

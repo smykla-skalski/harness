@@ -22,9 +22,9 @@ use super::protocol::{
     ObserveSessionRequest, RoleChangeRequest, SessionEndRequest, SessionJoinRequest,
     SessionMutationResponse, SessionStartRequest, SetLogLevelRequest, SignalAckRequest,
     SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest,
-    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest,
+    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineCursor,
+    TimelineWindowRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
+    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
 };
 use super::read_cache::run_preferred_db_read;
 use super::service;
@@ -386,10 +386,50 @@ async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     timed_json("GET", "/v1/sessions", &request_id, start, result)
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 struct SessionScopeQuery {
     #[serde(default)]
     scope: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    known_revision: Option<i64>,
+    #[serde(default)]
+    before_recorded_at: Option<String>,
+    #[serde(default)]
+    before_entry_id: Option<String>,
+    #[serde(default)]
+    after_recorded_at: Option<String>,
+    #[serde(default)]
+    after_entry_id: Option<String>,
+}
+
+impl SessionScopeQuery {
+    fn timeline_window_request(&self) -> TimelineWindowRequest {
+        TimelineWindowRequest {
+            scope: self.scope.clone(),
+            limit: self.limit,
+            before: timeline_cursor(
+                self.before_recorded_at.clone(),
+                self.before_entry_id.clone(),
+            ),
+            after: timeline_cursor(self.after_recorded_at.clone(), self.after_entry_id.clone()),
+            known_revision: self.known_revision,
+        }
+    }
+}
+
+fn timeline_cursor(
+    recorded_at: Option<String>,
+    entry_id: Option<String>,
+) -> Option<TimelineCursor> {
+    match (recorded_at, entry_id) {
+        (Some(recorded_at), Some(entry_id)) => Some(TimelineCursor {
+            recorded_at,
+            entry_id,
+        }),
+        _ => None,
+    }
 }
 
 async fn get_session(
@@ -446,7 +486,8 @@ async fn get_timeline(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let payload_scope = match query.scope.as_deref() {
+    let timeline_request = query.timeline_window_request();
+    let payload_scope = match timeline_request.scope.as_deref() {
         Some("summary") => super::timeline::TimelinePayloadScope::Summary,
         _ => super::timeline::TimelinePayloadScope::Full,
     };
@@ -460,9 +501,10 @@ async fn get_timeline(
         read_name,
         {
             let session_id = session_id.clone();
-            move |db| service::session_timeline_with_scope(&session_id, payload_scope, Some(db))
+            let timeline_request = timeline_request.clone();
+            move |db| service::session_timeline_window(&session_id, &timeline_request, Some(db))
         },
-        || service::session_timeline_with_scope(&session_id, payload_scope, None),
+        || service::session_timeline_window(&session_id, &timeline_request, None),
     )
     .await;
     let route = if payload_scope == super::timeline::TimelinePayloadScope::Summary {
@@ -1590,7 +1632,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_timeline_summary_scope_omits_payloads() {
+    async fn get_timeline_summary_scope_returns_window_metadata() {
         let state = test_http_state_with_db();
         let db = state.db.get().expect("db slot").clone();
         {
@@ -1612,6 +1654,7 @@ mod tests {
             axum::extract::Path("sess-test-1".to_owned()),
             Query(SessionScopeQuery {
                 scope: Some("summary".into()),
+                ..SessionScopeQuery::default()
             }),
             auth_headers(),
             State(state),
@@ -1620,8 +1663,11 @@ mod tests {
 
         let (status, body) = response_json(response).await;
         assert_eq!(status, StatusCode::OK);
-        let Value::Array(entries) = body else {
-            panic!("expected timeline array response");
+        assert_eq!(body["revision"].as_i64(), Some(1));
+        assert_eq!(body["total_count"].as_u64(), Some(1));
+        assert_eq!(body["unchanged"].as_bool(), Some(false));
+        let Value::Array(entries) = body["entries"].clone() else {
+            panic!("expected timeline entries array response");
         };
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["kind"].as_str(), Some("tool_result"));

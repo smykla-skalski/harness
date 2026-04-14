@@ -10,7 +10,8 @@ use uuid::Uuid;
 
 use crate::daemon::bridge;
 use crate::daemon::codex_transport::{self, CodexTransportKind};
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{DaemonDb, ensure_shared_db};
+use crate::daemon::index;
 use crate::daemon::protocol::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexApprovalRequest,
     CodexApprovalRequestedPayload, CodexRunListResponse, CodexRunRequest, CodexRunSnapshot,
@@ -312,7 +313,7 @@ impl CodexControllerHandle {
         }
         drop(guard);
 
-        let resolved = crate::daemon::index::resolve_session(session_id)?;
+        let resolved = index::resolve_session(session_id)?;
         let fallback = resolved
             .project
             .project_dir
@@ -322,7 +323,7 @@ impl CodexControllerHandle {
     }
 
     fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
-        crate::daemon::db::ensure_shared_db(&self.state.db)
+        ensure_shared_db(&self.state.db)
     }
 
     fn active_runs(&self) -> Result<MutexGuard<'_, HashMap<String, ActiveRun>>, CliError> {
