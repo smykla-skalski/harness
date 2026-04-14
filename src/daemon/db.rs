@@ -81,7 +81,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-const SCHEMA_VERSION: &str = "5";
+const SCHEMA_VERSION: &str = "6";
 
 impl DaemonDb {
     /// Open (or create) the daemon database at the given path with WAL mode
@@ -153,21 +153,29 @@ impl DaemonDb {
                 let reclaimed = migrate_v2_to_v3(&self.conn)?;
                 migrate_v3_to_v4(&self.conn)?;
                 migrate_v4_to_v5(&self.conn)?;
+                migrate_v5_to_v6(&self.conn)?;
                 reclaimed
             }
             "2" => {
                 let reclaimed = migrate_v2_to_v3(&self.conn)?;
                 migrate_v3_to_v4(&self.conn)?;
                 migrate_v4_to_v5(&self.conn)?;
+                migrate_v5_to_v6(&self.conn)?;
                 reclaimed
             }
             "3" => {
                 migrate_v3_to_v4(&self.conn)?;
                 migrate_v4_to_v5(&self.conn)?;
+                migrate_v5_to_v6(&self.conn)?;
                 false
             }
             "4" => {
                 migrate_v4_to_v5(&self.conn)?;
+                migrate_v5_to_v6(&self.conn)?;
+                false
+            }
+            "5" => {
+                migrate_v5_to_v6(&self.conn)?;
                 false
             }
             _ => false,
@@ -395,16 +403,39 @@ impl DaemonDb {
     /// Returns [`CliError`] on SQL failures.
     pub fn bump_change(&self, scope: &str) -> Result<(), CliError> {
         let normalized_scope = normalize_change_scope(scope);
-        self.conn
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin change bump transaction: {error}")))?;
+        transaction
             .execute(
-                "INSERT INTO change_tracking (scope, version, updated_at)
-                 VALUES (?1, 1, ?2)
+                "UPDATE change_tracking_state
+                 SET last_seq = last_seq + 1
+                 WHERE singleton = 1",
+                [],
+            )
+            .map_err(|error| db_error(format!("advance change sequence: {error}")))?;
+        let change_seq = transaction
+            .query_row(
+                "SELECT last_seq FROM change_tracking_state WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|error| db_error(format!("read change sequence: {error}")))?;
+        transaction
+            .execute(
+                "INSERT INTO change_tracking (scope, version, updated_at, change_seq)
+                 VALUES (?1, 1, ?2, ?3)
                  ON CONFLICT(scope) DO UPDATE SET
                      version = version + 1,
-                     updated_at = excluded.updated_at",
-                rusqlite::params![normalized_scope.as_ref(), utc_now()],
+                     updated_at = excluded.updated_at,
+                     change_seq = excluded.change_seq",
+                rusqlite::params![normalized_scope.as_ref(), utc_now(), change_seq],
             )
             .map_err(|error| db_error(format!("bump change: {error}")))?;
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit change bump transaction: {error}")))?;
         Ok(())
     }
 
@@ -2068,6 +2099,29 @@ fn schema_exists(conn: &Connection) -> Result<bool, CliError> {
     .map_err(|error| db_error(format!("check schema_meta existence: {error}")))
 }
 
+fn table_exists(conn: &Connection, table_name: &str) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        [table_name],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| db_error(format!("check {table_name} table existence: {error}")))
+}
+
+fn column_exists(conn: &Connection, table_name: &str, column_name: &str) -> Result<bool, CliError> {
+    let pragma = format!("PRAGMA table_info({table_name})");
+    let columns = conn
+        .prepare(&pragma)
+        .and_then(|mut statement| {
+            statement
+                .query_map([], |row| row.get::<_, String>(1))
+                .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+        })
+        .map_err(|error| db_error(format!("read {table_name} columns: {error}")))?;
+    Ok(columns.iter().any(|column| column == column_name))
+}
+
 fn create_schema(conn: &Connection) -> Result<(), CliError> {
     emit_schema_init_info();
     conn.execute_batch(CREATE_SCHEMA)
@@ -2147,9 +2201,68 @@ fn migrate_v4_to_v5(conn: &Connection) -> Result<(), CliError> {
         .map_err(|error| db_error(format!("migrate v4 -> v5 agent tuis: {error}")))?;
     conn.execute(
         "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
-        [SCHEMA_VERSION],
+        ["5"],
     )
     .map_err(|error| db_error(format!("bump schema version to v5: {error}")))?;
+    Ok(())
+}
+
+fn migrate_v5_to_v6(conn: &Connection) -> Result<(), CliError> {
+    if table_exists(conn, "change_tracking")? {
+        if !column_exists(conn, "change_tracking", "change_seq")? {
+            conn.execute_batch(
+                "ALTER TABLE change_tracking
+                     ADD COLUMN change_seq INTEGER NOT NULL DEFAULT 0;",
+            )
+            .map_err(|error| db_error(format!("add change_seq column: {error}")))?;
+        }
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_change_tracking_change_seq
+                 ON change_tracking(change_seq);
+             UPDATE change_tracking
+                SET change_seq = CASE
+                    WHEN version > 0 THEN 1
+                    ELSE 0
+                END;",
+        )
+        .map_err(|error| db_error(format!("backfill change tracking sequence: {error}")))?;
+    } else {
+        conn.execute_batch(
+            "CREATE TABLE change_tracking (
+                 scope      TEXT PRIMARY KEY,
+                 version    INTEGER NOT NULL DEFAULT 0,
+                 updated_at TEXT NOT NULL,
+                 change_seq INTEGER NOT NULL DEFAULT 0
+             ) WITHOUT ROWID;
+             CREATE INDEX idx_change_tracking_change_seq
+                 ON change_tracking(change_seq);
+             INSERT INTO change_tracking (scope, version, updated_at, change_seq)
+             VALUES ('global', 0, datetime('now'), 0);",
+        )
+        .map_err(|error| db_error(format!("create v6 change tracking tables: {error}")))?;
+    }
+
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS change_tracking_state (
+             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+             last_seq  INTEGER NOT NULL
+         ) WITHOUT ROWID;
+         INSERT INTO change_tracking_state (singleton, last_seq)
+         VALUES (
+             1,
+             CASE
+                 WHEN EXISTS(SELECT 1 FROM change_tracking WHERE version > 0) THEN 1
+                 ELSE 0
+             END
+         )
+         ON CONFLICT(singleton) DO UPDATE SET last_seq = excluded.last_seq;",
+    )
+    .map_err(|error| db_error(format!("seed change tracking sequence state: {error}")))?;
+    conn.execute(
+        "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
+        [SCHEMA_VERSION],
+    )
+    .map_err(|error| db_error(format!("bump schema version to v6: {error}")))?;
     Ok(())
 }
 
@@ -2535,7 +2648,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '5');
+INSERT INTO schema_meta (key, value) VALUES ('version', '6');
 
 -- Discovered projects
 CREATE TABLE projects (
@@ -2718,7 +2831,15 @@ CREATE TABLE agent_activity_cache (
 CREATE TABLE change_tracking (
     scope      TEXT PRIMARY KEY,
     version    INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    change_seq INTEGER NOT NULL DEFAULT 0
+) WITHOUT ROWID;
+CREATE INDEX idx_change_tracking_change_seq
+    ON change_tracking(change_seq);
+
+CREATE TABLE change_tracking_state (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    last_seq  INTEGER NOT NULL
 ) WITHOUT ROWID;
 
 -- Cached diagnostics metadata (avoids process spawns and directory walks)
@@ -2777,6 +2898,8 @@ CREATE INDEX idx_agent_tuis_status
 
 INSERT INTO change_tracking (scope, version, updated_at)
 VALUES ('global', 0, datetime('now'));
+INSERT INTO change_tracking_state (singleton, last_seq)
+VALUES (1, 0);
 ";
 
 fn derive_effective_signal_status(
@@ -2858,6 +2981,48 @@ mod tests {
     }
 
     #[test]
+    fn migrates_v5_schema_to_incremental_change_tracking() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let path = tmp.path().join("harness.db");
+        {
+            let conn = Connection::open(&path).expect("open sqlite");
+            conn.execute_batch(
+                "CREATE TABLE schema_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                ) WITHOUT ROWID;
+                INSERT INTO schema_meta (key, value) VALUES ('version', '5');
+                CREATE TABLE change_tracking (
+                    scope TEXT PRIMARY KEY,
+                    version INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                ) WITHOUT ROWID;
+                INSERT INTO change_tracking (scope, version, updated_at)
+                VALUES ('global', 3, '2026-04-13T12:00:00Z');",
+            )
+            .expect("seed v5 schema");
+        }
+
+        let db = DaemonDb::open(&path).expect("open migrated db");
+        assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+
+        let (change_seq, last_seq): (i64, i64) = db
+            .conn
+            .query_row(
+                "SELECT change_tracking.change_seq, change_tracking_state.last_seq
+                 FROM change_tracking
+                 JOIN change_tracking_state ON change_tracking_state.singleton = 1
+                 WHERE change_tracking.scope = 'global'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("query migrated change tracking");
+
+        assert_eq!(change_seq, 1);
+        assert_eq!(last_seq, 1);
+    }
+
+    #[test]
     fn all_tables_exist() {
         let db = DaemonDb::open_in_memory().expect("open db");
         let tables: Vec<String> = db
@@ -2874,6 +3039,7 @@ mod tests {
             "agent_tuis",
             "agents",
             "change_tracking",
+            "change_tracking_state",
             "codex_runs",
             "conversation_events",
             "daemon_events",
@@ -2981,15 +3147,71 @@ mod tests {
     #[test]
     fn change_tracking_seeded() {
         let db = DaemonDb::open_in_memory().expect("open db");
-        let version: i64 = db
+        let (version, change_seq): (i64, i64) = db
             .conn
             .query_row(
-                "SELECT version FROM change_tracking WHERE scope = 'global'",
+                "SELECT version, change_seq
+                 FROM change_tracking
+                 WHERE scope = 'global'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("global version");
+        let last_seq: i64 = db
+            .conn
+            .query_row(
+                "SELECT last_seq
+                 FROM change_tracking_state
+                 WHERE singleton = 1",
                 [],
                 |row| row.get(0),
             )
-            .expect("global version");
+            .expect("last change sequence");
         assert_eq!(version, 0);
+        assert_eq!(change_seq, 0);
+        assert_eq!(last_seq, 0);
+    }
+
+    #[test]
+    fn bump_change_advances_monotonic_sequence() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        db.bump_change("alpha").expect("first bump");
+        db.bump_change("beta").expect("second bump");
+
+        let alpha_seq: i64 = db
+            .conn
+            .query_row(
+                "SELECT change_seq
+                 FROM change_tracking
+                 WHERE scope = 'session:alpha'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("alpha change sequence");
+        let beta_seq: i64 = db
+            .conn
+            .query_row(
+                "SELECT change_seq
+                 FROM change_tracking
+                 WHERE scope = 'session:beta'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("beta change sequence");
+        let last_seq: i64 = db
+            .conn
+            .query_row(
+                "SELECT last_seq
+                 FROM change_tracking_state
+                 WHERE singleton = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("last change sequence");
+
+        assert_eq!(alpha_seq, 1);
+        assert_eq!(beta_seq, 2);
+        assert_eq!(last_seq, 2);
     }
 
     fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
