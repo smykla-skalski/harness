@@ -244,6 +244,23 @@ enum SessionTimelinePagination {
     return clampedCurrentPage
   }
 
+  static func adjustedPageAfterTimelineCountChange(
+    currentPage: Int,
+    oldItemCount: Int,
+    newItemCount: Int,
+    pageSize: Int
+  ) -> Int? {
+    guard newItemCount < oldItemCount else {
+      return nil
+    }
+
+    return adjustedPage(
+      currentPage: currentPage,
+      itemCount: newItemCount,
+      pageSize: pageSize
+    )
+  }
+
   static func currentEntries(
     in timeline: [TimelineEntry],
     currentPage: Int,
