@@ -9,6 +9,7 @@ actor RecordingDaemonController: DaemonControlling {
   private let statusReportOverride: DaemonStatusReport?
   private let warmUpError: (any Error)?
   private var lastEventMessage = "daemon ready"
+  private var registerLaunchAgentCallCount = 0
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
@@ -29,6 +30,7 @@ actor RecordingDaemonController: DaemonControlling {
   }
 
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    registerLaunchAgentCallCount += 1
     launchAgentInstalled = true
     lastEventMessage = "launch agent installed"
     return .enabled
@@ -126,5 +128,9 @@ actor RecordingDaemonController: DaemonControlling {
     launchAgentInstalled = false
     lastEventMessage = "launch agent removed"
     return "removed"
+  }
+
+  func recordedRegisterLaunchAgentCallCount() async -> Int {
+    registerLaunchAgentCallCount
   }
 }

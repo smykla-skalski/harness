@@ -189,8 +189,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.contentUI.session.selectedSessionSummary == nil)
   }
 
-  @Test("Bootstrap with notRegistered agent marks offline and sets installed false")
-  func bootstrapWithNotRegisteredAgentMarksOffline() async {
+  @Test("Bootstrap with notRegistered agent registers and connects")
+  func bootstrapWithNotRegisteredAgentRegistersAndConnects() async {
     let daemon = RecordingDaemonController(
       launchAgentInstalled: false,
       registrationState: .notRegistered
@@ -199,12 +199,22 @@ extension HarnessMonitorStoreLifecycleCoreTests {
 
     await store.bootstrap()
 
-    if case .offline(let reason) = store.connectionState {
-      #expect(reason.contains("not installed"))
-    } else {
-      Issue.record("expected offline state, got \(store.connectionState)")
-    }
-    #expect(store.daemonStatus?.launchAgent.installed == false)
+    #expect(store.connectionState == .online)
+    #expect(await daemon.recordedRegisterLaunchAgentCallCount() == 1)
+  }
+
+  @Test("Bootstrap with notFound agent registers and connects")
+  func bootstrapWithNotFoundAgentRegistersAndConnects() async {
+    let daemon = RecordingDaemonController(
+      launchAgentInstalled: true,
+      registrationState: .notFound
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    #expect(store.connectionState == .online)
+    #expect(await daemon.recordedRegisterLaunchAgentCallCount() == 1)
   }
 
   @Test("Bootstrap with requiresApproval marks offline with approval message")

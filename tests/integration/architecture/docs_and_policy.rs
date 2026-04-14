@@ -195,8 +195,20 @@ fn repo_version_surfaces_stay_in_sync() {
         "apps/harness-monitor-macos/project.yml should match Cargo.toml version {version}"
     );
     assert!(
-        daemon_info_plist.contains(&format!("<string>{version}</string>")),
-        "daemon Info.plist should match Cargo.toml version {version}"
+        project_yml.contains(&format!("CURRENT_PROJECT_VERSION: {version}")),
+        "apps/harness-monitor-macos/project.yml CURRENT_PROJECT_VERSION should match Cargo.toml version {version}"
+    );
+    assert!(
+        daemon_info_plist.contains(&format!(
+            "<key>CFBundleShortVersionString</key>\n\t<string>{version}</string>"
+        )),
+        "daemon Info.plist CFBundleShortVersionString should match Cargo.toml version {version}"
+    );
+    assert!(
+        daemon_info_plist.contains(&format!(
+            "<key>CFBundleVersion</key>\n\t<string>{version}</string>"
+        )),
+        "daemon Info.plist CFBundleVersion should match Cargo.toml version {version}"
     );
 
     let pbxproj_versions: Vec<_> = project_pbxproj
@@ -214,6 +226,22 @@ fn repo_version_surfaces_stay_in_sync() {
     assert!(
         pbxproj_versions.iter().all(|value| value == version),
         "project.pbxproj MARKETING_VERSION values should all match Cargo.toml version {version}: {pbxproj_versions:?}"
+    );
+    let pbxproj_build_versions: Vec<_> = project_pbxproj
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("CURRENT_PROJECT_VERSION = ")
+                .map(|value| value.trim_end_matches(';').to_string())
+        })
+        .collect();
+    assert!(
+        !pbxproj_build_versions.is_empty(),
+        "project.pbxproj should contain CURRENT_PROJECT_VERSION entries"
+    );
+    assert!(
+        pbxproj_build_versions.iter().all(|value| value == version),
+        "project.pbxproj CURRENT_PROJECT_VERSION values should all match Cargo.toml version {version}: {pbxproj_build_versions:?}"
     );
     assert!(
         observe_output.contains("env!(\"CARGO_PKG_VERSION\")"),
