@@ -5,7 +5,7 @@ use crate::session::types::CURRENT_VERSION;
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
 };
-use super::registry::{merge_project_origin, ProjectOriginRecord};
+use super::registry::{ProjectOriginRecord, merge_project_origin};
 
 #[test]
 fn migrate_v1_and_v2_stamp_expected_schema_versions() {

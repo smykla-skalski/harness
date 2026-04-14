@@ -112,18 +112,21 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");
-        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("expired-worker-session"))], || {
-            session_service::join_session(
-                "hook-expired-sess",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join worker")
-        });
+        let joined = temp_env::with_vars(
+            [("CODEX_SESSION_ID", Some("expired-worker-session"))],
+            || {
+                session_service::join_session(
+                    "hook-expired-sess",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker")
+            },
+        );
         let worker_id = joined
             .agents
             .keys()

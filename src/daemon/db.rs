@@ -2955,15 +2955,13 @@ fn timeline_source_identity(entry: &TimelineEntry) -> (&'static str, String) {
             | "agent_state_change"
             | "file_modification"
             | "agent_session_marker"
-    ) {
-        if let Some(agent_id) = entry.agent_id.as_deref()
-            && let Some((_, sequence)) = entry.entry_id.rsplit_once('-')
-        {
-            return (
-                "conversation",
-                format!("conversation:{agent_id}:{sequence}"),
-            );
-        }
+    ) && let Some(agent_id) = entry.agent_id.as_deref()
+        && let Some((_, sequence)) = entry.entry_id.rsplit_once('-')
+    {
+        return (
+            "conversation",
+            format!("conversation:{agent_id}:{sequence}"),
+        );
     }
     ("derived", entry.entry_id.clone())
 }

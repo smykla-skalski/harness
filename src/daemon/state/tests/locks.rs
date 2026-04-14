@@ -13,7 +13,10 @@ use super::sample_manifest;
 fn singleton_lock_rejects_second_holder() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             let _guard = acquire_singleton_lock().expect("first lock");
             write_manifest(&sample_manifest(4242, "http://127.0.0.1:9999")).expect("manifest");

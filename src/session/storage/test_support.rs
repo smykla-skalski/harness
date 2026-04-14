@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::session::types::{
-    AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState, SessionStatus,
-    TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem, CURRENT_VERSION,
+    AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole, SessionState,
+    SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
 
 pub(super) fn sample_state(session_id: &str) -> SessionState {

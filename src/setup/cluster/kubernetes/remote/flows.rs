@@ -5,8 +5,8 @@ use crate::infra::blocks::KubernetesRuntime;
 use crate::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting};
 use crate::workspace::RemoteKubernetesInstallState;
 
-use super::members::{install_member, resolve_remote_kds_address, state_member, uninstall_member};
 use super::InstallMemberPlan;
+use super::members::{install_member, resolve_remote_kds_address, state_member, uninstall_member};
 
 pub(super) fn execute_remote_up(
     kubernetes: &dyn KubernetesRuntime,
@@ -131,7 +131,10 @@ fn execute_remote_global_two_zones_up(
     let kds_address = resolve_remote_kds_address(kubernetes, global_state)?;
     for zone_index in [1usize, 2usize] {
         let zone = spec.members[zone_index].name.as_str();
-        let zone_name = spec.members[zone_index].zone_name.as_deref().unwrap_or(zone);
+        let zone_name = spec.members[zone_index]
+            .zone_name
+            .as_deref()
+            .unwrap_or(zone);
         install_member(
             kubernetes,
             root,
@@ -166,13 +169,33 @@ pub(super) fn execute_remote_down(
             state_member(state, spec.primary_member().name.as_str())?,
         ),
         ClusterMode::GlobalZoneDown => {
-            uninstall_member(kubernetes, root, state_member(state, spec.members[1].name.as_str())?)?;
-            uninstall_member(kubernetes, root, state_member(state, spec.members[0].name.as_str())?)
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[1].name.as_str())?,
+            )?;
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[0].name.as_str())?,
+            )
         }
         ClusterMode::GlobalTwoZonesDown => {
-            uninstall_member(kubernetes, root, state_member(state, spec.members[2].name.as_str())?)?;
-            uninstall_member(kubernetes, root, state_member(state, spec.members[1].name.as_str())?)?;
-            uninstall_member(kubernetes, root, state_member(state, spec.members[0].name.as_str())?)
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[2].name.as_str())?,
+            )?;
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[1].name.as_str())?,
+            )?;
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[0].name.as_str())?,
+            )
         }
         ClusterMode::SingleUp | ClusterMode::GlobalZoneUp | ClusterMode::GlobalTwoZonesUp => {
             Err(CliErrorKind::cluster_error("remote down flow called for up mode").into())

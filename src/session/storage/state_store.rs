@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
-use crate::session::types::{SessionState, CURRENT_VERSION};
+use crate::session::types::{CURRENT_VERSION, SessionState};
 use crate::workspace::utc_now;
 
 use super::files;

@@ -4,9 +4,10 @@ use std::thread;
 use std::time::Duration;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::kuma::repo::helm_chart_path;
 use crate::infra::blocks::KubernetesRuntime;
+use crate::infra::blocks::kuma::repo::helm_chart_path;
 use crate::infra::exec::{run_command, run_command_streaming};
+use crate::kernel::topology::HelmSetting;
 use crate::setup::gateway::gateway;
 use crate::workspace::{RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState};
 
@@ -102,7 +103,7 @@ fn install_member_settings(plan: &InstallMemberPlan<'_>) -> Vec<String> {
         format!("kumactl.image.tag={}", plan.push_tag),
     ];
     settings.extend(plan.mode_settings.iter().cloned());
-    settings.extend(plan.helm_settings.iter().map(|setting| setting.to_cli_arg()));
+    settings.extend(plan.helm_settings.iter().map(HelmSetting::to_cli_arg));
     settings
 }
 

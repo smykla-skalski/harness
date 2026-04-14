@@ -41,7 +41,10 @@ fn capture_uses_run_context() {
         let invocations = tc.invocations("kubectl");
         assert!(!invocations.is_empty(), "kubectl should have been invoked");
         let invoc = invocations[0].to_lowercase();
-        assert!(invoc.contains("get"), "kubectl should have run get: {invoc}");
+        assert!(
+            invoc.contains("get"),
+            "kubectl should have run get: {invoc}"
+        );
         assert!(
             invoc.contains("pods"),
             "kubectl should have queried pods: {invoc}"

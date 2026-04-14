@@ -2,11 +2,11 @@ use std::path::Path;
 
 use crate::errors::CliError;
 use crate::kernel::topology::ClusterSpec;
+use crate::run::RunStatus;
 use crate::run::args::RunDirArgs;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
 use crate::run::workflow::{runner_state_path, write_runner_state};
-use crate::run::RunStatus;
 
 use super::checks::{append_pointer_checks, append_run_checks};
 use super::helpers::{fixed_check, repaired_status, repaired_workflow};
