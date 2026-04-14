@@ -331,6 +331,30 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
   }
 
+  @Test("Refresh overlaps bootstrap reads so startup latency tracks the slowest request")
+  func refreshOverlapsBootstrapReads() async {
+    let diagnosticsDelay: Duration = .milliseconds(250)
+    let projectsDelay: Duration = .milliseconds(250)
+    let sessionsDelay: Duration = .milliseconds(250)
+    let client = RecordingHarnessClient()
+    client.configureDiagnosticsDelay(diagnosticsDelay)
+    client.configureProjectsDelay(projectsDelay)
+    client.configureSessionsDelay(sessionsDelay)
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    let clock = ContinuousClock()
+    let startedAt = clock.now
+
+    await store.refresh(using: client, preserveSelection: true)
+
+    let elapsed = startedAt.duration(to: clock.now)
+    #expect(client.readCallCount(.diagnostics) == 1)
+    #expect(client.readCallCount(.projects) == 1)
+    #expect(client.readCallCount(.sessions) == 1)
+    #expect(elapsed < .milliseconds(550))
+  }
+
   @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
   func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
     let daemon = RecordingDaemonController(
