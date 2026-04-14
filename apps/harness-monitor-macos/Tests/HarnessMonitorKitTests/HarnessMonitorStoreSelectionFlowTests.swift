@@ -230,6 +230,77 @@ struct HarnessMonitorStoreSelectionFlowTests {
     #expect(store.isShowingCachedData == false)
   }
 
+  @Test("Selecting an uncached session requests only the latest timeline window")
+  func selectingUncachedSessionRequestsOnlyLatestWindow() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-window-latest",
+        context: "Windowed timeline lane",
+        status: .active,
+        leaderId: "leader-window-latest",
+        observeId: "observe-window-latest",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-window-latest",
+      workerName: "Window Worker"
+    )
+    let fullTimeline = (0..<25).map { index in
+      TimelineEntry(
+        entryId: "timeline-window-\(index)",
+        recordedAt: String(
+          format: "2026-03-29T12:%02d:00Z",
+          59 - index
+        ),
+        kind: "task_checkpoint",
+        sessionId: summary.sessionId,
+        agentId: detail.agents[0].agentId,
+        taskId: nil,
+        summary: "Window event \(index)",
+        payload: .object([:])
+      )
+    }
+    let pageSize = 10
+    let latestWindowEntries = Array(fullTimeline.prefix(pageSize))
+    let latestWindowResponse = TimelineWindowResponse(
+      revision: 7,
+      totalCount: fullTimeline.count,
+      windowStart: 0,
+      windowEnd: latestWindowEntries.count,
+      hasOlder: true,
+      hasNewer: false,
+      oldestCursor: latestWindowEntries.last.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      newestCursor: latestWindowEntries.first.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      entries: latestWindowEntries,
+      unchanged: false
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: fullTimeline],
+      detail: detail
+    )
+    client.configureTimelineWindowResponse(latestWindowResponse, for: summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+
+    #expect(client.recordedTimelineWindowRequests(for: summary.sessionId) == [
+      .latest(limit: pageSize)
+    ])
+    #expect(client.readCallCount(.timeline(summary.sessionId)) == 0)
+    #expect(store.timeline == latestWindowEntries)
+  }
+
   @Test("Selecting a session finishes before slow secondary panes hydrate")
   func selectingSessionFinishesBeforeSlowSecondaryPanesHydrate() async throws {
     let summary = makeSession(

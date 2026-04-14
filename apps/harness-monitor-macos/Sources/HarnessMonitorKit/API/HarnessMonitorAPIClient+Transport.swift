@@ -28,6 +28,15 @@ extension HarnessMonitorAPIClient {
     return try await send(request)
   }
 
+  func get<Response: Decodable>(
+    _ path: String,
+    queryItems: [URLQueryItem]
+  ) async throws -> Response {
+    var request = try makeRequest(path: path, queryItems: queryItems)
+    request.httpMethod = "GET"
+    return try await send(request)
+  }
+
   func post<RequestBody: Encodable, Response: Decodable>(
     _ path: String,
     body: RequestBody
@@ -117,8 +126,22 @@ extension HarnessMonitorAPIClient {
     }
   }
 
-  func makeRequest(path: String) throws -> URLRequest {
-    guard let url = URL(string: path, relativeTo: connection.endpoint) else {
+  func makeRequest(
+    path: String,
+    queryItems: [URLQueryItem] = []
+  ) throws -> URLRequest {
+    guard let baseURL = URL(string: path, relativeTo: connection.endpoint) else {
+      throw HarnessMonitorAPIError.invalidEndpoint(connection.endpoint.absoluteString)
+    }
+    guard
+      var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: true)
+    else {
+      throw HarnessMonitorAPIError.invalidEndpoint(connection.endpoint.absoluteString)
+    }
+    if !queryItems.isEmpty {
+      components.queryItems = queryItems
+    }
+    guard let url = components.url else {
       throw HarnessMonitorAPIError.invalidEndpoint(connection.endpoint.absoluteString)
     }
 

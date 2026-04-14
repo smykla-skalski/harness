@@ -110,6 +110,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case sessions
     case sessionDetail(String)
     case timeline(String)
+    case timelineWindow(String)
   }
 
   let lock = NSLock()
@@ -130,10 +131,14 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var sessionDetailScopesByID: [String: [String?]] = [:]
   var timelinesBySessionID: [String: [TimelineEntry]] = [:]
   var timelineScopesBySessionID: [String: [TimelineScope]] = [:]
+  var timelineWindowRequestsBySessionID: [String: [TimelineWindowRequest]] = [:]
+  var timelineWindowResponsesBySessionID: [String: TimelineWindowResponse] = [:]
   var timelineBatchesBySessionID: [String: [[TimelineEntry]]] = [:]
   var timelineDelaysBySessionID: [String: Duration] = [:]
+  var timelineWindowDelaysBySessionID: [String: Duration] = [:]
   var timelineBatchDelaysBySessionID: [String: Duration] = [:]
   var timelineErrorsBySessionID: [String: any Error] = [:]
+  var timelineWindowErrorsBySessionID: [String: any Error] = [:]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
@@ -157,6 +162,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var recordedSessionsCallCount = 0
   var sessionDetailCallCountsBySessionID: [String: Int] = [:]
   var timelineCallCountsBySessionID: [String: Int] = [:]
+  var timelineWindowCallCountsBySessionID: [String: Int] = [:]
 
   var calls: [Call] {
     get { lock.withLock { callsStorage } }

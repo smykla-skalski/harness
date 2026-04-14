@@ -214,7 +214,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(store.selectedSessionID == summary.sessionId)
     #expect(store.selectedSession?.session.sessionId == summary.sessionId)
     #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == 1)
-    #expect(client.readCallCount(.timeline(summary.sessionId)) == 1)
+    #expect(client.readCallCount(.timelineWindow(summary.sessionId)) == 1)
   }
 
   @Test("Reselecting the loaded sidebar session clears inspector without reloading")

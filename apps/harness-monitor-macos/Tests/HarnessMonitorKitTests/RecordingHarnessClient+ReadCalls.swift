@@ -20,6 +20,8 @@ extension RecordingHarnessClient {
         sessionDetailCallCountsBySessionID[sessionID, default: 0] += 1
       case .timeline(let sessionID):
         timelineCallCountsBySessionID[sessionID, default: 0] += 1
+      case .timelineWindow(let sessionID):
+        timelineWindowCallCountsBySessionID[sessionID, default: 0] += 1
       }
     }
   }
@@ -41,6 +43,8 @@ extension RecordingHarnessClient {
         sessionDetailCallCountsBySessionID[sessionID, default: 0]
       case .timeline(let sessionID):
         timelineCallCountsBySessionID[sessionID, default: 0]
+      case .timelineWindow(let sessionID):
+        timelineWindowCallCountsBySessionID[sessionID, default: 0]
       }
     }
   }
@@ -70,6 +74,18 @@ extension RecordingHarnessClient {
   func recordTimelineScope(sessionID: String, scope: TimelineScope) {
     lock.withLock {
       timelineScopesBySessionID[sessionID, default: []].append(scope)
+    }
+  }
+
+  func recordTimelineWindowRequest(sessionID: String, request: TimelineWindowRequest) {
+    lock.withLock {
+      timelineWindowRequestsBySessionID[sessionID, default: []].append(request)
+    }
+  }
+
+  func recordedTimelineWindowRequests(for sessionID: String) -> [TimelineWindowRequest] {
+    lock.withLock {
+      timelineWindowRequestsBySessionID[sessionID, default: []]
     }
   }
 

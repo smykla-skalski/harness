@@ -3,6 +3,8 @@ import Foundation
 public typealias DaemonPushEventStream = AsyncThrowingStream<DaemonPushEvent, Error>
 public typealias TimelineBatchHandler =
   @Sendable (_ entries: [TimelineEntry], _ batchIndex: Int, _ batchCount: Int) async -> Void
+public typealias TimelineWindowBatchHandler =
+  @Sendable (_ response: TimelineWindowResponse, _ batchIndex: Int, _ batchCount: Int) async -> Void
 
 public enum TimelineScope: String, Codable, Equatable, Sendable {
   case full
@@ -21,6 +23,13 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func projects() async throws -> [ProjectSummary]
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
+  func timelineWindow(sessionID: String, request: TimelineWindowRequest) async throws
+    -> TimelineWindowResponse
+  func timelineWindow(
+    sessionID: String,
+    request: TimelineWindowRequest,
+    onBatch: @escaping TimelineWindowBatchHandler
+  ) async throws -> TimelineWindowResponse
   func timeline(sessionID: String) async throws -> [TimelineEntry]
   func timeline(
     sessionID: String,
@@ -159,6 +168,34 @@ extension HarnessMonitorClientProtocol {
     try await sessionDetail(id: id, scope: nil)
   }
 
+  public func timelineWindow(sessionID: String, request: TimelineWindowRequest) async throws
+    -> TimelineWindowResponse
+  {
+    try await timelineWindow(sessionID: sessionID, request: request) { _, _, _ in }
+  }
+
+  public func timelineWindow(
+    sessionID: String,
+    request: TimelineWindowRequest,
+    onBatch: @escaping TimelineWindowBatchHandler
+  ) async throws -> TimelineWindowResponse {
+    let resolvedScope = request.scope ?? .full
+    let entries = try await timeline(
+      sessionID: sessionID,
+      scope: resolvedScope
+    ) { entries, batchIndex, batchCount in
+      let response = timelineWindowResponse(
+        from: entries,
+        request: request
+      )
+      await onBatch(response, batchIndex, batchCount)
+    }
+    return timelineWindowResponse(
+      from: entries,
+      request: request
+    )
+  }
+
   public func timeline(
     sessionID: String,
     onBatch: @escaping TimelineBatchHandler
@@ -184,6 +221,33 @@ extension HarnessMonitorClientProtocol {
 
   public func personas() async throws -> [AgentPersona] {
     []
+  }
+
+  private func timelineWindowResponse(
+    from entries: [TimelineEntry],
+    request: TimelineWindowRequest
+  ) -> TimelineWindowResponse {
+    let oldestCursor = entries.first.map {
+      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+    }
+    let newestCursor = entries.last.map {
+      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+    }
+    let totalCount = entries.count
+    let windowCount = entries.count
+    let windowStart = max(0, totalCount - windowCount)
+    return TimelineWindowResponse(
+      revision: request.knownRevision ?? 0,
+      totalCount: totalCount,
+      windowStart: windowStart,
+      windowEnd: totalCount,
+      hasOlder: false,
+      hasNewer: false,
+      oldestCursor: oldestCursor,
+      newestCursor: newestCursor,
+      entries: entries,
+      unchanged: false
+    )
   }
 
   public func codexRuns(sessionID _: String) async throws -> CodexRunListResponse {
