@@ -180,7 +180,10 @@ extension HarnessMonitorStore {
     lastSessionPushFallbackAt[sessionID] = ContinuousClock.now
     do {
       let timelineRequest = TimelineWindowRequest.latest(
-        limit: timelineWindow?.pageSize ?? Self.initialSelectedTimelineWindowLimit,
+        limit: selectedTimelineRequestLimit(
+          loadedTimeline: timeline,
+          timelineWindow: timelineWindow
+        ),
         knownRevision: timelineWindow?.revision
       )
       let measuredTimeline = try await Self.measureOperation {

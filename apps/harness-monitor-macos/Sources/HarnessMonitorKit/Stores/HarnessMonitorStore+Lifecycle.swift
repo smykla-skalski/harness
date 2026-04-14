@@ -226,7 +226,10 @@ extension HarnessMonitorStore {
       isTimelineLoading = !preserveVisibleTimeline
 
       let timelineRequest = TimelineWindowRequest.latest(
-        limit: preservedTimelineWindow?.pageSize ?? Self.initialSelectedTimelineWindowLimit,
+        limit: selectedTimelineRequestLimit(
+          loadedTimeline: preserveVisibleTimeline ? timeline : [],
+          timelineWindow: preservedTimelineWindow
+        ),
         knownRevision: preservedTimelineWindow?.revision
       )
       let measuredTimeline = try await Self.measureOperation {
@@ -346,16 +349,19 @@ extension HarnessMonitorStore {
     guard selectedSessionID == sessionID else { return }
 
     withUISyncBatch {
+      let updatedTimeline: [TimelineEntry]
       if batchIndex == 0 {
-        timeline = batch
+        updatedTimeline = batch
       } else {
-        var updated = timeline
-        updated.append(contentsOf: batch)
-        timeline = updated
+        var prefix = timeline
+        prefix.append(contentsOf: batch)
+        updatedTimeline = prefix
       }
-      if let timelineWindow {
-        self.timelineWindow = timelineWindow
-      }
+      timeline = updatedTimeline
+      self.timelineWindow = normalizedTimelineWindow(
+        timelineWindow,
+        loadedTimeline: updatedTimeline
+      )
       isShowingCachedData = false
     }
   }
@@ -467,7 +473,10 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       selectedSession = detail
       self.timeline = timeline
-      self.timelineWindow = timelineWindow ?? fallbackTimelineWindow(for: timeline)
+      self.timelineWindow = normalizedTimelineWindow(
+        timelineWindow,
+        loadedTimeline: timeline
+      )
       applySessionSummaryUpdate(detail.session)
       isShowingCachedData = showingCachedData
       synchronizeActionActor()
@@ -484,4 +493,42 @@ extension HarnessMonitorStore {
     return TimelineWindowResponse.fallbackMetadata(for: timeline)
   }
 
+  func selectedTimelineRequestLimit(
+    loadedTimeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?
+  ) -> Int {
+    if loadedTimeline.isEmpty == false {
+      return max(Self.initialSelectedTimelineWindowLimit, loadedTimeline.count)
+    }
+    return max(Self.initialSelectedTimelineWindowLimit, timelineWindow?.pageSize ?? 0)
+  }
+
+  func normalizedTimelineWindow(
+    _ timelineWindow: TimelineWindowResponse?,
+    loadedTimeline: [TimelineEntry]
+  ) -> TimelineWindowResponse? {
+    guard let timelineWindow else {
+      return fallbackTimelineWindow(for: loadedTimeline)
+    }
+
+    return TimelineWindowResponse(
+      revision: timelineWindow.revision,
+      totalCount: max(timelineWindow.totalCount, loadedTimeline.count),
+      windowStart: 0,
+      windowEnd: loadedTimeline.count,
+      hasOlder: loadedTimeline.count < timelineWindow.totalCount,
+      hasNewer: false,
+      oldestCursor: loadedTimeline.last.map(\.timelineCursor),
+      newestCursor: loadedTimeline.first.map(\.timelineCursor),
+      entries: nil,
+      unchanged: timelineWindow.unchanged
+    )
+  }
+
+}
+
+private extension TimelineEntry {
+  var timelineCursor: TimelineCursor {
+    TimelineCursor(recordedAt: recordedAt, entryId: entryId)
+  }
 }
