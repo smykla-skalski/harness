@@ -7,19 +7,19 @@ extension RecordingHarnessClient {
     lock.withLock {
       switch call {
       case .health:
-        _healthCallCount += 1
+        recordedHealthCallCount += 1
       case .transportLatency:
-        _transportLatencyCallCount += 1
+        recordedTransportLatencyCallCount += 1
       case .diagnostics:
-        _diagnosticsCallCount += 1
+        recordedDiagnosticsCallCount += 1
       case .projects:
-        _projectsCallCount += 1
+        recordedProjectsCallCount += 1
       case .sessions:
-        _sessionsCallCount += 1
+        recordedSessionsCallCount += 1
       case .sessionDetail(let sessionID):
-        _sessionDetailCallCounts[sessionID, default: 0] += 1
+        sessionDetailCallCountsBySessionID[sessionID, default: 0] += 1
       case .timeline(let sessionID):
-        _timelineCallCounts[sessionID, default: 0] += 1
+        timelineCallCountsBySessionID[sessionID, default: 0] += 1
       }
     }
   }
@@ -28,26 +28,26 @@ extension RecordingHarnessClient {
     lock.withLock {
       switch call {
       case .health:
-        _healthCallCount
+        recordedHealthCallCount
       case .transportLatency:
-        _transportLatencyCallCount
+        recordedTransportLatencyCallCount
       case .diagnostics:
-        _diagnosticsCallCount
+        recordedDiagnosticsCallCount
       case .projects:
-        _projectsCallCount
+        recordedProjectsCallCount
       case .sessions:
-        _sessionsCallCount
+        recordedSessionsCallCount
       case .sessionDetail(let sessionID):
-        _sessionDetailCallCounts[sessionID, default: 0]
+        sessionDetailCallCountsBySessionID[sessionID, default: 0]
       case .timeline(let sessionID):
-        _timelineCallCounts[sessionID, default: 0]
+        timelineCallCountsBySessionID[sessionID, default: 0]
       }
     }
   }
 
   func recordSessionDetailScope(id: String, scope: String?) {
     lock.withLock {
-      _sessionDetailScopesByID[id, default: []].append(scope)
+      sessionDetailScopesByID[id, default: []].append(scope)
     }
   }
 
@@ -57,25 +57,25 @@ extension RecordingHarnessClient {
     for sessionID: String
   ) {
     lock.withLock {
-      _timelineBatchesBySessionID[sessionID] = batches
+      timelineBatchesBySessionID[sessionID] = batches
       if let batchDelay {
-        _timelineBatchDelaysBySessionID[sessionID] = batchDelay
+        timelineBatchDelaysBySessionID[sessionID] = batchDelay
       } else {
-        _timelineBatchDelaysBySessionID.removeValue(forKey: sessionID)
+        timelineBatchDelaysBySessionID.removeValue(forKey: sessionID)
       }
-      _timelinesBySessionID[sessionID] = batches.flatMap(\.self)
+      timelinesBySessionID[sessionID] = batches.flatMap(\.self)
     }
   }
 
   func recordTimelineScope(sessionID: String, scope: TimelineScope) {
     lock.withLock {
-      _timelineScopesByID[sessionID, default: []].append(scope)
+      timelineScopesBySessionID[sessionID, default: []].append(scope)
     }
   }
 
   func shutdown() async {
     lock.withLock {
-      _shutdownCallCount += 1
+      recordedShutdownCallCount += 1
     }
   }
 
@@ -94,10 +94,10 @@ extension RecordingHarnessClient {
       storage[tuiID] = snapshots
     }
 
-    var tuis = _agentTuisBySessionID[snapshot.sessionId] ?? []
+    var tuis = agentTuisBySessionID[snapshot.sessionId] ?? []
     tuis.removeAll { $0.tuiId == snapshot.tuiId }
     tuis.insert(snapshot, at: 0)
-    _agentTuisBySessionID[snapshot.sessionId] = tuis
+    agentTuisBySessionID[snapshot.sessionId] = tuis
     return snapshot
   }
 }
