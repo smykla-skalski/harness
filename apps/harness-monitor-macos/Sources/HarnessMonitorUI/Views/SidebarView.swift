@@ -1,10 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-private final class SidebarSelectionTapBridge {
-  var pendingTapSelectionID: String?
-}
-
 struct SidebarView: View {
   let store: HarnessMonitorStore
   let controls: HarnessMonitorStore.SessionControlsSlice
@@ -23,7 +19,6 @@ struct SidebarView: View {
   @State private var isSidebarVisibilityAnimating = false
   @State private var pendingSidebarWidth: CGFloat?
   @State private var sidebarVisibilityResetTask: Task<Void, Never>?
-  @State private var selectionTapBridge = SidebarSelectionTapBridge()
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
@@ -38,10 +33,9 @@ struct SidebarView: View {
     )
   }
 
-  // The sidebar search field already moves with the split view. Keep the
-  // filter menu in that same toolbar lane and drive it from both the live
-  // width and the split-view visibility state so it follows the motion but
-  // still clears reliably once the sidebar finishes collapsing.
+  // Keep the filter menu in the window toolbar while fading it with the
+  // sidebar width and split-view visibility so it follows collapse/expand
+  // transitions without popping in or out mid-animation.
   private var filterToolbarVisibilityProgress: Double {
     let hiddenWidth = Self.filterToolbarFadeHiddenWidth
     let visibleWidth = Self.filterToolbarFadeVisibleWidth
@@ -59,17 +53,10 @@ struct SidebarView: View {
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
       collapsedCheckoutKeys: collapsedCheckoutKeys,
-      selectionTapBridge: selectionTapBridge,
       setCheckoutCollapsed: setCheckoutCollapsed
     )
     .listStyle(.sidebar)
     .scrollEdgeEffectStyle(.soft, for: .top)
-    .searchable(
-      text: sidebarSearchText,
-      placement: .sidebar,
-      prompt: "Search sessions, projects, leaders"
-    )
-    .searchFocused($isSearchFocused)
     .safeAreaInset(edge: .top, spacing: 0) {
       sidebarHeader
     }
@@ -83,12 +70,6 @@ struct SidebarView: View {
         searchResults: searchResults,
         visibilityProgress: filterToolbarVisibilityProgress
       )
-    }
-    .onSubmit(of: .search) {
-      store.flushPendingSearchRebuild()
-      if sidebarUI.isPersistenceAvailable {
-        _ = store.recordSearch(store.searchText)
-      }
     }
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
@@ -123,10 +104,20 @@ struct SidebarView: View {
 
   @ViewBuilder private var sidebarHeader: some View {
     SidebarRecentSearchesHeader(
+      searchText: sidebarSearchText,
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+      searchFocus: $isSearchFocused,
+      submitSearch: submitSearch,
       applyQuery: applyRecentSearch,
       clearHistory: { _ = store.clearSearchHistory() }
     )
+  }
+
+  private func submitSearch() {
+    store.flushPendingSearchRebuild()
+    if sidebarUI.isPersistenceAvailable {
+      _ = store.recordSearch(store.searchText)
+    }
   }
 
   func updateSidebarWidth(_ width: CGFloat) {
@@ -189,10 +180,7 @@ struct SidebarView: View {
 
   private func applyRecentSearch(_ query: String) {
     store.searchText = query
-    store.flushPendingSearchRebuild()
-    if sidebarUI.isPersistenceAvailable {
-      _ = store.recordSearch(query)
-    }
+    submitSearch()
   }
 }
 
@@ -266,19 +254,12 @@ private struct SidebarSessionListColumn: View {
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
-  let selectionTapBridge: SidebarSelectionTapBridge
   let setCheckoutCollapsed: (String, Bool) -> Void
 
   private var sidebarSelection: Binding<String?> {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
-        if let pendingTapSelectionID = selectionTapBridge.pendingTapSelectionID {
-          selectionTapBridge.pendingTapSelectionID = nil
-          if pendingTapSelectionID == newValue {
-            return
-          }
-        }
         if newValue == nil, sidebarUI.selectedSessionID != nil {
           return
         }
@@ -319,10 +300,6 @@ private struct SidebarSessionListColumn: View {
     List(selection: sidebarSelection) {
       SidebarSessionListContent(
         renderState: renderState,
-        selectSession: { sessionID in
-          selectionTapBridge.pendingTapSelectionID = sessionID
-          store.selectSessionFromList(sessionID)
-        },
         toggleBookmark: { sessionID, projectID in
           store.toggleBookmark(sessionId: sessionID, projectId: projectID)
         },

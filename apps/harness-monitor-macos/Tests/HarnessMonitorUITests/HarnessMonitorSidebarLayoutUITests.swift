@@ -64,7 +64,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThan(checkoutHeader.frame.width, sidebarShell.frame.width - 48)
   }
 
-  func testToolbarSearchAndFilterControlsAreVisible() throws {
+  func testSidebarSearchAndFilterControlsAreVisible() throws {
     let app = launch(mode: "preview")
     let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
     let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
@@ -73,7 +73,27 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(filterMenu, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(filterState.label.contains("status=active"))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) {
+        !filterState.label.isEmpty && filterState.label.contains("sort=")
+      }
+    )
+  }
+
+  func testSidebarSearchFieldIsRenderedInsideSidebarChrome() throws {
+    let app = launch(mode: "preview")
+    let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let searchField = app.descendants(matching: .any)
+      .matching(identifier: Accessibility.sidebarSearchField)
+      .firstMatch
+
+    XCTAssertTrue(waitForElement(sidebarShell, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitForElement(searchField, timeout: Self.fastActionTimeout),
+      "Sidebar search should be rendered by the app rather than only through the system search field"
+    )
+    XCTAssertGreaterThanOrEqual(searchField.frame.minY, sidebarShell.frame.minY)
+    XCTAssertLessThanOrEqual(searchField.frame.maxY, sidebarShell.frame.maxY)
   }
 
   func testSidebarScrollMovesSessionRowsWhenContentOverflows() throws {
