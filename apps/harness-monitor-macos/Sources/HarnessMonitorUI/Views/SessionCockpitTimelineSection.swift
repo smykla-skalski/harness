@@ -1,6 +1,28 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum SessionTimelinePlaceholderShimmer {
+  static let cycleDuration: TimeInterval = 1.15
+  private static let leadingPhase: CGFloat = -0.6
+  private static let trailingPhase: CGFloat = 1.8
+
+  static func shouldAnimate(reduceMotion: Bool, placeholderCount: Int) -> Bool {
+    !reduceMotion && placeholderCount > 0
+  }
+
+  static func phase(at date: Date) -> CGFloat {
+    let cycleProgress =
+      date.timeIntervalSinceReferenceDate
+      .truncatingRemainder(dividingBy: cycleDuration)
+      / cycleDuration
+    return leadingPhase + ((trailingPhase - leadingPhase) * cycleProgress)
+  }
+
+  static var restingPhase: CGFloat {
+    0
+  }
+}
+
 struct SessionCockpitTimelineSection: View {
   let sessionID: String
   let timeline: [TimelineEntry]
@@ -42,6 +64,13 @@ struct SessionCockpitTimelineSection: View {
     reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)
   }
 
+  private var shouldAnimatePlaceholders: Bool {
+    SessionTimelinePlaceholderShimmer.shouldAnimate(
+      reduceMotion: reduceMotion,
+      placeholderCount: placeholderCount
+    )
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text("Timeline")
@@ -61,20 +90,7 @@ struct SessionCockpitTimelineSection: View {
             pageSize: $pageSize
           )
 
-          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-            ForEach(currentEntries) { entry in
-              SessionCockpitTimelineEntryRow(
-                entry: entry,
-                dateTimeConfiguration: dateTimeConfiguration
-              )
-            }
-
-            ForEach(Array(0..<placeholderCount), id: \.self) { index in
-              SessionCockpitTimelinePlaceholderRow(seed: index)
-            }
-          }
-          .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
-          .frame(maxWidth: .infinity, alignment: .leading)
+          placeholderAwareTimelineRows
 
           if showsPagination {
             SessionTimelinePaginationFooter(
@@ -121,6 +137,38 @@ struct SessionCockpitTimelineSection: View {
         }
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder
+  private var placeholderAwareTimelineRows: some View {
+    if shouldAnimatePlaceholders {
+      TimelineView(.periodic(from: .now, by: 1 / 12)) { context in
+        timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.phase(at: context.date))
+      }
+    } else {
+      timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase)
+    }
+  }
+
+  private func timelineRows(shimmerPhase: CGFloat) -> some View {
+    LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      ForEach(currentEntries) { entry in
+        SessionCockpitTimelineEntryRow(
+          entry: entry,
+          dateTimeConfiguration: dateTimeConfiguration
+        )
+      }
+
+      ForEach(Array(0..<placeholderCount), id: \.self) { index in
+        SessionCockpitTimelinePlaceholderRow(
+          seed: index,
+          shimmerPhase: shimmerPhase,
+          showsShimmer: shouldAnimatePlaceholders
+        )
+      }
+    }
+    .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
@@ -231,9 +279,10 @@ private struct SessionCockpitTimelineEntryRow: View {
 
 private struct SessionCockpitTimelinePlaceholderRow: View {
   let seed: Int
+  let shimmerPhase: CGFloat
+  let showsShimmer: Bool
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @State private var shimmerPhase = -1.0
 
   private var summaryWidth: CGFloat {
     let widths: [CGFloat] = [220, 264, 198, 242]
@@ -247,8 +296,10 @@ private struct SessionCockpitTimelinePlaceholderRow: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-      SessionTimelineEntryMarker()
-        .redacted(reason: .placeholder)
+      shimmerBar(width: 6, height: 18, opacity: 0.18)
+        .clipShape(
+          RoundedRectangle(cornerRadius: 3, style: .continuous)
+        )
       shimmerBar(width: 108)
       shimmerBar(width: summaryWidth)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -261,30 +312,20 @@ private struct SessionCockpitTimelinePlaceholderRow: View {
         .fill(.primary.opacity(0.03))
     }
     .overlay {
-      shimmerOverlay
-        .clipShape(
-          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        )
+      if showsShimmer {
+        shimmerOverlay
+          .clipShape(
+            RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          )
+      }
     }
     .accessibilityHidden(true)
-    .onAppear {
-      guard reduceMotion == false else {
-        return
-      }
-
-      withAnimation(
-        .linear(duration: 1.15)
-          .repeatForever(autoreverses: false)
-      ) {
-        shimmerPhase = 1.8
-      }
-    }
   }
 
-  private func shimmerBar(width: CGFloat) -> some View {
+  private func shimmerBar(width: CGFloat, height: CGFloat = 12, opacity: Double = 0.08) -> some View {
     RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-      .fill(.primary.opacity(0.08))
-      .frame(width: width, height: 12)
+      .fill(.primary.opacity(opacity))
+      .frame(width: width, height: height)
   }
 
   private var shimmerOverlay: some View {
@@ -300,7 +341,11 @@ private struct SessionCockpitTimelinePlaceholderRow: View {
         endPoint: .trailing
       )
       .frame(width: proxy.size.width * 0.46)
-      .offset(x: reduceMotion ? 0 : proxy.size.width * shimmerPhase)
+      .offset(
+        x: reduceMotion || showsShimmer == false
+          ? 0
+          : proxy.size.width * shimmerPhase
+      )
       .blendMode(.plusLighter)
     }
   }
