@@ -226,7 +226,7 @@ extension AgentTuiWindowView {
         .scrollContentBackground(.hidden)
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
-        .focused($focusedField, equals: field)
+        .focused(focusedFieldBinding, equals: field)
     }
     .frame(minHeight: minHeight)
     .overlay {
