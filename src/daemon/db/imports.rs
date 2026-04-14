@@ -186,7 +186,7 @@ impl DaemonDb {
         }
 
         Ok(Some(PreparedRuntimeTranscriptResync {
-            session_id: resolved.state.session_id.clone(),
+            session_id: resolved.state.session_id,
             agents,
         }))
     }

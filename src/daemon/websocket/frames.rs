@@ -54,7 +54,7 @@ fn serialize_semantic_array_response_frames(
         return Ok(None);
     }
 
-    let batches = build_semantic_array_batches(&items)?;
+    let batches = build_semantic_array_batches(items)?;
     if batches.len() <= 1 {
         return Ok(None);
     }

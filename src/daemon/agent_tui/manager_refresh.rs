@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
-use std::sync::atomic::AtomicBool;
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 
-use crate::daemon::db::DaemonDb;
+use crate::daemon::bridge::{BridgeCapability, BridgeClient};
+use crate::daemon::db::{DaemonDb, ensure_shared_db};
+use crate::daemon::service::{broadcast_session_snapshot, disconnect_agent_direct};
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
@@ -15,7 +18,7 @@ use super::support::{agent_id_for_tui, lock, lock_db};
 
 impl AgentTuiManagerHandle {
     pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
-        crate::daemon::db::ensure_shared_db(&self.state.db)
+        ensure_shared_db(&self.state.db)
     }
 
     pub(super) fn active(
@@ -71,10 +74,8 @@ impl AgentTuiManagerHandle {
         snapshot: AgentTuiSnapshot,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let snapshot = crate::daemon::bridge::BridgeClient::for_capability(
-                crate::daemon::bridge::BridgeCapability::AgentTui,
-            )?
-            .agent_tui_get(&snapshot.tui_id)?;
+            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_get(&snapshot.tui_id)?;
             return Ok(self.normalize_snapshot(snapshot));
         }
         self.refresh_local_snapshot(snapshot)
@@ -102,7 +103,7 @@ impl AgentTuiManagerHandle {
         snapshot.screen = process.screen()?;
         snapshot.size = snapshot.screen.size();
         snapshot.updated_at = utc_now();
-        process.persist_transcript(std::path::Path::new(&snapshot.transcript_path))?;
+        process.persist_transcript(Path::new(&snapshot.transcript_path))?;
 
         if snapshot.agent_id.is_empty() {
             self.try_resolve_agent_id(&mut snapshot);
@@ -170,11 +171,11 @@ impl AgentTuiManagerHandle {
     }
 
     fn wait_for_live_refresh_tick(stop_flag: &AtomicBool) -> bool {
-        if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+        if stop_flag.load(Ordering::Relaxed) {
             return false;
         }
         thread::sleep(LIVE_REFRESH_INTERVAL);
-        !stop_flag.load(std::sync::atomic::Ordering::Relaxed)
+        !stop_flag.load(Ordering::Relaxed)
     }
 
     fn handle_live_refresh_step(&self, tui_id: &str) -> bool {
@@ -251,13 +252,13 @@ impl AgentTuiManagerHandle {
 
         let db = self.db()?;
         let db_guard = lock_db(&db)?;
-        if crate::daemon::service::disconnect_agent_direct(
+        if disconnect_agent_direct(
             &snapshot.session_id,
             &snapshot.agent_id,
             reason,
             Some(&db_guard),
         )? {
-            crate::daemon::service::broadcast_session_snapshot(
+            broadcast_session_snapshot(
                 &self.state.sender,
                 &snapshot.session_id,
                 Some(&db_guard),
