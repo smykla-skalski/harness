@@ -54,7 +54,9 @@ xcodebuild \
 SANDBOX_VIOLATIONS="$(log show \
   --predicate 'subsystem == "com.apple.sandbox.reporting" AND composedMessage CONTAINS "io.harnessmonitor"' \
   --last 10m \
-  --style compact 2>/dev/null || true)"
+  --style compact 2>/dev/null \
+  | tail -n +2 \
+  | sed '/^[[:space:]]*$/d' || true)"
 
 if [ -n "$SANDBOX_VIOLATIONS" ]; then
   printf '\n=== Sandbox violations detected ===\n%s\n' "$SANDBOX_VIOLATIONS" >&2
