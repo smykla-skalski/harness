@@ -230,6 +230,42 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     }
   }
 
+  func testCockpitSessionStatusRendersAsCornerOverlay() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+
+    let statusCorner = element(in: app, identifier: Accessibility.sessionStatusCorner)
+    let statusCornerFrame = frameElement(
+      in: app, identifier: Accessibility.sessionStatusCornerFrame)
+    let contentRoot = frameElement(in: app, identifier: Accessibility.contentRootFrame)
+
+    XCTAssertTrue(waitForElement(statusCorner, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(statusCornerFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(contentRoot, timeout: Self.actionTimeout))
+
+    XCTAssertEqual(
+      statusCornerFrame.frame.minX,
+      contentRoot.frame.minX,
+      accuracy: 4,
+      "Status corner overlay should be flush with the detail column leading edge"
+    )
+    XCTAssertEqual(
+      statusCornerFrame.frame.minY,
+      contentRoot.frame.minY,
+      accuracy: 4,
+      "Status corner overlay should be flush with the detail column top edge"
+    )
+    XCTAssertTrue(
+      statusCorner.label.contains("Session status"),
+      "Status corner should carry session status accessibility label"
+    )
+  }
+
   func testSessionCockpitTaskAndAgentCardsShareHeight() throws {
     let app = launch(mode: "preview")
 

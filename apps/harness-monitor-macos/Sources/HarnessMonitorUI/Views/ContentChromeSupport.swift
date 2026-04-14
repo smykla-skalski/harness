@@ -68,8 +68,13 @@ struct ContentDetailChrome<Content: View>: View {
   @ViewBuilder let content: Content
 
   var body: some View {
-    contentWithTopChrome
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    ZStack(alignment: .topLeading) {
+      if let sessionStatus {
+        SessionStatusCornerOverlay(status: sessionStatus, isStale: isStale)
+      }
+      contentWithTopChrome
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   @ViewBuilder private var contentWithTopChrome: some View {
@@ -86,7 +91,6 @@ struct ContentDetailChrome<Content: View>: View {
   private var showsTopChrome: Bool {
     persistenceError != nil
       || sessionDataAvailability != .live
-      || sessionStatus != nil
   }
 
   private var isStale: Bool {
@@ -103,10 +107,6 @@ struct ContentDetailChrome<Content: View>: View {
         SessionDataAvailabilityBanner(availability: sessionDataAvailability)
         chromeDivider
       }
-      if let sessionStatus {
-        SessionStatusBanner(status: sessionStatus, isStale: isStale)
-        chromeDivider
-      }
     }
     .background(Color(nsColor: .windowBackgroundColor))
   }
@@ -119,38 +119,74 @@ struct ContentDetailChrome<Content: View>: View {
   }
 }
 
-struct SessionStatusBanner: View {
+struct SessionStatusCornerOverlay: View {
   let status: SessionStatus
   let isStale: Bool
 
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
   private var color: Color {
     isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
+  }
+
+  private var tintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.55 : 0.45
   }
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       if isStale {
         Image(systemName: "clock.badge.questionmark")
-          .font(.system(size: 8, weight: .bold))
+          .font(.system(size: 9, weight: .bold))
           .accessibilityHidden(true)
       }
       Text(status.title.uppercased())
-        .font(.system(size: 9, weight: .bold))
+        .font(.system(size: 10, weight: .bold))
         .tracking(HarnessMonitorTheme.uppercaseTracking)
-      Spacer(minLength: 0)
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
-    .foregroundStyle(color)
-    .modifier(SessionStatusBannerSurfaceModifier(tint: color))
+    .foregroundStyle(.white)
+    .padding(.leading, 24)
+    .padding(.trailing, 240)
+    .padding(.top, HarnessMonitorTheme.spacingMD)
+    .padding(.bottom, 200)
+    .background {
+      Rectangle()
+        .fill(.clear)
+        .harnessPanelGlass()
+        .overlay {
+          LinearGradient(
+            colors: [
+              color.opacity(tintOpacity),
+              color.opacity(0),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          )
+        }
+        .mask {
+          RadialGradient(
+            stops: [
+              .init(color: .black, location: 0),
+              .init(color: .black.opacity(0.6), location: 0.4),
+              .init(color: .clear, location: 0.75),
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: 320
+          )
+        }
+    }
+    .allowsHitTesting(false)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Session status")
     .accessibilityValue(isStale ? "\(status.title), estimated" : status.title)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionStatusBanner)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionStatusCorner)
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionStatusCornerFrame)
   }
 }
 
-private struct SessionStatusBannerSurfaceModifier: ViewModifier {
+private struct ChromeBannerSurfaceModifier: ViewModifier {
   let tint: Color
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
@@ -182,7 +218,7 @@ struct SessionDataAvailabilityBanner: View {
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .foregroundStyle(HarnessMonitorTheme.caution)
-    .modifier(SessionStatusBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
@@ -251,7 +287,7 @@ struct PersistenceUnavailableBanner: View {
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .foregroundStyle(HarnessMonitorTheme.caution)
-    .modifier(SessionStatusBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
