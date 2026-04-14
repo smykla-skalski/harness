@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -12,7 +12,7 @@ use super::render_common::copy_extra_text_files;
 use super::rewrite::{rewrite_allowed_tools, rewrite_skill_hooks, rewrite_text_for_target};
 
 pub(super) fn render_skill_outputs(
-    repo_root: &std::path::Path,
+    repo_root: &Path,
     target: RenderTarget,
     skill: &SkillDefinition,
 ) -> Result<BTreeMap<PathBuf, String>, CliError> {

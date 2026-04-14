@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsStr;
 use std::path::PathBuf;
@@ -80,7 +81,7 @@ pub(super) struct PluginDefinition {
 #[derive(Debug, Clone)]
 pub(super) struct PlannedOutput {
     pub(super) managed_root: PathBuf,
-    pub(super) files: std::collections::BTreeMap<PathBuf, String>,
+    pub(super) files: BTreeMap<PathBuf, String>,
 }
 
 pub(super) fn repo_root() -> PathBuf {
