@@ -1,6 +1,5 @@
 // Compact/fingerprint integration tests.
-// Tests FileFingerprint creation, serialization, content change detection,
-// and compact handoff lifecycle (build, save, consume, session start/stop).
+// Tests compact handoff lifecycle (build, save, consume, session start/stop).
 //
 // All env-dependent tests are combined into one #[test] to avoid races
 // from parallel test execution mutating the same env vars (XDG_DATA_HOME,
@@ -8,7 +7,7 @@
 
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::PoisonError;
 
 use harness::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
@@ -17,6 +16,8 @@ use harness::workspace::compact::{
 };
 
 use super::helpers::*;
+
+mod fingerprints;
 
 // Build a runner handoff for testing.
 fn test_runner() -> RunnerHandoff<'static> {
@@ -75,54 +76,22 @@ fn setup_env() -> (tempfile::TempDir, tempfile::TempDir) {
     (xdg, project)
 }
 
-// ============================================================================
-// FileFingerprint tests (pure unit, no external deps)
-// ============================================================================
+fn with_compact_env(session_id: &str, test: impl FnOnce(&Path)) {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+    let (xdg, project) = setup_env();
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let path_with_bin = format!("{}:{orig_path}", xdg.path().join("bin").display());
+    let xdg_str = xdg.path().to_str().unwrap();
 
-#[test]
-fn file_fingerprint_from_existing_file() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = tmp.path().join("test.txt");
-    fs::write(&path, "hello world\n").unwrap();
-    let fp = FileFingerprint::from_path("test-label", &path);
-    assert!(fp.exists);
-    assert_eq!(fp.label, "test-label");
-    assert!(fp.size.is_some());
-    assert!(fp.sha256.is_some());
-}
-
-#[test]
-fn file_fingerprint_from_missing_file() {
-    let fp = FileFingerprint::from_path("missing", Path::new("/nonexistent/path.txt"));
-    assert!(!fp.exists);
-    assert!(fp.size.is_none());
-    assert!(fp.sha256.is_none());
-}
-
-#[test]
-fn file_fingerprint_serialization_roundtrip() {
-    let fp = FileFingerprint {
-        label: "test".into(),
-        path: PathBuf::from("/tmp/test.txt"),
-        exists: true,
-        size: Some(42),
-        mtime_ns: Some(1_000_000_000),
-        sha256: Some("abc123".into()),
-    };
-    let json = serde_json::to_string(&fp).unwrap();
-    let back: FileFingerprint<'_> = serde_json::from_str(&json).unwrap();
-    assert_eq!(fp, back);
-}
-
-#[test]
-fn file_fingerprint_detects_content_change() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = tmp.path().join("content.txt");
-    fs::write(&path, "version 1\n").unwrap();
-    let fp1 = FileFingerprint::from_path("test", &path);
-    fs::write(&path, "version 2\n").unwrap();
-    let fp2 = FileFingerprint::from_path("test", &path);
-    assert_ne!(fp1.sha256, fp2.sha256);
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg_str)),
+            ("CLAUDE_SESSION_ID", Some(session_id)),
+            ("HOME", Some(xdg_str)),
+            ("PATH", Some(path_with_bin.as_str())),
+        ],
+        || test(project.path()),
+    );
 }
 
 // ============================================================================
@@ -491,39 +460,33 @@ fn check_session_start_no_replay(project: &Path) {
 }
 
 #[test]
+fn compact_runner_handoff_roundtrip_smoke() {
+    with_compact_env(
+        "compact-runner-roundtrip",
+        check_build_compact_includes_runner,
+    );
+}
+
+#[test]
 #[ignore = "slow: spawns fake toolchain processes"]
 fn compact_handoff_lifecycle() {
-    let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-    let (xdg, project) = setup_env();
-    let orig_path = env::var("PATH").unwrap_or_default();
-    let path_with_bin = format!("{}:{orig_path}", xdg.path().join("bin").display());
-    let xdg_str = xdg.path().to_str().unwrap();
-
-    temp_env::with_vars(
-        [
-            ("XDG_DATA_HOME", Some(xdg_str)),
-            ("CLAUDE_SESSION_ID", Some("compact-lifecycle")),
-            ("HOME", Some(xdg_str)),
-            ("PATH", Some(path_with_bin.as_str())),
-        ],
-        || {
-            check_build_compact_includes_runner(project.path());
-            check_build_compact_worktree_project(project.path());
-            check_build_compact_includes_create(project.path());
-            check_build_compact_create_fallback(project.path());
-            check_save_consume_compact_handoff(project.path());
-            check_pre_compact_persists(project.path());
-            check_session_start_compact_hydrates(project.path());
-            check_session_start_compact_worktree(project.path());
-            check_session_start_compact_aborted_resume(project.path());
-            check_session_start_compact_restores_create(project.path());
-            check_session_start_compact_divergence_warning(project.path());
-            check_session_start_restores_project(project.path());
-            check_session_start_restores_worktree(project.path());
-            check_session_start_cross_project(project.path());
-            check_session_start_without_pending_handoff(project.path());
-            check_session_stop_without_pointer(project.path());
-            check_session_start_no_replay(project.path());
-        },
-    );
+    with_compact_env("compact-lifecycle", |project| {
+        check_build_compact_includes_runner(project);
+        check_build_compact_worktree_project(project);
+        check_build_compact_includes_create(project);
+        check_build_compact_create_fallback(project);
+        check_save_consume_compact_handoff(project);
+        check_pre_compact_persists(project);
+        check_session_start_compact_hydrates(project);
+        check_session_start_compact_worktree(project);
+        check_session_start_compact_aborted_resume(project);
+        check_session_start_compact_restores_create(project);
+        check_session_start_compact_divergence_warning(project);
+        check_session_start_restores_project(project);
+        check_session_start_restores_worktree(project);
+        check_session_start_cross_project(project);
+        check_session_start_without_pending_handoff(project);
+        check_session_stop_without_pointer(project);
+        check_session_start_no_replay(project);
+    });
 }
