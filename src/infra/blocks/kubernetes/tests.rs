@@ -18,6 +18,35 @@ fn success_result(args: &[&str], stdout: &str) -> CommandResult {
     }
 }
 
+fn write_dead_kubeconfig() -> (tempfile::TempDir, std::path::PathBuf) {
+    let temp_dir = tempfile::tempdir().expect("expected temp dir");
+    let kubeconfig = temp_dir.path().join("dead-kubeconfig.yaml");
+    fs::write(
+        &kubeconfig,
+        r#"apiVersion: v1
+kind: Config
+clusters:
+  - name: dead
+    cluster:
+      server: https://127.0.0.1:65535
+      insecure-skip-tls-verify: true
+contexts:
+  - name: dead
+    context:
+      cluster: dead
+      user: dead
+current-context: dead
+preferences: {}
+users:
+  - name: dead
+    user:
+      token: dead-token
+"#,
+    )
+    .expect("expected kubeconfig write to succeed");
+    (temp_dir, kubeconfig)
+}
+
 #[test]
 fn kubectl_runtime_includes_kubeconfig() {
     let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
@@ -185,31 +214,7 @@ fn kubernetes_block_types_are_send_sync() {
 
 #[test]
 fn kube_runtime_dead_kubeconfig_returns_error_without_panicking() {
-    let temp_dir = tempfile::tempdir().expect("expected temp dir");
-    let kubeconfig = temp_dir.path().join("dead-kubeconfig.yaml");
-    fs::write(
-        &kubeconfig,
-        r#"apiVersion: v1
-kind: Config
-clusters:
-  - name: dead
-    cluster:
-      server: https://127.0.0.1:65535
-      insecure-skip-tls-verify: true
-contexts:
-  - name: dead
-    context:
-      cluster: dead
-      user: dead
-current-context: dead
-preferences: {}
-users:
-  - name: dead
-    user:
-      token: dead-token
-"#,
-    )
-    .expect("expected kubeconfig write to succeed");
+    let (_temp_dir, kubeconfig) = write_dead_kubeconfig();
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         KubeRuntime::new().list_pods(Some(kubeconfig.as_path()))
@@ -220,6 +225,17 @@ users:
         result.expect("catch_unwind should return result").is_err(),
         "dead kubeconfig should still return an error"
     );
+}
+
+#[test]
+fn kube_runtime_cluster_server_reads_kubeconfig_server() {
+    let (_temp_dir, kubeconfig) = write_dead_kubeconfig();
+
+    let server = KubeRuntime::new()
+        .cluster_server(kubeconfig.as_path())
+        .expect("expected cluster server lookup");
+
+    assert_eq!(server, "https://127.0.0.1:65535/");
 }
 
 #[test]
