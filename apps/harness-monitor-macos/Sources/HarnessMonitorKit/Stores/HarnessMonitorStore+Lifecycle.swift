@@ -1,6 +1,8 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private static let initialSelectedTimelineWindowLimit = 10
+
   private struct RefreshSnapshot: Sendable {
     let diagnostics: MeasuredOperation<DaemonDiagnosticsReport>
     let projects: MeasuredOperation<[ProjectSummary]>
@@ -220,17 +222,18 @@ extension HarnessMonitorStore {
         showingCachedData: preserveVisibleTimeline
       )
 
-      // The cockpit renders summary fields only, so fallback transports should
-      // stay on the lighter timeline payload as well.
-      let timelineScope: TimelineScope = .summary
+      let timelineRequest = TimelineWindowRequest.latest(
+        limit: Self.initialSelectedTimelineWindowLimit
+      )
       let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(
+        try await client.timelineWindow(
           sessionID: sessionID,
-          scope: timelineScope
+          request: timelineRequest
         ) { [weak self] batch, batchIndex, _ in
           await MainActor.run {
+            guard let entries = batch.entries else { return }
             self?.applyTimelineBatch(
-              batch, index: batchIndex, requestID: requestID, sessionID: sessionID
+              entries, index: batchIndex, requestID: requestID, sessionID: sessionID
             )
           }
         }
@@ -238,16 +241,17 @@ extension HarnessMonitorStore {
       try Task.checkCancellation()
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
       recordRequestSuccess()
+      let resolvedTimeline = measuredTimeline.value.entries ?? timeline
 
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
-        timeline: measuredTimeline.value,
+        timeline: resolvedTimeline,
         showingCachedData: false
       )
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
-          await service.cacheSessionDetail(detail, timeline: measuredTimeline.value)
+          await service.cacheSessionDetail(detail, timeline: resolvedTimeline)
         }
       }
       startSessionSecondaryHydration(

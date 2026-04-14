@@ -108,6 +108,54 @@ extension RecordingHarnessClient {
     return configuredSessionDetail(id: id) ?? detail
   }
 
+  func timelineWindow(
+    sessionID: String,
+    request: TimelineWindowRequest
+  ) async throws -> TimelineWindowResponse {
+    try await timelineWindow(sessionID: sessionID, request: request) { _, _, _ in }
+  }
+
+  func timelineWindow(
+    sessionID: String,
+    request: TimelineWindowRequest,
+    onBatch: @escaping TimelineWindowBatchHandler
+  ) async throws -> TimelineWindowResponse {
+    recordReadCall(.timelineWindow(sessionID))
+    recordTimelineWindowRequest(sessionID: sessionID, request: request)
+    recordTimelineScope(sessionID: sessionID, scope: request.scope ?? .full)
+    try await sleepIfNeeded(
+      configuredTimelineWindowDelay(for: sessionID) ?? configuredTimelineDelay(for: sessionID)
+    )
+    if let error = configuredTimelineWindowError(for: sessionID) ?? configuredTimelineError(for: sessionID) {
+      throw error
+    }
+    if let response = configuredTimelineWindowResponse(for: sessionID) {
+      await onBatch(response, 0, 1)
+      return response
+    }
+    if let batches = configuredTimelineBatches(for: sessionID) {
+      let batchCount = batches.count
+      let allEntries = batches.flatMap(\.self)
+      for (batchIndex, batch) in batches.enumerated() {
+        await onBatch(
+          timelineWindowResponse(entries: batch, request: request),
+          batchIndex,
+          batchCount
+        )
+        if batchIndex < batchCount - 1 {
+          try await sleepIfNeeded(configuredTimelineBatchDelay(for: sessionID))
+        }
+      }
+      return timelineWindowResponse(entries: allEntries, request: request)
+    }
+    let response = timelineWindowResponse(
+      entries: configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline,
+      request: request
+    )
+    await onBatch(response, 0, 1)
+    return response
+  }
+
   func timeline(sessionID: String) async throws -> [TimelineEntry] {
     try await timeline(sessionID: sessionID, scope: .full)
   }
@@ -145,6 +193,34 @@ extension RecordingHarnessClient {
       return batches.flatMap(\.self)
     }
     return configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline
+  }
+
+  private func timelineWindowResponse(
+    entries: [TimelineEntry],
+    request: TimelineWindowRequest
+  ) -> TimelineWindowResponse {
+    let totalCount = entries.count
+    let limit = max(1, request.limit ?? totalCount)
+    let limitedEntries = Array(entries.prefix(limit))
+    let oldestCursor = limitedEntries.last.map {
+      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+    }
+    let newestCursor = limitedEntries.first.map {
+      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+    }
+    let windowStart = 0
+    return TimelineWindowResponse(
+      revision: request.knownRevision ?? 1,
+      totalCount: totalCount,
+      windowStart: windowStart,
+      windowEnd: windowStart + limitedEntries.count,
+      hasOlder: totalCount > limitedEntries.count,
+      hasNewer: false,
+      oldestCursor: oldestCursor,
+      newestCursor: newestCursor,
+      entries: limitedEntries,
+      unchanged: false
+    )
   }
 
   nonisolated func globalStream() -> DaemonPushEventStream {

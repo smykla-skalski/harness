@@ -56,6 +56,34 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(SummaryTimelineURLProtocol.lastRequestURL?.query == "scope=summary")
   }
 
+  @Test("API client timeline window adds viewport query parameters")
+  func apiClientTimelineWindowAddsViewportQueryParameters() async throws {
+    TimelineWindowURLProtocol.reset()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [TimelineWindowURLProtocol.self]
+    let session = URLSession(configuration: configuration)
+    let client = HarnessMonitorAPIClient(
+      connection: HarnessMonitorConnection(
+        endpoint: URL(string: "http://127.0.0.1:9999")!,
+        token: "token"
+      ),
+      session: session
+    )
+
+    let response = try await client.timelineWindow(
+      sessionID: "sess-http-window",
+      request: .latest(limit: 10)
+    )
+
+    let requestURL = try #require(TimelineWindowURLProtocol.lastRequestURL)
+    let queryItems = URLComponents(url: requestURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+
+    #expect(response.totalCount == 42)
+    #expect(requestURL.path == "/v1/sessions/sess-http-window/timeline")
+    #expect(queryItems.contains(URLQueryItem(name: "scope", value: "summary")))
+    #expect(queryItems.contains(URLQueryItem(name: "limit", value: "10")))
+  }
+
   @Test("bootstrapIfNeeded only bootstraps once")
   func bootstrapIfNeededOnlyBootstrapsOnce() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -239,7 +267,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     await store.selectSession(summary.sessionId)
 
     let baselineDetailCount = client.readCallCount(.sessionDetail(summary.sessionId))
-    let baselineTimelineCount = client.readCallCount(.timeline(summary.sessionId))
+    let baselineTimelineCount = client.readCallCount(.timelineWindow(summary.sessionId))
 
     client.configureDetailDelay(.milliseconds(200), for: summary.sessionId)
 
@@ -263,7 +291,7 @@ struct HarnessMonitorStoreLifecycleCoreTests {
 
     #expect(store.selectedSession?.session.context == secondUpdate.context)
     #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCount + 1)
-    #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCount + 1)
+    #expect(client.readCallCount(.timelineWindow(summary.sessionId)) == baselineTimelineCount + 1)
   }
 
   @Test("Summary refresh during selection load keeps the selected session stream attached")
@@ -392,6 +420,79 @@ private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable
           "payload": {}
         }
       ]
+      """
+    let data = Data(responseBody.utf8)
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: data)
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {}
+}
+
+private final class TimelineWindowURLProtocol: URLProtocol, @unchecked Sendable {
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var requestURL: URL?
+
+  static var lastRequestURL: URL? {
+    lock.withLock { requestURL }
+  }
+
+  static func reset() {
+    lock.withLock {
+      requestURL = nil
+    }
+  }
+
+  override static func canInit(with request: URLRequest) -> Bool {
+    true
+  }
+
+  override static func canonicalRequest(for request: URLRequest) -> URLRequest {
+    request
+  }
+
+  override func startLoading() {
+    guard let requestURL = request.url else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+      return
+    }
+
+    Self.lock.withLock {
+      Self.requestURL = requestURL
+    }
+
+    guard
+      let response = HTTPURLResponse(
+        url: requestURL,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: ["Content-Type": "application/json"]
+      )
+    else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+      return
+    }
+    let responseBody =
+      """
+      {
+        "revision": 7,
+        "total_count": 42,
+        "window_start": 0,
+        "window_end": 10,
+        "has_older": true,
+        "has_newer": false,
+        "oldest_cursor": {
+          "recorded_at": "2026-04-14T03:09:00Z",
+          "entry_id": "entry-10"
+        },
+        "newest_cursor": {
+          "recorded_at": "2026-04-14T03:00:00Z",
+          "entry_id": "entry-1"
+        },
+        "entries": [],
+        "unchanged": false
+      }
       """
     let data = Data(responseBody.utf8)
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

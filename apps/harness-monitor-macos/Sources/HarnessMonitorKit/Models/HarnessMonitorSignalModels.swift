@@ -258,6 +258,87 @@ public struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
   public var id: String { entryId }
 }
 
+public struct TimelineCursor: Codable, Equatable, Sendable {
+  public let recordedAt: String
+  public let entryId: String
+
+  public init(recordedAt: String, entryId: String) {
+    self.recordedAt = recordedAt
+    self.entryId = entryId
+  }
+}
+
+public struct TimelineWindowRequest: Codable, Equatable, Sendable {
+  public let scope: TimelineScope?
+  public let limit: Int?
+  public let before: TimelineCursor?
+  public let after: TimelineCursor?
+  public let knownRevision: Int64?
+
+  public init(
+    scope: TimelineScope? = nil,
+    limit: Int? = nil,
+    before: TimelineCursor? = nil,
+    after: TimelineCursor? = nil,
+    knownRevision: Int64? = nil
+  ) {
+    self.scope = scope
+    self.limit = limit
+    self.before = before
+    self.after = after
+    self.knownRevision = knownRevision
+  }
+
+  public static func latest(
+    limit: Int,
+    scope: TimelineScope = .summary,
+    knownRevision: Int64? = nil
+  ) -> Self {
+    Self(
+      scope: scope,
+      limit: limit,
+      knownRevision: knownRevision
+    )
+  }
+}
+
+public struct TimelineWindowResponse: Codable, Equatable, Sendable {
+  public let revision: Int64
+  public let totalCount: Int
+  public let windowStart: Int
+  public let windowEnd: Int
+  public let hasOlder: Bool
+  public let hasNewer: Bool
+  public let oldestCursor: TimelineCursor?
+  public let newestCursor: TimelineCursor?
+  public let entries: [TimelineEntry]?
+  public let unchanged: Bool
+
+  public init(
+    revision: Int64,
+    totalCount: Int,
+    windowStart: Int,
+    windowEnd: Int,
+    hasOlder: Bool,
+    hasNewer: Bool,
+    oldestCursor: TimelineCursor?,
+    newestCursor: TimelineCursor?,
+    entries: [TimelineEntry]?,
+    unchanged: Bool
+  ) {
+    self.revision = revision
+    self.totalCount = totalCount
+    self.windowStart = windowStart
+    self.windowEnd = windowEnd
+    self.hasOlder = hasOlder
+    self.hasNewer = hasNewer
+    self.oldestCursor = oldestCursor
+    self.newestCursor = newestCursor
+    self.entries = entries
+    self.unchanged = unchanged
+  }
+}
+
 public struct LogLevelResponse: Codable, Equatable, Sendable {
   public let level: String
   public let filter: String

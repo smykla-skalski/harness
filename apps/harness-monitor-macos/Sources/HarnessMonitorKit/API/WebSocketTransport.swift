@@ -138,6 +138,26 @@ extension WebSocketTransport {
     try await timeline(sessionID: sessionID, scope: .full) { _, _, _ in }
   }
 
+  public func timelineWindow(sessionID: String, request: TimelineWindowRequest) async throws
+    -> TimelineWindowResponse
+  {
+    try await timelineWindow(sessionID: sessionID, request: request) { _, _, _ in }
+  }
+
+  public func timelineWindow(
+    sessionID: String,
+    request: TimelineWindowRequest,
+    onBatch: @escaping TimelineWindowBatchHandler
+  ) async throws -> TimelineWindowResponse {
+    let value = try await send(
+      method: "session.timeline",
+      params: timelineWindowParams(sessionID: sessionID, request: request)
+    )
+    let response: TimelineWindowResponse = try decode(value)
+    await onBatch(response, 0, 1)
+    return response
+  }
+
   public func timeline(
     sessionID: String,
     onBatch: @escaping TimelineBatchHandler
@@ -174,6 +194,35 @@ extension WebSocketTransport {
       await onBatch(entries, 0, 1)
     }
     return entries
+  }
+
+  private func timelineWindowParams(
+    sessionID: String,
+    request: TimelineWindowRequest
+  ) -> JSONValue {
+    var params: [String: JSONValue] = ["session_id": .string(sessionID)]
+    if let scope = request.scope?.rawValue {
+      params["scope"] = .string(scope)
+    }
+    if let limit = request.limit {
+      params["limit"] = .number(Double(limit))
+    }
+    if let knownRevision = request.knownRevision {
+      params["known_revision"] = .number(Double(knownRevision))
+    }
+    if let before = request.before {
+      params["before"] = .object([
+        "recorded_at": .string(before.recordedAt),
+        "entry_id": .string(before.entryId),
+      ])
+    }
+    if let after = request.after {
+      params["after"] = .object([
+        "recorded_at": .string(after.recordedAt),
+        "entry_id": .string(after.entryId),
+      ])
+    }
+    return .object(params)
   }
 }
 
