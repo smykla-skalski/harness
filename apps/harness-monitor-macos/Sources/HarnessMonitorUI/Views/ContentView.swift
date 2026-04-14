@@ -176,8 +176,7 @@ public struct ContentView: View {
     )
   }
 
-  @ToolbarContentBuilder
-  private var contentToolbarItems: some ToolbarContent {
+  @ToolbarContentBuilder private var contentToolbarItems: some ToolbarContent {
     ContentNavigationToolbarItems(
       store: store,
       toolbarUI: contentToolbar
@@ -190,8 +189,7 @@ public struct ContentView: View {
     )
   }
 
-  @ViewBuilder
-  private var contentAccessibilityOverlay: some View {
+  @ViewBuilder private var contentAccessibilityOverlay: some View {
     ContentAccessibilityOverlayBridge(
       contentToolbar: contentToolbar,
       contentSession: contentSession,
@@ -202,8 +200,7 @@ public struct ContentView: View {
     )
   }
 
-  @ViewBuilder
-  private var contentBackground: some View {
+  @ViewBuilder private var contentBackground: some View {
     if HarnessMonitorUITestEnvironment.isEnabled {
       EmptyView()
     } else {
