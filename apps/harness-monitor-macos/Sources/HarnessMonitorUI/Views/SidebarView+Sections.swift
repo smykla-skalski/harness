@@ -322,10 +322,6 @@ private struct SidebarCheckoutDisclosureHeader: View {
           .foregroundStyle(.secondary)
           .frame(width: Self.leadingIconWidth, alignment: .leading)
           .accessibilityHidden(true)
-          .accessibilityTestProbe(
-            HarnessMonitorAccessibility.worktreeHeaderGlyph(group.checkoutId),
-            label: leadingIconName
-          )
         Text(verbatim: group.title)
           .font(titleFont)
           .foregroundStyle(.secondary)
@@ -346,6 +342,10 @@ private struct SidebarCheckoutDisclosureHeader: View {
     )
     .accessibilityFrameMarker(
       HarnessMonitorAccessibility.worktreeHeaderFrame(group.checkoutId)
+    )
+    .accessibilityTestProbe(
+      HarnessMonitorAccessibility.worktreeHeaderGlyph(group.checkoutId),
+      label: leadingIconName
     )
   }
 
