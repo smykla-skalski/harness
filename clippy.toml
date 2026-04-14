@@ -1,2 +1,4 @@
 absolute-paths-max-segments = 2
 cognitive-complexity-threshold = 7
+# Clippy does not yet expose a stable file-level line-count lint, so the
+# repo-wide 520-line file cap is enforced from `build.rs` instead.
