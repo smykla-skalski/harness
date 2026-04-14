@@ -170,7 +170,8 @@ fn platform_module_stays_internal_to_the_crate() {
     for path in [
         "tests/integration/universal.rs",
         "tests/integration/preflight.rs",
-        "tests/integration/compact.rs",
+        "tests/integration/compact/fingerprints.rs",
+        "tests/integration/compact/mod.rs",
         "tests/integration/commands/session_stop.rs",
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
