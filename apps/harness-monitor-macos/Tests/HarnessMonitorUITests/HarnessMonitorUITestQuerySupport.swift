@@ -41,6 +41,28 @@ extension HarnessMonitorUITestCase {
 
   func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
     if identifier == HarnessMonitorUITestAccessibility.sidebarSearchField {
+      let roles: [XCUIElement.ElementType] = [
+        .textField,
+        .searchField,
+        .comboBox,
+      ]
+      for role in roles {
+        let windowMatch = mainWindow(in: app)
+          .descendants(matching: role)
+          .matching(identifier: identifier)
+          .firstMatch
+        if windowMatch.exists {
+          return windowMatch
+        }
+
+        let appMatch = app.descendants(matching: role)
+          .matching(identifier: identifier)
+          .firstMatch
+        if appMatch.exists {
+          return appMatch
+        }
+      }
+
       let windowSearchField = mainWindow(in: app).searchFields.firstMatch
       if windowSearchField.exists {
         return windowSearchField

@@ -3,7 +3,10 @@ import SwiftData
 import SwiftUI
 
 struct SidebarRecentSearchesHeader: View {
+  let searchText: Binding<String>
   let isPersistenceAvailable: Bool
+  let searchFocus: FocusState<Bool>.Binding
+  let submitSearch: () -> Void
   let applyQuery: (String) -> Void
   let clearHistory: () -> Void
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
@@ -17,16 +20,70 @@ struct SidebarRecentSearchesHeader: View {
   }
 
   var body: some View {
-    if !recentSearchQueries.isEmpty {
-      SidebarRecentSearchesView(
-        queries: recentSearchQueries,
-        isPersistenceAvailable: isPersistenceAvailable,
-        applyQuery: applyQuery,
-        clearHistory: clearHistory
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      SidebarInlineSearchField(
+        searchText: searchText,
+        searchFocus: searchFocus,
+        submitSearch: submitSearch
       )
-      .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
-      .padding(.top, HarnessMonitorTheme.spacingXL)
-      .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+
+      if !recentSearchQueries.isEmpty {
+        SidebarRecentSearchesView(
+          queries: recentSearchQueries,
+          isPersistenceAvailable: isPersistenceAvailable,
+          applyQuery: applyQuery,
+          clearHistory: clearHistory
+        )
+      }
+    }
+    .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
+    .padding(.top, HarnessMonitorTheme.spacingXL)
+    .padding(.bottom, HarnessMonitorTheme.sectionSpacing)
+  }
+}
+
+private struct SidebarInlineSearchField: View {
+  let searchText: Binding<String>
+  let searchFocus: FocusState<Bool>.Binding
+  let submitSearch: () -> Void
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+
+      TextField("Search sessions, projects, leaders", text: searchText)
+        .textFieldStyle(.plain)
+        .focused(searchFocus)
+        .onSubmit(submitSearch)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSearchField)
+
+      if !searchText.wrappedValue.isEmpty {
+        Button {
+          searchText.wrappedValue = ""
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .background {
+      RoundedRectangle(
+        cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+        style: .continuous
+      )
+      .fill(.primary.opacity(0.04))
+      .overlay {
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          style: .continuous
+        )
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+      }
     }
   }
 }
