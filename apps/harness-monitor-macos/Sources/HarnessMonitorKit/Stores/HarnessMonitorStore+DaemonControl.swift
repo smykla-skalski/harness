@@ -1,6 +1,14 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
+    var registrationState = await daemonController.launchAgentRegistrationState()
+    if registrationState == .notRegistered || registrationState == .notFound {
+      registrationState = try await daemonController.registerLaunchAgent()
+    }
+    return registrationState
+  }
+
   public func focusSidebarSearch() {
     sidebarUI.searchFocusRequest += 1
   }
@@ -86,14 +94,12 @@ extension HarnessMonitorStore {
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
-    var registrationState = await daemonController.launchAgentRegistrationState()
-    if registrationState == .notRegistered || registrationState == .notFound {
-      do {
-        registrationState = try await daemonController.registerLaunchAgent()
-      } catch {
-        await applyLaunchAgentOfflineState(reason: error.localizedDescription)
-        return
-      }
+    let registrationState: DaemonLaunchAgentRegistrationState
+    do {
+      registrationState = try await ensureManagedLaunchAgentReady()
+    } catch {
+      await applyLaunchAgentOfflineState(reason: error.localizedDescription)
+      return
     }
 
     switch registrationState {
