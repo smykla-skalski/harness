@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV4 {
+extension HarnessMonitorSchemaV5 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -63,6 +63,7 @@ extension HarnessMonitorSchemaV4 {
     var lastCachedAt: Date
     var metricsData: Data
     var pendingTransferData: Data?
+    var timelineWindowData: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \CachedAgent.session)
     var agents: [CachedAgent]
@@ -103,7 +104,8 @@ extension HarnessMonitorSchemaV4 {
       lastViewedAt: Date? = nil,
       lastCachedAt: Date = .now,
       metricsData: Data,
-      pendingTransferData: Data? = nil
+      pendingTransferData: Data? = nil,
+      timelineWindowData: Data? = nil
     ) {
       self.sessionId = sessionId
       self.projectId = projectId
@@ -126,6 +128,7 @@ extension HarnessMonitorSchemaV4 {
       self.lastCachedAt = lastCachedAt
       self.metricsData = metricsData
       self.pendingTransferData = pendingTransferData
+      self.timelineWindowData = timelineWindowData
       self.agents = []
       self.tasks = []
       self.signals = []
@@ -380,3 +383,12 @@ extension HarnessMonitorSchemaV4 {
     }
   }
 }
+
+typealias CachedProject = HarnessMonitorSchemaV5.CachedProject
+typealias CachedSession = HarnessMonitorSchemaV5.CachedSession
+typealias CachedAgent = HarnessMonitorSchemaV5.CachedAgent
+typealias CachedWorkItem = HarnessMonitorSchemaV5.CachedWorkItem
+typealias CachedSignalRecord = HarnessMonitorSchemaV5.CachedSignalRecord
+typealias CachedTimelineEntry = HarnessMonitorSchemaV5.CachedTimelineEntry
+typealias CachedObserver = HarnessMonitorSchemaV5.CachedObserver
+typealias CachedAgentActivity = HarnessMonitorSchemaV5.CachedAgentActivity

@@ -56,6 +56,13 @@ extension ProjectSummary {
 // MARK: - SessionSummary <-> CachedSession
 
 extension CachedSession {
+  func decodedTimelineWindow() -> TimelineWindowResponse? {
+    guard let timelineWindowData else {
+      return nil
+    }
+    return try? Codecs.decoder.decode(TimelineWindowResponse.self, from: timelineWindowData)
+  }
+
   func toSessionSummary() -> SessionSummary {
     let metrics =
       (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))

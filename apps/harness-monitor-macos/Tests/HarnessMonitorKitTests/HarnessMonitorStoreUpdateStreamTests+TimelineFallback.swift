@@ -83,7 +83,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("Selected session update without timeline refetches timeline separately")
-  func selectedSessionUpdateWithoutTimelineRefetchesTimelineSeparately() async {
+  func selectedSessionUpdateWithoutTimelineRefetchesTimelineSeparately() async throws {
     let client = RecordingHarnessClient()
     let summary = makeSession(
       .init(
@@ -158,7 +158,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
 
     await store.bootstrap()
     await store.selectSession(summary.sessionId)
-    let baselineTimelineCalls = client.readCallCount(.timeline(summary.sessionId))
+    let selectedWindow = try #require(store.timelineWindow)
+    let baselineTimelineCalls = client.readCallCount(.timelineWindow(summary.sessionId))
 
     client.configureSessions(
       summaries: [updatedSummary],
@@ -169,7 +170,11 @@ extension HarnessMonitorStoreUpdateStreamTests {
 
     #expect(store.selectedSession?.session.context == "Selected cockpit updated")
     #expect(store.timeline == refreshedTimeline)
-    #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCalls + 1)
+    #expect(client.readCallCount(.timelineWindow(summary.sessionId)) == baselineTimelineCalls + 1)
+    #expect(
+      client.recordedTimelineWindowRequests(for: summary.sessionId).last
+        == .latest(limit: selectedWindow.pageSize, knownRevision: selectedWindow.revision)
+    )
 
     store.stopAllStreams()
   }

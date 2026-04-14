@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private static let initialSelectedTimelineWindowLimit = 10
+  static let initialSelectedTimelineWindowLimit = 10
 
   private struct RefreshSnapshot: Sendable {
     let diagnostics: MeasuredOperation<DaemonDiagnosticsReport>
@@ -215,15 +215,19 @@ extension HarnessMonitorStore {
 
       let preserveVisibleTimeline =
         isShowingCachedData && selectedSession?.session.sessionId == sessionID
+      let preservedTimelineWindow = preserveVisibleTimeline ? timelineWindow : nil
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
         timeline: preserveVisibleTimeline ? timeline : [],
+        timelineWindow: preservedTimelineWindow,
         showingCachedData: preserveVisibleTimeline
       )
+      isTimelineLoading = !preserveVisibleTimeline
 
       let timelineRequest = TimelineWindowRequest.latest(
-        limit: Self.initialSelectedTimelineWindowLimit
+        limit: preservedTimelineWindow?.pageSize ?? Self.initialSelectedTimelineWindowLimit,
+        knownRevision: preservedTimelineWindow?.revision
       )
       let measuredTimeline = try await Self.measureOperation {
         try await client.timelineWindow(
@@ -233,7 +237,11 @@ extension HarnessMonitorStore {
           await MainActor.run {
             guard let entries = batch.entries else { return }
             self?.applyTimelineBatch(
-              entries, index: batchIndex, requestID: requestID, sessionID: sessionID
+              entries,
+              timelineWindow: batch.metadataOnly,
+              index: batchIndex,
+              requestID: requestID,
+              sessionID: sessionID
             )
           }
         }
@@ -242,16 +250,23 @@ extension HarnessMonitorStore {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
       recordRequestSuccess()
       let resolvedTimeline = measuredTimeline.value.entries ?? timeline
+      let resolvedTimelineWindow = measuredTimeline.value.metadataOnly
 
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
         timeline: resolvedTimeline,
+        timelineWindow: resolvedTimelineWindow,
         showingCachedData: false
       )
+      isTimelineLoading = false
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
-          await service.cacheSessionDetail(detail, timeline: resolvedTimeline)
+          await service.cacheSessionDetail(
+            detail,
+            timeline: resolvedTimeline,
+            timelineWindow: resolvedTimelineWindow
+          )
         }
       }
       startSessionSecondaryHydration(
@@ -308,16 +323,23 @@ extension HarnessMonitorStore {
 
   private func applyTimelineBatch(
     _ batch: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?,
     index batchIndex: Int,
     requestID: UInt64,
     sessionID: String
   ) {
     guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-    applySelectedTimelineBatch(batch, index: batchIndex, sessionID: sessionID)
+    applySelectedTimelineBatch(
+      batch,
+      timelineWindow: timelineWindow,
+      index: batchIndex,
+      sessionID: sessionID
+    )
   }
 
   func applySelectedTimelineBatch(
     _ batch: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?,
     index batchIndex: Int,
     sessionID: String
   ) {
@@ -330,6 +352,9 @@ extension HarnessMonitorStore {
         var updated = timeline
         updated.append(contentsOf: batch)
         timeline = updated
+      }
+      if let timelineWindow {
+        self.timelineWindow = timelineWindow
       }
       isShowingCachedData = false
     }
@@ -352,6 +377,7 @@ extension HarnessMonitorStore {
     )
     withUISyncBatch {
       isExtensionsLoading = false
+      isTimelineLoading = false
     }
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
@@ -359,6 +385,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         detail: cached.detail,
         timeline: cached.timeline,
+        timelineWindow: cached.timelineWindow,
         showingCachedData: true
       )
     } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
@@ -373,6 +400,7 @@ extension HarnessMonitorStore {
           agentActivity: []
         ),
         timeline: [],
+        timelineWindow: nil,
         showingCachedData: true
       )
     } else {
@@ -427,6 +455,7 @@ extension HarnessMonitorStore {
     sessionID: String,
     detail: SessionDetail,
     timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse? = nil,
     showingCachedData: Bool,
     cancelPendingTimelineRefresh: Bool = true
   ) {
@@ -438,6 +467,7 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       selectedSession = detail
       self.timeline = timeline
+      self.timelineWindow = timelineWindow ?? fallbackTimelineWindow(for: timeline)
       applySessionSummaryUpdate(detail.session)
       isShowingCachedData = showingCachedData
       synchronizeActionActor()
@@ -445,6 +475,13 @@ extension HarnessMonitorStore {
     if cancelPendingTimelineRefresh {
       cancelSessionPushFallback(for: sessionID)
     }
+  }
+
+  func fallbackTimelineWindow(for timeline: [TimelineEntry]) -> TimelineWindowResponse? {
+    guard !timeline.isEmpty else {
+      return nil
+    }
+    return TimelineWindowResponse.fallbackMetadata(for: timeline)
   }
 
 }

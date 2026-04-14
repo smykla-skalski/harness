@@ -2,6 +2,15 @@ import Foundation
 import SwiftData
 
 extension HarnessMonitorStore {
+  private func awaitOutstandingDirectPersistenceConflicts() async {
+    if let pendingCacheWriteTask {
+      await pendingCacheWriteTask.value
+    }
+    if let sessionSnapshotHydrationTask {
+      await sessionSnapshotHydrationTask.value
+    }
+  }
+
   func cacheSessionList(
     _ sessions: [SessionSummary],
     projects: [ProjectSummary]
@@ -15,14 +24,28 @@ extension HarnessMonitorStore {
   func cacheSessionDetail(
     _ detail: SessionDetail,
     timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse? = nil,
     markViewed: Bool = true
   ) async {
     guard let cacheService, persistenceError == nil else { return }
+    await awaitOutstandingDirectPersistenceConflicts()
     let result = await cacheService.cacheSessionDetail(
       detail,
       timeline: timeline,
+      timelineWindow: timelineWindow,
       markViewed: markViewed
     )
+    await applyPersistedCacheWriteResult(result)
+  }
+
+  func cacheSessionDetails(
+    _ entries: [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)],
+    markViewed: Bool = false
+  ) async {
+    guard let cacheService, persistenceError == nil else { return }
+    guard !entries.isEmpty else { return }
+    await awaitOutstandingDirectPersistenceConflicts()
+    let result = await cacheService.cacheSessionDetails(entries, markViewed: markViewed)
     await applyPersistedCacheWriteResult(result)
   }
 
@@ -30,10 +53,10 @@ extension HarnessMonitorStore {
     _ entries: [(detail: SessionDetail, timeline: [TimelineEntry])],
     markViewed: Bool = false
   ) async {
-    guard let cacheService, persistenceError == nil else { return }
-    guard !entries.isEmpty else { return }
-    let result = await cacheService.cacheSessionDetails(entries, markViewed: markViewed)
-    await applyPersistedCacheWriteResult(result)
+    await cacheSessionDetails(
+      entries.map { (detail: $0.detail, timeline: $0.timeline, timelineWindow: nil) },
+      markViewed: markViewed
+    )
   }
 
   func cacheSessionSummary(

@@ -5,7 +5,7 @@ import Testing
 @MainActor
 extension HarnessMonitorStoreUpdateStreamTests {
   @Test("Push fallback timeline refresh is rate-limited for repeated selected-session updates")
-  func pushFallbackTimelineRefreshIsRateLimitedForRepeatedSelectedSessionUpdates() async {
+  func pushFallbackTimelineRefreshIsRateLimitedForRepeatedSelectedSessionUpdates() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     store.activeTransport = .webSocket
@@ -13,7 +13,9 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.sessionPushFallbackMinimumInterval = .milliseconds(120)
 
     await store.selectSession(PreviewFixtures.summary.sessionId)
-    let baselineTimelineCalls = client.readCallCount(.timeline(PreviewFixtures.summary.sessionId))
+    let selectedWindow = try #require(store.timelineWindow)
+    let baselineTimelineCalls = client.readCallCount(
+      .timelineWindow(PreviewFixtures.summary.sessionId))
 
     store.scheduleSessionPushFallback(
       using: client,
@@ -21,10 +23,12 @@ extension HarnessMonitorStoreUpdateStreamTests {
     )
     try? await Task.sleep(for: .milliseconds(50))
 
-    let timelineKey = RecordingHarnessClient.ReadCall.timeline(PreviewFixtures.summary.sessionId)
+    let timelineKey = RecordingHarnessClient.ReadCall.timelineWindow(
+      PreviewFixtures.summary.sessionId)
     #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
     #expect(
-      client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary, .summary]
+      client.recordedTimelineWindowRequests(for: PreviewFixtures.summary.sessionId).last
+        == .latest(limit: selectedWindow.pageSize, knownRevision: selectedWindow.revision)
     )
 
     store.scheduleSessionPushFallback(
@@ -43,14 +47,16 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("Push fallback timeline refresh prefers summary scope on HTTP transport")
-  func pushFallbackTimelineRefreshPrefersSummaryScopeOnHTTPTransport() async {
+  func pushFallbackTimelineRefreshPrefersSummaryScopeOnHTTPTransport() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     store.activeTransport = .httpSSE
     store.sessionPushFallbackDelay = .milliseconds(20)
 
     await store.selectSession(PreviewFixtures.summary.sessionId)
-    let baselineTimelineCalls = client.readCallCount(.timeline(PreviewFixtures.summary.sessionId))
+    let selectedWindow = try #require(store.timelineWindow)
+    let baselineTimelineCalls = client.readCallCount(
+      .timelineWindow(PreviewFixtures.summary.sessionId))
 
     store.scheduleSessionPushFallback(
       using: client,
@@ -58,10 +64,12 @@ extension HarnessMonitorStoreUpdateStreamTests {
     )
     try? await Task.sleep(for: .milliseconds(50))
 
-    let timelineKey = RecordingHarnessClient.ReadCall.timeline(PreviewFixtures.summary.sessionId)
+    let timelineKey = RecordingHarnessClient.ReadCall.timelineWindow(
+      PreviewFixtures.summary.sessionId)
     #expect(client.readCallCount(timelineKey) == baselineTimelineCalls + 1)
     #expect(
-      client.timelineScopes(for: PreviewFixtures.summary.sessionId) == [.summary, .summary]
+      client.recordedTimelineWindowRequests(for: PreviewFixtures.summary.sessionId).last
+        == .latest(limit: selectedWindow.pageSize, knownRevision: selectedWindow.revision)
     )
 
     store.stopAllStreams()

@@ -55,8 +55,11 @@ extension HarnessMonitorStore {
   public final class ContentSessionDetailSlice {
     public var selectedSessionDetail: SessionDetail?
     public var timeline: [TimelineEntry] = []
+    public var timelineWindow: TimelineWindowResponse?
+    public var isTimelineLoading = false
     public var presentedSessionDetail: SessionDetail?
     public var presentedTimeline: [TimelineEntry] = []
+    public var presentedTimelineWindow: TimelineWindowResponse?
     private var selectedSessionDetailIdentity: SessionDetailIdentity?
     private var presentedSessionDetailIdentity: SessionDetailIdentity?
 
@@ -75,6 +78,12 @@ extension HarnessMonitorStore {
       if timeline != state.timeline {
         timeline = state.timeline
       }
+      if timelineWindow != state.timelineWindow {
+        timelineWindow = state.timelineWindow
+      }
+      if isTimelineLoading != state.isTimelineLoading {
+        isTimelineLoading = state.isTimelineLoading
+      }
 
       if let detail = state.selectedSessionDetail {
         if presentedSessionDetailIdentity != nextSelectedIdentity {
@@ -83,6 +92,9 @@ extension HarnessMonitorStore {
         }
         if presentedTimeline != state.timeline {
           presentedTimeline = state.timeline
+        }
+        if presentedTimelineWindow != state.timelineWindow {
+          presentedTimelineWindow = state.timelineWindow
         }
         return
       }
@@ -94,6 +106,9 @@ extension HarnessMonitorStore {
         }
         if !presentedTimeline.isEmpty {
           presentedTimeline = []
+        }
+        if presentedTimelineWindow != nil {
+          presentedTimelineWindow = nil
         }
         return
       }
