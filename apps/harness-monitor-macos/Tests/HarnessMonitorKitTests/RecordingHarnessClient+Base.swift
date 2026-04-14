@@ -79,6 +79,7 @@ extension RecordingHarnessClient {
 
   func projects() async throws -> [ProjectSummary] {
     recordReadCall(.projects)
+    try await sleepIfNeeded(configuredProjectsDelay())
     return configuredProjects() ?? [
       ProjectSummary(
         projectId: detail.session.projectId,
@@ -93,6 +94,7 @@ extension RecordingHarnessClient {
 
   func sessions() async throws -> [SessionSummary] {
     recordReadCall(.sessions)
+    try await sleepIfNeeded(configuredSessionsDelay())
     return configuredSessions() ?? [detail.session]
   }
 
