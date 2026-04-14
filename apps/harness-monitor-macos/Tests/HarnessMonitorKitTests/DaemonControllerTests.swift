@@ -55,6 +55,87 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test(
+    "awaitManifestWarmUp does not issue a stale HTTP bootstrap after a managed dead pid is detected")
+  func awaitManifestWarmUpSkipsFinalBootstrapForManagedDeadPid() async throws {
+    try await withTempDaemonFixture(pid: 999_999) { environment in
+      let client = RecordingHarnessClient()
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { _ in client },
+        endpointProbe: { _ in false }
+      )
+
+      await #expect(throws: DaemonControlError.daemonDidNotStart) {
+        _ = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+      }
+
+      #expect(client.readCallCount(.health) == 0)
+    }
+  }
+
+  @Test("awaitManifestWarmUp refreshes the managed launch agent before probing when the bundled helper changed")
+  func awaitManifestWarmUpRefreshesManagedLaunchAgentBeforeProbingWhenBundledHelperChanged()
+    async throws
+  {
+    try await withTempDaemonFixture(pid: 999_999) { environment in
+      let client = PreviewHarnessClient()
+      let manifestRewritePID = UInt32(getpid())
+      let liveEndpoint = "http://127.0.0.1:65533"
+      try writeManagedLaunchAgentBundleStampFixture(
+        ManagedLaunchAgentBundleStampFixture(
+          helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+          deviceIdentifier: 41,
+          inode: 84,
+          fileSize: 16_384,
+          modificationTimeIntervalSince1970: 1_713_000_000
+        ),
+        environment: environment
+      )
+      let manager = HookedLaunchAgentManager(
+        state: .enabled,
+        onRegister: {
+          try rewriteTempDaemonFixtureManifest(
+            environment: environment,
+            pid: manifestRewritePID,
+            endpoint: liveEndpoint,
+            startedAt: "2026-04-14T13:22:13Z"
+          )
+        }
+      )
+      let probedEndpoints = EndpointProbeRecorder()
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: manager,
+        ownership: .managed,
+        sessionFactory: { _ in client },
+        endpointProbe: { endpoint in
+          await probedEndpoints.record(endpoint.absoluteString)
+          return endpoint.absoluteString == liveEndpoint
+        },
+        managedLaunchAgentCurrentBundleStamp: {
+          ManagedLaunchAgentBundleStamp(
+            helperPath:
+              "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness",
+            deviceIdentifier: 99,
+            inode: 128,
+            fileSize: 32_768,
+            modificationTimeIntervalSince1970: 1_714_000_000
+          )
+        }
+      )
+
+      let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+
+      #expect(bootstrappedClient as AnyObject === client as AnyObject)
+      #expect(manager.unregisterCallCount == 1)
+      #expect(manager.registerCallCount == 1)
+      #expect(await probedEndpoints.values() == [liveEndpoint])
+    }
+  }
+
   @Test("awaitManifestWarmUp waits for managed manifest rewrite while the stale pid is still alive")
   func awaitManifestWarmUpWaitsForManagedManifestRewriteWhilePidIsAlive() async throws {
     try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
@@ -415,4 +496,36 @@ struct DaemonControllerTests {
     #expect(offlineSnapshot.installed == false)
     #expect(offlineSnapshot.loaded == false)
   }
+}
+
+private struct ManagedLaunchAgentBundleStampFixture: Codable {
+  let helperPath: String
+  let deviceIdentifier: UInt64
+  let inode: UInt64
+  let fileSize: UInt64
+  let modificationTimeIntervalSince1970: Double
+}
+
+private actor EndpointProbeRecorder {
+  private var endpoints: [String] = []
+
+  func record(_ endpoint: String) {
+    endpoints.append(endpoint)
+  }
+
+  func values() -> [String] {
+    endpoints
+  }
+}
+
+private func writeManagedLaunchAgentBundleStampFixture(
+  _ stamp: ManagedLaunchAgentBundleStampFixture,
+  environment: HarnessMonitorEnvironment
+) throws {
+  let url = HarnessMonitorPaths.daemonRoot(using: environment)
+    .appendingPathComponent("managed-launch-agent-bundle-stamp.json")
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+  let data = try encoder.encode(stamp)
+  try data.write(to: url)
 }

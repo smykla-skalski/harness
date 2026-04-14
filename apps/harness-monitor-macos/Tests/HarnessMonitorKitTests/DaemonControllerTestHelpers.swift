@@ -129,3 +129,53 @@ final class RecordingLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked S
     }
   }
 }
+
+final class HookedLaunchAgentManager: DaemonLaunchAgentManaging, @unchecked Sendable {
+  private let lock = NSLock()
+  private var protectedState: DaemonLaunchAgentRegistrationState
+  private let registerResult: DaemonLaunchAgentRegistrationState
+  private let onRegister: @Sendable () throws -> Void
+  private let onUnregister: @Sendable () throws -> Void
+  private var protectedRegisterCallCount = 0
+  private var protectedUnregisterCallCount = 0
+
+  init(
+    state: DaemonLaunchAgentRegistrationState,
+    registerResult: DaemonLaunchAgentRegistrationState = .enabled,
+    onRegister: @escaping @Sendable () throws -> Void = {},
+    onUnregister: @escaping @Sendable () throws -> Void = {}
+  ) {
+    self.protectedState = state
+    self.registerResult = registerResult
+    self.onRegister = onRegister
+    self.onUnregister = onUnregister
+  }
+
+  var registerCallCount: Int {
+    lock.withLock { protectedRegisterCallCount }
+  }
+
+  var unregisterCallCount: Int {
+    lock.withLock { protectedUnregisterCallCount }
+  }
+
+  func registrationState() -> DaemonLaunchAgentRegistrationState {
+    lock.withLock { protectedState }
+  }
+
+  func register() throws {
+    try onRegister()
+    lock.withLock {
+      protectedRegisterCallCount += 1
+      protectedState = registerResult
+    }
+  }
+
+  func unregister() throws {
+    try onUnregister()
+    lock.withLock {
+      protectedUnregisterCallCount += 1
+      protectedState = .notRegistered
+    }
+  }
+}

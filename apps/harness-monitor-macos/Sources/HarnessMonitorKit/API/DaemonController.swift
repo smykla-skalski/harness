@@ -143,6 +143,45 @@ struct ManagedStaleManifestTracker {
   }
 }
 
+public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
+  let helperPath: String
+  let deviceIdentifier: UInt64
+  let inode: UInt64
+  let fileSize: UInt64
+  let modificationTimeIntervalSince1970: Double
+
+  public init(
+    helperPath: String,
+    deviceIdentifier: UInt64,
+    inode: UInt64,
+    fileSize: UInt64,
+    modificationTimeIntervalSince1970: Double
+  ) {
+    self.helperPath = helperPath
+    self.deviceIdentifier = deviceIdentifier
+    self.inode = inode
+    self.fileSize = fileSize
+    self.modificationTimeIntervalSince1970 = modificationTimeIntervalSince1970
+  }
+
+  init(helperURL: URL) throws {
+    var fileStatus = stat()
+    guard helperURL.path.withCString({ stat($0, &fileStatus) }) == 0 else {
+      throw DaemonControlError.harnessBinaryNotFound
+    }
+
+    self.init(
+      helperPath: helperURL.path,
+      deviceIdentifier: UInt64(fileStatus.st_dev),
+      inode: UInt64(fileStatus.st_ino),
+      fileSize: UInt64(fileStatus.st_size),
+      modificationTimeIntervalSince1970:
+        Double(fileStatus.st_mtimespec.tv_sec)
+        + (Double(fileStatus.st_mtimespec.tv_nsec) / 1_000_000_000)
+    )
+  }
+}
+
 public struct DaemonController: DaemonControlling {
   private static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
 
@@ -154,6 +193,7 @@ public struct DaemonController: DaemonControlling {
   let endpointProbe: @Sendable (URL) async -> Bool
   let managedStaleManifestGracePeriod: Duration
   let expectedManagedDaemonVersion: @Sendable () -> String?
+  let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -179,7 +219,11 @@ public struct DaemonController: DaemonControlling {
       }
 
       return Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    }
+    },
+    managedLaunchAgentCurrentBundleStamp: @escaping @Sendable () throws
+      -> ManagedLaunchAgentBundleStamp? = {
+        try Self.currentManagedLaunchAgentBundleStamp()
+      }
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
@@ -189,6 +233,7 @@ public struct DaemonController: DaemonControlling {
     self.endpointProbe = endpointProbe
     self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
     self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
+    self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -243,7 +288,11 @@ public struct DaemonController: DaemonControlling {
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     try launchAgentManager.register()
-    return launchAgentManager.registrationState()
+    let state = launchAgentManager.registrationState()
+    if state == .enabled {
+      try persistCurrentManagedLaunchAgentBundleStamp()
+    }
+    return state
   }
 
   public func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
@@ -274,6 +323,7 @@ public struct DaemonController: DaemonControlling {
   public func stopDaemon() async throws -> String {
     if launchAgentManager.registrationState() == .enabled {
       try launchAgentManager.unregister()
+      clearManagedLaunchAgentBundleStamp()
       return "stopped"
     }
 
@@ -330,6 +380,7 @@ public struct DaemonController: DaemonControlling {
       return "launch agent not installed"
     case .enabled, .requiresApproval:
       try launchAgentManager.unregister()
+      clearManagedLaunchAgentBundleStamp()
       return "launch agent removed"
     }
   }
@@ -347,6 +398,17 @@ public struct DaemonController: DaemonControlling {
         timeout: .milliseconds(200)
       )
     }.value
+  }
+
+  public static func currentManagedLaunchAgentBundleStamp() throws -> ManagedLaunchAgentBundleStamp? {
+    let helperURL = Bundle.main.bundleURL
+      .appendingPathComponent("Contents", isDirectory: true)
+      .appendingPathComponent("Helpers", isDirectory: true)
+      .appendingPathComponent("harness")
+    guard FileManager.default.fileExists(atPath: helperURL.path) else {
+      return nil
+    }
+    return try ManagedLaunchAgentBundleStamp(helperURL: helperURL)
   }
 
   func managedDaemonVersionMismatch(for manifest: DaemonManifest) -> DaemonControlError? {
