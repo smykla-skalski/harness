@@ -7,7 +7,7 @@ use crate::errors::{CliError, CliErrorKind};
 mod data;
 #[path = "capabilities/model.rs"]
 mod model;
-#[path = "capabilities/readiness.rs"]
+#[path = "capabilities/readiness/mod.rs"]
 mod readiness;
 
 use data::{cluster_topologies, create, features, platforms, providers};
