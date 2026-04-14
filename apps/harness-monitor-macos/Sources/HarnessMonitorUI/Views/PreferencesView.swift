@@ -62,6 +62,9 @@ public struct PreferencesView: View {
     }
     .navigationSplitViewStyle(.balanced)
     .toolbarBaselineOverlay()
+    .suppressToolbarBaselineSeparator(
+      markedAs: HarnessMonitorAccessibility.preferencesToolbarSeparatorSuppressed
+    )
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .accessibilityElement(children: .contain)
