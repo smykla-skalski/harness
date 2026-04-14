@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::mem;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -7,7 +8,7 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::spawn;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
-use tokio::time::interval as tokio_interval;
+use tokio::time::{Instant as TokioInstant, interval as tokio_interval, sleep_until};
 
 use super::db::DaemonDb;
 use super::index;
@@ -44,6 +45,69 @@ const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change_seq
      FROM change_tracking
      WHERE change_seq > ?1
      ORDER BY change_seq";
+const DB_WATCH_EVENT_DEBOUNCE: Duration = Duration::from_millis(250);
+const DB_WATCH_MAX_BATCH_WINDOW: Duration = Duration::from_secs(1);
+
+#[derive(Debug, Default)]
+struct PendingWatchPaths {
+    paths: Vec<PathBuf>,
+    first_event_at: Option<Instant>,
+    last_event_at: Option<Instant>,
+}
+
+impl PendingWatchPaths {
+    fn has_pending(&self) -> bool {
+        !self.paths.is_empty()
+    }
+
+    fn push_result(&mut self, result: notify::Result<notify::Event>, now: Instant) {
+        if let Ok(event) = result {
+            self.push_paths(event.paths, now);
+        }
+    }
+
+    fn push_paths(&mut self, mut paths: Vec<PathBuf>, now: Instant) {
+        if paths.is_empty() {
+            return;
+        }
+
+        if self.first_event_at.is_none() {
+            self.first_event_at = Some(now);
+        }
+        self.last_event_at = Some(now);
+        self.paths.append(&mut paths);
+    }
+
+    fn next_flush_at(&self) -> Option<Instant> {
+        let first_event_at = self.first_event_at?;
+        let last_event_at = self.last_event_at?;
+        Some(
+            (last_event_at + DB_WATCH_EVENT_DEBOUNCE)
+                .min(first_event_at + DB_WATCH_MAX_BATCH_WINDOW),
+        )
+    }
+
+    fn take_ready_paths(&mut self, now: Instant) -> Option<Vec<PathBuf>> {
+        let flush_at = self.next_flush_at()?;
+        if now < flush_at {
+            return None;
+        }
+        self.take_all()
+    }
+
+    fn take_all(&mut self) -> Option<Vec<PathBuf>> {
+        if self.paths.is_empty() {
+            self.first_event_at = None;
+            self.last_event_at = None;
+            return None;
+        }
+
+        let paths = mem::take(&mut self.paths);
+        self.first_event_at = None;
+        self.last_event_at = None;
+        Some(paths)
+    }
+}
 
 /// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
 /// is available, uses `change_tracking` versions instead of full filesystem
@@ -79,22 +143,29 @@ fn spawn_db_watch_loop(
 
         let mut ticker = tokio_interval(interval);
         let mut last_change_seq: i64 = 0;
+        let mut pending_paths = PendingWatchPaths::default();
 
         loop {
+            let debounce_sleep = pending_paths
+                .next_flush_at()
+                .map(|deadline| sleep_until(TokioInstant::from_std(deadline)));
             tokio::select! {
                 Some(result) = event_rx.recv() => {
-                    // Collect all pending file events and extract affected session IDs
-                    let mut paths: Vec<_> = result
-                        .map(|event| event.paths)
-                        .unwrap_or_default();
+                    pending_paths.push_result(result, Instant::now());
                     while let Ok(result) = event_rx.try_recv() {
-                        if let Ok(event) = result {
-                            paths.extend(event.paths);
-                        }
+                        pending_paths.push_result(result, Instant::now());
                     }
-                    reindex_sessions_from_paths(&db, &paths);
                 }
                 _ = ticker.tick() => {}
+                () = async {
+                    if let Some(sleep) = debounce_sleep {
+                        sleep.await;
+                    }
+                }, if pending_paths.has_pending() => {}
+            }
+
+            if let Some(paths) = pending_paths.take_ready_paths(Instant::now()) {
+                reindex_sessions_from_paths(&db, &paths);
             }
 
             let Ok(db_guard) = db.lock() else {
@@ -673,6 +744,71 @@ mod tests {
                 .iter()
                 .any(|detail| detail.contains("idx_change_tracking_change_seq")),
             "expected explain plan to use change_seq index, got {details:?}"
+        );
+    }
+
+    #[test]
+    fn pending_watch_paths_flushes_after_quiet_period() {
+        let base = Instant::now();
+        let mut pending = PendingWatchPaths::default();
+        pending.push_paths(vec![PathBuf::from("/tmp/watch-1")], base);
+        pending.push_paths(
+            vec![PathBuf::from("/tmp/watch-2")],
+            base + Duration::from_millis(125),
+        );
+
+        assert!(
+            pending
+                .take_ready_paths(base + Duration::from_millis(374))
+                .is_none(),
+            "batch should stay open until the debounce window after the last event"
+        );
+
+        let paths = pending
+            .take_ready_paths(base + Duration::from_millis(375))
+            .expect("batched paths");
+        assert_eq!(
+            paths,
+            vec![PathBuf::from("/tmp/watch-1"), PathBuf::from("/tmp/watch-2")]
+        );
+        assert!(
+            !pending.has_pending(),
+            "flush should reset the pending batch"
+        );
+    }
+
+    #[test]
+    fn pending_watch_paths_flushes_at_max_batch_window() {
+        let base = Instant::now();
+        let mut pending = PendingWatchPaths::default();
+        pending.push_paths(vec![PathBuf::from("/tmp/watch-1")], base);
+        pending.push_paths(
+            vec![PathBuf::from("/tmp/watch-2")],
+            base + Duration::from_millis(200),
+        );
+        pending.push_paths(
+            vec![PathBuf::from("/tmp/watch-3")],
+            base + Duration::from_millis(400),
+        );
+        pending.push_paths(
+            vec![PathBuf::from("/tmp/watch-4")],
+            base + Duration::from_millis(800),
+        );
+
+        assert!(
+            pending
+                .take_ready_paths(base + Duration::from_millis(999))
+                .is_none(),
+            "batch should remain pending until the max window expires"
+        );
+
+        let paths = pending
+            .take_ready_paths(base + Duration::from_secs(1))
+            .expect("forced batch flush");
+        assert_eq!(paths.len(), 4);
+        assert!(
+            !pending.has_pending(),
+            "forced flush should reset the batch"
         );
     }
 
