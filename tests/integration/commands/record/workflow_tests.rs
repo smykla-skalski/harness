@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use harness::create::{read_create_state, ApprovalBeginArgs, CreatePhase};
+use harness::create::{ApprovalBeginArgs, CreatePhase, read_create_state};
 use harness::run::workflow::{self as runner_workflow, RunnerPhase};
 use harness::run::{CloseoutArgs, RunDirArgs, Verdict};
 

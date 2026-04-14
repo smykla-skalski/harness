@@ -149,7 +149,11 @@ fn readiness_marks_repo_contract_unready_when_targets_are_missing() {
     .unwrap();
     fs::write(repo_root.join("mk/k3d.mk"), "k3d/start:\n\t@echo old\n").unwrap();
     fs::write(repo_root.join("mk/k8s.mk"), "KIND_CLUSTER_NAME ?= kuma-1\n").unwrap();
-    fs::write(repo_root.join("mk/docker.mk"), "docker/push:\n\t@echo old\n").unwrap();
+    fs::write(
+        repo_root.join("mk/docker.mk"),
+        "docker/push:\n\t@echo old\n",
+    )
+    .unwrap();
 
     let report = with_data_root(tmp.path(), || {
         build_report(
@@ -282,13 +286,16 @@ fn readiness_blocks_kubernetes_when_kubectl_cli_backend_is_selected_without_kube
     let (home_dir, project_dir) = prepare_project_root_with_contract(tmp.path());
 
     let report = with_data_root(tmp.path(), || {
-        with_vars([("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"))], || {
-            build_report(
-                Some(project_dir.to_str().unwrap()),
-                None,
-                &FakeProbe::ready(&home_dir).without_command("kubectl"),
-            )
-        })
+        with_vars(
+            [("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"))],
+            || {
+                build_report(
+                    Some(project_dir.to_str().unwrap()),
+                    None,
+                    &FakeProbe::ready(&home_dir).without_command("kubectl"),
+                )
+            },
+        )
     });
 
     assert!(!report.readiness.platforms["kubernetes"].ready);

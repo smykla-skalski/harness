@@ -149,7 +149,10 @@ fn malformed_pending_signal_is_quarantined() {
     let signals = read_pending_signals(&signal_dir).unwrap();
 
     assert!(signals.is_empty());
-    assert!(!malformed.exists(), "malformed file should be moved out of pending");
+    assert!(
+        !malformed.exists(),
+        "malformed file should be moved out of pending"
+    );
     let quarantined: Vec<_> = fs::read_dir(&pending)
         .unwrap()
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))

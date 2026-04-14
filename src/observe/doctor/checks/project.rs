@@ -87,7 +87,9 @@ pub(super) fn check_global_install(project_dir: &Path) -> Vec<DoctorCheck> {
         ));
     }
 
-    let observe_dir = project_context_dir(project_dir).join("agents").join("observe");
+    let observe_dir = project_context_dir(project_dir)
+        .join("agents")
+        .join("observe");
     match fs::create_dir_all(&observe_dir) {
         Ok(()) => checks.push(ok_check(
             "observe_state_dir",

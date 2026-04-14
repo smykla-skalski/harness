@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
 use crate::run::context::{RunLayout, RunMetadata};
-use crate::run::workflow::{read_runner_state, RunnerPhase, RunnerWorkflowState, TransitionRecord};
+use crate::run::workflow::{RunnerPhase, RunnerWorkflowState, TransitionRecord, read_runner_state};
 use crate::run::{RunCounts, RunStatus};
 use crate::workspace::utc_now;
 

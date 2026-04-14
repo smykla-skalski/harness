@@ -24,12 +24,18 @@ fn manifest_deserializes_legacy_json_without_sandbox_fields() {
     let manifest: DaemonManifest = serde_json::from_str(legacy).expect("legacy deserialize");
     assert_eq!(manifest.version, "18.14.0");
     assert_eq!(manifest.pid, 101);
-    assert!(!manifest.sandboxed, "legacy manifests default to unsandboxed");
+    assert!(
+        !manifest.sandboxed,
+        "legacy manifests default to unsandboxed"
+    );
     assert!(
         manifest.host_bridge == HostBridgeManifest::default(),
         "legacy manifests default host bridge to an empty snapshot"
     );
-    assert_eq!(manifest.revision, 0, "legacy manifests default revision to zero");
+    assert_eq!(
+        manifest.revision, 0,
+        "legacy manifests default revision to zero"
+    );
     assert!(
         manifest.updated_at.is_empty(),
         "legacy manifests default updated_at to empty"
@@ -40,7 +46,10 @@ fn manifest_deserializes_legacy_json_without_sandbox_fields() {
 fn manifest_round_trip() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             let manifest = sample_manifest(42, "http://127.0.0.1:9999");
             write_manifest(&manifest).expect("write");
@@ -57,12 +66,18 @@ fn manifest_round_trip() {
 fn clear_manifest_for_pid_only_removes_owned_manifest() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             write_manifest(&sample_manifest(777, "http://127.0.0.1:7777")).expect("manifest");
 
             clear_manifest_for_pid(778).expect("skip foreign pid");
-            assert!(manifest_path().exists(), "foreign pid should not clear manifest");
+            assert!(
+                manifest_path().exists(),
+                "foreign pid should not clear manifest"
+            );
 
             clear_manifest_for_pid(777).expect("clear owned manifest");
             assert!(!manifest_path().exists(), "owned pid should clear manifest");
@@ -74,14 +89,20 @@ fn clear_manifest_for_pid_only_removes_owned_manifest() {
 fn load_running_manifest_clears_stale_manifest_when_lock_is_free() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             write_manifest(&sample_manifest(9191, "http://127.0.0.1:9191")).expect("manifest");
 
             let manifest = load_running_manifest().expect("load running manifest");
 
             assert!(manifest.is_none(), "stale manifest should be hidden");
-            assert!(!manifest_path().exists(), "stale manifest should be removed");
+            assert!(
+                !manifest_path().exists(),
+                "stale manifest should be removed"
+            );
         },
     );
 }
@@ -90,7 +111,10 @@ fn load_running_manifest_clears_stale_manifest_when_lock_is_free() {
 fn write_manifest_serializes_concurrent_writers_before_loading_next_revision() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             let base = sample_manifest(4242, "http://127.0.0.1:4242");
             let (event_tx, event_rx) = mpsc::channel();
@@ -148,7 +172,10 @@ fn write_manifest_serializes_concurrent_writers_before_loading_next_revision() {
 fn write_manifest_bumps_revision_monotonically() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             let base = sample_manifest(123, "http://127.0.0.1:0");
             let first = write_manifest(&base).expect("first write");
@@ -172,7 +199,10 @@ fn write_manifest_bumps_revision_monotonically() {
 fn write_manifest_sets_updated_at_to_non_empty_string() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             let written =
                 write_manifest(&sample_manifest(555, "http://127.0.0.1:0")).expect("write");

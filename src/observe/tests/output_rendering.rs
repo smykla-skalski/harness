@@ -1,11 +1,11 @@
 use std::fs;
 
+use super::super::{classifier, output};
 use super::{
     Issue, IssueCode, IssueSeverity, ObserveFilter, ObserveFilterArgs,
     assert_json_issue_classification_shape, assert_json_issue_identity_shape,
     assert_json_issue_message_shape, scan, types, write_session_file,
 };
-use super::super::{classifier, output};
 
 #[test]
 fn golden_scan_json_output() {

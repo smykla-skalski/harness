@@ -148,7 +148,10 @@ pub(super) fn check_compact_handoff(project_dir: &Path, compact_path: &Path) -> 
             ok_check(
                 "observe_compact_handoff",
                 "compact",
-                format!("Compact handoff is readable with status {}.", handoff.status),
+                format!(
+                    "Compact handoff is readable with status {}.",
+                    handoff.status
+                ),
                 Some(compact_path),
             )
         }
