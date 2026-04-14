@@ -74,13 +74,23 @@ extension HarnessMonitorStore {
   }
 
   func applyCachedSessionIfAvailable(sessionID: String) async {
-    guard selectedSessionID == sessionID, selectedSession == nil else { return }
+    guard selectedSessionID == sessionID else { return }
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       guard selectedSessionID == sessionID else { return }
+      let shouldPromoteCachedSnapshot =
+        selectedSession?.session.sessionId != sessionID
+        || timeline.isEmpty
+        || isShowingCachedData
+      guard shouldPromoteCachedSnapshot else { return }
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: cached.detail,
+        timeline: cached.timeline,
+        showingCachedData: true,
+        cancelPendingTimelineRefresh: false
+      )
       withUISyncBatch {
-        selectedSession = cached.detail
-        timeline = cached.timeline
         isSelectionLoading = false
       }
     }
