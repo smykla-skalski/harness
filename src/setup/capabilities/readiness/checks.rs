@@ -1,3 +1,4 @@
+use std::env::split_paths;
 use std::path::Path;
 
 use fs_err as fs;
@@ -10,11 +11,11 @@ use crate::setup::capabilities::model::{ReadinessCheck, ReadinessCheckScope, Rea
 use crate::setup::wrapper::choose_install_dir_with_home;
 use crate::workspace::harness_data_root;
 
+use super::CapabilityProbe;
 use super::repo::{
     check_repo_is_kuma_checkout, check_repo_make_contract, check_repo_remote_publish_contract,
     check_repo_root_exists, check_repo_root_resolved, is_kuma_checkout,
 };
-use super::CapabilityProbe;
 
 pub(super) fn build_checks(
     project_dir: &Path,
@@ -414,7 +415,7 @@ pub(super) fn command_on_path(command: &str, path_env: &str) -> bool {
         return candidate.is_file();
     }
 
-    std::env::split_paths(path_env)
+    split_paths(path_env)
         .map(|dir| dir.join(command))
         .any(|path| path.is_file())
 }
