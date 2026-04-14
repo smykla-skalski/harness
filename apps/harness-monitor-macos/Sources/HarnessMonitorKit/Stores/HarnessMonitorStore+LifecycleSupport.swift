@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private func previewReadySessionID(
+  func previewReadySessionID(
     client: any HarnessMonitorClientProtocol,
     sessions: [SessionSummary]
   ) -> String? {
