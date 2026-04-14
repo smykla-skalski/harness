@@ -120,16 +120,7 @@ public struct ContentView: View {
     .containerBackground(.windowBackground, for: .window)
     .focusedSceneValue(\.windowNavigation, windowNavigation)
     .toolbar {
-      ContentNavigationToolbarItems(
-        store: store,
-        toolbarUI: contentToolbar
-      )
-      ContentCenterpieceToolbarItems(
-        store: store,
-        toolbarUI: contentToolbar,
-        displayMode: toolbarCenterpieceDisplayMode,
-        availableDetailWidth: toolbarLayoutWidth
-      )
+      contentToolbarItems
     }
     .onChange(of: contentToolbar.canNavigateBack) { _, newValue in
       windowNavigation.canGoBack = newValue
@@ -153,37 +144,14 @@ public struct ContentView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
-    .overlay {
-      ContentAccessibilityOverlayBridge(
-        contentToolbar: contentToolbar,
-        contentSession: contentSession,
-        contentSessionDetail: contentSessionDetail,
-        toolbarCenterpieceDisplayMode: toolbarCenterpieceDisplayMode,
-        appChromeAccessibilityValue: appChromeAccessibilityValue,
-        auditBuildAccessibilityValue: auditBuildAccessibilityValue
-      )
-    }
+    .overlay(contentAccessibilityOverlay)
     .overlay(alignment: .topTrailing) {
       ContentFloatingOverlay(
         toast: toast,
         auditBuildBadgeState: auditBuildBadgeState
       )
     }
-    .background {
-      if HarnessMonitorUITestEnvironment.isEnabled {
-        EmptyView()
-      } else {
-        ContentSceneRestorationBridge(
-          store: store,
-          selection: store.selection
-        )
-      }
-      ContentEscapeCommandBridge(
-        store: store,
-        toast: toast,
-        contentSessionDetail: contentSessionDetail
-      )
-    }
+    .background(contentBackground)
     .modifier(
       OptionalToolbarBaselineOverlayModifier(
         isEnabled: !toolbarGlassReproConfiguration.disablesToolbarBaselineOverlay
@@ -205,6 +173,49 @@ public struct ContentView: View {
     )
     .modifier(
       ContentAnnouncementsModifier(shellUI: contentShell)
+    )
+  }
+
+  @ToolbarContentBuilder
+  private var contentToolbarItems: some ToolbarContent {
+    ContentNavigationToolbarItems(
+      store: store,
+      toolbarUI: contentToolbar
+    )
+    ContentCenterpieceToolbarItems(
+      store: store,
+      toolbarUI: contentToolbar,
+      displayMode: toolbarCenterpieceDisplayMode,
+      availableDetailWidth: toolbarLayoutWidth
+    )
+  }
+
+  @ViewBuilder
+  private var contentAccessibilityOverlay: some View {
+    ContentAccessibilityOverlayBridge(
+      contentToolbar: contentToolbar,
+      contentSession: contentSession,
+      contentSessionDetail: contentSessionDetail,
+      toolbarCenterpieceDisplayMode: toolbarCenterpieceDisplayMode,
+      appChromeAccessibilityValue: appChromeAccessibilityValue,
+      auditBuildAccessibilityValue: auditBuildAccessibilityValue
+    )
+  }
+
+  @ViewBuilder
+  private var contentBackground: some View {
+    if HarnessMonitorUITestEnvironment.isEnabled {
+      EmptyView()
+    } else {
+      ContentSceneRestorationBridge(
+        store: store,
+        selection: store.selection
+      )
+    }
+    ContentEscapeCommandBridge(
+      store: store,
+      toast: toast,
+      contentSessionDetail: contentSessionDetail
     )
   }
 
