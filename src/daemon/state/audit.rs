@@ -13,6 +13,10 @@ use super::{
     events_path, manifest_path,
 };
 
+/// Generate and persist a local bearer token with 0600 permissions.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
 pub fn ensure_auth_token() -> Result<String, CliError> {
     ensure_daemon_dirs()?;
     let path = auth_token_path();
@@ -35,6 +39,10 @@ pub fn ensure_auth_token() -> Result<String, CliError> {
     Ok(token)
 }
 
+/// Append a daemon-owned audit event.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
 pub fn append_event(level: &str, message: &str) -> Result<(), CliError> {
     ensure_daemon_dirs()?;
     let path = events_path();
@@ -72,6 +80,10 @@ pub fn append_event_best_effort(level: &str, message: &str) {
     }
 }
 
+/// Read the newest daemon audit events from disk.
+///
+/// # Errors
+/// Returns `CliError` when the audit log cannot be read or parsed.
 pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliError> {
     let path = events_path();
     if limit == 0 || !path.is_file() {
@@ -105,6 +117,10 @@ pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliErro
     Ok(events)
 }
 
+/// Build a derived diagnostics snapshot for the local daemon workspace.
+///
+/// # Errors
+/// Returns `CliError` on filesystem or parse failures.
 pub fn diagnostics() -> Result<DaemonDiagnostics, CliError> {
     let db_path = daemon_root().join("harness.db");
     let db_size = db_path.metadata().map_or(0, |metadata| metadata.len());

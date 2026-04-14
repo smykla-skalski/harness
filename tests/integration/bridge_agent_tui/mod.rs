@@ -16,11 +16,11 @@ use harness::session::types::SessionRole;
 use tempfile::tempdir;
 use tokio::sync::broadcast;
 
-use super::helpers::ManagedChild;
 use self::support::{
     ensure_host_home, harness_binary, output_text, run_bridge, run_bridge_with_data_home,
     wait_for_bridge_exit, wait_for_bridge_state,
 };
+use super::helpers::ManagedChild;
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);

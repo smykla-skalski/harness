@@ -1,5 +1,5 @@
 use fs_err as fs;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::session::types::CURRENT_VERSION;

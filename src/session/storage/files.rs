@@ -4,12 +4,12 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
-use crate::infra::persistence::flock::{with_exclusive_flock, FlockErrorContext};
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::project_context_dir;
 
 pub(super) fn orchestration_root(project_dir: &Path) -> PathBuf {
@@ -87,7 +87,7 @@ pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, 
 
     let mut session_ids: Vec<String> = fs::read_dir(root)
         .map_err(|error| io_err(&error))?
-        .filter_map(std::result::Result::ok)
+        .filter_map(Result::ok)
         .filter_map(|entry| {
             entry
                 .file_type()

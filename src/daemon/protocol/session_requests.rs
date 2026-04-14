@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::agents::runtime::signal::AckResult;
-use crate::session::types::{
-    SessionRole, SessionState, TaskQueuePolicy, TaskSeverity, TaskStatus,
-};
+use crate::session::types::{SessionRole, SessionState, TaskQueuePolicy, TaskSeverity, TaskStatus};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleChangeRequest {

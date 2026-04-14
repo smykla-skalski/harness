@@ -26,6 +26,11 @@ pub(crate) fn flock_is_held_at(path: &Path) -> bool {
     shared_flock_is_held_at(path)
 }
 
+/// Acquire the daemon singleton lock for the current process lifetime.
+///
+/// # Errors
+/// Returns `CliError` when another daemon already owns the lock or the lock
+/// file cannot be opened.
 pub fn acquire_singleton_lock() -> Result<DaemonLockGuard, CliError> {
     ensure_daemon_dirs()?;
     acquire_flock_exclusive(&lock_path(), "daemon").map_err(|_| {

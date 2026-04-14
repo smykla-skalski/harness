@@ -6,8 +6,8 @@ use super::{
     AgentRemoveRequest, CodexRunRequest, LeaderTransferRequest, ObserveSessionRequest,
     RoleChangeRequest, SessionEndRequest, SignalCancelRequest, SignalSendRequest,
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, VoiceAudioChunkRequest,
-    VoiceSessionFinishRequest, VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
+    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
 };
 
 /// Rebind actor-bearing daemon requests to the authenticated control-plane

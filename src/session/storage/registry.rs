@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::errors::CliError;
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::workspace::{
-    project_context_dir, resolve_git_checkout_identity, utc_now, GitCheckoutIdentity,
+    GitCheckoutIdentity, project_context_dir, resolve_git_checkout_identity, utc_now,
 };
 
 use super::files;

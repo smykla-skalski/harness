@@ -76,7 +76,10 @@ fn daemon_root_override_takes_precedence_over_env() {
         [
             ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
             ("HARNESS_APP_GROUP_ID", None),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             reset_override_for_tests();
@@ -95,7 +98,10 @@ fn daemon_root_override_clears_when_set_to_none() {
         [
             ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
             ("HARNESS_APP_GROUP_ID", None),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             reset_override_for_tests();

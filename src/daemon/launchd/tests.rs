@@ -49,7 +49,10 @@ fn launch_agent_install_and_remove_round_trip() {
     temp_env::with_vars(
         [
             ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             let path = install_launch_agent_with(Path::new("/tmp/harness-bin"), &runner)
@@ -124,7 +127,10 @@ fn install_launch_agent_removes_legacy_plist() {
     temp_env::with_vars(
         [
             ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             let legacy_path = state::legacy_launch_agent_path();
@@ -166,7 +172,10 @@ fn restart_launch_agent_uses_existing_plist() {
     temp_env::with_vars(
         [
             ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             let path = state::launch_agent_path();
@@ -239,14 +248,21 @@ fn restart_launch_agent_requires_installed_plist() {
     temp_env::with_vars(
         [
             ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             let error = restart_launch_agent_with(&|_args| {
                 panic!("runner should not be called when plist is missing");
             })
             .expect_err("restart should fail without a plist");
-            assert!(error.to_string().contains("launch agent plist not installed"));
+            assert!(
+                error
+                    .to_string()
+                    .contains("launch agent plist not installed")
+            );
         },
     );
 }
@@ -290,7 +306,10 @@ fn launch_agent_status_coalesces_legacy_runtime_into_current_contract() {
     temp_env::with_vars(
         [
             ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
-            ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
         ],
         || {
             let legacy_path = state::legacy_launch_agent_path();
@@ -333,7 +352,10 @@ fn launch_agent_status_coalesces_legacy_runtime_into_current_contract() {
             assert!(status.installed);
             assert!(status.loaded);
             assert_eq!(status.label, LAUNCH_AGENT_LABEL);
-            assert_eq!(status.path, state::launch_agent_path().display().to_string());
+            assert_eq!(
+                status.path,
+                state::launch_agent_path().display().to_string()
+            );
             assert_eq!(status.service_target, launchd_service_target());
             assert_eq!(status.state.as_deref(), Some("running"));
             assert_eq!(status.pid, Some(4242));

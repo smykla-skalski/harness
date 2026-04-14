@@ -48,12 +48,16 @@ fn docker_types_are_send_sync() {
 
 #[test]
 fn container_runtime_backend_defaults_to_bollard() {
-    with_var(super::super::backend::CONTAINER_RUNTIME_ENV, None::<&str>, || {
-        assert_eq!(
-            container_backend_from_env().expect("expected default backend"),
-            ContainerRuntimeBackend::Bollard
-        );
-    });
+    with_var(
+        super::super::backend::CONTAINER_RUNTIME_ENV,
+        None::<&str>,
+        || {
+            assert_eq!(
+                container_backend_from_env().expect("expected default backend"),
+                ContainerRuntimeBackend::Bollard
+            );
+        },
+    );
 }
 
 #[test]
@@ -72,15 +76,20 @@ fn container_runtime_backend_accepts_docker_cli_selector() {
 
 #[test]
 fn container_runtime_backend_rejects_invalid_selector() {
-    with_var(super::super::backend::CONTAINER_RUNTIME_ENV, Some("nope"), || {
-        let error = container_backend_from_env().expect_err("expected invalid selector to fail");
-        assert!(
-            error
-                .to_string()
-                .contains("expected `bollard` or `docker-cli`"),
-            "unexpected error: {error}"
-        );
-    });
+    with_var(
+        super::super::backend::CONTAINER_RUNTIME_ENV,
+        Some("nope"),
+        || {
+            let error =
+                container_backend_from_env().expect_err("expected invalid selector to fail");
+            assert!(
+                error
+                    .to_string()
+                    .contains("expected `bollard` or `docker-cli`"),
+                "unexpected error: {error}"
+            );
+        },
+    );
 }
 
 #[test]

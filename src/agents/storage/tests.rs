@@ -138,7 +138,10 @@ fn session_registry_keeps_agent_pointers_independent() {
 
         clear_current_session_id(project_dir, HookAgent::Codex).unwrap();
 
-        assert_eq!(current_session_id(project_dir, HookAgent::Codex).unwrap(), None);
+        assert_eq!(
+            current_session_id(project_dir, HookAgent::Codex).unwrap(),
+            None
+        );
         assert_eq!(
             current_session_id(project_dir, HookAgent::Claude)
                 .unwrap()

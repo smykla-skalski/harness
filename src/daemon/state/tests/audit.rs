@@ -11,7 +11,10 @@ use super::super::{
 fn ensure_auth_token_writes_strict_permissions() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             let token = ensure_auth_token().expect("token");
             assert!(!token.is_empty());
@@ -25,7 +28,10 @@ fn ensure_auth_token_writes_strict_permissions() {
 fn diagnostics_include_latest_event_and_database_path() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             append_event("info", "daemon booted").expect("append event");
 
@@ -45,7 +51,10 @@ fn diagnostics_include_latest_event_and_database_path() {
 fn read_recent_events_returns_last_entries_in_order() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path")))],
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
         || {
             append_event("info", "daemon booted").expect("append event");
             append_event("warn", "stalled session").expect("append event");

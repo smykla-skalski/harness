@@ -20,7 +20,7 @@ pub(crate) use journal::{
     append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints,
 };
 pub(crate) use registry::{
-    deregister_active, load_active_registry_for, load_project_origin, record_project_origin,
-    register_active, ActiveRegistry, ProjectOriginRecord,
+    ActiveRegistry, ProjectOriginRecord, deregister_active, load_active_registry_for,
+    load_project_origin, record_project_origin, register_active,
 };
 pub(crate) use state_store::{create_state, load_state, update_state, update_state_if_changed};
