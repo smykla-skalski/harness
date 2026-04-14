@@ -31,6 +31,18 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureProjectsDelay(_ delay: Duration?) {
+    lock.withLock {
+      projectsDelay = delay
+    }
+  }
+
+  func configureSessionsDelay(_ delay: Duration?) {
+    lock.withLock {
+      sessionsDelay = delay
+    }
+  }
+
   func configureMutationDelay(_ delay: Duration?) {
     lock.withLock {
       mutationDelay = delay
@@ -243,6 +255,8 @@ extension RecordingHarnessClient {
     lock.withLock { transportLatencyError }
   }
   func configuredDiagnosticsDelay() -> Duration? { lock.withLock { diagnosticsDelay } }
+  func configuredProjectsDelay() -> Duration? { lock.withLock { projectsDelay } }
+  func configuredSessionsDelay() -> Duration? { lock.withLock { sessionsDelay } }
   func configuredMutationDelay() -> Duration? { lock.withLock { mutationDelay } }
   func configuredProjects() -> [ProjectSummary]? { lock.withLock { projectSummariesStorage } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { sessionSummariesStorage } }

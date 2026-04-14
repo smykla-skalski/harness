@@ -1,6 +1,18 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private struct RefreshSnapshot: Sendable {
+    let diagnostics: MeasuredOperation<DaemonDiagnosticsReport>
+    let projects: MeasuredOperation<[ProjectSummary]>
+    let sessions: MeasuredOperation<[SessionSummary]>
+  }
+
+  private enum RefreshSnapshotPiece: Sendable {
+    case diagnostics(MeasuredOperation<DaemonDiagnosticsReport>)
+    case projects(MeasuredOperation<[ProjectSummary]>)
+    case sessions(MeasuredOperation<[SessionSummary]>)
+  }
+
   func connect(using client: any HarnessMonitorClientProtocol) async {
     self.client = client
     withUISyncBatch {
@@ -52,16 +64,10 @@ extension HarnessMonitorStore {
     defer { isRefreshing = false }
 
     do {
-      // Avoid async-let teardown crashes seen on current macOS Swift runtime.
-      let measuredDiagnostics = try await Self.measureOperation {
-        try await client.diagnostics()
-      }
-      let measuredProjects = try await Self.measureOperation {
-        try await client.projects()
-      }
-      let measuredSessions = try await Self.measureOperation {
-        try await client.sessions()
-      }
+      let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
+      let measuredDiagnostics = refreshSnapshot.diagnostics
+      let measuredProjects = refreshSnapshot.projects
+      let measuredSessions = refreshSnapshot.sessions
 
       withUISyncBatch {
         diagnostics = measuredDiagnostics.value
@@ -111,6 +117,62 @@ extension HarnessMonitorStore {
       _ = disconnectActiveConnection()
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
+    }
+  }
+
+  nonisolated private static func loadRefreshSnapshot(
+    using client: any HarnessMonitorClientProtocol
+  ) async throws -> RefreshSnapshot {
+    try await withThrowingTaskGroup(
+      of: RefreshSnapshotPiece.self,
+      returning: RefreshSnapshot.self
+    ) { group in
+      group.addTask {
+        .diagnostics(
+          try await Self.measureOperation {
+            try await client.diagnostics()
+          }
+        )
+      }
+      group.addTask {
+        .projects(
+          try await Self.measureOperation {
+            try await client.projects()
+          }
+        )
+      }
+      group.addTask {
+        .sessions(
+          try await Self.measureOperation {
+            try await client.sessions()
+          }
+        )
+      }
+
+      var diagnostics: MeasuredOperation<DaemonDiagnosticsReport>?
+      var projects: MeasuredOperation<[ProjectSummary]>?
+      var sessions: MeasuredOperation<[SessionSummary]>?
+
+      for try await piece in group {
+        switch piece {
+        case .diagnostics(let measuredDiagnostics):
+          diagnostics = measuredDiagnostics
+        case .projects(let measuredProjects):
+          projects = measuredProjects
+        case .sessions(let measuredSessions):
+          sessions = measuredSessions
+        }
+      }
+
+      guard let diagnostics, let projects, let sessions else {
+        throw CancellationError()
+      }
+
+      return RefreshSnapshot(
+        diagnostics: diagnostics,
+        projects: projects,
+        sessions: sessions
+      )
     }
   }
 
