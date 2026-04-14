@@ -1,0 +1,229 @@
+pub(crate) use std::borrow::Cow;
+pub(crate) use std::collections::BTreeMap;
+pub(crate) use std::fmt;
+pub(crate) use std::io::{Error as IoError, ErrorKind};
+pub(crate) use std::path::{Path, PathBuf};
+pub(crate) use std::sync::{Arc, Mutex, OnceLock};
+
+pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};
+pub(crate) use sha2::{Digest, Sha256};
+
+pub(crate) use crate::agents::runtime::event::ConversationEvent;
+pub(crate) use crate::agents::runtime::signal::Signal;
+pub(crate) use crate::daemon::agent_tui::{
+    AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
+};
+pub(crate) use crate::daemon::index::DiscoveredProject;
+pub(crate) use crate::daemon::protocol::{
+    CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineCursor, TimelineEntry,
+    TimelineWindowRequest, TimelineWindowResponse,
+};
+pub(crate) use crate::errors::{CliError, CliErrorKind};
+pub(crate) use crate::session::types::{
+    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
+    SessionStatus, TaskCheckpoint, WorkItem,
+};
+pub(crate) use crate::workspace::{project_context_dir, project_context_id, utc_now};
+
+pub(crate) use super::{
+    index as daemon_index, launchd as daemon_launchd, protocol as daemon_protocol,
+    snapshot as daemon_snapshot, state, state as daemon_state, timeline as daemon_timeline,
+};
+
+mod conversation;
+mod diagnostics;
+mod imports;
+mod runtime;
+mod schema;
+mod schema_sql;
+mod session_data;
+mod signals;
+mod summaries;
+mod timeline;
+mod timeline_store;
+mod writes;
+
+pub(crate) use runtime::ensure_shared_db;
+#[allow(unused_imports)]
+use conversation::{
+    clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
+};
+#[allow(unused_imports)]
+use diagnostics::import_daemon_events;
+#[allow(unused_imports)]
+use signals::derive_effective_signal_status;
+#[allow(unused_imports)]
+use timeline::{stored_timeline_entry, stored_timeline_entry_from_row};
+#[allow(unused_imports)]
+use timeline_store::{
+    replace_all_session_timeline_entries, replace_session_timeline_entries_for_prefix,
+    upsert_session_timeline_entry,
+};
+
+pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
+    if scope == "global" || scope.starts_with("session:") {
+        Cow::Borrowed(scope)
+    } else {
+        Cow::Owned(format!("session:{scope}"))
+    }
+}
+
+pub(crate) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
+    if scope == "global" {
+        None
+    } else {
+        Some(scope.strip_prefix("session:").unwrap_or(scope))
+            .filter(|session_id| !session_id.is_empty())
+    }
+}
+
+/// `SQLite`-backed storage for the harness daemon. Replaces the file-based
+/// discovery layer with indexed queries while keeping file writes for
+/// backward compatibility with CLI offline access and agent runtimes.
+pub struct DaemonDb {
+    conn: Connection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AgentTuiLiveRefreshState {
+    pub(crate) status: AgentTuiStatus,
+    pub(crate) updated_at: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedSessionResync {
+    pub(crate) resolved: daemon_index::ResolvedSession,
+    log_entries: Vec<SessionLogEntry>,
+    task_checkpoints: Vec<PreparedTaskCheckpointImport>,
+    signals: Vec<SessionSignalRecord>,
+    activities: Vec<daemon_protocol::AgentToolActivitySummary>,
+    conversation_events: Vec<PreparedConversationEventImport>,
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedTaskCheckpointImport {
+    checkpoints: Vec<TaskCheckpoint>,
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedConversationEventImport {
+    agent_id: String,
+    runtime: String,
+    events: Vec<ConversationEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StoredTimelineEntry {
+    session_id: String,
+    entry_id: String,
+    source_kind: String,
+    source_key: String,
+    recorded_at: String,
+    kind: String,
+    agent_id: Option<String>,
+    task_id: Option<String>,
+    summary: String,
+    payload_json: String,
+    sort_recorded_at: String,
+    sort_tiebreaker: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SessionTimelineStateRow {
+    session_id: String,
+    revision: i64,
+    entry_count: usize,
+    newest_recorded_at: Option<String>,
+    oldest_recorded_at: Option<String>,
+    integrity_hash: String,
+    updated_at: String,
+}
+
+impl StoredTimelineEntry {
+    fn into_timeline_entry(
+        self,
+        payload_scope: daemon_timeline::TimelinePayloadScope,
+    ) -> Result<TimelineEntry, CliError> {
+        let payload = if payload_scope == daemon_timeline::TimelinePayloadScope::Summary {
+            serde_json::Value::Object(serde_json::Map::new())
+        } else {
+            serde_json::from_str(&self.payload_json).map_err(|error| {
+                db_error(format!("parse timeline payload {}: {error}", self.entry_id))
+            })?
+        };
+        Ok(TimelineEntry {
+            entry_id: self.entry_id,
+            recorded_at: self.recorded_at,
+            kind: self.kind,
+            session_id: self.session_id,
+            agent_id: self.agent_id,
+            task_id: self.task_id,
+            summary: self.summary,
+            payload,
+        })
+    }
+}
+
+impl fmt::Debug for DaemonDb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DaemonDb").finish_non_exhaustive()
+    }
+}
+
+pub(crate) const SCHEMA_VERSION: &str = "7";
+
+/// Summary of what was imported from file-based storage.
+#[derive(Debug, Default)]
+pub struct ImportResult {
+    pub projects: usize,
+    pub sessions: usize,
+}
+
+/// Summary of background file reconciliation.
+#[derive(Debug, Default)]
+pub struct ReconcileResult {
+    pub projects: usize,
+    pub sessions_imported: usize,
+    pub sessions_skipped: usize,
+}
+
+/// Extract the serde tag from a serialized `SessionTransition` JSON string.
+/// Returns the variant name (e.g. `SessionStarted`, `AgentJoined`) for indexing.
+pub(crate) fn extract_transition_kind(json: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|value| {
+            value
+                .as_object()
+                .and_then(|object| object.keys().next().cloned())
+                .or_else(|| value.as_str().map(String::from))
+        })
+        .unwrap_or_default()
+}
+
+pub(crate) fn db_error(detail: impl Into<Cow<'static, str>>) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(detail))
+}
+
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "intentional bit-pattern reinterpretation for SQLite storage"
+)]
+pub(crate) const fn i64_from_u64(value: u64) -> i64 {
+    value as i64
+}
+
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "intentional bit-pattern reinterpretation for SQLite storage"
+)]
+pub(crate) const fn u64_from_i64(value: i64) -> u64 {
+    value as u64
+}
+
+pub(crate) fn usize_from_i64(value: i64) -> usize {
+    usize::try_from(value).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests;
