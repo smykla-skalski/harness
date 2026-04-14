@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    HostBridgeManifest, compute_bridge_manifest_update, hold_bridge_lock, process_id, state,
+    with_temp_daemon_root, write_fake_bridge_state,
+};
 
 #[test]
 fn compute_bridge_manifest_update_returns_none_when_host_bridge_unchanged() {
@@ -14,6 +17,7 @@ fn compute_bridge_manifest_update_returns_none_when_host_bridge_unchanged() {
             host_bridge: HostBridgeManifest::default(),
             revision: 1,
             updated_at: "2026-04-11T00:00:00Z".to_string(),
+            binary_stamp: None,
         };
         // No bridge.json exists so host_bridge_manifest returns default.
         // current.host_bridge is already default, so no update needed.
@@ -44,6 +48,7 @@ fn compute_bridge_manifest_update_returns_some_when_lock_held_and_manifest_stale
             host_bridge: HostBridgeManifest::default(),
             revision: 2,
             updated_at: "2026-04-11T00:00:00Z".to_string(),
+            binary_stamp: None,
         };
         let updated = compute_bridge_manifest_update(&current)
             .expect("update should be produced when lock held and manifest stale");

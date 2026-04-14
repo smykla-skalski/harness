@@ -1,4 +1,18 @@
-use super::{BridgeServer, AgentTuiStartSpec, AgentTuiSnapshot, CliError, BRIDGE_CAPABILITY_AGENT_TUI, CliErrorKind, BridgeCapability, spawn_agent_tui_process, Arc, BridgeSnapshotContext, snapshot_from_process, AgentTuiStatus, BridgeActiveTui, thread, deliver_deferred_prompts, Duration, BridgeAgentTuiMetadata, HostBridgeCapabilityManifest, stringify_metadata_map};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+
+use crate::daemon::agent_tui::{
+    AgentTuiSnapshot, AgentTuiStatus, deliver_deferred_prompts, snapshot_from_process,
+    spawn_agent_tui_process,
+};
+use crate::daemon::state::HostBridgeCapabilityManifest;
+use crate::errors::{CliError, CliErrorKind};
+
+use super::core::{BridgeActiveTui, BridgeAgentTuiMetadata, BridgeSnapshotContext};
+use super::helpers::stringify_metadata_map;
+use super::server::BridgeServer;
+use super::types::{AgentTuiStartSpec, BRIDGE_CAPABILITY_AGENT_TUI, BridgeCapability};
 
 impl BridgeServer {
     pub(super) fn start_agent_tui(

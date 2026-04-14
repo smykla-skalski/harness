@@ -1,4 +1,35 @@
-use super::*;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::Permissions;
+use std::io::{BufRead, BufReader, ErrorKind, Write as _};
+use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use std::os::unix::fs::PermissionsExt;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
+
+use fs_err as fs;
+
+use crate::daemon::state::{self, HostBridgeCapabilityManifest};
+use crate::errors::{CliError, CliErrorKind};
+
+use super::bridge_state::{
+    LivenessMode, acquire_bridge_lock_exclusive, bridge_lock_path, clear_bridge_state,
+    resolve_running_bridge, write_bridge_config,
+};
+use super::core::{
+    BridgeAgentTuiMetadata, BridgeCodexMetadata, BridgeCodexProcess, BridgeEnvelope,
+    BridgeResponse, CodexEndpointScheme, ResolvedBridgeConfig,
+};
+use super::helpers::{detect_codex_version, remove_if_exists, stringify_metadata_map};
+use super::server::BridgeServer;
+use super::types::{
+    BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
+    CODEX_READY_POLL_INTERVAL, CODEX_READY_PROBE_TIMEOUT, CODEX_READY_TIMEOUT,
+    CODEX_READY_WARN_AFTER,
+};
 
 pub(super) fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bool, CliError> {
     let Some(running) = resolve_running_bridge(LivenessMode::HostAuthoritative)? else {

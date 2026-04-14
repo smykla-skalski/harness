@@ -1,4 +1,22 @@
-use super::*;
+use std::fmt;
+use std::os::unix::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use sha2::{Digest, Sha256};
+
+use crate::daemon::service;
+use crate::daemon::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
+use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io::{read_json_typed, write_json_pretty};
+
+use super::client::BridgeClient;
+use super::helpers::remove_if_exists;
+use super::types::{
+    BRIDGE_CAPABILITY_CODEX, BridgeState, BridgeStatusReport, DEFAULT_BRIDGE_SOCKET_NAME,
+    FALLBACK_BRIDGE_SOCKET_PREFIX, FALLBACK_BRIDGE_SOCKET_SUFFIX, PersistedBridgeConfig,
+    UNIX_SOCKET_PATH_LIMIT, status_report_from_state,
+};
 
 #[must_use]
 pub fn bridge_state_path() -> PathBuf {
@@ -228,7 +246,7 @@ fn resolve_running_bridge_from_rpc(
 
 #[must_use]
 fn should_use_pid_fallback(mode: LivenessMode) -> bool {
-    matches!(mode, LivenessMode::HostAuthoritative) && !super::service::sandboxed_from_env()
+    matches!(mode, LivenessMode::HostAuthoritative) && !service::sandboxed_from_env()
 }
 
 fn resolve_running_bridge_from_pid(
@@ -343,7 +361,7 @@ pub fn codex_websocket_endpoint() -> Result<Option<String>, CliError> {
 /// # Errors
 /// Returns `SANDBOX001` when the current process is sandboxed.
 pub fn ensure_host_context(feature: &'static str) -> Result<(), CliError> {
-    if super::service::sandboxed_from_env() {
+    if service::sandboxed_from_env() {
         return Err(CliErrorKind::sandbox_feature_disabled(feature).into());
     }
     Ok(())
