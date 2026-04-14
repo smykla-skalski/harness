@@ -148,6 +148,47 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTimelineWindowResponse(
+    _ response: TimelineWindowResponse,
+    for sessionID: String
+  ) {
+    lock.withLock {
+      timelineWindowResponsesBySessionID[sessionID] = response
+    }
+  }
+
+  func configuredTimelineWindowResponse(for sessionID: String) -> TimelineWindowResponse? {
+    lock.withLock { timelineWindowResponsesBySessionID[sessionID] }
+  }
+
+  func configureTimelineWindowDelay(_ delay: Duration?, for sessionID: String) {
+    lock.withLock {
+      if let delay {
+        timelineWindowDelaysBySessionID[sessionID] = delay
+      } else {
+        timelineWindowDelaysBySessionID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configuredTimelineWindowDelay(for sessionID: String) -> Duration? {
+    lock.withLock { timelineWindowDelaysBySessionID[sessionID] }
+  }
+
+  func configureTimelineWindowError(_ error: (any Error)?, for sessionID: String) {
+    lock.withLock {
+      if let error {
+        timelineWindowErrorsBySessionID[sessionID] = error
+      } else {
+        timelineWindowErrorsBySessionID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configuredTimelineWindowError(for sessionID: String) -> (any Error)? {
+    lock.withLock { timelineWindowErrorsBySessionID[sessionID] }
+  }
+
   func configureGlobalStream(
     events: [DaemonPushEvent],
     error: (any Error)? = nil

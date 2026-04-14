@@ -54,7 +54,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
 
     let baselineSelectedDetailCount = client.readCallCount(
       .sessionDetail(selectedSummary.sessionId))
-    let baselineSelectedTimelineCount = client.readCallCount(.timeline(selectedSummary.sessionId))
+    let baselineSelectedTimelineCount = client.readCallCount(
+      .timelineWindow(selectedSummary.sessionId))
     let baselineBackgroundDetailCount = client.readCallCount(
       .sessionDetail(backgroundSummary.sessionId))
     let baselineBackgroundTimelineCount = client.readCallCount(
@@ -71,7 +72,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
         == baselineBackgroundTimelineCount)
 
     for _ in 0..<50 {
-      let selectedTimelineCount = client.readCallCount(.timeline(selectedSummary.sessionId))
+      let selectedTimelineCount = client.readCallCount(
+        .timelineWindow(selectedSummary.sessionId))
       let backgroundTimelineCount = client.readCallCount(.timeline(backgroundSummary.sessionId))
       if selectedTimelineCount > baselineSelectedTimelineCount
         && backgroundTimelineCount > baselineBackgroundTimelineCount
@@ -85,8 +87,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       client.readCallCount(.sessionDetail(selectedSummary.sessionId)) == baselineSelectedDetailCount
         + 1)
     #expect(
-      client.readCallCount(.timeline(selectedSummary.sessionId)) == baselineSelectedTimelineCount
-        + 1)
+      client.readCallCount(.timelineWindow(selectedSummary.sessionId))
+        == baselineSelectedTimelineCount + 1)
     #expect(
       client.readCallCount(.sessionDetail(backgroundSummary.sessionId))
         == baselineBackgroundDetailCount + 1)
