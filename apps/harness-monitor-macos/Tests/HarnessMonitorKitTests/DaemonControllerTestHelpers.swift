@@ -6,6 +6,7 @@ import Testing
 
 func withTempDaemonFixture(
   pid: UInt32,
+  version: String = "19.4.1",
   endpoint: String = "http://127.0.0.1:65534",
   tokenPathFactory: ((URL) throws -> URL)? = nil,
   perform: (HarnessMonitorEnvironment) async throws -> Void
@@ -29,7 +30,7 @@ func withTempDaemonFixture(
   }
 
   let manifest = DaemonManifest(
-    version: "19.4.1",
+    version: version,
     pid: Int(pid),
     endpoint: endpoint,
     startedAt: "2026-04-11T12:00:00Z",
@@ -62,12 +63,13 @@ func writeTokenFixture(
 func rewriteTempDaemonFixtureManifest(
   environment: HarnessMonitorEnvironment,
   pid: UInt32,
+  version: String = "19.4.1",
   endpoint: String,
   startedAt: String
 ) throws {
   let tokenPath = HarnessMonitorPaths.authTokenURL(using: environment)
   let manifest = DaemonManifest(
-    version: "19.4.1",
+    version: version,
     pid: Int(pid),
     endpoint: endpoint,
     startedAt: startedAt,

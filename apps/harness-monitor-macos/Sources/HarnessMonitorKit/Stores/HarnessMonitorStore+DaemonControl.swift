@@ -51,6 +51,8 @@ extension HarnessMonitorStore {
     switch daemonError {
     case .daemonDidNotStart, .daemonOffline, .manifestMissing, .manifestUnreadable:
       return true
+    case .managedDaemonVersionMismatch:
+      return true
     case .harnessBinaryNotFound, .externalDaemonOffline, .externalDaemonManifestStale,
       .invalidManifest, .commandFailed:
       return false

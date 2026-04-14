@@ -57,6 +57,11 @@ extension DaemonController {
   ) async throws -> WarmUpIterationOutcome {
     do {
       let manifest = try loadManifest()
+      if let mismatch = managedDaemonVersionMismatch(for: manifest) {
+        state.lastError = mismatch
+        state.immediateError = mismatch
+        return .stopLoop
+      }
       let connection = try daemonConnection(from: manifest)
       let endpoint = connection.endpoint.absoluteString
       let manifestPid = manifest.pid
