@@ -106,6 +106,33 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test("warm-up lifecycle messages keep related context in a single event")
+  func warmUpLifecycleMessagesKeepRelatedContextInSingleEvent() {
+    let endpoint = "http://127.0.0.1:54593"
+    let manifestPath = "/tmp/harness-monitor/daemon/manifest.json"
+
+    #expect(
+      DaemonController.warmUpObservedManifestMessage(pid: 92_673, endpoint: endpoint)
+        == "Warm-up observed manifest pid=92673 endpoint=\(endpoint)"
+    )
+    #expect(
+      DaemonController.warmUpStaleManifestMessage(path: manifestPath, endpoint: endpoint)
+        == "Warm-up found stale daemon manifest at \(manifestPath) endpoint=\(endpoint)"
+    )
+    #expect(
+      DaemonController.warmUpDeadManagedManifestMessage(pid: 92_673, path: manifestPath)
+        == "Warm-up detected dead managed daemon pid 92673 stale-manifest=\(manifestPath)"
+    )
+    #expect(
+      DaemonController.warmUpManagedStaleManifestTimeoutMessage(
+        path: manifestPath,
+        gracePeriod: "5.0 seconds"
+      )
+        == "Warm-up aborting managed stale manifest wait at \(manifestPath) "
+        + "grace-period=5.0 seconds"
+    )
+  }
+
   @Test("awaitManifestWarmUp reports external offline when no manifest appears")
   func awaitManifestWarmUpReportsExternalOfflineWhenManifestMissing() async throws {
     let root = FileManager.default.temporaryDirectory

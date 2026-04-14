@@ -110,7 +110,8 @@ public struct AgentTuiWindowView: View {
         } else {
           "size=missing"
         }
-      return "selection=session:\(sessionID),status=\(status),wrap=\(viewModel.wrapLines),\(sizeLabel)"
+      return
+        "selection=session:\(sessionID),status=\(status),wrap=\(viewModel.wrapLines),\(sizeLabel)"
     }
   }
 
