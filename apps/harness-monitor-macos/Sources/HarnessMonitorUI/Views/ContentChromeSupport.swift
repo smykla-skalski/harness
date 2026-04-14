@@ -128,6 +128,12 @@ struct SessionStatusCornerOverlay: View {
     colorSchemeContrast == .increased ? 0.55 : 0.45
   }
 
+  private var labelColor: Color {
+    let baseColor = statusColor(for: status)
+    let opacity = colorSchemeContrast == .increased ? 0.94 : 0.82
+    return baseColor.opacity(opacity)
+  }
+
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       if isStale {
@@ -139,7 +145,7 @@ struct SessionStatusCornerOverlay: View {
         .font(.system(size: 10, weight: .bold))
         .tracking(HarnessMonitorTheme.uppercaseTracking)
     }
-    .foregroundStyle(.white)
+    .foregroundStyle(labelColor)
     .padding(.leading, 24)
     .padding(.trailing, 240)
     .padding(.top, HarnessMonitorTheme.spacingMD)
