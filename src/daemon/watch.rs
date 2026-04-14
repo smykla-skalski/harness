@@ -40,6 +40,11 @@ enum RefreshScope {
     Full,
 }
 
+const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change_seq
+     FROM change_tracking
+     WHERE change_seq > ?1
+     ORDER BY change_seq";
+
 /// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
 /// is available, uses `change_tracking` versions instead of full filesystem
 /// discovery. Falls back to the legacy JSON-diff approach otherwise.
@@ -73,8 +78,7 @@ fn spawn_db_watch_loop(
         });
 
         let mut ticker = tokio_interval(interval);
-        let mut last_global_version: i64 = 0;
-        let mut last_session_versions: BTreeMap<String, i64> = BTreeMap::new();
+        let mut last_change_seq: i64 = 0;
 
         loop {
             tokio::select! {
@@ -97,11 +101,7 @@ fn spawn_db_watch_loop(
                 continue;
             };
 
-            let changes = poll_change_tracking(
-                &db_guard,
-                &mut last_global_version,
-                &mut last_session_versions,
-            );
+            let changes = poll_change_tracking(&db_guard, &mut last_change_seq);
             drop(db_guard);
 
             emit_watch_changes(&sender, changes, Some(&db));
@@ -159,20 +159,20 @@ fn spawn_legacy_watch_loop(
     })
 }
 
-fn poll_change_tracking(
-    db: &DaemonDb,
-    last_global_version: &mut i64,
-    last_session_versions: &mut BTreeMap<String, i64>,
-) -> WatchChanges {
+fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> WatchChanges {
     let mut changes = WatchChanges::default();
 
     let Ok(rows) = db
         .connection()
-        .prepare("SELECT scope, version FROM change_tracking")
+        .prepare(CHANGE_TRACKING_POLL_SQL)
         .and_then(|mut statement| {
             statement
-                .query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                .query_map([*last_change_seq], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                    ))
                 })
                 .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
         })
@@ -180,18 +180,12 @@ fn poll_change_tracking(
         return changes;
     };
 
-    for (scope, version) in rows {
+    for (scope, _version, change_seq) in rows {
+        *last_change_seq = change_seq;
         if scope == "global" {
-            if version > *last_global_version {
-                changes.sessions_updated = true;
-                *last_global_version = version;
-            }
+            changes.sessions_updated = true;
         } else if let Some(session_id) = super::db::session_id_from_change_scope(&scope) {
-            let last = last_session_versions.get(session_id).copied().unwrap_or(0);
-            if version > last {
-                changes.session_ids.insert(session_id.to_string());
-                last_session_versions.insert(session_id.to_string(), version);
-            }
+            changes.session_ids.insert(session_id.to_string());
         }
     }
 
@@ -655,12 +649,31 @@ mod tests {
         let db = DaemonDb::open_in_memory().expect("open db");
         db.bump_change("watch-sess").expect("bump change");
 
-        let mut last_global_version = 0;
-        let mut last_session_versions = BTreeMap::new();
-        let changes =
-            poll_change_tracking(&db, &mut last_global_version, &mut last_session_versions);
+        let mut last_change_seq = 0;
+        let changes = poll_change_tracking(&db, &mut last_change_seq);
 
         assert!(changes.session_ids.contains("watch-sess"));
+        assert_eq!(last_change_seq, 1);
+    }
+
+    #[test]
+    fn poll_change_tracking_uses_change_seq_index() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let details: Vec<String> = db
+            .connection()
+            .prepare(&format!("EXPLAIN QUERY PLAN {CHANGE_TRACKING_POLL_SQL}"))
+            .expect("prepare explain")
+            .query_map([0_i64], |row| row.get(3))
+            .expect("query explain")
+            .collect::<Result<_, _>>()
+            .expect("collect explain");
+
+        assert!(
+            details
+                .iter()
+                .any(|detail| detail.contains("idx_change_tracking_change_seq")),
+            "expected explain plan to use change_seq index, got {details:?}"
+        );
     }
 
     #[test]
