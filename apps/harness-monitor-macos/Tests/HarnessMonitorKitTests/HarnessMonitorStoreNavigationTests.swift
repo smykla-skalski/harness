@@ -174,6 +174,50 @@ struct HarnessMonitorStoreNavigationTests {
     )
   }
 
+  @Test(
+    "Startup with restoration bridge does not emit FocusedValue warnings",
+    .disabled(
+      """
+      Currently fails due to a platform-level SwiftUI bug on macOS 26: \
+      .inspector(isPresented:) emits "FocusedValue update tried to update \
+      multiple times per frame" during initial window setup, even with a \
+      constant-false binding and Text-only inspector content. \
+      Minimal repro: Text("x").inspector(isPresented: .constant(false)) { Text("y") }. \
+      Reenable once Apple fixes the platform bug or we move off .inspector.
+      """
+    )
+  )
+  func startupWithRestorationDoesNotEmitFocusedValueWarning() async throws {
+    let dataHome = FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "HarnessMonitorFocusedValueRestore-\(UUID().uuidString)",
+        isDirectory: true
+      )
+    try FileManager.default.createDirectory(at: dataHome, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dataHome) }
+
+    let logStream = try startFocusedValueLogStream()
+    defer { terminate(logStream.process) }
+    try await Task.sleep(for: .milliseconds(500))
+
+    // Launch without HARNESS_MONITOR_UI_TESTS so the ContentSceneRestorationBridge
+    // runs and enableStartupFocusParticipation() fires, exercising the real
+    // inspector + sidebar focus hydration path.
+    let appProcess = try launchUITestHost(dataHome: dataHome, includeUITestFlag: false)
+    defer { terminate(appProcess) }
+
+    try await Task.sleep(for: .seconds(4))
+
+    let warningLines = capturedFocusedValueWarnings(from: logStream)
+    #expect(
+      warningLines.isEmpty,
+      """
+      Startup with restoration bridge emitted a SwiftUI FocusedValue warning:
+      \(warningLines.joined(separator: "\n"))
+      """
+    )
+  }
+
   // MARK: - Fixtures
 
   private func makeNavigationStore() async throws -> HarnessMonitorStore {
@@ -207,7 +251,10 @@ struct HarnessMonitorStoreNavigationTests {
     return await makeBootstrappedStore(client: client)
   }
 
-  private func launchUITestHost(dataHome: URL) throws -> Process {
+  private func launchUITestHost(
+    dataHome: URL,
+    includeUITestFlag: Bool = true
+  ) throws -> Process {
     let inherited = ProcessInfo.processInfo.environment
     let builtProductsDir = Bundle(for: StartupLogTestBundleToken.self)
       .bundleURL
@@ -227,7 +274,8 @@ struct HarnessMonitorStoreNavigationTests {
     process.arguments = ["-ApplePersistenceIgnoreState", "YES"]
     process.environment = launchEnvironment(
       inherited: inherited,
-      dataHome: dataHome.path
+      dataHome: dataHome.path,
+      includeUITestFlag: includeUITestFlag
     )
     try process.run()
     return process
@@ -235,7 +283,8 @@ struct HarnessMonitorStoreNavigationTests {
 
   private func launchEnvironment(
     inherited: [String: String],
-    dataHome: String
+    dataHome: String,
+    includeUITestFlag: Bool = true
   ) -> [String: String] {
     var environment: [String: String] = [:]
     for key in [
@@ -251,7 +300,9 @@ struct HarnessMonitorStoreNavigationTests {
         environment[key] = value
       }
     }
-    environment["HARNESS_MONITOR_UI_TESTS"] = "1"
+    if includeUITestFlag {
+      environment["HARNESS_MONITOR_UI_TESTS"] = "1"
+    }
     environment["HARNESS_MONITOR_LAUNCH_MODE"] = "preview"
     environment["HARNESS_DAEMON_DATA_HOME"] = dataHome
     return environment
