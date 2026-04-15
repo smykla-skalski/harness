@@ -3,11 +3,15 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::Router;
 use tokio::net::TcpListener;
+#[cfg(test)]
+use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, watch};
+#[cfg(test)]
+use tokio::task::block_in_place;
 
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
@@ -47,6 +51,73 @@ impl AsyncDaemonDbSlot {
     #[must_use]
     pub(crate) fn get(&self) -> Option<&Arc<AsyncDaemonDb>> {
         self.inner.get()
+    }
+}
+
+pub(crate) fn require_async_db<'a>(
+    state: &'a DaemonHttpState,
+    operation: &str,
+) -> Result<&'a AsyncDaemonDb, CliError> {
+    state
+        .async_db
+        .get()
+        .map(AsRef::as_ref)
+        .ok_or_else(|| canonical_db_unavailable(operation))
+}
+
+#[cfg(test)]
+pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDaemonDb> {
+    let path = path.to_path_buf();
+
+    match Handle::try_current() {
+        Ok(current) => match current.runtime_flavor() {
+            RuntimeFlavor::MultiThread => {
+                let runtime = current.clone();
+                let path = path.clone();
+                block_in_place(move || {
+                    runtime.block_on(async move {
+                        Arc::new(
+                            AsyncDaemonDb::connect(&path)
+                                .await
+                                .expect("open async daemon db"),
+                        )
+                    })
+                })
+            }
+            RuntimeFlavor::CurrentThread => std::thread::spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("build async daemon db test runtime")
+                    .block_on(async move {
+                        Arc::new(
+                            AsyncDaemonDb::connect(&path)
+                                .await
+                                .expect("open async daemon db"),
+                        )
+                    })
+            })
+            .join()
+            .expect("join async daemon db thread"),
+            _ => current.block_on(async move {
+                Arc::new(
+                    AsyncDaemonDb::connect(&path)
+                        .await
+                        .expect("open async daemon db"),
+                )
+            }),
+        },
+        Err(_) => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("build async daemon db test runtime")
+            .block_on(async move {
+                Arc::new(
+                    AsyncDaemonDb::connect(&path)
+                        .await
+                        .expect("open async daemon db"),
+                )
+            }),
     }
 }
 

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::env;
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -37,6 +37,8 @@ use super::codex_transport::{self, CodexTransportKind};
 use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
+#[cfg(test)]
+use super::protocol::TimelineCursor;
 use super::protocol::{
     AgentRemoveRequest, DaemonControlResponse, DaemonDiagnosticsReport, HealthResponse,
     LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
@@ -44,8 +46,8 @@ use super::protocol::{
     SessionExtensionsPayload, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
     SetLogLevelRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, TimelineCursor, TimelineEntry,
-    TimelineWindowRequest, TimelineWindowResponse,
+    TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry, TimelineWindowRequest,
+    TimelineWindowResponse,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -262,15 +264,24 @@ pub(crate) use observe_stream::{
     session_updated_core_event_async, sessions_updated_event_async,
 };
 pub(crate) use read_reconciliation::*;
+#[cfg(test)]
 pub(crate) use sessions::session_timeline_window;
 pub(crate) use sessions::{
     list_projects_async, list_sessions_async, session_detail_async, session_detail_core_async,
-    session_extensions_async, session_timeline_window_async,
+    session_detail_from_async_daemon_db, session_detail_from_daemon_db, session_extensions_async,
+    session_timeline_window_async,
 };
 pub(crate) use signals_async::{cancel_signal_async, record_signal_ack_direct_async};
 pub(crate) use signals_async_send::send_signal_async;
 pub(crate) use status::{diagnostics_report_async, health_response_async};
-pub(crate) use sync_support::*;
+pub(crate) use sync_support::{
+    acknowledged_signal_record, append_leave_signal_logs_to_db, append_task_drop_effect_logs,
+    append_transfer_logs_to_async_db, append_transfer_logs_to_db, build_log_entry,
+    effective_project_dir, pending_signal_record, project_dir_for_db_session,
+    reconcile_expired_pending_signals_for_db, record_signal_ack, refresh_signal_index_for_db,
+    resolve_hook_agent, session_not_found, sync_after_mutation, task_drop_effect_signal_records,
+    write_task_start_signals,
+};
 
 #[cfg(test)]
 pub(crate) use serve::session_import_required;

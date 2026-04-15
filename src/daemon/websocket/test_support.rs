@@ -111,14 +111,40 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
 fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db = Arc::new(OnceLock::new());
+    let async_db = Arc::new(OnceLock::new());
     let db_path =
         install_db.then(|| temp_dir().join(format!("harness-ws-test-{}.db", Uuid::new_v4())));
     if install_db {
+        let db_path = db_path.as_ref().expect("db path");
         db.set(Arc::new(Mutex::new(
-            DaemonDb::open(db_path.as_ref().expect("db path")).expect("open file db"),
+            DaemonDb::open(db_path).expect("open file db"),
         )))
         .expect("install db");
+        async_db
+            .set(crate::daemon::http::connect_async_db_for_tests(db_path))
+            .expect("install async db");
     }
+
+    let codex_controller = if install_db {
+        CodexControllerHandle::new_with_async_db(
+            sender.clone(),
+            db.clone(),
+            async_db.clone(),
+            false,
+        )
+    } else {
+        CodexControllerHandle::new(sender.clone(), db.clone(), false)
+    };
+    let agent_tui_manager = if install_db {
+        AgentTuiManagerHandle::new_with_async_db(
+            sender.clone(),
+            db.clone(),
+            async_db.clone(),
+            false,
+        )
+    } else {
+        AgentTuiManagerHandle::new(sender.clone(), db.clone(), false)
+    };
 
     DaemonHttpState {
         token: "token".into(),
@@ -127,10 +153,10 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
         db: db.clone(),
-        async_db: crate::daemon::http::AsyncDaemonDbSlot::empty(),
+        async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db),
         db_path,
-        codex_controller: CodexControllerHandle::new(sender.clone(), db.clone(), false),
-        agent_tui_manager: AgentTuiManagerHandle::new(sender, db, false),
+        codex_controller,
+        agent_tui_manager,
     }
 }
 

@@ -90,6 +90,70 @@ pub(super) fn set_log_mtime_seconds_ago(path: &Path, seconds: u64) {
         .expect("set mtime");
 }
 
+pub(super) struct SessionReadFixture {
+    pub(super) state: crate::session::types::SessionState,
+    pub(super) leader_log: PathBuf,
+    pub(super) worker_log: PathBuf,
+}
+
+pub(super) fn setup_session_with_worker_logs(
+    project: &Path,
+    title: &str,
+    session_id: &str,
+) -> SessionReadFixture {
+    let state =
+        session_service::start_session(title, "", project, Some("claude"), Some(session_id))
+            .expect("start session");
+    let worker_session_id = format!("{session_id}-worker");
+    temp_env::with_var("CODEX_SESSION_ID", Some(worker_session_id.as_str()), || {
+        session_service::join_session(
+            &state.session_id,
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            project,
+            None,
+        )
+        .expect("join worker");
+    });
+
+    let status = session_service::session_status(&state.session_id, project).expect("status");
+    let leader = status
+        .leader_id
+        .as_ref()
+        .and_then(|agent_id| status.agents.get(agent_id))
+        .expect("leader agent");
+    let worker = status
+        .agents
+        .values()
+        .find(|agent| agent.runtime == "codex")
+        .expect("worker agent");
+
+    let leader_log = write_agent_log_file(
+        project,
+        "claude",
+        leader
+            .agent_session_id
+            .as_deref()
+            .expect("leader session id"),
+    );
+    let worker_log = write_agent_log_file(
+        project,
+        "codex",
+        worker
+            .agent_session_id
+            .as_deref()
+            .expect("worker session id"),
+    );
+
+    SessionReadFixture {
+        state,
+        leader_log,
+        worker_log,
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(super) enum IdleSignalScriptBehavior {
     AckOnWake,
@@ -156,12 +220,10 @@ pub(super) fn setup_db_with_session(
     session_id: &str,
 ) -> crate::daemon::db::DaemonDb {
     let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
-    let projects = index::discover_projects().expect("discover projects");
-    for p in &projects {
-        db.sync_project(p).expect("sync project");
-    }
+    let project_record = index::discovered_project_for_checkout(project);
+    db.sync_project(&project_record).expect("sync project");
     let resolved = index::resolve_session(session_id).expect("resolve session");
-    db.sync_session(&resolved.project.project_id, &resolved.state)
+    db.sync_session(&project_record.project_id, &resolved.state)
         .expect("sync session");
     append_project_ledger_entry(project);
     db

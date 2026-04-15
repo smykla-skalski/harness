@@ -12,16 +12,15 @@ use crate::daemon::protocol::{
     SessionJoinRequest, SessionMutationResponse, SessionStartRequest, TimelineCursor,
     TimelineWindowRequest, TimelineWindowResponse,
 };
-use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
 use crate::errors::CliError;
 use crate::session::types::SessionState;
 
-use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_session;
+use super::{DaemonHttpState, require_async_db};
 
 pub(super) fn session_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -100,13 +99,9 @@ pub(super) async fn get_sessions(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = if let Some(async_db) = state.async_db.get() {
-        service::list_sessions_async(true, Some(async_db.as_ref())).await
-    } else {
-        run_canonical_db_read(&state.db, state.db_path.clone(), "sessions", |db| {
-            service::list_sessions(true, Some(db))
-        })
-        .await
+    let result = match require_async_db(&state, "sessions") {
+        Ok(async_db) => service::list_sessions_async(true, Some(async_db)).await,
+        Err(error) => Err(error),
     };
     timed_json("GET", "/v1/sessions", &request_id, start, result)
 }
@@ -141,29 +136,20 @@ async fn read_session_detail(
     session_id: &str,
     core_only: bool,
 ) -> Result<SessionDetail, CliError> {
-    if let Some(async_db) = state.async_db.get() {
+    let async_db = require_async_db(
+        state,
         if core_only {
-            return service::session_detail_core_async(session_id, Some(async_db.as_ref())).await;
-        }
-        return service::session_detail_async(session_id, Some(async_db.as_ref())).await;
+            "session detail core"
+        } else {
+            "session detail"
+        },
+    )?;
+
+    if core_only {
+        return service::session_detail_core_async(session_id, Some(async_db)).await;
     }
 
-    let read_name = if core_only {
-        "session detail core"
-    } else {
-        "session detail"
-    };
-    run_canonical_db_read(&state.db, state.db_path.clone(), read_name, {
-        let session_id = session_id.to_string();
-        move |db| {
-            if core_only {
-                service::session_detail_core(&session_id, Some(db))
-            } else {
-                service::session_detail(&session_id, Some(db))
-            }
-        }
-    })
-    .await
+    service::session_detail_async(session_id, Some(async_db)).await
 }
 
 pub(super) async fn get_timeline(
@@ -202,21 +188,9 @@ async fn read_timeline_window(
     timeline_request: &TimelineWindowRequest,
     read_name: &'static str,
 ) -> Result<TimelineWindowResponse, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        return service::session_timeline_window_async(
-            session_id,
-            timeline_request,
-            Some(async_db.as_ref()),
-        )
-        .await;
-    }
+    let async_db = require_async_db(state, read_name)?;
 
-    run_canonical_db_read(&state.db, state.db_path.clone(), read_name, {
-        let session_id = session_id.to_string();
-        let timeline_request = timeline_request.clone();
-        move |db| service::session_timeline_window(&session_id, &timeline_request, Some(db))
-    })
-    .await
+    service::session_timeline_window_async(session_id, timeline_request, Some(async_db)).await
 }
 
 pub(super) async fn post_end_session(

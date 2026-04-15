@@ -8,13 +8,12 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use tokio::sync::broadcast;
 
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 use crate::errors::CliError;
 
-use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::map_json;
+use super::{DaemonHttpState, require_async_db};
 
 pub(super) async fn stream_global(
     headers: HeaderMap,
@@ -79,44 +78,14 @@ pub(super) async fn stream_session(
 pub(super) async fn load_global_initial_events(
     state: &DaemonHttpState,
 ) -> Result<Vec<StreamEvent>, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        return Ok(service::global_stream_initial_events_async(Some(async_db.as_ref())).await);
-    }
-
-    run_canonical_db_read(
-        &state.db,
-        state.db_path.clone(),
-        "global stream initial events",
-        |db| Ok::<_, CliError>(service::global_stream_initial_events(Some(db))),
-    )
-    .await
+    let async_db = require_async_db(state, "global stream initial events")?;
+    Ok(service::global_stream_initial_events_async(Some(async_db)).await)
 }
 
 pub(super) async fn load_session_initial_events(
     state: &DaemonHttpState,
     session_id: &str,
 ) -> Result<Vec<StreamEvent>, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        return Ok(service::session_stream_initial_events_async(
-            session_id,
-            Some(async_db.as_ref()),
-        )
-        .await);
-    }
-
-    run_canonical_db_read(
-        &state.db,
-        state.db_path.clone(),
-        "session stream initial events",
-        {
-            let session_id = session_id.to_string();
-            move |db| {
-                Ok::<_, CliError>(service::session_stream_initial_events(
-                    &session_id,
-                    Some(db),
-                ))
-            }
-        },
-    )
-    .await
+    let async_db = require_async_db(state, "session stream initial events")?;
+    Ok(service::session_stream_initial_events_async(session_id, Some(async_db)).await)
 }

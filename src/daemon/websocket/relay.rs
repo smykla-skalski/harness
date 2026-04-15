@@ -4,10 +4,9 @@ use std::sync::{Arc, Mutex};
 use axum::extract::ws::Message;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::http::DaemonHttpState;
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{StreamEvent, WsPushEvent};
-use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 use crate::errors::CliError;
 
@@ -169,47 +168,15 @@ async fn recovery_events_for_connection(
         return Vec::new();
     }
 
-    if let Some(async_db) = state.async_db.get() {
-        return build_recovery_events_async(&plan, async_db.as_ref()).await;
+    match require_async_db(state, "websocket recovery snapshot") {
+        Ok(async_db) => build_recovery_events_async(&plan, async_db).await,
+        Err(error) => recovery_events_on_error(&error),
     }
-
-    run_canonical_db_read(
-        &state.db,
-        state.db_path.clone(),
-        "websocket recovery snapshot",
-        {
-            let plan = plan.clone();
-            move |db| Ok::<Vec<StreamEvent>, CliError>(build_recovery_events(&plan, Some(db)))
-        },
-    )
-    .await
-    .unwrap_or_else(|error| recovery_events_on_error(&error))
 }
 
 fn recovery_events_on_error(error: &CliError) -> Vec<StreamEvent> {
     warn_recovery_snapshot_failure(error);
     Vec::new()
-}
-
-fn build_recovery_events(plan: &RelayRecoveryPlan, db: Option<&DaemonDb>) -> Vec<StreamEvent> {
-    let mut events = Vec::new();
-    if plan.include_sessions_updated {
-        append_recovery_event(
-            &mut events,
-            service::sessions_updated_event(db),
-            "sessions_updated",
-            None,
-        );
-    }
-    for session_id in &plan.session_ids {
-        append_recovery_event(
-            &mut events,
-            service::session_updated_core_event(session_id, db),
-            "session_updated",
-            Some(session_id),
-        );
-    }
-    events
 }
 
 async fn build_recovery_events_async(

@@ -4,8 +4,9 @@ use super::{
     TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
     append_leave_signal_logs_to_db, append_task_drop_effect_logs, append_transfer_logs_to_db,
     build_log_entry, effective_project_dir, index, project_dir_for_db_session,
-    refresh_signal_index_for_db, session_detail, session_not_found, session_service, slice,
-    sync_after_mutation, utc_now, write_task_start_signals,
+    refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db, session_not_found,
+    session_service, slice, sync_after_mutation, task_drop_effect_signal_records, utc_now,
+    write_task_start_signals,
 };
 
 /// Create a task through the shared session service.
@@ -43,7 +44,7 @@ pub fn create_task(
         ))?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -86,7 +87,7 @@ pub fn assign_task(
         ))?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -132,10 +133,13 @@ pub fn drop_task(
         db.save_session_state(&project_id, &state)?;
         write_task_start_signals(&project_dir, &effects)?;
         append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
-        refresh_signal_index_for_db(db, session_id)?;
+        db.merge_signal_records(
+            session_id,
+            &task_drop_effect_signal_records(session_id, &effects),
+        )?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -181,10 +185,13 @@ pub fn update_task_queue_policy(
         db.save_session_state(&project_id, &state)?;
         write_task_start_signals(&project_dir, &effects)?;
         append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
-        refresh_signal_index_for_db(db, session_id)?;
+        db.merge_signal_records(
+            session_id,
+            &task_drop_effect_signal_records(session_id, &effects),
+        )?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -237,10 +244,13 @@ pub fn update_task(
             None,
         ))?;
         append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
-        refresh_signal_index_for_db(db, session_id)?;
+        db.merge_signal_records(
+            session_id,
+            &task_drop_effect_signal_records(session_id, &effects),
+        )?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -295,7 +305,7 @@ pub fn checkpoint_task(
         ))?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -344,7 +354,7 @@ pub fn change_role(
         ))?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -411,7 +421,7 @@ pub fn remove_agent(
         refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -447,7 +457,7 @@ pub fn transfer_leader(
         append_transfer_logs_to_db(db, session_id, &request.actor, &plan)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -496,7 +506,7 @@ pub fn end_session(
         refresh_signal_index_for_db(db, session_id)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     let resolved = index::resolve_session(session_id)?;

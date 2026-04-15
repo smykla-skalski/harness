@@ -70,6 +70,66 @@ impl DaemonDb {
         Ok(())
     }
 
+    /// Merge updated signal records into the existing session index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when loading or writing the signal index fails.
+    pub(crate) fn merge_signal_records(
+        &self,
+        session_id: &str,
+        records: &[SessionSignalRecord],
+    ) -> Result<(), CliError> {
+        if records.is_empty() {
+            return Ok(());
+        }
+        let mut statement = self
+            .conn
+            .prepare(
+                "INSERT OR REPLACE INTO signal_index (
+                    signal_id, session_id, agent_id, runtime, command, priority,
+                    status, created_at, source_agent, message, action_hint,
+                    signal_json, ack_json, file_path, indexed_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            )
+            .map_err(|error| db_error(format!("prepare signal upsert: {error}")))?;
+
+        let now = utc_now();
+        for record in records {
+            let signal_json = serde_json::to_string(&record.signal)
+                .map_err(|error| db_error(format!("serialize signal upsert row: {error}")))?;
+            let ack_json = record
+                .acknowledgment
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|error| {
+                    db_error(format!("serialize signal upsert acknowledgment: {error}"))
+                })?;
+            let status = format!("{:?}", record.status).to_lowercase();
+
+            statement
+                .execute(rusqlite::params![
+                    record.signal.signal_id,
+                    session_id,
+                    record.agent_id,
+                    record.runtime,
+                    record.signal.command,
+                    format!("{:?}", record.signal.priority).to_lowercase(),
+                    status,
+                    record.signal.created_at,
+                    record.signal.source_agent,
+                    record.signal.payload.message,
+                    record.signal.payload.action_hint,
+                    signal_json,
+                    ack_json,
+                    "",
+                    now,
+                ])
+                .map_err(|error| db_error(format!("upsert signal: {error}")))?;
+        }
+        Ok(())
+    }
+
     /// Load signals for a session from the index.
     ///
     /// Pending signals whose `expires_at` has passed are surfaced as
