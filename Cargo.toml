@@ -62,7 +62,7 @@ kube = { version = "3.1.0", features = ["runtime", "ws"] }
 axum = { version = "0.8.7", features = ["json", "ws"] }
 async-stream = "0.3.6"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.39", features = ["bundled"] }
 sea-query = { version = "1.0.0-rc.33", default-features = false, features = ["backend-sqlite"] }
 sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
 async-trait = "0.1.83"
