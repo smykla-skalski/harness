@@ -138,8 +138,7 @@ pub(crate) fn signal_dirs_for_agent_in_context_root(
     runtime::signal_session_keys(orchestration_session_id, agent_session_id)
         .into_iter()
         .map(|signal_session_id| {
-            let signal_dir =
-                signal_dir_in_context_root(runtime, context_root, &signal_session_id);
+            let signal_dir = signal_dir_in_context_root(runtime, context_root, &signal_session_id);
             (signal_session_id, signal_dir)
         })
         .collect()

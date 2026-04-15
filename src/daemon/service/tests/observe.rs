@@ -1,6 +1,68 @@
 use super::*;
 
 #[test]
+fn observe_session_with_db_persists_tasks_without_touching_state_file() {
+    with_temp_project(|project| {
+        let state = session_service::start_session(
+            "observe db direct test",
+            "",
+            project,
+            Some("claude"),
+            Some("daemon-observe-db"),
+        )
+        .expect("start session");
+        let leader_id = state.leader_id.clone().expect("leader id");
+
+        temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
+            session_service::join_session(
+                &state.session_id,
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join codex worker");
+        });
+
+        append_project_ledger_entry(project);
+        write_agent_log(
+            project,
+            HookAgent::Codex,
+            "worker-session",
+            "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+        );
+        let db = setup_db_with_session(project, &state.session_id);
+
+        let detail = observe_session(
+            &state.session_id,
+            Some(&ObserveSessionRequest {
+                actor: Some(leader_id),
+            }),
+            Some(&db),
+        )
+        .expect("observe session");
+
+        let file_state = crate::session::storage::load_state(project, &state.session_id)
+            .expect("load state")
+            .expect("file-backed state");
+        let db_state = db
+            .load_session_state(&state.session_id)
+            .expect("load db state")
+            .expect("db state");
+
+        assert!(file_state.tasks.is_empty());
+        assert_eq!(db_state.tasks.len(), 1);
+        assert_eq!(detail.tasks.len(), 1);
+        assert_eq!(
+            detail.tasks[0].source,
+            crate::session::types::TaskSource::Observe
+        );
+    });
+}
+
+#[test]
 fn observe_session_with_actor_creates_tasks() {
     install_test_observe_runtime(Duration::from_secs(60));
     let runtime = tokio::runtime::Builder::new_current_thread()

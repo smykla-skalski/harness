@@ -252,17 +252,18 @@ async fn acknowledge_indexed_expired_signal_async(
 
     let Some((signal_session_id, signal_dir)) =
         session_service::signal_dirs_for_agent_in_context_root(
-        runtime,
-        session_id,
-        agent.agent_session_id.as_deref(),
-        context_root,
-    )
-    .into_iter()
-    .find(|(_, signal_dir)| {
-        pending_dir(signal_dir)
-            .join(format!("{}.json", indexed_signal.signal.signal_id))
-            .is_file()
-    }) else {
+            runtime,
+            session_id,
+            agent.agent_session_id.as_deref(),
+            context_root,
+        )
+        .into_iter()
+        .find(|(_, signal_dir)| {
+            pending_dir(signal_dir)
+                .join(format!("{}.json", indexed_signal.signal.signal_id))
+                .is_file()
+        })
+    else {
         return Ok(false);
     };
 
