@@ -328,9 +328,7 @@ fn list_session_ids(
                 .into_keys()
                 .collect())
         }?;
-        if !session_ids.is_empty()
-            || project_context_dir(project_dir) == project.context_root
-        {
+        if !session_ids.is_empty() || project_context_dir(project_dir) == project.context_root {
             return Ok(session_ids);
         }
     }

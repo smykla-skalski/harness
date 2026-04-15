@@ -6,8 +6,8 @@ use std::thread;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::db::{DaemonDb, ensure_shared_db};
-use crate::daemon::service::{broadcast_session_snapshot, disconnect_agent_direct};
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::service::{broadcast_session_snapshot, disconnect_agent_direct};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
@@ -258,11 +258,7 @@ impl AgentTuiManagerHandle {
             reason,
             Some(&db_guard),
         )? {
-            broadcast_session_snapshot(
-                &self.state.sender,
-                &snapshot.session_id,
-                Some(&db_guard),
-            );
+            broadcast_session_snapshot(&self.state.sender, &snapshot.session_id, Some(&db_guard));
         }
         Ok(())
     }

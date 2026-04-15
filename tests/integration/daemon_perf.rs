@@ -98,6 +98,8 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         daemon_epoch: harness::workspace::utc_now(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(64))),
         db: db_slot,
+        async_db: harness::daemon::http::AsyncDaemonDbSlot::empty(),
+        db_path: None,
         codex_controller,
         agent_tui_manager,
     };
