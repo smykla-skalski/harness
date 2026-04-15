@@ -6,8 +6,11 @@ use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
 
-use crate::daemon::protocol::{SignalAckRequest, SignalCancelRequest, SignalSendRequest};
+use crate::daemon::protocol::{
+    SessionDetail, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
+};
 use crate::daemon::service;
+use crate::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
@@ -26,7 +29,7 @@ pub(super) fn signal_routes() -> Router<DaemonHttpState> {
         )
 }
 
-async fn post_send_signal(
+pub(super) async fn post_send_signal(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -57,7 +60,7 @@ async fn post_send_signal(
     )
 }
 
-async fn post_cancel_signal(
+pub(super) async fn post_cancel_signal(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -68,12 +71,7 @@ async fn post_cancel_signal(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::cancel_signal(&session_id, &request, db_ref);
-    if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
-    }
+    let result = cancel_signal_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
         "/v1/sessions/{id}/signal-cancel",
@@ -83,7 +81,7 @@ async fn post_cancel_signal(
     )
 }
 
-async fn post_signal_ack(
+pub(super) async fn post_signal_ack(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -94,12 +92,7 @@ async fn post_signal_ack(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::record_signal_ack_direct(&session_id, &request, db_ref);
-    if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
-    }
+    let result = signal_ack_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
         "/v1/sessions/{id}/signal-ack",
@@ -107,4 +100,59 @@ async fn post_signal_ack(
         start,
         result.map(|()| serde_json::json!({"ok": true})),
     )
+}
+
+async fn cancel_signal_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SignalCancelRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        let result = service::cancel_signal_async(session_id, request, async_db.as_ref()).await;
+        if result.is_ok() {
+            service::broadcast_session_snapshot_async(
+                &state.sender,
+                session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+        }
+        return result;
+    }
+
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::cancel_signal(session_id, request, db_ref);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, session_id, db_ref);
+    }
+    result
+}
+
+async fn signal_ack_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SignalAckRequest,
+) -> Result<(), CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        let result =
+            service::record_signal_ack_direct_async(session_id, request, async_db.as_ref()).await;
+        if result.is_ok() {
+            service::broadcast_session_snapshot_async(
+                &state.sender,
+                session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+        }
+        return result;
+    }
+
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::record_signal_ack_direct(session_id, request, db_ref);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, session_id, db_ref);
+    }
+    result
 }
