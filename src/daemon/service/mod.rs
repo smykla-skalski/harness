@@ -225,7 +225,8 @@ pub use mutations::{
 };
 pub(crate) use mutations_async::{
     assign_task_async, change_role_async, checkpoint_task_async, create_task_async,
-    transfer_leader_async,
+    drop_task_async, end_session_async, remove_agent_async, transfer_leader_async,
+    update_task_async, update_task_queue_policy_async,
 };
 pub use observe_stream::{
     broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,

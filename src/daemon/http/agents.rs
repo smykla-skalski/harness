@@ -73,7 +73,7 @@ pub(super) async fn post_role_change(
     )
 }
 
-async fn post_remove_agent(
+pub(super) async fn post_remove_agent(
     Path((session_id, agent_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -84,11 +84,9 @@ async fn post_remove_agent(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::remove_agent(&session_id, &agent_id, &request, db_ref);
+    let result = remove_agent_response(&state, &session_id, &agent_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_agent_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -146,6 +144,19 @@ async fn transfer_leader_response(
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     service::transfer_leader(session_id, request, db_guard.as_deref())
+}
+
+async fn remove_agent_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+    request: &AgentRemoveRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::remove_agent_async(session_id, agent_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::remove_agent(session_id, agent_id, request, db_guard.as_deref())
 }
 
 async fn broadcast_agent_snapshot(state: &DaemonHttpState, session_id: &str) {

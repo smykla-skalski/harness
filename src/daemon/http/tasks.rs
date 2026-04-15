@@ -84,7 +84,7 @@ pub(super) async fn post_task_assign(
     )
 }
 
-async fn post_task_drop(
+pub(super) async fn post_task_drop(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -95,11 +95,9 @@ async fn post_task_drop(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::drop_task(&session_id, &task_id, &request, db_ref);
+    let result = task_drop_response(&state, &session_id, &task_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_task_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -110,7 +108,7 @@ async fn post_task_drop(
     )
 }
 
-async fn post_task_queue_policy(
+pub(super) async fn post_task_queue_policy(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -121,11 +119,9 @@ async fn post_task_queue_policy(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::update_task_queue_policy(&session_id, &task_id, &request, db_ref);
+    let result = task_queue_policy_response(&state, &session_id, &task_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_task_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -136,7 +132,7 @@ async fn post_task_queue_policy(
     )
 }
 
-async fn post_task_update(
+pub(super) async fn post_task_update(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -147,11 +143,9 @@ async fn post_task_update(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::update_task(&session_id, &task_id, &request, db_ref);
+    let result = task_update_response(&state, &session_id, &task_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_task_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -209,6 +203,51 @@ async fn task_assign_response(
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     service::assign_task(session_id, task_id, request, db_guard.as_deref())
+}
+
+async fn task_drop_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDropRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::drop_task_async(session_id, task_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::drop_task(session_id, task_id, request, db_guard.as_deref())
+}
+
+async fn task_queue_policy_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskQueuePolicyRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::update_task_queue_policy_async(
+            session_id,
+            task_id,
+            request,
+            async_db.as_ref(),
+        )
+        .await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::update_task_queue_policy(session_id, task_id, request, db_guard.as_deref())
+}
+
+async fn task_update_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskUpdateRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::update_task_async(session_id, task_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::update_task(session_id, task_id, request, db_guard.as_deref())
 }
 
 async fn task_checkpoint_response(
