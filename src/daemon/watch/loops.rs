@@ -87,12 +87,8 @@ fn spawn_db_watch_loop(
                 reindex_sessions_from_paths(&db, &paths, &mut resolve_cache);
             }
 
-            let changes = {
-                let Ok(db_guard) = db.lock() else {
-                    continue;
-                };
-                poll_change_tracking(&db_guard, &mut last_change_seq)
-            };
+            let changes =
+                poll_change_tracking_prefer_async(async_db.get(), &db, &mut last_change_seq).await;
             emit_watch_changes(&sender, changes, Some(&db), async_db.get()).await;
         }
     })
@@ -189,6 +185,39 @@ pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> 
         }
     }
 
+    changes
+}
+
+async fn poll_change_tracking_prefer_async(
+    async_db: Option<&Arc<AsyncDaemonDb>>,
+    db: &Arc<Mutex<DaemonDb>>,
+    last_change_seq: &mut i64,
+) -> WatchChanges {
+    if let Some(async_db) = async_db {
+        return poll_change_tracking_async(async_db.as_ref(), last_change_seq).await;
+    }
+    let Ok(db_guard) = db.lock() else {
+        return WatchChanges::default();
+    };
+    poll_change_tracking(&db_guard, last_change_seq)
+}
+
+pub(super) async fn poll_change_tracking_async(
+    async_db: &AsyncDaemonDb,
+    last_change_seq: &mut i64,
+) -> WatchChanges {
+    let Ok(rows) = async_db.load_change_tracking_since(*last_change_seq).await else {
+        return WatchChanges::default();
+    };
+    let mut changes = WatchChanges::default();
+    for (scope, change_seq) in rows {
+        *last_change_seq = change_seq;
+        if scope == "global" {
+            changes.sessions_updated = true;
+        } else if let Some(session_id) = session_id_from_change_scope(&scope) {
+            changes.session_ids.insert(session_id.to_string());
+        }
+    }
     changes
 }
 
