@@ -5,6 +5,7 @@ import SwiftUI
 struct SidebarRecentSearchesHeader: View {
   let searchText: Binding<String>
   let isPersistenceAvailable: Bool
+  let isSearchFocused: Bool
   let searchFocus: FocusState<Bool>.Binding
   let submitSearch: () -> Void
   let applyQuery: (String) -> Void
@@ -23,6 +24,7 @@ struct SidebarRecentSearchesHeader: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       SidebarInlineSearchField(
         searchText: searchText,
+        isSearchFocused: isSearchFocused,
         searchFocus: searchFocus,
         submitSearch: submitSearch
       )
@@ -44,8 +46,14 @@ struct SidebarRecentSearchesHeader: View {
 
 private struct SidebarInlineSearchField: View {
   let searchText: Binding<String>
+  let isSearchFocused: Bool
   let searchFocus: FocusState<Bool>.Binding
   let submitSearch: () -> Void
+
+  @Environment(\.harnessNativeFormControlFont)
+  private var nativeFormControlFont
+  @Environment(\.harnessNativeFormControlSize)
+  private var nativeFormControlSize
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
@@ -53,6 +61,12 @@ private struct SidebarInlineSearchField: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
 
+      // Always render the real TextField with .focused() to avoid an
+      // identity-breaking if/else branch (Text vs TextField) that triggers
+      // "FocusedValue update tried to update multiple times per frame"
+      // when the branch flips post-startup. A .focused() binding with
+      // false (the default @FocusState value) is inert - no focus is
+      // stolen and no programmatic focus fires until explicitly requested.
       TextField("Search sessions, projects, leaders", text: searchText)
         .textFieldStyle(.plain)
         .focused(searchFocus)
@@ -66,9 +80,11 @@ private struct SidebarInlineSearchField: View {
           Image(systemName: "xmark.circle.fill")
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.borderless)
       }
     }
+    .font(nativeFormControlFont)
+    .controlSize(nativeFormControlSize)
     .padding(.horizontal, HarnessMonitorTheme.spacingSM)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .background {
@@ -82,9 +98,15 @@ private struct SidebarInlineSearchField: View {
           cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
           style: .continuous
         )
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+        .stroke(
+          isSearchFocused
+            ? HarnessMonitorTheme.accent.opacity(0.9)
+            : HarnessMonitorTheme.controlBorder.opacity(0.55),
+          lineWidth: isSearchFocused ? 2 : 1
+        )
       }
     }
+    .animation(.easeInOut(duration: 0.12), value: isSearchFocused)
   }
 }
 
