@@ -1,5 +1,5 @@
 use crate::agents::runtime::signal::AckResult;
-use crate::daemon::protocol::{SignalAckRequest, SignalCancelRequest};
+use crate::daemon::protocol::{SignalAckRequest, SignalCancelRequest, SignalSendRequest};
 use crate::session::types::{SessionRole, SessionSignalStatus};
 
 use super::*;
@@ -38,6 +38,78 @@ async fn seed_pending_signal(
         .write_signal(project_dir, signal_session_id, &signal)
         .expect("write signal");
     signal.signal_id
+}
+
+#[test]
+fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
+    with_temp_project(|project| {
+        temp_env::with_var("CODEX_SESSION_ID", Some("async-signal-send-worker"), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = project
+                    .parent()
+                    .expect("project parent")
+                    .join("daemon.sqlite");
+                let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db");
+                let state = start_session_direct_async(
+                    &crate::daemon::protocol::SessionStartRequest {
+                        title: "async signal send".into(),
+                        context: "async signal send".into(),
+                        runtime: "claude".into(),
+                        session_id: Some("daemon-async-signal-send".into()),
+                        project_dir: project.to_string_lossy().into(),
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("start session");
+                let leader_id = state.leader_id.clone().expect("leader id");
+                let joined = join_session_direct_async(
+                    "daemon-async-signal-send",
+                    &crate::daemon::protocol::SessionJoinRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: None,
+                        project_dir: project.to_string_lossy().into(),
+                        persona: None,
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("join session");
+                let worker_id = joined
+                    .agents
+                    .keys()
+                    .find(|agent_id| agent_id.starts_with("codex-"))
+                    .expect("worker id")
+                    .to_string();
+
+                let detail = send_signal_async(
+                    "daemon-async-signal-send",
+                    &SignalSendRequest {
+                        actor: leader_id,
+                        agent_id: worker_id.clone(),
+                        command: "inject_context".into(),
+                        message: "Investigate the async signal lane".into(),
+                        action_hint: Some("task:async-signal".into()),
+                    },
+                    &async_db,
+                    None,
+                )
+                .await
+                .expect("send signal async");
+
+                assert_eq!(detail.session.session_id, "daemon-async-signal-send");
+                assert_eq!(detail.signals.len(), 1);
+                assert_eq!(detail.signals[0].agent_id, worker_id);
+                assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
+                assert_eq!(detail.signals[0].signal.command, "inject_context");
+            });
+        });
+    });
 }
 
 #[test]

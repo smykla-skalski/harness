@@ -4,7 +4,9 @@ use axum::http::StatusCode;
 use tempfile::tempdir;
 
 use crate::agents::runtime::signal::AckResult;
-use crate::daemon::protocol::{SessionJoinRequest, SignalAckRequest, SignalCancelRequest};
+use crate::daemon::protocol::{
+    SessionJoinRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
+};
 use crate::session::types::{SessionRole, SessionSignalStatus};
 use harness_testkit::with_isolated_harness_env;
 
@@ -159,6 +161,70 @@ fn post_cancel_signal_uses_async_db_when_sync_db_is_unavailable() {
                         Some(signal_id.as_str())
                     );
                     assert_eq!(body["signals"][0]["status"].as_str(), Some("rejected"));
+                });
+            },
+        );
+    });
+}
+
+#[test]
+fn post_send_signal_uses_async_db_when_sync_db_is_unavailable() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        temp_env::with_vars(
+            [
+                ("CLAUDE_SESSION_ID", Some("http-async-signal-send-leader")),
+                ("CODEX_SESSION_ID", Some("http-async-signal-send-worker")),
+            ],
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
+
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_http_state_with_empty_async_db(&db_path).await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "http-async-signal-send",
+                    )
+                    .await;
+                    let worker_id = join_http_worker(
+                        &state,
+                        "http-async-signal-send",
+                        &project_dir,
+                        "Async Send Worker",
+                    )
+                    .await;
+                    let leader_id = leader_id_for_session(&state, "http-async-signal-send").await;
+
+                    let response = post_send_signal(
+                        axum::extract::Path("http-async-signal-send".to_owned()),
+                        auth_headers(),
+                        State(state.clone()),
+                        Json(SignalSendRequest {
+                            actor: leader_id,
+                            agent_id: worker_id.clone(),
+                            command: "inject_context".into(),
+                            message: "async send me".into(),
+                            action_hint: Some("task:http-async-signal".into()),
+                        }),
+                    )
+                    .await;
+
+                    let (status, body) = response_json(response).await;
+                    assert_eq!(status, StatusCode::OK);
+                    let signal = body["signals"]
+                        .as_array()
+                        .and_then(|signals| signals.first())
+                        .expect("signal response");
+                    assert_eq!(signal["agent_id"].as_str(), Some(worker_id.as_str()));
+                    assert_eq!(signal["status"].as_str(), Some("pending"));
+                    assert_eq!(
+                        signal["signal"]["payload"]["message"].as_str(),
+                        Some("async send me")
+                    );
                 });
             },
         );
