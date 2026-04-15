@@ -37,69 +37,40 @@ struct SessionActionDock: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
 
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-          flowButton(
-            title: "Task Flow",
-            subtitle: "Create, reassign, checkpoint",
-            symbol: "checklist",
-            action: focusFirstTask,
-            accessibilityID: nil
-          )
-          flowButton(
-            title: "People Flow",
-            subtitle: "Change roles and leadership",
-            symbol: "person.2",
-            action: focusFirstAgent,
-            accessibilityID: nil
-          )
-          flowButton(
-            title: "Observe Flow",
-            subtitle: "Surface and triage issues",
-            symbol: "eye",
-            action: focusObserver,
-            accessibilityID: nil
-          )
-          flowButton(
-            title: "Agent TUI",
-            subtitle: "Drive Copilot or Codex",
-            symbol: "terminal",
-            action: openAgentTui,
-            accessibilityID: HarnessMonitorAccessibility.agentTuiButton
-          )
-          codexFlowButton
-        }
-        VStack(spacing: HarnessMonitorTheme.itemSpacing) {
-          flowButton(
-            title: "Task Flow",
-            subtitle: "Create, reassign, checkpoint",
-            symbol: "checklist",
-            action: focusFirstTask,
-            accessibilityID: nil
-          )
-          flowButton(
-            title: "People Flow",
-            subtitle: "Change roles and leadership",
-            symbol: "person.2",
-            action: focusFirstAgent,
-            accessibilityID: nil
-          )
-          flowButton(
-            title: "Observe Flow",
-            subtitle: "Surface and triage issues",
-            symbol: "eye",
-            action: focusObserver,
-            accessibilityID: nil
-          )
-          flowButton(
-            title: "Agent TUI",
-            subtitle: "Drive Copilot or Codex",
-            symbol: "terminal",
-            action: openAgentTui,
-            accessibilityID: HarnessMonitorAccessibility.agentTuiButton
-          )
-          codexFlowButton
-        }
+      HarnessMonitorAdaptiveGridLayout(
+        minimumColumnWidth: 180,
+        maximumColumns: 5,
+        spacing: HarnessMonitorTheme.sectionSpacing
+      ) {
+        flowButton(
+          title: "Task Flow",
+          subtitle: "Create, reassign, checkpoint",
+          symbol: "checklist",
+          action: focusFirstTask,
+          accessibilityID: nil
+        )
+        flowButton(
+          title: "People Flow",
+          subtitle: "Change roles and leadership",
+          symbol: "person.2",
+          action: focusFirstAgent,
+          accessibilityID: nil
+        )
+        flowButton(
+          title: "Observe Flow",
+          subtitle: "Surface and triage issues",
+          symbol: "eye",
+          action: focusObserver,
+          accessibilityID: nil
+        )
+        flowButton(
+          title: "Agent TUI",
+          subtitle: "Drive Copilot or Codex",
+          symbol: "terminal",
+          action: openAgentTui,
+          accessibilityID: HarnessMonitorAccessibility.agentTuiButton
+        )
+        codexFlowButton
       }
     }
   }
