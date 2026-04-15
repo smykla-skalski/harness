@@ -6,6 +6,7 @@ import SwiftUI
 @main
 @MainActor
 struct HarnessMonitorApp: App {
+  private static let resetBackgroundRecentsKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   @NSApplicationDelegateAdaptor private var delegate: HarnessMonitorAppDelegate
   private let container: ModelContainer?
   private let isUITesting: Bool
@@ -25,6 +26,9 @@ struct HarnessMonitorApp: App {
     UserDefaults.standard.register(defaults: [
       "NSUseAnimatedFocusRing": false
     ])
+    if ProcessInfo.processInfo.environment[Self.resetBackgroundRecentsKey] == "1" {
+      UserDefaults.standard.removeObject(forKey: HarnessMonitorBackgroundDefaults.recentKey)
+    }
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
     container = configuration.container

@@ -354,17 +354,20 @@ extension HarnessMonitorUITestCase {
   func selectFirstExistingBackground(
     in app: XCUIApplication,
     candidates: [String]
-  ) throws -> String {
+  ) -> String? {
     let preferencesRoot = element(
       in: app,
       identifier: HarnessMonitorUITestAccessibility.preferencesRoot
     )
     let preferencesWindow = window(in: app, containing: preferencesRoot)
-    let nativeTab = app.buttons
-      .matching(NSPredicate(format: "label == %@", "Native"))
-      .firstMatch
+    let collectionPicker = segmentedControl(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesBackgroundCollectionPicker
+    )
+    let nativeTab = button(in: app, title: "Native")
 
-    XCTAssertTrue(nativeTab.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(collectionPicker.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(nativeTab.waitForExistence(timeout: Self.fastActionTimeout))
 
     for _ in 0..<4 where !nativeTab.isHittable {
       dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
@@ -373,22 +376,55 @@ extension HarnessMonitorUITestCase {
     XCTAssertTrue(nativeTab.isHittable, "Native background tab never became hittable")
     nativeTab.tap()
 
-    for _ in 0..<4 {
+    let nativeTileAppeared = waitUntil(timeout: Self.fastActionTimeout) {
+      candidates.contains { candidate in
+        self.element(
+          in: app,
+          identifier: HarnessMonitorUITestAccessibility.preferencesBackgroundTile(candidate)
+        ).exists
+      }
+    }
+
+    guard nativeTileAppeared else {
+      return nil
+    }
+
+    for _ in 0..<2 {
       for candidate in candidates {
         let tile = element(
           in: app,
           identifier: HarnessMonitorUITestAccessibility.preferencesBackgroundTile(candidate)
         )
-        if tile.waitForExistence(timeout: 1), tile.isHittable {
+        if tile.exists, tile.isHittable {
           tile.tap()
           return candidate
         }
       }
-
       dragUp(in: app, element: mainWindow(in: app), distanceRatio: 0.22)
     }
 
-    throw XCTSkip("No expected macOS wallpaper tiles were available on this machine.")
+    return nil
+  }
+
+  func tapBackgroundTile(in app: XCUIApplication, key: String) {
+    let preferencesRoot = element(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesRoot
+    )
+    let preferencesWindow = window(in: app, containing: preferencesRoot)
+    let identifier = HarnessMonitorUITestAccessibility.preferencesBackgroundTile(key)
+
+    for _ in 0..<2 {
+      let tile = descendantElement(in: preferencesWindow, identifier: identifier)
+      if tile.exists, tile.isHittable {
+        tile.tap()
+        return
+      }
+
+      dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
+    }
+
+    XCTFail("Failed to tap background tile \(key)")
   }
 
   func closeSettings(in app: XCUIApplication, preferencesRoot: XCUIElement) {

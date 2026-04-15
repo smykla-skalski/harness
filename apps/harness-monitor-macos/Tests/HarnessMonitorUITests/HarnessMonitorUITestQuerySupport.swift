@@ -217,6 +217,25 @@ extension HarnessMonitorUITestCase {
     return app.toolbars.buttons.matching(identifier: identifier).firstMatch
   }
 
+  func segmentedControl(in app: XCUIApplication, identifier: String) -> XCUIElement {
+    let mainWindowMatch = mainWindow(in: app)
+      .descendants(matching: .segmentedControl)
+      .matching(identifier: identifier)
+      .firstMatch
+    if mainWindowMatch.exists {
+      return mainWindowMatch
+    }
+
+    let appMatch = app.descendants(matching: .segmentedControl)
+      .matching(identifier: identifier)
+      .firstMatch
+    if appMatch.exists {
+      return appMatch
+    }
+
+    return element(in: app, identifier: identifier)
+  }
+
   func editableField(in app: XCUIApplication, identifier: String) -> XCUIElement {
     if identifier == HarnessMonitorUITestAccessibility.sidebarSearchField {
       return element(in: app, identifier: identifier)

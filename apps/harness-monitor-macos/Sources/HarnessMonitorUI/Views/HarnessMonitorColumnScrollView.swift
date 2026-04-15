@@ -6,15 +6,15 @@ enum HarnessMonitorColumnTopScrollEdgeEffect {
   case hard
 }
 
-struct HarnessMonitorColumnScrollView<Content: View>: View {
+struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: View>: View {
   let horizontalPadding: CGFloat
   let verticalPadding: CGFloat
   let constrainContentWidth: Bool
   let readableWidth: Bool
   let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
   private let content: Content
-  private let underlay: AnyView?
-  private let overlay: AnyView?
+  private let underlay: Underlay?
+  private let overlay: Overlay?
 
   /// HIG readable content width for body text (~70 characters at body size).
   private static var readableMaxWidth: CGFloat { 680 }
@@ -26,7 +26,7 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     readableWidth: Bool = false,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
     @ViewBuilder content: () -> Content
-  ) {
+  ) where Underlay == EmptyView, Overlay == EmptyView {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
@@ -37,7 +37,7 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     overlay = nil
   }
 
-  init<Underlay: View>(
+  init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
@@ -45,18 +45,18 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder content: () -> Content
-  ) {
+  ) where Overlay == EmptyView {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
-    self.underlay = AnyView(underlay())
+    self.underlay = underlay()
     overlay = nil
   }
 
-  init<Underlay: View, Overlay: View>(
+  init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
@@ -72,8 +72,8 @@ struct HarnessMonitorColumnScrollView<Content: View>: View {
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
-    self.underlay = AnyView(underlay())
-    self.overlay = AnyView(overlay())
+    self.underlay = underlay()
+    self.overlay = overlay()
   }
 
   var body: some View {

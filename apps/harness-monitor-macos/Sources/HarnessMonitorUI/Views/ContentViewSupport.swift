@@ -190,9 +190,9 @@ struct ContentToolbarAccessibilityMarker: View {
   }
 }
 
-struct ContentCornerOverlayModifier: ViewModifier {
+struct ContentCornerOverlayModifier<CornerAnimationContent: View>: ViewModifier {
   let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let cornerAnimationContent: () -> AnyView
+  let cornerAnimationContent: CornerAnimationContent
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
 
@@ -218,7 +218,7 @@ struct ContentCornerOverlayModifier: ViewModifier {
             presentationDelay: cornerAnimationEnabled ? nil : .milliseconds(400)
           )
         ) {
-          cornerAnimationContent()
+          cornerAnimationContent
         }
       )
   }

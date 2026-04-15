@@ -30,49 +30,63 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   var body: some View {
-    ContentView(
-      store: store,
-      cornerAnimationContent: cornerAnimationEnabled
-        ? {
-          AnyView(HarnessMonitorAppLlamaAnimation())
-        } : nil
-    )
-    .writingToolsBehavior(.disabled)
-    .modifier(
-      HarnessMonitorPerfScenarioModifier(
-        delegate: delegate,
-        store: store,
-        perfScenario: perfScenario
+    windowContent
+  }
+
+  @ViewBuilder
+  private var windowContent: some View {
+    if cornerAnimationEnabled {
+      configuredContentRoot(
+        ContentView(
+          store: store,
+          cornerAnimationContent: {
+            HarnessMonitorAppLlamaAnimation()
+          }
+        )
       )
-    )
-    .frame(minWidth: 900, minHeight: 600)
-    .modifier(
-      OptionalInstantFocusRingModifier(
-        isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
-      )
-    )
-    .modifier(
-      HarnessMonitorSceneAppearanceModifier(
-        themeMode: $themeMode,
-        appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
-      )
-    )
-    .modifier(PinchToZoomTextSizeModifier())
-    .modifier(
-      HarnessMonitorWindowBackdropModifier(
-        mode: backdropMode,
-        backgroundImage: backgroundImage
-      )
-    )
-    .modifier(HarnessMonitorUITestAnimationModifier())
-    .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
-      guard requestID != handledSettingsOpenRequestID else {
-        return
-      }
-      handledSettingsOpenRequestID = requestID
-      preferencesSelectedSection = .notifications
-      openWindow(id: HarnessMonitorWindowID.preferences)
+    } else {
+      configuredContentRoot(ContentView(store: store))
     }
+  }
+
+  private func configuredContentRoot<Root: View>(_ content: Root) -> some View {
+    content
+      .writingToolsBehavior(.disabled)
+      .modifier(
+        HarnessMonitorPerfScenarioModifier(
+          delegate: delegate,
+          store: store,
+          perfScenario: perfScenario
+        )
+      )
+      .frame(minWidth: 900, minHeight: 600)
+      .modifier(
+        OptionalInstantFocusRingModifier(
+          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+        )
+      )
+      .modifier(
+        HarnessMonitorSceneAppearanceModifier(
+          themeMode: $themeMode,
+          appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
+        )
+      )
+      .modifier(PinchToZoomTextSizeModifier())
+      .modifier(
+        HarnessMonitorWindowBackdropModifier(
+          mode: backdropMode,
+          backgroundImage: backgroundImage
+        )
+      )
+      .modifier(HarnessMonitorUITestAnimationModifier())
+      .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
+        guard requestID != handledSettingsOpenRequestID else {
+          return
+        }
+        handledSettingsOpenRequestID = requestID
+        preferencesSelectedSection = .notifications
+        openWindow(id: HarnessMonitorWindowID.preferences)
+      }
   }
 }
 
@@ -171,6 +185,7 @@ struct HarnessMonitorSettingsRootView: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
+  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   init(
     store: HarnessMonitorStore,
@@ -207,7 +222,11 @@ struct HarnessMonitorSettingsRootView: View {
         backgroundImage: backgroundImage
       )
     )
-    .instantFocusRing()
+    .modifier(
+      OptionalInstantFocusRingModifier(
+        isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+      )
+    )
     .modifier(
       HarnessMonitorSceneAppearanceModifier(
         themeMode: $themeMode,
@@ -228,6 +247,7 @@ struct AgentTuiWindowRootView: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
+  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var backdropMode: HarnessMonitorBackdropMode {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
@@ -247,7 +267,11 @@ struct AgentTuiWindowRootView: View {
           backgroundImage: backgroundImage
         )
       )
-      .instantFocusRing()
+      .modifier(
+        OptionalInstantFocusRingModifier(
+          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+        )
+      )
       .modifier(
         HarnessMonitorSceneAppearanceModifier(
           themeMode: $themeMode,

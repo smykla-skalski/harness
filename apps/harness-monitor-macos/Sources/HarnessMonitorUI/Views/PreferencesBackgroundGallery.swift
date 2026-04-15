@@ -1,5 +1,51 @@
 import SwiftUI
 
+private enum PreferencesBackgroundGalleryRecents {
+  static func items(
+    from recentStorageValues: String,
+    maxItems: Int
+  ) -> [HarnessMonitorBackgroundSelection] {
+    guard !recentStorageValues.isEmpty else {
+      return []
+    }
+
+    var recentItems: [HarnessMonitorBackgroundSelection] = []
+    var seenStorageValues = Set<String>()
+
+    for storedValue in recentStorageValues.split(separator: "|").map(String.init) {
+      let selection = HarnessMonitorBackgroundSelection.decode(storedValue)
+      guard selection.storageValue == storedValue else {
+        continue
+      }
+      guard seenStorageValues.insert(selection.storageValue).inserted else {
+        continue
+      }
+
+      recentItems.append(selection)
+      if recentItems.count == max(0, maxItems) {
+        break
+      }
+    }
+
+    return recentItems
+  }
+
+  static func updatedStorageValues(
+    _ recentStorageValues: String,
+    with background: HarnessMonitorBackgroundSelection,
+    maxItems: Int
+  ) -> String {
+    var updatedValues = items(from: recentStorageValues, maxItems: maxItems).map(\.storageValue)
+    updatedValues.removeAll { $0 == background.storageValue }
+    updatedValues.insert(background.storageValue, at: 0)
+    return Array(updatedValues.prefix(max(0, maxItems))).joined(separator: "|")
+  }
+
+  static func stateLabel(for recentItems: [HarnessMonitorBackgroundSelection]) -> String {
+    "recent=\(recentItems.map(\.preferencesStateValue).joined(separator: "|"))"
+  }
+}
+
 struct PreferencesBackgroundGalleryPrefetchPlan {
   static func selections(
     options: [HarnessMonitorBackgroundSelection],
@@ -63,7 +109,7 @@ struct PreferencesBackgroundGallery: View {
   }
 
   private var hasStoredRecents: Bool {
-    !recentStorageValues.isEmpty
+    !recentItems.isEmpty
   }
 
   private var options: [HarnessMonitorBackgroundSelection] {
@@ -74,15 +120,14 @@ struct PreferencesBackgroundGallery: View {
   }
 
   private var recentItems: [HarnessMonitorBackgroundSelection] {
-    let stored =
-      recentStorageValues.isEmpty
-      ? []
-      : recentStorageValues.split(separator: "|").map(String.init)
-    var items = [selectedBackground]
-    for value in stored where value != selectedBackground.storageValue {
-      items.append(HarnessMonitorBackgroundSelection.decode(value))
-    }
-    return Array(items.prefix(Self.maxRecents))
+    PreferencesBackgroundGalleryRecents.items(
+      from: recentStorageValues,
+      maxItems: Self.maxRecents
+    )
+  }
+
+  private var recentStateLabel: String {
+    PreferencesBackgroundGalleryRecents.stateLabel(for: recentItems)
   }
 
   private let columns = [
@@ -105,63 +150,69 @@ struct PreferencesBackgroundGallery: View {
   }
 
   var body: some View {
-    if isBackdropDisabled {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        if hasStoredRecents {
-          recentBackgroundsRow
-            .saturation(0)
-            .allowsHitTesting(false)
+    Group {
+      if isBackdropDisabled {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+          VStack(spacing: HarnessMonitorTheme.spacingSM) {
+            Image(systemName: "photo.on.rectangle.angled")
+              .font(.system(size: 36))
+              .foregroundStyle(.tertiary)
+            Text("Background image requires a backdrop")
+              .scaledFont(.headline)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: true, vertical: false)
+            Text("Set the backdrop to Window or Content to choose a background image")
+              .scaledFont(.subheadline)
+              .foregroundStyle(.tertiary)
+              .fixedSize(horizontal: true, vertical: false)
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, HarnessMonitorTheme.spacingXL)
         }
-
-        VStack(spacing: HarnessMonitorTheme.spacingSM) {
-          Image(systemName: "photo.on.rectangle.angled")
-            .font(.system(size: 36))
-            .foregroundStyle(.tertiary)
-          Text("Background image requires a backdrop")
-            .scaledFont(.headline)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: true, vertical: false)
-          Text("Set the backdrop to Window or Content to choose a background image")
-            .scaledFont(.subheadline)
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
+        .task(id: recentStorageValues) {
+          guard hasStoredRecents else { return }
+          await BackgroundThumbnailCache.shared.prefetch(recentItems)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, HarnessMonitorTheme.spacingXL)
-      }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
-      .task(id: recentStorageValues) {
-        guard hasStoredRecents else { return }
-        await BackgroundThumbnailCache.shared.prefetch(recentItems)
-      }
-    } else if options.isEmpty {
-      ContentUnavailableView(
-        "No wallpapers found",
-        systemImage: "photo",
-        description: Text("macOS wallpapers were not found on this Mac")
-      )
-    } else {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        recentBackgroundsRow
+      } else if options.isEmpty {
+        ContentUnavailableView(
+          "No wallpapers found",
+          systemImage: "photo",
+          description: Text("macOS wallpapers were not found on this Mac")
+        )
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+          if hasStoredRecents {
+            recentBackgroundsRow
+          }
 
-        LazyVGrid(columns: columns, alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-          ForEach(options) { background in
-            PreferencesBackgroundTile(
-              background: background,
-              isSelected: background.storageValue == selectedBackground.storageValue,
-              previewHeight: previewHeight,
-              select: { select(background) },
-              didAppear: { registerVisibleBackground(background) },
-              didDisappear: { unregisterVisibleBackground(background) }
-            )
+          LazyVGrid(columns: columns, alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+            ForEach(options) { background in
+              PreferencesBackgroundTile(
+                background: background,
+                isSelected: background.storageValue == selectedBackground.storageValue,
+                previewHeight: previewHeight,
+                select: { select(background) },
+                didAppear: { registerVisibleBackground(background) },
+                didDisappear: { unregisterVisibleBackground(background) }
+              )
+            }
           }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
+        .task(id: galleryPrefetchSignature) {
+          await BackgroundThumbnailCache.shared.prefetch(galleryPrefetchSelections)
+        }
       }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
-      .task(id: galleryPrefetchSignature) {
-        await BackgroundThumbnailCache.shared.prefetch(galleryPrefetchSelections)
+    }
+    .overlay {
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.preferencesBackgroundRecentState,
+          text: recentStateLabel
+        )
       }
     }
   }
@@ -186,6 +237,8 @@ struct PreferencesBackgroundGallery: View {
         }
       }
     }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundRecentsSection)
   }
 
   private func select(_ background: HarnessMonitorBackgroundSelection) {
@@ -198,14 +251,11 @@ struct PreferencesBackgroundGallery: View {
   }
 
   private func updateRecents(with background: HarnessMonitorBackgroundSelection) {
-    var stored =
-      recentStorageValues.isEmpty
-      ? []
-      : recentStorageValues.split(separator: "|").map(String.init)
-    stored.removeAll { $0 == background.storageValue }
-    stored.insert(background.storageValue, at: 0)
-    stored = Array(stored.prefix(Self.maxRecents))
-    recentStorageValues = stored.joined(separator: "|")
+    recentStorageValues = PreferencesBackgroundGalleryRecents.updatedStorageValues(
+      recentStorageValues,
+      with: background,
+      maxItems: Self.maxRecents
+    )
   }
 
   private func registerVisibleBackground(_ background: HarnessMonitorBackgroundSelection) {
