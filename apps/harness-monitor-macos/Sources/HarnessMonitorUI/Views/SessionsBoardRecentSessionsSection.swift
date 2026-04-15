@@ -2,8 +2,8 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionsBoardRecentSessionsSection: View {
+  let store: HarnessMonitorStore
   let sessions: [SessionSummary]
-  let selectSession: (String) -> Void
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -20,14 +20,14 @@ struct SessionsBoardRecentSessionsSection: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .frame(maxWidth: .infinity, alignment: .leading)
       } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          ForEach(sessions.prefix(8)) { session in
-            DashboardSessionCard(
-              session: session,
-              selectSession: selectSession
-            )
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+            ForEach(sessions.prefix(8)) { session in
+              DashboardSessionCard(
+                store: store,
+                session: session
+              )
+            }
           }
-        }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
@@ -42,19 +42,23 @@ struct SessionsBoardRecentSessionsSection: View {
 }
 
 private struct DashboardSessionCard: View {
+  let store: HarnessMonitorStore
   let session: SessionSummary
-  let selectSession: (String) -> Void
   @State private var isHovered = false
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
+  private var presentation: HarnessMonitorStore.SessionSummaryPresentation {
+    store.sessionSummaryPresentation(for: session)
+  }
+
   var body: some View {
     Button {
-      selectSession(session.sessionId)
+      Task { await store.selectSession(session.sessionId) }
     } label: {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .fill(statusColor(for: session.status))
+          .fill(statusColor(for: presentation.statusTone))
           .frame(width: 8)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 4) {
@@ -66,15 +70,15 @@ private struct DashboardSessionCard: View {
                 session.title.isEmpty
                   ? HarnessMonitorTheme.tertiaryInk
                   : HarnessMonitorTheme.ink
-              )
-              .multilineTextAlignment(.leading)
-            Spacer(minLength: 12)
-            Text(session.status.title)
-              .scaledFont(.caption2.weight(.bold))
-              .foregroundStyle(statusColor(for: session.status))
-          }
-          HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-            Text(sessionMetadata(session))
+               )
+               .multilineTextAlignment(.leading)
+             Spacer(minLength: 12)
+             Text(presentation.statusText)
+               .scaledFont(.caption2.weight(.bold))
+               .foregroundStyle(statusColor(for: presentation.statusTone))
+           }
+           HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
+             Text(sessionMetadata(session))
               .scaledFont(.caption.monospaced())
               .truncationMode(.middle)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -97,7 +101,7 @@ private struct DashboardSessionCard: View {
     .onHover { isHovered = $0 }
     .contextMenu {
       Button {
-        selectSession(session.sessionId)
+        Task { await store.selectSession(session.sessionId) }
       } label: {
         Label("Inspect", systemImage: "info.circle")
       }
@@ -125,9 +129,11 @@ private func sessionMetadata(_ session: SessionSummary) -> String {
 }
 
 #Preview("Recent sessions") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+
   SessionsBoardRecentSessionsSection(
-    sessions: PreviewFixtures.overflowSessions,
-    selectSession: { _ in }
+    store: store,
+    sessions: PreviewFixtures.overflowSessions
   )
   .padding()
   .frame(width: 960)

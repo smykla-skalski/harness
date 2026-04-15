@@ -11,36 +11,38 @@ extension HarnessMonitorStore {
     }
 
     guard selectedSession != nil else {
-      let requestID = beginSessionLoad()
-      startSessionLoad(
-        using: client,
-        sessionID: selectedSessionID,
-        requestID: requestID
-      )
+      applySessionSummaryUpdate(updatedSummary)
+      if isSelectionLoading {
+        scheduleSelectedSessionRefreshFallback(sessionID: selectedSessionID)
+      } else {
+        let requestID = beginSessionLoad()
+        startSessionLoad(
+          using: client,
+          sessionID: selectedSessionID,
+          requestID: requestID
+        )
+      }
       return
     }
 
-    applySelectedSessionSummaryUpdate(updatedSummary)
+    invalidateSelectedSessionDetailForSummaryUpdate(updatedSummary)
     scheduleSelectedSessionRefreshFallback(sessionID: selectedSessionID)
   }
 
-  func applySelectedSessionSummaryUpdate(_ summary: SessionSummary) {
-    applySessionSummaryUpdate(summary)
-    guard let selectedSession,
-      selectedSession.session.sessionId == summary.sessionId
+  func invalidateSelectedSessionDetailForSummaryUpdate(_ summary: SessionSummary) {
+    guard selectedSessionID == summary.sessionId
     else {
       return
     }
 
+    cancelSelectedTimelinePageLoad()
     withUISyncBatch {
-      self.selectedSession = SessionDetail(
-        session: summary,
-        agents: selectedSession.agents,
-        tasks: selectedSession.tasks,
-        signals: selectedSession.signals,
-        observer: selectedSession.observer,
-        agentActivity: selectedSession.agentActivity
-      )
+      selection.retainPresentedDetailWhenSelectionClears = false
+      selectedSession = nil
+      timeline = []
+      timelineWindow = nil
+      isSelectionLoading = true
+      applySessionSummaryUpdate(summary)
       synchronizeActionActor()
     }
   }
@@ -70,7 +72,7 @@ extension HarnessMonitorStore {
         self.pendingSelectedSessionRefreshFallback?.sessionID == sessionID,
         self.pendingSelectedSessionRefreshFallback?.token == token,
         self.selectedSessionID == sessionID,
-        self.selectedSession != nil,
+        (self.selectedSession != nil || self.isSelectionLoading),
         let client = self.client
       else {
         return

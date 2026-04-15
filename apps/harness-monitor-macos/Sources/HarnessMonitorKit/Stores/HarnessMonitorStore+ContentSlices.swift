@@ -78,6 +78,19 @@ extension HarnessMonitorStore {
       _ state: ContentSessionDetailState,
       selectedSessionSummary: SessionSummary?
     ) {
+      if !state.retainPresentedDetailWhenSelectionClears {
+        if retainedSessionDetail != nil {
+          retainedSessionDetail = nil
+          retainedSessionDetailIdentity = nil
+        }
+        if !retainedTimeline.isEmpty {
+          retainedTimeline = []
+        }
+        if retainedTimelineWindow != nil {
+          retainedTimelineWindow = nil
+        }
+      }
+
       let nextSelectedIdentity = SessionDetailIdentity(state.selectedSessionDetail)
       let didUpdateSelectedTimeline = timeline != state.timeline
       let didUpdateTimelineWindow = timelineWindow != state.timelineWindow

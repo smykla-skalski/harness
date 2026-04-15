@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SidebarSessionRow: View {
   let session: SessionSummary
+  let presentation: HarnessMonitorStore.SessionSummaryPresentation
   let isBookmarked: Bool
   let lastActivityText: String
   let fontScale: CGFloat
@@ -10,7 +11,7 @@ struct SidebarSessionRow: View {
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(statusColor(for: session.status))
+        .fill(statusColor(for: presentation.statusTone))
         .frame(width: 8)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -28,7 +29,7 @@ struct SidebarSessionRow: View {
               .foregroundStyle(.secondary)
               .accessibilityLabel("Bookmarked")
           }
-          Text(verbatim: session.status.title)
+          Text(verbatim: presentation.statusText)
             .font(scaled(.caption2.weight(.bold)))
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
@@ -38,8 +39,8 @@ struct SidebarSessionRow: View {
           .truncationMode(.middle)
           .foregroundStyle(.secondary)
         HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-          footerLabel("\(session.metrics.activeAgentCount) active")
-          footerLabel("\(session.metrics.inProgressTaskCount) moving")
+          footerLabel(presentation.agentCountText)
+          footerLabel(presentation.taskCountText)
           Spacer(minLength: 0)
           Text(verbatim: lastActivityText)
             .font(scaled(.caption.weight(.medium)))
@@ -65,9 +66,12 @@ struct SidebarSessionRow: View {
 }
 
 #Preview("Sidebar row") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+
   VStack(spacing: HarnessMonitorTheme.sectionSpacing) {
     SidebarSessionRow(
       session: PreviewFixtures.summary,
+      presentation: store.sessionSummaryPresentation(for: PreviewFixtures.summary),
       isBookmarked: true,
       lastActivityText: formatTimestamp(PreviewFixtures.summary.lastActivityAt),
       fontScale: 1
@@ -77,6 +81,7 @@ struct SidebarSessionRow: View {
     let overflowSession = PreviewFixtures.overflowSessions[3]
     SidebarSessionRow(
       session: overflowSession,
+      presentation: store.sessionSummaryPresentation(for: overflowSession),
       isBookmarked: false,
       lastActivityText: formatTimestamp(overflowSession.lastActivityAt),
       fontScale: 1

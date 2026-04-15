@@ -20,8 +20,8 @@ struct SessionsBoardView: View {
     ) {
       VStack(alignment: .leading, spacing: 24) {
         SessionsBoardRecentSessionsSection(
-          sessions: sessionCatalog.recentSessions,
-          selectSession: selectSession
+          store: store,
+          sessions: sessionCatalog.recentSessions
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -30,9 +30,6 @@ struct SessionsBoardView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionsBoardRoot)
   }
 
-  private func selectSession(_ sessionID: String) {
-    Task { await store.selectSession(sessionID) }
-  }
 }
 
 #Preview("Sessions Board - Dashboard") {

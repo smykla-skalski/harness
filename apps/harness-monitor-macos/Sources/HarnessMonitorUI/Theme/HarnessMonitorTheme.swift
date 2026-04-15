@@ -57,6 +57,19 @@ func statusColor(for status: SessionStatus) -> Color {
   }
 }
 
+func statusColor(for tone: HarnessMonitorStore.StatusMessageTone) -> Color {
+  switch tone {
+  case .secondary:
+    HarnessMonitorTheme.ink.opacity(0.55)
+  case .info:
+    HarnessMonitorTheme.accent
+  case .success:
+    HarnessMonitorTheme.success
+  case .caution:
+    HarnessMonitorTheme.caution
+  }
+}
+
 func severityColor(for severity: TaskSeverity) -> Color {
   switch severity {
   case .low:

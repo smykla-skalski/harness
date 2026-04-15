@@ -255,7 +255,9 @@ extension HarnessMonitorStore {
         selectedSessionDetail: selection.matchedSelectedSession,
         timeline: selection.timeline,
         timelineWindow: selection.timelineWindow,
-        isTimelineLoading: selection.isTimelineLoading
+        isTimelineLoading: selection.isTimelineLoading,
+        retainPresentedDetailWhenSelectionClears: selection
+          .retainPresentedDetailWhenSelectionClears
       ),
       selectedSessionSummary: selectedSessionSummary
     )
@@ -332,7 +334,10 @@ extension HarnessMonitorStore {
       )
     case .offline(let reason):
       let offlineText =
-        isShowingCachedData || persistedSessionCount > 0 || sessionCount > 0
+        isShowingCachedCatalog
+          || isShowingCachedSelectedSession
+          || persistedSessionCount > 0
+          || sessionCount > 0
         ? cachedDataStatusMessage
         : reason
       messages.append(
