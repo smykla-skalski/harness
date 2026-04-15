@@ -116,6 +116,39 @@ fn test_http_state_with_db() -> DaemonHttpState {
     }
 }
 
+fn test_http_state_with_sync_db_only(db_path: &std::path::Path) -> DaemonHttpState {
+    let (sender, _) = broadcast::channel(8);
+    let db_slot = Arc::new(OnceLock::new());
+    let async_db = Arc::new(OnceLock::new());
+    let db = Arc::new(Mutex::new(DaemonDb::open(db_path).expect("open file db")));
+    db_slot.set(db).expect("install db");
+    let manifest: DaemonManifest = serde_json::from_value(serde_json::json!({
+        "version": "20.6.0",
+        "pid": 1,
+        "endpoint": "http://127.0.0.1:0",
+        "started_at": "2026-04-13T00:00:00Z",
+        "token_path": "/tmp/token",
+        "sandboxed": false,
+        "host_bridge": {},
+        "revision": 0,
+        "updated_at": "",
+        "binary_stamp": null,
+    }))
+    .expect("deserialize daemon manifest");
+    DaemonHttpState {
+        token: "token".into(),
+        sender: sender.clone(),
+        manifest,
+        daemon_epoch: "epoch".into(),
+        replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),
+        db: db_slot.clone(),
+        async_db: super::AsyncDaemonDbSlot::from_inner(async_db),
+        db_path: Some(db_path.to_path_buf()),
+        codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+        agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+    }
+}
+
 #[tokio::test]
 async fn map_json_maps_codex_unavailable_to_503() {
     let error = CliErrorKind::codex_server_unavailable("ws://127.0.0.1:4500").into();
