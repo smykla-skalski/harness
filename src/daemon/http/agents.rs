@@ -7,8 +7,11 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
-use crate::daemon::protocol::{AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest};
+use crate::daemon::protocol::{
+    AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail,
+};
 use crate::daemon::service;
+use crate::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
@@ -46,7 +49,7 @@ pub(super) fn agent_tui_routes() -> Router<DaemonHttpState> {
         .route("/v1/agent-tuis/{tui_id}/ready", post(post_agent_tui_ready))
 }
 
-async fn post_role_change(
+pub(super) async fn post_role_change(
     Path((session_id, agent_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -57,11 +60,9 @@ async fn post_role_change(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::change_role(&session_id, &agent_id, &request, db_ref);
+    let result = role_change_response(&state, &session_id, &agent_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_agent_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -98,7 +99,7 @@ async fn post_remove_agent(
     )
 }
 
-async fn post_transfer_leader(
+pub(super) async fn post_transfer_leader(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -109,11 +110,9 @@ async fn post_transfer_leader(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::transfer_leader(&session_id, &request, db_ref);
+    let result = transfer_leader_response(&state, &session_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_agent_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -122,6 +121,45 @@ async fn post_transfer_leader(
         start,
         result,
     )
+}
+
+async fn role_change_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+    request: &RoleChangeRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::change_role_async(session_id, agent_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::change_role(session_id, agent_id, request, db_guard.as_deref())
+}
+
+async fn transfer_leader_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &LeaderTransferRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::transfer_leader_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::transfer_leader(session_id, request, db_guard.as_deref())
+}
+
+async fn broadcast_agent_snapshot(state: &DaemonHttpState, session_id: &str) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::broadcast_session_snapshot(&state.sender, session_id, db_guard.as_deref());
 }
 
 async fn get_agent_tuis(

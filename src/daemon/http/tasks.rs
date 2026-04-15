@@ -7,10 +7,11 @@ use axum::routing::post;
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
     TaskQueuePolicyRequest, TaskUpdateRequest,
 };
 use crate::daemon::service;
+use crate::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::authorize_control_request;
@@ -41,7 +42,7 @@ pub(super) fn task_routes() -> Router<DaemonHttpState> {
         )
 }
 
-async fn post_task_create(
+pub(super) async fn post_task_create(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -52,16 +53,14 @@ async fn post_task_create(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::create_task(&session_id, &request, db_ref);
+    let result = task_create_response(&state, &session_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_task_snapshot(&state, &session_id).await;
     }
     timed_json("POST", "/v1/sessions/{id}/task", &request_id, start, result)
 }
 
-async fn post_task_assign(
+pub(super) async fn post_task_assign(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -72,11 +71,9 @@ async fn post_task_assign(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::assign_task(&session_id, &task_id, &request, db_ref);
+    let result = task_assign_response(&state, &session_id, &task_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_task_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -165,7 +162,7 @@ async fn post_task_update(
     )
 }
 
-async fn post_task_checkpoint(
+pub(super) async fn post_task_checkpoint(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -176,11 +173,9 @@ async fn post_task_checkpoint(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::checkpoint_task(&session_id, &task_id, &request, db_ref);
+    let result = task_checkpoint_response(&state, &session_id, &task_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_task_snapshot(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -189,4 +184,57 @@ async fn post_task_checkpoint(
         start,
         result,
     )
+}
+
+async fn task_create_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &TaskCreateRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::create_task_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::create_task(session_id, request, db_guard.as_deref())
+}
+
+async fn task_assign_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskAssignRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::assign_task_async(session_id, task_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::assign_task(session_id, task_id, request, db_guard.as_deref())
+}
+
+async fn task_checkpoint_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskCheckpointRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::checkpoint_task_async(session_id, task_id, request, async_db.as_ref())
+            .await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::checkpoint_task(session_id, task_id, request, db_guard.as_deref())
+}
+
+async fn broadcast_task_snapshot(state: &DaemonHttpState, session_id: &str) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::broadcast_session_snapshot(&state.sender, session_id, db_guard.as_deref());
 }
