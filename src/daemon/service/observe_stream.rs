@@ -1,8 +1,9 @@
 use super::{
     CliError, CliErrorKind, ObserveSessionRequest, PathBuf, ReadyEventPayload, Serialize,
     SessionDetail, SessionUpdatedPayload, SessionsUpdatedPayload, StreamEvent, Value, broadcast,
-    effective_project_dir, index, list_projects, list_sessions, session_detail,
-    session_detail_core, session_extensions, session_observe, start_daemon_observe_loop,
+    effective_project_dir, index, list_projects, list_projects_async, list_sessions,
+    list_sessions_async, session_detail, session_detail_core, session_detail_core_async,
+    session_extensions, session_extensions_async, session_observe, start_daemon_observe_loop,
     sync_after_mutation, utc_now,
 };
 
@@ -63,6 +64,18 @@ pub fn global_stream_initial_events(db: Option<&super::db::DaemonDb>) -> Vec<Str
     events
 }
 
+/// Build the events every global stream subscriber receives immediately from the
+/// canonical async DB.
+pub(crate) async fn global_stream_initial_events_async(
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Vec<StreamEvent> {
+    let mut events = vec![ready_event(None)];
+    if let Ok(event) = sessions_updated_event_async(async_db).await {
+        events.push(event);
+    }
+    events
+}
+
 /// Build the events every per-session stream subscriber receives immediately.
 ///
 /// This gives reconnecting clients a fresh selected-session snapshot even when
@@ -82,6 +95,22 @@ pub fn session_stream_initial_events(
     events
 }
 
+/// Build the events every per-session stream subscriber receives immediately
+/// from the canonical async DB.
+pub(crate) async fn session_stream_initial_events_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Vec<StreamEvent> {
+    let mut events = vec![ready_event(Some(session_id))];
+    if let Ok(event) = session_updated_core_event_async(session_id, async_db).await {
+        events.push(event);
+    }
+    if let Ok(event) = session_extensions_event_async(session_id, async_db).await {
+        events.push(event);
+    }
+    events
+}
+
 /// Build a `sessions_updated` stream event with current project and session lists.
 ///
 /// # Errors
@@ -90,6 +119,20 @@ pub fn sessions_updated_event(db: Option<&super::db::DaemonDb>) -> Result<Stream
     let payload = SessionsUpdatedPayload {
         projects: list_projects(db)?,
         sessions: list_sessions(true, db)?,
+    };
+    stream_event("sessions_updated", None, payload)
+}
+
+/// Build a `sessions_updated` stream event from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when project or session reads fail.
+pub(crate) async fn sessions_updated_event_async(
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<StreamEvent, CliError> {
+    let payload = SessionsUpdatedPayload {
+        projects: list_projects_async(async_db).await?,
+        sessions: list_sessions_async(true, async_db).await?,
     };
     stream_event("sessions_updated", None, payload)
 }
@@ -129,6 +172,23 @@ pub fn session_updated_core_event(
     stream_event("session_updated", Some(session_id), payload)
 }
 
+/// Build a lightweight `session_updated` stream event using core-only detail
+/// from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or serialized.
+pub(crate) async fn session_updated_core_event_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<StreamEvent, CliError> {
+    let payload = SessionUpdatedPayload {
+        detail: session_detail_core_async(session_id, async_db).await?,
+        timeline: None,
+        extensions_pending: true,
+    };
+    stream_event("session_updated", Some(session_id), payload)
+}
+
 /// Build a `session_extensions` stream event with the expensive detail fields.
 ///
 /// # Errors
@@ -141,11 +201,35 @@ pub fn session_extensions_event(
     stream_event("session_extensions", Some(session_id), payload)
 }
 
+/// Build a `session_extensions` stream event using the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or extensions fail to load.
+pub(crate) async fn session_extensions_event_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<StreamEvent, CliError> {
+    let payload = session_extensions_async(session_id, async_db).await?;
+    stream_event("session_extensions", Some(session_id), payload)
+}
+
 pub fn broadcast_sessions_updated(
     sender: &broadcast::Sender<StreamEvent>,
     db: Option<&super::db::DaemonDb>,
 ) {
     broadcast_event(sender, sessions_updated_event(db), "sessions_updated", None);
+}
+
+pub(crate) async fn broadcast_sessions_updated_async(
+    sender: &broadcast::Sender<StreamEvent>,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) {
+    broadcast_event(
+        sender,
+        sessions_updated_event_async(async_db).await,
+        "sessions_updated",
+        None,
+    );
 }
 
 pub fn broadcast_session_updated(
@@ -192,6 +276,19 @@ pub fn broadcast_session_extensions(
     );
 }
 
+pub(crate) async fn broadcast_session_extensions_async(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) {
+    broadcast_event(
+        sender,
+        session_extensions_event_async(session_id, async_db).await,
+        "session_extensions",
+        Some(session_id),
+    );
+}
+
 pub fn broadcast_session_snapshot(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
@@ -200,6 +297,21 @@ pub fn broadcast_session_snapshot(
     broadcast_sessions_updated(sender, db);
     broadcast_session_updated_core(sender, session_id, db);
     broadcast_session_extensions(sender, session_id, db);
+}
+
+pub(crate) async fn broadcast_session_snapshot_async(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) {
+    broadcast_sessions_updated_async(sender, async_db).await;
+    broadcast_event(
+        sender,
+        session_updated_core_event_async(session_id, async_db).await,
+        "session_updated",
+        Some(session_id),
+    );
+    broadcast_session_extensions_async(sender, session_id, async_db).await;
 }
 
 pub(crate) fn stream_event<T: Serialize>(

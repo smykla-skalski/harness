@@ -1,9 +1,13 @@
 use axum::extract::ws::Message;
+use std::sync::{Arc, Mutex};
 
 use super::ReplayBuffer;
+use super::connection::ConnectionState;
 use super::frames::serialize_response_frames;
-use super::queries::dispatch_read_query;
-use super::test_support::{seed_sample_timeline, test_http_state_with_db};
+use super::queries::{dispatch_read_query, handle_session_subscribe, handle_stream_subscribe};
+use super::test_support::{
+    seed_sample_timeline, test_http_state_with_async_db_timeline, test_http_state_with_db,
+};
 use crate::daemon::protocol::{WsRequest, WsResponse};
 
 #[tokio::test]
@@ -61,5 +65,94 @@ async fn websocket_round_trip_smoke_covers_public_surface() {
             .and_then(|entries| entries.first())
             .and_then(|entry| entry["kind"].as_str()),
         Some("tool_result")
+    );
+}
+
+#[tokio::test]
+async fn websocket_async_detail_query_succeeds_without_sync_db() {
+    let state = test_http_state_with_async_db_timeline().await;
+    let request = WsRequest {
+        id: "req-detail-async".into(),
+        method: "session.detail".into(),
+        params: serde_json::json!({ "session_id": "sess-test-1" }),
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert!(response.error.is_none());
+    assert_eq!(
+        response
+            .result
+            .as_ref()
+            .and_then(|result| result["session"]["session_id"].as_str()),
+        Some("sess-test-1")
+    );
+}
+
+#[tokio::test]
+async fn websocket_async_diagnostics_query_succeeds_without_sync_db() {
+    let state = test_http_state_with_async_db_timeline().await;
+    let request = WsRequest {
+        id: "req-diagnostics-async".into(),
+        method: "diagnostics".into(),
+        params: serde_json::json!({}),
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert!(response.error.is_none());
+    assert!(
+        response
+            .result
+            .as_ref()
+            .is_some_and(|result| result["recent_events"].is_array())
+    );
+}
+
+#[tokio::test]
+async fn session_subscribe_broadcasts_async_snapshot_without_sync_db() {
+    let state = test_http_state_with_async_db_timeline().await;
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let mut receiver = state.sender.subscribe();
+    let request = WsRequest {
+        id: "req-session-subscribe".into(),
+        method: "session.subscribe".into(),
+        params: serde_json::json!({ "session_id": "sess-test-1" }),
+    };
+
+    let response = handle_session_subscribe(&request, &state, &connection).await;
+
+    assert!(response.error.is_none());
+    assert_eq!(
+        receiver.recv().await.expect("sessions_updated").event,
+        "sessions_updated"
+    );
+    assert_eq!(
+        receiver.recv().await.expect("session_updated").event,
+        "session_updated"
+    );
+    assert_eq!(
+        receiver.recv().await.expect("session_extensions").event,
+        "session_extensions"
+    );
+}
+
+#[tokio::test]
+async fn stream_subscribe_broadcasts_async_index_without_sync_db() {
+    let state = test_http_state_with_async_db_timeline().await;
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let mut receiver = state.sender.subscribe();
+    let request = WsRequest {
+        id: "req-stream-subscribe".into(),
+        method: "stream.subscribe".into(),
+        params: serde_json::json!({}),
+    };
+
+    let response = handle_stream_subscribe(&request, &state, &connection).await;
+
+    assert!(response.error.is_none());
+    assert_eq!(
+        receiver.recv().await.expect("sessions_updated").event,
+        "sessions_updated"
     );
 }

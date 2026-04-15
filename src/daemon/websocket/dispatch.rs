@@ -104,7 +104,7 @@ async fn dispatch_inner(
         }
         "session.subscribe" => handle_session_subscribe(request, state, connection).await,
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
-        "stream.subscribe" => handle_stream_subscribe(request, state, connection),
+        "stream.subscribe" => handle_stream_subscribe(request, state, connection).await,
         "stream.unsubscribe" => handle_stream_unsubscribe(request, connection),
         "task.create" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: TaskCreateRequest = serde_json::from_value(params)?;

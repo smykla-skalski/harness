@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::env::temp_dir;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::body::to_bytes;
@@ -6,6 +7,7 @@ use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
 use serde_json::Value;
 use tokio::sync::broadcast;
+use uuid::Uuid;
 
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
@@ -23,9 +25,12 @@ use crate::session::types::{
 
 use super::DaemonHttpState;
 use super::auth::authorize_control_request;
-use super::core::{get_diagnostics, get_health};
+use super::core::{get_diagnostics, get_health, get_projects};
 use super::response::{map_json, request_activity_log_level};
-use super::sessions::{SessionScopeQuery, get_timeline};
+use super::sessions::{SessionScopeQuery, get_session, get_sessions, get_timeline};
+
+mod async_reads;
+mod async_stream;
 
 async fn response_body(result: Result<Value, crate::errors::CliError>) -> (StatusCode, Value) {
     let response = map_json(result);
@@ -35,7 +40,7 @@ async fn response_body(result: Result<Value, crate::errors::CliError>) -> (Statu
     (status, json)
 }
 
-async fn response_json(response: axum::response::Response) -> (StatusCode, Value) {
+pub(super) async fn response_json(response: axum::response::Response) -> (StatusCode, Value) {
     let status = response.status();
     let bytes = to_bytes(response.into_body(), 4 * 1024 * 1024)
         .await
@@ -44,7 +49,7 @@ async fn response_json(response: axum::response::Response) -> (StatusCode, Value
     (status, json)
 }
 
-fn auth_headers() -> HeaderMap {
+pub(super) fn auth_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -56,9 +61,8 @@ fn auth_headers() -> HeaderMap {
 fn test_http_state_with_db() -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
-    let db = Arc::new(Mutex::new(
-        DaemonDb::open_in_memory().expect("open in-memory db"),
-    ));
+    let db_path = temp_dir().join(format!("harness-http-test-{}.db", Uuid::new_v4()));
+    let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open file db")));
     db_slot.set(db).expect("install db");
     let manifest: DaemonManifest = serde_json::from_value(serde_json::json!({
         "version": "20.6.0",
@@ -80,6 +84,8 @@ fn test_http_state_with_db() -> DaemonHttpState {
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),
         db: db_slot.clone(),
+        async_db: super::AsyncDaemonDbSlot::empty(),
+        db_path: Some(db_path),
         codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
     }
@@ -266,7 +272,7 @@ fn authorize_control_request_rebinds_client_actor() {
     assert_eq!(request.actor, CONTROL_PLANE_ACTOR_ID);
 }
 
-fn sample_project() -> DiscoveredProject {
+pub(super) fn sample_project() -> DiscoveredProject {
     DiscoveredProject {
         project_id: "project-abc123".into(),
         name: "harness".into(),
@@ -280,7 +286,7 @@ fn sample_project() -> DiscoveredProject {
     }
 }
 
-fn sample_session_state() -> SessionState {
+pub(super) fn sample_session_state() -> SessionState {
     let mut agents = BTreeMap::new();
     agents.insert(
         "codex-worker".into(),
@@ -321,7 +327,7 @@ fn sample_session_state() -> SessionState {
     }
 }
 
-fn sample_tool_result_event() -> ConversationEvent {
+pub(super) fn sample_tool_result_event() -> ConversationEvent {
     ConversationEvent {
         timestamp: Some("2026-04-13T19:02:00Z".into()),
         sequence: 1,

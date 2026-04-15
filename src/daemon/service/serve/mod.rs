@@ -7,6 +7,7 @@ use super::{
     env, http, index, log_sandbox_startup, process_id, spawn_blocking, state, tokio_watch, utc_now,
     watch,
 };
+use crate::daemon::http::AsyncDaemonDbSlot;
 
 use binary_stamp::current_binary_stamp;
 
@@ -52,6 +53,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let (sender, _) = broadcast::channel(64);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
     let db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>> = Arc::new(OnceLock::new());
+    let async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>> = Arc::new(OnceLock::new());
     let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
         sender: sender.clone(),
         poll_interval: config.observe_interval,
@@ -62,7 +64,16 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
-    initialize_db_and_spawn_background_tasks(&db, sender.clone(), config.poll_interval);
+    if let Err(error) =
+        initialize_db_and_spawn_background_tasks(&db, sender.clone(), config.poll_interval)
+    {
+        let _ = state::clear_manifest_for_pid(process_id());
+        return Err(error);
+    }
+    if let Err(error) = initialize_async_db(&async_db).await {
+        let _ = state::clear_manifest_for_pid(process_id());
+        return Err(error);
+    }
     let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
     let agent_tui_manager =
         super::agent_tui::AgentTuiManagerHandle::new(sender.clone(), db.clone(), config.sandboxed);
@@ -75,6 +86,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         daemon_epoch,
         replay_buffer,
         db,
+        async_db: AsyncDaemonDbSlot::from_inner(async_db),
+        db_path: Some(state::daemon_root().join("harness.db")),
         codex_controller,
         agent_tui_manager,
     };
@@ -120,34 +133,36 @@ pub(crate) fn validate_serve_config(config: &DaemonServeConfig) -> Result<(), Cl
 )]
 pub(crate) fn open_and_publish_db(
     db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
-) -> Option<Arc<Mutex<super::db::DaemonDb>>> {
+) -> Result<Arc<Mutex<super::db::DaemonDb>>, CliError> {
     let db_path = state::daemon_root().join("harness.db");
     let db = open_daemon_db(&db_path)?;
     let db = Arc::new(Mutex::new(db));
     let _ = db_slot.set(Arc::clone(&db));
     tracing::info!("database ready");
-    Some(db)
+    Ok(db)
 }
 
 pub(crate) fn initialize_db_and_spawn_background_tasks(
     db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
     sender: broadcast::Sender<super::protocol::StreamEvent>,
     poll_interval: Duration,
-) {
-    let Some(db) = open_and_publish_db(db_slot) else {
-        return;
-    };
-
-    let db_option = Some(Arc::clone(&db));
-    let _watch = watch::spawn_watch_loop(sender, poll_interval, db_option.clone());
-    spawn_background_reconciliation(db_option.clone());
-    spawn_background_diagnostics(db_option);
+) -> Result<(), CliError> {
+    let db = open_and_publish_db(db_slot)?;
+    let _watch = watch::spawn_watch_loop(sender, poll_interval, Some(Arc::clone(&db)));
+    spawn_background_reconciliation(Arc::clone(&db));
+    spawn_background_diagnostics(db);
+    Ok(())
 }
 
-pub(crate) fn spawn_background_reconciliation(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
-    let Some(db) = db else {
-        return;
-    };
+pub(crate) async fn initialize_async_db(
+    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+) -> Result<(), CliError> {
+    let db = open_and_publish_async_db(async_db_slot).await?;
+    let _ = db.health_counts().await?;
+    Ok(())
+}
+
+pub(crate) fn spawn_background_reconciliation(db: Arc<Mutex<super::db::DaemonDb>>) {
     tokio::spawn(async move {
         let _ = spawn_blocking(move || run_background_reconciliation(&db)).await;
     });
@@ -406,10 +421,7 @@ pub(crate) fn log_background_session_import_error(
     );
 }
 
-pub(crate) fn spawn_background_diagnostics(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
-    let Some(db) = db else {
-        return;
-    };
+pub(crate) fn spawn_background_diagnostics(db: Arc<Mutex<super::db::DaemonDb>>) {
     tokio::spawn(async move {
         let _ = spawn_blocking(move || {
             let Ok(db_guard) = db.lock() else {
@@ -421,11 +433,34 @@ pub(crate) fn spawn_background_diagnostics(db: Option<Arc<Mutex<super::db::Daemo
     });
 }
 
-pub(crate) fn open_daemon_db(path: &Path) -> Option<super::db::DaemonDb> {
-    super::db::DaemonDb::open(path)
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub(crate) async fn open_and_publish_async_db(
+    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+) -> Result<Arc<super::db::AsyncDaemonDb>, CliError> {
+    let db_path = state::daemon_root().join("harness.db");
+    let db = Arc::new(open_daemon_async_db(&db_path).await?);
+    let _ = async_db_slot.set(Arc::clone(&db));
+    tracing::info!("async database pool ready");
+    Ok(db)
+}
+
+pub(crate) fn open_daemon_db(path: &Path) -> Result<super::db::DaemonDb, CliError> {
+    super::db::DaemonDb::open(path).inspect_err(|error| {
+        let message = format!("failed to open daemon database: {error}");
+        let _ = state::append_event("warn", &message);
+    })
+}
+
+pub(crate) async fn open_daemon_async_db(
+    path: &Path,
+) -> Result<super::db::AsyncDaemonDb, CliError> {
+    super::db::AsyncDaemonDb::connect(path)
+        .await
         .inspect_err(|error| {
-            let message = format!("failed to open daemon database: {error}");
+            let message = format!("failed to open daemon async database pool: {error}");
             let _ = state::append_event("warn", &message);
         })
-        .ok()
 }

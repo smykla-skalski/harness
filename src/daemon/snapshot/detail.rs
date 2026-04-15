@@ -1,13 +1,13 @@
 use super::super::index::{self, ResolvedSession};
 use super::super::ordering::{sort_session_agents, sort_session_tasks};
-use super::super::protocol::{SessionDetail, SessionExtensionsPayload};
+use super::super::protocol::{AgentToolActivitySummary, SessionDetail, SessionExtensionsPayload};
 use super::activity::load_agent_activity_for;
 use super::observer::load_observer_summary;
 use super::signals::load_signals_for_resolved;
 use super::summaries::summary_from_resolved;
 use crate::daemon::db::DaemonDb;
 use crate::errors::CliError;
-use crate::session::types::{AgentRegistration, AgentStatus, SessionState};
+use crate::session::types::{AgentRegistration, AgentStatus, SessionSignalRecord, SessionState};
 
 /// Build a rich session detail snapshot, then persist it into the daemon cache.
 ///
@@ -118,12 +118,30 @@ pub fn build_session_extensions(
     } else {
         load_agent_activity_for(&resolved.project, &resolved.state)?
     };
-    let observer = load_observer_summary(&resolved.project, &resolved.state)?;
+    build_session_extensions_from_cached_runtime(resolved, signals, agent_activity)
+}
 
+pub(crate) fn build_session_detail_from_cached_runtime(
+    resolved: &ResolvedSession,
+    signals: Vec<SessionSignalRecord>,
+    agent_activity: Vec<AgentToolActivitySummary>,
+) -> Result<SessionDetail, CliError> {
+    let mut detail = build_session_detail_core(resolved);
+    detail.signals = signals;
+    detail.observer = load_observer_summary(&resolved.project, &resolved.state)?;
+    detail.agent_activity = agent_activity;
+    Ok(detail)
+}
+
+pub(crate) fn build_session_extensions_from_cached_runtime(
+    resolved: &ResolvedSession,
+    signals: Vec<SessionSignalRecord>,
+    agent_activity: Vec<AgentToolActivitySummary>,
+) -> Result<SessionExtensionsPayload, CliError> {
     Ok(SessionExtensionsPayload {
         session_id: resolved.state.session_id.clone(),
         signals: Some(signals),
-        observer,
+        observer: load_observer_summary(&resolved.project, &resolved.state)?,
         agent_activity: Some(agent_activity),
     })
 }

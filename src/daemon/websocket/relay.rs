@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 use axum::extract::ws::Message;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{StreamEvent, WsPushEvent};
-use crate::daemon::read_cache::run_preferred_db_read;
+use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 use crate::errors::CliError;
 
@@ -169,14 +169,18 @@ async fn recovery_events_for_connection(
         return Vec::new();
     }
 
-    run_preferred_db_read(
+    if let Some(async_db) = state.async_db.get() {
+        return build_recovery_events_async(&plan, async_db.as_ref()).await;
+    }
+
+    run_canonical_db_read(
         &state.db,
+        state.db_path.clone(),
         "websocket recovery snapshot",
         {
             let plan = plan.clone();
             move |db| Ok::<Vec<StreamEvent>, CliError>(build_recovery_events(&plan, Some(db)))
         },
-        move || Ok::<Vec<StreamEvent>, CliError>(build_recovery_events(&plan, None)),
     )
     .await
     .unwrap_or_else(|error| recovery_events_on_error(&error))
@@ -201,6 +205,30 @@ fn build_recovery_events(plan: &RelayRecoveryPlan, db: Option<&DaemonDb>) -> Vec
         append_recovery_event(
             &mut events,
             service::session_updated_core_event(session_id, db),
+            "session_updated",
+            Some(session_id),
+        );
+    }
+    events
+}
+
+async fn build_recovery_events_async(
+    plan: &RelayRecoveryPlan,
+    async_db: &AsyncDaemonDb,
+) -> Vec<StreamEvent> {
+    let mut events = Vec::new();
+    if plan.include_sessions_updated {
+        append_recovery_event(
+            &mut events,
+            service::sessions_updated_event_async(Some(async_db)).await,
+            "sessions_updated",
+            None,
+        );
+    }
+    for session_id in &plan.session_ids {
+        append_recovery_event(
+            &mut events,
+            service::session_updated_core_event_async(session_id, Some(async_db)).await,
             "session_updated",
             Some(session_id),
         );
@@ -313,6 +341,7 @@ fn prepare_push_frames(
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_support::test_http_state_with_async_db_timeline;
     use super::*;
 
     #[test]
@@ -360,5 +389,32 @@ mod tests {
         let buffer = ReplayBuffer::new(10);
         assert_eq!(buffer.current_seq(), 0);
         assert!(buffer.replay_since(0).is_none());
+    }
+
+    #[tokio::test]
+    async fn recovery_events_use_async_db_when_sync_db_is_unavailable() {
+        let state = test_http_state_with_async_db_timeline().await;
+        let connection = Arc::new(Mutex::new(ConnectionState::new()));
+        {
+            let mut connection_state = connection.lock().expect("connection lock");
+            connection_state.global_subscription = true;
+            connection_state
+                .session_subscriptions
+                .insert("sess-test-1".into());
+        }
+
+        let events = recovery_events_for_connection(&connection, &state).await;
+
+        assert!(
+            events.iter().any(|event| event.event == "sessions_updated"),
+            "expected sessions_updated recovery event"
+        );
+        assert!(
+            events.iter().any(|event| {
+                event.event == "session_updated"
+                    && event.session_id.as_deref() == Some("sess-test-1")
+            }),
+            "expected session_updated recovery event"
+        );
     }
 }
