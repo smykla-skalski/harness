@@ -148,6 +148,28 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(updated.canGoForward == state.canGoForward)
   }
 
+  @Test("Command routing scope persists until the active window is explicitly cleared")
+  func commandRoutingScopePersistsUntilClear() async {
+    let routingState = WindowCommandRoutingState()
+    let mainWindow = NSObject()
+    let agentWindow = NSObject()
+
+    routingState.activate(scope: .main, windowID: ObjectIdentifier(mainWindow))
+    #expect(routingState.activeScope == .main)
+
+    routingState.activate(scope: .agentTui, windowID: ObjectIdentifier(agentWindow))
+    #expect(routingState.activeScope == .agentTui)
+
+    routingState.clear(windowID: ObjectIdentifier(mainWindow))
+    #expect(
+      routingState.activeScope == .agentTui,
+      "Clearing a background window must not drop routing for the active window"
+    )
+
+    routingState.clear(windowID: ObjectIdentifier(agentWindow))
+    #expect(routingState.activeScope == nil)
+  }
+
   @Test("Launching the isolated host does not emit FocusedValue startup warnings")
   func launchDoesNotEmitFocusedValueWarning() async throws {
     let dataHome = FileManager.default.temporaryDirectory

@@ -6,7 +6,6 @@ import SwiftUI
 @main
 @MainActor
 struct HarnessMonitorApp: App {
-  private static let resetBackgroundRecentsKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   @NSApplicationDelegateAdaptor private var delegate: HarnessMonitorAppDelegate
   private let container: ModelContainer?
   private let isUITesting: Bool
@@ -15,7 +14,8 @@ struct HarnessMonitorApp: App {
   private let notificationController: HarnessMonitorUserNotificationController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
-  @State private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  @StateObject private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  @StateObject private var windowCommandRouting: WindowCommandRoutingState
   @State private var preferencesSelectedSection: PreferencesSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
@@ -26,9 +26,6 @@ struct HarnessMonitorApp: App {
     UserDefaults.standard.register(defaults: [
       "NSUseAnimatedFocusRing": false
     ])
-    if ProcessInfo.processInfo.environment[Self.resetBackgroundRecentsKey] == "1" {
-      UserDefaults.standard.removeObject(forKey: HarnessMonitorBackgroundDefaults.recentKey)
-    }
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
     container = configuration.container
@@ -40,7 +37,8 @@ struct HarnessMonitorApp: App {
     self.notificationController = notificationController
     perfScenario = configuration.perfScenario
     _store = State(initialValue: configuration.store)
-    _agentTuiNavigationBridge = State(initialValue: AgentTuiWindowNavigationBridge())
+    _agentTuiNavigationBridge = StateObject(wrappedValue: AgentTuiWindowNavigationBridge())
+    _windowCommandRouting = StateObject(wrappedValue: WindowCommandRoutingState())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
   }
 
@@ -55,6 +53,7 @@ struct HarnessMonitorApp: App {
       HarnessMonitorAppCommands(
         store: store,
         agentTuiNavigationBridge: agentTuiNavigationBridge,
+        windowCommandRouting: windowCommandRouting,
         displayState: store.commandsDisplayState,
         textSizeIndex: textSizeIndex,
         increaseTextSize: increaseTextSize,
@@ -75,6 +74,7 @@ struct HarnessMonitorApp: App {
       HarnessMonitorSettingsRootView(
         store: store,
         notifications: notificationController,
+        windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode,
         selectedSection: $preferencesSelectedSection
       )
@@ -87,6 +87,7 @@ struct HarnessMonitorApp: App {
       AgentTuiWindowRootView(
         store: store,
         navigationBridge: agentTuiNavigationBridge,
+        windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode
       )
     }
@@ -105,6 +106,7 @@ struct HarnessMonitorApp: App {
         delegate: delegate,
         store: store,
         notifications: notificationController,
+        windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode,
         preferencesSelectedSection: $preferencesSelectedSection,
         perfScenario: perfScenario
@@ -115,6 +117,7 @@ struct HarnessMonitorApp: App {
         delegate: delegate,
         store: store,
         notifications: notificationController,
+        windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode,
         preferencesSelectedSection: $preferencesSelectedSection,
         perfScenario: perfScenario

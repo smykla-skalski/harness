@@ -47,6 +47,75 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testCommandNavigationRoutesBackAndForwardWithinActiveAgentTuiWindowHistory() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "exercise command navigation")
+
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    let createTab = element(in: app, identifier: Accessibility.agentTuiCreateTab)
+    let commandRoutingState = element(
+      in: app,
+      identifier: Accessibility.agentTuiCommandRoutingState
+    )
+    let backButton = element(in: app, identifier: Accessibility.agentTuiNavigateBackButton)
+    let forwardButton = element(in: app, identifier: Accessibility.agentTuiNavigateForwardButton)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("selection=session:preview-agent-tui-1")
+          && createTab.exists
+          && commandRoutingState.exists
+          && backButton.exists
+          && forwardButton.exists
+      }
+    )
+
+    tapButton(in: app, identifier: Accessibility.agentTuiCreateTab)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("selection=create")
+          && commandRoutingState.label.contains("scope=agentTui")
+          && commandRoutingState.label.contains("canGoBack=true")
+          && commandRoutingState.label.contains("canGoForward=false")
+          && backButton.isEnabled
+          && !forwardButton.isEnabled
+      },
+      "Selecting the create tab should move the active Agent TUI window into its create pane"
+    )
+
+    invokeHarnessMonitorMenuItem(in: app, title: "Back")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("selection=session:preview-agent-tui-1")
+          && backButton.isEnabled
+          && forwardButton.isEnabled
+      },
+      """
+      Harness Monitor > Back should navigate back inside the active Agent TUI window history while
+      preserving the original create pane behind the restored session.
+      state=\(state.label)
+      routing=\(commandRoutingState.label)
+      backEnabled=\(backButton.isEnabled)
+      forwardEnabled=\(forwardButton.isEnabled)
+      """
+    )
+
+    invokeHarnessMonitorMenuItem(in: app, title: "Forward")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("selection=create")
+          && backButton.isEnabled
+          && !forwardButton.isEnabled
+      },
+      "Harness Monitor > Forward should navigate forward inside the active Agent TUI window history"
+    )
+  }
+
   func testSidebarShowsAllSessionsWithoutOverflow() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-overflow"]

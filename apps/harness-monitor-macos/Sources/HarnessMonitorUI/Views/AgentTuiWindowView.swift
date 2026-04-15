@@ -166,7 +166,6 @@ public struct AgentTuiWindowView: View {
     .toolbarBaselineOverlay()
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .focusedSceneValue(\.windowNavigationScope, .agentTui)
     .task {
       viewModel.windowNavigation.setHandlers(
         back: { navigateHistoryBack() },
