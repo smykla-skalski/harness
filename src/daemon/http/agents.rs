@@ -173,7 +173,7 @@ async fn broadcast_agent_snapshot(state: &DaemonHttpState, session_id: &str) {
     service::broadcast_session_snapshot(&state.sender, session_id, db_guard.as_deref());
 }
 
-async fn get_agent_tuis(
+pub(super) async fn get_agent_tuis(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -205,9 +205,18 @@ async fn post_agent_tui_start(
     }
     let result = state.agent_tui_manager.start(&session_id, &request);
     if result.is_ok() {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        if let Some(async_db) = state.async_db.get() {
+            service::broadcast_session_snapshot_async(
+                &state.sender,
+                &session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+        } else {
+            let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+            let db_ref = db_guard.as_deref();
+            service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        }
     }
     timed_json(
         "POST",
@@ -218,7 +227,7 @@ async fn post_agent_tui_start(
     )
 }
 
-async fn get_agent_tui(
+pub(super) async fn get_agent_tui(
     Path(tui_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -289,9 +298,18 @@ async fn post_agent_tui_stop(
     }
     let result = state.agent_tui_manager.stop(&tui_id);
     if let Ok(snapshot) = &result {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        service::broadcast_session_snapshot(&state.sender, &snapshot.session_id, db_ref);
+        if let Some(async_db) = state.async_db.get() {
+            service::broadcast_session_snapshot_async(
+                &state.sender,
+                &snapshot.session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+        } else {
+            let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+            let db_ref = db_guard.as_deref();
+            service::broadcast_session_snapshot(&state.sender, &snapshot.session_id, db_ref);
+        }
     }
     timed_json(
         "POST",

@@ -78,9 +78,18 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
-    let codex_controller = CodexControllerHandle::new(sender.clone(), db.clone(), config.sandboxed);
-    let agent_tui_manager =
-        super::agent_tui::AgentTuiManagerHandle::new(sender.clone(), db.clone(), config.sandboxed);
+    let codex_controller = CodexControllerHandle::new_with_async_db(
+        sender.clone(),
+        db.clone(),
+        async_db.clone(),
+        config.sandboxed,
+    );
+    let agent_tui_manager = super::agent_tui::AgentTuiManagerHandle::new_with_async_db(
+        sender.clone(),
+        db.clone(),
+        async_db.clone(),
+        config.sandboxed,
+    );
     let _bridge_watcher = bridge::spawn_manifest_watcher();
 
     let app_state = DaemonHttpState {

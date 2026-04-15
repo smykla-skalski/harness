@@ -30,7 +30,7 @@ pub(super) fn codex_routes() -> Router<DaemonHttpState> {
         )
 }
 
-async fn get_codex_runs(
+pub(super) async fn get_codex_runs(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -69,7 +69,7 @@ async fn post_codex_run(
     )
 }
 
-async fn get_codex_run(
+pub(super) async fn get_codex_run(
     Path(run_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

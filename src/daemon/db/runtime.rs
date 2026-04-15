@@ -309,7 +309,7 @@ fn agent_tui_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTuiSnaps
     })
 }
 
-fn row_i64_to_u16(value: i64, column: &str) -> rusqlite::Result<u16> {
+pub(super) fn row_i64_to_u16(value: i64, column: &str) -> rusqlite::Result<u16> {
     u16::try_from(value)
         .map_err(|error| parse_error_to_sql(format!("invalid {column} value {value}: {error}")))
 }
@@ -322,7 +322,7 @@ fn parse_error_to_sql(error: String) -> rusqlite::Error {
     )
 }
 
-fn codex_mode_as_str(mode: CodexRunMode) -> &'static str {
+pub(super) fn codex_mode_as_str(mode: CodexRunMode) -> &'static str {
     match mode {
         CodexRunMode::Report => "report",
         CodexRunMode::WorkspaceWrite => "workspace_write",
@@ -330,7 +330,7 @@ fn codex_mode_as_str(mode: CodexRunMode) -> &'static str {
     }
 }
 
-fn codex_mode_from_str(value: &str) -> Result<CodexRunMode, String> {
+pub(super) fn codex_mode_from_str(value: &str) -> Result<CodexRunMode, String> {
     match value {
         "report" => Ok(CodexRunMode::Report),
         "workspace_write" => Ok(CodexRunMode::WorkspaceWrite),
@@ -339,7 +339,7 @@ fn codex_mode_from_str(value: &str) -> Result<CodexRunMode, String> {
     }
 }
 
-fn codex_status_as_str(status: CodexRunStatus) -> &'static str {
+pub(super) fn codex_status_as_str(status: CodexRunStatus) -> &'static str {
     match status {
         CodexRunStatus::Queued => "queued",
         CodexRunStatus::Running => "running",
@@ -350,7 +350,7 @@ fn codex_status_as_str(status: CodexRunStatus) -> &'static str {
     }
 }
 
-fn codex_status_from_str(value: &str) -> Result<CodexRunStatus, String> {
+pub(super) fn codex_status_from_str(value: &str) -> Result<CodexRunStatus, String> {
     match value {
         "queued" => Ok(CodexRunStatus::Queued),
         "running" => Ok(CodexRunStatus::Running),

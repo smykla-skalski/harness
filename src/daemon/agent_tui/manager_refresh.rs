@@ -1,13 +1,20 @@
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 
+use tokio::runtime::{Handle, RuntimeFlavor};
+use tokio::task::block_in_place;
+
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
-use crate::daemon::db::{DaemonDb, ensure_shared_db};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::service::{broadcast_session_snapshot, disconnect_agent_direct};
+use crate::daemon::service::{
+    broadcast_session_snapshot, broadcast_session_snapshot_async, disconnect_agent_direct,
+    disconnect_agent_direct_async,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
@@ -21,10 +28,50 @@ impl AgentTuiManagerHandle {
         ensure_shared_db(&self.state.db)
     }
 
+    pub(super) fn async_db(&self) -> Option<Arc<AsyncDaemonDb>> {
+        self.state.async_db.get().cloned()
+    }
+
     pub(super) fn active(
         &self,
     ) -> Result<MutexGuard<'_, BTreeMap<String, ActiveAgentTui>>, CliError> {
         lock(&self.state.active, "agent TUI active process map")
+    }
+
+    pub(super) fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
+    where
+        F: FnOnce(Arc<AsyncDaemonDb>) -> Fut,
+        Fut: Future<Output = Result<T, CliError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        let async_db = self.async_db()?;
+        let runtime = self.state.runtime.clone()?;
+        let future = task(async_db);
+        Some(match Handle::try_current() {
+            Ok(current) => match current.runtime_flavor() {
+                RuntimeFlavor::MultiThread => block_in_place(|| runtime.block_on(future)),
+                RuntimeFlavor::CurrentThread => thread::spawn(move || {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| {
+                            CliError::from(CliErrorKind::workflow_io(format!(
+                                "build async agent TUI bridge runtime: {error}"
+                            )))
+                        })?
+                        .block_on(future)
+                })
+                .join()
+                .map_err(|_| {
+                    CliError::from(CliErrorKind::workflow_io(
+                        "join async agent TUI bridge thread",
+                    ))
+                })
+                .and_then(std::convert::identity),
+                _ => runtime.block_on(future),
+            },
+            Err(_) => runtime.block_on(future),
+        })
     }
 
     pub(crate) fn active_process(
@@ -52,6 +99,15 @@ impl AgentTuiManagerHandle {
     }
 
     pub(super) fn load_snapshot(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        let tui_id_owned = tui_id.to_string();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            async_db.agent_tui(&tui_id_owned).await?.ok_or_else(|| {
+                CliErrorKind::session_not_active(format!("agent TUI '{tui_id_owned}' not found"))
+                    .into()
+            })
+        }) {
+            return result;
+        }
         let db = self.db()?;
         lock_db(&db)?.agent_tui(tui_id)?.ok_or_else(|| {
             CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' not found")).into()
@@ -114,6 +170,19 @@ impl AgentTuiManagerHandle {
 
     fn try_resolve_agent_id(&self, snapshot: &mut AgentTuiSnapshot) {
         let marker = format!("agent-tui:{}", snapshot.tui_id);
+        let session_id = snapshot.session_id.clone();
+        let async_marker = marker.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            Ok(async_db
+                .resolve_session(&session_id)
+                .await?
+                .and_then(|resolved| agent_id_for_tui(&resolved.state, &async_marker).ok()))
+        }) {
+            if let Ok(Some(agent_id)) = result {
+                snapshot.agent_id = agent_id;
+            }
+            return;
+        }
         let Ok(db) = self.db() else {
             return;
         };
@@ -204,10 +273,22 @@ impl AgentTuiManagerHandle {
         tui_id: &str,
         previous_updated_at: &str,
     ) -> Result<Option<AgentTuiStatus>, CliError> {
+        let tui_id_owned = tui_id.to_string();
+        let previous_updated_at = previous_updated_at.to_string();
+        let previous_updated_at_sync = previous_updated_at.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            Ok(async_db
+                .agent_tui_live_refresh_state(&tui_id_owned)
+                .await?
+                .filter(|state| state.updated_at.as_str() > previous_updated_at.as_str())
+                .map(|state| state.status))
+        }) {
+            return result;
+        }
         let db = self.db()?;
         let current = lock_db(&db)?.agent_tui_live_refresh_state(tui_id)?;
         Ok(current
-            .filter(|state| state.updated_at.as_str() > previous_updated_at)
+            .filter(|state| state.updated_at.as_str() > previous_updated_at_sync.as_str())
             .map(|state| state.status))
     }
 
@@ -225,8 +306,15 @@ impl AgentTuiManagerHandle {
         snapshot: &AgentTuiSnapshot,
     ) -> Result<(), CliError> {
         let snapshot = self.normalize_snapshot(snapshot.clone());
-        let db = self.db()?;
-        lock_db(&db)?.save_agent_tui(&snapshot)?;
+        let persisted = snapshot.clone();
+        if let Some(result) = self
+            .run_with_async_db(|async_db| async move { async_db.save_agent_tui(&persisted).await })
+        {
+            result?;
+        } else {
+            let db = self.db()?;
+            lock_db(&db)?.save_agent_tui(&snapshot)?;
+        }
         let session_id = snapshot.session_id.clone();
         let payload = serde_json::to_value(&snapshot).map_err(|error| {
             CliErrorKind::workflow_serialize(format!("serialize agent TUI event: {error}"))
@@ -248,6 +336,22 @@ impl AgentTuiManagerHandle {
         };
         if snapshot.agent_id.is_empty() {
             return Ok(());
+        }
+
+        let session_id = snapshot.session_id.clone();
+        let agent_id = snapshot.agent_id.clone();
+        let sender = self.state.sender.clone();
+        let reason_owned = reason.to_string();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let disconnected =
+                disconnect_agent_direct_async(&session_id, &agent_id, &reason_owned, &async_db)
+                    .await?;
+            if disconnected {
+                broadcast_session_snapshot_async(&sender, &session_id, Some(&async_db)).await;
+            }
+            Ok(())
+        }) {
+            return result;
         }
 
         let db = self.db()?;
