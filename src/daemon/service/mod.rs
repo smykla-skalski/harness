@@ -206,6 +206,7 @@ use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod direct;
 mod mutations;
+mod mutations_async;
 mod observe_loop;
 mod observe_stream;
 mod serve;
@@ -221,6 +222,10 @@ pub(crate) use direct::{join_session_direct_async, start_session_direct_async};
 pub use mutations::{
     assign_task, change_role, checkpoint_task, create_task, drop_task, end_session, remove_agent,
     transfer_leader, update_task, update_task_queue_policy,
+};
+pub(crate) use mutations_async::{
+    assign_task_async, change_role_async, checkpoint_task_async, create_task_async,
+    transfer_leader_async,
 };
 pub use observe_stream::{
     broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,

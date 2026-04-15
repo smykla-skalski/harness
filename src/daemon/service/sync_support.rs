@@ -3,7 +3,7 @@ use super::{
     SessionTransition, SignalAck, session_service, snapshot, utc_now, write_signal_ack,
 };
 use crate::agents::runtime::{runtime_for_name, signal::pending_dir};
-use crate::daemon::db::ExpiredPendingSignalIndexRecord;
+use crate::daemon::db::{AsyncDaemonDb, ExpiredPendingSignalIndexRecord};
 use crate::session::types::SessionState;
 
 /// Re-sync a session from files into `SQLite` after a file-based mutation.
@@ -295,6 +295,90 @@ pub(crate) fn append_transfer_logs_to_db(
         ))?;
     }
     Ok(())
+}
+
+pub(crate) async fn append_transfer_logs_to_async_db(
+    async_db: &AsyncDaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    plan: &session_service::LeaderTransferPlan,
+) -> Result<(), CliError> {
+    if let Some(ref request) = plan.pending_request {
+        append_async_transfer_log(
+            async_db,
+            session_id,
+            SessionTransition::LeaderTransferRequested {
+                from: request.current_leader_id.clone(),
+                to: request.new_leader_id.clone(),
+            },
+            Some(actor_id),
+            request.reason.as_deref(),
+        )
+        .await?;
+        return Ok(());
+    }
+    if let Some(ref outcome) = plan.outcome {
+        append_async_transfer_outcome_logs(async_db, session_id, actor_id, outcome).await?;
+    }
+    Ok(())
+}
+
+async fn append_async_transfer_outcome_logs(
+    async_db: &AsyncDaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    outcome: &session_service::LeaderTransferOutcome,
+) -> Result<(), CliError> {
+    if outcome.log_request_before_transfer {
+        append_async_transfer_log(
+            async_db,
+            session_id,
+            SessionTransition::LeaderTransferRequested {
+                from: outcome.old_leader.clone(),
+                to: outcome.new_leader_id.clone(),
+            },
+            Some(actor_id),
+            outcome.reason.as_deref(),
+        )
+        .await?;
+    }
+    if let Some(ref confirmed_by) = outcome.confirmed_by {
+        append_async_transfer_log(
+            async_db,
+            session_id,
+            SessionTransition::LeaderTransferConfirmed {
+                from: outcome.old_leader.clone(),
+                to: outcome.new_leader_id.clone(),
+                confirmed_by: confirmed_by.clone(),
+            },
+            Some(confirmed_by),
+            outcome.reason.as_deref(),
+        )
+        .await?;
+    }
+    append_async_transfer_log(
+        async_db,
+        session_id,
+        SessionTransition::LeaderTransferred {
+            from: outcome.old_leader.clone(),
+            to: outcome.new_leader_id.clone(),
+        },
+        Some(actor_id),
+        outcome.reason.as_deref(),
+    )
+    .await
+}
+
+async fn append_async_transfer_log(
+    async_db: &AsyncDaemonDb,
+    session_id: &str,
+    transition: SessionTransition,
+    actor_id: Option<&str>,
+    reason: Option<&str>,
+) -> Result<(), CliError> {
+    async_db
+        .append_log_entry(&build_log_entry(session_id, transition, actor_id, reason))
+        .await
 }
 
 pub(crate) fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
