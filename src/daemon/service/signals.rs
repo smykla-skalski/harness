@@ -2,9 +2,10 @@ use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, ActiveSignalDelivery,
     AgentRegistration, AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake,
     Path, PathBuf, SessionDetail, SignalAck, SignalSendRequest, acknowledged_signal_record,
-    agents_runtime, build_log_entry, effective_project_dir, index, pending_signal_record,
-    project_dir_for_db_session, record_signal_ack, refresh_signal_index_for_db, session_detail,
-    session_detail_from_daemon_db, session_not_found, session_service, state, thread, utc_now,
+    agents_runtime, build_log_entry, build_signal_ack, effective_project_dir, index,
+    pending_signal_record, project_dir_for_db_session, record_signal_ack,
+    refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db, session_not_found,
+    session_service, state, thread, utc_now,
 };
 
 /// Send a signal through the shared session service.
@@ -401,14 +402,17 @@ pub fn cancel_signal(
             db.merge_signal_records(
                 session_id,
                 &[acknowledged_signal_record(
-                    session_id,
                     &signal.runtime,
                     &request.agent_id,
                     &signal.signal,
-                    AckResult::Rejected,
-                    &ack_agent,
-                    &utc_now(),
-                    Some(format!("cancelled by {}", request.actor)),
+                    &build_signal_ack(
+                        session_id,
+                        &signal.signal.signal_id,
+                        &utc_now(),
+                        AckResult::Rejected,
+                        &ack_agent,
+                        Some(format!("cancelled by {}", request.actor)),
+                    ),
                 )],
             )?;
         } else {

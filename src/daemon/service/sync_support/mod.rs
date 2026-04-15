@@ -19,7 +19,7 @@ pub(crate) use logs::{
     append_transfer_logs_to_db, build_log_entry,
 };
 pub(crate) use signals::{
-    acknowledged_signal_record, pending_signal_record, reconcile_expired_pending_signals_for_db,
-    record_signal_ack, refresh_signal_index_for_db,
+    acknowledged_signal_record, build_signal_ack, pending_signal_record,
+    reconcile_expired_pending_signals_for_db, record_signal_ack, refresh_signal_index_for_db,
 };
 pub(crate) use task_effects::{task_drop_effect_signal_records, write_task_start_signals};
