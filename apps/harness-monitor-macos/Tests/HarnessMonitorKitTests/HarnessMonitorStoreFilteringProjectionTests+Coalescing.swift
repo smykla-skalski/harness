@@ -281,4 +281,24 @@ extension HarnessMonitorStoreProjectionTests {
 
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds)
   }
+
+  @Test("Stale async search results do not overwrite a newer committed projection")
+  func staleAsyncSearchResultsDoNotOverwriteNewerProjection() async {
+    let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
+    store.sessionIndex.debugProjectionComputationDelayNanoseconds = 250_000_000
+
+    store.searchText = "active"
+
+    try? await Task.sleep(nanoseconds: 175_000_000)
+
+    store.searchText = "ended"
+    store.flushPendingSearchRebuild()
+
+    #expect(store.visibleSessionIDs == ["ended"])
+
+    try? await Task.sleep(nanoseconds: 400_000_000)
+
+    #expect(store.visibleSessionIDs == ["ended"])
+    #expect(store.sessionIndex.searchResults.isSearchActive)
+  }
 }

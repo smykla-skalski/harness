@@ -245,4 +245,41 @@ struct HarnessMonitorStoreInspectorTests {
       Issue.record("Expected inspector primary content to resolve the selected agent")
     }
   }
+
+  @Test("Inspector lookup index resolves selected content and action actors")
+  func inspectorLookupIndexResolvesSelectedContentAndActionActors() {
+    let index = HarnessMonitorStore.InspectorLookupIndex(detail: PreviewFixtures.detail)
+
+    switch index.primaryContent(for: .task(PreviewFixtures.tasks[0].taskId), isPersistenceAvailable: true)
+    {
+    case .task(let selection):
+      #expect(selection.task.taskId == PreviewFixtures.tasks[0].taskId)
+      #expect(selection.notesSessionID == PreviewFixtures.summary.sessionId)
+      #expect(selection.isPersistenceAvailable)
+    default:
+      Issue.record("Expected lookup index to resolve the selected task")
+    }
+
+    guard
+      let actionContext = index.actionContext(
+        inspectorSelection: .agent(PreviewFixtures.agents[1].agentId),
+        isPersistenceAvailable: true,
+        selectedActionActorID: PreviewFixtures.summary.leaderId ?? "",
+        isSessionReadOnly: false,
+        isSessionActionInFlight: false
+      )
+    else {
+      Issue.record("Expected action context from lookup index")
+      return
+    }
+
+    #expect(actionContext.selectedAgent?.agentId == PreviewFixtures.agents[1].agentId)
+    #expect(
+      actionContext.actionActorOptions.contains { $0.agentId == PreviewFixtures.summary.leaderId }
+    )
+    #expect(
+      Set(actionContext.actionActorOptions.map(\.agentId)).count
+        == actionContext.actionActorOptions.count
+    )
+  }
 }
