@@ -202,6 +202,7 @@ enum HarnessMonitorUITestAccessibility {
   static let agentTuiButton = "harness.session.agent-tui"
   static let agentTuiSheet = "harness.sheet.agent-tui"
   static let agentTuiState = "harness.sheet.agent-tui.state"
+  static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"
   static let agentTuiCreateTab = "harness.sheet.agent-tui.tab.create"
   static let agentTuiRuntimePicker = "harness.sheet.agent-tui.runtime"
   static let agentTuiNameField = "harness.sheet.agent-tui.name"

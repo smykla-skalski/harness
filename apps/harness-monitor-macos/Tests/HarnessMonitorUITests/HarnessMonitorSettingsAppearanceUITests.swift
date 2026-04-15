@@ -141,7 +141,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
       additionalEnvironment: [
         HarnessMonitorSettingsUITestKeys.backgroundImageOverride: "auroraVeil",
         "HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE": "window",
-        "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS": "1",
+        HarnessMonitorSettingsUITestKeys.resetBackgroundRecents: "1",
       ]
     )
 

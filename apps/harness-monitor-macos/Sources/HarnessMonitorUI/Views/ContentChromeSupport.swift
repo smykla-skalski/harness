@@ -196,26 +196,15 @@ struct SessionStatusCornerBackdrop: View {
 
   private var statusBackdrop: some View {
     Rectangle()
-      .fill(.clear)
-      .harnessPanelGlass()
+      .fill(Color(nsColor: .windowBackgroundColor).opacity(reduceTransparency ? 0.94 : 0.82))
       .overlay { tintGradient }
       .mask { backdropMask }
-  }
-
-  @ViewBuilder
-  private var extendedStatusBackdrop: some View {
-    if reduceTransparency {
-      statusBackdrop
-    } else {
-      statusBackdrop
-        .backgroundExtensionEffect()
-    }
   }
 
   var body: some View {
     SessionStatusCornerBounds(status: status, isStale: isStale)
       .background {
-        extendedStatusBackdrop
+        statusBackdrop
       }
       .allowsHitTesting(false)
       .accessibilityHidden(true)

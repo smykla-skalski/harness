@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUI
 import SwiftUI
@@ -6,6 +7,7 @@ struct HarnessMonitorWindowRootView: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var preferencesSelectedSection: PreferencesSection
   let perfScenario: HarnessMonitorPerfScenario?
@@ -28,65 +30,55 @@ struct HarnessMonitorWindowRootView: View {
   private var backgroundImage: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
-
   var body: some View {
-    windowContent
-  }
-
-  @ViewBuilder
-  private var windowContent: some View {
-    if cornerAnimationEnabled {
-      configuredContentRoot(
-        ContentView(
-          store: store,
-          cornerAnimationContent: {
-            HarnessMonitorAppLlamaAnimation()
-          }
-        )
-      )
-    } else {
-      configuredContentRoot(ContentView(store: store))
+    ContentView(
+      store: store,
+      showsCornerAnimation: cornerAnimationEnabled
+    ) {
+      HarnessMonitorAppLlamaAnimation()
     }
-  }
-
-  private func configuredContentRoot<Root: View>(_ content: Root) -> some View {
-    content
-      .writingToolsBehavior(.disabled)
-      .modifier(
-        HarnessMonitorPerfScenarioModifier(
-          delegate: delegate,
-          store: store,
-          perfScenario: perfScenario
-        )
+    .writingToolsBehavior(.disabled)
+    .modifier(
+      HarnessMonitorPerfScenarioModifier(
+        delegate: delegate,
+        store: store,
+        perfScenario: perfScenario
       )
-      .frame(minWidth: 900, minHeight: 600)
-      .modifier(
-        OptionalInstantFocusRingModifier(
-          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
-        )
+    )
+    .frame(minWidth: 900, minHeight: 600)
+    .modifier(
+      OptionalInstantFocusRingModifier(
+        isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
       )
-      .modifier(
-        HarnessMonitorSceneAppearanceModifier(
-          themeMode: $themeMode,
-          appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
-        )
+    )
+    .modifier(
+      HarnessMonitorSceneAppearanceModifier(
+        themeMode: $themeMode,
+        appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
       )
-      .modifier(PinchToZoomTextSizeModifier())
-      .modifier(
-        HarnessMonitorWindowBackdropModifier(
-          mode: backdropMode,
-          backgroundImage: backgroundImage
-        )
+    )
+    .modifier(PinchToZoomTextSizeModifier())
+    .modifier(
+      HarnessMonitorWindowBackdropModifier(
+        mode: backdropMode,
+        backgroundImage: backgroundImage
       )
-      .modifier(HarnessMonitorUITestAnimationModifier())
-      .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
-        guard requestID != handledSettingsOpenRequestID else {
-          return
-        }
-        handledSettingsOpenRequestID = requestID
-        preferencesSelectedSection = .notifications
-        openWindow(id: HarnessMonitorWindowID.preferences)
+    )
+    .modifier(
+      WindowCommandScopeTrackingModifier(
+        scope: .main,
+        routingState: windowCommandRouting
+      )
+    )
+    .modifier(HarnessMonitorUITestAnimationModifier())
+    .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
+      guard requestID != handledSettingsOpenRequestID else {
+        return
       }
+      handledSettingsOpenRequestID = requestID
+      preferencesSelectedSection = .notifications
+      openWindow(id: HarnessMonitorWindowID.preferences)
+    }
   }
 }
 
@@ -178,6 +170,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
 struct HarnessMonitorSettingsRootView: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: PreferencesSection
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
@@ -185,16 +178,17 @@ struct HarnessMonitorSettingsRootView: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
-  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   init(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController,
+    windowCommandRouting: WindowCommandRoutingState,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<PreferencesSection>
   ) {
     self.store = store
     self.notifications = notifications
+    self.windowCommandRouting = windowCommandRouting
     _themeMode = themeMode
     _selectedSection = selectedSection
   }
@@ -222,15 +216,17 @@ struct HarnessMonitorSettingsRootView: View {
         backgroundImage: backgroundImage
       )
     )
-    .modifier(
-      OptionalInstantFocusRingModifier(
-        isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
-      )
-    )
+    .instantFocusRing()
     .modifier(
       HarnessMonitorSceneAppearanceModifier(
         themeMode: $themeMode,
         appliesPreferredColorScheme: true
+      )
+    )
+    .modifier(
+      WindowCommandScopeTrackingModifier(
+        scope: nil,
+        routingState: windowCommandRouting
       )
     )
     .modifier(PinchToZoomTextSizeModifier())
@@ -240,14 +236,14 @@ struct HarnessMonitorSettingsRootView: View {
 
 struct AgentTuiWindowRootView: View {
   let store: HarnessMonitorStore
-  let navigationBridge: AgentTuiWindowNavigationBridge
+  @ObservedObject var navigationBridge: AgentTuiWindowNavigationBridge
+  @ObservedObject var windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
-  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var backdropMode: HarnessMonitorBackdropMode {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
@@ -255,6 +251,23 @@ struct AgentTuiWindowRootView: View {
 
   private var backgroundImage: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  }
+
+  private var commandRoutingStateText: String {
+    let scopeLabel =
+      switch windowCommandRouting.activeScope {
+      case .agentTui:
+        "agentTui"
+      case .main:
+        "main"
+      case nil:
+        "nil"
+      }
+    return [
+      "scope=\(scopeLabel)",
+      "canGoBack=\(navigationBridge.state.canGoBack)",
+      "canGoForward=\(navigationBridge.state.canGoForward)",
+    ].joined(separator: ",")
   }
 
   var body: some View {
@@ -268,10 +281,12 @@ struct AgentTuiWindowRootView: View {
         )
       )
       .modifier(
-        OptionalInstantFocusRingModifier(
-          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+        WindowCommandScopeTrackingModifier(
+          scope: .agentTui,
+          routingState: windowCommandRouting
         )
       )
+      .instantFocusRing()
       .modifier(
         HarnessMonitorSceneAppearanceModifier(
           themeMode: $themeMode,
@@ -280,6 +295,14 @@ struct AgentTuiWindowRootView: View {
       )
       .modifier(PinchToZoomTextSizeModifier())
       .modifier(HarnessMonitorUITestAnimationModifier())
+      .overlay {
+        if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.agentTuiCommandRoutingState,
+            text: commandRoutingStateText
+          )
+        }
+      }
   }
 }
 
@@ -308,6 +331,126 @@ private struct OptionalInstantFocusRingModifier: ViewModifier {
     } else {
       content
     }
+  }
+}
+
+private struct WindowCommandScopeTrackingModifier: ViewModifier {
+  let scope: WindowNavigationScope?
+  let routingState: WindowCommandRoutingState
+
+  func body(content: Content) -> some View {
+    content
+      .background(WindowCommandScopeTrackingView(scope: scope, routingState: routingState))
+  }
+}
+
+private struct WindowCommandScopeTrackingView: NSViewRepresentable {
+  let scope: WindowNavigationScope?
+  let routingState: WindowCommandRoutingState
+
+  func makeNSView(context: Context) -> WindowCommandScopeTrackingNSView {
+    let view = WindowCommandScopeTrackingNSView()
+    view.alphaValue = 0
+    view.setAccessibilityHidden(true)
+    view.configure(scope: scope, routingState: routingState)
+    return view
+  }
+
+  func updateNSView(_ nsView: WindowCommandScopeTrackingNSView, context: Context) {
+    nsView.configure(scope: scope, routingState: routingState)
+  }
+}
+
+private final class WindowCommandScopeTrackingNSView: NSView {
+  private var scope: WindowNavigationScope?
+  private weak var routingState: WindowCommandRoutingState?
+  private var observedWindow: NSWindow?
+  private var notificationTokens: [NSObjectProtocol] = []
+
+  deinit {
+    MainActor.assumeIsolated {
+      tearDownWindowObservation()
+    }
+  }
+
+  func configure(
+    scope: WindowNavigationScope?,
+    routingState: WindowCommandRoutingState
+  ) {
+    self.scope = scope
+    self.routingState = routingState
+    if let window {
+      beginObserving(window: window)
+    }
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    beginObserving(window: window)
+  }
+
+  private func beginObserving(window: NSWindow?) {
+    guard observedWindow !== window else {
+      updateRoutingState()
+      return
+    }
+
+    tearDownWindowObservation()
+    observedWindow = window
+
+    guard let window else {
+      return
+    }
+
+    let notificationCenter = NotificationCenter.default
+    notificationTokens = [
+      notificationCenter.addObserver(
+        forName: NSWindow.didBecomeKeyNotification,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated {
+          self?.activate(window: window)
+        }
+      },
+      notificationCenter.addObserver(
+        forName: NSWindow.willCloseNotification,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated {
+          self?.clear(window: window)
+        }
+      },
+    ]
+
+    updateRoutingState()
+  }
+
+  private func tearDownWindowObservation() {
+    if let observedWindow {
+      routingState?.clear(windowID: ObjectIdentifier(observedWindow))
+    }
+    notificationTokens.forEach(NotificationCenter.default.removeObserver)
+    notificationTokens.removeAll()
+    observedWindow = nil
+  }
+
+  private func updateRoutingState() {
+    guard let window = observedWindow else {
+      return
+    }
+    if window.isKeyWindow {
+      activate(window: window)
+    }
+  }
+
+  private func activate(window: NSWindow) {
+    routingState?.activate(scope: scope, windowID: ObjectIdentifier(window))
+  }
+
+  private func clear(window: NSWindow) {
+    routingState?.clear(windowID: ObjectIdentifier(window))
   }
 }
 

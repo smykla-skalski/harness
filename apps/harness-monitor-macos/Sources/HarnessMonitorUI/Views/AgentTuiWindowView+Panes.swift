@@ -280,6 +280,7 @@ extension AgentTuiWindowView {
       } label: {
         Label("Back", systemImage: "chevron.backward")
       }
+      .keyboardShortcut("[", modifiers: [.command])
       .disabled(!viewModel.windowNavigation.canGoBack)
       .help("Go back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateBackButton)
@@ -289,6 +290,7 @@ extension AgentTuiWindowView {
       } label: {
         Label("Forward", systemImage: "chevron.forward")
       }
+      .keyboardShortcut("]", modifiers: [.command])
       .disabled(!viewModel.windowNavigation.canGoForward)
       .help("Go forward")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNavigateForwardButton)

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct HarnessMonitorAdaptiveGridLayout: Layout {
+  private static let cacheWidthQuantum: CGFloat = 4
+
   struct Cache {
     var measurement: Measurement?
     var measurementKey: MeasurementKey?
@@ -61,7 +63,7 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     guard let width, width.isFinite, width > 0 else {
       return nil
     }
-    return width.rounded(.down)
+    return (width / cacheWidthQuantum).rounded(.down) * cacheWidthQuantum
   }
 
   static func shouldInvalidateCache(

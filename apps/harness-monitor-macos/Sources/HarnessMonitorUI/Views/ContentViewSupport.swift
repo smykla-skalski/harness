@@ -71,9 +71,9 @@ enum ContentInspectorVisibilityPolicy {
 // MARK: - Commands state
 
 extension HarnessMonitorStore {
-  // Keep Commands state as plain data. The scene-level FocusedValue bridge
-  // emitted duplicate update faults during startup when the window toolbar
-  // and command menu refreshed in the same frame.
+  // Keep Commands state as plain data. Startup command enablement now reads a
+  // tracked key-window scope plus these snapshots instead of scene FocusedValue
+  // propagation, which avoided same-frame update faults during launch.
   public var commandsDisplayState: CommandsDisplayState {
     CommandsDisplayState(
       canNavigateBack: canNavigateBack,
@@ -191,16 +191,8 @@ struct ContentToolbarAccessibilityMarker: View {
 }
 
 struct ContentCornerOverlayModifier<CornerAnimationContent: View>: ViewModifier {
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
+  let isPresented: Bool
   let cornerAnimationContent: CornerAnimationContent
-  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
-  private var cornerAnimationEnabled = false
-
-  private var isPresented: Bool {
-    cornerAnimationEnabled
-      || toolbarUI.isRefreshing
-      || toolbarUI.connectionState == .connecting
-  }
 
   func body(content: Content) -> some View {
     content
@@ -215,7 +207,7 @@ struct ContentCornerOverlayModifier<CornerAnimationContent: View>: ViewModifier 
             contentPadding: 0,
             appliesGlass: false,
             accessibilityLabel: HarnessCornerAnimationDescriptor.dancingLlama.accessibilityLabel,
-            presentationDelay: cornerAnimationEnabled ? nil : .milliseconds(400)
+            presentationDelay: nil
           )
         ) {
           cornerAnimationContent
