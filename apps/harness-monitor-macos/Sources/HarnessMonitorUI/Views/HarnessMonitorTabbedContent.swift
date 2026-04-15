@@ -20,11 +20,8 @@ struct HarnessMonitorTabbedContent<
   let distribution: HarnessMonitorTabbedContentDistribution
   let alignment: HarnessMonitorTabbedContentAlignment
   let tabsDisabled: Bool
+  let pickerAccessibilityIdentifier: String?
   @ViewBuilder let content: (Tab) -> Content
-
-  @Namespace private var tabNamespace
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
 
   init(
     title: String,
@@ -33,6 +30,7 @@ struct HarnessMonitorTabbedContent<
     distribution: HarnessMonitorTabbedContentDistribution = .fitContent,
     alignment: HarnessMonitorTabbedContentAlignment = .leading,
     tabsDisabled: Bool = false,
+    pickerAccessibilityIdentifier: String? = nil,
     @ViewBuilder content: @escaping (Tab) -> Content
   ) {
     self.title = title
@@ -41,57 +39,43 @@ struct HarnessMonitorTabbedContent<
     self.distribution = distribution
     self.alignment = alignment
     self.tabsDisabled = tabsDisabled
+    self.pickerAccessibilityIdentifier = pickerAccessibilityIdentifier
     self.content = content
   }
 
   var body: some View {
     Section {
+      pickerRow
       content(selection)
     } header: {
-      HStack(alignment: .center, spacing: 0) {
-        Text(title)
-          .scaledFont(.body)
-        if alignment == .trailing {
-          Spacer(minLength: 0)
-        }
+      Text(title)
+    }
+  }
+
+  private var pickerRow: some View {
+    HStack(spacing: 0) {
+      Picker(title, selection: $selection) {
         ForEach(Array(Tab.allCases)) { tab in
-          let isSelected = !tabsDisabled && selection == tab
-          Button {
-            withAnimation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.15)) {
-              selection = tab
-            }
-          } label: {
-            Text(tabTitle(tab))
-              .scaledFont(.body)
-              .fontWeight(isSelected ? .semibold : .regular)
-              .foregroundStyle(isSelected ? .primary : (tabsDisabled ? .tertiary : .secondary))
-              .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-              .padding(.vertical, HarnessMonitorTheme.spacingSM)
-              .frame(maxWidth: distribution == .fillEqually ? .infinity : nil)
-              .background {
-                if isSelected {
-                  UnevenRoundedRectangle(
-                    topLeadingRadius: 6,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 6,
-                    style: .continuous
-                  )
-                  .fill(Color(nsColor: .quaternarySystemFill))
-                  .matchedGeometryEffect(id: "tab-background", in: tabNamespace)
-                }
-              }
-              .contentShape(Rectangle())
-          }
-          .harnessDismissButtonStyle()
-          .disabled(tabsDisabled)
-          .accessibilityLabel(tabTitle(tab))
-          .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+          Text(tabTitle(tab)).tag(tab)
         }
       }
-      .accessibilityElement(children: .contain)
-      .accessibilityLabel(title)
-      .padding(.bottom, -(HarnessMonitorTheme.spacingSM + 2))
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .harnessNativeFormControl()
+      .disabled(tabsDisabled)
+      .frame(maxWidth: distribution == .fillEqually ? .infinity : nil)
+    }
+    .frame(maxWidth: .infinity, alignment: pickerAlignment)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(pickerAccessibilityIdentifier ?? title)
+  }
+
+  private var pickerAlignment: Alignment {
+    switch alignment {
+    case .leading:
+      .leading
+    case .trailing:
+      .trailing
     }
   }
 }

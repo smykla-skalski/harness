@@ -76,7 +76,9 @@ struct PreferencesDatabaseSection: View {
       title: "Statistics",
       selection: $selectedStatisticsTab,
       tabTitle: \.title,
-      alignment: .trailing
+      alignment: .trailing,
+      pickerAccessibilityIdentifier: HarnessMonitorAccessibility
+        .preferencesDatabaseStatisticsPicker
     ) { tab in
       switch tab {
       case .cache:
@@ -264,6 +266,7 @@ struct PreferencesDatabaseSection: View {
     } header: {
       Text("Operations")
     }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesDatabaseOperations)
   }
 
   // MARK: - Health
@@ -326,6 +329,7 @@ struct PreferencesDatabaseSection: View {
     } header: {
       Text("Health")
     }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesDatabaseHealth)
   }
 
   // MARK: - Helpers
