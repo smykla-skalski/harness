@@ -14,4 +14,4 @@ mod snapshot_tests;
 #[cfg(test)]
 mod test_support;
 
-pub use loops::spawn_watch_loop;
+pub(crate) use loops::spawn_watch_loop;

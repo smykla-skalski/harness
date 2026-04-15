@@ -1,10 +1,14 @@
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
-use crate::daemon::db::DaemonDb;
+use tempfile::tempdir;
+
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::index::DiscoveredProject;
+use crate::session::service::build_new_session;
 
 use super::loops::{CHANGE_TRACKING_POLL_SQL, poll_change_tracking};
-use super::refresh::emit_watch_changes_with;
+use super::refresh::{emit_watch_changes, emit_watch_changes_with};
 use super::state::WatchChanges;
 
 #[test]
@@ -81,4 +85,65 @@ fn emit_watch_changes_releases_db_lock_before_extensions() {
     assert!(sessions_updated);
     assert!(session_updated_core);
     assert!(session_extensions);
+}
+
+#[tokio::test]
+async fn emit_watch_changes_prefers_async_broadcast_builders() {
+    let db_dir = tempdir().expect("tempdir");
+    let db_path = db_dir.path().join("watch.db");
+    let db = DaemonDb::open(&db_path).expect("open file db");
+    let project = DiscoveredProject {
+        project_id: "project-watch".into(),
+        name: "harness".into(),
+        project_dir: Some("/tmp/harness".into()),
+        repository_root: Some("/tmp/harness".into()),
+        checkout_id: "checkout-watch".into(),
+        checkout_name: "Repository".into(),
+        context_root: "/tmp/harness-context".into(),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    db.sync_project(&project).expect("sync project");
+    let state = build_new_session(
+        "watch async snapshot",
+        "",
+        "watch-sess",
+        "claude",
+        Some("watch-session"),
+        "2026-04-15T00:00:00Z",
+    );
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+    drop(db);
+
+    let async_db = Arc::new(
+        AsyncDaemonDb::connect(&db_path)
+            .await
+            .expect("open async db"),
+    );
+    let (sender, mut receiver) = tokio::sync::broadcast::channel(8);
+
+    emit_watch_changes(
+        &sender,
+        WatchChanges {
+            sessions_updated: true,
+            session_ids: BTreeSet::from([String::from("watch-sess")]),
+        },
+        None,
+        Some(&async_db),
+    )
+    .await;
+
+    assert_eq!(
+        receiver.recv().await.expect("sessions_updated").event,
+        "sessions_updated"
+    );
+    assert_eq!(
+        receiver.recv().await.expect("session_updated").event,
+        "session_updated"
+    );
+    assert_eq!(
+        receiver.recv().await.expect("session_extensions").event,
+        "session_extensions"
+    );
 }
