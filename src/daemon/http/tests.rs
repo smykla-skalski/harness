@@ -32,6 +32,7 @@ use super::sessions::{
     SessionScopeQuery, get_session, get_sessions, get_timeline, post_end_session,
     post_session_join, post_session_start,
 };
+use super::signals::{post_cancel_signal, post_signal_ack};
 use super::tasks::{
     post_task_assign, post_task_checkpoint, post_task_create, post_task_drop,
     post_task_queue_policy, post_task_update,
@@ -41,6 +42,7 @@ mod async_agent_mutations;
 mod async_lifecycle_mutations;
 mod async_mutations;
 mod async_reads;
+mod async_signal_mutations;
 mod async_stream;
 
 async fn response_body(result: Result<Value, crate::errors::CliError>) -> (StatusCode, Value) {

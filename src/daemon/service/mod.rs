@@ -42,9 +42,10 @@ use super::protocol::{
     LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
     ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionExtensionsPayload, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
-    SetLogLevelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineCursor,
-    TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
+    SetLogLevelRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, TimelineCursor, TimelineEntry,
+    TimelineWindowRequest, TimelineWindowResponse,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -212,6 +213,7 @@ mod observe_stream;
 mod serve;
 mod sessions;
 mod signals;
+mod signals_async;
 mod status;
 mod sync_support;
 
@@ -257,6 +259,7 @@ pub(crate) use sessions::{
     list_projects_async, list_sessions_async, session_detail_async, session_detail_core_async,
     session_extensions_async, session_timeline_window_async,
 };
+pub(crate) use signals_async::{cancel_signal_async, record_signal_ack_direct_async};
 pub(crate) use status::{diagnostics_report_async, health_response_async};
 pub(crate) use sync_support::*;
 
