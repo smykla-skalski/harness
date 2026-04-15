@@ -8,6 +8,7 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let sidebarVisible: Bool
+  let focusParticipationEnabled: Bool
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -19,6 +20,7 @@ struct SidebarView: View {
   @State private var isSidebarVisibilityAnimating = false
   @State private var pendingSidebarWidth: CGFloat?
   @State private var sidebarVisibilityResetTask: Task<Void, Never>?
+  @State private var hasPendingSearchFocusRequest = false
   @FocusState private var isSearchFocused: Bool
   private static let sidebarWidthMeasurementQuantum: CGFloat = 4
   private static let filterToolbarFadeHiddenWidth: CGFloat = 96
@@ -84,7 +86,10 @@ struct SidebarView: View {
       beginSidebarVisibilityTransition(to: nextPhase)
     }
     .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
-      isSearchFocused = true
+      requestSearchFocus()
+    }
+    .onChange(of: focusParticipationEnabled, initial: true) { _, isEnabled in
+      applyPendingSearchFocusRequestIfNeeded(isEnabled: isEnabled)
     }
     .onDisappear {
       sidebarVisibilityResetTask?.cancel()
@@ -106,6 +111,7 @@ struct SidebarView: View {
     SidebarRecentSearchesHeader(
       searchText: sidebarSearchText,
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
+      isSearchFocused: isSearchFocused,
       searchFocus: $isSearchFocused,
       submitSearch: submitSearch,
       applyQuery: applyRecentSearch,
@@ -118,6 +124,22 @@ struct SidebarView: View {
     if sidebarUI.isPersistenceAvailable {
       _ = store.recordSearch(store.searchText)
     }
+  }
+
+  private func requestSearchFocus() {
+    guard focusParticipationEnabled else {
+      hasPendingSearchFocusRequest = true
+      return
+    }
+    isSearchFocused = true
+  }
+
+  private func applyPendingSearchFocusRequestIfNeeded(isEnabled: Bool) {
+    guard isEnabled, hasPendingSearchFocusRequest else {
+      return
+    }
+    hasPendingSearchFocusRequest = false
+    isSearchFocused = true
   }
 
   func updateSidebarWidth(_ width: CGFloat) {
