@@ -2,15 +2,6 @@ use crate::daemon::db::DaemonDb;
 
 use super::{CliError, CliErrorKind, HookAgent, Path, PathBuf, ResolvedSession};
 
-/// Re-sync a session from files into `SQLite` after a file-based mutation.
-/// Silently ignores errors since the file write already succeeded and the
-/// watch loop will eventually catch up.
-pub(crate) fn sync_after_mutation(db: Option<&DaemonDb>, session_id: &str) {
-    if let Some(db) = db {
-        let _ = db.resync_session(session_id);
-    }
-}
-
 pub(crate) fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
     match runtime_name {
         "claude" => Some(HookAgent::Claude),

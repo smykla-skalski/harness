@@ -6,8 +6,7 @@ use super::{
     normalize_signal_ack_result, protocol, read_pending_signals, reconcile_expired_pending_signals,
     refresh_session, resolve_runtime_session_via_daemon, runtime, runtime_session_matches_agent,
     signal_context_root, signal_dirs_for_agent_in_context_root, signal_records_for_dirs, storage,
-    utc_now,
-    write_signal_ack,
+    utc_now, write_signal_ack,
 };
 
 /// Send a file-backed signal to a running agent session.
