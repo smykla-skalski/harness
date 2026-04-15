@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use super::ReplayBuffer;
 use super::connection::ConnectionState;
+use super::dispatch::dispatch;
 use super::frames::serialize_response_frames;
 use super::queries::{dispatch_read_query, handle_session_subscribe, handle_stream_subscribe};
 use super::test_support::{
@@ -154,5 +155,44 @@ async fn stream_subscribe_broadcasts_async_index_without_sync_db() {
     assert_eq!(
         receiver.recv().await.expect("sessions_updated").event,
         "sessions_updated"
+    );
+}
+
+#[tokio::test]
+async fn websocket_async_task_create_mutation_succeeds_without_sync_db() {
+    let state = test_http_state_with_async_db_timeline().await;
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let request = WsRequest {
+        id: "req-task-create-async".into(),
+        method: "task.create".into(),
+        params: serde_json::json!({
+            "session_id": "sess-test-1",
+            "actor": "spoofed-client",
+            "title": "async websocket task",
+            "context": "prefer sqlx websocket path",
+            "severity": "high",
+            "suggested_fix": "use async mutation dispatcher"
+        }),
+    };
+
+    let response = dispatch(&request, &state, &connection).await;
+
+    assert!(response.error.is_none());
+    assert_eq!(
+        response
+            .result
+            .as_ref()
+            .and_then(|result| result["tasks"].as_array())
+            .map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        response
+            .result
+            .as_ref()
+            .and_then(|result| result["tasks"].as_array())
+            .and_then(|tasks| tasks.first())
+            .and_then(|task| task["title"].as_str()),
+        Some("async websocket task")
     );
 }
