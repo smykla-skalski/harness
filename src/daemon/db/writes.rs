@@ -147,10 +147,6 @@ impl DaemonDb {
         let transition_json = serde_json::to_string(&entry.transition)
             .map_err(|error| db_error(format!("serialize log transition: {error}")))?;
         let transition_kind = extract_transition_kind(&transition_json);
-        let timeline_entry = daemon_timeline::log_entry_timeline_entry(
-            entry,
-            daemon_timeline::TimelinePayloadScope::Full,
-        )?;
         let transaction = self
             .conn
             .unchecked_transaction()
@@ -185,6 +181,13 @@ impl DaemonDb {
             )
             .map_err(|error| db_error(format!("append log entry: {error}")))?;
         if inserted > 0 {
+            let timeline_entry = daemon_timeline::log_entry_timeline_entry(
+                &SessionLogEntry {
+                    sequence,
+                    ..entry.clone()
+                },
+                daemon_timeline::TimelinePayloadScope::Full,
+            )?;
             upsert_session_timeline_entry(
                 &transaction,
                 &stored_timeline_entry("log", format!("log:{sequence}"), &timeline_entry)?,

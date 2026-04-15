@@ -27,8 +27,12 @@ use super::DaemonHttpState;
 use super::auth::authorize_control_request;
 use super::core::{get_diagnostics, get_health, get_projects};
 use super::response::{map_json, request_activity_log_level};
-use super::sessions::{SessionScopeQuery, get_session, get_sessions, get_timeline};
+use super::sessions::{
+    SessionScopeQuery, get_session, get_sessions, get_timeline, post_session_join,
+    post_session_start,
+};
 
+mod async_mutations;
 mod async_reads;
 mod async_stream;
 

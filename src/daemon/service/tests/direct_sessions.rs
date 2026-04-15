@@ -261,3 +261,102 @@ fn join_session_db_direct_adds_agent() {
         assert_eq!(db_state.agents.len(), 2);
     });
 }
+
+#[test]
+fn start_session_direct_async_creates_in_sqlite() {
+    with_temp_project(|project| {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let db_path = project
+                .parent()
+                .expect("project parent")
+                .join("daemon.sqlite");
+            let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                .await
+                .expect("open async daemon db");
+
+            let state = start_session_direct_async(
+                &crate::daemon::protocol::SessionStartRequest {
+                    title: "async direct start session".into(),
+                    context: "async direct start".into(),
+                    runtime: "claude".into(),
+                    session_id: Some("daemon-async-start-1".into()),
+                    project_dir: project.to_string_lossy().into(),
+                },
+                &async_db,
+            )
+            .await
+            .expect("start session via async db");
+
+            assert_eq!(state.context, "async direct start");
+            assert!(state.leader_id.is_some());
+            assert_eq!(state.agents.len(), 1);
+
+            let resolved = async_db
+                .resolve_session("daemon-async-start-1")
+                .await
+                .expect("resolve")
+                .expect("present");
+            assert_eq!(resolved.state.context, "async direct start");
+            assert_eq!(
+                resolved.project.project_dir.as_deref(),
+                Some(project.canonicalize().expect("canonical project").as_path())
+            );
+        });
+    });
+}
+
+#[test]
+fn join_session_direct_async_adds_agent() {
+    with_temp_project(|project| {
+        temp_env::with_var("CODEX_SESSION_ID", Some("async-join-worker"), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = project
+                    .parent()
+                    .expect("project parent")
+                    .join("daemon.sqlite");
+                let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db");
+
+                start_session_direct_async(
+                    &crate::daemon::protocol::SessionStartRequest {
+                        title: "async join test session".into(),
+                        context: "async join test".into(),
+                        runtime: "claude".into(),
+                        session_id: Some("daemon-async-join-1".into()),
+                        project_dir: project.to_string_lossy().into(),
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("start session");
+
+                let joined = join_session_direct_async(
+                    "daemon-async-join-1",
+                    &crate::daemon::protocol::SessionJoinRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: None,
+                        project_dir: project.to_string_lossy().into(),
+                        persona: None,
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("join session via async db");
+
+                assert_eq!(joined.agents.len(), 2);
+
+                let resolved = async_db
+                    .resolve_session("daemon-async-join-1")
+                    .await
+                    .expect("resolve")
+                    .expect("present");
+                assert_eq!(resolved.state.agents.len(), 2);
+            });
+        });
+    });
+}

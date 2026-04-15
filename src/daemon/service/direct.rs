@@ -64,6 +64,55 @@ pub fn start_session_direct(
     )
 }
 
+/// Start a new session through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the runtime is unknown or async DB operations fail.
+pub(crate) async fn start_session_direct_async(
+    request: &super::protocol::SessionStartRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionState, CliError> {
+    let runtime_name = &request.runtime;
+    let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "session start requires a known runtime, got '{runtime_name}'"
+        )))
+    })?;
+
+    let project_dir = Path::new(&request.project_dir);
+    let leader_agent_session_id =
+        agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
+    let now = utc_now();
+    let session_id = request
+        .session_id
+        .clone()
+        .unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().format("%Y%m%d%H%M%S%f")));
+
+    let state = session_service::build_new_session(
+        &request.context,
+        &request.title,
+        &session_id,
+        runtime_name,
+        leader_agent_session_id.as_deref(),
+        &now,
+    );
+
+    let project_id = ensure_project_registered_async(async_db, project_dir).await?;
+    async_db.create_session_record(&project_id, &state).await?;
+    let leader_id = state.leader_id.as_deref().unwrap_or("");
+    async_db
+        .append_log_entry(&build_log_entry(
+            &session_id,
+            session_service::log_session_started(&request.title, &request.context),
+            Some(leader_id),
+            None,
+        ))
+        .await?;
+    async_db.bump_change(&session_id).await?;
+    async_db.bump_change("global").await?;
+    Ok(state)
+}
+
 pub(crate) fn ensure_project_registered(
     db: &super::db::DaemonDb,
     project_dir: &Path,
@@ -71,6 +120,16 @@ pub(crate) fn ensure_project_registered(
     session_storage::record_project_origin(project_dir)?;
     let project = index::discovered_project_for_checkout(project_dir);
     db.sync_project(&project)?;
+    Ok(project.project_id)
+}
+
+pub(crate) async fn ensure_project_registered_async(
+    async_db: &super::db::AsyncDaemonDb,
+    project_dir: &Path,
+) -> Result<String, CliError> {
+    session_storage::record_project_origin(project_dir)?;
+    let project = index::discovered_project_for_checkout(project_dir);
+    async_db.sync_project(&project).await?;
     Ok(project.project_id)
 }
 
@@ -138,6 +197,63 @@ pub fn join_session_direct(
         project_dir,
         request.persona.as_deref(),
     )
+}
+
+/// Join an existing session through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session or runtime is unknown, or async DB
+/// operations fail.
+pub(crate) async fn join_session_direct_async(
+    session_id: &str,
+    request: &super::protocol::SessionJoinRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionState, CliError> {
+    if request.role == SessionRole::Leader {
+        return Err(CliErrorKind::session_agent_conflict(
+            "daemon join requests cannot claim the leader role",
+        )
+        .into());
+    }
+    let display_name = request
+        .name
+        .clone()
+        .unwrap_or_else(|| format!("{} {:?}", request.runtime, request.role).to_lowercase());
+
+    let project_dir = Path::new(&request.project_dir);
+    let agent_session_id = resolve_hook_agent(&request.runtime)
+        .and_then(|rt| agents_service::resolve_known_session_id(rt, project_dir, None).ok())
+        .flatten();
+
+    let mut resolved = async_db
+        .resolve_session(session_id)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))?;
+    let now = utc_now();
+    let agent_id = session_service::apply_join_session(
+        &mut resolved.state,
+        &display_name,
+        &request.runtime,
+        request.role,
+        &request.capabilities,
+        agent_session_id.as_deref(),
+        &now,
+        request.persona.as_deref(),
+    )?;
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    async_db
+        .append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_agent_joined(&agent_id, request.role, &request.runtime),
+            None,
+            None,
+        ))
+        .await?;
+    async_db.bump_change(session_id).await?;
+    async_db.bump_change("global").await?;
+    Ok(resolved.state)
 }
 
 /// Mark a session agent as disconnected, writing directly to `SQLite` when a
