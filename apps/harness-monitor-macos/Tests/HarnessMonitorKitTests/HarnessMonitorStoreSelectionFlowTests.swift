@@ -455,6 +455,70 @@ struct HarnessMonitorStoreSelectionFlowTests {
     #expect(store.timelineWindow?.windowEnd == 20)
   }
 
+  @Test("Loading the same timeline page while it is already in flight coalesces requests")
+  func loadingSameTimelinePageWhileInFlightCoalescesRequests() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-window-page-coalesce",
+        context: "Window coalescing lane",
+        status: .active,
+        leaderId: "leader-window-page-coalesce",
+        observeId: "observe-window-page-coalesce",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-window-page-coalesce",
+      workerName: "Window Coalescing Worker"
+    )
+    let fullTimeline = (0..<25).map { index in
+      TimelineEntry(
+        entryId: "timeline-page-coalesce-\(index)",
+        recordedAt: String(format: "2026-04-14T10:%02d:00Z", 59 - index),
+        kind: "task_checkpoint",
+        sessionId: summary.sessionId,
+        agentId: detail.agents[0].agentId,
+        taskId: nil,
+        summary: "Window coalescing \(index)",
+        payload: .object([:])
+      )
+    }
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: fullTimeline],
+      detail: detail
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+    client.configureTimelineWindowDelay(.milliseconds(250), for: summary.sessionId)
+
+    async let firstLoad: Void = store.loadSelectedTimelinePage(page: 1, pageSize: 10)
+    async let secondLoad: Void = store.loadSelectedTimelinePage(page: 1, pageSize: 10)
+    await firstLoad
+    await secondLoad
+
+    #expect(client.recordedTimelineWindowRequests(for: summary.sessionId) == [
+      .latest(limit: 10),
+      TimelineWindowRequest(
+        scope: .summary,
+        limit: 10,
+        before: TimelineCursor(
+          recordedAt: fullTimeline[9].recordedAt,
+          entryId: fullTimeline[9].entryId
+        )
+      ),
+    ])
+    #expect(store.timeline == Array(fullTimeline.prefix(20)))
+    #expect(store.timelineWindow?.totalCount == fullTimeline.count)
+    #expect(store.timelineWindow?.windowEnd == 20)
+  }
+
   @Test("Loading a farther timeline page requests only the missing prefix")
   func loadingFartherTimelinePageRequestsOnlyMissingPrefix() async throws {
     let summary = makeSession(

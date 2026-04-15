@@ -57,11 +57,20 @@ extension HarnessMonitorStore {
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
     public var isTimelineLoading = false
-    public var presentedSessionDetail: SessionDetail?
-    public var presentedTimeline: [TimelineEntry] = []
-    public var presentedTimelineWindow: TimelineWindowResponse?
+    public var presentedSessionDetail: SessionDetail? {
+      selectedSessionDetail ?? retainedSessionDetail
+    }
+    public var presentedTimeline: [TimelineEntry] {
+      selectedSessionDetail == nil ? retainedTimeline : timeline
+    }
+    public var presentedTimelineWindow: TimelineWindowResponse? {
+      selectedSessionDetail == nil ? retainedTimelineWindow : timelineWindow
+    }
+    private var retainedSessionDetail: SessionDetail?
+    private var retainedTimeline: [TimelineEntry] = []
+    private var retainedTimelineWindow: TimelineWindowResponse?
     private var selectedSessionDetailIdentity: SessionDetailIdentity?
-    private var presentedSessionDetailIdentity: SessionDetailIdentity?
+    private var retainedSessionDetailIdentity: SessionDetailIdentity?
 
     public init() {}
 
@@ -70,15 +79,17 @@ extension HarnessMonitorStore {
       selectedSessionSummary: SessionSummary?
     ) {
       let nextSelectedIdentity = SessionDetailIdentity(state.selectedSessionDetail)
+      let didUpdateSelectedTimeline = timeline != state.timeline
+      let didUpdateTimelineWindow = timelineWindow != state.timelineWindow
 
       if selectedSessionDetailIdentity != nextSelectedIdentity {
         selectedSessionDetail = state.selectedSessionDetail
         selectedSessionDetailIdentity = nextSelectedIdentity
       }
-      if timeline != state.timeline {
+      if didUpdateSelectedTimeline {
         timeline = state.timeline
       }
-      if timelineWindow != state.timelineWindow {
+      if didUpdateTimelineWindow {
         timelineWindow = state.timelineWindow
       }
       if isTimelineLoading != state.isTimelineLoading {
@@ -86,29 +97,30 @@ extension HarnessMonitorStore {
       }
 
       if let detail = state.selectedSessionDetail {
-        if presentedSessionDetailIdentity != nextSelectedIdentity {
-          presentedSessionDetail = detail
-          presentedSessionDetailIdentity = nextSelectedIdentity
+        let didUpdateRetainedIdentity = retainedSessionDetailIdentity != nextSelectedIdentity
+        if didUpdateRetainedIdentity {
+          retainedSessionDetail = detail
+          retainedSessionDetailIdentity = nextSelectedIdentity
         }
-        if presentedTimeline != state.timeline {
-          presentedTimeline = state.timeline
+        if didUpdateRetainedIdentity || didUpdateSelectedTimeline {
+          retainedTimeline = timeline
         }
-        if presentedTimelineWindow != state.timelineWindow {
-          presentedTimelineWindow = state.timelineWindow
+        if retainedTimelineWindow != timelineWindow {
+          retainedTimelineWindow = timelineWindow
         }
         return
       }
 
-      guard presentedSessionDetail?.session.sessionId == selectedSessionSummary?.sessionId else {
-        if presentedSessionDetail != nil {
-          presentedSessionDetail = nil
-          presentedSessionDetailIdentity = nil
+      guard retainedSessionDetail?.session.sessionId == selectedSessionSummary?.sessionId else {
+        if retainedSessionDetail != nil {
+          retainedSessionDetail = nil
+          retainedSessionDetailIdentity = nil
         }
-        if !presentedTimeline.isEmpty {
-          presentedTimeline = []
+        if !retainedTimeline.isEmpty {
+          retainedTimeline = []
         }
-        if presentedTimelineWindow != nil {
-          presentedTimelineWindow = nil
+        if retainedTimelineWindow != nil {
+          retainedTimelineWindow = nil
         }
         return
       }
