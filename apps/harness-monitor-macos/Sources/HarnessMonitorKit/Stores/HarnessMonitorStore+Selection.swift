@@ -169,6 +169,7 @@ extension HarnessMonitorStore {
       if isChangingSelectedSession, inFlightActionID != nil {
         inFlightActionID = nil
       }
+      selection.retainPresentedDetailWhenSelectionClears = true
       selectedSessionID = sessionID
       inspectorSelection = .none
       isExtensionsLoading = false
@@ -278,7 +279,7 @@ extension HarnessMonitorStore {
     pendingListSelectionTaskToken &+= 1
   }
 
-  private func cancelSelectedTimelinePageLoad() {
+  func cancelSelectedTimelinePageLoad() {
     selectedTimelinePageLoadTask?.cancel()
     selectedTimelinePageLoadTask = nil
     selectedTimelinePageLoadKey = nil

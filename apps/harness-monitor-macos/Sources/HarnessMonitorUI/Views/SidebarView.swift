@@ -321,6 +321,7 @@ private struct SidebarSessionListColumn: View {
   var body: some View {
     List(selection: sidebarSelection) {
       SidebarSessionListContent(
+        store: store,
         renderState: renderState,
         toggleBookmark: { sessionID, projectID in
           store.toggleBookmark(sessionId: sessionID, projectId: projectID)

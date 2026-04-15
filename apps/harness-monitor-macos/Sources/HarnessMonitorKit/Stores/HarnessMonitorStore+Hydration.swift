@@ -20,7 +20,7 @@ extension HarnessMonitorStore {
     guard connectionState == .connecting else { return }
 
     withUISyncBatch {
-      isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+      isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
     }
 
     if let selectedSessionID,
@@ -29,6 +29,9 @@ extension HarnessMonitorStore {
       await restorePersistedSessionSelectionWhileConnecting(sessionID: selectedSessionID)
     } else {
       withUISyncBatch {
+        isShowingCachedData =
+          selectedSessionID != nil
+          && selectedSession?.session.sessionId == selectedSessionID
         activeSessionLoadRequest = 0
         isSelectionLoading = false
       }
@@ -65,7 +68,7 @@ extension HarnessMonitorStore {
     } else {
       guard connectionState == .connecting else { return }
       withUISyncBatch {
-        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+        isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
 
@@ -118,7 +121,7 @@ extension HarnessMonitorStore {
       )
     } else {
       withUISyncBatch {
-        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+        isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
 
@@ -142,7 +145,7 @@ extension HarnessMonitorStore {
 
     if case .offline = connectionState {
       withUISyncBatch {
-        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+        isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
 
@@ -150,6 +153,9 @@ extension HarnessMonitorStore {
       await restorePersistedSessionSelection(sessionID: selectedSessionID)
     } else {
       withUISyncBatch {
+        isShowingCachedData =
+          selectedSessionID != nil
+          && selectedSession?.session.sessionId == selectedSessionID
         activeSessionLoadRequest = 0
         isSelectionLoading = false
       }

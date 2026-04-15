@@ -124,12 +124,12 @@ struct SessionAgentSummaryCard: View {
     )
   }
 
-  private var queueSummary: String {
-    guard !queuedTasks.isEmpty else {
-      return agent.currentTaskId == nil ? "Ready" : "Working"
-    }
-    let suffix = queuedTasks.count == 1 ? "task" : "tasks"
-    return "\(queuedTasks.count) queued \(suffix)"
+  private var activityPresentation: HarnessMonitorStore.AgentActivityPresentation {
+    store.agentActivityPresentation(
+      for: agent,
+      queuedTasks: queuedTasks,
+      isSelectedSessionLive: store.sessionDataAvailability == .live
+    )
   }
 
   var body: some View {
@@ -172,7 +172,10 @@ struct SessionAgentSummaryCard: View {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
             badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
-            badge(queueSummary)
+            badge(
+              activityPresentation.label,
+              accessibilityValue: activityPresentation.accessibilityValue
+            )
           }
         }
         .frame(
@@ -303,12 +306,16 @@ struct SessionAgentSummaryCard: View {
     return true
   }
 
-  private func badge(_ value: String) -> some View {
+  private func badge(
+    _ value: String,
+    accessibilityValue: String? = nil
+  ) -> some View {
     Text(value)
       .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
       .harnessPillPadding()
       .harnessContentPill()
+      .accessibilityLabel(accessibilityValue ?? value)
   }
 
   private func relativeLuminance(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGFloat {

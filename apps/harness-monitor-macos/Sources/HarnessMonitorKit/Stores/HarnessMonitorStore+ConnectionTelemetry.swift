@@ -76,9 +76,19 @@ extension HarnessMonitorStore {
     set { connection.daemonLogLevel = newValue }
   }
 
+  public var isShowingCachedCatalog: Bool {
+    get { connection.isShowingCachedCatalog }
+    set { connection.isShowingCachedCatalog = newValue }
+  }
+
+  public var isShowingCachedSelectedSession: Bool {
+    get { connection.isShowingCachedSelectedSession }
+    set { connection.isShowingCachedSelectedSession = newValue }
+  }
+
   public var isShowingCachedData: Bool {
-    get { connection.isShowingCachedData }
-    set { connection.isShowingCachedData = newValue }
+    get { isShowingCachedSelectedSession }
+    set { isShowingCachedSelectedSession = newValue }
   }
 
   public var persistedSessionCount: Int {
@@ -99,6 +109,13 @@ extension HarnessMonitorStore {
     connectionState != .online
   }
 
+  public var sessionCatalogIsEstimated: Bool {
+    if case .offline = connectionState {
+      return persistedSessionCount > 0 || !sessions.isEmpty
+    }
+    return isShowingCachedCatalog
+  }
+
   public var sessionDataAvailability: SessionDataAvailability {
     if case .offline(let reason) = connectionState {
       if persistedSessionCount > 0 || !sessions.isEmpty {
@@ -111,7 +128,7 @@ extension HarnessMonitorStore {
       return .unavailable(reason: .daemonOffline(reason))
     }
 
-    if isShowingCachedData {
+    if isShowingCachedSelectedSession {
       return .persisted(
         reason: .liveDataUnavailable,
         sessionCount: max(persistedSessionCount, sessions.count),

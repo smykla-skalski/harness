@@ -238,6 +238,125 @@ struct HarnessMonitorStoreTests {
     #expect(store.cachedDataStatusMessage == "Showing cached data - daemon is offline")
   }
 
+  @Test("Cached catalog does not mark selected-session availability stale")
+  func cachedCatalogDoesNotMarkSelectedSessionAvailabilityStale() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    store.connectionState = .online
+    store.isShowingCachedCatalog = true
+    store.isShowingCachedSelectedSession = false
+    store.persistedSessionCount = 1
+
+    #expect(store.sessionCatalogIsEstimated)
+    #expect(store.sessionDataAvailability == .live)
+  }
+
+  @Test("Leaderless summaries do not render as plain active")
+  func leaderlessSummariesDoNotRenderAsPlainActive() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-leaderless",
+        context: "Leaderless review lane",
+        status: .active,
+        leaderId: nil,
+        observeId: nil,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+
+    let presentation = store.sessionSummaryPresentation(for: summary)
+
+    #expect(presentation.statusText == "Leaderless")
+    #expect(presentation.statusTone == .caution)
+    #expect(presentation.agentCountText == "2 known")
+    #expect(presentation.isEstimated == false)
+  }
+
+  @Test("Cached catalog summaries avoid live agent phrasing")
+  func cachedCatalogSummariesAvoidLiveAgentPhrasing() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.connectionState = .connecting
+    store.isShowingCachedCatalog = true
+    store.persistedSessionCount = 1
+
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-cached",
+        context: "Cached reconnect lane",
+        status: .active,
+        leaderId: "leader-cached",
+        observeId: nil,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+
+    let presentation = store.sessionSummaryPresentation(for: summary)
+
+    #expect(presentation.statusText == "Active")
+    #expect(presentation.statusTone == .secondary)
+    #expect(presentation.isEstimated)
+    #expect(presentation.agentCountText == "2 known")
+  }
+
+  @Test("Agent activity presentation never shows ready for disconnected or cached agents")
+  func agentActivityPresentationNeverShowsReadyForDisconnectedOrCachedAgents() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let capabilities = PreviewFixtures.agents[0].runtimeCapabilities
+
+    let disconnectedAgent = AgentRegistration(
+      agentId: "worker-disconnected",
+      name: "Disconnected Worker",
+      runtime: "codex",
+      role: .worker,
+      capabilities: ["general"],
+      joinedAt: "2026-04-15T17:00:00Z",
+      updatedAt: "2026-04-15T17:30:00Z",
+      status: .disconnected,
+      agentSessionId: "worker-disconnected-session",
+      lastActivityAt: "2026-04-15T17:30:00Z",
+      currentTaskId: nil,
+      runtimeCapabilities: capabilities,
+      persona: nil
+    )
+
+    let activeAgent = AgentRegistration(
+      agentId: "worker-active",
+      name: "Active Worker",
+      runtime: "codex",
+      role: .worker,
+      capabilities: ["general"],
+      joinedAt: "2026-04-15T17:00:00Z",
+      updatedAt: "2026-04-15T17:30:00Z",
+      status: .active,
+      agentSessionId: "worker-active-session",
+      lastActivityAt: "2026-04-15T17:30:00Z",
+      currentTaskId: nil,
+      runtimeCapabilities: capabilities,
+      persona: nil
+    )
+
+    let disconnectedPresentation = store.agentActivityPresentation(
+      for: disconnectedAgent,
+      queuedTasks: [],
+      isSelectedSessionLive: true
+    )
+    let cachedPresentation = store.agentActivityPresentation(
+      for: activeAgent,
+      queuedTasks: [],
+      isSelectedSessionLive: false
+    )
+
+    #expect(disconnectedPresentation.label == "Disconnected")
+    #expect(cachedPresentation.label == "Snapshot")
+  }
+
   @Test("Refreshing diagnostics loads live daemon diagnostics")
   func refreshDiagnosticsLoadsLiveDaemonDiagnostics() async {
     let store = await makeBootstrappedStore()

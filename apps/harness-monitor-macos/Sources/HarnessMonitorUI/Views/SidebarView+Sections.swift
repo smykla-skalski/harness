@@ -64,6 +64,7 @@ struct SidebarSessionListRenderState {
 
 @MainActor
 struct SidebarSessionListContent: View {
+  let store: HarnessMonitorStore
   let renderState: SidebarSessionListRenderState
   let toggleBookmark: (String, String) -> Void
   let setCheckoutCollapsed: (String, Bool) -> Void
@@ -189,19 +190,22 @@ struct SidebarSessionListContent: View {
 
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
+    let presentation = store.sessionSummaryPresentation(for: session)
     let isSelectedForUITest =
       HarnessMonitorUITestEnvironment.selectionMarkersEnabled
       && renderState.selectedSessionIDForAccessibilityMarkers == session.sessionId
-    let row = sessionRowContent(session)
+    let row = sessionRowContent(session, presentation: presentation)
 
     let baseRow =
       row
-      .tag(session.sessionId as String?)
-      .contentShape(Rectangle())
-      .accessibilityAddTraits(.isButton)
-      .accessibilityLabel(sessionAccessibilityLabel(for: session))
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
-      .harnessUITestValue(
+        .tag(session.sessionId as String?)
+        .contentShape(Rectangle())
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(
+          sessionAccessibilityLabel(for: session, presentation: presentation)
+        )
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
+        .harnessUITestValue(
         isSelectedForUITest
           ? "selected, interactive=button, selectionChrome=translucent"
           : "interactive=button"
@@ -255,9 +259,13 @@ struct SidebarSessionListContent: View {
   }
 
   @ViewBuilder
-  private func sessionRowContent(_ session: SessionSummary) -> some View {
+  private func sessionRowContent(
+    _ session: SessionSummary,
+    presentation: HarnessMonitorStore.SessionSummaryPresentation
+  ) -> some View {
     let row = SidebarSessionListLinkRow(
       session: session,
+      presentation: presentation,
       isBookmarked: renderState.bookmarkedSessionIDs.contains(session.sessionId),
       lastActivityText: formatTimestamp(
         session.lastActivityAt,

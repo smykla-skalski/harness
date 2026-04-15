@@ -180,8 +180,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
-  @Test("Global session snapshot waits before selected-session fallback refetch")
-  func globalSessionSnapshotWaitsBeforeSelectedSessionFallbackRefetch() async {
+  @Test("Global session snapshot shows a loading cockpit before selected-session fallback refetch")
+  func globalSessionSnapshotShowsLoadingCockpitBeforeSelectedSessionFallbackRefetch() async {
     let client = RecordingHarnessClient()
     let summary = makeSession(
       .init(
@@ -237,10 +237,11 @@ extension HarnessMonitorStoreUpdateStreamTests {
 
     try? await Task.sleep(for: .milliseconds(300))
 
-    #expect(store.selectedSession?.session.context == updatedSummary.context)
-    #expect(
-      store.selectedSession?.agents.contains(where: { $0.agentId == "worker-before" }) == true
-    )
+    #expect(store.contentUI.session.selectedSessionSummary?.context == updatedSummary.context)
+    #expect(store.selectedSession == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedTimeline.isEmpty)
+    #expect(store.contentUI.session.isSelectionLoading)
     #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCalls)
     #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCalls)
 

@@ -57,6 +57,51 @@ extension HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.sessionDetail.presentedTimeline == PreviewFixtures.timeline)
   }
 
+  @Test(
+    "Selected-session summary refresh clears retained cockpit until fresh detail arrives")
+  func selectedSessionSummaryRefreshClearsRetainedCockpitUntilFreshDetailArrives() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let updatedSummary = SessionSummary(
+      projectId: PreviewFixtures.summary.projectId,
+      projectName: PreviewFixtures.summary.projectName,
+      projectDir: PreviewFixtures.summary.projectDir,
+      contextRoot: PreviewFixtures.summary.contextRoot,
+      checkoutId: PreviewFixtures.summary.checkoutId,
+      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
+      isWorktree: PreviewFixtures.summary.isWorktree,
+      worktreeName: PreviewFixtures.summary.worktreeName,
+      sessionId: PreviewFixtures.summary.sessionId,
+      title: PreviewFixtures.summary.title,
+      context: PreviewFixtures.summary.context,
+      status: .active,
+      createdAt: PreviewFixtures.summary.createdAt,
+      updatedAt: "2026-04-15T17:32:00Z",
+      lastActivityAt: "2026-04-15T17:32:00Z",
+      leaderId: nil,
+      observeId: PreviewFixtures.summary.observeId,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 1,
+        activeAgentCount: 0,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: PreviewFixtures.summary.metrics.completedTaskCount
+      )
+    )
+
+    store.refreshSelectedSessionIfSummaryChanged(sessions: [updatedSummary])
+
+    #expect(store.contentUI.session.selectedSessionSummary == updatedSummary)
+    #expect(store.selectedSession == nil)
+    #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedTimeline.isEmpty)
+    #expect(store.contentUI.session.isSelectionLoading)
+  }
+
   @Test("Content session detail presentation clears for a different selected summary")
   func contentSessionDetailPresentationClearsForDifferentSelectedSummary() async {
     let store = await makeBootstrappedStore()

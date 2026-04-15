@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SidebarSessionListLinkRow: View, Equatable {
   let session: SessionSummary
+  let presentation: HarnessMonitorStore.SessionSummaryPresentation
   let isBookmarked: Bool
   let lastActivityText: String
   let fontScale: CGFloat
@@ -10,6 +11,7 @@ struct SidebarSessionListLinkRow: View, Equatable {
   var body: some View {
     SidebarSessionRow(
       session: session,
+      presentation: presentation,
       isBookmarked: isBookmarked,
       lastActivityText: lastActivityText,
       fontScale: fontScale
@@ -21,6 +23,7 @@ struct SidebarSessionListLinkRow: View, Equatable {
 
   nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.session == rhs.session
+      && lhs.presentation == rhs.presentation
       && lhs.isBookmarked == rhs.isBookmarked
       && lhs.lastActivityText == rhs.lastActivityText
       && lhs.fontScale == rhs.fontScale

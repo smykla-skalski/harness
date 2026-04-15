@@ -411,7 +411,7 @@ extension HarnessMonitorStore {
       )
     } else {
       withUISyncBatch {
-        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+        isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
   }
@@ -432,7 +432,7 @@ extension HarnessMonitorStore {
     var didChange = false
     withUISyncBatch {
       didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
-      isShowingCachedData = false
+      isShowingCachedCatalog = false
     }
     if didChange {
       scheduleCacheWrite { service in
@@ -471,6 +471,7 @@ extension HarnessMonitorStore {
 
     cancelSelectedSessionRefreshFallback(for: sessionID)
     withUISyncBatch {
+      selection.retainPresentedDetailWhenSelectionClears = true
       selectedSession = detail
       self.timeline = timeline
       self.timelineWindow = normalizedTimelineWindow(
