@@ -2,8 +2,8 @@ use sqlx::{Sqlite, Transaction, query, query_scalar};
 
 use super::{
     AgentRegistration, AsyncDaemonDb, BTreeMap, CliError, DiscoveredProject, SessionLogEntry,
-    SessionState, SessionStatus, StoredTimelineEntry, WorkItem, daemon_timeline, db_error,
-    extract_transition_kind, i64_from_u64, normalize_change_scope, stored_timeline_entry,
+    SessionState, SessionStatus, StoredTimelineEntry, TaskCheckpoint, WorkItem, daemon_timeline,
+    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope, stored_timeline_entry,
     u64_from_i64, utc_now,
 };
 
@@ -63,6 +63,10 @@ const INSERT_TASK_SQL: &str = "INSERT INTO tasks (
     suggested_fix, source, blocked_reason, completed_at,
     notes_json, checkpoint_summary_json
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)";
+const INSERT_CHECKPOINT_SQL: &str = "INSERT OR IGNORE INTO task_checkpoints (
+    checkpoint_id, task_id, session_id, recorded_at,
+    actor_id, summary, progress
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 const MARK_SESSION_ACTIVE_SQL: &str = "UPDATE sessions SET is_active = 1 WHERE session_id = ?1";
 const NEXT_LOG_SEQUENCE_SQL: &str =
     "SELECT COALESCE(MAX(sequence), 0) + 1 FROM session_log WHERE session_id = ?1";
@@ -213,6 +217,60 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
+    /// Append a task checkpoint and keep the canonical timeline ledger in sync.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub(crate) async fn append_checkpoint(
+        &self,
+        session_id: &str,
+        checkpoint: &TaskCheckpoint,
+    ) -> Result<(), CliError> {
+        let mut transaction = self.pool().begin().await.map_err(|error| {
+            db_error(format!(
+                "begin async append checkpoint transaction: {error}"
+            ))
+        })?;
+        let inserted = query(INSERT_CHECKPOINT_SQL)
+            .bind(&checkpoint.checkpoint_id)
+            .bind(&checkpoint.task_id)
+            .bind(session_id)
+            .bind(&checkpoint.recorded_at)
+            .bind(&checkpoint.actor_id)
+            .bind(&checkpoint.summary)
+            .bind(i64::from(checkpoint.progress))
+            .execute(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("append async checkpoint: {error}")))?
+            .rows_affected();
+        if inserted > 0 {
+            let entry = daemon_timeline::checkpoint_entry(
+                session_id,
+                checkpoint,
+                daemon_timeline::TimelinePayloadScope::Full,
+            )?;
+            let stored = stored_timeline_entry(
+                "checkpoint",
+                format!("checkpoint:{}", checkpoint.checkpoint_id),
+                &entry,
+            )?;
+            upsert_timeline_entry(&mut transaction, &stored).await?;
+            query(UPSERT_TIMELINE_STATE_SQL)
+                .bind(session_id)
+                .bind(utc_now())
+                .execute(transaction.as_mut())
+                .await
+                .map_err(|error| {
+                    db_error(format!("persist async checkpoint timeline state: {error}"))
+                })?;
+        }
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit async append checkpoint transaction: {error}"
+            ))
+        })?;
+        Ok(())
+    }
     /// Increment one change-tracking scope through the canonical async daemon DB.
     ///
     /// # Errors
