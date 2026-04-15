@@ -30,9 +30,11 @@ mod config;
 mod diagnostics;
 mod direct_sessions;
 mod observe;
+mod session_liveness;
 mod session_reads;
 mod signal_reconciliation;
 mod signals;
+mod stream_initial_events;
 mod task_mutations;
 mod timeline;
 

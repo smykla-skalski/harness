@@ -1,12 +1,14 @@
 use std::collections::HashMap;
+use std::convert::identity;
 use std::env::var;
 use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::thread;
 use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
-use tokio::runtime::{Handle, RuntimeFlavor};
+use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::block_in_place;
 use uuid::Uuid;
@@ -442,8 +444,8 @@ impl CodexControllerHandle {
         Some(match Handle::try_current() {
             Ok(current) => match current.runtime_flavor() {
                 RuntimeFlavor::MultiThread => block_in_place(|| runtime.block_on(future)),
-                RuntimeFlavor::CurrentThread => std::thread::spawn(move || {
-                    tokio::runtime::Builder::new_current_thread()
+                RuntimeFlavor::CurrentThread => thread::spawn(move || {
+                    Builder::new_current_thread()
                         .enable_all()
                         .build()
                         .map_err(|error| {
@@ -457,7 +459,7 @@ impl CodexControllerHandle {
                 .map_err(|_| {
                     CliError::from(CliErrorKind::workflow_io("join async codex bridge thread"))
                 })
-                .and_then(std::convert::identity),
+                .and_then(identity),
                 _ => runtime.block_on(future),
             },
             Err(_) => runtime.block_on(future),

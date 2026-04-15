@@ -1,10 +1,15 @@
 use super::{
-    CliError, DaemonDb, OptionalExtension, SessionTimelineStateRow, StoredTimelineEntry,
-    TimelineCursor, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse, daemon_index,
-    daemon_timeline, db_error, replace_all_session_timeline_entries, usize_from_i64,
+    CliError, DaemonDb, StoredTimelineEntry, TimelineEntry, daemon_index, daemon_timeline,
+    db_error, replace_all_session_timeline_entries,
+};
+#[cfg(test)]
+use super::{
+    OptionalExtension, SessionTimelineStateRow, TimelineCursor, TimelineWindowRequest,
+    TimelineWindowResponse, usize_from_i64,
 };
 
 impl DaemonDb {
+    #[cfg(test)]
     pub(crate) fn load_session_timeline_window(
         &self,
         session_id: &str,
@@ -106,6 +111,7 @@ impl DaemonDb {
             &stored_entries,
         )
     }
+    #[cfg(test)]
     fn load_session_timeline_state(
         &self,
         session_id: &str,
@@ -133,6 +139,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("load session timeline state: {error}")))
     }
 
+    #[cfg(test)]
     fn load_timeline_cursor_offset(
         &self,
         session_id: &str,
@@ -171,6 +178,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("load timeline cursor offset: {error}")))
     }
 
+    #[cfg(test)]
     fn load_timeline_entries_range(
         &self,
         session_id: &str,
@@ -207,6 +215,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("read timeline range row: {error}")))
     }
 
+    #[cfg(test)]
     fn load_timeline_cursor_at_offset(
         &self,
         session_id: &str,
@@ -307,6 +316,7 @@ pub(super) fn stored_timeline_entry_from_row(
     })
 }
 
+#[cfg(test)]
 pub(super) fn cursor_from_timeline_entry(entry: &TimelineEntry) -> TimelineCursor {
     TimelineCursor {
         recorded_at: entry.recorded_at.clone(),

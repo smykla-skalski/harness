@@ -42,6 +42,34 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit async signal index sync: {error}")))?;
         Ok(())
     }
+
+    /// Merge updated signal records into the existing session index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when loading or writing the signal index fails.
+    pub(crate) async fn merge_signal_records(
+        &self,
+        _session_id: &str,
+        records: &[SessionSignalRecord],
+    ) -> Result<(), CliError> {
+        if records.is_empty() {
+            return Ok(());
+        }
+        let mut transaction = self.pool().begin().await.map_err(|error| {
+            db_error(format!(
+                "begin async signal index merge transaction: {error}"
+            ))
+        })?;
+        let indexed_at = utc_now();
+        for record in records {
+            insert_signal_index_row(&mut transaction, record, &indexed_at).await?;
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit async signal index merge: {error}")))?;
+        Ok(())
+    }
 }
 
 async fn insert_signal_index_row(

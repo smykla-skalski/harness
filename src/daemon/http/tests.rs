@@ -75,9 +75,13 @@ pub(super) fn auth_headers() -> HeaderMap {
 fn test_http_state_with_db() -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
+    let async_db = Arc::new(OnceLock::new());
     let db_path = temp_dir().join(format!("harness-http-test-{}.db", Uuid::new_v4()));
     let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open file db")));
     db_slot.set(db).expect("install db");
+    async_db
+        .set(super::connect_async_db_for_tests(&db_path))
+        .expect("install async db");
     let manifest: DaemonManifest = serde_json::from_value(serde_json::json!({
         "version": "20.6.0",
         "pid": 1,
@@ -98,10 +102,17 @@ fn test_http_state_with_db() -> DaemonHttpState {
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),
         db: db_slot.clone(),
-        async_db: super::AsyncDaemonDbSlot::empty(),
+        async_db: super::AsyncDaemonDbSlot::from_inner(async_db.clone()),
         db_path: Some(db_path),
-        codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
-        agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+        codex_controller: CodexControllerHandle::new_with_async_db(
+            sender.clone(),
+            db_slot.clone(),
+            async_db.clone(),
+            false,
+        ),
+        agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
+            sender, db_slot, async_db, false,
+        ),
     }
 }
 

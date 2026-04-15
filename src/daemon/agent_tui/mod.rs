@@ -7,6 +7,8 @@ use std::time::Duration;
 
 mod input;
 mod manager;
+mod manager_control;
+mod manager_lifecycle;
 mod manager_refresh;
 mod model;
 mod process;

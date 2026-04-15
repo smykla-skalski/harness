@@ -32,7 +32,6 @@ pub mod index;
 pub mod launchd;
 pub mod ordering;
 pub mod protocol;
-pub mod read_cache;
 pub mod service;
 pub mod snapshot;
 pub mod state;

@@ -1,12 +1,9 @@
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
-use crate::daemon::db::DaemonDb;
-use crate::daemon::http::AsyncDaemonDbSlot;
-use crate::daemon::http::DaemonHttpState;
+use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{StreamEvent, TimelineWindowRequest, WsRequest, WsResponse};
-use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 
 use super::connection::ConnectionState;
@@ -61,25 +58,17 @@ async fn dispatch_session_read_query(
 }
 
 async fn dispatch_projects_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    let result = if let Some(async_db) = state.async_db.get() {
-        service::list_projects_async(Some(async_db.as_ref())).await
-    } else {
-        run_canonical_db_read(&state.db, state.db_path.clone(), "projects", |db| {
-            service::list_projects(Some(db))
-        })
-        .await
+    let result = match require_async_db(state, "projects") {
+        Ok(async_db) => service::list_projects_async(Some(async_db)).await,
+        Err(error) => Err(error),
     };
     dispatch_query_result(request_id, result)
 }
 
 async fn dispatch_sessions_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    let result = if let Some(async_db) = state.async_db.get() {
-        service::list_sessions_async(true, Some(async_db.as_ref())).await
-    } else {
-        run_canonical_db_read(&state.db, state.db_path.clone(), "sessions", |db| {
-            service::list_sessions(true, Some(db))
-        })
-        .await
+    let result = match require_async_db(state, "sessions") {
+        Ok(async_db) => service::list_sessions_async(true, Some(async_db)).await,
+        Err(error) => Err(error),
     };
     dispatch_query_result(request_id, result)
 }
@@ -94,14 +83,9 @@ async fn dispatch_session_detail_query(request: &WsRequest, state: &DaemonHttpSt
         return dispatch_session_detail_core_query(&request.id, state, session_id).await;
     }
 
-    let result = if let Some(async_db) = state.async_db.get() {
-        service::session_detail_async(&session_id, Some(async_db.as_ref())).await
-    } else {
-        run_canonical_db_read(&state.db, state.db_path.clone(), "session detail", {
-            let session_id = session_id.clone();
-            move |db| service::session_detail(&session_id, Some(db))
-        })
-        .await
+    let result = match require_async_db(state, "session detail") {
+        Ok(async_db) => service::session_detail_async(&session_id, Some(async_db)).await,
+        Err(error) => Err(error),
     };
     dispatch_query_result(&request.id, result)
 }
@@ -111,17 +95,12 @@ async fn dispatch_session_detail_core_query(
     state: &DaemonHttpState,
     session_id: String,
 ) -> WsResponse {
-    let result = if let Some(async_db) = state.async_db.get() {
-        service::session_detail_core_async(&session_id, Some(async_db.as_ref())).await
-    } else {
-        run_canonical_db_read(&state.db, state.db_path.clone(), "session detail core", {
-            let session_id = session_id.clone();
-            move |db| service::session_detail_core(&session_id, Some(db))
-        })
-        .await
+    let result = match require_async_db(state, "session detail core") {
+        Ok(async_db) => service::session_detail_core_async(&session_id, Some(async_db)).await,
+        Err(error) => Err(error),
     };
     let response = dispatch_query_result(request_id, result);
-    schedule_extensions_push(&state.sender, &state.db, &state.async_db, &session_id);
+    schedule_extensions_push(&state.sender, &state.async_db, &session_id);
     response
 }
 
@@ -136,20 +115,16 @@ async fn dispatch_session_timeline_query(
 
     dispatch_query_result(
         &request.id,
-        if let Some(async_db) = state.async_db.get() {
-            service::session_timeline_window_async(
-                &session_id,
-                &timeline_request,
-                Some(async_db.as_ref()),
-            )
-            .await
-        } else {
-            run_canonical_db_read(&state.db, state.db_path.clone(), "session timeline", {
-                let session_id = session_id.clone();
-                let timeline_request = timeline_request.clone();
-                move |db| service::session_timeline_window(&session_id, &timeline_request, Some(db))
-            })
-            .await
+        match require_async_db(state, "session timeline") {
+            Ok(async_db) => {
+                service::session_timeline_window_async(
+                    &session_id,
+                    &timeline_request,
+                    Some(async_db),
+                )
+                .await
+            }
+            Err(error) => Err(error),
         },
     )
 }
@@ -188,73 +163,40 @@ fn dispatch_agent_tui_detail_query(request: &WsRequest, state: &DaemonHttpState)
 }
 
 async fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    if let Some(async_db) = state.async_db.get() {
-        return dispatch_query_result(
-            request_id,
-            service::health_response_async(&state.manifest, Some(async_db.as_ref())).await,
-        );
-    }
-
-    let manifest = state.manifest.clone();
     dispatch_query_result(
         request_id,
-        run_canonical_db_read(&state.db, state.db_path.clone(), "health", {
-            move |db| service::health_response(&manifest, Some(db))
-        })
-        .await,
+        match require_async_db(state, "health") {
+            Ok(async_db) => service::health_response_async(&state.manifest, Some(async_db)).await,
+            Err(error) => Err(error),
+        },
     )
 }
 
 async fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    if let Some(async_db) = state.async_db.get() {
-        return dispatch_query_result(
-            request_id,
-            service::diagnostics_report_async(Some(async_db.as_ref())).await,
-        );
-    }
-
     dispatch_query_result(
         request_id,
-        run_canonical_db_read(&state.db, state.db_path.clone(), "diagnostics", |db| {
-            service::diagnostics_report(Some(db))
-        })
-        .await,
+        match require_async_db(state, "diagnostics") {
+            Ok(async_db) => service::diagnostics_report_async(Some(async_db)).await,
+            Err(error) => Err(error),
+        },
     )
 }
 
 fn schedule_extensions_push(
     sender: &broadcast::Sender<StreamEvent>,
-    db: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     async_db: &AsyncDaemonDbSlot,
     session_id: &str,
 ) {
-    use tokio::task::{spawn, spawn_blocking};
+    use tokio::task::spawn;
 
     let sender = sender.clone();
-    let db = db.clone();
-    let async_db = async_db.get().cloned();
     let session_id = session_id.to_string();
+    let Some(async_db) = async_db.get().cloned() else {
+        return;
+    };
     spawn(async move {
-        if let Some(async_db) = async_db {
-            service::broadcast_session_extensions_async(
-                &sender,
-                &session_id,
-                Some(async_db.as_ref()),
-            )
+        service::broadcast_session_extensions_async(&sender, &session_id, Some(async_db.as_ref()))
             .await;
-            return;
-        }
-        let result = spawn_blocking(move || {
-            let db_guard = db
-                .get()
-                .map(|db: &Arc<Mutex<DaemonDb>>| db.lock().expect("db lock"));
-            let db_ref = db_guard.as_deref();
-            service::session_extensions_event(&session_id, db_ref)
-        })
-        .await;
-        if let Ok(Ok(event)) = result {
-            let _ = sender.send(event);
-        }
     });
 }
 
@@ -272,33 +214,14 @@ pub(crate) async fn handle_session_subscribe(
         state.session_subscriptions.insert(session_id.clone());
     }
 
-    if let Some(async_db) = state.async_db.get() {
-        service::broadcast_session_snapshot_async(
-            &state.sender,
-            &session_id,
-            Some(async_db.as_ref()),
-        )
-        .await;
-        return super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }));
+    match require_async_db(state, "session subscribe snapshot") {
+        Ok(async_db) => {
+            service::broadcast_session_snapshot_async(&state.sender, &session_id, Some(async_db))
+                .await;
+            super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
+        }
+        Err(error) => dispatch_query_result(&request.id, Err::<serde_json::Value, _>(error)),
     }
-
-    let sender = state.sender.clone();
-    let _ = run_canonical_db_read(
-        &state.db,
-        state.db_path.clone(),
-        "session subscribe snapshot",
-        {
-            let session_id = session_id.clone();
-            let sender = sender.clone();
-            move |db| {
-                service::broadcast_session_snapshot(&sender, &session_id, Some(db));
-                Ok(())
-            }
-        },
-    )
-    .await;
-
-    super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
 
 pub(crate) fn handle_session_unsubscribe(
@@ -326,17 +249,13 @@ pub(crate) async fn handle_stream_subscribe(
         let mut state = connection.lock().expect("connection lock");
         state.global_subscription = true;
     }
-    if let Some(async_db) = state.async_db.get() {
-        service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        return super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }));
+    match require_async_db(state, "stream subscribe snapshot") {
+        Ok(async_db) => {
+            service::broadcast_sessions_updated_async(&state.sender, Some(async_db)).await;
+            super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
+        }
+        Err(error) => dispatch_query_result(&request.id, Err::<serde_json::Value, _>(error)),
     }
-    let db_guard = state
-        .db
-        .get()
-        .map(|db: &Arc<Mutex<DaemonDb>>| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    service::broadcast_sessions_updated(&state.sender, db_ref);
-    super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
 
 pub(crate) fn handle_stream_unsubscribe(

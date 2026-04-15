@@ -11,20 +11,20 @@ use super::signals::{
     warn_active_signal_ack_record_failure,
 };
 use super::signals_async::{
-    bump_session, record_signal_ack_direct_async, refresh_signal_index_for_resolved,
-    resolved_session_for_signal_mutation, runtime_for_agent,
+    bump_session, record_signal_ack_direct_async, resolved_session_for_signal_mutation,
+    runtime_for_agent,
 };
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, ActiveSignalDelivery,
     AgentTuiManagerHandle, CliError, ManagedTuiWake, SessionDetail, SessionLogEntry,
     SignalAckRequest, SignalSendRequest, build_log_entry, effective_project_dir,
-    session_detail_async, session_service, utc_now,
+    pending_signal_record, session_detail_from_async_daemon_db, session_service, utc_now,
 };
 
 struct PreparedAsyncSignalDelivery {
-    resolved: ResolvedSession,
     project_dir: PathBuf,
     runtime: &'static dyn AgentRuntime,
+    runtime_name: String,
     signal: Signal,
     signal_session_id: String,
     target_tui_id: Option<String>,
@@ -155,9 +155,9 @@ async fn prepare_signal_send(
         ))
         .await?;
     Ok(PreparedAsyncSignalDelivery {
-        resolved,
         project_dir,
         runtime,
+        runtime_name,
         signal,
         signal_session_id,
         target_tui_id,
@@ -225,13 +225,24 @@ async fn attempt_active_signal_delivery_async(
 async fn finalize_signal_send(
     session_id: &str,
     async_db: &super::db::AsyncDaemonDb,
-    resolved: &ResolvedSession,
+    agent_id: &str,
+    runtime_name: &str,
+    signal: &Signal,
     actively_delivered: bool,
 ) -> Result<(), CliError> {
-    if actively_delivered {
-        return Ok(());
+    if !actively_delivered {
+        async_db
+            .merge_signal_records(
+                session_id,
+                &[pending_signal_record(
+                    session_id,
+                    runtime_name,
+                    agent_id,
+                    signal,
+                )],
+            )
+            .await?;
     }
-    refresh_signal_index_for_resolved(async_db, resolved).await?;
     bump_session(async_db, session_id).await
 }
 
@@ -261,6 +272,14 @@ pub(crate) async fn send_signal_async(
         async_db,
     )
     .await?;
-    finalize_signal_send(session_id, async_db, &prepared.resolved, actively_delivered).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    finalize_signal_send(
+        session_id,
+        async_db,
+        &request.agent_id,
+        &prepared.runtime_name,
+        &prepared.signal,
+        actively_delivered,
+    )
+    .await?;
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
