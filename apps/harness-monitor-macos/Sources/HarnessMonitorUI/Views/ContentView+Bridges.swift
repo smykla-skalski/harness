@@ -101,38 +101,86 @@ struct ContentAccessibilityOverlayBridge: View {
 struct ContentSceneRestorationBridge: View {
   let store: HarnessMonitorStore
   let selection: HarnessMonitorStore.SelectionSlice
+  let availableSessionCount: Int
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let onRestorationResolved: () -> Void
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
-  @State private var hasSeededSceneRestoration = false
+  @State private var hasResolvedSceneRestoration = false
+  @State private var hasObservedConnectionAttempt = false
+  @State private var hasRequestedSceneRestorationSelection = false
 
   var body: some View {
     Color.clear
       .allowsHitTesting(false)
       .onAppear {
-        seedRestorationIfNeeded(from: restoredSessionID)
+        if connectionState != .idle {
+          hasObservedConnectionAttempt = true
+        }
+        resolveRestorationIfNeeded(from: restoredSessionID)
       }
       .onChange(of: restoredSessionID) { _, newID in
-        seedRestorationIfNeeded(from: newID)
+        resolveRestorationIfNeeded(from: newID)
       }
       .onChange(of: selection.selectedSessionID) { _, newID in
         if restoredSessionID != newID {
           restoredSessionID = newID
         }
         if newID != nil {
-          hasSeededSceneRestoration = true
+          markRestorationResolved()
         }
+      }
+      .onChange(of: availableSessionCount) { _, _ in
+        resolveRestorationIfNeeded(from: restoredSessionID)
+      }
+      .onChange(of: connectionState) { _, newState in
+        if newState != .idle {
+          hasObservedConnectionAttempt = true
+        }
+        resolveRestorationIfNeeded(from: restoredSessionID)
       }
   }
 
-  private func seedRestorationIfNeeded(from restoredSessionID: String?) {
-    guard !hasSeededSceneRestoration else {
+  private func resolveRestorationIfNeeded(from restoredSessionID: String?) {
+    guard !hasResolvedSceneRestoration else {
       return
     }
-    guard selection.selectedSessionID == nil, let restoredSessionID else {
+    guard selection.selectedSessionID == nil else {
+      markRestorationResolved()
       return
     }
-    hasSeededSceneRestoration = true
-    store.primeSessionSelection(restoredSessionID)
+    guard let restoredSessionID else {
+      markRestorationResolved()
+      return
+    }
+
+    if availableSessionCount > 0 {
+      guard store.sessionIndex.sessionSummary(for: restoredSessionID) != nil else {
+        self.restoredSessionID = nil
+        markRestorationResolved()
+        return
+      }
+      guard !hasRequestedSceneRestorationSelection else {
+        return
+      }
+      hasRequestedSceneRestorationSelection = true
+      store.selectSessionFromList(restoredSessionID)
+      return
+    }
+
+    guard hasObservedConnectionAttempt, connectionState != .connecting else {
+      return
+    }
+    self.restoredSessionID = nil
+    markRestorationResolved()
+  }
+
+  private func markRestorationResolved() {
+    guard !hasResolvedSceneRestoration else {
+      return
+    }
+    hasResolvedSceneRestoration = true
+    onRestorationResolved()
   }
 }
 
