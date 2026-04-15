@@ -7,9 +7,12 @@ use super::connection::ConnectionState;
 use super::dispatch::dispatch;
 use super::tests::{
     init_git_project, join_async_worker, leader_id_for_session, start_async_session,
-    test_websocket_state_with_empty_async_db,
+    test_websocket_state_with_empty_async_db, test_websocket_state_with_sync_db_only,
 };
+use crate::daemon::index;
 use crate::daemon::protocol::WsRequest;
+use crate::session::types::SessionRole;
+use crate::session::{service as session_service, storage as session_storage};
 use crate::workspace::project_context_dir;
 use harness_testkit::with_isolated_harness_env;
 
@@ -126,4 +129,114 @@ fn websocket_async_session_observe_mutation_succeeds_without_sync_db() {
             },
         );
     });
+}
+
+#[test]
+fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        temp_env::with_vars(
+            [
+                ("CLAUDE_SESSION_ID", Some("ws-sync-observe-leader")),
+                ("CODEX_SESSION_ID", Some("ws-sync-observe-worker")),
+            ],
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
+
+                let state = session_service::start_session(
+                    "ws sync observe test",
+                    "",
+                    &project_dir,
+                    Some("claude"),
+                    Some("ws-sync-observe"),
+                )
+                .expect("start session");
+                let leader_id = state.leader_id.clone().expect("leader id");
+                let joined = session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    &project_dir,
+                    None,
+                )
+                .expect("join worker");
+                let worker_id = joined
+                    .agents
+                    .keys()
+                    .find(|agent_id| agent_id.starts_with("codex-"))
+                    .expect("worker id")
+                    .clone();
+                let worker_session_id = joined
+                    .agents
+                    .get(&worker_id)
+                    .and_then(|agent| agent.agent_session_id.clone())
+                    .expect("worker runtime session id");
+                append_project_ledger_entry(&project_dir);
+                write_agent_log(
+                    &project_dir,
+                    "codex",
+                    &worker_session_id,
+                    "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+                );
+
+                let db_path = sandbox.path().join("daemon-sync.sqlite");
+                let state = test_websocket_state_with_sync_db_only(&db_path);
+                seed_sync_file_backed_session(&state, "ws-sync-observe");
+
+                let connection = Arc::new(Mutex::new(ConnectionState::new()));
+                let request = WsRequest {
+                    id: "req-session-observe-sync".into(),
+                    method: "session.observe".into(),
+                    params: serde_json::json!({
+                        "session_id": "ws-sync-observe",
+                        "actor": leader_id.clone()
+                    }),
+                };
+
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let response = dispatch(&request, &state, &connection).await;
+
+                    assert!(response.error.is_none());
+                    assert_eq!(
+                        response
+                            .result
+                            .as_ref()
+                            .and_then(|result| result["tasks"].as_array())
+                            .map(Vec::len),
+                        Some(1)
+                    );
+                });
+
+                let file_state = session_storage::load_state(&project_dir, "ws-sync-observe")
+                    .expect("load state")
+                    .expect("file state");
+                assert!(file_state.tasks.is_empty());
+
+                let db = state.db.get().expect("db slot").lock().expect("db lock");
+                let db_state = db
+                    .load_session_state("ws-sync-observe")
+                    .expect("load db state")
+                    .expect("db state");
+                assert_eq!(db_state.tasks.len(), 1);
+                assert_eq!(
+                    db.load_conversation_events("ws-sync-observe", &worker_id)
+                        .expect("load worker transcript")
+                        .len(),
+                    1
+                );
+            },
+        );
+    });
+}
+
+fn seed_sync_file_backed_session(state: &crate::daemon::http::DaemonHttpState, session_id: &str) {
+    let resolved = index::resolve_session(session_id).expect("resolve session");
+    let db = state.db.get().expect("db slot").lock().expect("db lock");
+    db.sync_project(&resolved.project).expect("sync project");
+    db.sync_session(&resolved.project.project_id, &resolved.state)
+        .expect("sync session");
 }
