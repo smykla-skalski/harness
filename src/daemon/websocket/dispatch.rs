@@ -17,7 +17,8 @@ use super::frames::{
     error_response, ok_response, serialize_error_response_frames, serialize_response_frames,
 };
 use super::mutations::{
-    dispatch_mutation, dispatch_mutation_with_agent, dispatch_mutation_with_task, dispatch_query,
+    dispatch_mutation, dispatch_mutation_prefer_async, dispatch_mutation_with_agent_prefer_async,
+    dispatch_mutation_with_task_prefer_async, dispatch_query,
 };
 use super::queries::{
     dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
@@ -83,103 +84,360 @@ async fn dispatch_inner(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
+    if let Some(response) = dispatch_known_method(request, state, connection).await {
+        return response;
+    }
+    unknown_method_response(&request.id, &request.method)
+}
+
+async fn dispatch_known_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<WsResponse> {
+    if let Some(response) = dispatch_core_method(request, state, connection).await {
+        return Some(response);
+    }
+    if let Some(response) = dispatch_task_mutation(request, state).await {
+        return Some(response);
+    }
+    if let Some(response) = dispatch_agent_mutation(request, state).await {
+        return Some(response);
+    }
+    dispatch_session_mutation(request, state).await
+}
+
+async fn dispatch_core_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<WsResponse> {
+    if let Some(response) = dispatch_misc_method(request, state, connection).await {
+        return Some(response);
+    }
+    dispatch_read_method(request, state).await
+}
+
+async fn dispatch_misc_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<WsResponse> {
     match request.method.as_str() {
-        "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
-        "health" | "diagnostics" | "daemon.stop" | "daemon.log_level" | "projects" | "sessions"
-        | "session.detail" | "session.timeline" | "session.agent_tuis" | "agent_tui.detail" => {
-            dispatch_read_query(request, state).await
+        "ping" => Some(ok_response(
+            &request.id,
+            serde_json::json!({ "pong": true }),
+        )),
+        "daemon.set_log_level" => Some(dispatch_set_log_level(request, state)),
+        "session.subscribe" => Some(handle_session_subscribe(request, state, connection).await),
+        "session.unsubscribe" => Some(handle_session_unsubscribe(request, connection)),
+        "stream.subscribe" => Some(handle_stream_subscribe(request, state, connection).await),
+        "stream.unsubscribe" => Some(handle_stream_unsubscribe(request, connection)),
+        _ => None,
+    }
+}
+
+async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> Option<WsResponse> {
+    if matches!(
+        request.method.as_str(),
+        "health"
+            | "diagnostics"
+            | "daemon.stop"
+            | "daemon.log_level"
+            | "projects"
+            | "sessions"
+            | "session.detail"
+            | "session.timeline"
+            | "session.agent_tuis"
+            | "agent_tui.detail"
+    ) {
+        Some(dispatch_read_query(request, state).await)
+    } else {
+        None
+    }
+}
+
+async fn dispatch_task_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    if let Some(response) = dispatch_task_work_mutation(request, state).await {
+        return Some(response);
+    }
+    dispatch_task_lifecycle_mutation(request, state).await
+}
+
+async fn dispatch_task_work_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        "task.create" => Some(dispatch_task_create(request, state).await),
+        "task.assign" => Some(dispatch_task_assign(request, state).await),
+        "task.checkpoint" => Some(dispatch_task_checkpoint(request, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_task_lifecycle_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        "task.drop" => Some(dispatch_task_drop(request, state).await),
+        "task.queue_policy" => Some(dispatch_task_queue_policy(request, state).await),
+        "task.update" => Some(dispatch_task_update(request, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_agent_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        "agent.change_role" => Some(dispatch_agent_change_role(request, state).await),
+        "agent.remove" => Some(dispatch_agent_remove(request, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_session_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        "leader.transfer" => Some(dispatch_leader_transfer(request, state).await),
+        "session.end" => Some(dispatch_session_end(request, state).await),
+        "signal.send" => Some(dispatch_signal_send(request, state)),
+        "signal.cancel" => Some(dispatch_signal_cancel(request, state)),
+        "session.observe" => Some(dispatch_session_observe(request, state)),
+        _ => None,
+    }
+}
+
+fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
+        Ok(body) => body,
+        Err(error) => {
+            return error_response(
+                &request.id,
+                "INVALID_PARAMS",
+                &format!("invalid set_log_level params: {error}"),
+            );
         }
-        "daemon.set_log_level" => {
-            let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
-                Ok(body) => body,
-                Err(error) => {
-                    return error_response(
-                        &request.id,
-                        "INVALID_PARAMS",
-                        &format!("invalid set_log_level params: {error}"),
-                    );
-                }
-            };
-            dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
-        }
-        "session.subscribe" => handle_session_subscribe(request, state, connection).await,
-        "session.unsubscribe" => handle_session_unsubscribe(request, connection),
-        "stream.subscribe" => handle_stream_subscribe(request, state, connection).await,
-        "stream.unsubscribe" => handle_stream_unsubscribe(request, connection),
-        "task.create" => dispatch_mutation(request, state, |session_id, params, db| {
+    };
+    dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
+}
+
+async fn dispatch_task_create(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_prefer_async(
+        request,
+        state,
+        |session_id, params, db| {
             let body: TaskCreateRequest = serde_json::from_value(params)?;
             service::create_task(&session_id, &body, db).map_err(Into::into)
-        }),
-        "task.assign" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
-                let body: TaskAssignRequest = serde_json::from_value(params)?;
-                service::assign_task(&session_id, &task_id, &body, db).map_err(Into::into)
-            })
-        }
-        "task.drop" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
-                let body: TaskDropRequest = serde_json::from_value(params)?;
-                service::drop_task(&session_id, &task_id, &body, db).map_err(Into::into)
-            })
-        }
-        "task.queue_policy" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
-                let body: TaskQueuePolicyRequest = serde_json::from_value(params)?;
-                service::update_task_queue_policy(&session_id, &task_id, &body, db)
-                    .map_err(Into::into)
-            })
-        }
-        "task.update" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
-                let body: TaskUpdateRequest = serde_json::from_value(params)?;
-                service::update_task(&session_id, &task_id, &body, db).map_err(Into::into)
-            })
-        }
-        "task.checkpoint" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
-                let body: TaskCheckpointRequest = serde_json::from_value(params)?;
-                service::checkpoint_task(&session_id, &task_id, &body, db).map_err(Into::into)
-            })
-        }
-        "agent.change_role" => {
-            dispatch_mutation_with_agent(request, state, |session_id, agent_id, params, db| {
-                let body: RoleChangeRequest = serde_json::from_value(params)?;
-                service::change_role(&session_id, &agent_id, &body, db).map_err(Into::into)
-            })
-        }
-        "agent.remove" => {
-            dispatch_mutation_with_agent(request, state, |session_id, agent_id, params, db| {
-                let body: AgentRemoveRequest = serde_json::from_value(params)?;
-                service::remove_agent(&session_id, &agent_id, &body, db).map_err(Into::into)
-            })
-        }
-        "leader.transfer" => dispatch_mutation(request, state, |session_id, params, db| {
+        },
+        |session_id, params, async_db| async move {
+            let body: TaskCreateRequest = serde_json::from_value(params)?;
+            service::create_task_async(&session_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_task_assign(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_task_prefer_async(
+        request,
+        state,
+        |session_id, task_id, params, db| {
+            let body: TaskAssignRequest = serde_json::from_value(params)?;
+            service::assign_task(&session_id, &task_id, &body, db).map_err(Into::into)
+        },
+        |session_id, task_id, params, async_db| async move {
+            let body: TaskAssignRequest = serde_json::from_value(params)?;
+            service::assign_task_async(&session_id, &task_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_task_drop(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_task_prefer_async(
+        request,
+        state,
+        |session_id, task_id, params, db| {
+            let body: TaskDropRequest = serde_json::from_value(params)?;
+            service::drop_task(&session_id, &task_id, &body, db).map_err(Into::into)
+        },
+        |session_id, task_id, params, async_db| async move {
+            let body: TaskDropRequest = serde_json::from_value(params)?;
+            service::drop_task_async(&session_id, &task_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_task_queue_policy(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_task_prefer_async(
+        request,
+        state,
+        |session_id, task_id, params, db| {
+            let body: TaskQueuePolicyRequest = serde_json::from_value(params)?;
+            service::update_task_queue_policy(&session_id, &task_id, &body, db).map_err(Into::into)
+        },
+        |session_id, task_id, params, async_db| async move {
+            let body: TaskQueuePolicyRequest = serde_json::from_value(params)?;
+            service::update_task_queue_policy_async(&session_id, &task_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_task_update(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_task_prefer_async(
+        request,
+        state,
+        |session_id, task_id, params, db| {
+            let body: TaskUpdateRequest = serde_json::from_value(params)?;
+            service::update_task(&session_id, &task_id, &body, db).map_err(Into::into)
+        },
+        |session_id, task_id, params, async_db| async move {
+            let body: TaskUpdateRequest = serde_json::from_value(params)?;
+            service::update_task_async(&session_id, &task_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_task_checkpoint(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_task_prefer_async(
+        request,
+        state,
+        |session_id, task_id, params, db| {
+            let body: TaskCheckpointRequest = serde_json::from_value(params)?;
+            service::checkpoint_task(&session_id, &task_id, &body, db).map_err(Into::into)
+        },
+        |session_id, task_id, params, async_db| async move {
+            let body: TaskCheckpointRequest = serde_json::from_value(params)?;
+            service::checkpoint_task_async(&session_id, &task_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_agent_change_role(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_agent_prefer_async(
+        request,
+        state,
+        |session_id, agent_id, params, db| {
+            let body: RoleChangeRequest = serde_json::from_value(params)?;
+            service::change_role(&session_id, &agent_id, &body, db).map_err(Into::into)
+        },
+        |session_id, agent_id, params, async_db| async move {
+            let body: RoleChangeRequest = serde_json::from_value(params)?;
+            service::change_role_async(&session_id, &agent_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_agent_remove(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_with_agent_prefer_async(
+        request,
+        state,
+        |session_id, agent_id, params, db| {
+            let body: AgentRemoveRequest = serde_json::from_value(params)?;
+            service::remove_agent(&session_id, &agent_id, &body, db).map_err(Into::into)
+        },
+        |session_id, agent_id, params, async_db| async move {
+            let body: AgentRemoveRequest = serde_json::from_value(params)?;
+            service::remove_agent_async(&session_id, &agent_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_leader_transfer(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_prefer_async(
+        request,
+        state,
+        |session_id, params, db| {
             let body: LeaderTransferRequest = serde_json::from_value(params)?;
             service::transfer_leader(&session_id, &body, db).map_err(Into::into)
-        }),
-        "session.end" => dispatch_mutation(request, state, |session_id, params, db| {
+        },
+        |session_id, params, async_db| async move {
+            let body: LeaderTransferRequest = serde_json::from_value(params)?;
+            service::transfer_leader_async(&session_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
+}
+
+async fn dispatch_session_end(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_prefer_async(
+        request,
+        state,
+        |session_id, params, db| {
             let body: SessionEndRequest = serde_json::from_value(params)?;
             service::end_session(&session_id, &body, db).map_err(Into::into)
-        }),
-        "signal.send" => dispatch_mutation(request, state, |session_id, params, db| {
-            let body: SignalSendRequest = serde_json::from_value(params)?;
-            service::send_signal(&session_id, &body, db, Some(&state.agent_tui_manager))
+        },
+        |session_id, params, async_db| async move {
+            let body: SessionEndRequest = serde_json::from_value(params)?;
+            service::end_session_async(&session_id, &body, &async_db)
+                .await
                 .map_err(Into::into)
-        }),
-        "signal.cancel" => dispatch_mutation(request, state, |session_id, params, db| {
-            let body: SignalCancelRequest = serde_json::from_value(params)?;
-            service::cancel_signal(&session_id, &body, db).map_err(Into::into)
-        }),
-        "session.observe" => dispatch_mutation(request, state, |session_id, params, db| {
-            let body: ObserveSessionRequest = serde_json::from_value(params)?;
-            service::observe_session(&session_id, Some(&body), db).map_err(Into::into)
-        }),
-        unknown => error_response(
-            &request.id,
-            "UNKNOWN_METHOD",
-            &format!("unknown method: {unknown}"),
-        ),
-    }
+        },
+    )
+    .await
+}
+
+fn dispatch_signal_send(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation(request, state, |session_id, params, db| {
+        let body: SignalSendRequest = serde_json::from_value(params)?;
+        service::send_signal(&session_id, &body, db, Some(&state.agent_tui_manager))
+            .map_err(Into::into)
+    })
+}
+
+fn dispatch_signal_cancel(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation(request, state, |session_id, params, db| {
+        let body: SignalCancelRequest = serde_json::from_value(params)?;
+        service::cancel_signal(&session_id, &body, db).map_err(Into::into)
+    })
+}
+
+fn dispatch_session_observe(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation(request, state, |session_id, params, db| {
+        let body: ObserveSessionRequest = serde_json::from_value(params)?;
+        service::observe_session(&session_id, Some(&body), db).map_err(Into::into)
+    })
+}
+
+fn unknown_method_response(request_id: &str, method: &str) -> WsResponse {
+    error_response(
+        request_id,
+        "UNKNOWN_METHOD",
+        &format!("unknown method: {method}"),
+    )
 }
 
 #[cfg(test)]
