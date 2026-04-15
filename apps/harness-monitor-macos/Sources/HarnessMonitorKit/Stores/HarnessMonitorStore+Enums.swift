@@ -8,7 +8,7 @@ extension HarnessMonitorStore {
     case offline(String)
   }
 
-  public enum SessionFilter: String, CaseIterable, Identifiable {
+  public enum SessionFilter: String, CaseIterable, Identifiable, Sendable {
     case all
     case active
     case ended
@@ -31,7 +31,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  public enum InspectorSelection: Equatable {
+  public enum InspectorSelection: Equatable, Sendable {
     case none
     case task(String)
     case agent(String)
