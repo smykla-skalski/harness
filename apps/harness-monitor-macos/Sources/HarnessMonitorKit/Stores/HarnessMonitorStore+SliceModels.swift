@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  public struct CheckoutGroup: Identifiable, Equatable {
+  public struct CheckoutGroup: Identifiable, Equatable, Sendable {
     public let checkoutId: String
     public let title: String
     public let isWorktree: Bool
@@ -11,7 +11,7 @@ extension HarnessMonitorStore {
     public var sessionCount: Int { sessionIDs.count }
   }
 
-  public struct SessionGroup: Identifiable, Equatable {
+  public struct SessionGroup: Identifiable, Equatable, Sendable {
     public let project: ProjectSummary
     public let checkoutGroups: [CheckoutGroup]
 
@@ -70,13 +70,13 @@ extension HarnessMonitorStore {
     }
   }
 
-  public enum SidebarEmptyState: Equatable {
+  public enum SidebarEmptyState: Equatable, Sendable {
     case noSessions
     case noMatches
     case sessionsAvailable
   }
 
-  public struct InspectorTaskSelectionState: Equatable {
+  public struct InspectorTaskSelectionState: Equatable, Sendable {
     public let task: WorkItem
     public let notesSessionID: String?
     public let isPersistenceAvailable: Bool
@@ -92,7 +92,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct InspectorAgentSelectionState: Equatable {
+  public struct InspectorAgentSelectionState: Equatable, Sendable {
     public let agent: AgentRegistration
     public let activity: AgentToolActivitySummary?
 
@@ -105,7 +105,148 @@ extension HarnessMonitorStore {
     }
   }
 
-  public enum InspectorPrimaryContentState: Equatable {
+  public struct InspectorLookupIndex {
+    public let detail: SessionDetail
+
+    private let tasksByID: [String: WorkItem]
+    private let agentsByID: [String: AgentRegistration]
+    private let signalsByID: [String: SessionSignalRecord]
+    private let agentActivityByID: [String: AgentToolActivitySummary]
+
+    public init(detail: SessionDetail) {
+      self.detail = detail
+      tasksByID = Dictionary(uniqueKeysWithValues: detail.tasks.map { ($0.taskId, $0) })
+      agentsByID = Dictionary(uniqueKeysWithValues: detail.agents.map { ($0.agentId, $0) })
+      signalsByID = Dictionary(
+        uniqueKeysWithValues: detail.signals.map { ($0.signal.signalId, $0) }
+      )
+      agentActivityByID = Dictionary(
+        uniqueKeysWithValues: detail.agentActivity.map { ($0.agentId, $0) }
+      )
+    }
+
+    public func task(for taskID: String) -> WorkItem? {
+      tasksByID[taskID]
+    }
+
+    public func agent(for agentID: String) -> AgentRegistration? {
+      agentsByID[agentID]
+    }
+
+    public func signal(for signalID: String) -> SessionSignalRecord? {
+      signalsByID[signalID]
+    }
+
+    public func primaryContent(
+      for inspectorSelection: HarnessMonitorStore.InspectorSelection,
+      isPersistenceAvailable: Bool
+    ) -> InspectorPrimaryContentState {
+      switch inspectorSelection {
+      case .none:
+        return .session(detail)
+      case .task(let taskID):
+        guard let task = task(for: taskID) else {
+          return .session(detail)
+        }
+        return .task(
+          InspectorTaskSelectionState(
+            task: task,
+            notesSessionID: detail.session.sessionId,
+            isPersistenceAvailable: isPersistenceAvailable
+          )
+        )
+      case .agent(let agentID):
+        guard let agent = agent(for: agentID) else {
+          return .session(detail)
+        }
+        return .agent(
+          InspectorAgentSelectionState(
+            agent: agent,
+            activity: agentActivityByID[agent.agentId]
+          )
+        )
+      case .signal(let signalID):
+        guard let signal = signal(for: signalID) else {
+          return .session(detail)
+        }
+        return .signal(signal)
+      case .observer:
+        if let observer = detail.observer {
+          return .observer(observer)
+        }
+        return .session(detail)
+      }
+    }
+
+    public func actionContext(
+      inspectorSelection: HarnessMonitorStore.InspectorSelection,
+      isPersistenceAvailable: Bool,
+      selectedActionActorID: String,
+      isSessionReadOnly: Bool,
+      isSessionActionInFlight: Bool
+    ) -> InspectorActionContext? {
+      let selectedTask: WorkItem?
+      if case .task(let taskID) = inspectorSelection {
+        selectedTask = task(for: taskID)
+      } else {
+        selectedTask = nil
+      }
+
+      let selectedAgent: AgentRegistration?
+      if case .agent(let agentID) = inspectorSelection {
+        selectedAgent = agent(for: agentID)
+      } else {
+        selectedAgent = nil
+      }
+
+      let selectedObserver: ObserverSummary?
+      if case .observer = inspectorSelection {
+        selectedObserver = detail.observer
+      } else {
+        selectedObserver = nil
+      }
+
+      return InspectorActionContext(
+        detail: detail,
+        selectedTask: selectedTask,
+        selectedAgent: selectedAgent,
+        selectedObserver: selectedObserver,
+        isPersistenceAvailable: isPersistenceAvailable,
+        actionActorOptions: actionActorOptions(selectedActionActorID: selectedActionActorID),
+        selectedActionActorID: selectedActionActorID,
+        isSessionReadOnly: isSessionReadOnly,
+        isSessionActionInFlight: isSessionActionInFlight
+      )
+    }
+
+    func actionActorOptions(
+      selectedActionActorID: String
+    ) -> [AgentRegistration] {
+      var seenAgentIDs = Set<String>()
+      var options: [AgentRegistration] = []
+
+      func append(_ agent: AgentRegistration?) {
+        guard let agent else {
+          return
+        }
+        guard seenAgentIDs.insert(agent.agentId).inserted else {
+          return
+        }
+        options.append(agent)
+      }
+
+      for agent in detail.agents where agent.status == .active {
+        append(agent)
+      }
+      append(agentsByID[selectedActionActorID])
+      if let leaderID = detail.session.leaderId {
+        append(agentsByID[leaderID])
+      }
+      return options
+    }
+  }
+
+  public enum InspectorPrimaryContentState: Equatable, Sendable {
     case empty
     case loading(SessionSummary)
     case session(SessionDetail)
@@ -155,59 +296,14 @@ extension HarnessMonitorStore {
         return
       }
 
-      self = Self.resolveSelection(
-        selectedSession: selectedSession,
-        inspectorSelection: inspectorSelection,
+      self = InspectorLookupIndex(detail: selectedSession).primaryContent(
+        for: inspectorSelection,
         isPersistenceAvailable: isPersistenceAvailable
       )
     }
-
-    private static func resolveSelection(
-      selectedSession: SessionDetail,
-      inspectorSelection: HarnessMonitorStore.InspectorSelection,
-      isPersistenceAvailable: Bool
-    ) -> Self {
-      switch inspectorSelection {
-      case .none:
-        return .session(selectedSession)
-      case .task(let taskID):
-        guard let task = selectedSession.tasks.first(where: { $0.taskId == taskID }) else {
-          return .session(selectedSession)
-        }
-        return .task(
-          InspectorTaskSelectionState(
-            task: task,
-            notesSessionID: selectedSession.session.sessionId,
-            isPersistenceAvailable: isPersistenceAvailable
-          )
-        )
-      case .agent(let agentID):
-        guard let agent = selectedSession.agents.first(where: { $0.agentId == agentID }) else {
-          return .session(selectedSession)
-        }
-        return .agent(
-          InspectorAgentSelectionState(
-            agent: agent,
-            activity: selectedSession.agentActivity.first(where: { $0.agentId == agent.agentId })
-          )
-        )
-      case .signal(let signalID):
-        guard
-          let signal = selectedSession.signals.first(where: { $0.signal.signalId == signalID })
-        else {
-          return .session(selectedSession)
-        }
-        return .signal(signal)
-      case .observer:
-        if let observer = selectedSession.observer {
-          return .observer(observer)
-        }
-        return .session(selectedSession)
-      }
-    }
   }
 
-  public struct InspectorActionContext: Equatable {
+  public struct InspectorActionContext: Equatable, Sendable {
     public let detail: SessionDetail
     public let selectedTask: WorkItem?
     public let selectedAgent: AgentRegistration?
@@ -252,70 +348,20 @@ extension HarnessMonitorStore {
         return nil
       }
 
-      let selectedTask: WorkItem?
-      if case .task(let taskID) = inspectorSelection {
-        selectedTask = detail.tasks.first(where: { $0.taskId == taskID })
-      } else {
-        selectedTask = nil
-      }
-
-      let selectedAgent: AgentRegistration?
-      if case .agent(let agentID) = inspectorSelection {
-        selectedAgent = detail.agents.first(where: { $0.agentId == agentID })
-      } else {
-        selectedAgent = nil
-      }
-
-      let selectedObserver: ObserverSummary?
-      if case .observer = inspectorSelection {
-        selectedObserver = detail.observer
-      } else {
-        selectedObserver = nil
-      }
-
-      self.init(
-        detail: detail,
-        selectedTask: selectedTask,
-        selectedAgent: selectedAgent,
-        selectedObserver: selectedObserver,
+      guard let actionContext = InspectorLookupIndex(detail: detail).actionContext(
+        inspectorSelection: inspectorSelection,
         isPersistenceAvailable: isPersistenceAvailable,
-        actionActorOptions: Self.actionActorOptions(
-          for: detail,
-          selectedActionActorID: selectedActionActorID
-        ),
         selectedActionActorID: selectedActionActorID,
         isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight
-      )
-    }
-
-    private static func actionActorOptions(
-      for detail: SessionDetail,
-      selectedActionActorID: String
-    ) -> [AgentRegistration] {
-      var seenAgentIDs = Set<String>()
-      var options: [AgentRegistration] = []
-
-      func append(_ agent: AgentRegistration?) {
-        guard let agent else {
-          return
-        }
-        guard seenAgentIDs.insert(agent.agentId).inserted else {
-          return
-        }
-        options.append(agent)
+      ) else {
+        return nil
       }
-
-      for agent in detail.agents where agent.status == .active {
-        append(agent)
-      }
-      append(detail.agents.first { $0.agentId == selectedActionActorID })
-      append(detail.agents.first { $0.agentId == detail.session.leaderId })
-      return options
+      self = actionContext
     }
   }
 
-  public struct SessionProjectionState: Equatable {
+  public struct SessionProjectionState: Equatable, Sendable {
     public var groupedSessions: [SessionGroup] = []
     public var filteredSessionCount = 0
     public var totalSessionCount = 0
@@ -334,7 +380,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct SessionSearchPresentationState: Equatable {
+  public struct SessionSearchPresentationState: Equatable, Sendable {
     public var isSearchActive = false
     public var emptyState: SidebarEmptyState = .noSessions
 
@@ -347,7 +393,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct SessionSearchResultsListState: Equatable {
+  public struct SessionSearchResultsListState: Equatable, Sendable {
     public var visibleSessionIDs: [String] = []
 
     public init(
@@ -357,7 +403,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct SessionSearchResultsState: Equatable {
+  public struct SessionSearchResultsState: Equatable, Sendable {
     public var presentation = SessionSearchPresentationState()
     public var filteredSessionCount = 0
     public var totalSessionCount = 0

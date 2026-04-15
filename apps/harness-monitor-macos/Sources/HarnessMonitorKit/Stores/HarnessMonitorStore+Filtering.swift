@@ -25,8 +25,11 @@ extension HarnessMonitorStore {
     @ObservationIgnored var orderedSessionIDsBySortOrder: [SessionSortOrder: [String]] = [:]
     @ObservationIgnored var queryTokens: [String] = []
     @ObservationIgnored var searchRebuildTask: Task<Void, Never>?
+    @ObservationIgnored var projectionComputationTask: Task<Void, Never>?
+    @ObservationIgnored var projectionGeneration: UInt64 = 0
     @ObservationIgnored var debugCatalogRebuildCount = 0
     @ObservationIgnored var debugProjectionRebuildCount = 0
+    @ObservationIgnored var debugProjectionComputationDelayNanoseconds: UInt64 = 0
 
     static let searchRebuildDebounceNanoseconds: UInt64 = 150_000_000
 
@@ -165,7 +168,7 @@ extension HarnessMonitorStore {
     }
 
     public func flushPendingSearchRebuild() {
-      guard searchRebuildTask != nil else {
+      guard searchRebuildTask != nil || projectionComputationTask != nil else {
         return
       }
       cancelPendingSearchRebuild()

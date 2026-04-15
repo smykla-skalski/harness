@@ -73,13 +73,82 @@ extension HarnessMonitorStore.SessionIndexSlice {
       guard self.controls.searchText == targetSearchText else {
         return
       }
-      self.rebuildProjection(change: .projection)
+      self.rebuildProjectionAsync(change: .projection)
     }
   }
 
   func cancelPendingSearchRebuild() {
     searchRebuildTask?.cancel()
     searchRebuildTask = nil
+  }
+
+  func cancelPendingProjectionRebuild() {
+    projectionComputationTask?.cancel()
+    projectionComputationTask = nil
+  }
+
+  func advanceProjectionGeneration() -> UInt64 {
+    projectionGeneration &+= 1
+    return projectionGeneration
+  }
+
+  func projectionComputationInput() -> ProjectionComputationInput {
+    ProjectionComputationInput(
+      projectCatalogs: projectCatalogs,
+      sessionRecordsByID: sessionRecordsByID,
+      orderedSessionIDsBySortOrder: orderedSessionIDsBySortOrder,
+      sessionFilter: controls.sessionFilter,
+      sessionFocusFilter: controls.sessionFocusFilter,
+      sessionSortOrder: controls.sessionSortOrder,
+      queryTokens: Self.normalizedQueryTokens(for: controls.searchText),
+      totalSessionCount: catalog.totalSessionCount
+    )
+  }
+
+  func applyProjectionOutput(
+    _ output: ProjectionComputationOutput,
+    change: Change
+  ) {
+    queryTokens = output.queryTokens
+    if let projectionState = output.projectionState {
+      projection.apply(projectionState)
+    }
+    searchResults.apply(output.searchResultsState)
+    onChanged?(change)
+  }
+
+  func rebuildProjectionAsync(change: Change) {
+    searchRebuildTask?.cancel()
+    searchRebuildTask = nil
+    cancelPendingProjectionRebuild()
+
+    let generation = advanceProjectionGeneration()
+    let request = projectionComputationInput()
+    let delayNanoseconds = debugProjectionComputationDelayNanoseconds
+
+    projectionComputationTask = Task { @MainActor [weak self] in
+      let output = await Task.detached(priority: .userInitiated) {
+        () -> ProjectionComputationOutput? in
+        if delayNanoseconds > 0 {
+          try? await Task.sleep(nanoseconds: delayNanoseconds)
+        }
+        guard !Task.isCancelled else {
+          return nil
+        }
+        return Self.computeProjectionOutput(from: request)
+      }.value
+
+      guard !Task.isCancelled, let self, let output else {
+        return
+      }
+      guard self.projectionGeneration == generation else {
+        return
+      }
+
+      self.debugProjectionRebuildCount += 1
+      self.applyProjectionOutput(output, change: change)
+      self.projectionComputationTask = nil
+    }
   }
 
   func rebuildCatalogAndProjection(change: Change) {
@@ -200,52 +269,11 @@ extension HarnessMonitorStore.SessionIndexSlice {
   func rebuildProjection(change: Change) {
     searchRebuildTask?.cancel()
     searchRebuildTask = nil
+    cancelPendingProjectionRebuild()
+    _ = advanceProjectionGeneration()
     debugProjectionRebuildCount += 1
-    queryTokens = Self.normalizedQueryTokens(for: controls.searchText)
-
-    var visibleSessionIDSet = Set<String>()
-    visibleSessionIDSet.reserveCapacity(sessionRecordsByID.count)
-    for summary in catalog.sessions {
-      if let record = sessionRecordsByID[summary.sessionId],
-        matchesCurrentFilters(record)
-      {
-        visibleSessionIDSet.insert(summary.sessionId)
-      }
-    }
-    let orderedVisibleSessionIDs = orderedVisibleSessionIDs(in: visibleSessionIDSet)
-    let emptyState: HarnessMonitorStore.SidebarEmptyState
-    if catalog.totalSessionCount == 0 {
-      emptyState = .noSessions
-    } else if orderedVisibleSessionIDs.isEmpty {
-      emptyState = .noMatches
-    } else {
-      emptyState = .sessionsAvailable
-    }
-
-    if queryTokens.isEmpty {
-      projection.apply(
-        HarnessMonitorStore.SessionProjectionState(
-          groupedSessions: buildGroupedSessions(visibleSessionIDSet: visibleSessionIDSet),
-          filteredSessionCount: orderedVisibleSessionIDs.count,
-          totalSessionCount: catalog.totalSessionCount,
-          emptyState: emptyState
-        )
-      )
-    }
-    let nextSearchResults = HarnessMonitorStore.SessionSearchResultsState(
-      presentation: HarnessMonitorStore.SessionSearchPresentationState(
-        isSearchActive: !queryTokens.isEmpty,
-        emptyState: emptyState
-      ),
-      filteredSessionCount: orderedVisibleSessionIDs.count,
-      totalSessionCount: catalog.totalSessionCount,
-      list: HarnessMonitorStore.SessionSearchResultsListState(
-        visibleSessionIDs: orderedVisibleSessionIDs
-      )
-    )
-    searchResults.apply(nextSearchResults)
-
-    onChanged?(change)
+    let output = Self.computeProjectionOutput(from: projectionComputationInput())
+    applyProjectionOutput(output, change: change)
   }
 
   func buildGroupedSessions(

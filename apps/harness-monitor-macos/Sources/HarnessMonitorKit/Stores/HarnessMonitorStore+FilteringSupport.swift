@@ -1,6 +1,6 @@
 import Foundation
 
-public enum SessionSortOrder: String, CaseIterable, Identifiable {
+public enum SessionSortOrder: String, CaseIterable, Identifiable, Sendable {
   case recentActivity
   case name
   case status
@@ -37,7 +37,7 @@ extension SessionStatus {
   }
 }
 
-public enum SessionFocusFilter: String, CaseIterable, Identifiable {
+public enum SessionFocusFilter: String, CaseIterable, Identifiable, Sendable {
   case all
   case openWork
   case blocked
@@ -84,7 +84,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     case summaryOnly
   }
 
-  struct SessionRecord {
+  struct SessionRecord: Sendable {
     let summary: SessionSummary
     let normalizedSearchCorpus: String
     let normalizedName: String
@@ -101,7 +101,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     var recentActivitySortKey: String { summary.updatedAt }
   }
 
-  struct CheckoutCatalog {
+  struct CheckoutCatalog: Sendable {
     let checkoutId: String
     let title: String
     let isWorktree: Bool
@@ -123,21 +123,89 @@ extension HarnessMonitorStore.SessionIndexSlice {
     }
   }
 
-  struct CheckoutAccumulator {
+  struct CheckoutAccumulator: Sendable {
     let checkoutId: String
     let title: String
     let isWorktree: Bool
     var sessionIDs: [String]
   }
 
-  struct ProjectCatalog {
+  struct ProjectCatalog: Sendable {
     let project: ProjectSummary
     let checkouts: [CheckoutCatalog]
+  }
+
+  struct ProjectionComputationInput: Sendable {
+    let projectCatalogs: [ProjectCatalog]
+    let sessionRecordsByID: [String: SessionRecord]
+    let orderedSessionIDsBySortOrder: [SessionSortOrder: [String]]
+    let sessionFilter: HarnessMonitorStore.SessionFilter
+    let sessionFocusFilter: SessionFocusFilter
+    let sessionSortOrder: SessionSortOrder
+    let queryTokens: [String]
+    let totalSessionCount: Int
+  }
+
+  struct ProjectionComputationOutput: Sendable {
+    let queryTokens: [String]
+    let projectionState: HarnessMonitorStore.SessionProjectionState?
+    let searchResultsState: HarnessMonitorStore.SessionSearchResultsState
   }
 
   func orderedVisibleSessionIDs(in visibleSessionIDSet: Set<String>) -> [String] {
     orderedSessionIDsBySortOrder[controls.sessionSortOrder, default: []]
       .filter { visibleSessionIDSet.contains($0) }
+  }
+
+  nonisolated static func computeProjectionOutput(
+    from input: ProjectionComputationInput
+  ) -> ProjectionComputationOutput {
+    var visibleSessionIDSet = Set<String>()
+    visibleSessionIDSet.reserveCapacity(input.sessionRecordsByID.count)
+    for record in input.sessionRecordsByID.values where matchesFilters(record, using: input) {
+      visibleSessionIDSet.insert(record.summary.sessionId)
+    }
+
+    let orderedVisibleSessionIDs = orderedVisibleSessionIDs(
+      in: visibleSessionIDSet,
+      using: input
+    )
+    let emptyState: HarnessMonitorStore.SidebarEmptyState
+    if input.totalSessionCount == 0 {
+      emptyState = .noSessions
+    } else if orderedVisibleSessionIDs.isEmpty {
+      emptyState = .noMatches
+    } else {
+      emptyState = .sessionsAvailable
+    }
+
+    let projectionState: HarnessMonitorStore.SessionProjectionState?
+    if input.queryTokens.isEmpty {
+      projectionState = HarnessMonitorStore.SessionProjectionState(
+        groupedSessions: buildGroupedSessions(from: input, visibleSessionIDSet: visibleSessionIDSet),
+        filteredSessionCount: orderedVisibleSessionIDs.count,
+        totalSessionCount: input.totalSessionCount,
+        emptyState: emptyState
+      )
+    } else {
+      projectionState = nil
+    }
+
+    return ProjectionComputationOutput(
+      queryTokens: input.queryTokens,
+      projectionState: projectionState,
+      searchResultsState: HarnessMonitorStore.SessionSearchResultsState(
+        presentation: HarnessMonitorStore.SessionSearchPresentationState(
+          isSearchActive: !input.queryTokens.isEmpty,
+          emptyState: emptyState
+        ),
+        filteredSessionCount: orderedVisibleSessionIDs.count,
+        totalSessionCount: input.totalSessionCount,
+        list: HarnessMonitorStore.SessionSearchResultsListState(
+          visibleSessionIDs: orderedVisibleSessionIDs
+        )
+      )
+    )
   }
 
   func sortedSessionIDs(
@@ -203,6 +271,64 @@ extension HarnessMonitorStore.SessionIndexSlice {
       return true
     }
     return queryTokens.allSatisfy(record.normalizedSearchCorpus.contains)
+  }
+
+  nonisolated static func matchesFilters(
+    _ record: SessionRecord,
+    using input: ProjectionComputationInput
+  ) -> Bool {
+    input.sessionFilter.includes(record.summary.status)
+      && input.sessionFocusFilter.includes(record.summary)
+      && searchMatches(record, queryTokens: input.queryTokens)
+  }
+
+  nonisolated static func searchMatches(
+    _ record: SessionRecord,
+    queryTokens: [String]
+  ) -> Bool {
+    guard !queryTokens.isEmpty else {
+      return true
+    }
+    return queryTokens.allSatisfy(record.normalizedSearchCorpus.contains)
+  }
+
+  nonisolated static func orderedVisibleSessionIDs(
+    in visibleSessionIDSet: Set<String>,
+    using input: ProjectionComputationInput
+  ) -> [String] {
+    input.orderedSessionIDsBySortOrder[input.sessionSortOrder, default: []]
+      .filter { visibleSessionIDSet.contains($0) }
+  }
+
+  nonisolated static func buildGroupedSessions(
+    from input: ProjectionComputationInput,
+    visibleSessionIDSet: Set<String>
+  ) -> [HarnessMonitorStore.SessionGroup] {
+    input.projectCatalogs.compactMap { projectCatalog -> HarnessMonitorStore.SessionGroup? in
+      let checkoutGroups = projectCatalog.checkouts.compactMap {
+        checkout -> HarnessMonitorStore.CheckoutGroup? in
+        let checkoutSessionIDs =
+          checkout
+          .orderedSessionIDs(for: input.sessionSortOrder)
+          .filter { visibleSessionIDSet.contains($0) }
+        guard !checkoutSessionIDs.isEmpty else {
+          return nil
+        }
+        return HarnessMonitorStore.CheckoutGroup(
+          checkoutId: checkout.checkoutId,
+          title: checkout.title,
+          isWorktree: checkout.isWorktree,
+          sessionIDs: checkoutSessionIDs
+        )
+      }
+      guard !checkoutGroups.isEmpty else {
+        return nil
+      }
+      return HarnessMonitorStore.SessionGroup(
+        project: projectCatalog.project,
+        checkoutGroups: checkoutGroups
+      )
+    }
   }
 
   func requiresCatalogRebuild(
