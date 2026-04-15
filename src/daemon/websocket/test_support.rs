@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
+use std::env::temp_dir;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use serde_json::json;
 use tokio::sync::broadcast;
+use uuid::Uuid;
 
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
@@ -10,7 +12,7 @@ use crate::daemon::agent_tui::{
     AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
@@ -59,12 +61,56 @@ pub(super) fn seed_sample_timeline(state: &DaemonHttpState) {
     .expect("sync conversation events");
 }
 
+pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState {
+    let (sender, _) = broadcast::channel(8);
+    let db = Arc::new(OnceLock::new());
+    let async_db = Arc::new(OnceLock::new());
+    let db_path = temp_dir().join(format!("harness-ws-test-async-{}.db", Uuid::new_v4()));
+    let sync_db = DaemonDb::open(&db_path).expect("open file db");
+    persist_sample_session(&sync_db);
+    sync_db
+        .sync_conversation_events(
+            "sess-test-1",
+            "codex-worker",
+            "codex",
+            &[sample_tool_result_event()],
+        )
+        .expect("sync conversation events");
+    drop(sync_db);
+
+    assert!(
+        async_db
+            .set(Arc::new(
+                AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db"),
+            ))
+            .is_ok(),
+        "install async db"
+    );
+
+    DaemonHttpState {
+        token: "token".into(),
+        sender: sender.clone(),
+        manifest: sample_manifest("18.2.3", "2026-04-04T00:00:00Z"),
+        daemon_epoch: "epoch".into(),
+        replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
+        db: db.clone(),
+        async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db),
+        db_path: Some(db_path),
+        codex_controller: CodexControllerHandle::new(sender.clone(), db.clone(), false),
+        agent_tui_manager: AgentTuiManagerHandle::new(sender, db, false),
+    }
+}
+
 fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db = Arc::new(OnceLock::new());
+    let db_path =
+        install_db.then(|| temp_dir().join(format!("harness-ws-test-{}.db", Uuid::new_v4())));
     if install_db {
         db.set(Arc::new(Mutex::new(
-            DaemonDb::open_in_memory().expect("open in-memory db"),
+            DaemonDb::open(db_path.as_ref().expect("db path")).expect("open file db"),
         )))
         .expect("install db");
     }
@@ -76,6 +122,8 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
         db: db.clone(),
+        async_db: crate::daemon::http::AsyncDaemonDbSlot::empty(),
+        db_path,
         codex_controller: CodexControllerHandle::new(sender.clone(), db.clone(), false),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db, false),
     }

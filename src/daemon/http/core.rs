@@ -8,14 +8,14 @@ use axum::{Json, Router};
 
 use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::protocol::{HostBridgeReconfigureRequest, SetLogLevelRequest};
-use crate::daemon::read_cache::run_preferred_db_read;
+use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 use crate::daemon::websocket::ws_upgrade_handler;
 use crate::errors::CliError;
 use crate::session::persona;
 
 use super::DaemonHttpState;
-use super::auth::{require_auth, try_db_guard};
+use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_global;
 
@@ -44,15 +44,16 @@ pub(super) async fn get_health(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = try_db_guard(&state);
-    let db_ref = db_guard.as_deref();
-    timed_json(
-        "GET",
-        "/v1/health",
-        &request_id,
-        start,
-        service::health_response(&state.manifest, db_ref),
-    )
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::health_response_async(&state.manifest, Some(async_db.as_ref())).await
+    } else {
+        let manifest = state.manifest.clone();
+        run_canonical_db_read(&state.db, state.db_path.clone(), "health", {
+            move |db| service::health_response(&manifest, Some(db))
+        })
+        .await
+    };
+    timed_json("GET", "/v1/health", &request_id, start, result)
 }
 
 pub(super) async fn get_diagnostics(
@@ -64,14 +65,15 @@ pub(super) async fn get_diagnostics(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = try_db_guard(&state);
-    timed_json(
-        "GET",
-        "/v1/diagnostics",
-        &request_id,
-        start,
-        service::diagnostics_report(db_guard.as_deref()),
-    )
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::diagnostics_report_async(Some(async_db.as_ref())).await
+    } else {
+        run_canonical_db_read(&state.db, state.db_path.clone(), "diagnostics", |db| {
+            service::diagnostics_report(Some(db))
+        })
+        .await
+    };
+    timed_json("GET", "/v1/diagnostics", &request_id, start, result)
 }
 
 async fn get_personas(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
@@ -157,18 +159,22 @@ async fn put_log_level(
     )
 }
 
-async fn get_projects(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+pub(super) async fn get_projects(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = run_preferred_db_read(
-        &state.db,
-        "projects",
-        |db| service::list_projects(Some(db)),
-        || service::list_projects(None),
-    )
-    .await;
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::list_projects_async(Some(async_db.as_ref())).await
+    } else {
+        run_canonical_db_read(&state.db, state.db_path.clone(), "projects", |db| {
+            service::list_projects(Some(db))
+        })
+        .await
+    };
     timed_json("GET", "/v1/projects", &request_id, start, result)
 }

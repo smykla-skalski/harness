@@ -23,6 +23,7 @@ use harness_testkit::with_isolated_harness_env;
 mod support;
 use support::*;
 
+mod async_stream;
 mod background_import;
 mod config;
 mod diagnostics;

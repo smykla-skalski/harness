@@ -1,28 +1,17 @@
 use super::{
     CliError, CliErrorKind, DaemonControlResponse, DaemonDiagnosticsReport, DaemonManifest,
     DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL, SetLogLevelRequest,
-    StreamEvent, bridge, broadcast, index, launchd, snapshot, state, utc_now,
+    StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
 
 /// Build a point-in-time daemon status report.
 ///
-/// Uses the daemon `SQLite` database (WAL mode, safe for concurrent offline
-/// reads) when available, falling back to file-based discovery.
-///
 /// # Errors
-/// Returns `CliError` on discovery failures.
+/// Returns `CliError` when the daemon database or manifest cannot be loaded.
 pub fn status_report() -> Result<DaemonStatusReport, CliError> {
     let db_path = state::daemon_root().join("harness.db");
-    let db = super::db::DaemonDb::open(&db_path).ok();
-
-    let (project_count, worktree_count, session_count) = if let Some(ref db) = db {
-        db.health_counts()?
-    } else {
-        let projects = snapshot::project_summaries()?;
-        let sessions = snapshot::session_summaries(true)?;
-        let worktree_count = projects.iter().map(|project| project.worktrees.len()).sum();
-        (projects.len(), worktree_count, sessions.len())
-    };
+    let db = super::db::DaemonDb::open(&db_path)?;
+    let (project_count, worktree_count, session_count) = db.health_counts()?;
 
     Ok(DaemonStatusReport {
         manifest: state::load_running_manifest()?,
@@ -47,6 +36,33 @@ pub fn health_response(
     } else {
         index::fast_counts()
     };
+    Ok(HealthResponse {
+        status: "ok".into(),
+        version: manifest.version.clone(),
+        pid: manifest.pid,
+        endpoint: manifest.endpoint.clone(),
+        started_at: manifest.started_at.clone(),
+        log_level: current_log_level(),
+        project_count,
+        worktree_count,
+        session_count,
+    })
+}
+
+/// Build the daemon health response using the async `SQLx` pool when available.
+///
+/// # Errors
+/// Returns [`CliError`] on database failures.
+pub(crate) async fn health_response_async(
+    manifest: &DaemonManifest,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<HealthResponse, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async health reads",
+        ))
+    })?;
+    let (project_count, worktree_count, session_count) = async_db.health_counts().await?;
     Ok(HealthResponse {
         status: "ok".into(),
         version: manifest.version.clone(),
@@ -91,6 +107,34 @@ pub fn diagnostics_report(
     })
 }
 
+/// Build a richer diagnostics report for the daemon preferences screen using
+/// the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when daemon state cannot be loaded.
+pub(crate) async fn diagnostics_report_async(
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<DaemonDiagnosticsReport, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async diagnostics reads",
+        ))
+    })?;
+    let manifest = state::load_manifest()?.map(|mut m| {
+        if let Ok(live_bridge) = bridge::host_bridge_manifest() {
+            m.host_bridge = live_bridge;
+        }
+        m
+    });
+    let health = if let Some(manifest) = manifest.as_ref() {
+        Some(health_response_async(manifest, Some(async_db)).await?)
+    } else {
+        None
+    };
+
+    diagnostics_from_async_db(async_db, manifest, health).await
+}
+
 pub(crate) fn diagnostics_from_db(
     db: &super::db::DaemonDb,
     manifest: Option<DaemonManifest>,
@@ -104,6 +148,30 @@ pub(crate) fn diagnostics_from_db(
         None => state::diagnostics()?,
     };
     let recent_events = db.load_recent_daemon_events(16)?;
+
+    Ok(DaemonDiagnosticsReport {
+        health,
+        manifest,
+        launch_agent,
+        workspace,
+        recent_events,
+    })
+}
+
+async fn diagnostics_from_async_db(
+    async_db: &super::db::AsyncDaemonDb,
+    manifest: Option<DaemonManifest>,
+    health: Option<HealthResponse>,
+) -> Result<DaemonDiagnosticsReport, CliError> {
+    let launch_agent = async_db
+        .load_cached_launch_agent_status()
+        .await?
+        .unwrap_or_else(launchd::launch_agent_status);
+    let workspace = match async_db.load_cached_workspace_diagnostics().await? {
+        Some(cached) => cached,
+        None => state::diagnostics()?,
+    };
+    let recent_events = async_db.load_recent_daemon_events(16).await?;
 
     Ok(DaemonDiagnosticsReport {
         health,

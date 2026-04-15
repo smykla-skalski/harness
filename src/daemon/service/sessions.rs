@@ -3,7 +3,8 @@ use super::{
     SESSION_LIVENESS_REFRESH_CACHE, SESSION_LIVENESS_REFRESH_TTL, SessionDetail,
     SessionExtensionsPayload, SessionState, SessionStatus, SessionSummary, TimelineCursor,
     TimelineEntry, TimelineWindowRequest, TimelineWindowResponse, index,
-    reconcile_expired_pending_signals_for_db, session_service, session_storage, snapshot, timeline,
+    reconcile_expired_pending_signals_for_db, session_not_found, session_service, session_storage,
+    snapshot, timeline,
 };
 
 /// List discovered projects known to the daemon.
@@ -15,6 +16,21 @@ pub fn list_projects(db: Option<&super::db::DaemonDb>) -> Result<Vec<ProjectSumm
         return db.list_project_summaries();
     }
     snapshot::project_summaries()
+}
+
+/// List discovered projects from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] on query failures.
+pub(crate) async fn list_projects_async(
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<Vec<ProjectSummary>, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async project reads",
+        ))
+    })?;
+    async_db.list_project_summaries().await
 }
 
 /// List discovered sessions across all indexed projects.
@@ -30,6 +46,22 @@ pub fn list_sessions(
         return db.list_session_summaries_full();
     }
     snapshot::session_summaries(include_all)
+}
+
+/// List discovered sessions from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] on query failures.
+pub(crate) async fn list_sessions_async(
+    _include_all: bool,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<Vec<SessionSummary>, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async session reads",
+        ))
+    })?;
+    async_db.list_session_summaries().await
 }
 
 /// Load a single session detail snapshot.
@@ -50,6 +82,70 @@ pub fn session_detail(
         return snapshot::session_detail_from_resolved_with_db(&resolved, db);
     }
     snapshot::session_detail(session_id)
+}
+
+/// Load a full session detail snapshot from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or loaded.
+pub(crate) async fn session_detail_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async session reads",
+        ))
+    })?;
+    let resolved = async_db
+        .resolve_session(session_id)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))?;
+    let signals = async_db.load_signals(session_id).await?;
+    let agent_activity = async_db.load_agent_activity(session_id).await?;
+    snapshot::build_session_detail_from_cached_runtime(&resolved, signals, agent_activity)
+}
+
+/// Load a lightweight session detail with only in-memory fields from the
+/// canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or loaded.
+pub(crate) async fn session_detail_core_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async session reads",
+        ))
+    })?;
+    let resolved = async_db
+        .resolve_session(session_id)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))?;
+    Ok(snapshot::build_session_detail_core(&resolved))
+}
+
+/// Load a session timeline window from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or the timeline
+/// ledger cannot be loaded.
+pub(crate) async fn session_timeline_window_async(
+    session_id: &str,
+    request: &TimelineWindowRequest,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<TimelineWindowResponse, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async session timeline reads",
+        ))
+    })?;
+    async_db
+        .load_session_timeline_window(session_id, request)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))
 }
 
 /// Load a merged session timeline.
@@ -229,6 +325,31 @@ pub fn session_extensions(
     }
     let resolved = index::resolve_session(session_id)?;
     snapshot::build_session_extensions(&resolved, None)
+}
+
+/// Load the expensive session detail extensions from the canonical async daemon DB.
+///
+/// This resolves the session from the async database, then loads the remaining
+/// runtime-backed extension fields through the existing snapshot helpers.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or extension loading fails.
+pub(crate) async fn session_extensions_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<SessionExtensionsPayload, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async session extension reads",
+        ))
+    })?;
+    let resolved = async_db
+        .resolve_session(session_id)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))?;
+    let signals = async_db.load_signals(session_id).await?;
+    let agent_activity = async_db.load_agent_activity(session_id).await?;
+    snapshot::build_session_extensions_from_cached_runtime(&resolved, signals, agent_activity)
 }
 
 pub(crate) fn reconcile_active_session_liveness_for_reads(
