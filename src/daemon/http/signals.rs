@@ -40,17 +40,7 @@ pub(super) async fn post_send_signal(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::send_signal(
-        &session_id,
-        &request,
-        db_ref,
-        Some(&state.agent_tui_manager),
-    );
-    if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
-    }
+    let result = send_signal_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
         "/v1/sessions/{id}/signal",
@@ -58,6 +48,39 @@ pub(super) async fn post_send_signal(
         start,
         result,
     )
+}
+
+async fn send_signal_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SignalSendRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        let result = service::send_signal_async(
+            session_id,
+            request,
+            async_db.as_ref(),
+            Some(&state.agent_tui_manager),
+        )
+        .await;
+        if result.is_ok() {
+            service::broadcast_session_snapshot_async(
+                &state.sender,
+                session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+        }
+        return result;
+    }
+
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::send_signal(session_id, request, db_ref, Some(&state.agent_tui_manager));
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, session_id, db_ref);
+    }
+    result
 }
 
 pub(super) async fn post_cancel_signal(

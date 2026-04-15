@@ -7,7 +7,7 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::DiscoveredProject;
 use crate::session::service::build_new_session;
 
-use super::loops::{CHANGE_TRACKING_POLL_SQL, poll_change_tracking};
+use super::loops::{CHANGE_TRACKING_POLL_SQL, poll_change_tracking, poll_change_tracking_async};
 use super::refresh::{emit_watch_changes, emit_watch_changes_with};
 use super::state::WatchChanges;
 
@@ -41,6 +41,24 @@ fn poll_change_tracking_uses_change_seq_index() {
             .any(|detail| detail.contains("idx_change_tracking_change_seq")),
         "expected explain plan to use change_seq index, got {details:?}"
     );
+}
+
+#[tokio::test]
+async fn poll_change_tracking_async_accepts_raw_session_scope() {
+    let db_dir = tempdir().expect("tempdir");
+    let db_path = db_dir.path().join("watch-async.db");
+    let db = DaemonDb::open(&db_path).expect("open db");
+    db.bump_change("watch-async-sess").expect("bump change");
+    drop(db);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async db");
+    let mut last_change_seq = 0;
+    let changes = poll_change_tracking_async(&async_db, &mut last_change_seq).await;
+
+    assert!(changes.session_ids.contains("watch-async-sess"));
+    assert_eq!(last_change_seq, 1);
 }
 
 #[test]

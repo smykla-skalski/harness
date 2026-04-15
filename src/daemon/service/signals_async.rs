@@ -1,16 +1,15 @@
 use std::path::{Path, PathBuf};
 
-use crate::agents::runtime::signal::{AckResult, read_pending_signals};
-use crate::agents::runtime::{AgentRuntime, runtime_for_name};
-use crate::daemon::index::ResolvedSession;
-
 use super::{
     AgentRegistration, CliError, CliErrorKind, SessionDetail, SessionLogEntry, SessionTransition,
     SignalAck, SignalAckRequest, SignalCancelRequest, build_log_entry, effective_project_dir,
     session_detail_async, session_not_found, session_service, snapshot, utc_now, write_signal_ack,
 };
+use crate::agents::runtime::signal::{AckResult, read_pending_signals};
+use crate::agents::runtime::{AgentRuntime, runtime_for_name};
+use crate::daemon::index::ResolvedSession;
 
-async fn resolved_session_for_signal_mutation(
+pub(super) async fn resolved_session_for_signal_mutation(
     async_db: &super::db::AsyncDaemonDb,
     session_id: &str,
 ) -> Result<ResolvedSession, CliError> {
@@ -20,7 +19,7 @@ async fn resolved_session_for_signal_mutation(
         .ok_or_else(|| session_not_found(session_id))
 }
 
-async fn bump_session(
+pub(super) async fn bump_session(
     async_db: &super::db::AsyncDaemonDb,
     session_id: &str,
 ) -> Result<(), CliError> {
@@ -28,7 +27,7 @@ async fn bump_session(
     async_db.bump_change("global").await
 }
 
-async fn refresh_signal_index_for_resolved(
+pub(super) async fn refresh_signal_index_for_resolved(
     async_db: &super::db::AsyncDaemonDb,
     resolved: &ResolvedSession,
 ) -> Result<(), CliError> {
@@ -84,7 +83,7 @@ fn signal_session_id_for_agent<'a>(session_id: &'a str, agent: &'a AgentRegistra
     agent.agent_session_id.as_deref().unwrap_or(session_id)
 }
 
-fn runtime_for_agent(runtime_name: &str) -> Result<&'static dyn AgentRuntime, CliError> {
+pub(super) fn runtime_for_agent(runtime_name: &str) -> Result<&'static dyn AgentRuntime, CliError> {
     runtime_for_name(runtime_name).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "unknown runtime '{runtime_name}'"
@@ -203,7 +202,6 @@ async fn append_started_task_log(
         .append_log_entry(&assigned_task_log_entry(session_id, task_id, agent_id))
         .await
 }
-
 /// Cancel a pending signal while persisting the canonical async DB snapshot.
 ///
 /// # Errors

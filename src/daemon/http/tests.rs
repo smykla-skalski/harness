@@ -32,7 +32,7 @@ use super::sessions::{
     SessionScopeQuery, get_session, get_sessions, get_timeline, post_end_session,
     post_observe_session, post_session_join, post_session_start,
 };
-use super::signals::{post_cancel_signal, post_signal_ack};
+use super::signals::{post_cancel_signal, post_send_signal, post_signal_ack};
 use super::tasks::{
     post_task_assign, post_task_checkpoint, post_task_create, post_task_drop,
     post_task_queue_policy, post_task_update,
