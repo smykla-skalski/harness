@@ -1,10 +1,13 @@
+use crate::daemon::index as daemon_index;
+
 use super::{
-    CliError, CliErrorKind, ObserveSessionRequest, PathBuf, ReadyEventPayload, Serialize,
-    SessionDetail, SessionUpdatedPayload, SessionsUpdatedPayload, StreamEvent, Value, broadcast,
-    effective_project_dir, index, list_projects, list_projects_async, list_sessions,
-    list_sessions_async, session_detail, session_detail_core, session_detail_core_async,
-    session_extensions, session_extensions_async, session_observe, start_daemon_observe_loop,
-    sync_after_mutation, utc_now,
+    CliError, CliErrorKind, ObserveSessionRequest, ReadyEventPayload, Serialize, SessionDetail,
+    SessionUpdatedPayload, SessionsUpdatedPayload, StreamEvent, Value, apply_issue_tasks_to_db,
+    broadcast, effective_project_dir, list_projects, list_projects_async, list_sessions,
+    list_sessions_async, observe_actor_id, session_detail, session_detail_core,
+    session_detail_core_async, session_detail_from_daemon_db, session_extensions,
+    session_extensions_async, session_not_found, session_observe, start_daemon_observe_loop,
+    utc_now,
 };
 
 /// Start or refresh the daemon-owned session observation loop.
@@ -16,25 +19,33 @@ pub fn observe_session(
     request: Option<&ObserveSessionRequest>,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let actor_id = request
-        .and_then(|request| request.actor.as_deref())
-        .filter(|value| !value.trim().is_empty());
+    let actor_id = observe_actor_id(request);
+    if let Some(db) = db {
+        return observe_session_from_daemon_db(session_id, actor_id, db);
+    }
 
-    // Resolve project_dir from the DB when available, falling back to
-    // file-based discovery.
-    let project_dir = if let Some(db) = db
-        && let Some(dir) = db.project_dir_for_session(session_id)?
-    {
-        PathBuf::from(dir)
-    } else {
-        let resolved = index::resolve_session(session_id)?;
-        effective_project_dir(&resolved).to_path_buf()
-    };
-
+    let resolved = daemon_index::resolve_session(session_id)?;
+    let project_dir = effective_project_dir(&resolved).to_path_buf();
     let _ = session_observe::run_session_observe(session_id, &project_dir, actor_id)?;
     let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
+}
+
+fn observe_session_from_daemon_db(
+    session_id: &str,
+    actor_id: Option<&str>,
+    db: &super::db::DaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let _ = db.load_session_state_for_mutation(session_id)?;
+    let mut resolved = db
+        .resolve_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    let project_dir = effective_project_dir(&resolved).to_path_buf();
+    let issues = session_observe::scan_all_agents(&resolved.state, session_id, &project_dir)?;
+    apply_issue_tasks_to_db(db, &mut resolved, actor_id, &issues)?;
+    db.sync_runtime_transcripts(&resolved)?;
+    let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);
+    session_detail_from_daemon_db(session_id, db)
 }
 
 /// Build a `ready` stream event for SSE subscribers.

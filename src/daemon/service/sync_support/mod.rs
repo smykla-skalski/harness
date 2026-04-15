@@ -13,7 +13,6 @@ mod task_effects;
 
 pub(crate) use context::{
     effective_project_dir, project_dir_for_db_session, resolve_hook_agent, session_not_found,
-    sync_after_mutation,
 };
 pub(crate) use logs::{
     append_leave_signal_logs_to_db, append_task_drop_effect_logs, append_transfer_logs_to_async_db,

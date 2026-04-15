@@ -213,6 +213,7 @@ mod mutations;
 mod mutations_async;
 mod observe_async;
 mod observe_loop;
+mod observe_persistence;
 mod observe_stream;
 mod read_reconciliation;
 mod serve;
@@ -257,6 +258,10 @@ pub use status::{
 
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
+pub(crate) use observe_persistence::{
+    apply_heuristic_gap_tasks_to_async_db, apply_issue_tasks_to_async_db, apply_issue_tasks_to_db,
+    observe_actor_id,
+};
 pub(crate) use observe_stream::{
     broadcast_session_extensions_async, broadcast_session_snapshot_async,
     broadcast_session_updated_core_async, broadcast_sessions_updated_async,
@@ -279,7 +284,7 @@ pub(crate) use sync_support::{
     append_transfer_logs_to_async_db, append_transfer_logs_to_db, build_log_entry,
     effective_project_dir, pending_signal_record, project_dir_for_db_session,
     reconcile_expired_pending_signals_for_db, record_signal_ack, refresh_signal_index_for_db,
-    resolve_hook_agent, session_not_found, sync_after_mutation, task_drop_effect_signal_records,
+    resolve_hook_agent, session_not_found, task_drop_effect_signal_records,
     write_task_start_signals,
 };
 
