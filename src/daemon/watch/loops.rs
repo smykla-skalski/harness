@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -16,7 +16,7 @@ use super::refresh::{emit_watch_changes, refresh_watch_snapshot};
 use super::state::{
     PendingWatchPaths, RefreshScope, RuntimeSessionResolveCache, WatchChanges, WatchSnapshot,
 };
-use crate::daemon::db::{DaemonDb, session_id_from_change_scope};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_id_from_change_scope};
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 
@@ -29,13 +29,14 @@ pub(super) const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change
 /// is available, uses `change_tracking` versions instead of full filesystem
 /// discovery. Falls back to the legacy JSON-diff approach otherwise.
 #[must_use]
-pub fn spawn_watch_loop(
+pub(crate) fn spawn_watch_loop(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
     db: Option<Arc<Mutex<DaemonDb>>>,
+    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
 ) -> JoinHandle<()> {
     match db {
-        Some(db) => spawn_db_watch_loop(sender, interval, db),
+        Some(db) => spawn_db_watch_loop(sender, interval, db, async_db),
         None => spawn_legacy_watch_loop(sender, interval),
     }
 }
@@ -44,6 +45,7 @@ fn spawn_db_watch_loop(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
     db: Arc<Mutex<DaemonDb>>,
+    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
 ) -> JoinHandle<()> {
     spawn(async move {
         let root = index::projects_root();
@@ -85,13 +87,13 @@ fn spawn_db_watch_loop(
                 reindex_sessions_from_paths(&db, &paths, &mut resolve_cache);
             }
 
-            let Ok(db_guard) = db.lock() else {
-                continue;
+            let changes = {
+                let Ok(db_guard) = db.lock() else {
+                    continue;
+                };
+                poll_change_tracking(&db_guard, &mut last_change_seq)
             };
-            let changes = poll_change_tracking(&db_guard, &mut last_change_seq);
-            drop(db_guard);
-
-            emit_watch_changes(&sender, changes, Some(&db));
+            emit_watch_changes(&sender, changes, Some(&db), async_db.get()).await;
         }
     })
 }
@@ -152,7 +154,7 @@ fn spawn_legacy_watch_loop(
             else {
                 continue;
             };
-            emit_watch_changes(&sender, changes, None);
+            emit_watch_changes(&sender, changes, None, None).await;
         }
     })
 }

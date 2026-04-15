@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast::Sender;
 
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{SessionSummary, StreamEvent};
 use crate::daemon::{service, snapshot, timeline};
 use crate::errors::{CliError, CliErrorKind};
@@ -109,11 +109,17 @@ fn prune_removed_sessions(
     }
 }
 
-pub(super) fn emit_watch_changes(
+pub(super) async fn emit_watch_changes(
     sender: &Sender<StreamEvent>,
     changes: WatchChanges,
     db: Option<&Arc<Mutex<DaemonDb>>>,
+    async_db: Option<&Arc<AsyncDaemonDb>>,
 ) {
+    if let Some(async_db) = async_db {
+        emit_watch_changes_async(sender, changes, async_db).await;
+        return;
+    }
+
     emit_watch_changes_with(
         changes,
         db,
@@ -121,6 +127,25 @@ pub(super) fn emit_watch_changes(
         |session_id, db_ref| service::broadcast_session_updated_core(sender, session_id, db_ref),
         |session_id, db_ref| service::broadcast_session_extensions(sender, session_id, db_ref),
     );
+}
+
+async fn emit_watch_changes_async(
+    sender: &Sender<StreamEvent>,
+    changes: WatchChanges,
+    async_db: &Arc<AsyncDaemonDb>,
+) {
+    let session_ids: Vec<_> = changes.session_ids.into_iter().collect();
+    if changes.sessions_updated {
+        service::broadcast_sessions_updated_async(sender, Some(async_db.as_ref())).await;
+    }
+    for session_id in &session_ids {
+        service::broadcast_session_updated_core_async(sender, session_id, Some(async_db.as_ref()))
+            .await;
+    }
+    for session_id in session_ids {
+        service::broadcast_session_extensions_async(sender, &session_id, Some(async_db.as_ref()))
+            .await;
+    }
 }
 
 pub(super) fn emit_watch_changes_with<SessionsUpdated, SessionUpdatedCore, SessionExtensions>(
