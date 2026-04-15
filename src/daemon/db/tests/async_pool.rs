@@ -130,6 +130,51 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
     assert_eq!(applied_migration_versions(&async_db).await, vec![1]);
 }
 
+#[test]
+fn cache_startup_diagnostics_persists_async_cache_entries() {
+    let data_home = tempdir().expect("tempdir");
+    let home = tempdir().expect("tempdir");
+    temp_env::with_vars(
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(data_home.path().to_str().expect("utf8 path")),
+            ),
+            ("HOME", Some(home.path().to_str().expect("utf8 path"))),
+            ("CLAUDE_SESSION_ID", Some("async-diagnostics-cache-test")),
+        ],
+        || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = data_home.path().join("harness.db");
+                let async_db = AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db");
+
+                async_db
+                    .cache_startup_diagnostics()
+                    .await
+                    .expect("cache startup diagnostics");
+
+                assert!(
+                    async_db
+                        .load_cached_launch_agent_status()
+                        .await
+                        .expect("load cached launch agent")
+                        .is_some()
+                );
+                assert!(
+                    async_db
+                        .load_cached_workspace_diagnostics()
+                        .await
+                        .expect("load cached workspace diagnostics")
+                        .is_some()
+                );
+            });
+        },
+    );
+}
+
 async fn applied_migration_versions(db: &AsyncDaemonDb) -> Vec<i64> {
     query_scalar::<_, i64>("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db.pool())

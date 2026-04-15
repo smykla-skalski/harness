@@ -159,7 +159,6 @@ pub(crate) fn initialize_db_and_spawn_background_tasks(
         Arc::clone(async_db_slot),
     );
     spawn_background_reconciliation(Arc::clone(&db));
-    spawn_background_diagnostics(db);
     Ok(())
 }
 
@@ -167,6 +166,7 @@ pub(crate) async fn initialize_async_db(
     async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
 ) -> Result<(), CliError> {
     let db = open_and_publish_async_db(async_db_slot).await?;
+    db.cache_startup_diagnostics().await?;
     let _ = db.health_counts().await?;
     Ok(())
 }
@@ -428,18 +428,6 @@ pub(crate) fn log_background_session_import_error(
         session_id = %prepared.resolved.state.session_id,
         "background session import failed"
     );
-}
-
-pub(crate) fn spawn_background_diagnostics(db: Arc<Mutex<super::db::DaemonDb>>) {
-    tokio::spawn(async move {
-        let _ = spawn_blocking(move || {
-            let Ok(db_guard) = db.lock() else {
-                return;
-            };
-            let _ = db_guard.cache_startup_diagnostics();
-        })
-        .await;
-    });
 }
 
 #[expect(
