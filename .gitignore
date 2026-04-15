@@ -26,6 +26,8 @@ __pycache__/
 .mcp.json
 .sourcekit-lsp/
 buildServer.json
+!buildServer.json
+!apps/harness-monitor-macos/buildServer.json
 
 # macOS app (harness-monitor-macos)
 apps/harness-monitor-macos/.build/

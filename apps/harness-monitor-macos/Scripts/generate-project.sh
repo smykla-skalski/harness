@@ -4,22 +4,14 @@ set -euo pipefail
 ROOT="${SRCROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 XCODEGEN_BIN="${XCODEGEN_BIN:-$(command -v xcodegen || true)}"
+BUILD_SERVER_VERSION="1.3.0"
 
 if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
   "$REPO_ROOT/scripts/version.sh" sync-monitor
 fi
 
 if [ -z "${XCODEGEN_BIN}" ]; then
-  for candidate in /opt/homebrew/bin/xcodegen /usr/local/bin/xcodegen; do
-    if [ -x "$candidate" ]; then
-      XCODEGEN_BIN="$candidate"
-      break
-    fi
-  done
-fi
-
-if [ -z "${XCODEGEN_BIN}" ]; then
-  echo "xcodegen is required on PATH or at /opt/homebrew/bin/xcodegen" >&2
+  echo "xcodegen is required on PATH or via XCODEGEN_BIN" >&2
   exit 1
 fi
 
@@ -47,3 +39,45 @@ sed -i '' \
 for scheme in "$SCHEMES_DIR"/*.xcscheme; do
   sed -i '' 's/LastUpgradeVersion = "1430"/LastUpgradeVersion = "2640"/g' "$scheme"
 done
+
+write_build_server_config() {
+  local config_path="$1"
+  local argv_path="$2"
+  local workspace_path="$3"
+  local build_root_path="$4"
+
+  cat > "$config_path" <<EOF
+{
+  "name": "xcode build server",
+  "version": "${BUILD_SERVER_VERSION}",
+  "bspVersion": "2.2.0",
+  "languages": [
+    "c",
+    "cpp",
+    "objective-c",
+    "objective-cpp",
+    "swift"
+  ],
+  "argv": [
+    "/bin/bash",
+    "${argv_path}"
+  ],
+  "workspace": "${workspace_path}",
+  "build_root": "${build_root_path}",
+  "scheme": "HarnessMonitor",
+  "kind": "xcode"
+}
+EOF
+}
+
+write_build_server_config \
+  "$ROOT/buildServer.json" \
+  "./Scripts/run-xcode-build-server.sh" \
+  "HarnessMonitor.xcodeproj/project.xcworkspace" \
+  "../../tmp/xcode-derived"
+
+write_build_server_config \
+  "$REPO_ROOT/buildServer.json" \
+  "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh" \
+  "apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.xcworkspace" \
+  "tmp/xcode-derived"
