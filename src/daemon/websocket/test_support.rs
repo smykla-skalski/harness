@@ -96,10 +96,15 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
         db: db.clone(),
-        async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db),
+        async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db.clone()),
         db_path: Some(db_path),
-        codex_controller: CodexControllerHandle::new(sender.clone(), db.clone(), false),
-        agent_tui_manager: AgentTuiManagerHandle::new(sender, db, false),
+        codex_controller: CodexControllerHandle::new_with_async_db(
+            sender.clone(),
+            db.clone(),
+            async_db.clone(),
+            false,
+        ),
+        agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(sender, db, async_db, false),
     }
 }
 

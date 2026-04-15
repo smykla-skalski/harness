@@ -285,6 +285,43 @@ pub fn disconnect_agent_direct(
     Ok(true)
 }
 
+/// Mark a session agent as disconnected through the canonical async daemon DB.
+///
+/// Returns `Ok(false)` when the agent is already non-live or missing.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be loaded or persisted.
+pub(crate) async fn disconnect_agent_direct_async(
+    session_id: &str,
+    agent_id: &str,
+    reason: &str,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<bool, CliError> {
+    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
+        return Ok(false);
+    };
+
+    let now = utc_now();
+    if !session_service::apply_agent_disconnected(&mut resolved.state, agent_id, &now) {
+        return Ok(false);
+    }
+
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    async_db
+        .append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_agent_disconnected(agent_id, reason),
+            None,
+            None,
+        ))
+        .await?;
+    async_db.bump_change(session_id).await?;
+    async_db.bump_change("global").await?;
+    Ok(true)
+}
+
 pub(crate) fn persist_disconnect(
     db: &super::db::DaemonDb,
     session_id: &str,

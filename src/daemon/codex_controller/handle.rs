@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 use std::env::var;
+use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
+use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, mpsc};
+use tokio::task::block_in_place;
 use uuid::Uuid;
 
 use crate::daemon::bridge;
 use crate::daemon::codex_transport::{self, CodexTransportKind};
-use crate::daemon::db::{DaemonDb, ensure_shared_db};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::index;
 use crate::daemon::protocol::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexApprovalRequest,
@@ -31,6 +34,8 @@ pub struct CodexControllerHandle {
 struct CodexControllerState {
     sender: broadcast::Sender<StreamEvent>,
     db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    runtime: Option<Handle>,
     active_runs: Arc<Mutex<HashMap<String, ActiveRun>>>,
     sandboxed: bool,
 }
@@ -65,10 +70,22 @@ impl CodexControllerHandle {
         db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
         sandboxed: bool,
     ) -> Self {
+        Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()), sandboxed)
+    }
+
+    #[must_use]
+    pub(crate) fn new_with_async_db(
+        sender: broadcast::Sender<StreamEvent>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        sandboxed: bool,
+    ) -> Self {
         Self {
             state: Arc::new(CodexControllerState {
                 sender,
                 db,
+                async_db,
+                runtime: Handle::try_current().ok(),
                 active_runs: Arc::default(),
                 sandboxed,
             }),
@@ -224,6 +241,14 @@ impl CodexControllerHandle {
     /// # Errors
     /// Returns [`CliError`] on database failures.
     pub fn list_runs(&self, session_id: &str) -> Result<CodexRunListResponse, CliError> {
+        let session_id_owned = session_id.to_string();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            Ok(CodexRunListResponse {
+                runs: async_db.list_codex_runs(&session_id_owned).await?,
+            })
+        }) {
+            return result;
+        }
         let db = self.db()?;
         let runs = lock_db(&db)?.list_codex_runs(session_id)?;
         Ok(CodexRunListResponse { runs })
@@ -234,6 +259,15 @@ impl CodexControllerHandle {
     /// # Errors
     /// Returns [`CliError`] on database failures or when the run is missing.
     pub fn run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
+        let run_id_owned = run_id.to_string();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            async_db.codex_run(&run_id_owned).await?.ok_or_else(|| {
+                CliErrorKind::session_not_active(format!("codex run '{run_id_owned}' not found"))
+                    .into()
+            })
+        }) {
+            return result;
+        }
         let db = self.db()?;
         lock_db(&db)?.codex_run(run_id)?.ok_or_else(|| {
             CliErrorKind::session_not_active(format!("codex run '{run_id}' not found")).into()
@@ -306,6 +340,24 @@ impl CodexControllerHandle {
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<String, CliError> {
+        let session_id_owned = session_id.to_string();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            Ok(async_db
+                .resolve_session(&session_id_owned)
+                .await?
+                .and_then(|resolved| {
+                    resolved
+                        .project
+                        .project_dir
+                        .or(resolved.project.repository_root)
+                        .map(|path| path.display().to_string())
+                        .or_else(|| Some(resolved.project.context_root.display().to_string()))
+                }))
+        }) {
+            if let Some(project_dir) = result? {
+                return Ok(project_dir);
+            }
+        }
         let db = self.db()?;
         let guard = lock_db(&db)?;
         if let Some(project_dir) = guard.project_dir_for_session(session_id)? {
@@ -340,8 +392,15 @@ impl CodexControllerHandle {
     }
 
     pub(super) fn save_and_broadcast(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
-        let db = self.db()?;
-        lock_db(&db)?.save_codex_run(snapshot)?;
+        let persisted = snapshot.clone();
+        if let Some(result) = self
+            .run_with_async_db(|async_db| async move { async_db.save_codex_run(&persisted).await })
+        {
+            result?;
+        } else {
+            let db = self.db()?;
+            lock_db(&db)?.save_codex_run(snapshot)?;
+        }
         self.broadcast("codex_run_updated", snapshot, snapshot);
         Ok(())
     }
@@ -369,6 +428,40 @@ impl CodexControllerHandle {
             payload,
         };
         let _ = self.state.sender.send(event);
+    }
+
+    fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
+    where
+        F: FnOnce(Arc<AsyncDaemonDb>) -> Fut,
+        Fut: Future<Output = Result<T, CliError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        let async_db = self.state.async_db.get()?.clone();
+        let runtime = self.state.runtime.clone()?;
+        let future = task(async_db);
+        Some(match Handle::try_current() {
+            Ok(current) => match current.runtime_flavor() {
+                RuntimeFlavor::MultiThread => block_in_place(|| runtime.block_on(future)),
+                RuntimeFlavor::CurrentThread => std::thread::spawn(move || {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| {
+                            CliError::from(CliErrorKind::workflow_io(format!(
+                                "build async codex bridge runtime: {error}"
+                            )))
+                        })?
+                        .block_on(future)
+                })
+                .join()
+                .map_err(|_| {
+                    CliError::from(CliErrorKind::workflow_io("join async codex bridge thread"))
+                })
+                .and_then(std::convert::identity),
+                _ => runtime.block_on(future),
+            },
+            Err(_) => runtime.block_on(future),
+        })
     }
 }
 

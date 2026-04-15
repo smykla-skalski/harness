@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionState;
 use crate::workspace::project_context_dir;
@@ -40,6 +40,34 @@ pub(super) fn resolve_tui_project(
     }
 
     let resolved = db.resolve_session(session_id)?.ok_or_else(|| {
+        CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
+    })?;
+    let context_root = resolved.project.context_root;
+    let project_dir = resolved
+        .project
+        .project_dir
+        .or(resolved.project.repository_root)
+        .unwrap_or_else(|| context_root.clone());
+    Ok(ResolvedTuiProject {
+        project_dir,
+        context_root,
+    })
+}
+
+pub(super) async fn resolve_tui_project_async(
+    db: &AsyncDaemonDb,
+    session_id: &str,
+    project_dir: Option<&str>,
+) -> Result<ResolvedTuiProject, CliError> {
+    if let Some(project_dir) = project_dir.filter(|value| !value.trim().is_empty()) {
+        let project_dir = PathBuf::from(project_dir);
+        return Ok(ResolvedTuiProject {
+            context_root: project_context_dir(&project_dir),
+            project_dir,
+        });
+    }
+
+    let resolved = db.resolve_session(session_id).await?.ok_or_else(|| {
         CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
     })?;
     let context_root = resolved.project.context_root;

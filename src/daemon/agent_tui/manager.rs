@@ -5,12 +5,13 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
+use tokio::runtime::Handle;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::ordering::sort_agent_tui_snapshots;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::CliError;
@@ -26,7 +27,7 @@ use super::spawn::{
     build_auto_join_prompt, deliver_deferred_prompts, send_initial_prompt, spawn_agent_tui_process,
     wait_for_readiness,
 };
-use super::support::{lock_db, resolve_tui_project, transcript_path};
+use super::support::{lock_db, resolve_tui_project, resolve_tui_project_async, transcript_path};
 
 #[derive(Clone)]
 pub(crate) struct ActiveAgentTui {
@@ -56,6 +57,8 @@ pub struct AgentTuiManagerHandle {
 pub(crate) struct AgentTuiManagerState {
     pub(crate) sender: broadcast::Sender<StreamEvent>,
     pub(crate) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    pub(crate) async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    pub(crate) runtime: Option<Handle>,
     pub(crate) active: Mutex<BTreeMap<String, ActiveAgentTui>>,
     pub(crate) sandboxed: bool,
 }
@@ -68,10 +71,22 @@ impl AgentTuiManagerHandle {
         db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
         sandboxed: bool,
     ) -> Self {
+        Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()), sandboxed)
+    }
+
+    #[must_use]
+    pub(crate) fn new_with_async_db(
+        sender: broadcast::Sender<StreamEvent>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        sandboxed: bool,
+    ) -> Self {
         Self {
             state: Arc::new(AgentTuiManagerState {
                 sender,
                 db,
+                async_db,
+                runtime: Handle::try_current().ok(),
                 active: Mutex::new(BTreeMap::new()),
                 sandboxed,
             }),
@@ -100,7 +115,18 @@ impl AgentTuiManagerHandle {
         let profile = request.launch_profile()?;
         let size = request.size()?;
         let tui_id = format!("agent-tui-{}", Uuid::new_v4());
-        let project = {
+        let session_id_owned = session_id.to_string();
+        let requested_project_dir = request.project_dir.clone();
+        let project = if let Some(result) = self.run_with_async_db(|async_db| async move {
+            resolve_tui_project_async(
+                async_db.as_ref(),
+                &session_id_owned,
+                requested_project_dir.as_deref(),
+            )
+            .await
+        }) {
+            result?
+        } else {
             let db = self.db()?;
             let db_guard = lock_db(&db)?;
             resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?
@@ -230,10 +256,22 @@ impl AgentTuiManagerHandle {
         let size = request.size()?;
         let tui_id = format!("agent-tui-{}", Uuid::new_v4());
         let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
-        let db = self.db()?;
-        let db_guard = lock_db(&db)?;
-        let project = resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?;
-        drop(db_guard);
+        let session_id_owned = session_id.to_string();
+        let requested_project_dir = request.project_dir.clone();
+        let project = if let Some(result) = self.run_with_async_db(|async_db| async move {
+            resolve_tui_project_async(
+                async_db.as_ref(),
+                &session_id_owned,
+                requested_project_dir.as_deref(),
+            )
+            .await
+        }) {
+            result?
+        } else {
+            let db = self.db()?;
+            let db_guard = lock_db(&db)?;
+            resolve_tui_project(&db_guard, session_id, request.project_dir.as_deref())?
+        };
 
         let auto_join = build_auto_join_prompt(
             &profile.runtime,
@@ -272,6 +310,26 @@ impl AgentTuiManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when DB access fails.
     pub fn list(&self, session_id: &str) -> Result<AgentTuiListResponse, CliError> {
+        let session_id_owned = session_id.to_string();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let mut tuis = async_db.list_agent_tuis(&session_id_owned).await?;
+            let roles_by_agent = async_db
+                .resolve_session(&session_id_owned)
+                .await?
+                .map(|resolved| {
+                    resolved
+                        .state
+                        .agents
+                        .into_iter()
+                        .map(|(agent_id, agent)| (agent_id, agent.role))
+                        .collect::<BTreeMap<_, _>>()
+                })
+                .unwrap_or_default();
+            sort_agent_tui_snapshots(&mut tuis, &roles_by_agent);
+            Ok(AgentTuiListResponse { tuis })
+        }) {
+            return result;
+        }
         let db = self.db()?;
         let db_guard = lock_db(&db)?;
         let mut tuis = db_guard.list_agent_tuis(session_id)?;

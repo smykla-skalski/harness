@@ -223,7 +223,9 @@ mod sync_support;
 pub use direct::{
     disconnect_agent_direct, join_session_direct, record_signal_ack_direct, start_session_direct,
 };
-pub(crate) use direct::{join_session_direct_async, start_session_direct_async};
+pub(crate) use direct::{
+    disconnect_agent_direct_async, join_session_direct_async, start_session_direct_async,
+};
 pub use mutations::{
     assign_task, change_role, checkpoint_task, create_task, drop_task, end_session, remove_agent,
     transfer_leader, update_task, update_task_queue_policy,
