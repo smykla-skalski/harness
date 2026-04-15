@@ -59,6 +59,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         poll_interval: config.observe_interval,
         running_sessions: Arc::default(),
         db: db.clone(),
+        async_db: async_db.clone(),
     });
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));

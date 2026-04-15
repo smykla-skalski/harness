@@ -59,6 +59,7 @@ struct DaemonObserveRuntime {
     poll_interval: Duration,
     running_sessions: Arc<Mutex<BTreeMap<String, ObserveLoopRegistration>>>,
     db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,6 +209,7 @@ use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 mod direct;
 mod mutations;
 mod mutations_async;
+mod observe_async;
 mod observe_loop;
 mod observe_stream;
 mod serve;
@@ -247,6 +249,7 @@ pub use status::{
     status_report,
 };
 
+pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
 pub(crate) use observe_stream::{
     broadcast_session_extensions_async, broadcast_session_snapshot_async,

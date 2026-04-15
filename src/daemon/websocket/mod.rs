@@ -2,6 +2,8 @@ mod connection;
 mod dispatch;
 mod frames;
 mod mutations;
+#[cfg(test)]
+mod observe_tests;
 mod params;
 mod queries;
 mod relay;

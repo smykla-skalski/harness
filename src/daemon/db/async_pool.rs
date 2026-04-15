@@ -93,6 +93,7 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
 static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("./src/daemon/db/migrations");
 
 /// Async `SQLx` pool over the canonical daemon `SQLite` database.
+#[derive(Debug)]
 pub(crate) struct AsyncDaemonDb {
     pool: SqlitePool,
 }

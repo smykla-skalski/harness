@@ -15,7 +15,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index::DiscoveredProject;
-use crate::daemon::protocol::SessionEndRequest;
+use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
 use crate::daemon::state::DaemonManifest;
 use crate::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
@@ -30,7 +30,7 @@ use super::core::{get_diagnostics, get_health, get_projects};
 use super::response::{map_json, request_activity_log_level};
 use super::sessions::{
     SessionScopeQuery, get_session, get_sessions, get_timeline, post_end_session,
-    post_session_join, post_session_start,
+    post_observe_session, post_session_join, post_session_start,
 };
 use super::signals::{post_cancel_signal, post_signal_ack};
 use super::tasks::{
@@ -41,6 +41,7 @@ use super::tasks::{
 mod async_agent_mutations;
 mod async_lifecycle_mutations;
 mod async_mutations;
+mod async_observe;
 mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
