@@ -210,7 +210,7 @@ async fn dispatch_session_mutation(
         "leader.transfer" => Some(dispatch_leader_transfer(request, state).await),
         "session.end" => Some(dispatch_session_end(request, state).await),
         "signal.send" => Some(dispatch_signal_send(request, state)),
-        "signal.cancel" => Some(dispatch_signal_cancel(request, state)),
+        "signal.cancel" => Some(dispatch_signal_cancel(request, state).await),
         "session.observe" => Some(dispatch_session_observe(request, state)),
         _ => None,
     }
@@ -418,11 +418,22 @@ fn dispatch_signal_send(request: &WsRequest, state: &DaemonHttpState) -> WsRespo
     })
 }
 
-fn dispatch_signal_cancel(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    dispatch_mutation(request, state, |session_id, params, db| {
-        let body: SignalCancelRequest = serde_json::from_value(params)?;
-        service::cancel_signal(&session_id, &body, db).map_err(Into::into)
-    })
+async fn dispatch_signal_cancel(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_prefer_async(
+        request,
+        state,
+        |session_id, params, db| {
+            let body: SignalCancelRequest = serde_json::from_value(params)?;
+            service::cancel_signal(&session_id, &body, db).map_err(Into::into)
+        },
+        |session_id, params, async_db| async move {
+            let body: SignalCancelRequest = serde_json::from_value(params)?;
+            service::cancel_signal_async(&session_id, &body, &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
 }
 
 fn dispatch_session_observe(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
