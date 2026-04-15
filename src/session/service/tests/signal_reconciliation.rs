@@ -135,3 +135,39 @@ fn collect_expired_pending_signals_resolves_context_root_once_per_pass() {
         assert_eq!(state.session_id, joined.session_id);
     });
 }
+
+#[test]
+fn signal_dirs_in_context_root_do_not_rehash_existing_context_root() {
+    with_temp_project(|project| {
+        let context_root = signal_context_root(project);
+        let runtime = runtime::runtime_for_name("codex").expect("runtime");
+        let signal_dirs = signal_dirs_for_agent_in_context_root(
+            runtime,
+            "signal-root-session",
+            Some("signal-root-worker"),
+            &context_root,
+        );
+
+        assert_eq!(
+            signal_dirs,
+            vec![
+                (
+                    "signal-root-worker".to_string(),
+                    context_root
+                        .join("agents")
+                        .join("signals")
+                        .join("codex")
+                        .join("signal-root-worker"),
+                ),
+                (
+                    "signal-root-session".to_string(),
+                    context_root
+                        .join("agents")
+                        .join("signals")
+                        .join("codex")
+                        .join("signal-root-session"),
+                ),
+            ]
+        );
+    });
+}
