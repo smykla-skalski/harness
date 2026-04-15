@@ -355,10 +355,9 @@ impl CodexControllerHandle {
                         .map(|path| path.display().to_string())
                         .or_else(|| Some(resolved.project.context_root.display().to_string()))
                 }))
-        }) {
-            if let Some(project_dir) = result? {
-                return Ok(project_dir);
-            }
+        }) && let Some(project_dir) = result?
+        {
+            return Ok(project_dir);
         }
         let db = self.db()?;
         let guard = lock_db(&db)?;

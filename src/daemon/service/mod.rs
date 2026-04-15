@@ -282,7 +282,7 @@ pub(crate) use status::{diagnostics_report_async, health_response_async};
 pub(crate) use sync_support::{
     acknowledged_signal_record, append_leave_signal_logs_to_db, append_task_drop_effect_logs,
     append_transfer_logs_to_async_db, append_transfer_logs_to_db, build_log_entry,
-    effective_project_dir, pending_signal_record, project_dir_for_db_session,
+    build_signal_ack, effective_project_dir, pending_signal_record, project_dir_for_db_session,
     reconcile_expired_pending_signals_for_db, record_signal_ack, refresh_signal_index_for_db,
     resolve_hook_agent, session_not_found, task_drop_effect_signal_records,
     write_task_start_signals,

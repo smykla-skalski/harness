@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use super::{
     AgentRegistration, CliError, CliErrorKind, SessionDetail, SessionLogEntry, SessionTransition,
     SignalAck, SignalAckRequest, SignalCancelRequest, acknowledged_signal_record, build_log_entry,
-    effective_project_dir, session_detail_from_async_daemon_db, session_not_found, session_service,
-    snapshot, utc_now, write_signal_ack,
+    build_signal_ack, effective_project_dir, session_detail_from_async_daemon_db,
+    session_not_found, session_service, snapshot, utc_now, write_signal_ack,
 };
 use crate::agents::runtime::signal::{AckResult, Signal, read_pending_signals};
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
@@ -273,14 +273,10 @@ async fn persist_cancel_signal_state(
             .merge_signal_records(
                 session_id,
                 &[acknowledged_signal_record(
-                    session_id,
                     &signal.runtime,
                     &request.agent_id,
                     &signal.signal,
-                    AckResult::Rejected,
-                    &ack.agent,
-                    &ack.acknowledged_at,
-                    ack.details.clone(),
+                    ack,
                 )],
             )
             .await?;
@@ -310,14 +306,17 @@ async fn persist_acknowledged_signal_index(
         .merge_signal_records(
             session_id,
             &[acknowledged_signal_record(
-                session_id,
                 &signal.runtime,
                 &request.agent_id,
                 &signal.signal,
-                outcome.result,
-                ack_agent,
-                &utc_now(),
-                None,
+                &build_signal_ack(
+                    session_id,
+                    &signal.signal.signal_id,
+                    &utc_now(),
+                    outcome.result,
+                    ack_agent,
+                    None,
+                ),
             )],
         )
         .await
