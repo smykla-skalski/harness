@@ -1,5 +1,47 @@
 import SwiftUI
 
+struct PreferencesBackgroundGalleryPrefetchPlan {
+  static func selections(
+    options: [HarnessMonitorBackgroundSelection],
+    recentItems: [HarnessMonitorBackgroundSelection],
+    selectedBackground: HarnessMonitorBackgroundSelection,
+    visibleIDs: [String],
+    initialLimit: Int,
+    overscan: Int
+  ) -> [HarnessMonitorBackgroundSelection] {
+    var plannedSelections: [HarnessMonitorBackgroundSelection] = []
+    var seenStorageValues = Set<String>()
+
+    func append(_ selection: HarnessMonitorBackgroundSelection) {
+      guard seenStorageValues.insert(selection.storageValue).inserted else {
+        return
+      }
+      plannedSelections.append(selection)
+    }
+
+    for selection in options.prefix(max(0, initialLimit)) {
+      append(selection)
+    }
+
+    let indicesByID = Dictionary(uniqueKeysWithValues: options.enumerated().map { ($1.id, $0) })
+    let visibleIndices = visibleIDs.compactMap { indicesByID[$0] }
+    if let lowerBound = visibleIndices.min(), let upperBound = visibleIndices.max() {
+      let rangeLowerBound = max(0, lowerBound - max(0, overscan))
+      let rangeUpperBound = min(options.count - 1, upperBound + max(0, overscan))
+      for selection in options[rangeLowerBound...rangeUpperBound] {
+        append(selection)
+      }
+    }
+
+    append(selectedBackground)
+    for selection in recentItems {
+      append(selection)
+    }
+
+    return plannedSelections
+  }
+}
+
 struct PreferencesBackgroundGallery: View {
   @Binding var selection: String
   @Binding var backdropModeRawValue: String
@@ -12,6 +54,9 @@ struct PreferencesBackgroundGallery: View {
 
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
+  private static let initialPrefetchLimit = 12
+  private static let prefetchOverscan = 2
+  @State private var visibleBackgroundIDs: Set<String> = []
 
   private var isBackdropDisabled: Bool {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none
@@ -43,6 +88,21 @@ struct PreferencesBackgroundGallery: View {
   private let columns = [
     GridItem(.adaptive(minimum: 180, maximum: 220), spacing: HarnessMonitorTheme.spacingMD)
   ]
+
+  private var galleryPrefetchSelections: [HarnessMonitorBackgroundSelection] {
+    PreferencesBackgroundGalleryPrefetchPlan.selections(
+      options: options,
+      recentItems: recentItems,
+      selectedBackground: selectedBackground,
+      visibleIDs: Array(visibleBackgroundIDs),
+      initialLimit: Self.initialPrefetchLimit,
+      overscan: Self.prefetchOverscan
+    )
+  }
+
+  private var galleryPrefetchSignature: [String] {
+    galleryPrefetchSelections.map(\.storageValue)
+  }
 
   var body: some View {
     if isBackdropDisabled {
@@ -91,18 +151,17 @@ struct PreferencesBackgroundGallery: View {
               background: background,
               isSelected: background.storageValue == selectedBackground.storageValue,
               previewHeight: previewHeight,
-              select: { select(background) }
+              select: { select(background) },
+              didAppear: { registerVisibleBackground(background) },
+              didDisappear: { unregisterVisibleBackground(background) }
             )
           }
         }
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
-      .task(id: collection) {
-        await BackgroundThumbnailCache.shared.prefetch(options)
-      }
-      .task(id: recentStorageValues) {
-        await BackgroundThumbnailCache.shared.prefetch(recentItems)
+      .task(id: galleryPrefetchSignature) {
+        await BackgroundThumbnailCache.shared.prefetch(galleryPrefetchSelections)
       }
     }
   }
@@ -148,6 +207,14 @@ struct PreferencesBackgroundGallery: View {
     stored = Array(stored.prefix(Self.maxRecents))
     recentStorageValues = stored.joined(separator: "|")
   }
+
+  private func registerVisibleBackground(_ background: HarnessMonitorBackgroundSelection) {
+    visibleBackgroundIDs.insert(background.id)
+  }
+
+  private func unregisterVisibleBackground(_ background: HarnessMonitorBackgroundSelection) {
+    visibleBackgroundIDs.remove(background.id)
+  }
 }
 
 private struct PreferencesBackgroundTile: View {
@@ -155,12 +222,30 @@ private struct PreferencesBackgroundTile: View {
   let isSelected: Bool
   let previewHeight: CGFloat
   let select: () -> Void
+  let didAppear: () -> Void
+  let didDisappear: () -> Void
   @State private var loadedImage: Image?
 
   private static let selectionRingWidth: CGFloat = 3
 
   private var outerShape: RoundedRectangle {
     RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+  }
+
+  init(
+    background: HarnessMonitorBackgroundSelection,
+    isSelected: Bool,
+    previewHeight: CGFloat,
+    select: @escaping () -> Void,
+    didAppear: @escaping () -> Void = {},
+    didDisappear: @escaping () -> Void = {}
+  ) {
+    self.background = background
+    self.isSelected = isSelected
+    self.previewHeight = previewHeight
+    self.select = select
+    self.didAppear = didAppear
+    self.didDisappear = didDisappear
   }
 
   var body: some View {
@@ -219,9 +304,10 @@ private struct PreferencesBackgroundTile: View {
       guard let cgImage = await BackgroundThumbnailCache.shared.thumbnail(for: background) else {
         return
       }
-      let size = NSSize(width: cgImage.width, height: cgImage.height)
-      loadedImage = Image(nsImage: NSImage(cgImage: cgImage, size: size))
+      loadedImage = Image(decorative: cgImage, scale: 1.0)
     }
+    .onAppear(perform: didAppear)
+    .onDisappear(perform: didDisappear)
   }
 
   @ViewBuilder private var previewContent: some View {
