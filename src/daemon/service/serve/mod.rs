@@ -64,9 +64,12 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
-    if let Err(error) =
-        initialize_db_and_spawn_background_tasks(&db, sender.clone(), config.poll_interval)
-    {
+    if let Err(error) = initialize_db_and_spawn_background_tasks(
+        &db,
+        &async_db,
+        sender.clone(),
+        config.poll_interval,
+    ) {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
@@ -144,11 +147,17 @@ pub(crate) fn open_and_publish_db(
 
 pub(crate) fn initialize_db_and_spawn_background_tasks(
     db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
     sender: broadcast::Sender<super::protocol::StreamEvent>,
     poll_interval: Duration,
 ) -> Result<(), CliError> {
     let db = open_and_publish_db(db_slot)?;
-    let _watch = watch::spawn_watch_loop(sender, poll_interval, Some(Arc::clone(&db)));
+    let _watch = watch::spawn_watch_loop(
+        sender,
+        poll_interval,
+        Some(Arc::clone(&db)),
+        Arc::clone(async_db_slot),
+    );
     spawn_background_reconciliation(Arc::clone(&db));
     spawn_background_diagnostics(db);
     Ok(())
