@@ -283,6 +283,16 @@ struct HarnessMonitorStoreLifecycleCoreTests {
       updatedAt: "2026-03-28T15:06:00Z",
       agentCount: 3
     )
+    let refreshedDetail = makeSessionDetail(
+      summary: secondUpdate,
+      workerID: "worker-refresh-cancel",
+      workerName: "Worker Refresh Cancel"
+    )
+    client.configureSessions(
+      summaries: [secondUpdate],
+      detailsByID: [summary.sessionId: refreshedDetail],
+      timelinesBySessionID: [summary.sessionId: timeline]
+    )
 
     store.refreshSelectedSessionIfSummaryChanged(sessions: [firstUpdate])
     try? await Task.sleep(for: .milliseconds(40))

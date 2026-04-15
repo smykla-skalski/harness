@@ -22,11 +22,46 @@ extension HarnessMonitorStore {
     public var id: String { project.id }
   }
 
-  public enum StatusMessageTone: Equatable {
+  public enum StatusMessageTone: Equatable, Sendable {
     case secondary
     case info
     case success
     case caution
+  }
+
+  public struct SessionSummaryPresentation: Equatable, Sendable {
+    public let statusText: String
+    public let statusTone: StatusMessageTone
+    public let isEstimated: Bool
+    public let agentCountText: String
+    public let taskCountText: String
+    public let accessibilityStatusText: String
+
+    public init(
+      statusText: String,
+      statusTone: StatusMessageTone,
+      isEstimated: Bool,
+      agentCountText: String,
+      taskCountText: String,
+      accessibilityStatusText: String
+    ) {
+      self.statusText = statusText
+      self.statusTone = statusTone
+      self.isEstimated = isEstimated
+      self.agentCountText = agentCountText
+      self.taskCountText = taskCountText
+      self.accessibilityStatusText = accessibilityStatusText
+    }
+  }
+
+  public struct AgentActivityPresentation: Equatable, Sendable {
+    public let label: String
+    public let accessibilityValue: String
+
+    public init(label: String, accessibilityValue: String) {
+      self.label = label
+      self.accessibilityValue = accessibilityValue
+    }
   }
 
   public struct StatusMessageState: Equatable, Identifiable {
@@ -419,6 +454,85 @@ extension HarnessMonitorStore {
       self.filteredSessionCount = filteredSessionCount
       self.totalSessionCount = totalSessionCount
       self.list = list
+    }
+  }
+}
+
+extension HarnessMonitorStore {
+  public func sessionSummaryPresentation(
+    for summary: SessionSummary
+  ) -> SessionSummaryPresentation {
+    let isEstimated = sessionCatalogIsEstimated
+    let isLeaderless = summary.status != .ended && summary.leaderId == nil
+
+    let statusText = isLeaderless ? "Leaderless" : summary.status.title
+    let statusTone: StatusMessageTone
+    if isEstimated {
+      statusTone = .secondary
+    } else if isLeaderless {
+      statusTone = .caution
+    } else {
+      switch summary.status {
+      case .active:
+        statusTone = .success
+      case .paused:
+        statusTone = .caution
+      case .ended:
+        statusTone = .secondary
+      }
+    }
+
+    let usesLiveAgentPhrasing =
+      !isEstimated
+      && !isLeaderless
+      && summary.status == .active
+    let agentCountText =
+      usesLiveAgentPhrasing
+      ? "\(summary.metrics.activeAgentCount) active"
+      : "\(summary.metrics.agentCount) known"
+
+    return SessionSummaryPresentation(
+      statusText: statusText,
+      statusTone: statusTone,
+      isEstimated: isEstimated,
+      agentCountText: agentCountText,
+      taskCountText: "\(summary.metrics.inProgressTaskCount) moving",
+      accessibilityStatusText: isEstimated ? "\(statusText), estimated" : statusText
+    )
+  }
+
+  public func agentActivityPresentation(
+    for agent: AgentRegistration,
+    queuedTasks: [WorkItem],
+    isSelectedSessionLive: Bool
+  ) -> AgentActivityPresentation {
+    switch agent.status {
+    case .disconnected:
+      return AgentActivityPresentation(
+        label: "Disconnected",
+        accessibilityValue: "Disconnected"
+      )
+    case .removed:
+      return AgentActivityPresentation(
+        label: "Removed",
+        accessibilityValue: "Removed"
+      )
+    case .active:
+      guard isSelectedSessionLive else {
+        return AgentActivityPresentation(
+          label: "Snapshot",
+          accessibilityValue: "Estimated activity"
+        )
+      }
+      if !queuedTasks.isEmpty {
+        let suffix = queuedTasks.count == 1 ? "task" : "tasks"
+        return AgentActivityPresentation(
+          label: "\(queuedTasks.count) queued \(suffix)",
+          accessibilityValue: "\(queuedTasks.count) queued"
+        )
+      }
+      let label = agent.currentTaskId == nil ? "Ready" : "Working"
+      return AgentActivityPresentation(label: label, accessibilityValue: label)
     }
   }
 }

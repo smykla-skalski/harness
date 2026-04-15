@@ -53,11 +53,21 @@ extension HarnessMonitorStore {
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
     public var daemonLogLevel: String?
-    public var isShowingCachedData = false {
+    public var isShowingCachedCatalog = false {
       didSet {
-        guard oldValue != isShowingCachedData else { return }
+        guard oldValue != isShowingCachedCatalog else { return }
         onChanged?(.persistedDataAvailability)
       }
+    }
+    public var isShowingCachedSelectedSession = false {
+      didSet {
+        guard oldValue != isShowingCachedSelectedSession else { return }
+        onChanged?(.persistedDataAvailability)
+      }
+    }
+    public var isShowingCachedData: Bool {
+      get { isShowingCachedSelectedSession }
+      set { isShowingCachedSelectedSession = newValue }
     }
     public var persistedSessionCount = 0 {
       didSet {
@@ -145,6 +155,7 @@ extension HarnessMonitorStore {
         onChanged?(.extensionsLoading)
       }
     }
+    public var retainPresentedDetailWhenSelectionClears = true
     public var isSessionActionInFlight = false {
       didSet {
         guard oldValue != isSessionActionInFlight else { return }
@@ -307,6 +318,7 @@ extension HarnessMonitorStore {
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
     public var isTimelineLoading = false
+    public var retainPresentedDetailWhenSelectionClears = true
   }
 
   public struct ContentDashboardState: Equatable {
