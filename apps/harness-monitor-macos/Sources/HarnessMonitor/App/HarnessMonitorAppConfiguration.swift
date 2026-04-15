@@ -7,6 +7,7 @@ struct HarnessMonitorAppConfiguration {
   private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
+  private static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   private static let toastDismissOverrideKey = "HARNESS_MONITOR_TEST_TOAST_DISMISS_MS"
   private static let toastSeedKey = "HARNESS_MONITOR_TEST_SEED_TOASTS"
 
@@ -94,7 +95,8 @@ struct HarnessMonitorAppConfiguration {
         textSizeIndex: HarnessMonitorTextSize.defaultIndex,
         backdropMode: .none,
         backgroundImage: .defaultSelection,
-        showInspector: true
+        showInspector: true,
+        resetBackgroundRecents: false
       )
     }
     return UITestOverrides(
@@ -112,7 +114,10 @@ struct HarnessMonitorAppConfiguration {
       ),
       showInspector: uiTestBoolOverride(
         from: environment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]
-      ) ?? true
+      ) ?? true,
+      resetBackgroundRecents: uiTestBoolOverride(
+        from: environment.values[resetBackgroundRecentsOverrideKey]
+      ) ?? false
     )
   }
 
@@ -122,6 +127,7 @@ struct HarnessMonitorAppConfiguration {
     let backdropMode: HarnessMonitorBackdropMode
     let backgroundImage: HarnessMonitorBackgroundSelection
     let showInspector: Bool
+    let resetBackgroundRecents: Bool
   }
 
   private static func uiTestSafeEnvironment() -> HarnessMonitorEnvironment {
@@ -194,6 +200,9 @@ struct HarnessMonitorAppConfiguration {
       ]
       ?? HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
 
+    if overrides.resetBackgroundRecents {
+      UserDefaults.standard.removeObject(forKey: HarnessMonitorBackgroundDefaults.recentKey)
+    }
     UserDefaults.standard.set(
       overrides.themeMode.rawValue,
       forKey: HarnessMonitorThemeDefaults.modeKey

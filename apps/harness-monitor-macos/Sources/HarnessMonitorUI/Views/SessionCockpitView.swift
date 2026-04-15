@@ -43,6 +43,12 @@ struct SessionCockpitView: View {
       verticalPadding: HarnessMonitorTheme.spacingXL,
       constrainContentWidth: true,
       underlay: {
+        SessionStatusCornerBackdrop(
+          status: detail.session.status,
+          isStale: isSessionStatusStale
+        )
+      },
+      overlay: {
         SessionStatusCornerOverlay(
           status: detail.session.status,
           isStale: isSessionStatusStale
@@ -58,7 +64,9 @@ struct SessionCockpitView: View {
           requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
           inspectObserver: store.inspectObserver
         )
-        SessionMetricGrid(metrics: detail.session.metrics)
+        SessionMetricGrid(
+          metrics: detail.session.metrics
+        )
         SessionActionDock(
           detail: detail,
           inspectTask: store.inspect(taskID:),
@@ -73,22 +81,8 @@ struct SessionCockpitView: View {
           maximumColumns: 2,
           spacing: 16
         ) {
-          SessionTaskListSection(
-            store: store,
-            sessionID: detail.session.sessionId,
-            tasks: detail.tasks,
-            companionAgentCount: detail.agents.count,
-            inspectTask: store.inspect(taskID:)
-          )
-          SessionAgentListSection(
-            store: store,
-            sessionID: detail.session.sessionId,
-            agents: detail.agents,
-            tasks: detail.tasks,
-            isSessionReadOnly: isSessionReadOnly,
-            inspectAgent: store.inspect(agentID:),
-            tuiStatusByAgent: tuiStatusByAgent
-          )
+          taskSection
+          agentSection
         }
         SessionCockpitSignalsSection(
           store: store,
@@ -109,6 +103,28 @@ struct SessionCockpitView: View {
       .padding(.top, SessionCockpitLayout.statusHeaderClearance)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+  }
+
+  private var taskSection: some View {
+    SessionTaskListSection(
+      store: store,
+      sessionID: detail.session.sessionId,
+      tasks: detail.tasks,
+      companionAgentCount: detail.agents.count,
+      inspectTask: store.inspect(taskID:)
+    )
+  }
+
+  private var agentSection: some View {
+    SessionAgentListSection(
+      store: store,
+      sessionID: detail.session.sessionId,
+      agents: detail.agents,
+      tasks: detail.tasks,
+      isSessionReadOnly: isSessionReadOnly,
+      inspectAgent: store.inspect(agentID:),
+      tuiStatusByAgent: tuiStatusByAgent
+    )
   }
 }
 

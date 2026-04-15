@@ -291,7 +291,8 @@ struct HarnessMonitorAdaptiveGridLayoutCacheTests {
   @Test("Whole-point width changes still invalidate the cache")
   func wholePointWidthChangesStillInvalidateTheCache() {
     #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(720.0) == 720)
-    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(721.0) == 721)
+    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(723.0) == 720)
+    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(724.0) == 724)
   }
 
   @Test("Cache only invalidates when the subview count changes")
@@ -364,6 +365,21 @@ struct HarnessMonitorAdaptiveGridLayoutMeasurementKeyTests {
 
     #expect(key.subviewCount == 2)
     #expect(key.width == 640)
+  }
+
+  @Test("Measurement key buckets widths across minor jitter")
+  func measurementKeyBucketsWidthsAcrossMinorJitter() {
+    let left = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
+      subviewCount: 2,
+      width: 640
+    )
+    let right = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
+      subviewCount: 2,
+      width: 643
+    )
+
+    #expect(left == right)
+    #expect(right.width == 640)
   }
 }
 

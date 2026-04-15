@@ -61,20 +61,41 @@ public enum WindowNavigationScope: Hashable {
   case agentTui
 }
 
-extension FocusedValues {
-  @Entry public var windowNavigationScope: WindowNavigationScope?
-}
-
 @MainActor
 private final class WindowNavigationHandlers {
   var backHandler: (@MainActor () async -> Void)?
   var forwardHandler: (@MainActor () async -> Void)?
 }
 
-@Observable
 @MainActor
-public final class AgentTuiWindowNavigationBridge {
-  public var state = WindowNavigationState()
+public final class WindowCommandRoutingState: ObservableObject {
+  @Published public var activeScope: WindowNavigationScope?
+  private var activeWindowID: ObjectIdentifier?
+
+  public init(activeScope: WindowNavigationScope? = nil) {
+    self.activeScope = activeScope
+  }
+
+  public func activate(scope: WindowNavigationScope?, windowID: ObjectIdentifier) {
+    guard activeScope != scope || activeWindowID != windowID else {
+      return
+    }
+    activeScope = scope
+    activeWindowID = windowID
+  }
+
+  public func clear(windowID: ObjectIdentifier) {
+    guard activeWindowID == windowID else {
+      return
+    }
+    activeScope = nil
+    activeWindowID = nil
+  }
+}
+
+@MainActor
+public final class AgentTuiWindowNavigationBridge: ObservableObject {
+  @Published public var state = WindowNavigationState()
 
   public init() {}
 

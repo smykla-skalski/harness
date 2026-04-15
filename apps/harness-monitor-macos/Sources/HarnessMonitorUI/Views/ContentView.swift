@@ -86,30 +86,12 @@ public struct ContentView<CornerAnimationContent: View>: View {
   @MainActor
   public init(
     store: HarnessMonitorStore,
+    showsCornerAnimation: Bool = true,
     @ViewBuilder cornerAnimationContent: () -> CornerAnimationContent
-  ) {
-    self.showsCornerAnimation = true
-    self.cornerAnimationContent = cornerAnimationContent()
-    self.store = store
-    self.contentShell = store.contentUI.shell
-    self.contentToolbar = store.contentUI.toolbar
-    self.contentChrome = store.contentUI.chrome
-    self.contentSession = store.contentUI.session
-    self.contentSessionDetail = store.contentUI.sessionDetail
-    self.contentDashboard = store.contentUI.dashboard
-    self.toast = store.toast
-    self.auditBuildState = Self.resolveAuditBuildState()
-  }
-
-  @MainActor
-  private init(
-    store: HarnessMonitorStore,
-    showsCornerAnimation: Bool,
-    cornerAnimationContent: CornerAnimationContent
   ) {
     self.store = store
     self.showsCornerAnimation = showsCornerAnimation
-    self.cornerAnimationContent = cornerAnimationContent
+    self.cornerAnimationContent = cornerAnimationContent()
     self.contentShell = store.contentUI.shell
     self.contentToolbar = store.contentUI.toolbar
     self.contentChrome = store.contentUI.chrome
@@ -121,17 +103,13 @@ public struct ContentView<CornerAnimationContent: View>: View {
   }
 
   public var body: some View {
-    if showsCornerAnimation {
-      baseContent
-        .modifier(
-          ContentCornerOverlayModifier(
-            toolbarUI: contentToolbar,
-            cornerAnimationContent: cornerAnimationContent
-          )
+    baseContent
+      .modifier(
+        ContentCornerOverlayModifier(
+          isPresented: showsCornerAnimation,
+          cornerAnimationContent: cornerAnimationContent
         )
-    } else {
-      baseContent
-    }
+      )
   }
 
   private var baseContent: some View {
@@ -259,8 +237,8 @@ public struct ContentView<CornerAnimationContent: View>: View {
     )
     .inspector(isPresented: inspectorPresentationBinding) {
       inspectorColumn
-    }
   }
+}
 
   private var inspectorColumn: some View {
     InspectorColumnView(
@@ -451,15 +429,14 @@ public struct ContentView<CornerAnimationContent: View>: View {
       return trimmed.isEmpty ? nil : trimmed
     }
   }
+
 }
 
 public extension ContentView where CornerAnimationContent == EmptyView {
   @MainActor
   init(store: HarnessMonitorStore) {
-    self.init(
-      store: store,
-      showsCornerAnimation: false,
-      cornerAnimationContent: EmptyView()
-    )
+    self.init(store: store, showsCornerAnimation: false) {
+      EmptyView()
+    }
   }
 }

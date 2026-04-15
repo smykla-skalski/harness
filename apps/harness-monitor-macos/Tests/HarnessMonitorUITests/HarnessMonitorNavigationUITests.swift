@@ -85,4 +85,5 @@ final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
     )
     XCTAssertFalse(backButton.isEnabled, "Back button should be disabled at start of history")
   }
+
 }

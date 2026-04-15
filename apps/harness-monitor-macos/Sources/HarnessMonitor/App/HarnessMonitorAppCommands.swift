@@ -12,12 +12,11 @@ struct HarnessMonitorAppCommands: Commands {
 
   @Environment(\.openWindow)
   private var openWindow
-  @FocusedValue(\.windowNavigationScope)
-  private var windowNavigationScope
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
-  let agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  @ObservedObject var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  @ObservedObject var windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
   let increaseTextSize: () -> Void
@@ -41,21 +40,25 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   private var canNavigateBack: Bool {
-    switch windowNavigationScope {
+    switch activeWindowNavigationScope {
     case .agentTui:
       agentTuiNavigationBridge.state.canGoBack
-    case .main, nil:
+    case .main:
       displayState.canNavigateBack
     }
   }
 
   private var canNavigateForward: Bool {
-    switch windowNavigationScope {
+    switch activeWindowNavigationScope {
     case .agentTui:
       agentTuiNavigationBridge.state.canGoForward
-    case .main, nil:
+    case .main:
       displayState.canNavigateForward
     }
+  }
+
+  private var activeWindowNavigationScope: WindowNavigationScope {
+    windowCommandRouting.activeScope ?? .main
   }
 
   var body: some Commands {
@@ -158,22 +161,24 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   private func navigateBack() {
+    let scope = activeWindowNavigationScope
     Task {
-      switch windowNavigationScope {
+      switch scope {
       case .agentTui:
         await agentTuiNavigationBridge.navigateBack()
-      case .main, nil:
+      case .main:
         await store.navigateBack()
       }
     }
   }
 
   private func navigateForward() {
+    let scope = activeWindowNavigationScope
     Task {
-      switch windowNavigationScope {
+      switch scope {
       case .agentTui:
         await agentTuiNavigationBridge.navigateForward()
-      case .main, nil:
+      case .main:
         await store.navigateForward()
       }
     }

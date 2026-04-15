@@ -5,6 +5,7 @@ enum HarnessMonitorSettingsUITestKeys {
   static let timeZoneModeOverride = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"
   static let customTimeZoneOverride = "HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE"
   static let backgroundImageOverride = "HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"
+  static let resetBackgroundRecents = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   static let voiceLocaleOverride = "HARNESS_MONITOR_VOICE_LOCALE_OVERRIDE"
   static let voiceInsertionModeOverride = "HARNESS_MONITOR_VOICE_INSERTION_MODE_OVERRIDE"
   static let voiceRemoteProcessorEnabledOverride =

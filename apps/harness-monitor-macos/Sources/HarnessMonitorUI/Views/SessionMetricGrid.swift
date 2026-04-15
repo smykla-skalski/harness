@@ -68,18 +68,14 @@ struct SessionMetricGrid: View {
       .padding(.horizontal, badgePaddingH)
       .padding(.vertical, badgePaddingV)
       .frame(minWidth: badgeMinWidth)
-      .foregroundStyle(.clear)
+      .foregroundStyle(HarnessMonitorTheme.onContrast)
       .background {
-        ZStack {
-          RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(tint)
-          Text(value)
-            .scaledFont(.system(.body, design: .rounded, weight: .heavy))
-            .monospacedDigit()
-            .contentTransition(.numericText())
-            .blendMode(.destinationOut)
-        }
-        .compositingGroup()
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .fill(tint)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .strokeBorder(tint.opacity(0.16), lineWidth: 1)
       }
       .accessibilityLabel(value)
       .accessibilityValue("")
