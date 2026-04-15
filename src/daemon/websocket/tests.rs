@@ -28,7 +28,7 @@ use crate::session::types::{SessionRole, SessionSignalStatus};
 use crate::workspace::utc_now;
 use harness_testkit::with_isolated_harness_env;
 
-async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> DaemonHttpState {
+pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db_slot = Arc::new(OnceLock::new());
@@ -72,7 +72,7 @@ async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> DaemonHttpS
     }
 }
 
-fn init_git_project(project_dir: &Path) {
+pub(super) fn init_git_project(project_dir: &Path) {
     fs::create_dir_all(project_dir).expect("create project dir");
     let status = Command::new("git")
         .arg("init")
@@ -83,7 +83,11 @@ fn init_git_project(project_dir: &Path) {
     assert!(status.success(), "git init should succeed");
 }
 
-async fn start_async_session(state: &DaemonHttpState, project_dir: &Path, session_id: &str) {
+pub(super) async fn start_async_session(
+    state: &DaemonHttpState,
+    project_dir: &Path,
+    session_id: &str,
+) {
     let async_db = state.async_db.get().expect("async db");
     start_session_direct_async(
         &SessionStartRequest {
@@ -99,7 +103,7 @@ async fn start_async_session(state: &DaemonHttpState, project_dir: &Path, sessio
     .expect("start session");
 }
 
-async fn join_async_worker(
+pub(super) async fn join_async_worker(
     state: &DaemonHttpState,
     session_id: &str,
     project_dir: &Path,
@@ -128,7 +132,7 @@ async fn join_async_worker(
         .to_string()
 }
 
-async fn leader_id_for_session(state: &DaemonHttpState, session_id: &str) -> String {
+pub(super) async fn leader_id_for_session(state: &DaemonHttpState, session_id: &str) -> String {
     let async_db = state.async_db.get().expect("async db");
     let resolved = async_db
         .resolve_session(session_id)

@@ -1,7 +1,8 @@
 use super::{
     AbortHandle, CliError, DaemonObserveRuntime, Duration, Future, Handle, OBSERVE_RUNTIME,
     ObserveLoopRegistration, ObserveLoopRequest, ObserveLoopState, Path, PathBuf,
-    broadcast_session_snapshot, session_observe, sync_after_mutation,
+    broadcast_session_snapshot, broadcast_session_snapshot_async, run_daemon_observe_task_async,
+    session_observe,
 };
 
 pub(crate) fn start_daemon_observe_loop(
@@ -79,8 +80,18 @@ fn spawn_daemon_observe_loop(
 ) -> AbortHandle {
     let join_handle = handle.spawn(async move {
         let cleanup_session_id = session_id.clone();
-        let result =
-            run_daemon_observe_task(session_id, project_dir, runtime.poll_interval, actor_id).await;
+        let result = if let Some(async_db) = runtime.async_db.get().cloned() {
+            run_daemon_observe_task_async(
+                session_id,
+                project_dir,
+                runtime.poll_interval,
+                actor_id,
+                async_db.as_ref(),
+            )
+            .await
+        } else {
+            run_daemon_observe_task(session_id, project_dir, runtime.poll_interval, actor_id).await
+        };
         if let Err(error) = result {
             tracing::warn!(
                 %error,
@@ -95,10 +106,18 @@ fn spawn_daemon_observe_loop(
         {
             running_sessions.remove(&cleanup_session_id);
         }
-        let db_guard = runtime.db.get().and_then(|db| db.lock().ok());
-        let db_ref = db_guard.as_deref();
-        sync_after_mutation(db_ref, &cleanup_session_id);
-        broadcast_session_snapshot(&runtime.sender, &cleanup_session_id, db_ref);
+        if let Some(async_db) = runtime.async_db.get() {
+            broadcast_session_snapshot_async(
+                &runtime.sender,
+                &cleanup_session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+        } else {
+            let db_guard = runtime.db.get().and_then(|db| db.lock().ok());
+            let db_ref = db_guard.as_deref();
+            broadcast_session_snapshot(&runtime.sender, &cleanup_session_id, db_ref);
+        }
     });
     join_handle.abort_handle()
 }
