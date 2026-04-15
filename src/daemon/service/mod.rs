@@ -28,7 +28,7 @@ use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch as tokio_watch};
-use tokio::task::{AbortHandle, spawn_blocking};
+use tokio::task::AbortHandle;
 
 use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
@@ -212,6 +212,7 @@ mod mutations_async;
 mod observe_async;
 mod observe_loop;
 mod observe_stream;
+mod read_reconciliation;
 mod serve;
 mod sessions;
 mod signals;
@@ -260,6 +261,7 @@ pub(crate) use observe_stream::{
     global_stream_initial_events_async, session_stream_initial_events_async,
     session_updated_core_event_async, sessions_updated_event_async,
 };
+pub(crate) use read_reconciliation::*;
 pub(crate) use sessions::session_timeline_window;
 pub(crate) use sessions::{
     list_projects_async, list_sessions_async, session_detail_async, session_detail_core_async,

@@ -1,10 +1,11 @@
 use super::{
-    BTreeMap, BTreeSet, CliError, CliErrorKind, Instant, Mutex, PathBuf, ProjectSummary,
+    BTreeMap, BTreeSet, CliError, CliErrorKind, Instant, Mutex, ProjectSummary,
     SESSION_LIVENESS_REFRESH_CACHE, SESSION_LIVENESS_REFRESH_TTL, SessionDetail,
-    SessionExtensionsPayload, SessionState, SessionStatus, SessionSummary, TimelineCursor,
-    TimelineEntry, TimelineWindowRequest, TimelineWindowResponse, index,
-    reconcile_expired_pending_signals_for_db, session_not_found, session_service, session_storage,
-    snapshot, timeline,
+    SessionExtensionsPayload, SessionStatus, SessionSummary, TimelineCursor, TimelineEntry,
+    TimelineWindowRequest, TimelineWindowResponse, index, liveness_project_dir_for_resolved,
+    reconcile_expired_pending_signals_for_async_db, reconcile_expired_pending_signals_for_db,
+    refresh_resolved_session_from_files_if_newer, session_not_found, snapshot,
+    sync_resolved_liveness, sync_resolved_liveness_async, timeline,
 };
 
 /// List discovered projects known to the daemon.
@@ -53,7 +54,7 @@ pub fn list_sessions(
 /// # Errors
 /// Returns [`CliError`] on query failures.
 pub(crate) async fn list_sessions_async(
-    _include_all: bool,
+    include_all: bool,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<Vec<SessionSummary>, CliError> {
     let async_db = async_db.ok_or_else(|| {
@@ -61,6 +62,7 @@ pub(crate) async fn list_sessions_async(
             "async daemon database pool is required for async session reads",
         ))
     })?;
+    reconcile_active_session_liveness_for_reads_async(include_all, Some(async_db)).await?;
     async_db.list_session_summaries().await
 }
 
@@ -97,6 +99,8 @@ pub(crate) async fn session_detail_async(
             "async daemon database pool is required for async session reads",
         ))
     })?;
+    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
+    reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
     let resolved = async_db
         .resolve_session(session_id)
         .await?
@@ -120,6 +124,8 @@ pub(crate) async fn session_detail_core_async(
             "async daemon database pool is required for async session reads",
         ))
     })?;
+    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
+    reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
     let resolved = async_db
         .resolve_session(session_id)
         .await?
@@ -142,6 +148,7 @@ pub(crate) async fn session_timeline_window_async(
             "async daemon database pool is required for async session timeline reads",
         ))
     })?;
+    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
     async_db
         .load_session_timeline_window(session_id, request)
         .await?
@@ -343,6 +350,7 @@ pub(crate) async fn session_extensions_async(
             "async daemon database pool is required for async session extension reads",
         ))
     })?;
+    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
     let resolved = async_db
         .resolve_session(session_id)
         .await?
@@ -370,6 +378,34 @@ pub(crate) fn reconcile_active_session_liveness_for_reads(
     let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
     for session_id in stale_session_ids {
         if let Err(error) = reconcile_session_liveness_for_read(&session_id, Some(db)) {
+            clear_session_liveness_refresh_cache_entry(&session_id);
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn reconcile_active_session_liveness_for_reads_async(
+    _include_all: bool,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<(), CliError> {
+    let Some(async_db) = async_db else {
+        return Ok(());
+    };
+    let session_ids: BTreeSet<_> = async_db
+        .list_session_summaries()
+        .await?
+        .into_iter()
+        .filter(|state| {
+            state.status == SessionStatus::Active && state.metrics.active_agent_count > 0
+        })
+        .map(|state| state.session_id)
+        .collect();
+    let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
+    for session_id in stale_session_ids {
+        if let Err(error) =
+            reconcile_session_liveness_for_read_async(&session_id, Some(async_db)).await
+        {
             clear_session_liveness_refresh_cache_entry(&session_id);
             return Err(error);
         }
@@ -426,37 +462,30 @@ pub(crate) fn reconcile_session_liveness_for_read(
     let Some(db) = db else {
         return Ok(());
     };
-    if let Some(project_dir) = liveness_project_dir(session_id, db)? {
-        let result = session_service::sync_agent_liveness(session_id, &project_dir)?;
-        if !result.disconnected.is_empty() || !result.idled.is_empty() {
-            db.resync_session(session_id)?;
-        }
-    }
+    let Some(mut resolved) = db.resolve_session(session_id)? else {
+        return Ok(());
+    };
+    refresh_resolved_session_from_files_if_newer(db, &mut resolved)?;
+    let Some(project_dir) = liveness_project_dir_for_resolved(&resolved)? else {
+        return Ok(());
+    };
+    let _ = sync_resolved_liveness(db, &mut resolved, &project_dir)?;
     Ok(())
 }
 
-pub(crate) fn liveness_project_dir(
+pub(crate) async fn reconcile_session_liveness_for_read_async(
     session_id: &str,
-    db: &super::db::DaemonDb,
-) -> Result<Option<PathBuf>, CliError> {
-    let Some(resolved) = db.resolve_session(session_id)? else {
-        return Ok(None);
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<(), CliError> {
+    let Some(async_db) = async_db else {
+        return Ok(());
     };
-    if resolved.state.status != SessionStatus::Active {
-        return Ok(None);
-    }
-    if !session_has_live_agents(&resolved.state) {
-        return Ok(None);
-    }
-    let Some(project_dir) = resolved.project.project_dir else {
-        return Ok(None);
+    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
+        return Ok(());
     };
-    if session_storage::load_state(&project_dir, session_id)?.is_none() {
-        return Ok(None);
-    }
-    Ok(Some(project_dir))
-}
-
-pub(crate) fn session_has_live_agents(state: &SessionState) -> bool {
-    state.agents.values().any(|agent| agent.status.is_alive())
+    let Some(project_dir) = liveness_project_dir_for_resolved(&resolved)? else {
+        return Ok(());
+    };
+    let _ = sync_resolved_liveness_async(async_db, &mut resolved, &project_dir).await?;
+    Ok(())
 }
