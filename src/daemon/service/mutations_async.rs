@@ -1,9 +1,11 @@
 use crate::daemon::index::ResolvedSession;
 
 use super::{
-    CliError, LeaderTransferRequest, RoleChangeRequest, SessionDetail, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskSource, append_transfer_logs_to_async_db,
-    build_log_entry, session_detail_async, session_not_found, session_service, utc_now,
+    AgentRemoveRequest, CliError, LeaderTransferRequest, RoleChangeRequest, SessionDetail,
+    SessionEndRequest, SessionTransition, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
+    append_transfer_logs_to_async_db, build_log_entry, effective_project_dir, session_detail_async,
+    session_not_found, session_service, slice, snapshot, utc_now, write_task_start_signals,
 };
 
 async fn resolved_session_for_mutation(
@@ -22,6 +24,120 @@ async fn bump_session(
 ) -> Result<(), CliError> {
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await
+}
+
+async fn refresh_signal_index_for_resolved(
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &ResolvedSession,
+) -> Result<(), CliError> {
+    let signals = snapshot::load_signals_for(&resolved.project, &resolved.state)?;
+    async_db
+        .sync_signal_index(&resolved.state.session_id, &signals)
+        .await
+}
+
+async fn append_task_drop_effect_logs_async(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    effects: &[session_service::TaskDropEffect],
+) -> Result<(), CliError> {
+    for effect in effects {
+        let transition = match effect {
+            session_service::TaskDropEffect::Started(signal) => session_service::log_signal_sent(
+                &signal.signal.signal_id,
+                &signal.agent_id,
+                &signal.signal.command,
+            ),
+            session_service::TaskDropEffect::Queued { task_id, agent_id } => {
+                session_service::log_task_queued(task_id, agent_id)
+            }
+        };
+        async_db
+            .append_log_entry(&build_log_entry(
+                session_id,
+                transition,
+                Some(actor_id),
+                None,
+            ))
+            .await?;
+    }
+    Ok(())
+}
+
+async fn append_leave_signal_logs_async(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    signals: &[session_service::LeaveSignalRecord],
+) -> Result<(), CliError> {
+    for signal in signals {
+        async_db
+            .append_log_entry(&build_log_entry(
+                session_id,
+                session_service::log_signal_sent(
+                    &signal.signal.signal_id,
+                    &signal.agent_id,
+                    &signal.signal.command,
+                ),
+                Some(actor_id),
+                None,
+            ))
+            .await?;
+    }
+    Ok(())
+}
+
+async fn persist_task_signal_effects(
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &ResolvedSession,
+    session_id: &str,
+    actor_id: &str,
+    effects: &[session_service::TaskDropEffect],
+    extra_transition: Option<SessionTransition>,
+) -> Result<(), CliError> {
+    let project_dir = effective_project_dir(resolved).to_path_buf();
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    write_task_start_signals(&project_dir, effects)?;
+    if let Some(transition) = extra_transition {
+        async_db
+            .append_log_entry(&build_log_entry(
+                session_id,
+                transition,
+                Some(actor_id),
+                None,
+            ))
+            .await?;
+    }
+    append_task_drop_effect_logs_async(async_db, session_id, actor_id, effects).await?;
+    refresh_signal_index_for_resolved(async_db, resolved).await?;
+    bump_session(async_db, session_id).await
+}
+
+async fn persist_leave_signal_mutation(
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &ResolvedSession,
+    session_id: &str,
+    actor_id: &str,
+    leave_signals: &[session_service::LeaveSignalRecord],
+    transition: SessionTransition,
+) -> Result<(), CliError> {
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    append_leave_signal_logs_async(async_db, session_id, actor_id, leave_signals).await?;
+    async_db
+        .append_log_entry(&build_log_entry(
+            session_id,
+            transition,
+            Some(actor_id),
+            None,
+        ))
+        .await?;
+    refresh_signal_index_for_resolved(async_db, resolved).await?;
+    bump_session(async_db, session_id).await
 }
 
 /// Create a task through the canonical async daemon DB.
@@ -131,6 +247,109 @@ pub(crate) async fn checkpoint_task_async(
     session_detail_async(session_id, Some(async_db)).await
 }
 
+/// Drop a task onto an extensible target through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved, the drop is invalid,
+/// or task-start signal delivery fails.
+pub(crate) async fn drop_task_async(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDropRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
+    let now = utc_now();
+    let effects = session_service::apply_drop_task(
+        &mut resolved.state,
+        task_id,
+        &request.target,
+        request.queue_policy,
+        &request.actor,
+        &now,
+    )?;
+    persist_task_signal_effects(
+        async_db,
+        &resolved,
+        session_id,
+        &request.actor,
+        &effects,
+        None,
+    )
+    .await?;
+    session_detail_async(session_id, Some(async_db)).await
+}
+
+/// Update a queued task's reassignment policy through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved, the task is missing,
+/// or queue promotion signal delivery fails.
+pub(crate) async fn update_task_queue_policy_async(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskQueuePolicyRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
+    let now = utc_now();
+    let effects = session_service::apply_update_task_queue_policy(
+        &mut resolved.state,
+        task_id,
+        request.queue_policy,
+        &request.actor,
+        &now,
+    )?;
+    persist_task_signal_effects(
+        async_db,
+        &resolved,
+        session_id,
+        &request.actor,
+        &effects,
+        None,
+    )
+    .await?;
+    session_detail_async(session_id, Some(async_db)).await
+}
+
+/// Update a task status through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or the update fails.
+pub(crate) async fn update_task_async(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskUpdateRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
+    let now = utc_now();
+    let from_status = session_service::apply_update_task(
+        &mut resolved.state,
+        task_id,
+        request.status,
+        request.note.as_deref(),
+        &request.actor,
+        &now,
+    )?;
+    let effects =
+        session_service::apply_advance_queued_tasks(&mut resolved.state, &request.actor, &now)?;
+    persist_task_signal_effects(
+        async_db,
+        &resolved,
+        session_id,
+        &request.actor,
+        &effects,
+        Some(session_service::log_task_status_changed(
+            task_id,
+            from_status,
+            request.status,
+        )),
+    )
+    .await?;
+    session_detail_async(session_id, Some(async_db)).await
+}
+
 /// Change an agent role through the canonical async daemon DB.
 ///
 /// # Errors
@@ -164,6 +383,48 @@ pub(crate) async fn change_role_async(
     session_detail_async(session_id, Some(async_db)).await
 }
 
+/// Remove an agent through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or the removal fails.
+pub(crate) async fn remove_agent_async(
+    session_id: &str,
+    agent_id: &str,
+    request: &AgentRemoveRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
+    let project_dir = effective_project_dir(&resolved).to_path_buf();
+    let now = utc_now();
+    let leave_signal = session_service::prepare_remove_agent_leave_signal(
+        &resolved.state,
+        agent_id,
+        &request.actor,
+        &now,
+    )?;
+    if let Some(ref signal) = leave_signal {
+        session_service::write_prepared_leave_signals(
+            &project_dir,
+            slice::from_ref(signal),
+            "remove agent",
+        )?;
+    }
+    session_service::apply_remove_agent(&mut resolved.state, agent_id, &request.actor, &now)?;
+    let leave_signals = leave_signal
+        .as_ref()
+        .map_or_else(Vec::new, |signal| vec![signal.clone()]);
+    persist_leave_signal_mutation(
+        async_db,
+        &resolved,
+        session_id,
+        &request.actor,
+        &leave_signals,
+        session_service::log_agent_removed(agent_id),
+    )
+    .await?;
+    session_detail_async(session_id, Some(async_db)).await
+}
+
 /// Transfer session leadership through the canonical async daemon DB.
 ///
 /// # Errors
@@ -186,5 +447,33 @@ pub(crate) async fn transfer_leader_async(
         .await?;
     append_transfer_logs_to_async_db(async_db, session_id, &request.actor, &plan).await?;
     bump_session(async_db, session_id).await?;
+    session_detail_async(session_id, Some(async_db)).await
+}
+
+/// End a session through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or ending fails.
+pub(crate) async fn end_session_async(
+    session_id: &str,
+    request: &SessionEndRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
+    let project_dir = effective_project_dir(&resolved).to_path_buf();
+    let now = utc_now();
+    let leave_signals =
+        session_service::prepare_end_session_leave_signals(&resolved.state, &request.actor, &now)?;
+    session_service::write_prepared_leave_signals(&project_dir, &leave_signals, "end session")?;
+    session_service::apply_end_session(&mut resolved.state, &request.actor, &now)?;
+    persist_leave_signal_mutation(
+        async_db,
+        &resolved,
+        session_id,
+        &request.actor,
+        &leave_signals,
+        session_service::log_session_ended(),
+    )
+    .await?;
     session_detail_async(session_id, Some(async_db)).await
 }

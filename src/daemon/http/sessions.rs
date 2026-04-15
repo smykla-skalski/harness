@@ -219,7 +219,7 @@ async fn read_timeline_window(
     .await
 }
 
-async fn post_end_session(
+pub(super) async fn post_end_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -230,11 +230,9 @@ async fn post_end_session(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::end_session(&session_id, &request, db_ref);
+    let result = end_session_response(&state, &session_id, &request).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_session_end(&state, &session_id).await;
     }
     timed_json("POST", "/v1/sessions/{id}/end", &request_id, start, result)
 }
@@ -345,7 +343,36 @@ async fn join_session_response(
         .map(session_mutation_response)
 }
 
+async fn end_session_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SessionEndRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::end_session_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = db.lock().expect("db lock");
+    service::end_session(session_id, request, Some(&db_guard))
+}
+
 async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return;
+    }
+    if let Ok(db) = ensure_shared_db(&state.db) {
+        let db_guard = db.lock().expect("db lock");
+        service::broadcast_session_snapshot(&state.sender, session_id, Some(&db_guard));
+    }
+}
+
+async fn broadcast_session_end(state: &DaemonHttpState, session_id: &str) {
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_session_snapshot_async(
             &state.sender,

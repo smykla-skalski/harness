@@ -24,17 +24,21 @@ use crate::session::types::{
 };
 
 use super::DaemonHttpState;
-use super::agents::{post_role_change, post_transfer_leader};
+use super::agents::{post_remove_agent, post_role_change, post_transfer_leader};
 use super::auth::authorize_control_request;
 use super::core::{get_diagnostics, get_health, get_projects};
 use super::response::{map_json, request_activity_log_level};
 use super::sessions::{
-    SessionScopeQuery, get_session, get_sessions, get_timeline, post_session_join,
-    post_session_start,
+    SessionScopeQuery, get_session, get_sessions, get_timeline, post_end_session,
+    post_session_join, post_session_start,
 };
-use super::tasks::{post_task_assign, post_task_checkpoint, post_task_create};
+use super::tasks::{
+    post_task_assign, post_task_checkpoint, post_task_create, post_task_drop,
+    post_task_queue_policy, post_task_update,
+};
 
 mod async_agent_mutations;
+mod async_lifecycle_mutations;
 mod async_mutations;
 mod async_reads;
 mod async_stream;
