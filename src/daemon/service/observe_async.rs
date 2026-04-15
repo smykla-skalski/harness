@@ -9,7 +9,7 @@ use crate::session::types::{SessionStatus, TaskSeverity, TaskSource};
 
 use super::{
     CliError, Duration, ObserveSessionRequest, Path, PathBuf, SessionDetail, build_log_entry,
-    effective_project_dir, session_detail_async, session_not_found, session_observe,
+    effective_project_dir, session_detail_from_async_daemon_db, session_not_found, session_observe,
     session_service, start_daemon_observe_loop, sync_resolved_liveness_async, utc_now,
 };
 
@@ -53,7 +53,7 @@ pub(crate) async fn observe_session_async(
     apply_issue_tasks(async_db, &mut resolved, actor_id, &issues).await?;
     async_db.sync_runtime_transcripts(&resolved).await?;
     let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Run the daemon-owned async observe watch loop with direct canonical writes.

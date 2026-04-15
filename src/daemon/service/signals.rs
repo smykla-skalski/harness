@@ -1,10 +1,11 @@
 use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, ActiveSignalDelivery,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, ActiveSignalDelivery,
     AgentRegistration, AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake,
-    Path, PathBuf, SessionDetail, SignalAck, SignalSendRequest, agents_runtime, build_log_entry,
-    effective_project_dir, index, project_dir_for_db_session, record_signal_ack,
-    refresh_signal_index_for_db, session_detail, session_not_found, session_service, state,
-    sync_after_mutation, thread, utc_now,
+    Path, PathBuf, SessionDetail, SignalAck, SignalSendRequest, acknowledged_signal_record,
+    agents_runtime, build_log_entry, effective_project_dir, index, pending_signal_record,
+    project_dir_for_db_session, record_signal_ack, refresh_signal_index_for_db, session_detail,
+    session_detail_from_daemon_db, session_not_found, session_service, state, sync_after_mutation,
+    thread, utc_now,
 };
 
 /// Send a signal through the shared session service.
@@ -70,7 +71,7 @@ pub fn send_signal(
             Some(&request.actor),
             None,
         ))?;
-        attempt_active_signal_delivery(
+        let actively_delivered = attempt_active_signal_delivery(
             &ActiveSignalDelivery {
                 session_id,
                 agent_id: &request.agent_id,
@@ -82,10 +83,20 @@ pub fn send_signal(
             },
             managed_tui_wake(target_tui_id.as_deref(), agent_tui_manager),
         );
-        refresh_signal_index_for_db(db, session_id)?;
+        if !actively_delivered {
+            db.merge_signal_records(
+                session_id,
+                &[pending_signal_record(
+                    session_id,
+                    &runtime_name,
+                    &request.agent_id,
+                    &signal,
+                )],
+            )?;
+        }
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        return session_detail(session_id, Some(db));
+        return session_detail_from_daemon_db(session_id, db);
     }
 
     // File-based fallback
@@ -117,21 +128,22 @@ pub(crate) fn managed_tui_wake<'a>(
 pub(crate) fn attempt_active_signal_delivery(
     delivery: &ActiveSignalDelivery<'_>,
     managed_tui: Option<ManagedTuiWake<'_>>,
-) {
+) -> bool {
     let Some(managed_tui) = managed_tui else {
-        return;
+        return false;
     };
 
     let Some(woke_tui) = handled_active_signal_wake_result(
         delivery,
         wake_tui_for_signal(&managed_tui, delivery.signal),
     ) else {
-        return;
+        return false;
     };
 
     if woke_tui {
-        process_active_signal_ack(delivery);
+        return process_active_signal_ack(delivery);
     }
+    false
 }
 
 pub(crate) fn wake_tui_for_signal(
@@ -155,7 +167,7 @@ pub(crate) fn handled_active_signal_wake_result(
     }
 }
 
-pub(crate) fn process_active_signal_ack(delivery: &ActiveSignalDelivery<'_>) {
+pub(crate) fn process_active_signal_ack(delivery: &ActiveSignalDelivery<'_>) -> bool {
     let Some(ack) = handled_active_signal_ack_wait_result(
         delivery,
         wait_for_signal_ack(
@@ -165,10 +177,10 @@ pub(crate) fn process_active_signal_ack(delivery: &ActiveSignalDelivery<'_>) {
             &delivery.signal.signal_id,
         ),
     ) else {
-        return;
+        return false;
     };
 
-    record_active_signal_ack(delivery, &ack);
+    record_active_signal_ack(delivery, &ack)
 }
 
 pub(crate) fn handled_active_signal_ack_wait_result(
@@ -192,19 +204,25 @@ pub(crate) fn handled_active_signal_ack_wait_result(
     }
 }
 
-pub(crate) fn record_active_signal_ack(delivery: &ActiveSignalDelivery<'_>, ack: &SignalAck) {
-    let Err(error) = record_signal_ack(
+pub(crate) fn record_active_signal_ack(
+    delivery: &ActiveSignalDelivery<'_>,
+    ack: &SignalAck,
+) -> bool {
+    let result = record_signal_ack(
         delivery.session_id,
         delivery.agent_id,
         &delivery.signal.signal_id,
         ack.result,
         delivery.project_dir,
         delivery.db,
-    ) else {
-        return;
-    };
-
-    warn_active_signal_ack_record_failure(delivery, &error);
+    );
+    match result {
+        Ok(()) => true,
+        Err(error) => {
+            warn_active_signal_ack_record_failure(delivery, &error);
+            false
+        }
+    }
 }
 
 pub(crate) fn build_active_signal_prompt(signal: &agents_runtime::signal::Signal) -> String {
@@ -370,7 +388,34 @@ pub fn cancel_signal(
     )?;
 
     if let Some(db) = db {
-        refresh_signal_index_for_db(db, session_id)?;
+        if let Some(signal) = db.load_signals(session_id)?.into_iter().find(|record| {
+            record.agent_id == request.agent_id && record.signal.signal_id == request.signal_id
+        }) {
+            let ack_agent = db
+                .load_session_state(session_id)?
+                .and_then(|state| {
+                    state
+                        .agents
+                        .get(&request.agent_id)
+                        .and_then(|agent| agent.agent_session_id.clone())
+                })
+                .unwrap_or_else(|| session_id.to_string());
+            db.merge_signal_records(
+                session_id,
+                &[acknowledged_signal_record(
+                    session_id,
+                    &signal.runtime,
+                    &request.agent_id,
+                    &signal.signal,
+                    AckResult::Rejected,
+                    &ack_agent,
+                    &utc_now(),
+                    Some(format!("cancelled by {}", request.actor)),
+                )],
+            )?;
+        } else {
+            refresh_signal_index_for_db(db, session_id)?;
+        }
         db.bump_change(session_id)?;
         db.bump_change("global")?;
     } else {

@@ -4,8 +4,9 @@ use super::{
     AgentRemoveRequest, CliError, LeaderTransferRequest, RoleChangeRequest, SessionDetail,
     SessionEndRequest, SessionTransition, TaskAssignRequest, TaskCheckpointRequest,
     TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
-    append_transfer_logs_to_async_db, build_log_entry, effective_project_dir, session_detail_async,
-    session_not_found, session_service, slice, snapshot, utc_now, write_task_start_signals,
+    append_transfer_logs_to_async_db, build_log_entry, effective_project_dir,
+    session_detail_from_async_daemon_db, session_not_found, session_service, slice, snapshot,
+    task_drop_effect_signal_records, utc_now, write_task_start_signals,
 };
 
 async fn resolved_session_for_mutation(
@@ -112,7 +113,12 @@ async fn persist_task_signal_effects(
             .await?;
     }
     append_task_drop_effect_logs_async(async_db, session_id, actor_id, effects).await?;
-    refresh_signal_index_for_resolved(async_db, resolved).await?;
+    async_db
+        .merge_signal_records(
+            session_id,
+            &task_drop_effect_signal_records(session_id, effects),
+        )
+        .await?;
     bump_session(async_db, session_id).await
 }
 
@@ -172,7 +178,7 @@ pub(crate) async fn create_task_async(
         ))
         .await?;
     bump_session(async_db, session_id).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Assign a task through the canonical async daemon DB.
@@ -205,7 +211,7 @@ pub(crate) async fn assign_task_async(
         ))
         .await?;
     bump_session(async_db, session_id).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Record a task checkpoint through the canonical async daemon DB.
@@ -244,7 +250,7 @@ pub(crate) async fn checkpoint_task_async(
         ))
         .await?;
     bump_session(async_db, session_id).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Drop a task onto an extensible target through the canonical async daemon DB.
@@ -277,7 +283,7 @@ pub(crate) async fn drop_task_async(
         None,
     )
     .await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Update a queued task's reassignment policy through the canonical async daemon DB.
@@ -309,7 +315,7 @@ pub(crate) async fn update_task_queue_policy_async(
         None,
     )
     .await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Update a task status through the canonical async daemon DB.
@@ -347,7 +353,7 @@ pub(crate) async fn update_task_async(
         )),
     )
     .await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Change an agent role through the canonical async daemon DB.
@@ -380,7 +386,7 @@ pub(crate) async fn change_role_async(
         ))
         .await?;
     bump_session(async_db, session_id).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Remove an agent through the canonical async daemon DB.
@@ -422,7 +428,7 @@ pub(crate) async fn remove_agent_async(
         session_service::log_agent_removed(agent_id),
     )
     .await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Transfer session leadership through the canonical async daemon DB.
@@ -447,7 +453,7 @@ pub(crate) async fn transfer_leader_async(
         .await?;
     append_transfer_logs_to_async_db(async_db, session_id, &request.actor, &plan).await?;
     bump_session(async_db, session_id).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// End a session through the canonical async daemon DB.
@@ -475,5 +481,5 @@ pub(crate) async fn end_session_async(
         session_service::log_session_ended(),
     )
     .await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }

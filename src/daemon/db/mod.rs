@@ -162,6 +162,7 @@ pub(crate) struct StoredTimelineEntry {
     sort_tiebreaker: String,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SessionTimelineStateRow {
     session_id: String,

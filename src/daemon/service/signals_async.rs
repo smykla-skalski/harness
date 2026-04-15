@@ -2,12 +2,14 @@ use std::path::{Path, PathBuf};
 
 use super::{
     AgentRegistration, CliError, CliErrorKind, SessionDetail, SessionLogEntry, SessionTransition,
-    SignalAck, SignalAckRequest, SignalCancelRequest, build_log_entry, effective_project_dir,
-    session_detail_async, session_not_found, session_service, snapshot, utc_now, write_signal_ack,
+    SignalAck, SignalAckRequest, SignalCancelRequest, acknowledged_signal_record, build_log_entry,
+    effective_project_dir, session_detail_from_async_daemon_db, session_not_found, session_service,
+    snapshot, utc_now, write_signal_ack,
 };
-use crate::agents::runtime::signal::{AckResult, read_pending_signals};
+use crate::agents::runtime::signal::{AckResult, Signal, read_pending_signals};
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::index::ResolvedSession;
+use crate::session::types::SessionSignalRecord;
 
 pub(super) async fn resolved_session_for_signal_mutation(
     async_db: &super::db::AsyncDaemonDb,
@@ -46,6 +48,19 @@ async fn signal_already_acknowledged(
     Ok(signals
         .iter()
         .any(|signal| signal.signal.signal_id == signal_id && signal.acknowledgment.is_some()))
+}
+
+async fn indexed_signal_record(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+) -> Result<Option<SessionSignalRecord>, CliError> {
+    Ok(async_db
+        .load_signals(session_id)
+        .await?
+        .into_iter()
+        .find(|record| record.agent_id == agent_id && record.signal.signal_id == signal_id))
 }
 
 fn acknowledged_signal_transition(
@@ -149,6 +164,7 @@ fn write_signal_ack_artifact(
 struct SignalAckOutcome {
     result: AckResult,
     started_task: Option<String>,
+    indexed_signal: Option<SessionSignalRecord>,
 }
 
 async fn persist_signal_ack_state(
@@ -157,12 +173,23 @@ async fn persist_signal_ack_state(
     request: &SignalAckRequest,
     project_dir: &Path,
 ) -> Result<SignalAckOutcome, CliError> {
-    let signal = session_service::load_signal_record_for_agent_from_state(
-        &resolved.state,
+    let signal = if let Some(signal) = indexed_signal_record(
+        async_db,
+        &resolved.state.session_id,
         &request.agent_id,
         &request.signal_id,
-        project_dir,
-    )?;
+    )
+    .await?
+    {
+        Some(signal)
+    } else {
+        session_service::load_signal_record_for_agent_from_state(
+            &resolved.state,
+            &request.agent_id,
+            &request.signal_id,
+            project_dir,
+        )?
+    };
     let result = signal.as_ref().map_or(request.result, |record| {
         session_service::normalize_signal_ack_result(&record.signal, request.result)
     });
@@ -186,6 +213,7 @@ async fn persist_signal_ack_state(
     Ok(SignalAckOutcome {
         result,
         started_task,
+        indexed_signal: signal,
     })
 }
 
@@ -202,6 +230,99 @@ async fn append_started_task_log(
         .append_log_entry(&assigned_task_log_entry(session_id, task_id, agent_id))
         .await
 }
+
+fn ensure_pending_signal_exists(
+    pending: &[Signal],
+    request: &SignalCancelRequest,
+) -> Result<(), CliError> {
+    if pending
+        .iter()
+        .any(|signal| signal.signal_id == request.signal_id)
+    {
+        return Ok(());
+    }
+    Err(CliError::from(CliErrorKind::workflow_io(format!(
+        "signal '{}' is not pending for agent '{}'",
+        request.signal_id, request.agent_id
+    ))))
+}
+
+async fn persist_cancel_signal_state(
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &ResolvedSession,
+    session_id: &str,
+    request: &SignalCancelRequest,
+    ack: &SignalAck,
+) -> Result<(), CliError> {
+    async_db
+        .append_log_entry(&build_log_entry(
+            session_id,
+            acknowledged_signal_transition(
+                &request.signal_id,
+                &request.agent_id,
+                AckResult::Rejected,
+            ),
+            Some(&request.actor),
+            None,
+        ))
+        .await?;
+    if let Some(signal) =
+        indexed_signal_record(async_db, session_id, &request.agent_id, &request.signal_id).await?
+    {
+        async_db
+            .merge_signal_records(
+                session_id,
+                &[acknowledged_signal_record(
+                    session_id,
+                    &signal.runtime,
+                    &request.agent_id,
+                    &signal.signal,
+                    AckResult::Rejected,
+                    &ack.agent,
+                    &ack.acknowledged_at,
+                    ack.details.clone(),
+                )],
+            )
+            .await?;
+    } else {
+        refresh_signal_index_for_resolved(async_db, resolved).await?;
+    }
+    Ok(())
+}
+
+async fn persist_acknowledged_signal_index(
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &ResolvedSession,
+    session_id: &str,
+    request: &SignalAckRequest,
+    outcome: &SignalAckOutcome,
+) -> Result<(), CliError> {
+    let Some(signal) = outcome.indexed_signal.as_ref() else {
+        return refresh_signal_index_for_resolved(async_db, resolved).await;
+    };
+    let ack_agent = resolved
+        .state
+        .agents
+        .get(&request.agent_id)
+        .and_then(|agent| agent.agent_session_id.as_deref())
+        .unwrap_or(session_id);
+    async_db
+        .merge_signal_records(
+            session_id,
+            &[acknowledged_signal_record(
+                session_id,
+                &signal.runtime,
+                &request.agent_id,
+                &signal.signal,
+                outcome.result,
+                ack_agent,
+                &utc_now(),
+                None,
+            )],
+        )
+        .await
+}
+
 /// Cancel a pending signal while persisting the canonical async DB snapshot.
 ///
 /// # Errors
@@ -216,46 +337,23 @@ pub(crate) async fn cancel_signal_async(
     let project_dir = effective_project_dir(&resolved).to_path_buf();
     let signal_dir = pending_signal_dir(&resolved, session_id, &request.agent_id, &project_dir)?;
     let pending = read_pending_signals(&signal_dir)?;
-    if !pending
-        .iter()
-        .any(|signal| signal.signal_id == request.signal_id)
-    {
-        return Err(CliError::from(CliErrorKind::workflow_io(format!(
-            "signal '{}' is not pending for agent '{}'",
-            request.signal_id, request.agent_id
-        ))));
-    }
+    ensure_pending_signal_exists(&pending, request)?;
 
     let agent = resolved
         .state
         .agents
         .get(&request.agent_id)
         .expect("agent already validated");
-    write_signal_ack(
-        &signal_dir,
-        &cancel_ack_record(
-            session_id,
-            &request.actor,
-            &request.signal_id,
-            signal_session_id_for_agent(session_id, agent),
-        ),
-    )?;
-
-    async_db
-        .append_log_entry(&build_log_entry(
-            session_id,
-            acknowledged_signal_transition(
-                &request.signal_id,
-                &request.agent_id,
-                AckResult::Rejected,
-            ),
-            Some(&request.actor),
-            None,
-        ))
-        .await?;
-    refresh_signal_index_for_resolved(async_db, &resolved).await?;
+    let ack = cancel_ack_record(
+        session_id,
+        &request.actor,
+        &request.signal_id,
+        signal_session_id_for_agent(session_id, agent),
+    );
+    write_signal_ack(&signal_dir, &ack)?;
+    persist_cancel_signal_state(async_db, &resolved, session_id, request, &ack).await?;
     bump_session(async_db, session_id).await?;
-    session_detail_async(session_id, Some(async_db)).await
+    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 /// Record a signal acknowledgment while keeping the async DB authoritative.
@@ -298,6 +396,6 @@ async fn record_signal_ack_direct_async_inner(
             outcome.result,
         ))
         .await?;
-    refresh_signal_index_for_resolved(async_db, &resolved).await?;
+    persist_acknowledged_signal_index(async_db, &resolved, session_id, request, &outcome).await?;
     bump_session(async_db, session_id).await
 }

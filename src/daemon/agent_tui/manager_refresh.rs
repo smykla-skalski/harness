@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
+use std::convert::identity;
 use std::future::Future;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 
-use tokio::runtime::{Handle, RuntimeFlavor};
+use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::task::block_in_place;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
@@ -51,7 +52,7 @@ impl AgentTuiManagerHandle {
             Ok(current) => match current.runtime_flavor() {
                 RuntimeFlavor::MultiThread => block_in_place(|| runtime.block_on(future)),
                 RuntimeFlavor::CurrentThread => thread::spawn(move || {
-                    tokio::runtime::Builder::new_current_thread()
+                    Builder::new_current_thread()
                         .enable_all()
                         .build()
                         .map_err(|error| {
@@ -67,7 +68,7 @@ impl AgentTuiManagerHandle {
                         "join async agent TUI bridge thread",
                     ))
                 })
-                .and_then(std::convert::identity),
+                .and_then(identity),
                 _ => runtime.block_on(future),
             },
             Err(_) => runtime.block_on(future),

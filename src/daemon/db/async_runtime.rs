@@ -251,9 +251,9 @@ impl AsyncCodexRunRow {
             thread_id: self.thread_id,
             turn_id: self.turn_id,
             mode: codex_mode_from_str(&self.mode)
-                .map_err(|error| parse_async_runtime_error("codex mode", error))?,
+                .map_err(|error| parse_async_runtime_error("codex mode", &error))?,
             status: codex_status_from_str(&self.status)
-                .map_err(|error| parse_async_runtime_error("codex status", error))?,
+                .map_err(|error| parse_async_runtime_error("codex status", &error))?,
             prompt: self.prompt,
             latest_summary: self.latest_summary,
             final_message: self.final_message,
@@ -308,7 +308,7 @@ impl AsyncAgentTuiRow {
             agent_id: self.agent_id,
             runtime: self.runtime,
             status: AgentTuiStatus::from_str(&self.status)
-                .map_err(|error| parse_async_runtime_error("agent TUI status", error))?,
+                .map_err(|error| parse_async_runtime_error("agent TUI status", &error))?,
             argv: serde_json::from_str(&self.argv_json)
                 .map_err(|error| db_error(format!("parse async agent TUI argv: {error}")))?,
             project_dir: self.project_dir,
@@ -340,7 +340,7 @@ impl AsyncAgentTuiLiveRefreshStateRow {
     fn into_state(self) -> Result<AgentTuiLiveRefreshState, CliError> {
         Ok(AgentTuiLiveRefreshState {
             status: AgentTuiStatus::from_str(&self.status).map_err(|error| {
-                parse_async_runtime_error("agent TUI live-refresh status", error)
+                parse_async_runtime_error("agent TUI live-refresh status", &error)
             })?,
             updated_at: self.updated_at,
         })
@@ -352,6 +352,6 @@ fn row_i64_to_u16(value: i64, column: &str) -> Result<u16, CliError> {
         .map_err(|error| db_error(format!("parse async {column} value {value}: {error}")))
 }
 
-fn parse_async_runtime_error(subject: &str, error: String) -> CliError {
+fn parse_async_runtime_error(subject: &str, error: &str) -> CliError {
     db_error(format!("parse async {subject}: {error}"))
 }

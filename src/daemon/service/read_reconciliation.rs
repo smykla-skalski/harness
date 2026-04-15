@@ -92,34 +92,52 @@ pub(crate) async fn sync_resolved_liveness_async(
     async_db
         .save_session_state(&resolved.project.project_id, &resolved.state)
         .await?;
-    if !result.disconnected.is_empty() || !result.idled.is_empty() {
-        async_db
-            .append_log_entry(&build_log_entry(
-                &resolved.state.session_id,
-                SessionTransition::LivenessSynced {
-                    disconnected: result.disconnected.clone(),
-                    idled: result.idled.clone(),
-                },
-                None,
-                Some("liveness sync"),
-            ))
-            .await?;
-    }
+    append_liveness_sync_log_async(async_db, &resolved.state.session_id, &result).await?;
     session_service::cleanup_dead_agent_signals(
         &activity_map,
         &result,
         &resolved.state.session_id,
         project_dir,
     );
-    if !result.disconnected.is_empty() {
-        let signals = snapshot::load_signals_for(&resolved.project, &resolved.state)?;
-        async_db
-            .sync_signal_index(&resolved.state.session_id, &signals)
-            .await?;
-    }
+    sync_disconnected_signal_index_async(async_db, resolved, &result).await?;
     async_db.bump_change(&resolved.state.session_id).await?;
     async_db.bump_change("global").await?;
     Ok(true)
+}
+
+async fn append_liveness_sync_log_async(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    result: &session_service::LivenessSyncResult,
+) -> Result<(), CliError> {
+    if result.disconnected.is_empty() && result.idled.is_empty() {
+        return Ok(());
+    }
+    async_db
+        .append_log_entry(&build_log_entry(
+            session_id,
+            SessionTransition::LivenessSynced {
+                disconnected: result.disconnected.clone(),
+                idled: result.idled.clone(),
+            },
+            None,
+            Some("liveness sync"),
+        ))
+        .await
+}
+
+async fn sync_disconnected_signal_index_async(
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &ResolvedSession,
+    result: &session_service::LivenessSyncResult,
+) -> Result<(), CliError> {
+    if result.disconnected.is_empty() {
+        return Ok(());
+    }
+    let signals = snapshot::load_signals_for(&resolved.project, &resolved.state)?;
+    async_db
+        .sync_signal_index(&resolved.state.session_id, &signals)
+        .await
 }
 
 pub(crate) async fn reconcile_expired_pending_signals_for_async_db(
@@ -136,52 +154,84 @@ pub(crate) async fn reconcile_expired_pending_signals_for_async_db(
     };
     let project_dir = effective_project_dir(&resolved).to_path_buf();
     let context_root = session_service::signal_context_root(&project_dir);
-    let mut needs_filesystem_fallback = false;
+    let needs_filesystem_fallback = acknowledge_indexed_expired_signals_async(
+        session_id,
+        &project_dir,
+        &context_root,
+        &resolved.state,
+        async_db,
+        &expired,
+    )
+    .await?;
 
+    if needs_filesystem_fallback {
+        reconcile_expired_pending_signals_from_files_async(
+            session_id,
+            &project_dir,
+            &resolved.state,
+            async_db,
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn acknowledge_indexed_expired_signals_async(
+    session_id: &str,
+    project_dir: &Path,
+    context_root: &Path,
+    state: &SessionState,
+    async_db: &super::db::AsyncDaemonDb,
+    expired: &[ExpiredPendingSignalIndexRecord],
+) -> Result<bool, CliError> {
+    let mut needs_filesystem_fallback = false;
     for indexed_signal in expired {
         if !acknowledge_indexed_expired_signal_async(
             session_id,
-            &project_dir,
-            &context_root,
-            &resolved.state,
+            project_dir,
+            context_root,
+            state,
             async_db,
-            &indexed_signal,
+            indexed_signal,
         )
         .await?
         {
             needs_filesystem_fallback = true;
         }
     }
+    Ok(needs_filesystem_fallback)
+}
 
-    if needs_filesystem_fallback {
-        let expired = session_service::collect_expired_pending_signals_for_state(
-            &resolved.state,
-            &project_dir,
-        )?;
-        for signal in expired {
-            let ack = SignalAck {
-                signal_id: signal.signal.signal_id.clone(),
-                acknowledged_at: utc_now(),
+async fn reconcile_expired_pending_signals_from_files_async(
+    session_id: &str,
+    project_dir: &Path,
+    state: &SessionState,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<(), CliError> {
+    let expired = session_service::collect_expired_pending_signals_for_state(state, project_dir)?;
+    for signal in expired {
+        let ack = SignalAck {
+            signal_id: signal.signal.signal_id.clone(),
+            acknowledged_at: utc_now(),
+            result: AckResult::Expired,
+            agent: signal.signal_session_id.clone(),
+            session_id: session_id.to_string(),
+            details: Some("expired before agent acknowledged delivery".to_string()),
+        };
+        write_signal_ack(&signal.signal_dir, &ack)?;
+        record_signal_ack_direct_async(
+            session_id,
+            &SignalAckRequest {
+                agent_id: signal.agent_id,
+                signal_id: signal.signal.signal_id,
                 result: AckResult::Expired,
-                agent: signal.signal_session_id.clone(),
-                session_id: session_id.to_string(),
-                details: Some("expired before agent acknowledged delivery".to_string()),
-            };
-            write_signal_ack(&signal.signal_dir, &ack)?;
-            record_signal_ack_direct_async(
-                session_id,
-                &SignalAckRequest {
-                    agent_id: signal.agent_id,
-                    signal_id: signal.signal.signal_id,
-                    result: AckResult::Expired,
-                    project_dir: project_dir.display().to_string(),
-                },
-                async_db,
-            )
-            .await?;
-        }
+                project_dir: project_dir.display().to_string(),
+            },
+            async_db,
+        )
+        .await?;
     }
-
     Ok(())
 }
 
