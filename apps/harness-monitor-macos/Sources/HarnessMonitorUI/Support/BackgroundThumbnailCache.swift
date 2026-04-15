@@ -10,7 +10,12 @@ public actor BackgroundThumbnailCache {
 
   let cacheDirectory: URL
   let maxPixelSize: Int
-  var memoryCache: [String: CGImage] = [:]
+  let thumbnailMemoryLimit: Int
+  let fullImageMemoryLimit: Int
+  var thumbnailMemoryCache: [String: CGImage] = [:]
+  var fullImageMemoryCache: [String: CGImage] = [:]
+  private var thumbnailAccessOrder: [String] = []
+  private var fullImageAccessOrder: [String] = []
 
   static let allowedPathPrefixes = ["/System/Library/", "/Library/"]
   static let allowedExtensions: Set<String> = ["heic", "jpg", "jpeg", "png", "tiff"]
@@ -18,10 +23,14 @@ public actor BackgroundThumbnailCache {
 
   public init(
     cacheDirectory: URL = HarnessMonitorPaths.thumbnailCacheRoot(),
-    maxPixelSize: Int = 512
+    maxPixelSize: Int = 512,
+    thumbnailMemoryLimit: Int = 24,
+    fullImageMemoryLimit: Int = 1
   ) {
     self.cacheDirectory = cacheDirectory
     self.maxPixelSize = maxPixelSize
+    self.thumbnailMemoryLimit = max(0, thumbnailMemoryLimit)
+    self.fullImageMemoryLimit = max(0, fullImageMemoryLimit)
   }
 
   // MARK: - Public
@@ -29,7 +38,7 @@ public actor BackgroundThumbnailCache {
   public func thumbnail(for selection: HarnessMonitorBackgroundSelection) -> CGImage? {
     let key = cacheKey(for: selection)
 
-    if let cached = memoryCache[key] {
+    if let cached = cachedMemoryImage(for: key, kind: .thumbnail) {
       return cached
     }
 
@@ -44,7 +53,7 @@ public actor BackgroundThumbnailCache {
   public func fullImage(for selection: HarnessMonitorBackgroundSelection) -> CGImage? {
     let key = "full:\(cacheKey(for: selection))"
 
-    if let cached = memoryCache[key] {
+    if let cached = cachedMemoryImage(for: key, kind: .fullImage) {
       return cached
     }
 
@@ -70,7 +79,7 @@ public actor BackgroundThumbnailCache {
     image: HarnessMonitorBackgroundImage
   ) -> CGImage? {
     if let diskImage = loadFromDiskCache(key: key, expectedMtime: nil) {
-      memoryCache[key] = diskImage
+      cacheMemoryImage(diskImage, for: key, kind: .thumbnail)
       return diskImage
     }
 
@@ -90,7 +99,7 @@ public actor BackgroundThumbnailCache {
     }
 
     saveToDiskCache(image: thumbnail, key: key, sourceMtime: nil)
-    memoryCache[key] = thumbnail
+    cacheMemoryImage(thumbnail, for: key, kind: .thumbnail)
     return thumbnail
   }
 
@@ -106,7 +115,7 @@ public actor BackgroundThumbnailCache {
       return nil
     }
 
-    memoryCache[key] = cgImage
+    cacheMemoryImage(cgImage, for: key, kind: .fullImage)
     return cgImage
   }
 
@@ -123,7 +132,7 @@ public actor BackgroundThumbnailCache {
     let sourceMtime = fileMtime(at: wallpaper.imagePath)
 
     if let diskImage = loadFromDiskCache(key: key, expectedMtime: sourceMtime) {
-      memoryCache[key] = diskImage
+      cacheMemoryImage(diskImage, for: key, kind: .thumbnail)
       return diskImage
     }
 
@@ -133,7 +142,7 @@ public actor BackgroundThumbnailCache {
     }
 
     saveToDiskCache(image: thumbnail, key: key, sourceMtime: sourceMtime)
-    memoryCache[key] = thumbnail
+    cacheMemoryImage(thumbnail, for: key, kind: .thumbnail)
     return thumbnail
   }
 
@@ -166,7 +175,7 @@ public actor BackgroundThumbnailCache {
       return nil
     }
 
-    memoryCache[key] = cgImage
+    cacheMemoryImage(cgImage, for: key, kind: .fullImage)
     return cgImage
   }
 
@@ -347,5 +356,74 @@ public actor BackgroundThumbnailCache {
   }
 
   // MARK: - Helpers
+  private enum MemoryCacheKind {
+    case thumbnail
+    case fullImage
+  }
 
+  private func cachedMemoryImage(for key: String, kind: MemoryCacheKind) -> CGImage? {
+    switch kind {
+    case .thumbnail:
+      guard let cached = thumbnailMemoryCache[key] else {
+        return nil
+      }
+      recordMemoryAccess(for: key, kind: .thumbnail)
+      return cached
+    case .fullImage:
+      guard let cached = fullImageMemoryCache[key] else {
+        return nil
+      }
+      recordMemoryAccess(for: key, kind: .fullImage)
+      return cached
+    }
+  }
+
+  private func cacheMemoryImage(_ image: CGImage, for key: String, kind: MemoryCacheKind) {
+    let limit: Int
+    switch kind {
+    case .thumbnail:
+      limit = thumbnailMemoryLimit
+    case .fullImage:
+      limit = fullImageMemoryLimit
+    }
+
+    guard limit > 0 else {
+      return
+    }
+
+    switch kind {
+    case .thumbnail:
+      thumbnailMemoryCache[key] = image
+    case .fullImage:
+      fullImageMemoryCache[key] = image
+    }
+    recordMemoryAccess(for: key, kind: kind)
+    evictMemoryCacheIfNeeded(kind: kind, limit: limit)
+  }
+
+  private func recordMemoryAccess(for key: String, kind: MemoryCacheKind) {
+    switch kind {
+    case .thumbnail:
+      thumbnailAccessOrder.removeAll { $0 == key }
+      thumbnailAccessOrder.append(key)
+    case .fullImage:
+      fullImageAccessOrder.removeAll { $0 == key }
+      fullImageAccessOrder.append(key)
+    }
+  }
+
+  private func evictMemoryCacheIfNeeded(kind: MemoryCacheKind, limit: Int) {
+    switch kind {
+    case .thumbnail:
+      while thumbnailMemoryCache.count > limit, let evictedKey = thumbnailAccessOrder.first {
+        thumbnailAccessOrder.removeFirst()
+        thumbnailMemoryCache.removeValue(forKey: evictedKey)
+      }
+    case .fullImage:
+      while fullImageMemoryCache.count > limit, let evictedKey = fullImageAccessOrder.first {
+        fullImageAccessOrder.removeFirst()
+        fullImageMemoryCache.removeValue(forKey: evictedKey)
+      }
+    }
+  }
 }

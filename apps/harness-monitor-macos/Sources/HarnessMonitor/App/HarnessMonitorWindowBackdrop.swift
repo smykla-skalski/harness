@@ -142,8 +142,7 @@ struct HarnessMonitorWindowBackdropView: View {
       else {
         return
       }
-      let size = NSSize(width: cgImage.width, height: cgImage.height)
-      loadedImage = Image(nsImage: NSImage(cgImage: cgImage, size: size))
+      loadedImage = Image(decorative: cgImage, scale: 1.0)
     }
   }
 }
