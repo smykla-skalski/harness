@@ -1,11 +1,12 @@
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use tokio::sync::broadcast;
 
 use crate::daemon::db::DaemonDb;
+use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{StreamEvent, TimelineWindowRequest, WsRequest, WsResponse};
-use crate::daemon::read_cache::run_preferred_db_read;
+use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 
 use super::connection::ConnectionState;
@@ -20,45 +21,67 @@ pub(crate) async fn dispatch_read_query(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if let Some(response) = dispatch_daemon_read_query(request, state).await {
+        return response;
+    }
+
+    if let Some(response) = dispatch_session_read_query(request, state).await {
+        return response;
+    }
+
+    error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method")
+}
+
+async fn dispatch_daemon_read_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
     match request.method.as_str() {
-        "health" => dispatch_health_query(&request.id, state),
-        "diagnostics" => dispatch_diagnostics_query(&request.id, state),
-        "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
-        "daemon.log_level" => dispatch_query(&request.id, service::get_log_level),
-        "projects" => dispatch_projects_query(&request.id, state).await,
-        "sessions" => dispatch_sessions_query(&request.id, state).await,
-        "session.detail" => dispatch_session_detail_query(request, state).await,
-        "session.timeline" => dispatch_session_timeline_query(request, state).await,
-        "session.agent_tuis" => dispatch_session_agent_tuis_query(request, state),
-        "agent_tui.detail" => dispatch_agent_tui_detail_query(request, state),
-        _ => error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method"),
+        "health" => Some(dispatch_health_query(&request.id, state).await),
+        "diagnostics" => Some(dispatch_diagnostics_query(&request.id, state).await),
+        "daemon.stop" => Some(dispatch_query(&request.id, service::request_shutdown)),
+        "daemon.log_level" => Some(dispatch_query(&request.id, service::get_log_level)),
+        "projects" => Some(dispatch_projects_query(&request.id, state).await),
+        "sessions" => Some(dispatch_sessions_query(&request.id, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_session_read_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        "session.detail" => Some(dispatch_session_detail_query(request, state).await),
+        "session.timeline" => Some(dispatch_session_timeline_query(request, state).await),
+        "session.agent_tuis" => Some(dispatch_session_agent_tuis_query(request, state)),
+        "agent_tui.detail" => Some(dispatch_agent_tui_detail_query(request, state)),
+        _ => None,
     }
 }
 
 async fn dispatch_projects_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    dispatch_query_result(
-        request_id,
-        run_preferred_db_read(
-            &state.db,
-            "projects",
-            |db| service::list_projects(Some(db)),
-            || service::list_projects(None),
-        )
-        .await,
-    )
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::list_projects_async(Some(async_db.as_ref())).await
+    } else {
+        run_canonical_db_read(&state.db, state.db_path.clone(), "projects", |db| {
+            service::list_projects(Some(db))
+        })
+        .await
+    };
+    dispatch_query_result(request_id, result)
 }
 
 async fn dispatch_sessions_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    dispatch_query_result(
-        request_id,
-        run_preferred_db_read(
-            &state.db,
-            "sessions",
-            |db| service::list_sessions(true, Some(db)),
-            || service::list_sessions(true, None),
-        )
-        .await,
-    )
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::list_sessions_async(true, Some(async_db.as_ref())).await
+    } else {
+        run_canonical_db_read(&state.db, state.db_path.clone(), "sessions", |db| {
+            service::list_sessions(true, Some(db))
+        })
+        .await
+    };
+    dispatch_query_result(request_id, result)
 }
 
 async fn dispatch_session_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -71,19 +94,16 @@ async fn dispatch_session_detail_query(request: &WsRequest, state: &DaemonHttpSt
         return dispatch_session_detail_core_query(&request.id, state, session_id).await;
     }
 
-    dispatch_query_result(
-        &request.id,
-        run_preferred_db_read(
-            &state.db,
-            "session detail",
-            {
-                let session_id = session_id.clone();
-                move |db| service::session_detail(&session_id, Some(db))
-            },
-            || service::session_detail(&session_id, None),
-        )
-        .await,
-    )
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::session_detail_async(&session_id, Some(async_db.as_ref())).await
+    } else {
+        run_canonical_db_read(&state.db, state.db_path.clone(), "session detail", {
+            let session_id = session_id.clone();
+            move |db| service::session_detail(&session_id, Some(db))
+        })
+        .await
+    };
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_session_detail_core_query(
@@ -91,20 +111,17 @@ async fn dispatch_session_detail_core_query(
     state: &DaemonHttpState,
     session_id: String,
 ) -> WsResponse {
-    let response = dispatch_query_result(
-        request_id,
-        run_preferred_db_read(
-            &state.db,
-            "session detail core",
-            {
-                let session_id = session_id.clone();
-                move |db| service::session_detail_core(&session_id, Some(db))
-            },
-            || service::session_detail_core(&session_id, None),
-        )
-        .await,
-    );
-    schedule_extensions_push(&state.sender, &state.db, &session_id);
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::session_detail_core_async(&session_id, Some(async_db.as_ref())).await
+    } else {
+        run_canonical_db_read(&state.db, state.db_path.clone(), "session detail core", {
+            let session_id = session_id.clone();
+            move |db| service::session_detail_core(&session_id, Some(db))
+        })
+        .await
+    };
+    let response = dispatch_query_result(request_id, result);
+    schedule_extensions_push(&state.sender, &state.db, &state.async_db, &session_id);
     response
 }
 
@@ -119,17 +136,21 @@ async fn dispatch_session_timeline_query(
 
     dispatch_query_result(
         &request.id,
-        run_preferred_db_read(
-            &state.db,
-            "session timeline",
-            {
+        if let Some(async_db) = state.async_db.get() {
+            service::session_timeline_window_async(
+                &session_id,
+                &timeline_request,
+                Some(async_db.as_ref()),
+            )
+            .await
+        } else {
+            run_canonical_db_read(&state.db, state.db_path.clone(), "session timeline", {
                 let session_id = session_id.clone();
                 let timeline_request = timeline_request.clone();
                 move |db| service::session_timeline_window(&session_id, &timeline_request, Some(db))
-            },
-            || service::session_timeline_window(&session_id, &timeline_request, None),
-        )
-        .await,
+            })
+            .await
+        },
     )
 }
 
@@ -166,38 +187,63 @@ fn dispatch_agent_tui_detail_query(request: &WsRequest, state: &DaemonHttpState)
     dispatch_query_result(&request.id, state.agent_tui_manager.get(&tui_id))
 }
 
-fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    let db_guard = try_db_guard(state);
-    dispatch_query(request_id, || {
-        service::health_response(&state.manifest, db_guard.as_deref())
-    })
+async fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    if let Some(async_db) = state.async_db.get() {
+        return dispatch_query_result(
+            request_id,
+            service::health_response_async(&state.manifest, Some(async_db.as_ref())).await,
+        );
+    }
+
+    let manifest = state.manifest.clone();
+    dispatch_query_result(
+        request_id,
+        run_canonical_db_read(&state.db, state.db_path.clone(), "health", {
+            move |db| service::health_response(&manifest, Some(db))
+        })
+        .await,
+    )
 }
 
-fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    let db_guard = try_db_guard(state);
-    dispatch_query(request_id, || {
-        service::diagnostics_report(db_guard.as_deref())
-    })
-}
+async fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    if let Some(async_db) = state.async_db.get() {
+        return dispatch_query_result(
+            request_id,
+            service::diagnostics_report_async(Some(async_db.as_ref())).await,
+        );
+    }
 
-fn try_db_guard(state: &DaemonHttpState) -> Option<MutexGuard<'_, DaemonDb>> {
-    state
-        .db
-        .get()
-        .and_then(|db: &Arc<Mutex<DaemonDb>>| db.try_lock().ok())
+    dispatch_query_result(
+        request_id,
+        run_canonical_db_read(&state.db, state.db_path.clone(), "diagnostics", |db| {
+            service::diagnostics_report(Some(db))
+        })
+        .await,
+    )
 }
 
 fn schedule_extensions_push(
     sender: &broadcast::Sender<StreamEvent>,
     db: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    async_db: &AsyncDaemonDbSlot,
     session_id: &str,
 ) {
     use tokio::task::{spawn, spawn_blocking};
 
     let sender = sender.clone();
     let db = db.clone();
+    let async_db = async_db.get().cloned();
     let session_id = session_id.to_string();
     spawn(async move {
+        if let Some(async_db) = async_db {
+            service::broadcast_session_extensions_async(
+                &sender,
+                &session_id,
+                Some(async_db.as_ref()),
+            )
+            .await;
+            return;
+        }
         let result = spawn_blocking(move || {
             let db_guard = db
                 .get()
@@ -226,9 +272,20 @@ pub(crate) async fn handle_session_subscribe(
         state.session_subscriptions.insert(session_id.clone());
     }
 
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            &session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }));
+    }
+
     let sender = state.sender.clone();
-    let _ = run_preferred_db_read(
+    let _ = run_canonical_db_read(
         &state.db,
+        state.db_path.clone(),
         "session subscribe snapshot",
         {
             let session_id = session_id.clone();
@@ -237,10 +294,6 @@ pub(crate) async fn handle_session_subscribe(
                 service::broadcast_session_snapshot(&sender, &session_id, Some(db));
                 Ok(())
             }
-        },
-        || {
-            service::broadcast_session_snapshot(&sender, &session_id, None);
-            Ok(())
         },
     )
     .await;
@@ -264,7 +317,7 @@ pub(crate) fn handle_session_unsubscribe(
     super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
 
-pub(crate) fn handle_stream_subscribe(
+pub(crate) async fn handle_stream_subscribe(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
@@ -272,6 +325,10 @@ pub(crate) fn handle_stream_subscribe(
     {
         let mut state = connection.lock().expect("connection lock");
         state.global_subscription = true;
+    }
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
+        return super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }));
     }
     let db_guard = state
         .db
@@ -298,7 +355,8 @@ mod tests {
     use serde_json::Value;
 
     use super::super::test_support::{
-        seed_sample_agent_tui, seed_sample_timeline, test_http_state_with_db,
+        seed_sample_agent_tui, seed_sample_timeline, test_http_state_with_async_db_timeline,
+        test_http_state_with_db,
     };
     use super::*;
     use crate::daemon::protocol::WsRequest;
@@ -396,6 +454,31 @@ mod tests {
             entries[0]["summary"].as_str(),
             Some("codex-worker received a result from Bash")
         );
+        assert_eq!(entries[0]["payload"], serde_json::json!({}));
+    }
+
+    #[tokio::test]
+    async fn dispatch_read_query_session_timeline_uses_async_db_when_sync_db_is_unavailable() {
+        let state = test_http_state_with_async_db_timeline().await;
+        let request = WsRequest {
+            id: "req-timeline-async".into(),
+            method: "session.timeline".into(),
+            params: serde_json::json!({
+                "session_id": "sess-test-1",
+                "scope": "summary",
+            }),
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert!(response.error.is_none());
+        let result = response.result.expect("timeline response");
+        assert_eq!(result["revision"].as_i64(), Some(1));
+        assert_eq!(result["total_count"].as_u64(), Some(1));
+        let Value::Array(entries) = result["entries"].clone() else {
+            panic!("expected timeline entries array response");
+        };
+        assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["payload"], serde_json::json!({}));
     }
 }

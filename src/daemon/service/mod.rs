@@ -239,7 +239,18 @@ pub use status::{
 };
 
 pub(crate) use observe_loop::*;
+pub(crate) use observe_stream::{
+    broadcast_session_extensions_async, broadcast_session_snapshot_async,
+    broadcast_sessions_updated_async, global_stream_initial_events_async,
+    session_stream_initial_events_async, session_updated_core_event_async,
+    sessions_updated_event_async,
+};
 pub(crate) use sessions::session_timeline_window;
+pub(crate) use sessions::{
+    list_projects_async, list_sessions_async, session_detail_async, session_detail_core_async,
+    session_extensions_async, session_timeline_window_async,
+};
+pub(crate) use status::{diagnostics_report_async, health_response_async};
 pub(crate) use sync_support::*;
 
 #[cfg(test)]

@@ -15,3 +15,6 @@ pub use signals::load_signals_for;
 pub use summaries::{project_summaries, session_summaries};
 
 pub(crate) use activity::agent_activity_summary_from_events;
+pub(crate) use detail::{
+    build_session_detail_from_cached_runtime, build_session_extensions_from_cached_runtime,
+};

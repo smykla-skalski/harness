@@ -8,6 +8,8 @@ mod support;
 #[allow(unused_imports)]
 use support::*;
 
+mod async_pool;
+mod async_reads;
 mod conversation;
 mod mutations;
 mod performance;

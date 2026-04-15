@@ -1,3 +1,10 @@
+//! Canonical daemon persistence.
+//!
+//! Durable domain state belongs in `DaemonDb`. Files remain outside the
+//! database only when a runtime or OS integration explicitly requires them,
+//! such as manifests, auth tokens, lock files, and live signal/transcript
+//! artifacts.
+
 pub(crate) use std::borrow::Cow;
 pub(crate) use std::collections::BTreeMap;
 pub(crate) use std::fmt;
@@ -30,6 +37,10 @@ pub(crate) use super::{
     snapshot as daemon_snapshot, state, state as daemon_state, timeline as daemon_timeline,
 };
 
+mod async_detail;
+mod async_diagnostics;
+mod async_pool;
+mod async_reads;
 mod conversation;
 mod diagnostics;
 mod imports;
@@ -43,6 +54,7 @@ mod timeline;
 mod timeline_store;
 mod writes;
 
+pub(crate) use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
@@ -79,9 +91,10 @@ pub(crate) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
     }
 }
 
-/// `SQLite`-backed storage for the harness daemon. Replaces the file-based
-/// discovery layer with indexed queries while keeping file writes for
-/// backward compatibility with CLI offline access and agent runtimes.
+/// `SQLite`-backed canonical storage for durable harness daemon state.
+///
+/// Operational files remain only for integration boundaries that cannot move
+/// into the database.
 pub struct DaemonDb {
     conn: Connection,
 }
@@ -219,6 +232,12 @@ pub(crate) fn extract_transition_kind(json: &str) -> String {
 
 pub(crate) fn db_error(detail: impl Into<Cow<'static, str>>) -> CliError {
     CliError::from(CliErrorKind::workflow_io(detail))
+}
+
+pub(crate) fn canonical_db_unavailable(operation: &str) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "daemon canonical database unavailable for {operation}"
+    )))
 }
 
 #[expect(

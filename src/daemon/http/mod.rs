@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::Router;
@@ -6,7 +7,7 @@ use tokio::sync::{broadcast, watch};
 
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
@@ -27,6 +28,28 @@ mod voice;
 
 pub(crate) use auth::require_auth;
 
+#[derive(Clone, Default)]
+pub struct AsyncDaemonDbSlot {
+    inner: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+}
+
+impl AsyncDaemonDbSlot {
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub(crate) fn from_inner(inner: Arc<OnceLock<Arc<AsyncDaemonDb>>>) -> Self {
+        Self { inner }
+    }
+
+    #[must_use]
+    pub(crate) fn get(&self) -> Option<&Arc<AsyncDaemonDb>> {
+        self.inner.get()
+    }
+}
+
 #[derive(Clone)]
 pub struct DaemonHttpState {
     pub token: String,
@@ -35,6 +58,8 @@ pub struct DaemonHttpState {
     pub daemon_epoch: String,
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
     pub db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    pub async_db: AsyncDaemonDbSlot,
+    pub db_path: Option<PathBuf>,
     pub codex_controller: CodexControllerHandle,
     pub agent_tui_manager: AgentTuiManagerHandle,
 }
