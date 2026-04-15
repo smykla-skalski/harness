@@ -58,10 +58,20 @@ pub(super) async fn test_http_state_with_empty_async_db(
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),
         db: db_slot.clone(),
-        async_db: super::super::AsyncDaemonDbSlot::from_inner(async_db_slot),
+        async_db: super::super::AsyncDaemonDbSlot::from_inner(async_db_slot.clone()),
         db_path: Some(db_path.to_path_buf()),
-        codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
-        agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+        codex_controller: CodexControllerHandle::new_with_async_db(
+            sender.clone(),
+            db_slot.clone(),
+            async_db_slot.clone(),
+            false,
+        ),
+        agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
+            sender,
+            db_slot,
+            async_db_slot,
+            false,
+        ),
     }
 }
 

@@ -43,6 +43,7 @@ mod async_detail;
 mod async_diagnostics;
 mod async_pool;
 mod async_reads;
+mod async_runtime;
 mod async_signal_writes;
 mod async_writes;
 mod conversation;
