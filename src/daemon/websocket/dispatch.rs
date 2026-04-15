@@ -211,7 +211,7 @@ async fn dispatch_session_mutation(
         "session.end" => Some(dispatch_session_end(request, state).await),
         "signal.send" => Some(dispatch_signal_send(request, state)),
         "signal.cancel" => Some(dispatch_signal_cancel(request, state).await),
-        "session.observe" => Some(dispatch_session_observe(request, state)),
+        "session.observe" => Some(dispatch_session_observe(request, state).await),
         _ => None,
     }
 }
@@ -436,11 +436,22 @@ async fn dispatch_signal_cancel(request: &WsRequest, state: &DaemonHttpState) ->
     .await
 }
 
-fn dispatch_session_observe(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    dispatch_mutation(request, state, |session_id, params, db| {
-        let body: ObserveSessionRequest = serde_json::from_value(params)?;
-        service::observe_session(&session_id, Some(&body), db).map_err(Into::into)
-    })
+async fn dispatch_session_observe(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_mutation_prefer_async(
+        request,
+        state,
+        |session_id, params, db| {
+            let body: ObserveSessionRequest = serde_json::from_value(params)?;
+            service::observe_session(&session_id, Some(&body), db).map_err(Into::into)
+        },
+        |session_id, params, async_db| async move {
+            let body: ObserveSessionRequest = serde_json::from_value(params)?;
+            service::observe_session_async(&session_id, Some(&body), &async_db)
+                .await
+                .map_err(Into::into)
+        },
+    )
+    .await
 }
 
 fn unknown_method_response(request_id: &str, method: &str) -> WsResponse {

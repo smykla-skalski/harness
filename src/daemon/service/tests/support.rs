@@ -7,7 +7,14 @@ pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
         poll_interval,
         running_sessions: Arc::default(),
         db: Arc::new(OnceLock::new()),
+        async_db: Arc::new(OnceLock::new()),
     });
+}
+
+pub(super) fn install_test_observe_async_db(async_db: Arc<crate::daemon::db::AsyncDaemonDb>) {
+    install_test_observe_runtime(Duration::from_secs(60));
+    let runtime = OBSERVE_RUNTIME.get().expect("observe runtime");
+    let _ = runtime.async_db.set(async_db);
 }
 
 pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
@@ -158,6 +165,29 @@ pub(super) fn setup_db_with_session(
         .expect("sync session");
     append_project_ledger_entry(project);
     db
+}
+
+pub(super) async fn setup_async_db_with_session(
+    project: &Path,
+    session_id: &str,
+) -> Arc<crate::daemon::db::AsyncDaemonDb> {
+    let db_path = project.join("daemon.sqlite");
+    let async_db = Arc::new(
+        crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+            .await
+            .expect("open async daemon db"),
+    );
+    let resolved = index::resolve_session(session_id).expect("resolve session");
+    async_db
+        .sync_project(&resolved.project)
+        .await
+        .expect("sync project");
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await
+        .expect("save session state");
+    append_project_ledger_entry(project);
+    async_db
 }
 
 /// Build an in-memory DB with a project and session loaded only into

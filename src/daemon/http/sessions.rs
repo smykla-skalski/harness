@@ -237,7 +237,7 @@ pub(super) async fn post_end_session(
     timed_json("POST", "/v1/sessions/{id}/end", &request_id, start, result)
 }
 
-async fn post_observe_session(
+pub(super) async fn post_observe_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -248,15 +248,13 @@ async fn post_observe_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
     let mut request = request.map(|Json(request)| request);
     if let Some(request) = request.as_mut() {
         request.bind_control_plane_actor();
     }
-    let result = service::observe_session(&session_id, request.as_ref(), db_ref);
+    let result = observe_session_response(&state, &session_id, request.as_ref()).await;
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+        broadcast_observe_session(&state, &session_id).await;
     }
     timed_json(
         "POST",
@@ -265,6 +263,34 @@ async fn post_observe_session(
         start,
         result,
     )
+}
+
+async fn observe_session_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: Option<&ObserveSessionRequest>,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::observe_session_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    service::observe_session(session_id, request, db_ref)
+}
+
+async fn broadcast_observe_session(state: &DaemonHttpState, session_id: &str) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    service::broadcast_session_snapshot(&state.sender, session_id, db_ref);
 }
 
 pub(super) async fn post_session_start(

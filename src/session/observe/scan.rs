@@ -13,9 +13,9 @@ use crate::session::service;
 use crate::session::types::SessionState;
 
 #[derive(Debug)]
-pub(super) struct AgentLogTailState {
+pub(crate) struct AgentLogTailState {
     log_path: PathBuf,
-    pub(super) offset: u64,
+    pub(crate) offset: u64,
     next_line_index: usize,
     scan_state: ScanState,
 }
@@ -50,7 +50,7 @@ impl AgentLogTailState {
     }
 }
 
-pub(super) fn scan_all_agents(
+pub(crate) fn scan_all_agents(
     state: &SessionState,
     session_id: &str,
     project_dir: &Path,
@@ -78,7 +78,7 @@ pub(super) fn scan_all_agents(
     Ok(all_issues)
 }
 
-pub(super) fn scan_all_agents_incremental(
+pub(crate) fn scan_all_agents_incremental(
     state: &SessionState,
     session_id: &str,
     project_dir: &Path,
