@@ -78,7 +78,9 @@ struct PreferencesAppearanceSection: View {
       selection: $selectedBackgroundTab,
       tabTitle: \.title,
       alignment: .trailing,
-      tabsDisabled: isBackdropDisabled
+      tabsDisabled: isBackdropDisabled,
+      pickerAccessibilityIdentifier: HarnessMonitorAccessibility
+        .preferencesBackgroundCollectionPicker
     ) { tab in
       PreferencesBackgroundGallery(
         selection: $backgroundImageRawValue,

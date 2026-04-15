@@ -72,6 +72,31 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     let schemaVersionLabel = app.staticTexts["Schema Version"].firstMatch
     XCTAssertTrue(schemaVersionLabel.waitForExistence(timeout: 2), "Schema Version not found")
   }
+
+  func testDatabaseStatisticsUseNativeSegmentedControl() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    selectPreferencesSection(
+      in: app,
+      identifier: Accessibility.preferencesDatabaseSection,
+      expectedTitle: "Database"
+    )
+
+    let statisticsPicker = segmentedControl(
+      in: app,
+      identifier: Accessibility.preferencesDatabaseStatisticsPicker
+    )
+    XCTAssertTrue(statisticsPicker.waitForExistence(timeout: Self.actionTimeout))
+
+    let storageSegment = button(in: app, title: "Storage")
+    XCTAssertTrue(storageSegment.waitForExistence(timeout: Self.actionTimeout))
+
+    storageSegment.tap()
+
+    let appCacheSizeLabel = app.staticTexts["App Cache Size"].firstMatch
+    XCTAssertTrue(appCacheSizeLabel.waitForExistence(timeout: Self.actionTimeout))
+  }
 }
 
 extension HarnessMonitorSettingsDatabaseUITests {
