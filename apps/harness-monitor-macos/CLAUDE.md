@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working in the Harness Monitor m
 
 ## Build and test
 
-The Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
+The Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. That script also refreshes the repo-root and app-local `buildServer.json` SourceKit configs. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
 
 Validation expectations (run from repo root):
 

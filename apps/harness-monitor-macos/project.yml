@@ -127,6 +127,7 @@ targets:
           - $(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj
           - $(PROJECT_DIR)/Resources
           - $(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh
+          - $(PROJECT_DIR)/Scripts/run-xcode-build-server.sh
           - $(PROJECT_DIR)/Sources/HarnessMonitor
           - $(PROJECT_DIR)/Sources/HarnessMonitorKit
           - $(PROJECT_DIR)/Sources/HarnessMonitorUI
@@ -166,6 +167,7 @@ targets:
               root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
               root / "Resources",
               root / "Scripts" / "bundle-daemon-agent.sh",
+              root / "Scripts" / "run-xcode-build-server.sh",
               root / "Sources" / "HarnessMonitor",
               root / "Sources" / "HarnessMonitorKit",
               root / "Sources" / "HarnessMonitorUI",
@@ -306,6 +308,7 @@ targets:
           - $(PROJECT_DIR)/HarnessMonitor.xcodeproj/project.pbxproj
           - $(PROJECT_DIR)/Resources
           - $(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh
+          - $(PROJECT_DIR)/Scripts/run-xcode-build-server.sh
           - $(PROJECT_DIR)/Sources/HarnessMonitor
           - $(PROJECT_DIR)/Sources/HarnessMonitorKit
           - $(PROJECT_DIR)/Sources/HarnessMonitorUI
@@ -346,6 +349,7 @@ targets:
               root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
               root / "Resources",
               root / "Scripts" / "bundle-daemon-agent.sh",
+              root / "Scripts" / "run-xcode-build-server.sh",
               root / "Sources" / "HarnessMonitor",
               root / "Sources" / "HarnessMonitorKit",
               root / "Sources" / "HarnessMonitorUI",
