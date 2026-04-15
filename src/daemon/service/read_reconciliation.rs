@@ -250,7 +250,8 @@ async fn acknowledge_indexed_expired_signal_async(
         return Ok(false);
     };
 
-    let Some((signal_session_id, signal_dir)) = session_service::signal_dirs_for_agent(
+    let Some((signal_session_id, signal_dir)) =
+        session_service::signal_dirs_for_agent_in_context_root(
         runtime,
         session_id,
         agent.agent_session_id.as_deref(),
