@@ -147,6 +147,78 @@ fn remove_agent_db_direct_sends_abort_signal() {
 }
 
 #[test]
+fn remove_agent_async_direct_sends_abort_signal() {
+    with_temp_project(|project| {
+        temp_env::with_var("CODEX_SESSION_ID", Some("async-remove-worker"), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = project
+                    .parent()
+                    .expect("project parent")
+                    .join("daemon.sqlite");
+                let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db");
+                let state = start_session_direct_async(
+                    &crate::daemon::protocol::SessionStartRequest {
+                        title: "async remove session".into(),
+                        context: "async remove".into(),
+                        runtime: "claude".into(),
+                        session_id: Some("daemon-async-remove".into()),
+                        project_dir: project.to_string_lossy().into(),
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("start session");
+                let leader_id = state.leader_id.clone().expect("leader id");
+                let joined = join_session_direct_async(
+                    "daemon-async-remove",
+                    &crate::daemon::protocol::SessionJoinRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: None,
+                        project_dir: project.to_string_lossy().into(),
+                        persona: None,
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("join session");
+                let worker_id = joined
+                    .agents
+                    .keys()
+                    .find(|agent_id| agent_id.starts_with("codex-"))
+                    .expect("worker id")
+                    .to_string();
+
+                let detail = remove_agent_async(
+                    "daemon-async-remove",
+                    &worker_id,
+                    &AgentRemoveRequest { actor: leader_id },
+                    &async_db,
+                )
+                .await
+                .expect("remove via async db");
+
+                assert!(
+                    detail
+                        .agents
+                        .iter()
+                        .all(|agent| agent.agent_id != worker_id),
+                    "removed agents should disappear from session detail"
+                );
+                assert_eq!(detail.signals.len(), 1);
+                assert_eq!(detail.signals[0].agent_id, worker_id);
+                assert_eq!(detail.signals[0].signal.command, "abort");
+                assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
+            });
+        });
+    });
+}
+
+#[test]
 fn start_session_db_direct_creates_in_sqlite() {
     with_temp_project(|project| {
         use crate::daemon::protocol::SessionStartRequest;
@@ -174,6 +246,78 @@ fn start_session_db_direct_creates_in_sqlite() {
             .expect("load")
             .expect("present");
         assert_eq!(db_state.context, "db-direct start");
+    });
+}
+
+#[test]
+fn end_session_async_direct_marks_inactive() {
+    with_temp_project(|project| {
+        temp_env::with_var("CODEX_SESSION_ID", Some("async-end-worker"), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = project
+                    .parent()
+                    .expect("project parent")
+                    .join("daemon.sqlite");
+                let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db");
+                let state = start_session_direct_async(
+                    &crate::daemon::protocol::SessionStartRequest {
+                        title: "async end session".into(),
+                        context: "async end".into(),
+                        runtime: "claude".into(),
+                        session_id: Some("daemon-async-end".into()),
+                        project_dir: project.to_string_lossy().into(),
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("start session");
+                let leader_id = state.leader_id.clone().expect("leader id");
+                let joined = join_session_direct_async(
+                    "daemon-async-end",
+                    &crate::daemon::protocol::SessionJoinRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        capabilities: vec![],
+                        name: None,
+                        project_dir: project.to_string_lossy().into(),
+                        persona: None,
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("join session");
+                let worker_id = joined
+                    .agents
+                    .keys()
+                    .find(|agent_id| agent_id.starts_with("codex-"))
+                    .expect("worker id")
+                    .to_string();
+
+                let detail = end_session_async(
+                    "daemon-async-end",
+                    &SessionEndRequest { actor: leader_id },
+                    &async_db,
+                )
+                .await
+                .expect("end session via async db");
+
+                assert_eq!(detail.session.status, SessionStatus::Ended);
+                assert_eq!(detail.session.metrics.active_agent_count, 0);
+                assert!(detail.session.leader_id.is_none());
+                assert!(detail.agents.is_empty());
+                assert_eq!(detail.signals.len(), 2);
+                assert!(
+                    detail
+                        .signals
+                        .iter()
+                        .any(|signal| signal.agent_id == worker_id),
+                    "worker leave signal should remain visible in async detail"
+                );
+            });
+        });
     });
 }
 
