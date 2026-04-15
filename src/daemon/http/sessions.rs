@@ -16,6 +16,7 @@ use crate::daemon::read_cache::run_canonical_db_read;
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
 use crate::errors::CliError;
+use crate::session::types::SessionState;
 
 use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
@@ -268,7 +269,7 @@ async fn post_observe_session(
     )
 }
 
-async fn post_session_start(
+pub(super) async fn post_session_start(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<SessionStartRequest>,
@@ -278,27 +279,14 @@ async fn post_session_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = match ensure_shared_db(&state.db) {
-        Ok(db) => {
-            let db_guard = db.lock().expect("db lock");
-            service::start_session_direct(&request, Some(&db_guard)).map(|session_state| {
-                SessionMutationResponse {
-                    state: session_state,
-                }
-            })
-        }
-        Err(error) => Err(error),
-    };
-    if result.is_ok()
-        && let Ok(db) = ensure_shared_db(&state.db)
-    {
-        let db_guard = db.lock().expect("db lock");
-        service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+    let result = start_session_response(&state, &request).await;
+    if result.is_ok() {
+        broadcast_session_start(&state).await;
     }
     timed_json("POST", "/v1/sessions", &request_id, start, result)
 }
 
-async fn post_session_join(
+pub(super) async fn post_session_join(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -309,22 +297,72 @@ async fn post_session_join(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = match ensure_shared_db(&state.db) {
-        Ok(db) => {
-            let db_guard = db.lock().expect("db lock");
-            service::join_session_direct(&session_id, &request, Some(&db_guard)).map(
-                |session_state| SessionMutationResponse {
-                    state: session_state,
-                },
-            )
-        }
-        Err(error) => Err(error),
-    };
-    if result.is_ok()
-        && let Ok(db) = ensure_shared_db(&state.db)
-    {
-        let db_guard = db.lock().expect("db lock");
-        service::broadcast_session_snapshot(&state.sender, &session_id, Some(&db_guard));
+    let result = join_session_response(&state, &session_id, &request).await;
+    if result.is_ok() {
+        broadcast_session_join(&state, &session_id).await;
     }
     timed_json("POST", "/v1/sessions/{id}/join", &request_id, start, result)
+}
+
+async fn start_session_response(
+    state: &DaemonHttpState,
+    request: &SessionStartRequest,
+) -> Result<SessionMutationResponse, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::start_session_direct_async(request, async_db.as_ref())
+            .await
+            .map(session_mutation_response);
+    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = db.lock().expect("db lock");
+    service::start_session_direct(request, Some(&db_guard)).map(session_mutation_response)
+}
+
+async fn broadcast_session_start(state: &DaemonHttpState) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
+        return;
+    }
+    if let Ok(db) = ensure_shared_db(&state.db) {
+        let db_guard = db.lock().expect("db lock");
+        service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+    }
+}
+
+async fn join_session_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SessionJoinRequest,
+) -> Result<SessionMutationResponse, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::join_session_direct_async(session_id, request, async_db.as_ref())
+            .await
+            .map(session_mutation_response);
+    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = db.lock().expect("db lock");
+    service::join_session_direct(session_id, request, Some(&db_guard))
+        .map(session_mutation_response)
+}
+
+async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return;
+    }
+    if let Ok(db) = ensure_shared_db(&state.db) {
+        let db_guard = db.lock().expect("db lock");
+        service::broadcast_session_snapshot(&state.sender, session_id, Some(&db_guard));
+    }
+}
+
+fn session_mutation_response(session_state: SessionState) -> SessionMutationResponse {
+    SessionMutationResponse {
+        state: session_state,
+    }
 }
