@@ -5,8 +5,7 @@ use super::{
     append_leave_signal_logs_to_db, append_task_drop_effect_logs, append_transfer_logs_to_db,
     build_log_entry, effective_project_dir, index, project_dir_for_db_session,
     refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db, session_not_found,
-    session_service, slice, sync_after_mutation, task_drop_effect_signal_records, utc_now,
-    write_task_start_signals,
+    session_service, slice, task_drop_effect_signal_records, utc_now, write_task_start_signals,
 };
 
 /// Create a task through the shared session service.
@@ -51,7 +50,6 @@ pub fn create_task(
     let project_dir = effective_project_dir(&resolved);
     let _ =
         session_service::create_task_with_source(session_id, &spec, &request.actor, project_dir)?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -99,7 +97,6 @@ pub fn assign_task(
         &request.actor,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -152,7 +149,6 @@ pub fn drop_task(
         &request.actor,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -203,7 +199,6 @@ pub fn update_task_queue_policy(
         &request.actor,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -263,7 +258,6 @@ pub fn update_task(
         &request.actor,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -318,7 +312,6 @@ pub fn checkpoint_task(
         request.progress,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -367,7 +360,6 @@ pub fn change_role(
         &request.actor,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -427,7 +419,6 @@ pub fn remove_agent(
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     session_service::remove_agent(session_id, agent_id, &request.actor, project_dir)?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -469,7 +460,6 @@ pub fn transfer_leader(
         &request.actor,
         project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -512,6 +502,5 @@ pub fn end_session(
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     session_service::end_session(session_id, &request.actor, project_dir)?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }

@@ -28,6 +28,7 @@ mod async_stream;
 mod background_import;
 mod config;
 mod diagnostics;
+mod direct_session_bootstrap;
 mod direct_sessions;
 mod observe;
 mod session_liveness;

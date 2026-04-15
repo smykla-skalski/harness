@@ -1,8 +1,46 @@
+use std::path::Path;
+
+use crate::daemon::index as daemon_index;
+use crate::session::storage as session_storage;
+
 use super::{
     CliError, DaemonDb, SessionLogEntry, SessionState, TaskCheckpoint, db_error, u64_from_i64,
 };
 
 impl DaemonDb {
+    fn refresh_session_state_for_mutation(&self, session_id: &str) -> Result<(), CliError> {
+        let db_version = self.session_state_version(session_id)?;
+        let Some(db_version) = db_version else {
+            let prepared = match Self::prepare_session_resync(session_id) {
+                Ok(prepared) => Some(prepared),
+                Err(error) if error.code() == "KSRCLI090" => None,
+                Err(error) => return Err(error),
+            };
+            if let Some(prepared) = prepared {
+                self.apply_prepared_session_resync(&prepared)?;
+            }
+            return Ok(());
+        };
+        let Some(project_dir) = self.project_dir_for_session(session_id)? else {
+            return Ok(());
+        };
+        let project_dir = Path::new(&project_dir);
+        let Some(file_state) = session_storage::load_state(project_dir, session_id)? else {
+            return Ok(());
+        };
+        let file_version = i64::try_from(file_state.state_version).unwrap_or(i64::MAX);
+        if db_version >= file_version {
+            return Ok(());
+        }
+        let resolved = daemon_index::ResolvedSession {
+            project: daemon_index::discovered_project_for_checkout(project_dir),
+            state: file_state,
+        };
+        let prepared = Self::prepare_session_import_from_resolved(&resolved)?;
+        self.apply_prepared_session_resync(&prepared)?;
+        Ok(())
+    }
+
     /// Load session state by ID.
     ///
     /// # Errors
@@ -112,6 +150,7 @@ impl DaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
+        self.refresh_session_state_for_mutation(session_id)?;
         self.load_session_state(session_id)
     }
 

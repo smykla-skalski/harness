@@ -5,7 +5,8 @@ use super::{
     load_state_or_err, log_signal_acknowledged, log_signal_sent, log_task_assigned,
     normalize_signal_ack_result, protocol, read_pending_signals, reconcile_expired_pending_signals,
     refresh_session, resolve_runtime_session_via_daemon, runtime, runtime_session_matches_agent,
-    signal_context_root, signal_dirs_for_agent, signal_records_for_dirs, storage, utc_now,
+    signal_context_root, signal_dirs_for_agent_in_context_root, signal_records_for_dirs, storage,
+    utc_now,
     write_signal_ack,
 };
 
@@ -202,7 +203,7 @@ pub fn list_signals(
         let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-        let signal_dirs = signal_dirs_for_agent(
+        let signal_dirs = signal_dirs_for_agent_in_context_root(
             runtime,
             session_id,
             agent.agent_session_id.as_deref(),

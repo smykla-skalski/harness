@@ -229,7 +229,7 @@ fn session_detail_core_db_direct_reopens_expired_pending_delivery() {
             ..signal.signal.clone()
         };
         fs::write(
-            pending_signal,
+            &pending_signal,
             serde_json::to_string_pretty(&expired_signal).expect("serialize expired signal"),
         )
         .expect("rewrite expired signal");
@@ -241,6 +241,45 @@ fn session_detail_core_db_direct_reopens_expired_pending_delivery() {
             .expect("load signals");
         db.sync_signal_index(&state.session_id, &signals)
             .expect("refresh signal index");
+        let indexed_signal = db
+            .load_signals(&state.session_id)
+            .expect("load indexed signals")
+            .into_iter()
+            .find(|candidate| {
+                candidate.agent_id == worker_id && candidate.signal.signal_id == signal.signal.signal_id
+            })
+            .expect("indexed signal present");
+        assert_eq!(indexed_signal.status, SessionSignalStatus::Expired);
+        super::super::reconcile_expired_pending_signals_for_db(&state.session_id, &db)
+            .expect("reconcile expired");
+        let reconciled = db
+            .load_session_state(&state.session_id)
+            .expect("load reconciled state")
+            .expect("reconciled state present");
+        let reconciled_task = reconciled.tasks.get(&task_id).expect("reconciled task present");
+        let reconciled_signal = db
+            .load_signals(&state.session_id)
+            .expect("load reconciled signals")
+            .into_iter()
+            .find(|candidate| {
+                candidate.agent_id == worker_id && candidate.signal.signal_id == signal.signal.signal_id
+            })
+            .expect("reconciled signal present");
+        let acknowledged_logs: Vec<_> = db
+            .load_session_log(&state.session_id)
+            .expect("load reconciled log")
+            .into_iter()
+            .filter_map(|entry| match entry.transition {
+                crate::session::types::SessionTransition::SignalAcknowledged { signal_id, .. } => {
+                    Some(signal_id)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(reconciled_task.status, crate::session::types::TaskStatus::Open);
+        assert!(reconciled_task.assigned_to.is_none());
+        assert_eq!(reconciled_signal.status, SessionSignalStatus::Expired);
+        assert_eq!(acknowledged_logs, vec![signal.signal.signal_id.clone()]);
 
         let core = session_detail_core(&state.session_id, Some(&db)).expect("core detail");
         let reopened_task = core

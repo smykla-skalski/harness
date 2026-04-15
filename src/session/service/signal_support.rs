@@ -81,7 +81,7 @@ pub(crate) fn collect_expired_pending_signals_for_state_in_context_root(
         let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-        for (signal_session_id, signal_dir) in signal_dirs_for_agent(
+        for (signal_session_id, signal_dir) in signal_dirs_for_agent_in_context_root(
             runtime,
             &state.session_id,
             agent.agent_session_id.as_deref(),
@@ -117,7 +117,19 @@ pub(crate) fn signal_context_root(project_dir: &Path) -> PathBuf {
     project_context_dir(project_dir)
 }
 
-pub(crate) fn signal_dirs_for_agent(
+fn signal_dir_in_context_root(
+    runtime: &dyn runtime::AgentRuntime,
+    context_root: &Path,
+    signal_session_id: &str,
+) -> PathBuf {
+    context_root
+        .join("agents")
+        .join("signals")
+        .join(runtime.name())
+        .join(signal_session_id)
+}
+
+pub(crate) fn signal_dirs_for_agent_in_context_root(
     runtime: &dyn runtime::AgentRuntime,
     orchestration_session_id: &str,
     agent_session_id: Option<&str>,
@@ -126,7 +138,8 @@ pub(crate) fn signal_dirs_for_agent(
     runtime::signal_session_keys(orchestration_session_id, agent_session_id)
         .into_iter()
         .map(|signal_session_id| {
-            let signal_dir = runtime.signal_dir(context_root, &signal_session_id);
+            let signal_dir =
+                signal_dir_in_context_root(runtime, context_root, &signal_session_id);
             (signal_session_id, signal_dir)
         })
         .collect()
@@ -174,7 +187,7 @@ pub(crate) fn load_signal_record_for_agent_from_state(
         return Ok(None);
     };
     let context_root = signal_context_root(project_dir);
-    let signal_dirs = signal_dirs_for_agent(
+    let signal_dirs = signal_dirs_for_agent_in_context_root(
         runtime,
         &state.session_id,
         agent.agent_session_id.as_deref(),

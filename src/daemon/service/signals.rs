@@ -4,8 +4,7 @@ use super::{
     Path, PathBuf, SessionDetail, SignalAck, SignalSendRequest, acknowledged_signal_record,
     agents_runtime, build_log_entry, effective_project_dir, index, pending_signal_record,
     project_dir_for_db_session, record_signal_ack, refresh_signal_index_for_db, session_detail,
-    session_detail_from_daemon_db, session_not_found, session_service, state, sync_after_mutation,
-    thread, utc_now,
+    session_detail_from_daemon_db, session_not_found, session_service, state, thread, utc_now,
 };
 
 /// Send a signal through the shared session service.
@@ -111,7 +110,6 @@ pub fn send_signal(
         &request.actor,
         &project_dir,
     )?;
-    sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
 
@@ -418,8 +416,6 @@ pub fn cancel_signal(
         }
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-    } else {
-        sync_after_mutation(db, session_id);
     }
     session_detail(session_id, db)
 }
