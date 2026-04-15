@@ -158,6 +158,7 @@ extension HarnessMonitorStore {
     let isChangingSelectedSession = selectedSession?.session.sessionId != sessionID
 
     if isChangingSelectedSession {
+      cancelSelectedTimelinePageLoad()
       cancelSelectedSessionRefreshFallback()
       cancelSessionLoad()
     }
@@ -277,6 +278,13 @@ extension HarnessMonitorStore {
     pendingListSelectionTaskToken &+= 1
   }
 
+  private func cancelSelectedTimelinePageLoad() {
+    selectedTimelinePageLoadTask?.cancel()
+    selectedTimelinePageLoadTask = nil
+    selectedTimelinePageLoadKey = nil
+    selectedTimelinePageLoadSequence &+= 1
+  }
+
   private func performSessionSelection(sessionID: String) async {
     await applyCachedSessionIfAvailable(sessionID: sessionID)
 
@@ -316,58 +324,66 @@ extension HarnessMonitorStore {
 
     let currentRevision = timelineWindow?.revision
     let missingCount = targetEnd - timeline.count
+    let loadKey = SelectedTimelinePageLoadKey(
+      sessionID: sessionID,
+      targetEnd: targetEnd,
+      pageSize: pageSize,
+      revision: currentRevision
+    )
+
+    if let selectedTimelinePageLoadTask, selectedTimelinePageLoadKey == loadKey {
+      await selectedTimelinePageLoadTask.value
+      return
+    }
+
+    cancelSelectedTimelinePageLoad()
+    selectedTimelinePageLoadSequence &+= 1
+    let token = selectedTimelinePageLoadSequence
+    selectedTimelinePageLoadKey = loadKey
 
     withUISyncBatch {
       isTimelineLoading = true
     }
-    defer {
-      if selectedSessionID == sessionID {
-        isTimelineLoading = false
-      }
-    }
-
-    do {
-      let response = try await fetchSelectedTimelinePrefix(
-        using: client,
-        sessionID: sessionID,
-        targetEnd: targetEnd,
-        missingCount: missingCount,
-        currentRevision: currentRevision
-      )
-      guard selectedSessionID == sessionID else {
+    let task = Task { @MainActor [weak self] in
+      guard let self else {
         return
       }
-
-      let resolvedTimeline: [TimelineEntry]
-      if response.windowStart == 0 || response.revision != currentRevision {
-        resolvedTimeline = response.entries ?? timeline
-      } else if let responseEntries = response.entries {
-        resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
-      } else {
-        resolvedTimeline = timeline
+      defer {
+        self.finishSelectedTimelinePageLoadIfCurrent(token, sessionID: sessionID)
       }
-      let resolvedTimelineWindow = normalizedTimelineWindow(
-        response.metadataOnly,
-        loadedTimeline: resolvedTimeline
-      )
 
-      withUISyncBatch {
-        timeline = resolvedTimeline
-        timelineWindow = resolvedTimelineWindow
-        isShowingCachedData = false
-      }
-      scheduleCacheWrite { service in
-        await service.cacheSessionDetail(
-          selectedSession,
-          timeline: resolvedTimeline,
-          timelineWindow: resolvedTimelineWindow
+      do {
+        let response = try await self.fetchSelectedTimelinePrefix(
+          using: client,
+          sessionID: sessionID,
+          targetEnd: targetEnd,
+          missingCount: missingCount,
+          currentRevision: currentRevision
+        )
+        guard !Task.isCancelled else {
+          return
+        }
+        guard self.isCurrentSelectedTimelinePageLoad(token, key: loadKey) else {
+          return
+        }
+        self.applySelectedTimelinePageResponse(
+          response,
+          currentRevision: currentRevision,
+          selectedSession: selectedSession
+        )
+      } catch is CancellationError {
+        return
+      } catch {
+        guard self.isCurrentSelectedTimelinePageLoad(token, key: loadKey) else {
+          return
+        }
+        HarnessMonitorLogger.store.warning(
+          "timeline page load failed for \(sessionID, privacy: .public): \(error.localizedDescription, privacy: .public)"
         )
       }
-    } catch {
-      HarnessMonitorLogger.store.warning(
-        "timeline page load failed for \(sessionID, privacy: .public): \(error.localizedDescription, privacy: .public)"
-      )
     }
+    selectedTimelinePageLoadTask = task
+    await task.value
   }
 
   public func inspect(taskID: String) { inspectorSelection = .task(taskID) }
@@ -515,9 +531,61 @@ extension HarnessMonitorStore {
     activeSessionLoadRequest == requestID && selectedSessionID == sessionID
   }
 
+  func isCurrentSelectedTimelinePageLoad(
+    _ token: UInt64,
+    key: SelectedTimelinePageLoadKey
+  ) -> Bool {
+    selectedTimelinePageLoadSequence == token
+      && selectedTimelinePageLoadKey == key
+      && selectedSessionID == key.sessionID
+  }
+
+  func finishSelectedTimelinePageLoadIfCurrent(_ token: UInt64, sessionID: String) {
+    guard selectedTimelinePageLoadSequence == token else {
+      return
+    }
+    selectedTimelinePageLoadTask = nil
+    selectedTimelinePageLoadKey = nil
+    if selectedSessionID == sessionID {
+      isTimelineLoading = false
+    }
+  }
+
 }
 
 private extension HarnessMonitorStore {
+  func applySelectedTimelinePageResponse(
+    _ response: TimelineWindowResponse,
+    currentRevision: Int64?,
+    selectedSession: SessionDetail
+  ) {
+    let resolvedTimeline: [TimelineEntry]
+    if response.windowStart == 0 || response.revision != currentRevision {
+      resolvedTimeline = response.entries ?? timeline
+    } else if let responseEntries = response.entries {
+      resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
+    } else {
+      resolvedTimeline = timeline
+    }
+    let resolvedTimelineWindow = normalizedTimelineWindow(
+      response.metadataOnly,
+      loadedTimeline: resolvedTimeline
+    )
+
+    withUISyncBatch {
+      timeline = resolvedTimeline
+      timelineWindow = resolvedTimelineWindow
+      isShowingCachedData = false
+    }
+    scheduleCacheWrite { service in
+      await service.cacheSessionDetail(
+        selectedSession,
+        timeline: resolvedTimeline,
+        timelineWindow: resolvedTimelineWindow
+      )
+    }
+  }
+
   func fetchSelectedTimelinePrefix(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String,
@@ -578,6 +646,15 @@ private extension HarnessMonitorStore {
       mergedEntries.append(entry)
     }
     return mergedEntries
+  }
+}
+
+extension HarnessMonitorStore {
+  struct SelectedTimelinePageLoadKey: Equatable {
+    let sessionID: String
+    let targetEnd: Int
+    let pageSize: Int
+    let revision: Int64?
   }
 }
 
