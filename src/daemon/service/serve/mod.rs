@@ -4,8 +4,7 @@ use super::{
     Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind, DaemonHttpState,
     DaemonManifest, DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME,
     OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener, bridge, broadcast,
-    env, http, index, log_sandbox_startup, process_id, spawn_blocking, state, tokio_watch, utc_now,
-    watch,
+    env, http, index, log_sandbox_startup, process_id, state, tokio_watch, utc_now, watch,
 };
 use crate::daemon::http::AsyncDaemonDbSlot;
 
@@ -168,7 +167,7 @@ pub(crate) fn initialize_db_and_spawn_background_tasks(
         Some(Arc::clone(&db)),
         Arc::clone(async_db_slot),
     );
-    spawn_background_reconciliation(Arc::clone(&db));
+    run_background_reconciliation(&db);
     Ok(())
 }
 
@@ -179,12 +178,6 @@ pub(crate) async fn initialize_async_db(
     db.cache_startup_diagnostics().await?;
     let _ = db.health_counts().await?;
     Ok(())
-}
-
-pub(crate) fn spawn_background_reconciliation(db: Arc<Mutex<super::db::DaemonDb>>) {
-    tokio::spawn(async move {
-        let _ = spawn_blocking(move || run_background_reconciliation(&db)).await;
-    });
 }
 
 #[expect(

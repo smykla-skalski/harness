@@ -5,12 +5,12 @@ use tokio::time::sleep;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::index::ResolvedSession;
 use crate::observe::types::{Issue, IssueSeverity};
-use crate::session::types::{SessionStatus, SessionTransition, TaskSeverity, TaskSource};
+use crate::session::types::{SessionStatus, TaskSeverity, TaskSource};
 
 use super::{
     CliError, Duration, ObserveSessionRequest, Path, PathBuf, SessionDetail, build_log_entry,
     effective_project_dir, session_detail_async, session_not_found, session_observe,
-    session_service, snapshot, start_daemon_observe_loop, utc_now,
+    session_service, start_daemon_observe_loop, sync_resolved_liveness_async, utc_now,
 };
 
 const SWEEP_CYCLE_COUNT: u64 = 100;
@@ -96,7 +96,8 @@ async fn watch_cycle_async(
     let Some(mut resolved) = resolve_active_session(async_db, session_id).await? else {
         return Ok(false);
     };
-    let liveness_changed = sync_liveness_async(async_db, &mut resolved, project_dir).await?;
+    let liveness_changed =
+        sync_resolved_liveness_async(async_db, &mut resolved, project_dir).await?;
     let logs_changed =
         process_incremental_observe(async_db, &mut resolved, actor_id, project_dir, cycle).await?;
     cycle.cycle_count += 1;
@@ -255,58 +256,6 @@ async fn apply_task_specs(
     }
     bump_session(async_db, &resolved.state.session_id).await?;
     Ok(created_logs.len())
-}
-
-async fn sync_liveness_async(
-    async_db: &AsyncDaemonDb,
-    resolved: &mut ResolvedSession,
-    project_dir: &Path,
-) -> Result<bool, CliError> {
-    let now = utc_now();
-    let mut result = session_service::LivenessSyncResult::default();
-    let activity_map =
-        session_service::collect_agent_activity(&resolved.state.session_id, project_dir)?;
-    let changed = session_service::apply_liveness_transitions(
-        &mut resolved.state,
-        &activity_map,
-        &now,
-        &mut result,
-    );
-    if !changed {
-        return Ok(false);
-    }
-
-    session_service::refresh_session(&mut resolved.state, &now);
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
-    if !result.disconnected.is_empty() || !result.idled.is_empty() {
-        async_db
-            .append_log_entry(&build_log_entry(
-                &resolved.state.session_id,
-                SessionTransition::LivenessSynced {
-                    disconnected: result.disconnected.clone(),
-                    idled: result.idled.clone(),
-                },
-                None,
-                Some("liveness sync"),
-            ))
-            .await?;
-    }
-    session_service::cleanup_dead_agent_signals(
-        &activity_map,
-        &result,
-        &resolved.state.session_id,
-        project_dir,
-    );
-    if !result.disconnected.is_empty() {
-        let signals = snapshot::load_signals_for(&resolved.project, &resolved.state)?;
-        async_db
-            .sync_signal_index(&resolved.state.session_id, &signals)
-            .await?;
-    }
-    bump_session(async_db, &resolved.state.session_id).await?;
-    Ok(true)
 }
 
 async fn bump_session(async_db: &AsyncDaemonDb, session_id: &str) -> Result<(), CliError> {

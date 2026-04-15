@@ -190,6 +190,100 @@ fn list_sessions_db_marks_dead_leader_leaderless_and_excludes_dead_members() {
 }
 
 #[test]
+fn list_sessions_async_marks_dead_leader_leaderless_and_excludes_dead_members() {
+    with_temp_project(|project| {
+        let state = session_service::start_session(
+            "daemon async leaderless summaries",
+            "",
+            project,
+            Some("claude"),
+            Some("daemon-async-leaderless-summaries"),
+        )
+        .expect("start session");
+
+        temp_env::with_var(
+            "CODEX_SESSION_ID",
+            Some("leaderless-async-db-worker-session"),
+            || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            },
+        );
+
+        let status = session_service::session_status(&state.session_id, project).expect("status");
+        let leader = status
+            .leader_id
+            .as_ref()
+            .and_then(|agent_id| status.agents.get(agent_id))
+            .expect("leader agent");
+        let worker = status
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("worker agent");
+
+        let leader_log = write_agent_log_file(
+            project,
+            "claude",
+            leader
+                .agent_session_id
+                .as_deref()
+                .expect("leader session id"),
+        );
+        set_log_mtime_seconds_ago(&leader_log, 600);
+        write_agent_log_file(
+            project,
+            "codex",
+            worker
+                .agent_session_id
+                .as_deref()
+                .expect("worker session id"),
+        );
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let async_db = setup_async_db_with_session(project, &state.session_id).await;
+            clear_session_liveness_refresh_cache_entry(&state.session_id);
+
+            let sessions = list_sessions_async(true, Some(async_db.as_ref()))
+                .await
+                .expect("session summaries");
+            let summary = sessions
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("summary");
+            assert!(
+                summary.leader_id.is_none(),
+                "dead leader should clear leader_id"
+            );
+            assert_eq!(summary.metrics.agent_count, 1);
+            assert_eq!(summary.metrics.active_agent_count, 1);
+
+            let resolved = async_db
+                .resolve_session(&state.session_id)
+                .await
+                .expect("resolve session")
+                .expect("session present");
+            assert!(
+                resolved.state.leader_id.is_none(),
+                "db state should persist leaderless session"
+            );
+            let leader_id = state.leader_id.as_ref().expect("leader id");
+            let dead_leader = resolved.state.agents.get(leader_id).expect("leader agent");
+            assert_eq!(dead_leader.status, AgentStatus::Disconnected);
+        });
+    });
+}
+
+#[test]
 fn list_sessions_reads_cached_liveness_state_within_ttl() {
     with_temp_project(|project| {
         let state = session_service::start_session(
@@ -268,6 +362,87 @@ fn list_sessions_reads_cached_liveness_state_within_ttl() {
         );
         assert_eq!(second_summary.metrics.agent_count, 2);
         assert_eq!(second_summary.metrics.active_agent_count, 2);
+    });
+}
+
+#[test]
+fn session_detail_async_marks_dead_leader_leaderless_and_hides_dead_agents() {
+    with_temp_project(|project| {
+        let state = session_service::start_session(
+            "daemon async leaderless detail",
+            "",
+            project,
+            Some("claude"),
+            Some("daemon-async-leaderless-detail"),
+        )
+        .expect("start session");
+
+        temp_env::with_var(
+            "CODEX_SESSION_ID",
+            Some("leaderless-async-detail-worker-session"),
+            || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker");
+            },
+        );
+
+        let status = session_service::session_status(&state.session_id, project).expect("status");
+        let leader = status
+            .leader_id
+            .as_ref()
+            .and_then(|agent_id| status.agents.get(agent_id))
+            .expect("leader agent");
+        let worker = status
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("worker agent");
+
+        let leader_log = write_agent_log_file(
+            project,
+            "claude",
+            leader
+                .agent_session_id
+                .as_deref()
+                .expect("leader session id"),
+        );
+        set_log_mtime_seconds_ago(&leader_log, 600);
+        write_agent_log_file(
+            project,
+            "codex",
+            worker
+                .agent_session_id
+                .as_deref()
+                .expect("worker session id"),
+        );
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let async_db = setup_async_db_with_session(project, &state.session_id).await;
+            let detail = session_detail_async(&state.session_id, Some(async_db.as_ref()))
+                .await
+                .expect("session detail");
+            assert!(
+                detail.session.leader_id.is_none(),
+                "dead leader should clear leader_id"
+            );
+            assert_eq!(detail.session.metrics.agent_count, 1);
+            assert_eq!(detail.session.metrics.active_agent_count, 1);
+            assert_eq!(
+                detail.agents.len(),
+                1,
+                "only the live worker should remain visible"
+            );
+            assert_eq!(detail.agents[0].runtime, "codex");
+        });
     });
 }
 
