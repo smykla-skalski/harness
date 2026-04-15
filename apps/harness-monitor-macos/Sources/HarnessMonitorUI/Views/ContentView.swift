@@ -31,7 +31,10 @@ public struct ContentView: View {
   private var persistedShowInspector = true
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
-  @State private var showInspector = Self.initialInspectorVisibility()
+  @State private var showInspector = false
+  @State private var hasHydratedInspectorVisibility = false
+  @State private var isStartupFocusParticipationEnabled = false
+  @State private var shouldIgnoreNextInspectorMeasurement = false
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var pendingDetailColumnWidth: CGFloat?
   @State private var isLayoutAnimating = false
@@ -119,9 +122,14 @@ public struct ContentView: View {
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .focusedSceneValue(\.windowNavigationScope, .main)
     .toolbar {
       contentToolbarItems
+    }
+    .onChange(of: isStartupFocusParticipationEnabled, initial: true) { _, isEnabled in
+      guard isEnabled else {
+        return
+      }
+      hydrateInspectorVisibilityIfNeeded()
     }
     .onChange(of: persistedShowInspector) { _, newValue in
       applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
@@ -187,7 +195,10 @@ public struct ContentView: View {
     } else {
       ContentSceneRestorationBridge(
         store: store,
-        selection: store.selection
+        selection: store.selection,
+        availableSessionCount: store.sessionIndex.searchResults.totalSessionCount,
+        connectionState: store.connectionState,
+        onRestorationResolved: enableStartupFocusParticipation
       )
     }
     ContentEscapeCommandBridge(
@@ -204,7 +215,8 @@ public struct ContentView: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      sidebarVisible: columnVisibility != .detailOnly
+      sidebarVisible: columnVisibility != .detailOnly,
+      focusParticipationEnabled: isStartupFocusParticipationEnabled
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }
@@ -284,12 +296,36 @@ public struct ContentView: View {
     guard !isLayoutAnimating,
       showInspector,
       width >= HarnessMonitorInspectorLayout.minWidth,
-      width <= HarnessMonitorInspectorLayout.maxWidth,
-      abs(width - inspectorColumnWidth) > 1
+      width <= HarnessMonitorInspectorLayout.maxWidth
     else {
       return
     }
+    if shouldIgnoreNextInspectorMeasurement {
+      shouldIgnoreNextInspectorMeasurement = false
+      return
+    }
+    guard abs(width - inspectorColumnWidth) > 1 else {
+      return
+    }
     inspectorColumnWidth = width
+  }
+
+  private func hydrateInspectorVisibilityIfNeeded() {
+    guard !hasHydratedInspectorVisibility else {
+      return
+    }
+    hasHydratedInspectorVisibility = true
+    applyInspectorVisibilityChange(
+      to: persistedShowInspector,
+      source: .persistedPreference
+    )
+  }
+
+  private func enableStartupFocusParticipation() {
+    guard !isStartupFocusParticipationEnabled else {
+      return
+    }
+    isStartupFocusParticipationEnabled = true
   }
 
   private func applyInspectorVisibilityChange(
@@ -307,6 +343,10 @@ public struct ContentView: View {
       return
     }
 
+    let isPresentingInspector = !showInspector && change.nextPresentation
+    if isPresentingInspector {
+      shouldIgnoreNextInspectorMeasurement = true
+    }
     if showInspector != change.nextPresentation {
       showInspector = change.nextPresentation
     }
@@ -389,9 +429,5 @@ public struct ContentView: View {
       let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
     }
-  }
-
-  private static func initialInspectorVisibility() -> Bool {
-    UserDefaults.standard.object(forKey: "showInspector") as? Bool ?? true
   }
 }
