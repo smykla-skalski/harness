@@ -18,22 +18,10 @@ pub(crate) fn record_signal_ack(
     db: Option<&DaemonDb>,
 ) -> Result<(), CliError> {
     let Some(db) = db else {
-        return session_service::record_signal_acknowledgment(
-            session_id,
-            agent_id,
-            signal_id,
-            result,
-            project_dir,
-        );
+        return record_signal_ack_fallback(session_id, agent_id, signal_id, result, project_dir);
     };
     let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
-        return session_service::record_signal_acknowledgment(
-            session_id,
-            agent_id,
-            signal_id,
-            result,
-            project_dir,
-        );
+        return record_signal_ack_fallback(session_id, agent_id, signal_id, result, project_dir);
     };
 
     let already_logged = db.load_session_log(session_id)?.into_iter().any(|entry| {
@@ -65,10 +53,8 @@ pub(crate) fn record_signal_ack(
     let result = signal.as_ref().map_or(result, |signal| {
         session_service::normalize_signal_ack_result(&signal.signal, result)
     });
-    let mut started_task = None;
-
-    if let Some(signal) = signal.as_ref() {
-        started_task = session_service::apply_signal_ack_result(
+    let started_task = if let Some(signal) = signal.as_ref() {
+        let started_task = session_service::apply_signal_ack_result(
             &mut state,
             agent_id,
             &signal.signal,
@@ -80,30 +66,33 @@ pub(crate) fn record_signal_ack(
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
-    }
-
-    if let Some(signal) = signal.as_ref() {
         let ack_agent = state
             .agents
             .get(agent_id)
             .and_then(|agent| agent.agent_session_id.as_deref())
             .unwrap_or(session_id);
+        let acknowledgment = build_signal_ack(
+            session_id,
+            &signal.signal.signal_id,
+            &now,
+            result,
+            ack_agent,
+            None,
+        );
         db.merge_signal_records(
             session_id,
             &[acknowledged_signal_record(
-                session_id,
                 &signal.runtime,
                 agent_id,
                 &signal.signal,
-                result,
-                ack_agent,
-                &now,
-                None,
+                &acknowledgment,
             )],
         )?;
+        started_task
     } else {
         refresh_signal_index_for_db(db, session_id)?;
-    }
+        None
+    };
 
     if let Some(task_id) = started_task.as_deref() {
         db.append_log_entry(&build_log_entry(
@@ -123,6 +112,22 @@ pub(crate) fn record_signal_ack(
     db.bump_change(session_id)?;
     db.bump_change("global")?;
     Ok(())
+}
+
+fn record_signal_ack_fallback(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    result: AckResult,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    session_service::record_signal_acknowledgment(
+        session_id,
+        agent_id,
+        signal_id,
+        result,
+        project_dir,
+    )
 }
 
 pub(crate) fn reconcile_expired_pending_signals_for_db(
@@ -260,29 +265,36 @@ pub(crate) fn pending_signal_record(
     }
 }
 
-pub(crate) fn acknowledged_signal_record(
+pub(crate) fn build_signal_ack(
     session_id: &str,
+    signal_id: &str,
+    acknowledged_at: &str,
+    result: AckResult,
+    agent: &str,
+    details: Option<String>,
+) -> SignalAck {
+    SignalAck {
+        signal_id: signal_id.to_string(),
+        acknowledged_at: acknowledged_at.to_string(),
+        result,
+        agent: agent.to_string(),
+        session_id: session_id.to_string(),
+        details,
+    }
+}
+
+pub(crate) fn acknowledged_signal_record(
     runtime: &str,
     agent_id: &str,
     signal: &Signal,
-    result: AckResult,
-    ack_agent: &str,
-    acknowledged_at: &str,
-    details: Option<String>,
+    acknowledgment: &SignalAck,
 ) -> SessionSignalRecord {
     SessionSignalRecord {
         runtime: runtime.to_string(),
         agent_id: agent_id.to_string(),
-        session_id: session_id.to_string(),
-        status: SessionSignalStatus::from_ack_result(result),
+        session_id: acknowledgment.session_id.clone(),
+        status: SessionSignalStatus::from_ack_result(acknowledgment.result),
         signal: signal.clone(),
-        acknowledgment: Some(SignalAck {
-            signal_id: signal.signal_id.clone(),
-            acknowledged_at: acknowledged_at.to_string(),
-            result,
-            agent: ack_agent.to_string(),
-            session_id: session_id.to_string(),
-            details,
-        }),
+        acknowledgment: Some(acknowledgment.clone()),
     }
 }
