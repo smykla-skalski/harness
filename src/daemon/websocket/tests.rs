@@ -82,6 +82,47 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
     }
 }
 
+pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHttpState {
+    let (sender, _) = broadcast::channel(8);
+    let db_slot = Arc::new(OnceLock::new());
+    let async_db_slot = Arc::new(OnceLock::new());
+    assert!(
+        db_slot
+            .set(Arc::new(Mutex::new(
+                crate::daemon::db::DaemonDb::open(db_path).expect("open sync daemon db"),
+            )))
+            .is_ok(),
+        "install sync db"
+    );
+
+    let manifest: DaemonManifest = serde_json::from_value(serde_json::json!({
+        "version": "20.6.0",
+        "pid": 1,
+        "endpoint": "http://127.0.0.1:0",
+        "started_at": "2026-04-13T00:00:00Z",
+        "token_path": "/tmp/token",
+        "sandboxed": false,
+        "host_bridge": {},
+        "revision": 0,
+        "updated_at": "",
+        "binary_stamp": null,
+    }))
+    .expect("deserialize daemon manifest");
+
+    DaemonHttpState {
+        token: "token".into(),
+        sender: sender.clone(),
+        manifest,
+        daemon_epoch: "epoch".into(),
+        replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
+        db: db_slot.clone(),
+        async_db: AsyncDaemonDbSlot::from_inner(async_db_slot),
+        db_path: Some(db_path.to_path_buf()),
+        codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+        agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+    }
+}
+
 pub(super) fn init_git_project(project_dir: &Path) {
     fs::create_dir_all(project_dir).expect("create project dir");
     let status = Command::new("git")
