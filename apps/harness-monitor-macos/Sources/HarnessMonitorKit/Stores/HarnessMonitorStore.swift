@@ -104,6 +104,9 @@ public final class HarnessMonitorStore {
   var selectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0
+  @ObservationIgnored var selectedTimelinePageLoadTask: Task<Void, Never>?
+  @ObservationIgnored var selectedTimelinePageLoadKey: SelectedTimelinePageLoadKey?
+  @ObservationIgnored var selectedTimelinePageLoadSequence: UInt64 = 0
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
