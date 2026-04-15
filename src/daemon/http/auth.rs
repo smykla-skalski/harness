@@ -1,17 +1,10 @@
-use std::sync::MutexGuard;
-
 use axum::Json;
 use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
 use axum::response::{IntoResponse, Response};
 
-use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::ControlPlaneActorRequest;
 
 use super::DaemonHttpState;
-
-pub(super) fn try_db_guard(state: &DaemonHttpState) -> Option<MutexGuard<'_, DaemonDb>> {
-    state.db.get().and_then(|db| db.try_lock().ok())
-}
 
 pub(super) fn authorize_control_request<T: ControlPlaneActorRequest>(
     headers: &HeaderMap,

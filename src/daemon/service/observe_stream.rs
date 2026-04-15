@@ -262,6 +262,19 @@ pub fn broadcast_session_updated_core(
     );
 }
 
+pub(crate) async fn broadcast_session_updated_core_async(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) {
+    broadcast_event(
+        sender,
+        session_updated_core_event_async(session_id, async_db).await,
+        "session_updated",
+        Some(session_id),
+    );
+}
+
 /// Broadcast the expensive session detail extensions.
 pub fn broadcast_session_extensions(
     sender: &broadcast::Sender<StreamEvent>,
@@ -305,12 +318,7 @@ pub(crate) async fn broadcast_session_snapshot_async(
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) {
     broadcast_sessions_updated_async(sender, async_db).await;
-    broadcast_event(
-        sender,
-        session_updated_core_event_async(session_id, async_db).await,
-        "session_updated",
-        Some(session_id),
-    );
+    broadcast_session_updated_core_async(sender, session_id, async_db).await;
     broadcast_session_extensions_async(sender, session_id, async_db).await;
 }
 

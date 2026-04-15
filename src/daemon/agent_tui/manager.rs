@@ -159,10 +159,12 @@ impl AgentTuiManagerHandle {
         auto_join: &str,
         request: &AgentTuiStartRequest,
     ) {
-        let delivery = runtime_for_name(&runtime)
-            .map_or(InitialPromptDelivery::PtySend, AgentRuntime::initial_prompt_delivery);
-        let pty_auto_join = matches!(delivery, InitialPromptDelivery::PtySend)
-        .then(|| auto_join.to_string());
+        let delivery = runtime_for_name(&runtime).map_or(
+            InitialPromptDelivery::PtySend,
+            AgentRuntime::initial_prompt_delivery,
+        );
+        let pty_auto_join =
+            matches!(delivery, InitialPromptDelivery::PtySend).then(|| auto_join.to_string());
         let user_prompt = request
             .prompt
             .as_deref()
