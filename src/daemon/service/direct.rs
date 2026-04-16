@@ -56,12 +56,13 @@ pub fn start_session_direct(
     }
 
     // File-based fallback
-    session_service::start_session(
+    session_service::start_session_with_policy(
         &request.context,
         &request.title,
         project_dir,
         Some(runtime_name),
         Some(&session_id),
+        request.policy_preset.as_deref(),
     )
 }
 
