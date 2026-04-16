@@ -15,8 +15,8 @@ struct HarnessMonitorAppCommands: Commands {
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
-  @ObservedObject var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
-  @ObservedObject var windowCommandRouting: WindowCommandRoutingState
+  let agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
   let increaseTextSize: () -> Void

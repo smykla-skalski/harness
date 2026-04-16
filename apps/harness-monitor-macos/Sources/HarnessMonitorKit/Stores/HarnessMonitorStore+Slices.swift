@@ -155,7 +155,7 @@ extension HarnessMonitorStore {
         onChanged?(.extensionsLoading)
       }
     }
-    public var retainPresentedDetailWhenSelectionClears = true
+    public var retainPresentedDetailWhenSelectionClears = false
     public var isSessionActionInFlight = false {
       didSet {
         guard oldValue != isSessionActionInFlight else { return }
@@ -318,7 +318,7 @@ extension HarnessMonitorStore {
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
     public var isTimelineLoading = false
-    public var retainPresentedDetailWhenSelectionClears = true
+    public var retainPresentedDetailWhenSelectionClears = false
   }
 
   public struct ContentDashboardState: Equatable {

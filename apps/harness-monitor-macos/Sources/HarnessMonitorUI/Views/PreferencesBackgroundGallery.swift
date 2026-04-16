@@ -75,8 +75,10 @@ enum PreferencesBackgroundGalleryPrefetchPlan {
     if let lowerBound = visibleIndices.min(), let upperBound = visibleIndices.max() {
       let rangeLowerBound = max(0, lowerBound - max(0, overscan))
       let rangeUpperBound = min(options.count - 1, upperBound + max(0, overscan))
-      for selection in options[rangeLowerBound...rangeUpperBound] {
-        append(selection)
+      if rangeLowerBound <= rangeUpperBound {
+        for selection in options[rangeLowerBound...rangeUpperBound] {
+          append(selection)
+        }
       }
     }
 

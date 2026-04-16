@@ -146,6 +146,12 @@ extension HarnessMonitorStore {
           _ = await self.refreshAgentTuis(using: client, sessionID: sessionID)
         }
       }
+
+      guard !Task.isCancelled, self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
+
+      self.isExtensionsLoading = false
     }
   }
 
@@ -294,9 +300,7 @@ extension HarnessMonitorStore {
       return
     }
 
-    cancelSelectedSessionRefreshFallback(for: sessionID)
     withUISyncBatch {
-      selection.retainPresentedDetailWhenSelectionClears = true
       selectedSession = detail
       self.timeline = timeline
       self.timelineWindow = normalizedTimelineWindow(

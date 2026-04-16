@@ -198,14 +198,14 @@ struct SidebarSessionListContent: View {
 
     let baseRow =
       row
-        .tag(session.sessionId as String?)
-        .contentShape(Rectangle())
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(
-          sessionAccessibilityLabel(for: session, presentation: presentation)
-        )
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
-        .harnessUITestValue(
+      .tag(session.sessionId as String?)
+      .contentShape(Rectangle())
+      .accessibilityAddTraits(.isButton)
+      .accessibilityLabel(
+        sessionAccessibilityLabel(for: session, presentation: presentation)
+      )
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
+      .harnessUITestValue(
         isSelectedForUITest
           ? "selected, interactive=button, selectionChrome=translucent"
           : "interactive=button"

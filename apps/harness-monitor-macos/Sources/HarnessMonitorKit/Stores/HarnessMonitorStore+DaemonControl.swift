@@ -33,7 +33,8 @@ extension HarnessMonitorStore {
       guard shouldAttemptManagedLaunchAgentRefresh(now: ContinuousClock.now) else {
         appendConnectionEvent(
           kind: .reconnecting,
-          detail: "Managed daemon recovery is waiting for the previous launch-agent refresh to settle"
+          detail:
+            "Managed daemon recovery is waiting for the previous launch-agent refresh to settle"
         )
         throw error
       }

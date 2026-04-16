@@ -236,8 +236,8 @@ struct HarnessMonitorSettingsRootView: View {
 
 struct AgentTuiWindowRootView: View {
   let store: HarnessMonitorStore
-  @ObservedObject var navigationBridge: AgentTuiWindowNavigationBridge
-  @ObservedObject var windowCommandRouting: WindowCommandRoutingState
+  let navigationBridge: AgentTuiWindowNavigationBridge
+  let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
