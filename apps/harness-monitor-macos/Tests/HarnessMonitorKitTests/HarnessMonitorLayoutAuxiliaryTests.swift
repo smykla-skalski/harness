@@ -165,6 +165,29 @@ struct AdaptiveGridLayoutMeasurementKeyTests {
   }
 }
 
+@Suite("Agent TUI viewport auto-resize stabilization")
+struct AgentTuiViewportAutoResizeStabilizationTests {
+  @Test("Minor viewport jitter preserves the current terminal size")
+  func minorViewportJitterPreservesCurrentTerminalSize() {
+    let stabilized = AgentTuiWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
+      measured: AgentTuiSize(rows: 49, cols: 122),
+      baseline: AgentTuiSize(rows: 48, cols: 120)
+    )
+
+    #expect(stabilized == AgentTuiSize(rows: 48, cols: 120))
+  }
+
+  @Test("Meaningful viewport changes still auto-resize the terminal")
+  func meaningfulViewportChangesStillAutoResizeTheTerminal() {
+    let stabilized = AgentTuiWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
+      measured: AgentTuiSize(rows: 52, cols: 126),
+      baseline: AgentTuiSize(rows: 48, cols: 120)
+    )
+
+    #expect(stabilized == AgentTuiSize(rows: 52, cols: 126))
+  }
+}
+
 @Suite("Interactive card hover state")
 struct InteractiveCardHoverStateTests {
   @Test("Hover updates when the pointer enters or leaves")

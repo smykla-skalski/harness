@@ -84,6 +84,8 @@ extension AgentTuiWindowView {
     static let minimumMeasuredContentWidth: CGFloat = 160
     static let minimumMeasuredContentHeight: CGFloat = 96
     static let debounce = Duration.milliseconds(120)
+    static let automaticResizeMinimumRowDelta = 2
+    static let automaticResizeMinimumColDelta = 3
     static let contentInsets = CGSize(
       width: HarnessMonitorTheme.spacingMD * 2,
       height: HarnessMonitorTheme.spacingMD * 2
@@ -111,6 +113,24 @@ extension AgentTuiWindowView {
       )
     }
 
+    static func stabilizedAutomaticSize(
+      measured: AgentTuiSize,
+      baseline: AgentTuiSize
+    ) -> AgentTuiSize {
+      AgentTuiSize(
+        rows: stabilizedDimension(
+          measured: measured.rows,
+          baseline: baseline.rows,
+          minimumDelta: automaticResizeMinimumRowDelta
+        ),
+        cols: stabilizedDimension(
+          measured: measured.cols,
+          baseline: baseline.cols,
+          minimumDelta: automaticResizeMinimumColDelta
+        )
+      )
+    }
+
     @MainActor
     private static func measuredCellSize(for fontScale: CGFloat) -> CGSize {
       let pointSize = 13 * max(fontScale, 0.78)
@@ -121,6 +141,14 @@ extension AgentTuiWindowView {
       )
       let height = max(ceil(font.ascender - font.descender + font.leading), 1)
       return CGSize(width: width, height: height)
+    }
+
+    private static func stabilizedDimension(
+      measured: Int,
+      baseline: Int,
+      minimumDelta: Int
+    ) -> Int {
+      abs(measured - baseline) >= minimumDelta ? measured : baseline
     }
   }
 
