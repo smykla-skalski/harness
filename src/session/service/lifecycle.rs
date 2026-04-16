@@ -404,16 +404,19 @@ pub fn transfer_leader(
 
 /// Mark the calling agent as disconnected and unassign its tasks.
 ///
-/// Leaders cannot leave; they must transfer leadership first. This is a
-/// voluntary, graceful exit - the liveness sync handles involuntary exits.
+/// When the current leader leaves gracefully, the session either promotes the
+/// highest-priority successor or falls back to a leaderless degraded state.
 ///
 /// # Errors
-/// Returns `CliError` on storage failures or if the agent is the leader.
+/// Returns `CliError` on storage failures or if the agent is already inactive.
 pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Result<(), CliError> {
     let now = utc_now();
     storage::update_state(project_dir, session_id, |state| {
         require_active(state)?;
-        require_removable_agent(state, agent_id)?;
+        let departing_leader = state.leader_id.as_deref() == Some(agent_id);
+        if !departing_leader {
+            require_removable_agent(state, agent_id)?;
+        }
 
         let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
             CliError::from(CliErrorKind::session_agent_conflict(format!(
@@ -436,6 +439,9 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
         release_agent_tasks(state, agent_id, &now);
 
         clear_pending_leader_transfer(state, agent_id);
+        if departing_leader {
+            super::promote_or_degrade(state, &now);
+        }
         refresh_session(state, &now);
         Ok(())
     })?;

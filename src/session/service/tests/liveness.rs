@@ -114,28 +114,12 @@ fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
 }
 
 #[test]
-fn sync_liveness_clears_dead_leader_and_marks_session_leaderless() {
+fn sync_liveness_marks_session_leaderless_degraded_when_dead_leader_has_no_successor() {
     with_temp_project(|project| {
-        let _state =
+        let state =
             start_session("test", "", project, Some("claude"), Some("sync-leader")).expect("start");
-
-        temp_env::with_var("CODEX_SESSION_ID", Some("leaderless-worker"), || {
-            join_session(
-                "sync-leader",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join worker");
-        });
-
-        let state = session_status("sync-leader", project).expect("status");
         let leader_id = state.leader_id.clone().expect("leader");
         let leader = state.agents.get(&leader_id).expect("leader agent");
-        let worker = find_agent_by_runtime(&state, "codex");
 
         let leader_log = write_agent_log_file(
             project,
@@ -143,17 +127,13 @@ fn sync_liveness_clears_dead_leader_and_marks_session_leaderless() {
             leader.agent_session_id.as_deref().expect("leader session"),
         );
         set_log_mtime_seconds_ago(&leader_log, 600);
-        write_agent_log_file(
-            project,
-            "codex",
-            worker.agent_session_id.as_deref().expect("worker session"),
-        );
 
         let result = sync_agent_liveness("sync-leader", project).expect("sync");
 
         assert_eq!(result.disconnected, vec![leader_id.clone()]);
 
         let updated = session_status("sync-leader", project).expect("updated status");
+        assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
         assert!(
             updated.leader_id.is_none(),
             "dead leader should clear leader_id"
@@ -162,8 +142,90 @@ fn sync_liveness_clears_dead_leader_and_marks_session_leaderless() {
             updated.agents.get(&leader_id).expect("leader agent").status,
             AgentStatus::Disconnected
         );
-        assert_eq!(updated.metrics.agent_count, 1);
-        assert_eq!(updated.metrics.active_agent_count, 1);
+        assert_eq!(updated.metrics.agent_count, 0);
+        assert_eq!(updated.metrics.active_agent_count, 0);
+    });
+}
+
+#[test]
+fn sync_liveness_promotes_highest_priority_successor_within_same_role() {
+    with_temp_project(|project| {
+        let state = start_session_with_policy(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("sync-promote-priority"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.clone().expect("leader");
+        let leader = state.agents.get(&leader_id).expect("leader agent");
+
+        temp_env::with_var("CODEX_SESSION_ID", Some("preferred-improver"), || {
+            join_session(
+                "sync-promote-priority",
+                SessionRole::Improver,
+                "codex",
+                &["priority:90".into()],
+                Some("preferred improver"),
+                project,
+                None,
+            )
+            .expect("join preferred improver");
+        });
+        temp_env::with_var("CODEX_SESSION_ID", Some("backup-improver"), || {
+            join_session(
+                "sync-promote-priority",
+                SessionRole::Improver,
+                "codex",
+                &["priority:10".into()],
+                Some("backup improver"),
+                project,
+                None,
+            )
+            .expect("join backup improver");
+        });
+
+        let current = session_status("sync-promote-priority", project).expect("status");
+        let preferred_id = current
+            .agents
+            .values()
+            .find(|agent| agent.capabilities.iter().any(|capability| capability == "priority:90"))
+            .expect("preferred improver")
+            .agent_id
+            .clone();
+
+        let leader_log = write_agent_log_file(
+            project,
+            "claude",
+            leader.agent_session_id.as_deref().expect("leader session"),
+        );
+        set_log_mtime_seconds_ago(&leader_log, 600);
+        for agent in current
+            .agents
+            .values()
+            .filter(|agent| agent.runtime == "codex")
+        {
+            write_agent_log_file(
+                project,
+                "codex",
+                agent.agent_session_id.as_deref().expect("worker session"),
+            );
+        }
+
+        let result = sync_agent_liveness("sync-promote-priority", project).expect("sync");
+        assert_eq!(result.disconnected, vec![leader_id.clone()]);
+
+        let updated = session_status("sync-promote-priority", project).expect("updated");
+        let promoted = updated
+            .leader_id
+            .as_deref()
+            .and_then(|agent_id| updated.agents.get(agent_id))
+            .expect("promoted leader");
+        assert_eq!(updated.status, SessionStatus::Active);
+        assert_eq!(promoted.agent_id, preferred_id);
+        assert_eq!(promoted.role, SessionRole::Leader);
     });
 }
 
@@ -343,13 +405,68 @@ fn leave_session_marks_agent_disconnected() {
 }
 
 #[test]
-fn leave_session_leader_cannot_leave() {
+fn leave_session_promotes_highest_priority_successor() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("leave-2")).expect("start");
+        let state = start_session_with_policy(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("leave-promote"),
+            Some("swarm-default"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
 
-        let error = leave_session("leave-2", &leader_id, project).expect_err("leader cannot leave");
-        assert_eq!(error.code(), "KSRCLI092");
+        temp_env::with_var("CODEX_SESSION_ID", Some("improver-leave"), || {
+            join_session(
+                "leave-promote",
+                SessionRole::Improver,
+                "codex",
+                &["priority:90".into()],
+                Some("Improver"),
+                project,
+                None,
+            )
+            .expect("join improver");
+        });
+
+        leave_session("leave-promote", &leader_id, project).expect("leader leave");
+
+        let updated = session_status("leave-promote", project).expect("status");
+        let new_leader = updated
+            .leader_id
+            .as_deref()
+            .and_then(|agent_id| updated.agents.get(agent_id))
+            .expect("promoted leader");
+        assert_eq!(updated.status, SessionStatus::Active);
+        assert_eq!(new_leader.runtime, "codex");
+        assert_eq!(new_leader.role, SessionRole::Leader);
+    });
+}
+
+#[test]
+fn leave_session_marks_session_leaderless_degraded_without_successor() {
+    with_temp_project(|project| {
+        let state = start_session_with_policy(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("leave-degraded"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.clone().expect("leader");
+
+        leave_session("leave-degraded", &leader_id, project).expect("leader leave");
+
+        let updated = session_status("leave-degraded", project).expect("status");
+        assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
+        assert!(updated.leader_id.is_none(), "no replacement leader should exist");
+        assert_eq!(
+            updated.agents.get(&leader_id).expect("leader").status,
+            AgentStatus::Disconnected
+        );
     });
 }
