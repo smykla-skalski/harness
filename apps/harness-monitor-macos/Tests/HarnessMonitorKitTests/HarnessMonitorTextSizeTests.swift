@@ -225,6 +225,22 @@ struct SessionTimelinePaginationTests {
     #expect(!presentation.needsRefresh)
   }
 
+  @Test("Timeline content identity changes when the selected session changes")
+  func timelineContentIdentityChangesWhenSessionChanges() {
+    let primary = SessionTimelineContentIdentity(
+      sessionID: "sess-primary",
+      pageSize: SessionTimelinePageSize.defaultSize.rawValue,
+      currentPage: 0
+    )
+    let secondary = SessionTimelineContentIdentity(
+      sessionID: "sess-secondary",
+      pageSize: SessionTimelinePageSize.defaultSize.rawValue,
+      currentPage: 0
+    )
+
+    #expect(primary != secondary)
+  }
+
   private func makeTimelineEntries(count: Int) -> [TimelineEntry] {
     (0..<count).map { index in
       TimelineEntry(

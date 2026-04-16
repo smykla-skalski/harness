@@ -40,45 +40,60 @@ extension HarnessMonitorStore {
 
       let preserveVisibleTimeline =
         selectedSession?.session.sessionId == sessionID && !timeline.isEmpty
+      let preservedTimeline = preserveVisibleTimeline ? timeline : []
       let preservedTimelineWindow = preserveVisibleTimeline ? timelineWindow : nil
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
-        timeline: preserveVisibleTimeline ? timeline : [],
+        timeline: preservedTimeline,
         timelineWindow: preservedTimelineWindow,
         showingCachedData: false
       )
-      isTimelineLoading = !preserveVisibleTimeline
+      beginTimelineLoadingGate(hasVisibleTimeline: preserveVisibleTimeline)
 
-      let timelineRequest = TimelineWindowRequest.latest(
-        limit: selectedTimelineRequestLimit(
-          loadedTimeline: preserveVisibleTimeline ? timeline : [],
-          timelineWindow: preservedTimelineWindow
-        ),
-        knownRevision: preservedTimelineWindow?.revision
-      )
-      let measuredTimeline = try await Self.measureOperation {
-        try await client.timelineWindow(
+      let resolvedTimeline: [TimelineEntry]
+      let resolvedTimelineWindow: TimelineWindowResponse?
+      if preserveVisibleTimeline, let preservedTimelineWindow {
+        let refreshed = try await refreshSelectedTimelineDelta(
+          using: client,
           sessionID: sessionID,
-          request: timelineRequest
-        ) { [weak self] batch, batchIndex, _ in
-          await MainActor.run {
-            guard let entries = batch.entries else { return }
-            self?.applyTimelineBatch(
-              entries,
-              timelineWindow: batch.metadataOnly,
-              index: batchIndex,
-              requestID: requestID,
-              sessionID: sessionID
-            )
+          loadedTimeline: preservedTimeline,
+          loadedWindow: preservedTimelineWindow
+        )
+        try Task.checkCancellation()
+        guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
+        resolvedTimeline = refreshed.timeline
+        resolvedTimelineWindow = refreshed.timelineWindow
+      } else {
+        let timelineRequest = TimelineWindowRequest.latest(
+          limit: selectedTimelineRequestLimit(
+            loadedTimeline: preservedTimeline,
+            timelineWindow: preservedTimelineWindow
+          )
+        )
+        let measuredTimeline = try await Self.measureOperation {
+          try await client.timelineWindow(
+            sessionID: sessionID,
+            request: timelineRequest
+          ) { [weak self] batch, batchIndex, _ in
+            await MainActor.run {
+              guard let entries = batch.entries else { return }
+              self?.applyTimelineBatch(
+                entries,
+                timelineWindow: batch.metadataOnly,
+                index: batchIndex,
+                requestID: requestID,
+                sessionID: sessionID
+              )
+            }
           }
         }
+        try Task.checkCancellation()
+        guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
+        recordRequestSuccess()
+        resolvedTimeline = measuredTimeline.value.entries ?? timeline
+        resolvedTimelineWindow = measuredTimeline.value.metadataOnly
       }
-      try Task.checkCancellation()
-      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-      recordRequestSuccess()
-      let resolvedTimeline = measuredTimeline.value.entries ?? timeline
-      let resolvedTimelineWindow = measuredTimeline.value.metadataOnly
 
       applySelectedSessionSnapshot(
         sessionID: sessionID,
@@ -87,7 +102,7 @@ extension HarnessMonitorStore {
         timelineWindow: resolvedTimelineWindow,
         showingCachedData: false
       )
-      isTimelineLoading = false
+      finishTimelineLoadingGateIfCurrent(requestID: requestID, sessionID: sessionID)
       if !isExtensionsLoading {
         scheduleCacheWrite { service in
           await service.cacheSessionDetail(
@@ -203,7 +218,6 @@ extension HarnessMonitorStore {
     sessionID: String
   ) async {
     guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-    guard selectedSession?.session.sessionId != sessionID else { return }
 
     // Background hydration: log silently. The fallback to cached/index data
     // below is the user-visible recovery; we do not surface a toast for an
@@ -216,6 +230,9 @@ extension HarnessMonitorStore {
       isExtensionsLoading = false
       isTimelineLoading = false
     }
+    cancelTimelineLoadingGate()
+
+    guard selectedSession?.session.sessionId != sessionID else { return }
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       applySelectedSessionSnapshot(

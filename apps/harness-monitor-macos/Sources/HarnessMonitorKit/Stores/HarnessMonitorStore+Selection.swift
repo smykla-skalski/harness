@@ -345,6 +345,7 @@ extension HarnessMonitorStore {
     sessionLoadTask = nil
     sessionSecondaryHydrationTask?.cancel()
     sessionSecondaryHydrationTask = nil
+    cancelTimelineLoadingGate()
   }
 
   func completeSessionLoad(_ requestID: UInt64) {
@@ -353,7 +354,6 @@ extension HarnessMonitorStore {
     }
     withUISyncBatch {
       isSelectionLoading = false
-      isTimelineLoading = false
     }
   }
 

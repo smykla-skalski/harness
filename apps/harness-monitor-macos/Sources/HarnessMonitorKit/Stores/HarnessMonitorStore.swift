@@ -83,6 +83,9 @@ public final class HarnessMonitorStore {
   var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
+  var timelineMinimumLoadingDuration: Duration = .milliseconds(500)
+  @ObservationIgnored var timelineLoadingGateClock: any TimelineLoadingGateClock =
+    LiveContinuousClockSource()
 
   let daemonController: any DaemonControlling
   public let daemonOwnership: DaemonOwnership
@@ -99,6 +102,7 @@ public final class HarnessMonitorStore {
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTaskToken: UInt64 = 0
+  @ObservationIgnored var timelineLoadingGateTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTaskToken: UInt64 = 0
   var selectionTask: Task<Void, Never>?
@@ -119,6 +123,7 @@ public final class HarnessMonitorStore {
   var sessionPushFallbackSequence: UInt64 = 0
   @ObservationIgnored var selectedSessionRefreshFallbackSequence: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshSequence: UInt64 = 0
+  @ObservationIgnored var timelineLoadingGateStartedAt: ContinuousClock.Instant?
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var pendingSelectedSessionRefreshFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var lastSessionPushFallbackAt: [String: ContinuousClock.Instant] = [:]

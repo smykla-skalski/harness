@@ -234,8 +234,8 @@ struct HarnessMonitorStoreSelectionFlowTests {
     #expect(store.sessionDataAvailability == .live)
   }
 
-  @Test("Selecting a cached session validates the latest window with the cached revision")
-  func selectingCachedSessionValidatesLatestWindowWithCachedRevision() async throws {
+  @Test("Selecting a cached session requests only newer timeline entries after the cached cursor")
+  func selectingCachedSessionRequestsOnlyNewerTimelineEntriesAfterCachedCursor() async throws {
     let summary = makeSession(
       .init(
         sessionId: "sess-window-validate",
@@ -254,7 +254,7 @@ struct HarnessMonitorStoreSelectionFlowTests {
       workerID: "worker-window-validate",
       workerName: "Window Validate Worker"
     )
-    let cachedTimeline = (0..<10).map { index in
+    let fullTimeline = (0..<12).map { index in
       TimelineEntry(
         entryId: "cached-window-\(index)",
         recordedAt: String(format: "2026-04-14T10:%02d:00Z", 59 - index),
@@ -262,45 +262,19 @@ struct HarnessMonitorStoreSelectionFlowTests {
         sessionId: summary.sessionId,
         agentId: detail.agents.first?.agentId,
         taskId: nil,
-        summary: "Cached window \(index)",
+        summary: "Window event \(index)",
         payload: .object([:])
       )
     }
-    let cachedWindow = TimelineWindowResponse(
-      revision: 9,
-      totalCount: 42,
-      windowStart: 0,
-      windowEnd: cachedTimeline.count,
-      hasOlder: true,
-      hasNewer: false,
-      oldestCursor: cachedTimeline.last.map {
-        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
-      },
-      newestCursor: cachedTimeline.first.map {
-        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
-      },
-      entries: nil,
-      unchanged: false
-    )
-    let unchangedWindow = TimelineWindowResponse(
-      revision: cachedWindow.revision,
-      totalCount: cachedWindow.totalCount,
-      windowStart: cachedWindow.windowStart,
-      windowEnd: cachedWindow.windowEnd,
-      hasOlder: cachedWindow.hasOlder,
-      hasNewer: cachedWindow.hasNewer,
-      oldestCursor: cachedWindow.oldestCursor,
-      newestCursor: cachedWindow.newestCursor,
-      entries: nil,
-      unchanged: true
-    )
+    let cachedTimeline = Array(fullTimeline.dropFirst(2))
+    let cachedWindow = TimelineWindowResponse.fallbackMetadata(for: cachedTimeline)
+    let newestCursor = try #require(cachedWindow.newestCursor)
     let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
       summaries: [summary],
       detailsByID: [summary.sessionId: detail],
-      timelinesBySessionID: [summary.sessionId: cachedTimeline],
+      timelinesBySessionID: [summary.sessionId: fullTimeline],
       detail: detail
     )
-    client.configureTimelineWindowResponse(unchangedWindow, for: summary.sessionId)
     let container = try HarnessMonitorModelContainer.preview()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
@@ -322,11 +296,15 @@ struct HarnessMonitorStoreSelectionFlowTests {
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: cachedTimeline.count, knownRevision: cachedWindow.revision)
+        TimelineWindowRequest(
+          scope: .summary,
+          limit: cachedTimeline.count,
+          after: newestCursor
+        )
       ])
-    #expect(store.timeline == cachedTimeline)
-    #expect(store.timelineWindow?.totalCount == 42)
-    #expect(store.timelineWindow?.windowEnd == cachedTimeline.count)
+    #expect(store.timeline == fullTimeline)
+    #expect(store.timelineWindow?.totalCount == fullTimeline.count)
+    #expect(store.timelineWindow?.windowEnd == fullTimeline.count)
   }
 
   @Test("Selecting an uncached session requests only the latest timeline window")

@@ -57,15 +57,9 @@ extension HarnessMonitorStore {
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
     public var isTimelineLoading = false
-    public var presentedSessionDetail: SessionDetail? {
-      selectedSessionDetail ?? retainedSessionDetail
-    }
-    public var presentedTimeline: [TimelineEntry] {
-      selectedSessionDetail == nil ? retainedTimeline : timeline
-    }
-    public var presentedTimelineWindow: TimelineWindowResponse? {
-      selectedSessionDetail == nil ? retainedTimelineWindow : timelineWindow
-    }
+    public var presentedSessionDetail: SessionDetail?
+    public var presentedTimeline: [TimelineEntry] = []
+    public var presentedTimelineWindow: TimelineWindowResponse?
     private var retainedSessionDetail: SessionDetail?
     private var retainedTimeline: [TimelineEntry] = []
     private var retainedTimelineWindow: TimelineWindowResponse?
@@ -87,6 +81,11 @@ extension HarnessMonitorStore {
           identity: nextSelectedIdentity,
           didUpdateSelectedTimeline: didUpdateSelectedTimeline
         )
+        updatePresentedValues(
+          sessionDetail: detail,
+          timeline: timeline,
+          timelineWindow: timelineWindow
+        )
         return
       }
 
@@ -98,6 +97,13 @@ extension HarnessMonitorStore {
         !state.retainPresentedDetailWhenSelectionClears || selectedSessionSummary == nil
       if shouldDropRetainedDetail {
         clearRetainedDetail()
+        updatePresentedValues(sessionDetail: nil, timeline: [], timelineWindow: nil)
+      } else {
+        updatePresentedValues(
+          sessionDetail: retainedSessionDetail,
+          timeline: retainedTimeline,
+          timelineWindow: retainedTimelineWindow
+        )
       }
     }
 
@@ -152,6 +158,16 @@ extension HarnessMonitorStore {
       if retainedTimelineWindow != nil {
         retainedTimelineWindow = nil
       }
+    }
+
+    private func updatePresentedValues(
+      sessionDetail: SessionDetail?,
+      timeline: [TimelineEntry],
+      timelineWindow: TimelineWindowResponse?
+    ) {
+      if presentedSessionDetail != sessionDetail { presentedSessionDetail = sessionDetail }
+      if presentedTimeline != timeline { presentedTimeline = timeline }
+      if presentedTimelineWindow != timelineWindow { presentedTimelineWindow = timelineWindow }
     }
   }
 

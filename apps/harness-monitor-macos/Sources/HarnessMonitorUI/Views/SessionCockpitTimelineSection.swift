@@ -60,6 +60,14 @@ struct SessionCockpitTimelineSection: View {
 
   private var showsPagination: Bool { presentation.showsPagination }
 
+  private var contentIdentity: SessionTimelineContentIdentity {
+    SessionTimelineContentIdentity(
+      sessionID: sessionID,
+      pageSize: pageSize.rawValue,
+      currentPage: resolvedCurrentPage
+    )
+  }
+
   private var pageChangeAnimation: Animation? {
     reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)
   }
@@ -91,6 +99,7 @@ struct SessionCockpitTimelineSection: View {
           )
 
           placeholderAwareTimelineRows
+            .id(contentIdentity)
 
           if showsPagination {
             SessionTimelinePaginationFooter(
@@ -175,7 +184,6 @@ struct SessionCockpitTimelineSection: View {
         )
       }
     }
-    .id("\(pageSize.rawValue)-\(resolvedCurrentPage)")
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 

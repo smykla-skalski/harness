@@ -19,6 +19,39 @@ extension HarnessMonitorContentSelectionTests {
     #expect(didChange == false)
   }
 
+  // Task 1 – Req 3
+  // presentedTimeline (now a stored property) must invalidate when its VALUE changes.
+  // This verifies the stored property correctly produces an observation signal when
+  // content is applied to a fresh slice.
+  @Test(
+    "presentedTimeline invalidates when cached revisit restores the correct session timeline"
+  )
+  func presentedTimelineInvalidatesWhenCachedRevisitRestoresCorrectTimeline() async {
+    // Use a freshly created slice so presentedTimeline starts empty.
+    let slice = HarnessMonitorStore.ContentSessionDetailSlice()
+
+    // Verify initial state is empty.
+    #expect(slice.presentedTimeline.isEmpty)
+
+    // Applying a full detail must change presentedTimeline from [] to the session timeline.
+    let didChange = await didInvalidate(
+      { slice.presentedTimeline },
+      after: {
+        slice.apply(
+          HarnessMonitorStore.ContentSessionDetailState(
+            selectedSessionDetail: PreviewFixtures.detail,
+            timeline: PreviewFixtures.timeline,
+            retainPresentedDetailWhenSelectionClears: true
+          ),
+          selectedSessionSummary: PreviewFixtures.summary
+        )
+      }
+    )
+
+    #expect(didChange)
+    #expect(slice.presentedTimeline == PreviewFixtures.timeline)
+  }
+
   @Test("Content session detail state tracks selected session detail and timeline")
   func contentSessionDetailStateTracksSelectedSessionDetailAndTimeline() async {
     let store = await makeBootstrappedStore()
