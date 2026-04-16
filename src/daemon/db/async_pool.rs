@@ -312,11 +312,7 @@ impl AsyncSessionSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name,
         };
-        let status = match self.status.as_str() {
-            "active" => super::SessionStatus::Active,
-            "paused" => super::SessionStatus::Paused,
-            _ => super::SessionStatus::Ended,
-        };
+        let status = super::parse_session_status_db_label(&self.status);
         let pending_leader_transfer = self
             .pending_leader_transfer_json
             .map(|json| {

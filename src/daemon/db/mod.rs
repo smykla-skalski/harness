@@ -97,6 +97,21 @@ pub(crate) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
     }
 }
 
+pub(crate) fn session_status_db_label(status: SessionStatus) -> Result<String, CliError> {
+    let value = serde_json::to_value(status)
+        .map_err(|error| db_error(format!("serialize session status: {error}")))?;
+    value
+        .as_str()
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| db_error("serialize session status: expected string"))
+}
+
+#[must_use]
+pub(crate) fn parse_session_status_db_label(status: &str) -> SessionStatus {
+    serde_json::from_value(serde_json::Value::String(status.to_string()))
+        .unwrap_or(SessionStatus::Ended)
+}
+
 /// `SQLite`-backed canonical storage for durable harness daemon state.
 ///
 /// Operational files remain only for integration boundaries that cannot move

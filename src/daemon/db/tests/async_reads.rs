@@ -91,6 +91,32 @@ async fn load_session_timeline_window_reports_unchanged_known_revision() {
     assert_eq!(response.total_count, 1);
 }
 
+#[tokio::test]
+async fn list_session_summaries_preserves_leaderless_degraded_status() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    let project = sample_project();
+    sync_db.sync_project(&project).expect("sync project");
+    let mut state = sample_session_state();
+    state.status = SessionStatus::LeaderlessDegraded;
+    sync_db
+        .save_session_state(&project.project_id, &state)
+        .expect("save session state");
+    drop(sync_db);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db");
+    let summaries = async_db
+        .list_session_summaries()
+        .await
+        .expect("load async session summaries");
+
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].status, SessionStatus::LeaderlessDegraded);
+}
+
 fn sample_tool_result_event() -> crate::agents::runtime::event::ConversationEvent {
     let mut event = sample_conversation_event(1, "ignored");
     event.kind = ConversationEventKind::ToolResult {

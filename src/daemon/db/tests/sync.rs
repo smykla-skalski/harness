@@ -109,6 +109,32 @@ fn sync_session_replaces_agents_on_update() {
 }
 
 #[test]
+fn sync_session_preserves_leaderless_degraded_status_for_summaries() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+
+    let mut state = sample_session_state();
+    state.status = SessionStatus::LeaderlessDegraded;
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    let stored_status: String = db
+        .conn
+        .query_row(
+            "SELECT status FROM sessions WHERE session_id = ?1",
+            [&state.session_id],
+            |row| row.get(0),
+        )
+        .expect("query status");
+    assert_eq!(stored_status, "leaderless_degraded");
+
+    let summaries = db.list_session_summaries_full().expect("session summaries");
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].status, SessionStatus::LeaderlessDegraded);
+}
+
+#[test]
 fn append_log_entry_inserts() {
     use crate::session::types::SessionTransition;
 
