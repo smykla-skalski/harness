@@ -167,12 +167,20 @@ fn migrate_v6_to_v7_backfills_swarm_policy() {
 
     assert_eq!(migrated["schema_version"], json!(CURRENT_VERSION));
     assert_eq!(
-        migrated["policy"]["leader_join"]["require_explicit_fallback_role"],
-        json!(true)
-    );
-    assert_eq!(
-        migrated["policy"]["degraded_recovery"]["preset_id"],
-        json!("swarm-default")
+        migrated["policy"],
+        json!({
+            "leader_join": {
+                "require_explicit_fallback_role": true
+            },
+            "auto_promotion": {
+                "role_order": ["improver", "reviewer", "observer", "worker"],
+                "priority_preset_id": "swarm-default"
+            },
+            "degraded_recovery": {
+                "preset_id": "swarm-default",
+                "manual_recovery_allowed": true
+            }
+        })
     );
 }
 

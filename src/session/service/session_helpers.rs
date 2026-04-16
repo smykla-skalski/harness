@@ -5,6 +5,7 @@ use super::{
     build_signal, fmt, generate_session_id, is_permitted, refresh_session, runtime,
     runtime_capabilities, storage,
 };
+use crate::session::types::SessionPolicy;
 
 pub(crate) fn create_initial_session(
     context: &str,
@@ -219,7 +220,7 @@ pub(crate) fn build_initial_state(
         title: title.to_string(),
         context: context.to_string(),
         status: SessionStatus::Active,
-        policy: Default::default(),
+        policy: SessionPolicy::default(),
         created_at: now.to_string(),
         updated_at: now.to_string(),
         agents,
