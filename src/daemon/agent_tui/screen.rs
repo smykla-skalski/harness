@@ -60,6 +60,11 @@ impl TerminalScreenParser {
     }
 
     #[must_use]
+    pub fn state_formatted(&self) -> Vec<u8> {
+        self.parser.screen().state_formatted()
+    }
+
+    #[must_use]
     pub fn snapshot(&self) -> TerminalScreenSnapshot {
         let screen = self.parser.screen();
         let (rows, cols) = screen.size();

@@ -55,6 +55,11 @@ pub(crate) fn snapshot_from_process(
     })
 }
 
+pub(crate) struct AgentTuiAttachState {
+    pub(crate) initial_bytes: Vec<u8>,
+    pub(crate) broadcast_rx: broadcast::Receiver<Vec<u8>>,
+}
+
 /// Live process handle for an agent TUI running inside a PTY.
 pub struct AgentTuiProcess {
     master: Shared<Box<dyn MasterPty + Send>>,
@@ -168,6 +173,15 @@ impl AgentTuiProcess {
     /// Returns a workflow I/O error when internal state is poisoned.
     pub fn transcript(&self) -> Result<Vec<u8>, CliError> {
         Ok(lock(&self.transcript, "agent TUI transcript")?.clone())
+    }
+
+    pub(crate) fn attach_state(&self) -> Result<AgentTuiAttachState, CliError> {
+        let broadcast_rx = self.broadcast_rx.resubscribe();
+        let initial_bytes = lock(&self.screen, "agent TUI screen parser")?.state_formatted();
+        Ok(AgentTuiAttachState {
+            initial_bytes,
+            broadcast_rx,
+        })
     }
 
     /// Persist newly captured transcript bytes without rewriting the full file.

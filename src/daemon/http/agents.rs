@@ -441,9 +441,30 @@ pub(super) async fn get_agent_tui_attach(
         }
     };
 
-    let rx = process.broadcast_rx.resubscribe();
+    let attach_state = match process.attach_state() {
+        Ok(state) => state,
+        Err(e) => {
+            return super::response::timed_json(
+                "GET",
+                "/v1/agent-tuis/{id}/attach",
+                &request_id,
+                start,
+                Err::<(), _>(e),
+            );
+        }
+    };
+    let initial_bytes = attach_state.initial_bytes;
+    let rx = attach_state.broadcast_rx;
     ws.on_upgrade(move |mut socket: axum::extract::ws::WebSocket| async move {
         let mut rx = rx;
+        if !initial_bytes.is_empty()
+            && socket
+                .send(axum::extract::ws::Message::Binary(initial_bytes.into()))
+                .await
+                .is_err()
+        {
+            return;
+        }
         loop {
             tokio::select! {
                 msg = socket.recv() => {

@@ -2,11 +2,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use tokio::sync::broadcast;
-
 use crate::daemon::agent_tui::{
-    AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus, deliver_deferred_prompts,
-    snapshot_from_process, spawn_agent_tui_process,
+    AgentTuiAttachState, AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus,
+    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::errors::{CliError, CliErrorKind};
@@ -155,11 +153,8 @@ impl BridgeServer {
     pub(super) fn attach_agent_tui(
         &self,
         tui_id: &str,
-    ) -> Result<(Arc<AgentTuiProcess>, broadcast::Receiver<Vec<u8>>), CliError> {
+    ) -> Result<(Arc<AgentTuiProcess>, AgentTuiAttachState), CliError> {
         let active = self.active_tui(tui_id)?;
-        Ok((
-            Arc::clone(&active.process),
-            active.process.broadcast_rx.resubscribe(),
-        ))
+        Ok((Arc::clone(&active.process), active.process.attach_state()?))
     }
 }
