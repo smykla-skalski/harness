@@ -282,3 +282,180 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     daemon.kill().expect("kill daemon");
     wait_for_child_exit(&mut daemon);
 }
+
+#[test]
+fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    let mock_bin = tmp.path().join("bin");
+    std::fs::create_dir_all(&mock_bin).expect("create mock bin");
+    write_mock_codex_tui(&mock_bin);
+    let path_env = prefixed_path_env(&mock_bin);
+
+    let mut daemon = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["daemon", "serve", "--host", "127.0.0.1", "--port", "0"])
+            .env("HARNESS_HOST_HOME", &home)
+            .env("HOME", &home)
+            .env("XDG_DATA_HOME", &xdg)
+            .env("PATH", &path_env)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null()),
+    )
+    .expect("spawn daemon serve");
+
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
+    let project_arg = project.to_str().expect("utf8 project");
+    let session = start_session_via_http(
+        &home,
+        &xdg,
+        project_arg,
+        "recover-leader-tui",
+        "recover leader tui",
+        "verify managed leader recovery prompt",
+    );
+
+    let leave_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "leave",
+            session.session_id.as_str(),
+            "codex-leader",
+            "--project-dir",
+            project_arg,
+        ],
+    );
+    assert!(
+        leave_output.status.success(),
+        "session leave failed: {}",
+        output_text(&leave_output)
+    );
+
+    let status_output = run_harness(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "status",
+            session.session_id.as_str(),
+            "--json",
+            "--project-dir",
+            project_arg,
+        ],
+    );
+    assert!(
+        status_output.status.success(),
+        "session status failed: {}",
+        output_text(&status_output)
+    );
+    let degraded: SessionState =
+        serde_json::from_slice(&status_output.stdout).expect("parse degraded status");
+    assert_eq!(degraded.status, harness::session::types::SessionStatus::LeaderlessDegraded);
+
+    let recover_output = run_harness_with_timeout(
+        &home,
+        &xdg,
+        &[
+            "session",
+            "recover-leader",
+            session.session_id.as_str(),
+            "--preset",
+            "swarm-default",
+            "--runtime",
+            "codex",
+            "--project-dir",
+            project_arg,
+        ],
+        COMMAND_WAIT_TIMEOUT,
+    );
+    assert!(
+        recover_output.status.success(),
+        "recover leader failed: {}",
+        output_text(&recover_output)
+    );
+    let started: AgentTuiSnapshot =
+        serde_json::from_slice(&recover_output.stdout).expect("parse recover start");
+    assert_eq!(started.status, AgentTuiStatus::Running);
+    assert_eq!(started.session_id, session.session_id);
+
+    let shown = wait_for_tui_prompt(&home, &xdg, &started.tui_id);
+    assert!(shown.screen.text.contains("/harness:session:join"));
+    assert!(shown.screen.text.contains("--role leader"));
+    assert!(shown.screen.text.contains("policy-preset:swarm-default"));
+
+    let stop_output = run_harness(
+        &home,
+        &xdg,
+        &["session", "tui", "stop", started.tui_id.as_str()],
+    );
+    assert!(
+        stop_output.status.success(),
+        "tui stop failed: {}",
+        output_text(&stop_output)
+    );
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+fn prefixed_path_env(prefix: &Path) -> std::ffi::OsString {
+    let mut paths = vec![prefix.to_path_buf()];
+    if let Some(existing) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&existing));
+    }
+    std::env::join_paths(paths).expect("join PATH")
+}
+
+fn write_mock_codex_tui(bin_dir: &Path) {
+    let script = bin_dir.join("codex");
+    std::fs::write(
+        &script,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo 'mock-codex 0.0.1'
+  exit 0
+fi
+
+printf 'mock-codex-ready\n'
+printf '%s\n' "$@"
+exec cat
+"#,
+    )
+    .expect("write mock codex");
+    std::fs::set_permissions(
+        &script,
+        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
+    )
+    .expect("chmod mock codex");
+}
+
+fn wait_for_tui_prompt(home: &Path, xdg: &Path, tui_id: &str) -> AgentTuiSnapshot {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let output = run_harness(home, xdg, &["session", "tui", "show", tui_id]);
+        if output.status.success() {
+            let snapshot: AgentTuiSnapshot =
+                serde_json::from_slice(&output.stdout).expect("parse tui show");
+            if snapshot.screen.text.contains("--role leader")
+                && snapshot.screen.text.contains("policy-preset:swarm-default")
+            {
+                return snapshot;
+            }
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "managed TUI prompt did not surface before timeout"
+        );
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
+}

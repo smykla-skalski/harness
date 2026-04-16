@@ -342,6 +342,23 @@ fn build_auto_join_prompt_includes_fallback_role_flag() {
 }
 
 #[test]
+fn build_auto_join_prompt_includes_policy_preset_for_leader_recovery() {
+    let prompt = build_auto_join_prompt(
+        "codex",
+        "sess-recover",
+        SessionRole::Leader,
+        None,
+        &["policy-preset:swarm-default".to_string()],
+        "agent-tui-recover",
+        Some("Recovered codex"),
+        None,
+    );
+    assert!(prompt.contains("/harness:session:join sess-recover"));
+    assert!(prompt.contains("--role leader"));
+    assert!(prompt.contains("policy-preset:swarm-default"));
+}
+
+#[test]
 fn build_auto_join_prompt_omits_persona_when_none() {
     let prompt = build_auto_join_prompt(
         "codex",
