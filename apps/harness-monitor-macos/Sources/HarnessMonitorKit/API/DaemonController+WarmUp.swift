@@ -10,7 +10,8 @@ extension DaemonController {
       "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
     )
     let deadline = ContinuousClock.now + timeout
-    var state = WarmUpLoopState(refreshedManagedLaunchAgentDuringWarmUp: refreshedManagedLaunchAgent)
+    var state = WarmUpLoopState(
+      refreshedManagedLaunchAgentDuringWarmUp: refreshedManagedLaunchAgent)
     while ContinuousClock.now < deadline {
       let shouldBreak = try await warmUpIteration(state: &state)
       if let client = shouldBreak.liveClient {

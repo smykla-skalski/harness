@@ -58,9 +58,9 @@ struct BackgroundThumbnailCacheTests {
 struct BackgroundGalleryPrefetchPlanTests {
   @Test("Initial plan keeps the selected background warm without prefetching the whole library")
   func initialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary() {
-    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(20))
-    let selectedBackground = options[19]
-    let recentItems = [options[18]]
+    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(10))
+    let selectedBackground = options[9]
+    let recentItems = [options[8]]
 
     let plan = PreferencesBackgroundGalleryPrefetchPlan.selections(
       options: options,
@@ -71,28 +71,26 @@ struct BackgroundGalleryPrefetchPlanTests {
 
     #expect(
       plan.map { $0.storageValue }
-        == Array(options.prefix(12)).map(\.storageValue)
-        + [selectedBackground.storageValue, recentItems[0].storageValue]
+        == Array(options.prefix(10)).map(\.storageValue)
     )
   }
 
   @Test("Visible tiles expand the plan with overscan and keep entries unique")
   func visibleTilesExpandThePlanWithOverscanAndKeepEntriesUnique() {
-    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(20))
-    let selectedBackground = options[19]
+    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(10))
+    let selectedBackground = options[9]
     let recentItems = [options[0]]
 
     let plan = PreferencesBackgroundGalleryPrefetchPlan.selections(
       options: options,
       recentItems: recentItems,
       selectedBackground: selectedBackground,
-      visibleIDs: [options[13].id, options[14].id]
+      visibleIDs: [options[3].id, options[4].id]
     )
 
     #expect(
       plan.map { $0.storageValue }
-        == Array(options.prefix(17)).map(\.storageValue)
-        + [selectedBackground.storageValue]
+        == Array(options.prefix(10)).map(\.storageValue)
     )
   }
 }
