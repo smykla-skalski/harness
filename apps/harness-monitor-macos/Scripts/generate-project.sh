@@ -24,7 +24,8 @@ SCHEMES_DIR="$ROOT/HarnessMonitor.xcodeproj/xcshareddata/xcschemes"
 # Apply these as post-generation patches so they survive regeneration.
 
 # Xcode 26 compatibility version (1430 = Xcode 14.3, 2640 = Xcode 26.0)
-sed -i '' 's/LastUpgradeCheck = 1430/LastUpgradeCheck = 2640/g' "$PBXPROJ"
+# Use extended regex to match both spaced (= "1430") and compact (="1430") attribute formats.
+sed -i '' -E 's/LastUpgradeCheck *= *1430/LastUpgradeCheck = 2640/g' "$PBXPROJ"
 
 # Product bundle names: XcodeGen derives them from the target name, not PRODUCT_NAME.
 # The shipped app and UI test host have display names with spaces; fix the file references.
@@ -37,7 +38,7 @@ sed -i '' \
 
 # Scheme files carry the same LastUpgradeVersion attribute.
 for scheme in "$SCHEMES_DIR"/*.xcscheme; do
-  sed -i '' 's/LastUpgradeVersion = "1430"/LastUpgradeVersion = "2640"/g' "$scheme"
+  sed -i '' -E 's/LastUpgradeVersion *= *"1430"/LastUpgradeVersion = "2640"/g' "$scheme"
 done
 
 write_build_server_config() {
