@@ -251,6 +251,33 @@ fn parse_session_transfer_leader() {
 }
 
 #[test]
+fn parse_session_recover_leader() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "recover-leader",
+        "sess-r",
+        "--preset",
+        "swarm-default",
+        "--runtime",
+        "codex",
+        "--project-dir",
+        "/tmp/project",
+    ])
+    .unwrap();
+    let Command::Session {
+        command: crate::session::transport::SessionCommand::RecoverLeader(args),
+    } = cli.command
+    else {
+        panic!("expected Session RecoverLeader");
+    };
+    assert_eq!(args.session_id, "sess-r");
+    assert_eq!(args.preset, "swarm-default");
+    assert_eq!(args.runtime, crate::hooks::adapters::HookAgent::Codex);
+    assert_eq!(args.project_dir.as_deref(), Some("/tmp/project"));
+}
+
+#[test]
 fn parse_session_task_assign() {
     let cli = Cli::try_parse_from([
         "harness", "session", "task", "assign", "sess-ta", "task-1", "agent-1", "--actor",
