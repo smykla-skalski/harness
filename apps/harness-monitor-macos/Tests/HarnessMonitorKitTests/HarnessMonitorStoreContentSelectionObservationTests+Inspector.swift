@@ -102,8 +102,8 @@ extension HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.session.isSelectionLoading)
   }
 
-  @Test("Content session detail presentation clears for a different selected summary")
-  func contentSessionDetailPresentationClearsForDifferentSelectedSummary() async {
+  @Test("Switching to a different session retains the prior cockpit until fresh detail arrives")
+  func contentSessionDetailPresentationRetainsCockpitDuringSessionSwitch() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
@@ -114,6 +114,19 @@ extension HarnessMonitorContentSelectionTests {
     store.primeSessionSelection(nextSummary.sessionId)
 
     #expect(store.contentUI.session.selectedSessionSummary?.sessionId == nextSummary.sessionId)
+    #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == PreviewFixtures.detail)
+    #expect(store.contentUI.sessionDetail.presentedTimeline == PreviewFixtures.timeline)
+  }
+
+  @Test("Returning to the dashboard clears the retained cockpit")
+  func contentSessionDetailPresentationClearsWhenSelectionReturnsToDashboard() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.primeSessionSelection(nil)
+
+    #expect(store.contentUI.session.selectedSessionSummary == nil)
     #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
     #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
     #expect(store.contentUI.sessionDetail.presentedTimeline.isEmpty)
