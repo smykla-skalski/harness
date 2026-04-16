@@ -324,6 +324,24 @@ fn build_auto_join_prompt_includes_persona_flag() {
 }
 
 #[test]
+fn build_auto_join_prompt_includes_fallback_role_flag() {
+    let prompt = build_auto_join_prompt(
+        "codex",
+        "sess-789",
+        SessionRole::Leader,
+        Some(SessionRole::Improver),
+        &[],
+        "agent-tui-xyz",
+        None,
+        None,
+    );
+    assert!(
+        prompt.contains("--fallback-role improver"),
+        "should contain fallback role flag: {prompt}"
+    );
+}
+
+#[test]
 fn build_auto_join_prompt_omits_persona_when_none() {
     let prompt = build_auto_join_prompt(
         "codex",

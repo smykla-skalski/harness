@@ -336,6 +336,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                     runtime: "codex".into(),
                     session_id: Some("sess-sandbox-tui".into()),
                     project_dir: project.to_string_lossy().into_owned(),
+                    policy_preset: None,
                 },
                 Some(&db),
             )
@@ -353,6 +354,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                     &AgentTuiStartRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: Some("Sandboxed live refresh".into()),
                         prompt: None,
@@ -466,6 +468,7 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
             &AgentTuiStartRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec![],
                 name: Some("callback test".into()),
                 prompt: None,

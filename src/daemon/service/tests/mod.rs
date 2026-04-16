@@ -30,6 +30,7 @@ mod config;
 mod diagnostics;
 mod direct_session_bootstrap;
 mod direct_session_leader;
+mod direct_session_start;
 mod direct_sessions;
 mod observe;
 mod session_liveness;
