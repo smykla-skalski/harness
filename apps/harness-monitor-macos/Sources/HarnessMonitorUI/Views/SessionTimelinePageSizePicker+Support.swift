@@ -204,6 +204,12 @@ struct SessionTimelinePresentation {
   }
 }
 
+struct SessionTimelineContentIdentity: Hashable, Sendable {
+  let sessionID: String
+  let pageSize: Int
+  let currentPage: Int
+}
+
 #Preview("Timeline Summary - Wide") {
   @Previewable @State var pageSize = SessionTimelinePageSize.ten
 
