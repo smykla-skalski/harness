@@ -26,14 +26,15 @@ pub(super) fn repair_context_root(context_root: &Path) -> Result<Option<PathBuf>
     }
 
     let has_sessions = context_has_sessions(context_root)?;
+    let has_agent_activity = context_has_agent_activity(context_root);
     let Some(identity) = infer_checkout_identity(context_root) else {
-        if has_sessions {
+        if has_sessions || has_agent_activity {
             return Ok(Some(context_root.to_path_buf()));
         }
         prune_context_root(context_root, "pruned non-git project context")?;
         return Ok(None);
     };
-    if !identity.checkout_root.exists() && !has_sessions {
+    if !identity.checkout_root.exists() && !has_sessions && !has_agent_activity {
         prune_context_root(context_root, "pruned missing checkout context")?;
         return Ok(None);
     }
@@ -138,6 +139,15 @@ fn origin_checkout_root(origin: &storage::ProjectOriginRecord) -> Option<PathBuf
 
 fn context_has_sessions(context_root: &Path) -> Result<bool, CliError> {
     Ok(!list_session_ids_from_context_root(context_root)?.is_empty())
+}
+
+fn context_has_agent_activity(context_root: &Path) -> bool {
+    context_root
+        .join("agents")
+        .join("ledger")
+        .join("events.jsonl")
+        .is_file()
+        || context_root.join("agents").join("sessions").is_dir()
 }
 
 fn prune_context_root(context_root: &Path, reason: &str) -> Result<(), CliError> {
