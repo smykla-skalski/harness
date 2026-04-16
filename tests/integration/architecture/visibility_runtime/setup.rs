@@ -1,9 +1,10 @@
 use super::*;
+use super::super::helpers::{read_repo_file, repo_path_exists};
 
 #[test]
 fn setup_capabilities_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let capabilities = fs::read_to_string(root.join("src/setup/capabilities.rs")).unwrap();
+    let capabilities = read_repo_file(root, "src/setup/capabilities.rs");
 
     for needle in [
         "pub enum Feature {",
@@ -20,7 +21,7 @@ fn setup_capabilities_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/setup/capabilities/tests.rs").exists(),
+        repo_path_exists(root, "src/setup/capabilities/tests.rs"),
         "setup capabilities split test module should exist"
     );
     for path in [
@@ -29,7 +30,7 @@ fn setup_capabilities_root_stays_prod_only() {
         "src/setup/capabilities/readiness.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "setup capabilities split module should exist: {path}"
         );
     }
@@ -38,7 +39,7 @@ fn setup_capabilities_root_stays_prod_only() {
 #[test]
 fn setup_build_info_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let build_info = fs::read_to_string(root.join("src/setup/build_info.rs")).unwrap();
+    let build_info = read_repo_file(root, "src/setup/build_info.rs");
 
     for needle in ["fn build_info_env(", "mod tests {"] {
         assert!(
@@ -48,7 +49,7 @@ fn setup_build_info_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/setup/build_info/tests.rs").exists(),
+        repo_path_exists(root, "src/setup/build_info/tests.rs"),
         "setup build_info split test module should exist"
     );
 }
@@ -56,7 +57,7 @@ fn setup_build_info_root_stays_prod_only() {
 #[test]
 fn setup_gateway_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let gateway = fs::read_to_string(root.join("src/setup/gateway.rs")).unwrap();
+    let gateway = read_repo_file(root, "src/setup/gateway.rs");
 
     for needle in [
         "fn detect_version_parses_standard_entry()",
@@ -70,7 +71,7 @@ fn setup_gateway_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/setup/gateway/tests.rs").exists(),
+        repo_path_exists(root, "src/setup/gateway/tests.rs"),
         "setup gateway split test module should exist"
     );
 }
@@ -78,7 +79,7 @@ fn setup_gateway_root_stays_prod_only() {
 #[test]
 fn setup_cluster_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let cluster_mod = fs::read_to_string(root.join("src/setup/cluster/mod.rs")).unwrap();
+    let cluster_mod = read_repo_file(root, "src/setup/cluster/mod.rs");
 
     for needle in [
         "fn effective_store_uses_cli_arg_for_up(",
@@ -92,7 +93,7 @@ fn setup_cluster_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/setup/cluster/tests.rs").exists(),
+        repo_path_exists(root, "src/setup/cluster/tests.rs"),
         "setup cluster split test module should exist"
     );
 }
@@ -100,7 +101,7 @@ fn setup_cluster_root_stays_prod_only() {
 #[test]
 fn setup_cluster_kubernetes_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let kubernetes = fs::read_to_string(root.join("src/setup/cluster/kubernetes.rs")).unwrap();
+    let kubernetes = read_repo_file(root, "src/setup/cluster/kubernetes.rs");
 
     for needle in [
         "fn resolve_kds_address(",
@@ -123,7 +124,7 @@ fn setup_cluster_kubernetes_root_stays_a_facade() {
         "src/setup/cluster/kubernetes/runtime.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "setup cluster kubernetes split module should exist: {path}"
         );
     }
@@ -132,7 +133,7 @@ fn setup_cluster_kubernetes_root_stays_a_facade() {
 #[test]
 fn setup_universal_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let universal_mod = fs::read_to_string(root.join("src/setup/cluster/universal.rs")).unwrap();
+    let universal_mod = read_repo_file(root, "src/setup/cluster/universal.rs");
 
     for needle in [
         "fn universal_single_up(",
@@ -150,7 +151,7 @@ fn setup_universal_root_stays_a_facade() {
         "src/setup/cluster/universal/runtime.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "setup universal split module should exist: {path}"
         );
     }
@@ -159,7 +160,7 @@ fn setup_universal_root_stays_a_facade() {
 #[test]
 fn setup_universal_runtime_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let runtime = fs::read_to_string(root.join("src/setup/cluster/universal/runtime.rs")).unwrap();
+    let runtime = read_repo_file(root, "src/setup/cluster/universal/runtime.rs");
 
     for needle in [
         "fn universal_single_up_compose(",
@@ -174,8 +175,7 @@ fn setup_universal_runtime_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/setup/cluster/universal/runtime/compose.rs")
-            .exists(),
+        repo_path_exists(root, "src/setup/cluster/universal/runtime/compose.rs"),
         "setup universal runtime compose split module should exist"
     );
 }

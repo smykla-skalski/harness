@@ -1,5 +1,6 @@
-use std::fs;
 use std::path::Path;
+
+use super::helpers::{collect_hits_in_tree, read_repo_file, repo_path_exists};
 
 #[test]
 fn application_submodules_are_not_public_library_surface() {
@@ -10,7 +11,7 @@ fn application_submodules_are_not_public_library_surface() {
         ("src/create/mod.rs", "pub mod application;"),
         ("src/hooks/mod.rs", "pub mod application;"),
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         assert!(
             !contents.contains(needle),
             "{path} should keep `application` crate-internal instead of exporting `{needle}`"
@@ -21,19 +22,32 @@ fn application_submodules_are_not_public_library_surface() {
         );
     }
 
-    let hooks_root = fs::read_to_string(root.join("src/hooks/mod.rs")).unwrap();
+    let hooks_root = read_repo_file(root, "src/hooks/mod.rs");
     assert!(
         hooks_root.contains("pub use self::application::GuardContext;"),
         "src/hooks/mod.rs should re-export GuardContext as the stable public hook facade"
     );
 
-    let testkit_builders = fs::read_to_string(root.join("testkit/src/builders.rs")).unwrap();
-    assert!(
-        !testkit_builders.contains("harness::hooks::application::GuardContext"),
-        "testkit should not depend on the private hooks::application module"
+    let private_guard_context_hits = collect_hits_in_tree(
+        &root.join("testkit/src/builders"),
+        root,
+        None,
+        &["harness::hooks::application::GuardContext"],
+        |path, needle| format!("{path} still depends on private hook application via `{needle}`"),
     );
     assert!(
-        testkit_builders.contains("harness::hooks::GuardContext"),
+        private_guard_context_hits.is_empty(),
+        "testkit should not depend on the private hooks::application module"
+    );
+    let public_guard_context_hits = collect_hits_in_tree(
+        &root.join("testkit/src/builders"),
+        root,
+        None,
+        &["harness::hooks::GuardContext"],
+        |path, needle| format!("{path} depends on `{needle}`"),
+    );
+    assert!(
+        !public_guard_context_hits.is_empty(),
         "testkit should depend on the public hooks facade for GuardContext"
     );
 }
@@ -46,7 +60,7 @@ fn transport_command_modules_stay_internal_to_domains() {
         ("src/run/mod.rs", "pub mod commands;"),
         ("src/create/mod.rs", "pub mod commands;"),
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         assert!(
             !contents.contains(needle),
             "{path} should keep `commands` crate-internal instead of exporting `{needle}`"
@@ -71,7 +85,7 @@ fn transport_command_modules_stay_internal_to_domains() {
         "tests/integration/preflight.rs",
         "tests/integration/universal.rs",
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         assert!(
             !contents.contains("::commands::"),
             "{path} should depend on domain-root transport exports instead of `::commands::`"
@@ -145,7 +159,7 @@ fn helper_modules_do_not_leak_publicly() {
             "pub(crate) mod registry;",
         ),
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         assert!(
             !contents.contains(public_needle),
             "{path} should not leak helper module `{public_needle}` publicly"
@@ -156,7 +170,7 @@ fn helper_modules_do_not_leak_publicly() {
         );
     }
 
-    let setup_session = fs::read_to_string(root.join("src/setup/session.rs")).unwrap();
+    let setup_session = read_repo_file(root, "src/setup/session.rs");
     assert!(
         !setup_session.contains("crate::hooks::session::SessionStartHookOutput"),
         "src/setup/session.rs should not depend on the private hooks::session module"
@@ -166,7 +180,7 @@ fn helper_modules_do_not_leak_publicly() {
         "src/setup/session.rs should use the public hooks facade for SessionStartHookOutput"
     );
 
-    let hooks_root = fs::read_to_string(root.join("src/hooks/mod.rs")).unwrap();
+    let hooks_root = read_repo_file(root, "src/hooks/mod.rs");
     assert!(
         hooks_root.contains(
             "pub use self::session::{PreCompactHookInput, SessionStartHookInput, SessionStartHookOutput};"
@@ -178,7 +192,7 @@ fn helper_modules_do_not_leak_publicly() {
 #[test]
 fn errors_root_stays_a_transport_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let errors_mod = fs::read_to_string(root.join("src/errors/mod.rs")).unwrap();
+    let errors_mod = read_repo_file(root, "src/errors/mod.rs");
 
     for needle in [
         "impl CliErrorKind {",
@@ -208,7 +222,7 @@ fn errors_root_stays_a_transport_facade() {
         "src/errors/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "errors split module should exist: {path}"
         );
     }
@@ -217,7 +231,7 @@ fn errors_root_stays_a_transport_facade() {
 #[test]
 fn errors_cli_kind_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let cli_kind = fs::read_to_string(root.join("src/errors/cli_kind/mod.rs")).unwrap();
+    let cli_kind = read_repo_file(root, "src/errors/cli_kind/mod.rs");
 
     for needle in [
         "pub fn missing_tools(",
@@ -235,7 +249,7 @@ fn errors_cli_kind_root_stays_a_facade() {
 #[test]
 fn errors_run_setup_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let run_setup = fs::read_to_string(root.join("src/errors/run_setup/mod.rs")).unwrap();
+    let run_setup = read_repo_file(root, "src/errors/run_setup/mod.rs");
 
     for needle in [
         "pub fn missing_closeout_artifact(",
@@ -252,7 +266,7 @@ fn errors_run_setup_root_stays_a_facade() {
 #[test]
 fn errors_hook_message_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hook_message = fs::read_to_string(root.join("src/errors/hook_message/mod.rs")).unwrap();
+    let hook_message = read_repo_file(root, "src/errors/hook_message/mod.rs");
 
     for needle in [
         "pub fn write_outside_run(",
@@ -274,7 +288,7 @@ fn kernel_command_intent_root_stays_a_facade() {
         "legacy flat kernel command-intent module should not exist"
     );
     let command_intent_mod =
-        fs::read_to_string(root.join("src/kernel/command_intent/mod.rs")).unwrap();
+        read_repo_file(root, "src/kernel/command_intent/mod.rs");
 
     for needle in [
         "pub struct ParsedCommand {",
@@ -298,7 +312,7 @@ fn kernel_command_intent_root_stays_a_facade() {
         "src/kernel/command_intent/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "kernel command_intent split module should exist: {path}"
         );
     }
@@ -307,7 +321,7 @@ fn kernel_command_intent_root_stays_a_facade() {
 #[test]
 fn hooks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hooks_mod = fs::read_to_string(root.join("src/hooks/mod.rs")).unwrap();
+    let hooks_mod = read_repo_file(root, "src/hooks/mod.rs");
 
     for needle in [
         "pub enum HookType {",
@@ -332,7 +346,7 @@ fn hooks_root_stays_a_facade() {
         "src/hooks/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "hooks split module should exist: {path}"
         );
     }

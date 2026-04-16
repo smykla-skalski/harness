@@ -3,6 +3,7 @@ use std::path::Path;
 
 use super::helpers::{
     assert_file_contains_needles, assert_file_lacks_needles, collect_hits_in_paths, read_repo_file,
+    repo_path_exists,
 };
 
 mod create_boundary;
@@ -86,7 +87,7 @@ fn run_domain_does_not_depend_on_block_registry() {
 #[test]
 fn run_context_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let context_mod = fs::read_to_string(root.join("src/run/context/mod.rs")).unwrap();
+    let context_mod = read_repo_file(root, "src/run/context/mod.rs");
 
     for needle in [
         "pub struct RunLayout",
@@ -114,7 +115,7 @@ fn run_context_root_stays_a_facade() {
         "src/run/context/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "run/context split module should exist: {path}"
         );
     }
@@ -123,7 +124,7 @@ fn run_context_root_stays_a_facade() {
 #[test]
 fn run_application_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let application_mod = fs::read_to_string(root.join("src/run/application/mod.rs")).unwrap();
+    let application_mod = read_repo_file(root, "src/run/application/mod.rs");
 
     for needle in [
         "pub fn current_run_dir()",
@@ -144,7 +145,7 @@ fn run_application_root_stays_a_facade() {
         "src/run/application/managed_services.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "run/application split module should exist: {path}"
         );
     }
@@ -219,7 +220,7 @@ fn run_small_roots_stay_prod_only() {
             "src/run/workflow/persistence/tests.rs",
         ),
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         for needle in needles {
             assert!(
                 !contents.contains(needle),
@@ -227,7 +228,7 @@ fn run_small_roots_stay_prod_only() {
             );
         }
         assert!(
-            root.join(split_path).exists(),
+            repo_path_exists(root, split_path),
             "run split test module should exist: {split_path}"
         );
     }
