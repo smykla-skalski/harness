@@ -78,22 +78,34 @@ extension HarnessMonitorStore {
       _ state: ContentSessionDetailState,
       selectedSessionSummary: SessionSummary?
     ) {
-      if !state.retainPresentedDetailWhenSelectionClears {
-        if retainedSessionDetail != nil {
-          retainedSessionDetail = nil
-          retainedSessionDetailIdentity = nil
-        }
-        if !retainedTimeline.isEmpty {
-          retainedTimeline = []
-        }
-        if retainedTimelineWindow != nil {
-          retainedTimelineWindow = nil
-        }
+      let nextSelectedIdentity = SessionDetailIdentity(state.selectedSessionDetail)
+      let didUpdateSelectedTimeline = applySelectedDetail(state, identity: nextSelectedIdentity)
+
+      if let detail = state.selectedSessionDetail {
+        updateRetainedDetail(
+          with: detail,
+          identity: nextSelectedIdentity,
+          didUpdateSelectedTimeline: didUpdateSelectedTimeline
+        )
+        return
       }
 
-      let nextSelectedIdentity = SessionDetailIdentity(state.selectedSessionDetail)
+      // Fresh detail is not in place. The retained cockpit is kept alive so the
+      // detail scene does not teardown mid-transition; it is only released when
+      // the store marks the detail as non-retainable (e.g. the session was
+      // removed) or the selection returns to the dashboard.
+      let shouldDropRetainedDetail =
+        !state.retainPresentedDetailWhenSelectionClears || selectedSessionSummary == nil
+      if shouldDropRetainedDetail {
+        clearRetainedDetail()
+      }
+    }
+
+    private func applySelectedDetail(
+      _ state: ContentSessionDetailState,
+      identity nextSelectedIdentity: SessionDetailIdentity?
+    ) -> Bool {
       let didUpdateSelectedTimeline = timeline != state.timeline
-      let didUpdateTimelineWindow = timelineWindow != state.timelineWindow
 
       if selectedSessionDetailIdentity != nextSelectedIdentity {
         selectedSessionDetail = state.selectedSessionDetail
@@ -102,40 +114,43 @@ extension HarnessMonitorStore {
       if didUpdateSelectedTimeline {
         timeline = state.timeline
       }
-      if didUpdateTimelineWindow {
+      if timelineWindow != state.timelineWindow {
         timelineWindow = state.timelineWindow
       }
       if isTimelineLoading != state.isTimelineLoading {
         isTimelineLoading = state.isTimelineLoading
       }
+      return didUpdateSelectedTimeline
+    }
 
-      if let detail = state.selectedSessionDetail {
-        let didUpdateRetainedIdentity = retainedSessionDetailIdentity != nextSelectedIdentity
-        if didUpdateRetainedIdentity {
-          retainedSessionDetail = detail
-          retainedSessionDetailIdentity = nextSelectedIdentity
-        }
-        if didUpdateRetainedIdentity || didUpdateSelectedTimeline {
-          retainedTimeline = timeline
-        }
-        if retainedTimelineWindow != timelineWindow {
-          retainedTimelineWindow = timelineWindow
-        }
-        return
+    private func updateRetainedDetail(
+      with detail: SessionDetail,
+      identity nextSelectedIdentity: SessionDetailIdentity?,
+      didUpdateSelectedTimeline: Bool
+    ) {
+      let didUpdateRetainedIdentity = retainedSessionDetailIdentity != nextSelectedIdentity
+      if didUpdateRetainedIdentity {
+        retainedSessionDetail = detail
+        retainedSessionDetailIdentity = nextSelectedIdentity
       }
+      if didUpdateRetainedIdentity || didUpdateSelectedTimeline {
+        retainedTimeline = timeline
+      }
+      if retainedTimelineWindow != timelineWindow {
+        retainedTimelineWindow = timelineWindow
+      }
+    }
 
-      guard retainedSessionDetail?.session.sessionId == selectedSessionSummary?.sessionId else {
-        if retainedSessionDetail != nil {
-          retainedSessionDetail = nil
-          retainedSessionDetailIdentity = nil
-        }
-        if !retainedTimeline.isEmpty {
-          retainedTimeline = []
-        }
-        if retainedTimelineWindow != nil {
-          retainedTimelineWindow = nil
-        }
-        return
+    private func clearRetainedDetail() {
+      if retainedSessionDetail != nil {
+        retainedSessionDetail = nil
+        retainedSessionDetailIdentity = nil
+      }
+      if !retainedTimeline.isEmpty {
+        retainedTimeline = []
+      }
+      if retainedTimelineWindow != nil {
+        retainedTimelineWindow = nil
       }
     }
   }
