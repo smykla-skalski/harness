@@ -64,6 +64,35 @@ fn parse_session_start() {
 }
 
 #[test]
+fn parse_session_start_with_policy_preset() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "start",
+        "--context",
+        "test goal",
+        "--runtime",
+        "claude",
+        "--policy-preset",
+        "swarm-default",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command: crate::session::transport::SessionCommand::Start(args),
+        } => {
+            assert_eq!(args.context, "test goal");
+            assert_eq!(
+                args.runtime,
+                Some(crate::hooks::adapters::HookAgent::Claude)
+            );
+            assert_eq!(args.policy_preset.as_deref(), Some("swarm-default"));
+        }
+        _ => panic!("expected Session Start"),
+    }
+}
+
+#[test]
 fn parse_session_join() {
     let cli = Cli::try_parse_from([
         "harness",

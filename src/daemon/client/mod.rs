@@ -7,7 +7,7 @@ mod basic_tests;
 #[cfg(test)]
 mod discovery_tests;
 #[cfg(test)]
-mod test_support;
+pub(crate) mod test_support;
 
 use std::time::Duration;
 
