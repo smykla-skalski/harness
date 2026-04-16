@@ -5,14 +5,14 @@ pub(super) fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusRepo
     loop {
         let retry_reason = match try_daemon_status(home, xdg) {
             Ok(status) => {
-                if let Some(manifest) = status.manifest.as_ref()
-                    && endpoint_is_healthy(&manifest.endpoint, &manifest.token_path)
-                    && session_api_is_ready(home, xdg)
-                {
-                    return status;
+                if let Some(manifest) = status.manifest.as_ref() {
+                    match readiness_issue(&manifest.endpoint, &manifest.token_path) {
+                        None => return status,
+                        Some(issue) => issue,
+                    }
+                } else {
+                    "daemon status did not report a manifest yet".to_string()
                 }
-                "daemon status did not report a healthy manifest with a ready session API yet"
-                    .to_string()
             }
             Err(error) => error,
         };
@@ -129,9 +129,35 @@ fn endpoint_is_healthy(endpoint: &str, token_path: &str) -> bool {
     })
 }
 
-fn session_api_is_ready(home: &Path, xdg: &Path) -> bool {
-    let output = run_harness(home, xdg, &["session", "list", "--json"]);
-    output.status.success()
+fn readiness_issue(endpoint: &str, token_path: &str) -> Option<String> {
+    if !endpoint_is_healthy(endpoint, token_path) {
+        return Some(format!("health endpoint not ready for {endpoint}"));
+    }
+    session_api_issue(endpoint, token_path)
+}
+
+fn session_api_issue(endpoint: &str, token_path: &str) -> Option<String> {
+    let url = format!("{}/v1/sessions", endpoint.trim_end_matches('/'));
+    let Ok(token) = std::fs::read_to_string(token_path) else {
+        return Some(format!("session API token missing at {token_path}"));
+    };
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Some(format!("session API token empty at {token_path}"));
+    }
+    Runtime::new().expect("runtime").block_on(async {
+        match reqwest::Client::new()
+            .get(&url)
+            .bearer_auth(token)
+            .timeout(DAEMON_HTTP_TIMEOUT)
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => None,
+            Ok(response) => Some(format!("session API returned HTTP {} from {url}", response.status())),
+            Err(error) => Some(format!("session API request failed for {url}: {error}")),
+        }
+    })
 }
 
 pub(super) fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Value) {
