@@ -164,6 +164,14 @@ struct SessionTimelinePresentation {
     "Page \(resolvedCurrentPage + 1) of \(pageCount)"
   }
 
+  func interactivePage(forRequestedPage requestedPage: Int) -> Int {
+    SessionTimelinePagination.clampedPage(
+      requestedPage,
+      itemCount: totalCount,
+      pageSize: pageSize
+    )
+  }
+
   var showsPagination: Bool {
     pageCount > 1
   }
@@ -206,8 +214,6 @@ struct SessionTimelinePresentation {
 
 struct SessionTimelineContentIdentity: Hashable, Sendable {
   let sessionID: String
-  let pageSize: Int
-  let currentPage: Int
 }
 
 #Preview("Timeline Summary - Wide") {
