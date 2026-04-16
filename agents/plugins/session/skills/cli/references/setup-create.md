@@ -11,20 +11,21 @@
 | `setup gateway` | Check, install, or uninstall Gateway API CRDs | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` |
 | `setup capabilities` | Emit a structured capabilities/readiness report for planning | `--project-dir`, `--repo-root` |
 
-Sources: `cargo run --quiet -- setup --help`; `src/app/cli.rs:82-94`; `src/setup/bootstrap.rs:16-24`; `src/setup/agents.rs:7-35`; `src/setup/kuma.rs:8-27`; `src/setup/gateway.rs:35-50`; `src/setup/capabilities.rs:22-42`.
+Sources: `cargo run --quiet -- setup --help`; `cargo run --quiet -- setup agents --help`; `src/app/cli.rs:82-94`; `src/setup/bootstrap.rs:16-24`; `src/setup/agents.rs:7-35`; `src/setup/kuma.rs:8-27`; `src/setup/gateway.rs:35-50`; `src/setup/capabilities.rs:22-42`.
 
 ## `setup` key help surface
 
 | Command | Flags / arguments | Notes |
 | --- | --- | --- |
 | `harness setup bootstrap` | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...` | `--agents` defaults to all supported agents; valid values in help include `copilot` |
+| `harness setup agents` | `<COMMAND>`, `--delay <DELAY>` | Direct entrypoint; help currently exposes `generate` |
 | `harness setup agents generate` | `--check`, `--target <TARGET>` | `--target` defaults to `all` |
 | `harness setup kuma` | Subcommand `cluster` | Use `harness setup kuma cluster --help` for lifecycle flags |
 | `harness setup kuma cluster` | `<MODE> <CLUSTER_NAME> [EXTRA_CLUSTER_NAMES]...`, `--platform`, `--provider`, `--repo-root`, `--run-dir`, `--helm-setting`, `--remote`, `--push-prefix`, `--push-tag`, `--namespace`, `--release-name`, `--restart-namespace`, `--store`, `--image`, `--no-build`, `--no-load` | Modes in help: `single-up`, `single-down`, `global-zone-up`, `global-zone-down`, `global-two-zones-up`, `global-two-zones-down` |
 | `harness setup gateway` | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` | `--check-only` and `--uninstall` are mutually exclusive in source |
 | `harness setup capabilities` | `--project-dir`, `--repo-root` | Prints JSON |
 
-Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- setup agents generate --help`; `cargo run --quiet -- setup kuma --help`; `cargo run --quiet -- setup kuma cluster --help`; `cargo run --quiet -- setup gateway --help`; `cargo run --quiet -- setup capabilities --help`; `src/setup/bootstrap.rs:36-54`; `src/setup/gateway.rs:76-142`; `src/setup/capabilities.rs:33-42`.
+Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- setup agents --help`; `cargo run --quiet -- setup agents generate --help`; `cargo run --quiet -- setup kuma --help`; `cargo run --quiet -- setup kuma cluster --help`; `cargo run --quiet -- setup gateway --help`; `cargo run --quiet -- setup capabilities --help`; `src/setup/bootstrap.rs:36-54`; `src/setup/gateway.rs:76-142`; `src/setup/capabilities.rs:33-42`.
 
 ## Canonical `setup` shortcuts
 
