@@ -61,11 +61,7 @@ struct SessionCockpitTimelineSection: View {
   private var showsPagination: Bool { presentation.showsPagination }
 
   private var contentIdentity: SessionTimelineContentIdentity {
-    SessionTimelineContentIdentity(
-      sessionID: sessionID,
-      pageSize: pageSize.rawValue,
-      currentPage: resolvedCurrentPage
-    )
+    SessionTimelineContentIdentity(sessionID: sessionID)
   }
 
   private var pageChangeAnimation: Animation? {
@@ -188,11 +184,7 @@ struct SessionCockpitTimelineSection: View {
   }
 
   private func changePage(to page: Int) {
-    let clampedPage = SessionTimelinePagination.clampedPage(
-      page,
-      itemCount: timeline.count,
-      pageSize: pageSize.rawValue
-    )
+    let clampedPage = presentation.interactivePage(forRequestedPage: page)
     guard clampedPage != currentPage else {
       return
     }
@@ -216,11 +208,7 @@ struct SessionCockpitTimelineSection: View {
   }
 
   private func requestVisiblePageIfNeeded(page: Int) {
-    let targetPage = SessionTimelinePagination.clampedPage(
-      page,
-      itemCount: presentation.totalCount,
-      pageSize: pageSize.rawValue
-    )
+    let targetPage = presentation.interactivePage(forRequestedPage: page)
     guard targetPage >= 0 else {
       return
     }
