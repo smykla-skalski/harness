@@ -131,6 +131,20 @@ struct SessionTimelinePaginationTests {
     #expect(presentation.placeholderCount == 10)
   }
 
+  @Test("Presentation keeps requested page changes when only the first window is loaded")
+  func presentationKeepsRequestedPageChangesWhenOnlyFirstWindowIsLoaded() {
+    let presentation = SessionTimelinePresentation(
+      timeline: makeTimelineEntries(count: 10),
+      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    #expect(presentation.interactivePage(forRequestedPage: 1) == 1)
+    #expect(presentation.interactivePage(forRequestedPage: 9) == 4)
+  }
+
   @Test("Presentation fills only the unresolved slots with placeholders")
   func presentationFillsOnlyUnresolvedSlotsWithPlaceholders() {
     let timeline = makeTimelineEntries(count: 10)
@@ -228,17 +242,21 @@ struct SessionTimelinePaginationTests {
   @Test("Timeline content identity changes when the selected session changes")
   func timelineContentIdentityChangesWhenSessionChanges() {
     let primary = SessionTimelineContentIdentity(
-      sessionID: "sess-primary",
-      pageSize: SessionTimelinePageSize.defaultSize.rawValue,
-      currentPage: 0
+      sessionID: "sess-primary"
     )
     let secondary = SessionTimelineContentIdentity(
-      sessionID: "sess-secondary",
-      pageSize: SessionTimelinePageSize.defaultSize.rawValue,
-      currentPage: 0
+      sessionID: "sess-secondary"
     )
 
     #expect(primary != secondary)
+  }
+
+  @Test("Timeline content identity stays stable across pagination changes")
+  func timelineContentIdentityStaysStableAcrossPaginationChanges() {
+    let firstPage = SessionTimelineContentIdentity(sessionID: "sess-primary")
+    let laterPage = SessionTimelineContentIdentity(sessionID: "sess-primary")
+
+    #expect(firstPage == laterPage)
   }
 
   private func makeTimelineEntries(count: Int) -> [TimelineEntry] {
