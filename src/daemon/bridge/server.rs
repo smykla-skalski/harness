@@ -11,10 +11,12 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::bridge_state::{write_bridge_config, write_bridge_state};
-use super::client::{BridgeGetRequest, BridgeInputRequest, BridgeResizeRequest};
+use super::client::{
+    BridgeAttachRequest, BridgeGetRequest, BridgeInputRequest, BridgeResizeRequest,
+};
 use super::core::{
-    BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest,
-    BridgeResponse, ResolvedBridgeConfig,
+    BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope, BridgeHandleResult, BridgeReconfigureSpec,
+    BridgeRequest, BridgeResponse, ResolvedBridgeConfig,
 };
 use super::helpers::{parse_bridge_payload, resolve_bridge_config, uptime_from_started_at};
 use super::types::{
@@ -81,30 +83,30 @@ impl BridgeServer {
         })
     }
 
-    pub(super) fn handle(self: &Arc<Self>, envelope: BridgeEnvelope) -> BridgeResponse {
+    pub(super) fn handle(self: &Arc<Self>, envelope: BridgeEnvelope) -> BridgeHandleResult {
         if envelope.token != self.token {
             let error = CliError::from(CliErrorKind::workflow_io("bridge token mismatch"));
-            return BridgeResponse::error(&error);
+            return BridgeResponse::error(&error).into();
         }
         match self.handle_authorized(envelope.request) {
             Ok(response) => response,
-            Err(error) => BridgeResponse::error(&error),
+            Err(error) => BridgeResponse::error(&error).into(),
         }
     }
 
     pub(super) fn handle_authorized(
         self: &Arc<Self>,
         request: BridgeRequest,
-    ) -> Result<BridgeResponse, CliError> {
+    ) -> Result<BridgeHandleResult, CliError> {
         match request {
-            BridgeRequest::Status => BridgeResponse::ok_payload(&self.status_report()?),
+            BridgeRequest::Status => Ok(BridgeResponse::ok_payload(&self.status_report()?)?.into()),
             BridgeRequest::Shutdown => {
                 self.shutdown.store(true, Ordering::SeqCst);
-                Ok(BridgeResponse::empty_ok())
+                Ok(BridgeResponse::empty_ok().into())
             }
             BridgeRequest::Reconfigure { request } => {
                 let report = self.reconfigure(&request)?;
-                BridgeResponse::ok_payload(&report)
+                Ok(BridgeResponse::ok_payload(&report)?.into())
             }
             BridgeRequest::Capability {
                 capability,
@@ -180,7 +182,7 @@ impl BridgeServer {
         capability: &str,
         action: &str,
         payload: Value,
-    ) -> Result<BridgeResponse, CliError> {
+    ) -> Result<BridgeHandleResult, CliError> {
         match capability {
             BRIDGE_CAPABILITY_AGENT_TUI => self.handle_agent_tui(action, payload),
             BRIDGE_CAPABILITY_CODEX => Err(CliErrorKind::workflow_parse(format!(
@@ -198,36 +200,45 @@ impl BridgeServer {
         &self,
         action: &str,
         payload: Value,
-    ) -> Result<BridgeResponse, CliError> {
+    ) -> Result<BridgeHandleResult, CliError> {
         match action {
             "start" => {
                 let spec: AgentTuiStartSpec = parse_bridge_payload(payload)?;
                 let snapshot = self.start_agent_tui(spec)?;
-                BridgeResponse::ok_payload(&snapshot)
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
+            }
+            "attach" => {
+                let request: BridgeAttachRequest = parse_bridge_payload(payload)?;
+                let (process, rx) = self.attach_agent_tui(&request.tui_id)?;
+                Ok(BridgeHandleResult::AttachStream(
+                    BridgeResponse::empty_ok(),
+                    process,
+                    rx,
+                ))
             }
             "get" => {
                 let request: BridgeGetRequest = parse_bridge_payload(payload)?;
                 let snapshot = self.get_agent_tui(&request.tui_id)?;
-                BridgeResponse::ok_payload(&snapshot)
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }
             "input" => {
                 let request: BridgeInputRequest = parse_bridge_payload(payload)?;
                 let process = self.active_tui(&request.tui_id)?.process;
                 process.send_input(&request.request.input)?;
                 let snapshot = self.get_agent_tui(&request.tui_id)?;
-                BridgeResponse::ok_payload(&snapshot)
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }
             "resize" => {
                 let request: BridgeResizeRequest = parse_bridge_payload(payload)?;
                 let process = self.active_tui(&request.tui_id)?.process;
                 process.resize(request.request.size()?)?;
                 let snapshot = self.get_agent_tui(&request.tui_id)?;
-                BridgeResponse::ok_payload(&snapshot)
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }
             "stop" => {
                 let request: BridgeGetRequest = parse_bridge_payload(payload)?;
                 let snapshot = self.stop_agent_tui(&request.tui_id)?;
-                BridgeResponse::ok_payload(&snapshot)
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }
             _ => Err(CliErrorKind::workflow_parse(format!(
                 "unsupported agent-tui bridge action '{action}'"

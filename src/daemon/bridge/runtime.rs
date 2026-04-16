@@ -3,7 +3,7 @@ use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
 use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -20,11 +20,12 @@ use super::bridge_state::{
     resolve_running_bridge, write_bridge_config,
 };
 use super::core::{
-    BridgeAgentTuiMetadata, BridgeCodexMetadata, BridgeCodexProcess, BridgeEnvelope,
-    BridgeResponse, CodexEndpointScheme, ResolvedBridgeConfig,
+    BridgeAgentTuiMetadata, BridgeCodexMetadata, BridgeCodexProcess, CodexEndpointScheme,
+    ResolvedBridgeConfig,
 };
 use super::helpers::{detect_codex_version, remove_if_exists, stringify_metadata_map};
 use super::server::BridgeServer;
+use super::stream_handler::handle_stream;
 use super::types::{
     BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
     CODEX_READY_POLL_INTERVAL, CODEX_READY_PROBE_TIMEOUT, CODEX_READY_TIMEOUT,
@@ -115,7 +116,7 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
 
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => handle_stream(&server, stream)?,
+            Ok(stream) => handle_stream(&server, &stream)?,
             Err(error) => {
                 return Err(CliErrorKind::workflow_io(format!(
                     "accept bridge connection: {error}"
@@ -469,34 +470,4 @@ pub(super) fn initial_capabilities(
         );
     }
     capabilities
-}
-
-fn handle_stream(server: &Arc<BridgeServer>, stream: UnixStream) -> Result<(), CliError> {
-    let mut line = String::new();
-    BufReader::new(
-        stream
-            .try_clone()
-            .map_err(|error| CliErrorKind::workflow_io(format!("clone bridge stream: {error}")))?,
-    )
-    .read_line(&mut line)
-    .map_err(|error| CliErrorKind::workflow_io(format!("read bridge request: {error}")))?;
-    let response = match serde_json::from_str::<BridgeEnvelope>(&line) {
-        Ok(envelope) => server.handle(envelope),
-        Err(error) => {
-            let error = CliError::from(CliErrorKind::workflow_parse(format!(
-                "parse bridge request: {error}"
-            )));
-            BridgeResponse::error(&error)
-        }
-    };
-    let payload = serde_json::to_string(&response)
-        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-    let mut writer = stream;
-    writer
-        .write_all(payload.as_bytes())
-        .and_then(|()| writer.write_all(b"\n"))
-        .and_then(|()| writer.flush())
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("write bridge response: {error}")).into()
-        })
 }

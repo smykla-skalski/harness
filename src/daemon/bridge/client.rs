@@ -243,10 +243,83 @@ impl BridgeClient {
             },
         )
     }
+
+    /// Attach to one bridge-managed agent TUI.
+    /// Returns the raw socket for streaming output.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the bridge rejects the request.
+    pub fn agent_tui_attach(&self, tui_id: &str) -> Result<UnixStream, CliError> {
+        let request = BridgeRequest::Capability {
+            capability: BridgeCapability::AgentTui.name().to_string(),
+            action: "attach".to_string(),
+            payload: serde_json::to_value(BridgeAttachRequest {
+                tui_id: tui_id.to_string(),
+            })
+            .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?,
+        };
+        let envelope = BridgeEnvelope {
+            token: self.token.clone(),
+            request,
+        };
+        let payload = serde_json::to_string(&envelope)
+            .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
+        let mut stream = UnixStream::connect(&self.socket_path).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "connect bridge socket {}: {error}",
+                self.socket_path.display()
+            ))
+        })?;
+        stream
+            .write_all(payload.as_bytes())
+            .and_then(|()| stream.write_all(b"\n"))
+            .and_then(|()| stream.flush())
+            .map_err(|error| CliErrorKind::workflow_io(format!("write bridge request: {error}")))?;
+
+        let mut reader = stream
+            .try_clone()
+            .map_err(|error| CliErrorKind::workflow_io(format!("clone bridge stream: {error}")))?;
+        let mut buf = Vec::new();
+        let mut byte = [0u8; 1];
+        loop {
+            use std::io::Read;
+            match reader.read(&mut byte) {
+                Ok(0) => break,
+                Ok(_) => {
+                    let b = byte[0];
+                    buf.push(b);
+                    if b == b'\n' {
+                        break;
+                    }
+                }
+                Err(error) => {
+                    return Err(CliErrorKind::workflow_io(format!(
+                        "read bridge response: {error}"
+                    ))
+                    .into());
+                }
+            }
+        }
+        let line = String::from_utf8(buf).map_err(|error| {
+            CliErrorKind::workflow_parse(format!("parse bridge response: {error}"))
+        })?;
+        let response: BridgeResponse = serde_json::from_str(&line).map_err(|error| {
+            CliErrorKind::workflow_parse(format!("parse bridge response: {error}"))
+        })?;
+        if !response.ok {
+            return Err(bridge_response_error(response));
+        }
+        Ok(stream)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct BridgeGetRequest {
+    pub(super) tui_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAttachRequest {
     pub(super) tui_id: String,
 }
 
