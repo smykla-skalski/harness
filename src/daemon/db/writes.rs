@@ -1,8 +1,9 @@
 use super::{
     AgentRegistration, BTreeMap, CliError, Connection, DaemonDb, DiscoveredProject,
     SessionLogEntry, SessionState, SessionStatus, TaskCheckpoint, WorkItem, daemon_timeline,
-    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope, stored_timeline_entry,
-    u64_from_i64, upsert_session_timeline_entry, utc_now,
+    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope,
+    session_status_db_label, stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry,
+    utc_now,
 };
 
 impl DaemonDb {
@@ -68,6 +69,7 @@ impl DaemonDb {
             .pending_leader_transfer
             .as_ref()
             .and_then(|transfer| serde_json::to_string(transfer).ok());
+        let status = session_status_db_label(state.status)?;
         let is_active = i32::from(state.status == SessionStatus::Active);
 
         let transaction = self
@@ -106,7 +108,7 @@ impl DaemonDb {
                     i64_from_u64(state.state_version),
                     state.title,
                     state.context,
-                    format!("{:?}", state.status).to_lowercase(),
+                    status,
                     state.leader_id,
                     state.observe_id,
                     state.created_at,

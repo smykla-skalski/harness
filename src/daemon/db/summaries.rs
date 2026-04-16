@@ -1,7 +1,7 @@
 use super::{
-    BTreeMap, CliError, DaemonDb, DiscoveredProject, Path, PathBuf, SessionState, SessionStatus,
-    daemon_index, daemon_protocol, db_error, project_context_dir, project_context_id,
-    usize_from_i64,
+    BTreeMap, CliError, DaemonDb, DiscoveredProject, Path, PathBuf, SessionState, daemon_index,
+    daemon_protocol, db_error, parse_session_status_db_label, project_context_dir,
+    project_context_id, usize_from_i64,
 };
 
 impl DaemonDb {
@@ -348,11 +348,7 @@ impl SessionSummaryRow {
     fn into_summary(self) -> daemon_protocol::SessionSummary {
         use daemon_protocol::SessionSummary;
 
-        let status = match self.status.as_str() {
-            "active" => SessionStatus::Active,
-            "paused" => SessionStatus::Paused,
-            _ => SessionStatus::Ended,
-        };
+        let status = parse_session_status_db_label(&self.status);
         let pending_leader_transfer = self
             .pending_leader_transfer_json
             .and_then(|json| serde_json::from_str(&json).ok());
