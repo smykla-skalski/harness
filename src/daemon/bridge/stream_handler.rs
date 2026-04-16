@@ -1,4 +1,5 @@
 use std::io::{BufRead, BufReader, Write as _};
+use std::net::Shutdown;
 use std::os::unix::net::UnixStream;
 use std::sync::Arc;
 use std::thread;
@@ -49,11 +50,20 @@ pub(super) fn handle_stream(
         .and_then(|()| writer.flush())
         .map_err(|error| CliErrorKind::workflow_io(format!("write bridge response: {error}")))?;
 
-    if let Some((process, mut rx)) = stream_info {
+    if let Some((process, attach_state)) = stream_info {
         // Output proxy: Broadcast -> Socket
         let mut output_writer = stream
             .try_clone()
             .map_err(|error| CliErrorKind::workflow_io(format!("clone bridge writer: {error}")))?;
+        if !attach_state.initial_bytes.is_empty() {
+            output_writer
+                .write_all(&attach_state.initial_bytes)
+                .and_then(|()| output_writer.flush())
+                .map_err(|error| {
+                    CliErrorKind::workflow_io(format!("write bridge replay bytes: {error}"))
+                })?;
+        }
+        let mut rx = attach_state.broadcast_rx;
         thread::spawn(move || {
             let Ok(rt) = runtime::Builder::new_current_thread().enable_all().build() else {
                 return;
@@ -72,6 +82,7 @@ pub(super) fn handle_stream(
                         Err(broadcast::error::RecvError::Closed) => break,
                     }
                 }
+                let _ = output_writer.shutdown(Shutdown::Both);
             });
         });
 
@@ -92,6 +103,7 @@ pub(super) fn handle_stream(
                     }
                 }
             }
+            let _ = input_reader.shutdown(Shutdown::Both);
         });
     }
 

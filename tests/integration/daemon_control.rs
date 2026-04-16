@@ -21,6 +21,7 @@ mod daemon_api;
 mod lifecycle;
 mod process;
 mod tui;
+mod tui_attach;
 
 use daemon_api::*;
 use process::*;
