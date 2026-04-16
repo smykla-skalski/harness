@@ -1,5 +1,41 @@
 use super::*;
 
+/// Minimal `projects` + `sessions` DDL that the v6 -> v7 migration expects to
+/// exist before it can seed the timeline ledger.
+const PROJECTS_AND_SESSIONS_V6_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS projects (
+        project_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        project_dir TEXT,
+        repository_root TEXT,
+        checkout_id TEXT NOT NULL,
+        checkout_name TEXT NOT NULL,
+        context_root TEXT NOT NULL UNIQUE,
+        is_worktree INTEGER NOT NULL DEFAULT 0,
+        worktree_name TEXT,
+        origin_json TEXT,
+        discovered_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    ) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS sessions (
+        session_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        schema_version INTEGER NOT NULL,
+        state_version INTEGER NOT NULL DEFAULT 0,
+        title TEXT NOT NULL DEFAULT '',
+        context TEXT NOT NULL,
+        status TEXT NOT NULL,
+        leader_id TEXT,
+        observe_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_activity_at TEXT,
+        archived_at TEXT,
+        pending_leader_transfer TEXT,
+        metrics_json TEXT NOT NULL DEFAULT '{}',
+        state_json TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1
+    ) WITHOUT ROWID;";
+
 #[test]
 fn open_in_memory_creates_schema() {
     let db = DaemonDb::open_in_memory().expect("open in-memory db");
@@ -36,13 +72,14 @@ fn migrates_v4_schema_to_agent_tuis() {
     let path = tmp.path().join("harness.db");
     {
         let conn = Connection::open(&path).expect("open sqlite");
-        conn.execute_batch(
+        conn.execute_batch(&format!(
             "CREATE TABLE schema_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 ) WITHOUT ROWID;
-                INSERT INTO schema_meta (key, value) VALUES ('version', '4');",
-        )
+                INSERT INTO schema_meta (key, value) VALUES ('version', '4');
+                {PROJECTS_AND_SESSIONS_V6_SCHEMA}"
+        ))
         .expect("seed v4 schema meta");
     }
 
@@ -65,7 +102,7 @@ fn migrates_v5_schema_to_incremental_change_tracking() {
     let path = tmp.path().join("harness.db");
     {
         let conn = Connection::open(&path).expect("open sqlite");
-        conn.execute_batch(
+        conn.execute_batch(&format!(
             "CREATE TABLE schema_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -77,8 +114,9 @@ fn migrates_v5_schema_to_incremental_change_tracking() {
                     updated_at TEXT NOT NULL
                 ) WITHOUT ROWID;
                 INSERT INTO change_tracking (scope, version, updated_at)
-                VALUES ('global', 3, '2026-04-13T12:00:00Z');",
-        )
+                VALUES ('global', 3, '2026-04-13T12:00:00Z');
+                {PROJECTS_AND_SESSIONS_V6_SCHEMA}"
+        ))
         .expect("seed v5 schema");
     }
 
@@ -277,7 +315,7 @@ fn open_migrates_v2_db_and_deduplicates_event_indexes() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let path = tmp.path().join("harness.db");
     let conn = Connection::open(&path).expect("open raw db");
-    conn.execute_batch(
+    conn.execute_batch(&format!(
         "
             CREATE TABLE schema_meta (
                 key   TEXT PRIMARY KEY,
@@ -302,8 +340,10 @@ fn open_migrates_v2_db_and_deduplicates_event_indexes() {
                 kind         TEXT NOT NULL,
                 event_json   TEXT NOT NULL
             );
+
+            {PROJECTS_AND_SESSIONS_V6_SCHEMA}
             ",
-    )
+    ))
     .expect("create v2 schema");
 
     let event = sample_conversation_event(1, "duplicate");

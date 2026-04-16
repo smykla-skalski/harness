@@ -58,6 +58,7 @@ impl DaemonDb {
 
     fn run_migrations(&self) -> Result<(), CliError> {
         let version = self.schema_version()?;
+        let crosses_v7 = matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6");
         let should_reclaim_space = match version.as_str() {
             "1" => {
                 self.conn
@@ -107,6 +108,10 @@ impl DaemonDb {
             }
             _ => false,
         };
+
+        if crosses_v7 {
+            self.backfill_legacy_timelines()?;
+        }
 
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;

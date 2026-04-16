@@ -17,6 +17,7 @@ mod projects;
 mod reconcile;
 mod runtime;
 mod schema;
+mod schema_backfill;
 mod signals;
 mod sync;
 

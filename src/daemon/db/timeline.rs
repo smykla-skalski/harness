@@ -111,6 +111,65 @@ impl DaemonDb {
             &stored_entries,
         )
     }
+
+    /// Rebuild the timeline ledger for every session by replaying legacy sources
+    /// (`session_log`, `conversation_events`, `task_checkpoints`, `signal_index`).
+    ///
+    /// Sessions whose state cannot be parsed are logged and skipped - failing the
+    /// whole backfill because of one bad row would block the migration.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the session list cannot be enumerated.
+    pub(crate) fn backfill_legacy_timelines(&self) -> Result<(), CliError> {
+        for session_id in self.list_backfillable_session_ids()? {
+            self.backfill_session_timeline(&session_id);
+        }
+        Ok(())
+    }
+
+    fn list_backfillable_session_ids(&self) -> Result<Vec<String>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT session_id FROM sessions")
+            .map_err(|error| db_error(format!("prepare backfill session list: {error}")))?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| db_error(format!("query backfill session list: {error}")))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read backfill session list: {error}")))
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn backfill_session_timeline(&self, session_id: &str) {
+        let resolved = match self.resolve_session(session_id) {
+            Ok(Some(resolved)) => resolved,
+            Ok(None) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    "timeline backfill skipped: session could not be resolved"
+                );
+                return;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    %error,
+                    "timeline backfill skipped: session state could not be parsed"
+                );
+                return;
+            }
+        };
+        if let Err(error) = self.rebuild_session_timeline_from_resolved(&resolved) {
+            tracing::warn!(
+                session_id = %session_id,
+                %error,
+                "timeline backfill failed for session; leaving ledger empty"
+            );
+        }
+    }
     #[cfg(test)]
     fn load_session_timeline_state(
         &self,
