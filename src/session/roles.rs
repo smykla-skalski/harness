@@ -37,30 +37,16 @@ const ALL_ACTIONS: &[SessionAction] = &[
 #[must_use]
 pub fn permissions_for(role: SessionRole) -> HashSet<SessionAction> {
     use SessionAction::{
-        AssignTask, CreateTask, ObserveSession, SendSignal, TransferLeader, UpdateTaskStatus,
-        ViewStatus,
+        CreateTask, ObserveSession, SendSignal, TransferLeader, UpdateTaskStatus, ViewStatus,
     };
 
     let actions: &[SessionAction] = match role {
         SessionRole::Leader => ALL_ACTIONS,
         SessionRole::Observer => &[ObserveSession, ViewStatus, CreateTask, TransferLeader],
         SessionRole::Worker => &[CreateTask, UpdateTaskStatus, ObserveSession, ViewStatus],
-        SessionRole::Reviewer => &[
-            CreateTask,
-            AssignTask,
-            UpdateTaskStatus,
-            SendSignal,
-            ObserveSession,
-            ViewStatus,
-        ],
-        SessionRole::Improver => &[
-            CreateTask,
-            UpdateTaskStatus,
-            AssignTask,
-            SendSignal,
-            ObserveSession,
-            ViewStatus,
-        ],
+        SessionRole::Reviewer | SessionRole::Improver => {
+            &[CreateTask, UpdateTaskStatus, SendSignal, ObserveSession, ViewStatus]
+        }
     };
     actions.iter().copied().collect()
 }
@@ -113,16 +99,16 @@ mod tests {
     }
 
     #[test]
-    fn reviewer_can_assign_tasks() {
-        assert!(is_permitted(
+    fn reviewer_cannot_assign_tasks() {
+        assert!(!is_permitted(
             SessionRole::Reviewer,
             SessionAction::AssignTask
         ));
     }
 
     #[test]
-    fn improver_can_assign_tasks() {
-        assert!(is_permitted(
+    fn improver_cannot_assign_tasks() {
+        assert!(!is_permitted(
             SessionRole::Improver,
             SessionAction::AssignTask
         ));

@@ -149,6 +149,7 @@ pub(super) fn sample_work_item(
         notes: vec![],
         suggested_fix: None,
         source: TaskSource::Manual,
+        observe_issue_id: None,
         blocked_reason: None,
         completed_at: None,
         checkpoint_summary: None,

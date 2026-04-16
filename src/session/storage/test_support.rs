@@ -52,6 +52,7 @@ pub(super) fn sample_state(session_id: &str) -> SessionState {
                 notes: Vec::new(),
                 suggested_fix: None,
                 source: TaskSource::Manual,
+                observe_issue_id: None,
                 blocked_reason: None,
                 completed_at: None,
                 checkpoint_summary: None,

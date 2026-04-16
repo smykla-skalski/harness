@@ -124,6 +124,113 @@ fn assign_task_requires_active_assignee() {
 }
 
 #[test]
+fn improver_cannot_assign_tasks_under_swarm_contract() {
+    with_temp_project(|project| {
+        let state = start_session_with_policy(
+            "assignment rules",
+            "",
+            project,
+            Some("claude"),
+            Some("assign-rules"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.clone().expect("leader");
+
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("improver"), || {
+            join_session(
+                "assign-rules",
+                SessionRole::Improver,
+                "codex",
+                &[],
+                Some("Improver"),
+                project,
+                None,
+            )
+            .expect("join improver")
+        });
+        let improver_id = joined
+            .agents
+            .keys()
+            .find(|id| id.starts_with("codex-"))
+            .expect("improver id")
+            .to_string();
+        let task = create_task(
+            "assign-rules",
+            "task",
+            None,
+            TaskSeverity::Medium,
+            &leader_id,
+            project,
+        )
+        .expect("task");
+
+        let error = assign_task(
+            "assign-rules",
+            &task.task_id,
+            &improver_id,
+            &improver_id,
+            project,
+        )
+        .expect_err("improver should not assign");
+        assert_eq!(error.code(), "KSRCLI091");
+    });
+}
+
+#[test]
+fn leader_cannot_assign_task_to_observer() {
+    with_temp_project(|project| {
+        let state = start_session_with_policy(
+            "assignment rules",
+            "",
+            project,
+            Some("claude"),
+            Some("observer-assignee"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.clone().expect("leader");
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("observer"), || {
+            join_session(
+                "observer-assignee",
+                SessionRole::Observer,
+                "codex",
+                &[],
+                Some("Observer"),
+                project,
+                None,
+            )
+            .expect("join observer")
+        });
+        let observer_id = joined
+            .agents
+            .keys()
+            .find(|id| id.starts_with("codex-"))
+            .expect("observer id")
+            .to_string();
+        let task = create_task(
+            "observer-assignee",
+            "task",
+            None,
+            TaskSeverity::Medium,
+            &leader_id,
+            project,
+        )
+        .expect("task");
+
+        let error = assign_task(
+            "observer-assignee",
+            &task.task_id,
+            &observer_id,
+            &leader_id,
+            project,
+        )
+        .expect_err("observer should be rejected");
+        assert_eq!(error.code(), "KSRCLI092");
+    });
+}
+
+#[test]
 fn transfer_leader_requires_active_target() {
     with_temp_project(|project| {
         let state =
