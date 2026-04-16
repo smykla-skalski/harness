@@ -173,7 +173,8 @@ struct HarnessMonitorStoreNavigationTests {
   @Test("Launching the isolated host does not emit FocusedValue startup warnings")
   func launchDoesNotEmitFocusedValueWarning() async throws {
     let dataHome = FileManager.default.temporaryDirectory
-      .appendingPathComponent("HarnessMonitorFocusedValueLaunch-\(UUID().uuidString)", isDirectory: true)
+      .appendingPathComponent(
+        "HarnessMonitorFocusedValueLaunch-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: dataHome, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dataHome) }
 
@@ -282,7 +283,8 @@ struct HarnessMonitorStoreNavigationTests {
       .bundleURL
       .deletingLastPathComponent()
 
-    let executableURL = builtProductsDir
+    let executableURL =
+      builtProductsDir
       .appendingPathComponent("Harness Monitor UI Testing.app", isDirectory: true)
       .appendingPathComponent("Contents/MacOS", isDirectory: true)
       .appendingPathComponent("Harness Monitor UI Testing", isDirectory: false)
@@ -364,14 +366,16 @@ struct HarnessMonitorStoreNavigationTests {
   private func capturedFocusedValueWarnings(from logStream: LogStreamCapture) -> [String] {
     terminate(logStream.process)
 
-    let output = String(
-      decoding: logStream.stdout.fileHandleForReading.readDataToEndOfFile(),
-      as: UTF8.self
-    )
-    let errorOutput = String(
-      decoding: logStream.stderr.fileHandleForReading.readDataToEndOfFile(),
-      as: UTF8.self
-    )
+    let output =
+      String(
+        bytes: logStream.stdout.fileHandleForReading.readDataToEndOfFile(),
+        encoding: .utf8
+      ) ?? ""
+    let errorOutput =
+      String(
+        bytes: logStream.stderr.fileHandleForReading.readDataToEndOfFile(),
+        encoding: .utf8
+      ) ?? ""
 
     return [output, errorOutput]
       .joined(separator: "\n")

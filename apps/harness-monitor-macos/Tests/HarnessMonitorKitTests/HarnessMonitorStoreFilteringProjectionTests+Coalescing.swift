@@ -285,7 +285,7 @@ extension HarnessMonitorStoreProjectionTests {
   @Test("Stale async search results do not overwrite a newer committed projection")
   func staleAsyncSearchResultsDoNotOverwriteNewerProjection() async {
     let store = HarnessMonitorStoreFilteringTestSupport.storeWithStatusFixtures()
-    store.sessionIndex.debugProjectionComputationDelayNanoseconds = 250_000_000
+    store.sessionIndex.debugProjectionDelayNanoseconds = 250_000_000
 
     store.searchText = "active"
 

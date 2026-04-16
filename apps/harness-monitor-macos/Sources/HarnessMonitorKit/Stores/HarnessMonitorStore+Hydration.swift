@@ -200,7 +200,7 @@ extension HarnessMonitorStore {
     let hydrationQueue = await persistedSnapshotHydrationQueue(for: prioritySessions)
     guard !hydrationQueue.isEmpty else { return }
 
-    var batch: [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)] = []
+    var batch: [SessionCacheService.CachedSessionSnapshot] = []
     batch.reserveCapacity(hydrationQueue.count)
 
     for summary in hydrationQueue {
@@ -236,7 +236,7 @@ extension HarnessMonitorStore {
   private func fetchAndApplyHydrationSnapshot(
     using client: any HarnessMonitorClientProtocol,
     summary: SessionSummary,
-    batch: inout [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)]
+    batch: inout [SessionCacheService.CachedSessionSnapshot]
   ) async {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
@@ -277,11 +277,13 @@ extension HarnessMonitorStore {
       let resolvedTimeline = measuredTimeline.value.entries ?? []
       let resolvedTimelineWindow = measuredTimeline.value.metadataOnly
 
-      batch.append((
-        detail: measuredDetail.value,
-        timeline: resolvedTimeline,
-        timelineWindow: resolvedTimelineWindow
-      ))
+      batch.append(
+        SessionCacheService.CachedSessionSnapshot(
+          detail: measuredDetail.value,
+          timeline: resolvedTimeline,
+          timelineWindow: resolvedTimelineWindow
+        )
+      )
 
       if isSelected && needsUpdate {
         applySelectedSessionSnapshot(

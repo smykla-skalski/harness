@@ -39,7 +39,7 @@ extension HarnessMonitorStore {
   }
 
   func cacheSessionDetails(
-    _ entries: [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)],
+    _ entries: [SessionCacheService.CachedSessionSnapshot],
     markViewed: Bool = false
   ) async {
     guard let cacheService, persistenceError == nil else { return }
@@ -54,7 +54,13 @@ extension HarnessMonitorStore {
     markViewed: Bool = false
   ) async {
     await cacheSessionDetails(
-      entries.map { (detail: $0.detail, timeline: $0.timeline, timelineWindow: nil) },
+      entries.map {
+        SessionCacheService.CachedSessionSnapshot(
+          detail: $0.detail,
+          timeline: $0.timeline,
+          timelineWindow: nil
+        )
+      },
       markViewed: markViewed
     )
   }
