@@ -111,6 +111,29 @@ fn start_session_accepts_vibe_and_opencode_as_distinct_runtime_names() {
 }
 
 #[test]
+fn start_session_with_policy_rejects_unknown_preset() {
+    with_temp_project(|project| {
+        let error = start_session_with_policy(
+            "goal",
+            "",
+            project,
+            Some("claude"),
+            Some("unknown-preset"),
+            Some("swarm-future"),
+        )
+        .expect_err("unknown preset should be rejected");
+
+        assert_eq!(error.code(), "KSRCLI092");
+        assert!(
+            error
+                .to_string()
+                .contains("unknown session policy preset 'swarm-future'"),
+            "unexpected error: {error}"
+        );
+    });
+}
+
+#[test]
 fn auto_generated_session_ids_are_unique() {
     with_temp_project(|project| {
         let first = start_session("goal1", "", project, Some("claude"), None).expect("first");

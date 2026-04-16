@@ -244,6 +244,16 @@ pub(crate) fn build_initial_state(
     state
 }
 
+pub(crate) fn validate_policy_preset(policy_preset: Option<&str>) -> Result<(), CliError> {
+    match policy_preset {
+        None | Some("swarm-default") => Ok(()),
+        Some(preset) => Err(CliErrorKind::session_agent_conflict(format!(
+            "unknown session policy preset '{preset}'; supported presets: swarm-default"
+        ))
+        .into()),
+    }
+}
+
 fn policy_for_preset(_policy_preset: Option<&str>) -> SessionPolicy {
     SessionPolicy::default()
 }

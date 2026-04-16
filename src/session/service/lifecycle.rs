@@ -7,7 +7,7 @@ use super::{
     log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
     prepare_remove_agent_leave_signal, protocol, refresh_session, release_agent_tasks,
     require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime, slice,
-    storage, utc_now, write_prepared_leave_signals,
+    storage, utc_now, validate_policy_preset, write_prepared_leave_signals,
 };
 
 /// Start a new orchestration session and register the caller as leader.
@@ -48,6 +48,7 @@ pub fn start_session_with_policy(
         ))
     })?;
     ensure_known_runtime(runtime_name, "session start requires a known runtime")?;
+    validate_policy_preset(policy_preset)?;
 
     if let Some(client) = DaemonClient::try_connect() {
         return client.start_session(&protocol::SessionStartRequest {
