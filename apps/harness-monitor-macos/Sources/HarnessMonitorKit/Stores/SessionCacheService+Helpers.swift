@@ -191,12 +191,22 @@ extension SessionCacheService {
 
   func syncTimelineWindow(
     _ timelineWindow: TimelineWindowResponse?,
+    timelineIsEmpty: Bool,
     on session: CachedSession
   ) {
-    guard let timelineWindow else {
+    if let timelineWindow {
+      session.timelineWindowData = try? Codecs.encoder.encode(timelineWindow.metadataOnly)
       return
     }
-    session.timelineWindowData = try? Codecs.encoder.encode(timelineWindow.metadataOnly)
+    // When the caller omits a window but the timeline it just wrote is empty,
+    // the previously persisted window metadata is stale and would render as
+    // "Showing 0-0 of N" until something else refreshes it. Drop it so reader
+    // views recover without a manual reselect. We cannot trust
+    // `session.timelineEntries` here because SwiftData keeps deleted but
+    // unsaved relationship rows in the array until the next save.
+    if timelineIsEmpty {
+      session.timelineWindowData = nil
+    }
   }
 
   func syncActivity(
