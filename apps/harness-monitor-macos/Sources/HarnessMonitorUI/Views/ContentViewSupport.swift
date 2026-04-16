@@ -17,6 +17,55 @@ enum HarnessMonitorInspectorLayout {
   static let maxWidth: CGFloat = 480
 }
 
+// MARK: - Content status backdrop
+
+private enum ContentStatusBackdropLayout {
+  static let gradientRadius: CGFloat = 380
+  // Navigation buttons (back/forward) + spacing to title
+  static let titleLeadingPadding: CGFloat = 75
+}
+
+struct ContentStatusBackdrop: View {
+  let status: SessionStatus
+  let isStale: Bool
+  let titleLeadingEdge: CGFloat
+
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var color: Color {
+    isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
+  }
+
+  private var tintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.28 : 0.22
+  }
+
+  var body: some View {
+    let radius = ContentStatusBackdropLayout.gradientRadius
+    Circle()
+      .fill(
+        RadialGradient(
+          colors: [
+            color.opacity(tintOpacity),
+            color.opacity(tintOpacity * 0.5),
+            .clear,
+          ],
+          center: .center,
+          startRadius: 0,
+          endRadius: radius
+        )
+      )
+      .frame(width: radius * 2, height: radius * 2)
+      .offset(
+        x: titleLeadingEdge + ContentStatusBackdropLayout.titleLeadingPadding - radius,
+        y: -radius
+      )
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
+}
+
 enum ContentInspectorVisibilitySource {
   case persistedPreference
   case explicitUserPreference
@@ -231,7 +280,11 @@ struct ContentDetailColumn: View {
   let onDetailColumnWidthChange: (CGFloat) -> Void
 
   private var navigationTitleText: String {
-    contentSessionDetail.presentedSessionDetail != nil ? "Cockpit" : "Dashboard"
+    contentSessionDetail.presentedSessionDetail != nil ? "Session Cockpit" : "Dashboard"
+  }
+
+  private var navigationSubtitleText: String? {
+    contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
   }
 
   var body: some View {
@@ -261,6 +314,7 @@ struct ContentDetailColumn: View {
       )
     }
     .navigationTitle(navigationTitleText)
+    .navigationSubtitle(navigationSubtitleText ?? "")
     .onChange(of: selection.inspectorSelection) { _, newValue in
       if newValue != .none, !showInspector {
         setInspectorVisibility(true, .contextualAutoOpen)
