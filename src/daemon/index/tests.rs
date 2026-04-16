@@ -11,6 +11,8 @@ use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::{canonical_checkout_root, project_context_dir};
 
+mod repair_context_root;
+
 fn write_text(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("create parent");

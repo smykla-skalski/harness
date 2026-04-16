@@ -371,15 +371,18 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
 
     let mut saw_sessions_updated = false;
     let mut saw_session_updated = false;
-    while let Ok(event) = receiver.try_recv() {
-        match event.event.as_str() {
-            "sessions_updated" => saw_sessions_updated = true,
-            "session_updated" if event.session_id.as_deref() == Some("sess-tui-exit") => {
-                saw_session_updated = true;
+    wait_until(WAIT_TIMEOUT, || {
+        while let Ok(event) = receiver.try_recv() {
+            match event.event.as_str() {
+                "sessions_updated" => saw_sessions_updated = true,
+                "session_updated" if event.session_id.as_deref() == Some("sess-tui-exit") => {
+                    saw_session_updated = true;
+                }
+                _ => {}
             }
-            _ => {}
         }
-    }
+        saw_sessions_updated && saw_session_updated
+    });
     assert!(saw_sessions_updated, "expected global session refresh");
     assert!(saw_session_updated, "expected scoped session refresh");
 }
