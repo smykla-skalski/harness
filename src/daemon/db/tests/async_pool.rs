@@ -23,7 +23,7 @@ async fn connect_reads_current_schema_version() {
             .expect("async schema version"),
         SCHEMA_VERSION
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
 }
 
 #[tokio::test]
@@ -45,7 +45,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
         async_db.health_counts().await.expect("async health counts"),
         (0, 0, 0)
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
 }
 
 #[tokio::test]
@@ -127,7 +127,48 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
         async_db.health_counts().await.expect("async health counts"),
         (1, 0, 1)
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
+}
+
+#[tokio::test]
+async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    drop(sync_db);
+
+    let conn = Connection::open(&db_path).expect("open sqlite");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS _sqlx_migrations (
+                version BIGINT PRIMARY KEY,
+                description TEXT NOT NULL,
+                installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                success BOOLEAN NOT NULL,
+                checksum BLOB NOT NULL,
+                execution_time BIGINT NOT NULL
+            );",
+    )
+    .expect("create sqlx ledger");
+    conn.execute(
+        "INSERT INTO _sqlx_migrations (
+                version, description, success, checksum, execution_time
+            ) VALUES (?1, ?2, 1, ?3, 0)",
+        rusqlite::params![1_i64, "daemon v7 baseline", vec![0_u8; 48]],
+    )
+    .expect("seed mismatched baseline checksum");
+    drop(conn);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db with existing checksum drift");
+    assert_eq!(
+        async_db
+            .schema_version()
+            .await
+            .expect("async schema version"),
+        SCHEMA_VERSION
+    );
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
 }
 
 #[test]

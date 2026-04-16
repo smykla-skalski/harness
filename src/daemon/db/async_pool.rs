@@ -1,35 +1,17 @@
 use std::time::Duration;
 
-use sqlx::migrate::{Migration, Migrator};
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-use sqlx::{Sqlite, SqlitePool, query, query_as, query_scalar};
+use sqlx::{Sqlite, SqlitePool, query_as};
 
 use super::{
-    BTreeMap, CliError, Connection, DaemonDb, DiscoveredProject, Path, PathBuf, SCHEMA_VERSION,
-    SessionState, daemon_index, daemon_protocol, db_error, usize_from_i64,
+    BTreeMap, CliError, DiscoveredProject, Path, PathBuf, SCHEMA_VERSION, SessionState,
+    async_bootstrap, daemon_index, daemon_protocol, db_error, usize_from_i64,
 };
 
 const ASYNC_DB_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
 const ASYNC_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 const ASYNC_DB_MAX_CONNECTIONS: u32 = 8;
-const TABLE_EXISTS_SQL: &str =
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1";
-const SCHEMA_VERSION_SQL: &str = "SELECT value FROM schema_meta WHERE key = 'version'";
-const SQLX_MIGRATIONS_TABLE_SQL: &str = "
-CREATE TABLE IF NOT EXISTS _sqlx_migrations (
-    version BIGINT PRIMARY KEY,
-    description TEXT NOT NULL,
-    installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    success BOOLEAN NOT NULL,
-    checksum BLOB NOT NULL,
-    execution_time BIGINT NOT NULL
-)";
-const SQLX_MIGRATION_VERSION_EXISTS_SQL: &str =
-    "SELECT COUNT(*) FROM _sqlx_migrations WHERE version = ?1";
-const INSERT_SQLX_MIGRATION_SQL: &str = "
-INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time)
-VALUES (?1, ?2, TRUE, ?3, 0)";
 const HEALTH_COUNTS_SQL: &str = "SELECT
     COUNT(DISTINCT COALESCE(NULLIF(p.repository_root, ''), p.project_dir, p.project_id)) AS project_count,
     COUNT(DISTINCT CASE WHEN p.is_worktree = 1 THEN p.checkout_id END) AS worktree_count,
@@ -90,7 +72,6 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
  FROM sessions s
  JOIN projects p ON p.project_id = s.project_id
  WHERE s.session_id = ?1";
-static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("./src/daemon/db/migrations");
 
 /// Async `SQLx` pool over the canonical daemon `SQLite` database.
 #[derive(Debug)]
@@ -104,7 +85,7 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] when the pool or schema probe cannot be initialized.
     pub(crate) async fn connect(path: &Path) -> Result<Self, CliError> {
-        prepare_legacy_schema(path)?;
+        async_bootstrap::prepare_legacy_schema(path)?;
         let options = SqliteConnectOptions::new()
             .filename(path)
             .create_if_missing(true)
@@ -123,7 +104,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("open async daemon database pool: {error}")))?;
 
         let db = Self { pool };
-        db.ensure_schema().await?;
+        async_bootstrap::ensure_async_schema(db.pool()).await?;
         let version = db.schema_version().await?;
         if version != SCHEMA_VERSION {
             return Err(db_error(format!(
@@ -138,70 +119,12 @@ impl AsyncDaemonDb {
         &self.pool
     }
 
-    async fn ensure_schema(&self) -> Result<(), CliError> {
-        if !self.table_exists("schema_meta").await? {
-            run_daemon_migrator(self.pool()).await?;
-            return Ok(());
-        }
-
-        self.ensure_baseline_migration_recorded().await?;
-        run_daemon_migrator(self.pool()).await
-    }
-
-    async fn ensure_baseline_migration_recorded(&self) -> Result<(), CliError> {
-        if !self.table_exists("_sqlx_migrations").await? {
-            query(SQLX_MIGRATIONS_TABLE_SQL)
-                .execute(self.pool())
-                .await
-                .map_err(|error| db_error(format!("create async migration ledger: {error}")))?;
-        }
-
-        let baseline = baseline_migration()?;
-        if self.migration_exists(baseline.version).await? {
-            return Ok(());
-        }
-
-        query(INSERT_SQLX_MIGRATION_SQL)
-            .bind(baseline.version)
-            .bind(baseline.description.to_string())
-            .bind(baseline.checksum.as_ref().to_vec())
-            .execute(self.pool())
-            .await
-            .map_err(|error| db_error(format!("seed async migration ledger: {error}")))?;
-        Ok(())
-    }
-
-    async fn table_exists(&self, table_name: &str) -> Result<bool, CliError> {
-        query_scalar::<_, i64>(TABLE_EXISTS_SQL)
-            .bind(table_name)
-            .fetch_one(self.pool())
-            .await
-            .map(|count| count > 0)
-            .map_err(|error| db_error(format!("check async table {table_name} existence: {error}")))
-    }
-
-    async fn migration_exists(&self, version: i64) -> Result<bool, CliError> {
-        query_scalar::<_, i64>(SQLX_MIGRATION_VERSION_EXISTS_SQL)
-            .bind(version)
-            .fetch_one(self.pool())
-            .await
-            .map(|count| count > 0)
-            .map_err(|error| {
-                db_error(format!(
-                    "check async migration {version} existence: {error}"
-                ))
-            })
-    }
-
     /// Read the canonical schema version through `SQLx`.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub(crate) async fn schema_version(&self) -> Result<String, CliError> {
-        query_scalar::<_, String>(SCHEMA_VERSION_SQL)
-            .fetch_one(self.pool())
-            .await
-            .map_err(|error| db_error(format!("read async schema version: {error}")))
+        async_bootstrap::read_async_schema_version(self.pool()).await
     }
 
     /// Fast health counts for the daemon health endpoint.
@@ -468,46 +391,4 @@ impl AsyncResolvedSessionRow {
             state,
         })
     }
-}
-
-fn prepare_legacy_schema(path: &Path) -> Result<(), CliError> {
-    if !path.exists() {
-        return Ok(());
-    }
-
-    let conn = Connection::open(path)
-        .map_err(|error| db_error(format!("inspect async daemon database: {error}")))?;
-    if !sync_table_exists(&conn, "schema_meta")? {
-        return Ok(());
-    }
-
-    let version: String = conn
-        .query_row(SCHEMA_VERSION_SQL, [], |row| row.get(0))
-        .map_err(|error| db_error(format!("inspect async schema version: {error}")))?;
-    drop(conn);
-
-    if version != SCHEMA_VERSION {
-        let _ = DaemonDb::open(path)?;
-    }
-    Ok(())
-}
-
-fn sync_table_exists(conn: &Connection, table_name: &str) -> Result<bool, CliError> {
-    conn.query_row(TABLE_EXISTS_SQL, [table_name], |row| row.get::<_, i64>(0))
-        .map(|count| count > 0)
-        .map_err(|error| db_error(format!("check sync table {table_name} existence: {error}")))
-}
-
-fn baseline_migration() -> Result<&'static Migration, CliError> {
-    DAEMON_DB_MIGRATOR
-        .iter()
-        .next()
-        .ok_or_else(|| db_error("missing daemon async baseline migration"))
-}
-
-async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
-    DAEMON_DB_MIGRATOR
-        .run(pool)
-        .await
-        .map_err(|error| db_error(format!("run async daemon migrations: {error}")))
 }
