@@ -25,6 +25,7 @@ use super::helpers::ManagedChild;
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
+mod recovery;
 mod support;
 
 #[test]

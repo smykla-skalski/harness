@@ -81,7 +81,7 @@ pub(crate) fn ensure_session_can_end(state: &SessionState) -> Result<(), CliErro
         matches!(
             task.status,
             TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
-        )
+        ) || (task.status == TaskStatus::Open && task.assigned_to.is_some())
     });
     if active_tasks {
         return Err(CliErrorKind::session_agent_conflict(

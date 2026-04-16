@@ -72,7 +72,7 @@ pub(crate) fn apply_assign_task(
         .get_mut(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
     task.assigned_to = Some(agent_id.to_string());
-    task.status = TaskStatus::InProgress;
+    task.status = TaskStatus::Open;
     task.queue_policy = TaskQueuePolicy::Locked;
     task.queued_at = None;
     task.updated_at = now.to_string();
@@ -82,7 +82,6 @@ pub(crate) fn apply_assign_task(
     if let Some(agent) = state.agents.get_mut(agent_id) {
         agent.current_task_id = Some(task_id.to_string());
         agent.updated_at = now.to_string();
-        agent.last_activity_at = Some(now.to_string());
     }
 
     touch_agent(state, actor_id, now);
