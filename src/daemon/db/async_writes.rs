@@ -319,7 +319,6 @@ impl AsyncDaemonDb {
             self.pool().begin().await.map_err(|error| {
                 db_error(format!("begin async session sync transaction: {error}"))
             })?;
-
         query(UPSERT_SESSION_SQL)
             .bind(&state.session_id)
             .bind(project_id)
