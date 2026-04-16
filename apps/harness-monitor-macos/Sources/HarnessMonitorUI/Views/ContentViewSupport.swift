@@ -190,9 +190,9 @@ struct ContentToolbarAccessibilityMarker: View {
   }
 }
 
-struct ContentCornerOverlayModifier<CornerAnimationContent: View>: ViewModifier {
+struct ContentCornerOverlayModifier<CornerContent: View>: ViewModifier {
   let isPresented: Bool
-  let cornerAnimationContent: CornerAnimationContent
+  let cornerAnimationContent: CornerContent
 
   func body(content: Content) -> some View {
     content

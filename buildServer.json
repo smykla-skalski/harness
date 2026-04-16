@@ -2,8 +2,17 @@
   "name": "xcode build server",
   "version": "1.3.0",
   "bspVersion": "2.2.0",
-  "languages": ["c", "cpp", "objective-c", "objective-cpp", "swift"],
-  "argv": ["/bin/bash", "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh"],
+  "languages": [
+    "c",
+    "cpp",
+    "objective-c",
+    "objective-cpp",
+    "swift"
+  ],
+  "argv": [
+    "/bin/bash",
+    "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh"
+  ],
   "workspace": "apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.xcworkspace",
   "build_root": "tmp/xcode-derived",
   "scheme": "HarnessMonitor",
