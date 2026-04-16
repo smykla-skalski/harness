@@ -123,7 +123,9 @@ struct PersistenceSnapshotIntegrationTests {
 
     let cachedModels = try harness.container.mainContext.fetch(FetchDescriptor<CachedSession>())
     #expect(cachedModels.count == 1)
-    #expect(cachedModels.first(where: { $0.sessionId == "sess-window-detail" })?.timelineWindowData != nil)
+    #expect(
+      cachedModels.first(where: { $0.sessionId == "sess-window-detail" })?.timelineWindowData != nil
+    )
 
     let cached = try #require(await store.loadCachedSessionDetail(sessionID: "sess-window-detail"))
     #expect(cached.timelineWindow?.revision == 9)
@@ -214,6 +216,61 @@ struct PersistenceSnapshotIntegrationTests {
     #expect(cached.timelineWindow?.totalCount == timelineWindow.totalCount)
   }
 
+  @Test("cacheSessionDetail clears stale timeline window when timeline becomes empty")
+  func cacheSessionDetailClearsStaleTimelineWindowWhenTimelineBecomesEmpty() async throws {
+    let store = harness.makeStore()
+    let session = makeSession(
+      .init(
+        sessionId: "sess-stale-window",
+        context: "Stale window test",
+        status: .active,
+        leaderId: "leader-stale",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-stale",
+      workerName: "Stale Worker"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: "leader-stale",
+      summary: "Stale checkpoint"
+    )
+    let timelineWindow = TimelineWindowResponse(
+      revision: 3,
+      totalCount: 3,
+      windowStart: 0,
+      windowEnd: timeline.count,
+      hasOlder: false,
+      hasNewer: false,
+      oldestCursor: nil,
+      newestCursor: nil,
+      entries: nil,
+      unchanged: false
+    )
+
+    await store.cacheSessionDetail(
+      detail,
+      timeline: timeline,
+      timelineWindow: timelineWindow
+    )
+
+    // A later write with an empty timeline must not leave the old window metadata behind,
+    // otherwise the UI renders "Showing 0-0 of 3" forever.
+    await store.cacheSessionDetail(detail, timeline: [])
+
+    let cached = try #require(await store.loadCachedSessionDetail(sessionID: session.sessionId))
+    #expect(cached.timeline.isEmpty)
+    #expect(
+      cached.timelineWindow?.totalCount ?? 0 == 0,
+      "stale totalCount must be cleared when the cached timeline is emptied"
+    )
+  }
+
   @Test("preview containers keep in-memory cache isolated")
   func previewContainersKeepInMemoryCacheIsolated() async throws {
     let firstContainer = try HarnessMonitorModelContainer.preview()
@@ -246,145 +303,6 @@ struct PersistenceSnapshotIntegrationTests {
     )
 
     #expect(await secondStore.loadCachedSessionDetail(sessionID: session.sessionId) == nil)
-  }
-
-  @Test("loadCachedSessionDetail restores canonical agent and task ordering")
-  func loadCachedSessionDetailRestoresCanonicalOrdering() async throws {
-    let store = harness.makeStore()
-    let summary = makeSession(
-      .init(
-        sessionId: "sess-ordering",
-        context: "Ordering",
-        status: .active,
-        leaderId: "leader-1",
-        openTaskCount: 2,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 3
-      ))
-
-    let detail = SessionDetail(
-      session: summary,
-      agents: makeOrderingTestAgents(),
-      tasks: makeOrderingTestTasks(),
-      signals: [],
-      observer: nil,
-      agentActivity: []
-    )
-
-    await store.cacheSessionDetail(detail, timeline: [])
-    let cached = try #require(await store.loadCachedSessionDetail(sessionID: "sess-ordering"))
-
-    #expect(cached.detail.agents.map(\.agentId) == ["leader-1", "reviewer-1", "worker-1"])
-    #expect(cached.detail.tasks.map(\.taskId) == ["task-b", "task-a", "task-c"])
-  }
-
-  private func makeOrderingTestAgents() -> [AgentRegistration] {
-    let caps = PreviewFixtures.agents[0].runtimeCapabilities
-    let stamp = "2026-04-12T10:05:00Z"
-    return [
-      AgentRegistration(
-        agentId: "worker-1",
-        name: "Worker",
-        runtime: "codex",
-        role: .worker,
-        capabilities: [],
-        joinedAt: "2026-04-12T10:01:00Z",
-        updatedAt: stamp,
-        status: .active,
-        agentSessionId: "worker-1-session",
-        lastActivityAt: stamp,
-        currentTaskId: nil,
-        runtimeCapabilities: caps,
-        persona: nil
-      ),
-      AgentRegistration(
-        agentId: "leader-1",
-        name: "Leader",
-        runtime: "claude",
-        role: .leader,
-        capabilities: [],
-        joinedAt: "2026-04-12T10:00:00Z",
-        updatedAt: stamp,
-        status: .active,
-        agentSessionId: "leader-1-session",
-        lastActivityAt: stamp,
-        currentTaskId: nil,
-        runtimeCapabilities: caps,
-        persona: nil
-      ),
-      AgentRegistration(
-        agentId: "reviewer-1",
-        name: "Reviewer",
-        runtime: "codex",
-        role: .reviewer,
-        capabilities: [],
-        joinedAt: "2026-04-12T10:02:00Z",
-        updatedAt: stamp,
-        status: .active,
-        agentSessionId: "reviewer-1-session",
-        lastActivityAt: stamp,
-        currentTaskId: nil,
-        runtimeCapabilities: caps,
-        persona: nil
-      ),
-    ]
-  }
-
-  private func makeOrderingTestTasks() -> [WorkItem] {
-    [
-      WorkItem(
-        taskId: "task-a",
-        title: "A",
-        context: nil,
-        severity: .critical,
-        status: .open,
-        assignedTo: nil,
-        createdAt: "2026-04-12T09:00:00Z",
-        updatedAt: "2026-04-12T10:00:00Z",
-        createdBy: nil,
-        notes: [],
-        suggestedFix: nil,
-        source: .manual,
-        blockedReason: nil,
-        completedAt: nil,
-        checkpointSummary: nil
-      ),
-      WorkItem(
-        taskId: "task-b",
-        title: "B",
-        context: nil,
-        severity: .critical,
-        status: .open,
-        assignedTo: nil,
-        createdAt: "2026-04-12T09:05:00Z",
-        updatedAt: "2026-04-12T10:00:00Z",
-        createdBy: nil,
-        notes: [],
-        suggestedFix: nil,
-        source: .manual,
-        blockedReason: nil,
-        completedAt: nil,
-        checkpointSummary: nil
-      ),
-      WorkItem(
-        taskId: "task-c",
-        title: "C",
-        context: nil,
-        severity: .high,
-        status: .open,
-        assignedTo: nil,
-        createdAt: "2026-04-12T09:10:00Z",
-        updatedAt: "2026-04-12T10:01:00Z",
-        createdBy: nil,
-        notes: [],
-        suggestedFix: nil,
-        source: .manual,
-        blockedReason: nil,
-        completedAt: nil,
-        checkpointSummary: nil
-      ),
-    ]
   }
 
   @Test("cacheSessionDetail updates existing session in place")

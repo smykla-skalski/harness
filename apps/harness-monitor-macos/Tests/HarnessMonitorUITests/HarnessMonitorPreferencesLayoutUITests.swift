@@ -81,7 +81,10 @@ final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(
       separatorSuppressed.waitForExistence(timeout: Self.actionTimeout),
-      "Settings window toolbar separator suppressor must be applied to prevent the seam between toolbar and content"
+      """
+      Settings window toolbar separator suppressor must be applied to prevent the seam between
+      toolbar and content
+      """
     )
     XCTAssertEqual(
       separatorSuppressed.label,

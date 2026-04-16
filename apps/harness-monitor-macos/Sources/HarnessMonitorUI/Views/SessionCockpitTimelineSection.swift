@@ -124,15 +124,23 @@ struct SessionCockpitTimelineSection: View {
         }
         .onChange(of: pageSize) { oldPageSize, newPageSize in
           let rebasedPage = SessionTimelinePagination.rebasedPage(
-              currentPage,
-              itemCount: presentation.totalCount,
-              oldPageSize: oldPageSize.rawValue,
-              newPageSize: newPageSize.rawValue
-            )
+            currentPage,
+            itemCount: presentation.totalCount,
+            oldPageSize: oldPageSize.rawValue,
+            newPageSize: newPageSize.rawValue
+          )
           updateCurrentPageIfNeeded(rebasedPage, animated: true)
           requestVisiblePageIfNeeded(page: rebasedPage)
         }
         .onChange(of: timeline.count) { _, _ in
+          requestVisiblePageIfNeeded(page: resolvedCurrentPage)
+        }
+        .onChange(of: presentation.needsRefresh, initial: true) { _, needsRefresh in
+          // Safety net: if metadata reports entries but the list arrived empty
+          // (stale cache/window survived an entry wipe, daemon responded with
+          // an unchanged revision while we had nothing loaded, etc.) reload
+          // the page so the user never sees a frozen "Showing 0-0 of N" card.
+          guard needsRefresh else { return }
           requestVisiblePageIfNeeded(page: resolvedCurrentPage)
         }
       }
@@ -140,8 +148,7 @@ struct SessionCockpitTimelineSection: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  @ViewBuilder
-  private var placeholderAwareTimelineRows: some View {
+  @ViewBuilder private var placeholderAwareTimelineRows: some View {
     if shouldAnimatePlaceholders {
       TimelineView(.periodic(from: .now, by: 1 / 12)) { context in
         timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.phase(at: context.date))
@@ -322,7 +329,8 @@ private struct SessionCockpitTimelinePlaceholderRow: View {
     .accessibilityHidden(true)
   }
 
-  private func shimmerBar(width: CGFloat, height: CGFloat = 12, opacity: Double = 0.08) -> some View {
+  private func shimmerBar(width: CGFloat, height: CGFloat = 12, opacity: Double = 0.08) -> some View
+  {
     RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
       .fill(.primary.opacity(opacity))
       .frame(width: width, height: height)

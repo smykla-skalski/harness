@@ -46,14 +46,15 @@ private enum PreferencesBackgroundGalleryRecents {
   }
 }
 
-struct PreferencesBackgroundGalleryPrefetchPlan {
+enum PreferencesBackgroundGalleryPrefetchPlan {
+  static let initialLimit = 12
+  static let overscan = 2
+
   static func selections(
     options: [HarnessMonitorBackgroundSelection],
     recentItems: [HarnessMonitorBackgroundSelection],
     selectedBackground: HarnessMonitorBackgroundSelection,
-    visibleIDs: [String],
-    initialLimit: Int,
-    overscan: Int
+    visibleIDs: [String]
   ) -> [HarnessMonitorBackgroundSelection] {
     var plannedSelections: [HarnessMonitorBackgroundSelection] = []
     var seenStorageValues = Set<String>()
@@ -100,8 +101,6 @@ struct PreferencesBackgroundGallery: View {
 
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
-  private static let initialPrefetchLimit = 12
-  private static let prefetchOverscan = 2
   @State private var visibleBackgroundIDs: Set<String> = []
 
   private var isBackdropDisabled: Bool {
@@ -139,9 +138,7 @@ struct PreferencesBackgroundGallery: View {
       options: options,
       recentItems: recentItems,
       selectedBackground: selectedBackground,
-      visibleIDs: Array(visibleBackgroundIDs),
-      initialLimit: Self.initialPrefetchLimit,
-      overscan: Self.prefetchOverscan
+      visibleIDs: Array(visibleBackgroundIDs)
     )
   }
 

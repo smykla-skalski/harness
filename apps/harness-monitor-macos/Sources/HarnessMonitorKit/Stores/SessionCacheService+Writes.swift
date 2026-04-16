@@ -70,7 +70,7 @@ extension SessionCacheService {
     syncTasks(detail.tasks, on: cached, context: context)
     syncSignals(detail.signals, on: cached, context: context)
     syncTimeline(timeline, on: cached, context: context)
-    syncTimelineWindow(timelineWindow, on: cached)
+    syncTimelineWindow(timelineWindow, timelineIsEmpty: timeline.isEmpty, on: cached)
     syncActivity(detail.agentActivity, on: cached, context: context)
     syncObserver(detail.observer, on: cached, context: context)
 
@@ -82,7 +82,7 @@ extension SessionCacheService {
   }
 
   func cacheSessionDetails(
-    _ entries: [(detail: SessionDetail, timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)] ,
+    _ entries: [CachedSessionSnapshot],
     markViewed: Bool = false
   ) async -> WriteResult {
     guard !entries.isEmpty else {
@@ -102,7 +102,10 @@ extension SessionCacheService {
     )
 
     var insertedCount = 0
-    for (detail, timeline, timelineWindow) in entries {
+    for entry in entries {
+      let detail = entry.detail
+      let timeline = entry.timeline
+      let timelineWindow = entry.timelineWindow
       let cached: CachedSession
       if let existing = existingByID[detail.session.sessionId] {
         existing.update(from: detail.session)
@@ -121,7 +124,7 @@ extension SessionCacheService {
       syncTasks(detail.tasks, on: cached, context: context)
       syncSignals(detail.signals, on: cached, context: context)
       syncTimeline(timeline, on: cached, context: context)
-      syncTimelineWindow(timelineWindow, on: cached)
+      syncTimelineWindow(timelineWindow, timelineIsEmpty: timeline.isEmpty, on: cached)
       syncActivity(detail.agentActivity, on: cached, context: context)
       syncObserver(detail.observer, on: cached, context: context)
     }

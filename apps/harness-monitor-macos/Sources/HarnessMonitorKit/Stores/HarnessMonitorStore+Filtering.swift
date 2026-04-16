@@ -29,7 +29,7 @@ extension HarnessMonitorStore {
     @ObservationIgnored var projectionGeneration: UInt64 = 0
     @ObservationIgnored var debugCatalogRebuildCount = 0
     @ObservationIgnored var debugProjectionRebuildCount = 0
-    @ObservationIgnored var debugProjectionComputationDelayNanoseconds: UInt64 = 0
+    @ObservationIgnored var debugProjectionDelayNanoseconds: UInt64 = 0
 
     static let searchRebuildDebounceNanoseconds: UInt64 = 150_000_000
 

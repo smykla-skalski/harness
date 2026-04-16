@@ -99,59 +99,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  // MARK: - Navigation history
-
-  public var canNavigateBack: Bool { !navigationBackStack.isEmpty }
-  public var canNavigateForward: Bool { !navigationForwardStack.isEmpty }
-
-  public func navigateBack() async {
-    guard !navigationBackStack.isEmpty else { return }
-    let destination = navigationBackStack.removeLast()
-    navigationForwardStack.append(selectedSessionID)
-    isNavigatingHistory = true
-    defer { isNavigatingHistory = false }
-    await loadSessionWithoutHistory(destination)
-  }
-
-  public func navigateForward() async {
-    guard !navigationForwardStack.isEmpty else { return }
-    let destination = navigationForwardStack.removeLast()
-    navigationBackStack.append(selectedSessionID)
-    isNavigatingHistory = true
-    defer { isNavigatingHistory = false }
-    await loadSessionWithoutHistory(destination)
-  }
-
-  private func recordNavigation(to sessionID: String?) {
-    guard !isNavigatingHistory else { return }
-    guard selectedSessionID != sessionID else { return }
-    navigationBackStack.append(selectedSessionID)
-    if !navigationForwardStack.isEmpty {
-      navigationForwardStack.removeAll()
-    }
-  }
-
-  private func loadSessionWithoutHistory(_ sessionID: String?) async {
-    selectionTask?.cancel()
-    primeSessionSelection(sessionID)
-
-    guard let sessionID else {
-      selectionTask = nil
-      stopSessionStream()
-      return
-    }
-
-    let task = Task { @MainActor [weak self] in
-      guard let self else { return }
-      await self.performSessionSelection(sessionID: sessionID)
-      if !Task.isCancelled, self.selectedSessionID == sessionID {
-        self.selectionTask = nil
-      }
-    }
-    selectionTask = task
-    await task.value
-  }
-
   // MARK: - Selection
 
   public func primeSessionSelection(_ sessionID: String?) {
@@ -286,7 +233,7 @@ extension HarnessMonitorStore {
     selectedTimelinePageLoadSequence &+= 1
   }
 
-  private func performSessionSelection(sessionID: String) async {
+  func performSessionSelection(sessionID: String) async {
     await applyCachedSessionIfAvailable(sessionID: sessionID)
 
     guard !Task.isCancelled else { return }
@@ -378,8 +325,9 @@ extension HarnessMonitorStore {
         guard self.isCurrentSelectedTimelinePageLoad(token, key: loadKey) else {
           return
         }
+        let detail = error.localizedDescription
         HarnessMonitorLogger.store.warning(
-          "timeline page load failed for \(sessionID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+          "timeline page load failed for \(sessionID, privacy: .public): \(detail, privacy: .public)"
         )
       }
     }
@@ -391,125 +339,6 @@ extension HarnessMonitorStore {
   public func inspect(agentID: String) { inspectorSelection = .agent(agentID) }
   public func inspect(signalID: String) { inspectorSelection = .signal(signalID) }
   public func inspectObserver() { inspectorSelection = .observer }
-
-  public var selectedSessionBookmarkTitle: String {
-    guard isPersistenceAvailable else { return "Bookmarks Unavailable" }
-    guard let sessionID = selectedSessionID else { return "Bookmark Session" }
-    return isBookmarked(sessionId: sessionID) ? "Remove Bookmark" : "Bookmark Session"
-  }
-
-  public func toggleSelectedSessionBookmark() {
-    guard let sessionID = selectedSessionID else { return }
-    let projectID =
-      selectedSession?.session.projectId
-      ?? sessions.first(where: { $0.sessionId == sessionID })?.projectId
-      ?? ""
-    toggleBookmark(sessionId: sessionID, projectId: projectID)
-  }
-
-  public func copySelectedItemID() {
-    let text: String
-    switch inspectorSelection {
-    case .task(let taskID): text = taskID
-    case .agent(let agentID): text = agentID
-    case .signal(let signalID): text = signalID
-    case .observer:
-      text = selectedSession?.observer?.observeId ?? selectedSessionID ?? ""
-    case .none:
-      text = selectedSessionID ?? ""
-    }
-    guard !text.isEmpty else { return }
-    #if canImport(AppKit)
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(text, forType: .string)
-    #endif
-  }
-
-  func synchronizeActionActor() {
-    let agents = selectedSession?.agents ?? []
-    let available = availableActionActors
-    if agents.contains(where: { $0.agentId == actionActorID }) {
-      return
-    }
-    if let leaderID = selectedSession?.session.leaderId,
-      agents.contains(where: { $0.agentId == leaderID })
-    {
-      actionActorID = leaderID
-    } else {
-      actionActorID = available.first?.agentId
-    }
-  }
-
-  func resolvedActionActor() -> String? {
-    let agents = selectedSession?.agents ?? []
-    if let actionActorID, !actionActorID.isEmpty,
-      agents.contains(where: { $0.agentId == actionActorID })
-    {
-      return actionActorID
-    }
-    if let leaderID = selectedSession?.session.leaderId, !leaderID.isEmpty,
-      agents.contains(where: { $0.agentId == leaderID })
-    {
-      return leaderID
-    }
-    return availableActionActors.first?.agentId
-  }
-
-  func beginSessionLoad() -> UInt64 {
-    sessionLoadSequence &+= 1
-    withUISyncBatch {
-      activeSessionLoadRequest = sessionLoadSequence
-      if selectedSession == nil {
-        isSelectionLoading = true
-      }
-    }
-    return sessionLoadSequence
-  }
-
-  @discardableResult
-  func startSessionLoad(
-    using client: any HarnessMonitorClientProtocol,
-    sessionID: String,
-    requestID: UInt64
-  ) -> Task<Void, Never> {
-    cancelSessionLoad()
-    sessionLoadTaskToken &+= 1
-    let token = sessionLoadTaskToken
-    let task = Task { @MainActor [weak self] in
-      guard let self else {
-        return
-      }
-      defer {
-        if self.sessionLoadTaskToken == token {
-          self.sessionLoadTask = nil
-        }
-      }
-      await self.loadSession(using: client, sessionID: sessionID, requestID: requestID)
-      guard !Task.isCancelled else {
-        return
-      }
-      guard self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-        return
-      }
-      self.ensureSelectedSessionStream(using: client, sessionID: sessionID)
-    }
-    sessionLoadTask = task
-    return task
-  }
-
-  private func ensureSelectedSessionStream(
-    using client: any HarnessMonitorClientProtocol,
-    sessionID: String
-  ) {
-    guard selectedSessionID == sessionID else {
-      return
-    }
-    let expectedSubscriptions = Set([sessionID])
-    guard sessionStreamTask == nil || subscribedSessionIDs != expectedSubscriptions else {
-      return
-    }
-    startSessionStream(using: client, sessionID: sessionID)
-  }
 
   func cancelSessionLoad() {
     sessionLoadTask?.cancel()
@@ -552,115 +381,4 @@ extension HarnessMonitorStore {
     }
   }
 
-}
-
-private extension HarnessMonitorStore {
-  func applySelectedTimelinePageResponse(
-    _ response: TimelineWindowResponse,
-    currentRevision: Int64?,
-    selectedSession: SessionDetail
-  ) {
-    let resolvedTimeline: [TimelineEntry]
-    if response.windowStart == 0 || response.revision != currentRevision {
-      resolvedTimeline = response.entries ?? timeline
-    } else if let responseEntries = response.entries {
-      resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
-    } else {
-      resolvedTimeline = timeline
-    }
-    let resolvedTimelineWindow = normalizedTimelineWindow(
-      response.metadataOnly,
-      loadedTimeline: resolvedTimeline
-    )
-
-    withUISyncBatch {
-      timeline = resolvedTimeline
-      timelineWindow = resolvedTimelineWindow
-      isShowingCachedData = false
-    }
-    scheduleCacheWrite { service in
-      await service.cacheSessionDetail(
-        selectedSession,
-        timeline: resolvedTimeline,
-        timelineWindow: resolvedTimelineWindow
-      )
-    }
-  }
-
-  func fetchSelectedTimelinePrefix(
-    using client: any HarnessMonitorClientProtocol,
-    sessionID: String,
-    targetEnd: Int,
-    missingCount: Int,
-    currentRevision: Int64?
-  ) async throws -> TimelineWindowResponse {
-    if let oldestCursor = timelineWindow?.oldestCursor ?? timeline.last.map({
-      TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
-    }) {
-      let olderPrefix = try await Self.measureOperation {
-        try await client.timelineWindow(
-          sessionID: sessionID,
-          request: TimelineWindowRequest(
-            scope: .summary,
-            limit: missingCount,
-            before: oldestCursor
-          )
-        )
-      }
-      recordRequestSuccess()
-
-      if let currentRevision, olderPrefix.value.revision != currentRevision {
-        let refreshedPrefix = try await Self.measureOperation {
-          try await client.timelineWindow(
-            sessionID: sessionID,
-            request: .latest(limit: targetEnd)
-          )
-        }
-        recordRequestSuccess()
-        return refreshedPrefix.value
-      }
-
-      return olderPrefix.value
-    }
-
-    let refreshedPrefix = try await Self.measureOperation {
-      try await client.timelineWindow(
-        sessionID: sessionID,
-        request: .latest(limit: targetEnd)
-      )
-    }
-    recordRequestSuccess()
-    return refreshedPrefix.value
-  }
-
-  func mergeTimelinePrefix(
-    _ existingEntries: [TimelineEntry],
-    olderEntries: [TimelineEntry]
-  ) -> [TimelineEntry] {
-    guard olderEntries.isEmpty == false else {
-      return existingEntries
-    }
-
-    var mergedEntries = existingEntries
-    var existingKeys = Set(existingEntries.map(\.timelineEntryKey))
-    for entry in olderEntries where existingKeys.insert(entry.timelineEntryKey).inserted {
-      mergedEntries.append(entry)
-    }
-    return mergedEntries
-  }
-}
-
-extension HarnessMonitorStore {
-  struct SelectedTimelinePageLoadKey: Equatable {
-    let sessionID: String
-    let targetEnd: Int
-    let pageSize: Int
-    let revision: Int64?
-  }
-}
-
-private extension TimelineEntry {
-  var timelineEntryKey: String {
-    "\(recordedAt)|\(entryId)"
-  }
 }

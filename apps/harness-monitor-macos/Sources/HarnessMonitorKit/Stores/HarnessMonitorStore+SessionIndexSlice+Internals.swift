@@ -124,7 +124,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
 
     let generation = advanceProjectionGeneration()
     let request = projectionComputationInput()
-    let delayNanoseconds = debugProjectionComputationDelayNanoseconds
+    let delayNanoseconds = debugProjectionDelayNanoseconds
 
     projectionComputationTask = Task { @MainActor [weak self] in
       let output = await Task.detached(priority: .userInitiated) {

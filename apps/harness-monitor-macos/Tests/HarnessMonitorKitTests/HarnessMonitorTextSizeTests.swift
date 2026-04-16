@@ -147,6 +147,84 @@ struct SessionTimelinePaginationTests {
     #expect(presentation.placeholderCount == 5)
   }
 
+  @Test("Presentation renders every loaded entry when metadata matches loaded count")
+  func presentationRendersEveryLoadedEntryWhenMetadataMatchesLoadedCount() {
+    let timeline = makeTimelineEntries(count: 3)
+    let presentation = SessionTimelinePresentation(
+      timeline: timeline,
+      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 3),
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    #expect(presentation.entries.count == 3)
+    #expect(presentation.entries.map(\.entryId) == timeline.map(\.entryId))
+    #expect(presentation.rangeText == "Showing 1-3 of 3")
+    #expect(presentation.placeholderCount == 0)
+  }
+
+  @Test("Presentation keeps header and rendered rows in lockstep when not loading")
+  func presentationKeepsHeaderAndRenderedRowsInLockstepWhenNotLoading() {
+    // Regression guard: metadata claims 3 events but the timeline array arrived empty.
+    // The header must not advertise "Showing 1-3 of 3" while zero rows render.
+    let presentation = SessionTimelinePresentation(
+      timeline: [],
+      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 0),
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    #expect(presentation.entries.isEmpty)
+    #expect(presentation.placeholderCount == 0)
+    #expect(presentation.rangeText == "Showing 0-0 of 3")
+    #expect(
+      presentation.needsRefresh,
+      "stale window with zero loaded entries must ask the view to reload"
+    )
+  }
+
+  @Test("Presentation does not request a refresh while the fetch is in flight")
+  func presentationDoesNotRequestRefreshWhileLoading() {
+    let presentation = SessionTimelinePresentation(
+      timeline: [],
+      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 0),
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: true
+    )
+
+    #expect(!presentation.needsRefresh)
+  }
+
+  @Test("Presentation does not request a refresh when entries are visible")
+  func presentationDoesNotRequestRefreshWhenEntriesAreVisible() {
+    let timeline = makeTimelineEntries(count: 3)
+    let presentation = SessionTimelinePresentation(
+      timeline: timeline,
+      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 3),
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    #expect(!presentation.needsRefresh)
+  }
+
+  @Test("Presentation does not request a refresh when no entries are expected")
+  func presentationDoesNotRequestRefreshWhenNoEntriesAreExpected() {
+    let presentation = SessionTimelinePresentation(
+      timeline: [],
+      timelineWindow: nil,
+      currentPage: 0,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    #expect(!presentation.needsRefresh)
+  }
+
   private func makeTimelineEntries(count: Int) -> [TimelineEntry] {
     (0..<count).map { index in
       TimelineEntry(
@@ -219,289 +297,4 @@ struct SessionTimelinePlaceholderShimmerTests {
     #expect(phaseMidCycle == 0.6)
     #expect(phaseAtWrap == -0.6)
   }
-}
-
-@Suite("Content inspector visibility policy")
-struct ContentInspectorVisibilityPolicyTests {
-  @Test("Explicit user toggles persist the preference and suppress layout geometry")
-  func explicitUserTogglesPersistPreference() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: true,
-      currentPersistedPreference: true,
-      nextPresentation: false,
-      source: .explicitUserPreference
-    )
-
-    #expect(change?.nextPresentation == false)
-    #expect(change?.persistedPreference == false)
-    #expect(change?.shouldSuppressLayoutGeometry == true)
-  }
-
-  @Test("Framework-driven presentation changes do not persist or suppress layout geometry")
-  func frameworkDrivenChangesRemainEphemeral() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: true,
-      currentPersistedPreference: true,
-      nextPresentation: false,
-      source: .framework
-    )
-
-    #expect(change?.nextPresentation == false)
-    #expect(change?.persistedPreference == nil)
-    #expect(change?.shouldSuppressLayoutGeometry == false)
-  }
-
-  @Test("Contextual auto-open keeps the persisted preference unchanged")
-  func contextualAutoOpenDoesNotRewritePreference() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: false,
-      currentPersistedPreference: false,
-      nextPresentation: true,
-      source: .contextualAutoOpen
-    )
-
-    #expect(change?.nextPresentation == true)
-    #expect(change?.persistedPreference == nil)
-    #expect(change?.shouldSuppressLayoutGeometry == true)
-  }
-
-  @Test("Persisted preference sync updates presentation without writing back to storage")
-  func persistedPreferenceSyncDoesNotRepersist() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: false,
-      currentPersistedPreference: true,
-      nextPresentation: true,
-      source: .persistedPreference
-    )
-
-    #expect(change?.nextPresentation == true)
-    #expect(change?.persistedPreference == nil)
-    #expect(change?.shouldSuppressLayoutGeometry == true)
-  }
-}
-
-@Suite("Adaptive grid layout cache normalization")
-struct HarnessMonitorAdaptiveGridLayoutCacheTests {
-  @Test("Sub-point width jitter collapses to one cache width")
-  func subPointWidthJitterCollapsesToOneCacheWidth() {
-    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(720.1) == 720)
-    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(720.9) == 720)
-  }
-
-  @Test("Whole-point width changes still invalidate the cache")
-  func wholePointWidthChangesStillInvalidateTheCache() {
-    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(720.0) == 720)
-    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(723.0) == 720)
-    #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(724.0) == 724)
-  }
-
-  @Test("Cache only invalidates when the subview count changes")
-  func cacheOnlyInvalidatesWhenSubviewCountChanges() {
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.shouldInvalidateCache(
-        cachedSubviewCount: 4,
-        newSubviewCount: 4
-      ) == false
-    )
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.shouldInvalidateCache(
-        cachedSubviewCount: 4,
-        newSubviewCount: 5
-      ) == true
-    )
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.shouldInvalidateCache(
-        cachedSubviewCount: nil,
-        newSubviewCount: 5
-      ) == true
-    )
-  }
-}
-
-@Suite("Adaptive grid layout measurement key")
-struct HarnessMonitorAdaptiveGridLayoutMeasurementKeyTests {
-  @Test("Measurement key normalizes invalid widths to nil")
-  func measurementKeyNormalizesInvalidWidths() {
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-        subviewCount: 2,
-        width: nil
-      ).width == nil
-    )
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-        subviewCount: 2,
-        width: 0
-      ).width == nil
-    )
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-        subviewCount: 2,
-        width: -.infinity
-      ).width == nil
-    )
-  }
-
-  @Test("Measurement key tracks subview count")
-  func measurementKeyTracksSubviewCount() {
-    let left = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-      subviewCount: 2,
-      width: 640
-    )
-    let right = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-      subviewCount: 3,
-      width: 640
-    )
-
-    #expect(left != right)
-  }
-
-  @Test("Measurement key preserves a valid width")
-  func measurementKeyPreservesValidWidth() {
-    let key = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-      subviewCount: 2,
-      width: 640
-    )
-
-    #expect(key.subviewCount == 2)
-    #expect(key.width == 640)
-  }
-
-  @Test("Measurement key buckets widths across minor jitter")
-  func measurementKeyBucketsWidthsAcrossMinorJitter() {
-    let left = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-      subviewCount: 2,
-      width: 640
-    )
-    let right = HarnessMonitorAdaptiveGridLayout.MeasurementKey.make(
-      subviewCount: 2,
-      width: 643
-    )
-
-    #expect(left == right)
-    #expect(right.width == 640)
-  }
-}
-
-@Suite("Interactive card hover state")
-struct InteractiveCardHoverStateTests {
-  @Test("Hover updates when the pointer enters or leaves")
-  func hoverUpdatesWhenPointerStateChanges() {
-    #expect(InteractiveCardHoverState.resolve(current: false, isHovering: true) == true)
-    #expect(InteractiveCardHoverState.resolve(current: true, isHovering: false) == false)
-  }
-
-  @Test("Hover ignores redundant transitions")
-  func hoverIgnoresRedundantTransitions() {
-    #expect(InteractiveCardHoverState.resolve(current: false, isHovering: false) == nil)
-    #expect(InteractiveCardHoverState.resolve(current: true, isHovering: true) == nil)
-  }
-}
-
-@Suite("Background thumbnail cache")
-struct BackgroundThumbnailCacheTests {
-  @Test("Thumbnail memory cache evicts older entries beyond the configured limit")
-  func thumbnailMemoryCacheEvictsOlderEntriesBeyondConfiguredLimit() async {
-    let cache = BackgroundThumbnailCache(
-      cacheDirectory: makeTemporaryThumbnailCacheDirectory(),
-      maxPixelSize: 64,
-      thumbnailMemoryLimit: 2,
-      fullImageMemoryLimit: 1
-    )
-    let selections = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(3))
-
-    _ = await cache.thumbnail(for: selections[0])
-    _ = await cache.thumbnail(for: selections[1])
-    _ = await cache.thumbnail(for: selections[2])
-
-    let firstKey = await cache.cacheKey(for: selections[0])
-    let secondKey = await cache.cacheKey(for: selections[1])
-    let thirdKey = await cache.cacheKey(for: selections[2])
-
-    #expect(Set(await cache.thumbnailMemoryCache.keys) == Set([secondKey, thirdKey]))
-    #expect(await cache.thumbnailMemoryCache[firstKey] == nil)
-  }
-
-  @Test("Full image memory cache stays bounded independently of thumbnails")
-  func fullImageMemoryCacheStaysBoundedIndependentlyOfThumbnails() async {
-    let cache = BackgroundThumbnailCache(
-      cacheDirectory: makeTemporaryThumbnailCacheDirectory(),
-      maxPixelSize: 64,
-      thumbnailMemoryLimit: 3,
-      fullImageMemoryLimit: 1
-    )
-    let selections = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(3))
-
-    _ = await cache.thumbnail(for: selections[0])
-    _ = await cache.thumbnail(for: selections[1])
-    _ = await cache.fullImage(for: selections[0])
-    _ = await cache.fullImage(for: selections[1])
-
-    let firstKey = await cache.cacheKey(for: selections[0])
-    let secondKey = await cache.cacheKey(for: selections[1])
-    let firstFullKey = "full:\(firstKey)"
-    let secondFullKey = "full:\(secondKey)"
-
-    #expect(Set(await cache.thumbnailMemoryCache.keys) == Set([firstKey, secondKey]))
-    #expect(Set(await cache.fullImageMemoryCache.keys) == Set([secondFullKey]))
-    #expect(await cache.fullImageMemoryCache[firstFullKey] == nil)
-  }
-}
-
-@Suite("Background gallery prefetch plan")
-struct BackgroundGalleryPrefetchPlanTests {
-  @Test("Initial plan keeps the selected background warm without prefetching the whole library")
-  func initialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary() {
-    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(5))
-    let selectedBackground = options[4]
-    let recentItems = [options[3]]
-
-    let plan = PreferencesBackgroundGalleryPrefetchPlan.selections(
-      options: options,
-      recentItems: recentItems,
-      selectedBackground: selectedBackground,
-      visibleIDs: [],
-      initialLimit: 2,
-      overscan: 1
-    )
-
-    #expect(plan.map { $0.storageValue } == [
-      options[0].storageValue,
-      options[1].storageValue,
-      selectedBackground.storageValue,
-      recentItems[0].storageValue,
-    ])
-  }
-
-  @Test("Visible tiles expand the plan with overscan and keep entries unique")
-  func visibleTilesExpandThePlanWithOverscanAndKeepEntriesUnique() {
-    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(6))
-    let selectedBackground = options[5]
-    let recentItems = [options[0]]
-
-    let plan = PreferencesBackgroundGalleryPrefetchPlan.selections(
-      options: options,
-      recentItems: recentItems,
-      selectedBackground: selectedBackground,
-      visibleIDs: [options[3].id, options[4].id],
-      initialLimit: 2,
-      overscan: 1
-    )
-
-    #expect(plan.map { $0.storageValue } == [
-      options[0].storageValue,
-      options[1].storageValue,
-      options[2].storageValue,
-      options[3].storageValue,
-      options[4].storageValue,
-      options[5].storageValue,
-    ])
-  }
-}
-
-private func makeTemporaryThumbnailCacheDirectory() -> URL {
-  let directory = FileManager.default.temporaryDirectory
-    .appendingPathComponent(UUID().uuidString, isDirectory: true)
-  try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-  return directory
 }

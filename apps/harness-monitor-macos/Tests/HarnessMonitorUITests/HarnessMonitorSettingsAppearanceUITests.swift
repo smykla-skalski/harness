@@ -173,28 +173,12 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
     ]
 
     for expectedSelection in expectedRecentStates {
-      let expectedState = preferencesStateLabel(
-        .appearance(mode: "auto", backdrop: "window", background: expectedSelection.background)
-      )
-      tapBackgroundTile(in: app, key: expectedSelection.background)
-
-      XCTAssertTrue(
-        waitUntil(timeout: Self.fastActionTimeout) {
-          preferencesState.label == expectedState
-        },
-        """
-        Preferences state did not settle after selecting \(expectedSelection.background); got \
-        '\(preferencesState.label)'
-        """
-      )
-      XCTAssertTrue(
-        waitUntil(timeout: Self.fastActionTimeout) {
-          recentState.label == expectedSelection.recent
-        },
-        """
-        Recent backgrounds did not settle after selecting \(expectedSelection.background); got \
-        '\(recentState.label)'
-        """
+      selectBackgroundAndAssertRecentState(
+        background: expectedSelection.background,
+        recent: expectedSelection.recent,
+        in: app,
+        preferencesState: preferencesState,
+        recentState: recentState
       )
     }
 
@@ -210,24 +194,30 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
         "system:imac-blue",
       ]
     ) {
-      XCTAssertTrue(
-        waitUntil(timeout: Self.fastActionTimeout) {
-          preferencesState.label
-            == self.preferencesStateLabel(
-              .appearance(
-                mode: "auto",
-                backdrop: "window",
-                background: background
-              )
-            )
-        },
-        "Preferences state did not settle after selecting \(background); got '\(preferencesState.label)'"
+      let expectedState = preferencesStateLabel(
+        .appearance(
+          mode: "auto",
+          backdrop: "window",
+          background: background
+        )
       )
-      XCTAssertTrue(
-        waitUntil(timeout: Self.fastActionTimeout) {
-          recentState.label == "recent=\(background)|aleutianCloudbreak|blueMarble"
-        },
-        "Recent backgrounds did not include \(background) at the front; got '\(recentState.label)'"
+      assertSettledLabel(
+        of: preferencesState,
+        equals: expectedState,
+        timeout: Self.fastActionTimeout,
+        message: """
+          Preferences state did not settle after selecting \(background); got \
+          '\(preferencesState.label)'
+          """
+      )
+      assertSettledLabel(
+        of: recentState,
+        equals: "recent=\(background)|aleutianCloudbreak|blueMarble",
+        timeout: Self.fastActionTimeout,
+        message: """
+          Recent backgrounds did not include \(background) at the front; got \
+          '\(recentState.label)'
+          """
       )
     }
 
@@ -254,6 +244,51 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
       textSizeOverride: "6",
       expectedTextSize: "Largest",
       expectedControlSize: "large"
+    )
+  }
+
+  private func assertSettledLabel(
+    of element: XCUIElement,
+    equals expectedLabel: String,
+    timeout: TimeInterval,
+    message: String
+  ) {
+    XCTAssertTrue(
+      waitUntil(timeout: timeout) {
+        element.label == expectedLabel
+      },
+      message
+    )
+  }
+
+  private func selectBackgroundAndAssertRecentState(
+    background: String,
+    recent: String,
+    in app: XCUIApplication,
+    preferencesState: XCUIElement,
+    recentState: XCUIElement
+  ) {
+    let expectedState = preferencesStateLabel(
+      .appearance(mode: "auto", backdrop: "window", background: background)
+    )
+    tapBackgroundTile(in: app, key: background)
+    assertSettledLabel(
+      of: preferencesState,
+      equals: expectedState,
+      timeout: Self.fastActionTimeout,
+      message: """
+        Preferences state did not settle after selecting \(background); got \
+        '\(preferencesState.label)'
+        """
+    )
+    assertSettledLabel(
+      of: recentState,
+      equals: recent,
+      timeout: Self.fastActionTimeout,
+      message: """
+        Recent backgrounds did not settle after selecting \(background); got \
+        '\(recentState.label)'
+        """
     )
   }
 }
