@@ -102,7 +102,16 @@ pub(crate) fn apply_join_session(
     now: &str,
     persona: Option<&str>,
 ) -> Result<String, CliError> {
-    require_active(state)?;
+    if !matches!(
+        state.status,
+        SessionStatus::Active | SessionStatus::LeaderlessDegraded
+    ) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "session '{}' is {:?}; joins require an active or leaderless degraded session",
+            state.session_id, state.status
+        ))
+        .into());
+    }
 
     if let Some(existing_id) = find_agent_by_tui_marker(state, capabilities) {
         return Ok(existing_id);
@@ -127,6 +136,10 @@ pub(crate) fn apply_join_session(
             persona: persona.and_then(super::persona::resolve),
         },
     );
+    if role == SessionRole::Leader && state.leader_id.is_none() {
+        state.leader_id = Some(agent_id.clone());
+        state.status = SessionStatus::Active;
+    }
     refresh_session(state, now);
     Ok(agent_id)
 }
@@ -136,24 +149,17 @@ pub(crate) fn resolve_join_role(
     requested_role: SessionRole,
     fallback_role: Option<SessionRole>,
 ) -> Result<SessionRole, CliError> {
-    if requested_role != SessionRole::Leader {
+    if requested_role != SessionRole::Leader || state.leader_id.is_none() {
         return Ok(requested_role);
     }
-
-    if state.leader_id.is_some() {
-        return fallback_role
-            .filter(|role| *role != SessionRole::Leader)
-            .ok_or_else(|| {
-                CliError::from(CliErrorKind::session_agent_conflict(
-                    "leader joins require a non-leader fallback role while a leader is active"
-                        .to_string(),
-                ))
-            });
-    }
-
-    Err(CliError::from(CliErrorKind::session_agent_conflict(
-        "direct leader joins are not supported without the promotion/recovery flow".to_string(),
-    )))
+    fallback_role
+        .filter(|role| *role != SessionRole::Leader)
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(
+                "leader joins require a non-leader fallback role while a leader is active"
+                    .to_string(),
+            ))
+        })
 }
 
 pub(crate) fn prepare_end_session_leave_signals(

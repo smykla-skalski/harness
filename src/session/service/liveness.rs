@@ -1,7 +1,7 @@
 use super::{
     AgentStatus, CliError, LivenessConfig, Path, SessionState, SessionTransition, TaskQueuePolicy,
-    TaskStatus, agent_runtime_session_id, clear_leader_if_matching, clear_pending_leader_transfer,
-    load_state_or_err, refresh_session, require_active, runtime, signal_context_root, storage,
+    TaskStatus, agent_runtime_session_id, clear_pending_leader_transfer, load_state_or_err,
+    promote_or_degrade, refresh_session, require_active, runtime, signal_context_root, storage,
     utc_now,
 };
 
@@ -166,11 +166,14 @@ pub(crate) fn apply_single_transition(
     let old_status = agent.status;
     agent.status = new_status;
     now.clone_into(&mut agent.updated_at);
+    let was_leader = state.leader_id.as_deref() == Some(record.agent_id.as_str());
 
     if new_status == AgentStatus::Disconnected {
         release_agent_tasks(state, &record.agent_id, now);
-        clear_leader_if_matching(state, &record.agent_id);
         clear_pending_leader_transfer(state, &record.agent_id);
+        if was_leader {
+            promote_or_degrade(state, now);
+        }
         result.disconnected.push(record.agent_id.clone());
         tracing::info!(
             agent_id = record.agent_id,
@@ -201,10 +204,13 @@ pub(crate) fn apply_agent_disconnected(
         agent.last_activity_at = Some(now.to_string());
         agent.current_task_id = None;
     }
+    let was_leader = state.leader_id.as_deref() == Some(agent_id);
 
     release_agent_tasks(state, agent_id, now);
-    clear_leader_if_matching(state, agent_id);
     clear_pending_leader_transfer(state, agent_id);
+    if was_leader {
+        promote_or_degrade(state, now);
+    }
     refresh_session(state, now);
     true
 }

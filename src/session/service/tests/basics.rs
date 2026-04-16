@@ -36,6 +36,93 @@ fn join_adds_agent() {
 }
 
 #[test]
+fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
+    with_temp_project(|project| {
+        let state = start_session_with_policy(
+            "swarm contract",
+            "",
+            project,
+            Some("claude"),
+            Some("join-fallback-core"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.clone().expect("leader");
+
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("fallback-candidate"), || {
+            join_session_with_fallback(
+                "join-fallback-core",
+                SessionRole::Leader,
+                Some(SessionRole::Improver),
+                "codex",
+                &["priority:90".into()],
+                Some("fallback candidate"),
+                project,
+                None,
+            )
+        })
+        .expect("join");
+
+        let improver = joined
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("codex agent");
+        assert_eq!(improver.role, SessionRole::Improver);
+        assert_eq!(joined.leader_id.as_deref(), Some(leader_id.as_str()));
+    });
+}
+
+#[test]
+fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
+    with_temp_project(|project| {
+        start_session_with_policy(
+            "swarm contract",
+            "",
+            project,
+            Some("claude"),
+            Some("recover-manual"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        storage::update_state(project, "recover-manual", |state| {
+            let previous_leader = state.leader_id.take().expect("leader");
+            state.status = SessionStatus::LeaderlessDegraded;
+            let leader = state
+                .agents
+                .get_mut(&previous_leader)
+                .expect("leader registration");
+            leader.status = AgentStatus::Disconnected;
+            Ok(())
+        })
+        .expect("degrade session");
+
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("manual-recovery"), || {
+            join_session_with_fallback(
+                "recover-manual",
+                SessionRole::Leader,
+                None,
+                "codex",
+                &["priority:90".into()],
+                Some("Recovered leader"),
+                project,
+                None,
+            )
+        })
+        .expect("recover leader");
+
+        let recovered = joined
+            .leader_id
+            .as_deref()
+            .and_then(|leader_id| joined.agents.get(leader_id))
+            .expect("recovered leader");
+        assert_eq!(joined.status, SessionStatus::Active);
+        assert_eq!(recovered.runtime, "codex");
+        assert_eq!(recovered.role, SessionRole::Leader);
+    });
+}
+
+#[test]
 fn start_session_rejects_duplicate_session_id() {
     with_temp_project(|project| {
         start_session("goal1", "", project, Some("claude"), Some("dup")).expect("first");
