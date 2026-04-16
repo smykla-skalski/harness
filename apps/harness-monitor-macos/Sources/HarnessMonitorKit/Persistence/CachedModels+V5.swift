@@ -384,11 +384,11 @@ extension HarnessMonitorSchemaV5 {
   }
 }
 
-typealias CachedProject = HarnessMonitorSchemaV5.CachedProject
-typealias CachedSession = HarnessMonitorSchemaV5.CachedSession
-typealias CachedAgent = HarnessMonitorSchemaV5.CachedAgent
-typealias CachedWorkItem = HarnessMonitorSchemaV5.CachedWorkItem
-typealias CachedSignalRecord = HarnessMonitorSchemaV5.CachedSignalRecord
-typealias CachedTimelineEntry = HarnessMonitorSchemaV5.CachedTimelineEntry
-typealias CachedObserver = HarnessMonitorSchemaV5.CachedObserver
-typealias CachedAgentActivity = HarnessMonitorSchemaV5.CachedAgentActivity
+typealias CachedProject = HarnessMonitorCurrentSchema.CachedProject
+typealias CachedSession = HarnessMonitorCurrentSchema.CachedSession
+typealias CachedAgent = HarnessMonitorCurrentSchema.CachedAgent
+typealias CachedWorkItem = HarnessMonitorCurrentSchema.CachedWorkItem
+typealias CachedSignalRecord = HarnessMonitorCurrentSchema.CachedSignalRecord
+typealias CachedTimelineEntry = HarnessMonitorCurrentSchema.CachedTimelineEntry
+typealias CachedObserver = HarnessMonitorCurrentSchema.CachedObserver
+typealias CachedAgentActivity = HarnessMonitorCurrentSchema.CachedAgentActivity

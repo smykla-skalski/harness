@@ -71,6 +71,11 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
 
     let schemaVersionLabel = app.staticTexts["Schema Version"].firstMatch
     XCTAssertTrue(schemaVersionLabel.waitForExistence(timeout: 2), "Schema Version not found")
+    let schemaVersionValue = app.staticTexts["5.0.0"].firstMatch
+    XCTAssertTrue(
+      schemaVersionValue.waitForExistence(timeout: 2),
+      "Expected the current schema version value to be visible"
+    )
   }
 
   func testDatabaseStatisticsUseNativeSegmentedControl() throws {
