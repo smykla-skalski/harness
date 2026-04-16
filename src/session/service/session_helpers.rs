@@ -219,6 +219,7 @@ pub(crate) fn build_initial_state(
         title: title.to_string(),
         context: context.to_string(),
         status: SessionStatus::Active,
+        policy: Default::default(),
         created_at: now.to_string(),
         updated_at: now.to_string(),
         agents,

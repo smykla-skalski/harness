@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use super::test_support::{agent_registration, persona, session_state, work_item};
 use super::{
-    AgentStatus, SessionMetrics, SessionState, SessionStatus, TaskCheckpointSummary, TaskNote,
+    AgentStatus, AutoPromotionPolicy, LeaderJoinPolicy, LeaderRecoveryPolicy, SessionMetrics,
+    SessionPolicy, SessionRole, SessionState, SessionStatus, TaskCheckpointSummary, TaskNote,
     TaskQueuePolicy, TaskSeverity, TaskStatus,
 };
 
@@ -38,6 +39,49 @@ fn session_state_without_title_deserializes_with_empty_default() {
     assert_eq!(state.session_id, "old-sess");
     assert_eq!(state.title, "");
     assert_eq!(state.context, "legacy goal");
+}
+
+#[test]
+fn session_state_round_trip_preserves_policy_and_leaderless_degraded_status() {
+    let mut state = session_state(BTreeMap::new(), BTreeMap::new());
+    state.session_id = "swarm-policy".into();
+    state.status = SessionStatus::LeaderlessDegraded;
+    state.policy = SessionPolicy {
+        leader_join: LeaderJoinPolicy {
+            require_explicit_fallback_role: true,
+        },
+        auto_promotion: AutoPromotionPolicy {
+            role_order: vec![
+                SessionRole::Improver,
+                SessionRole::Reviewer,
+                SessionRole::Observer,
+                SessionRole::Worker,
+            ],
+            priority_preset_id: "swarm-default".into(),
+        },
+        degraded_recovery: LeaderRecoveryPolicy {
+            preset_id: Some("swarm-default".into()),
+            manual_recovery_allowed: true,
+        },
+    };
+
+    let json = serde_json::to_string(&state).expect("serialize");
+    let parsed: SessionState = serde_json::from_str(&json).expect("deserialize");
+
+    assert_eq!(parsed.status, SessionStatus::LeaderlessDegraded);
+    assert_eq!(
+        parsed.policy.auto_promotion.role_order,
+        vec![
+            SessionRole::Improver,
+            SessionRole::Reviewer,
+            SessionRole::Observer,
+            SessionRole::Worker,
+        ]
+    );
+    assert_eq!(
+        parsed.policy.degraded_recovery.preset_id.as_deref(),
+        Some("swarm-default")
+    );
 }
 
 #[test]

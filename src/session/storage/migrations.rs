@@ -122,3 +122,26 @@ pub(super) fn migrate_v5_to_v6(mut value: Value) -> Result<Value, CliError> {
     object.insert("schema_version".to_string(), json!(6));
     Ok(value)
 }
+
+pub(super) fn migrate_v6_to_v7(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    object.insert("schema_version".to_string(), json!(7));
+    object.entry("policy".to_string()).or_insert(json!({
+        "leader_join": {
+            "require_explicit_fallback_role": true
+        },
+        "auto_promotion": {
+            "role_order": ["improver", "reviewer", "observer", "worker"],
+            "priority_preset_id": "swarm-default"
+        },
+        "degraded_recovery": {
+            "preset_id": "swarm-default",
+            "manual_recovery_allowed": true
+        }
+    }));
+
+    Ok(value)
+}
