@@ -1,5 +1,6 @@
 # Harness CLI reference
 
-Use this skill to answer `harness` CLI questions from the repo's actual command
-surface. Prefer the reference files in this skill for breadth, then confirm with
-`harness ... --help` when the user needs a flag you have not cited yet.
+Use this skill as the entrypoint for `harness` CLI guidance from the repo's
+actual command surface. Until richer references land here, use
+`harness ... --help` plus repo source to answer command, flag, and recovery-flow
+questions accurately.
