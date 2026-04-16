@@ -88,12 +88,16 @@ extension HarnessMonitorStore {
         || timeline.isEmpty
         || isShowingCachedData
       guard shouldPromoteCachedSnapshot else { return }
+      // Cache is only ever applied here as scaffold for an in-flight live
+      // fetch. The persistence banner must stay hidden so session switches do
+      // not flash a stale-data warning between cache paint and live arrival;
+      // the banner is only raised by the dedicated offline fallback paths.
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: cached.detail,
         timeline: cached.timeline,
         timelineWindow: cached.timelineWindow,
-        showingCachedData: true,
+        showingCachedData: false,
         cancelPendingTimelineRefresh: false
       )
       withUISyncBatch {
