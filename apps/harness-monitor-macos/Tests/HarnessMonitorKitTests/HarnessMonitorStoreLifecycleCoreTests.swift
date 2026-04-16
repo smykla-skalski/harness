@@ -123,6 +123,44 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == ["core"])
   }
 
+  @Test("Session selection keeps cached signals visible when websocket core detail omits extensions")
+  func sessionSelectionKeepsCachedSignalsVisibleWhenWebsocketCoreDetailOmitsExtensions()
+    async throws
+  {
+    let client = RecordingHarnessClient()
+    let coreOnlyDetail = SessionDetail(
+      session: PreviewFixtures.detail.session,
+      agents: PreviewFixtures.detail.agents,
+      tasks: PreviewFixtures.detail.tasks,
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    client.configureSessions(
+      summaries: [PreviewFixtures.summary],
+      detailsByID: [PreviewFixtures.summary.sessionId: coreOnlyDetail],
+      timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
+    )
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContainer: try HarnessMonitorModelContainer.preview()
+    )
+    await store.bootstrap()
+    store.activeTransport = .webSocket
+    await store.cacheSessionDetail(
+      PreviewFixtures.detail,
+      timeline: PreviewFixtures.timeline,
+      markViewed: false
+    )
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == ["core"])
+    #expect(store.selectedSession?.signals == PreviewFixtures.signals)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail?.signals == PreviewFixtures.signals)
+  }
+
   @Test("Session selection keeps full detail scope on HTTP transport")
   func sessionSelectionKeepsFullDetailScopeOnHTTPTransport() async {
     let client = RecordingHarnessClient()

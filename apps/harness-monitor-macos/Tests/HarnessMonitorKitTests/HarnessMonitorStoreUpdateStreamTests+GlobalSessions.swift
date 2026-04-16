@@ -180,52 +180,54 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
-  @Test("Global session snapshot shows a loading cockpit before selected-session fallback refetch")
-  func globalSessionSnapshotShowsLoadingCockpitBeforeSelectedSessionFallbackRefetch() async {
+  @Test(
+    "Global session snapshot keeps the visible cockpit stable while selected-session fallback refetch is pending"
+  )
+  func globalSessionSnapshotKeepsVisibleCockpitStableWhileFallbackRefetchIsPending() async {
     let client = RecordingHarnessClient()
-    let summary = makeSession(
-      .init(
-        sessionId: "sess-selected-fallback-delay",
-        context: "Selected cockpit",
-        status: .active,
-        leaderId: "leader-selected",
-        observeId: nil,
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        activeAgentCount: 1
-      ))
+    let summary = PreviewFixtures.summary
     let updatedSummary = makeUpdatedSession(
       summary,
       context: "Selected cockpit updated by summary push",
       updatedAt: "2026-03-31T12:02:00Z",
       agentCount: 2
     )
-    let initialDetail = makeSessionDetail(
-      summary: summary,
-      workerID: "worker-before",
-      workerName: "Worker Before"
+    let coreOnlyDetail = SessionDetail(
+      session: updatedSummary,
+      agents: PreviewFixtures.detail.agents,
+      tasks: PreviewFixtures.detail.tasks,
+      signals: [],
+      observer: nil,
+      agentActivity: []
     )
 
     client.configureSessions(
       summaries: [summary],
-      detailsByID: [summary.sessionId: initialDetail],
+      detailsByID: [summary.sessionId: PreviewFixtures.detail],
       timelinesBySessionID: [summary.sessionId: PreviewFixtures.timeline]
     )
 
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
     )
+    store.selectedSessionRefreshFallbackDelay = .milliseconds(20)
 
     await store.bootstrap()
+    store.activeTransport = .webSocket
     await store.selectSession(summary.sessionId)
     #expect(store.selectedSession?.session.context == summary.context)
-    #expect(
-      store.selectedSession?.agents.contains(where: { $0.agentId == "worker-before" }) == true
-    )
+    #expect(store.selectedSession?.signals == PreviewFixtures.signals)
+    #expect(store.selectedSession?.agentActivity == PreviewFixtures.agentActivity)
+    #expect(store.timeline == PreviewFixtures.timeline)
 
     let baselineDetailCalls = client.readCallCount(.sessionDetail(summary.sessionId))
-    let baselineTimelineCalls = client.readCallCount(.timeline(summary.sessionId))
+    let baselineTimelineWindowCalls = client.readCallCount(.timelineWindow(summary.sessionId))
+    client.configureSessions(
+      summaries: [updatedSummary],
+      detailsByID: [summary.sessionId: coreOnlyDetail],
+      timelinesBySessionID: [summary.sessionId: PreviewFixtures.timeline]
+    )
+    client.configureTimelineWindowDelay(.milliseconds(250), for: summary.sessionId)
 
     store.applyGlobalPushEvent(
       .sessionsUpdated(
@@ -235,15 +237,25 @@ extension HarnessMonitorStoreUpdateStreamTests {
       )
     )
 
-    try? await Task.sleep(for: .milliseconds(300))
+    try? await Task.sleep(for: .milliseconds(80))
 
     #expect(store.contentUI.session.selectedSessionSummary?.context == updatedSummary.context)
-    #expect(store.selectedSession == nil)
-    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
-    #expect(store.contentUI.sessionDetail.presentedTimeline.isEmpty)
+    #expect(store.selectedSession?.session.context == updatedSummary.context)
+    #expect(store.selectedSession?.signals == PreviewFixtures.signals)
+    #expect(store.selectedSession?.agentActivity == PreviewFixtures.agentActivity)
+    #expect(store.timeline == PreviewFixtures.timeline)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail?.signals == PreviewFixtures.signals)
+    #expect(
+      store.contentUI.sessionDetail.presentedSessionDetail?.agentActivity
+        == PreviewFixtures.agentActivity
+    )
+    #expect(store.contentUI.sessionDetail.presentedTimeline == PreviewFixtures.timeline)
     #expect(store.contentUI.session.isSelectionLoading)
-    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCalls)
-    #expect(client.readCallCount(.timeline(summary.sessionId)) == baselineTimelineCalls)
+    #expect(client.readCallCount(.sessionDetail(summary.sessionId)) == baselineDetailCalls + 1)
+    #expect(
+      client.readCallCount(.timelineWindow(summary.sessionId))
+        == baselineTimelineWindowCalls + 1
+    )
 
     store.stopAllStreams()
   }

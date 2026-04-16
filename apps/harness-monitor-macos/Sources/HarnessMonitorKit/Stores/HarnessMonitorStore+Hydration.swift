@@ -240,18 +240,25 @@ extension HarnessMonitorStore {
   ) async {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
+      let expectsDeferredExtensions = detailScope == "core"
       let measuredDetail = try await Self.measureOperation {
         try await client.sessionDetail(id: summary.sessionId, scope: detailScope)
       }
       recordRequestSuccess()
+      let detail = sessionDetailPreservingSelectedExtensions(
+        sessionID: summary.sessionId,
+        detail: measuredDetail.value,
+        extensionsPending: expectsDeferredExtensions
+      )
       let isSelected = selectedSessionID == summary.sessionId
       let needsUpdate = selectedSession == nil || isShowingCachedData
+      let visibleTimelineSnapshot = visiblePresentedTimelineSnapshot(sessionID: summary.sessionId)
       if isSelected && needsUpdate {
         applySelectedSessionSnapshot(
           sessionID: summary.sessionId,
-          detail: measuredDetail.value,
-          timeline: timeline,
-          timelineWindow: timelineWindow,
+          detail: detail,
+          timeline: visibleTimelineSnapshot?.timeline ?? timeline,
+          timelineWindow: visibleTimelineSnapshot?.timelineWindow ?? timelineWindow,
           showingCachedData: false,
           cancelPendingTimelineRefresh: false
         )
@@ -279,7 +286,7 @@ extension HarnessMonitorStore {
 
       batch.append(
         SessionCacheService.CachedSessionSnapshot(
-          detail: measuredDetail.value,
+          detail: detail,
           timeline: resolvedTimeline,
           timelineWindow: resolvedTimelineWindow
         )
@@ -288,7 +295,7 @@ extension HarnessMonitorStore {
       if isSelected && needsUpdate {
         applySelectedSessionSnapshot(
           sessionID: summary.sessionId,
-          detail: measuredDetail.value,
+          detail: detail,
           timeline: resolvedTimeline,
           timelineWindow: resolvedTimelineWindow,
           showingCachedData: false,
