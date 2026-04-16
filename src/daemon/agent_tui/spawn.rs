@@ -117,10 +117,15 @@ pub(crate) fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Re
 
 /// Build the skill invocation string that the daemon sends as the first PTY
 /// input so the agent auto-joins the session.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "auto-join prompt generation needs to thread join flags explicitly"
+)]
 pub(crate) fn build_auto_join_prompt(
     runtime: &str,
     session_id: &str,
     role: SessionRole,
+    fallback_role: Option<SessionRole>,
     capabilities: &[String],
     tui_id: &str,
     name: Option<&str>,
@@ -145,9 +150,19 @@ pub(crate) fn build_auto_join_prompt(
 
     let name_flag = name.map_or_else(String::new, |value| format!(" --name \"{value}\""));
     let persona_flag = persona.map_or_else(String::new, |value| format!(" --persona \"{value}\""));
+    let fallback_role_flag = fallback_role.map_or_else(String::new, |value| {
+        let value = match value {
+            SessionRole::Leader => "leader",
+            SessionRole::Worker => "worker",
+            SessionRole::Observer => "observer",
+            SessionRole::Reviewer => "reviewer",
+            SessionRole::Improver => "improver",
+        };
+        format!(" --fallback-role {value}")
+    });
 
     format!(
-        "/harness:session:join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{name_flag}{persona_flag}"
+        "/harness:session:join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
     )
 }
 

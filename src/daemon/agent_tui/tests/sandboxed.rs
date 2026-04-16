@@ -146,6 +146,7 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
                     &AgentTuiStartRequest {
                         runtime: "copilot".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: Some("Copilot TUI".into()),
                         prompt: Some("hello".into()),

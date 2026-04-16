@@ -54,6 +54,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
             &crate::daemon::agent_tui::AgentTuiStartRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec![],
                 name: Some("Delayed output".into()),
                 prompt: None,

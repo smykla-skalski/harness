@@ -19,6 +19,10 @@ use super::{
 // ---------------------------------------------------------------------------
 
 /// Build the initial state for a new session (leader + metadata).
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "test helpers build sessions directly")
+)]
 pub(crate) fn build_new_session(
     context: &str,
     title: &str,
@@ -27,6 +31,26 @@ pub(crate) fn build_new_session(
     agent_session_id: Option<&str>,
     now: &str,
 ) -> SessionState {
+    build_new_session_with_policy(
+        context,
+        title,
+        session_id,
+        runtime_name,
+        agent_session_id,
+        now,
+        None,
+    )
+}
+
+pub(crate) fn build_new_session_with_policy(
+    context: &str,
+    title: &str,
+    session_id: &str,
+    runtime_name: &str,
+    agent_session_id: Option<&str>,
+    now: &str,
+    policy_preset: Option<&str>,
+) -> SessionState {
     build_initial_state(
         context,
         title,
@@ -34,6 +58,7 @@ pub(crate) fn build_new_session(
         runtime_name,
         agent_session_id,
         now,
+        policy_preset,
     )
 }
 
@@ -104,6 +129,31 @@ pub(crate) fn apply_join_session(
     );
     refresh_session(state, now);
     Ok(agent_id)
+}
+
+pub(crate) fn resolve_join_role(
+    state: &SessionState,
+    requested_role: SessionRole,
+    fallback_role: Option<SessionRole>,
+) -> Result<SessionRole, CliError> {
+    if requested_role != SessionRole::Leader {
+        return Ok(requested_role);
+    }
+
+    if state.leader_id.is_some() {
+        return fallback_role
+            .filter(|role| *role != SessionRole::Leader)
+            .ok_or_else(|| {
+                CliError::from(CliErrorKind::session_agent_conflict(
+                    "leader joins require a non-leader fallback role while a leader is active"
+                        .to_string(),
+                ))
+            });
+    }
+
+    Err(CliError::from(CliErrorKind::session_agent_conflict(
+        "direct leader joins are not supported without the promotion/recovery flow".to_string(),
+    )))
 }
 
 pub(crate) fn prepare_end_session_leave_signals(
