@@ -297,3 +297,22 @@ fn gemini_session_plugin_command_is_namespaced_under_harness() {
     assert!(rendered.contains("Start a new multi-agent orchestration session."));
     assert!(rendered.contains("harness session start"));
 }
+
+#[test]
+fn copilot_harness_plugin_includes_cli_skill() {
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Copilot).expect("assets plan succeeds");
+    let skill = repo_root()
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("cli")
+        .join("SKILL.md");
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("Copilot harness CLI skill should be planned");
+
+    assert!(rendered.contains("name: cli"));
+    assert!(rendered.contains("Use when"));
+}

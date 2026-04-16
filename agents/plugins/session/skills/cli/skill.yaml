@@ -1,0 +1,9 @@
+name: cli
+description: >-
+  Use when an agent needs accurate harness CLI command, subcommand, flag, or
+  recovery-flow guidance, especially for setup, create, run, observe, session,
+  daemon, bridge, or hidden lifecycle commands.
+argument-hint: '[command family or task]'
+allowed-tools: Agent, Bash, Glob, Grep, Read
+user-invocable: true
+direct-skill-name: harness:cli
