@@ -112,9 +112,12 @@ extension HarnessMonitorStore {
       identity nextSelectedIdentity: SessionDetailIdentity?
     ) -> Bool {
       let didUpdateSelectedTimeline = timeline != state.timeline
+      let didUpdateSelectedDetail = selectedSessionDetail != state.selectedSessionDetail
 
-      if selectedSessionDetailIdentity != nextSelectedIdentity {
+      if didUpdateSelectedDetail {
         selectedSessionDetail = state.selectedSessionDetail
+      }
+      if selectedSessionDetailIdentity != nextSelectedIdentity {
         selectedSessionDetailIdentity = nextSelectedIdentity
       }
       if didUpdateSelectedTimeline {
@@ -135,8 +138,11 @@ extension HarnessMonitorStore {
       didUpdateSelectedTimeline: Bool
     ) {
       let didUpdateRetainedIdentity = retainedSessionDetailIdentity != nextSelectedIdentity
-      if didUpdateRetainedIdentity {
+      let didUpdateRetainedDetail = retainedSessionDetail != detail
+      if didUpdateRetainedDetail {
         retainedSessionDetail = detail
+      }
+      if didUpdateRetainedIdentity {
         retainedSessionDetailIdentity = nextSelectedIdentity
       }
       if didUpdateRetainedIdentity || didUpdateSelectedTimeline {

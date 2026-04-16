@@ -1,14 +1,55 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  func visiblePresentedSessionDetail(sessionID: String) -> SessionDetail? {
+    guard sessionID == selectedSessionID else {
+      return nil
+    }
+
+    if let selectedSession, selectedSession.session.sessionId == sessionID {
+      return selectedSession
+    }
+
+    guard let presentedDetail = contentUI.sessionDetail.presentedSessionDetail,
+      presentedDetail.session.sessionId == sessionID
+    else {
+      return nil
+    }
+
+    return presentedDetail
+  }
+
+  func visiblePresentedTimelineSnapshot(
+    sessionID: String
+  ) -> (timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)? {
+    guard sessionID == selectedSessionID else {
+      return nil
+    }
+
+    if let selectedSession, selectedSession.session.sessionId == sessionID, !timeline.isEmpty {
+      return (timeline, timelineWindow)
+    }
+
+    guard let presentedDetail = contentUI.sessionDetail.presentedSessionDetail,
+      presentedDetail.session.sessionId == sessionID,
+      !contentUI.sessionDetail.presentedTimeline.isEmpty
+    else {
+      return nil
+    }
+
+    return (
+      contentUI.sessionDetail.presentedTimeline,
+      contentUI.sessionDetail.presentedTimelineWindow
+    )
+  }
+
   func sessionDetailPreservingSelectedExtensions(
     sessionID: String,
     detail: SessionDetail,
     extensionsPending: Bool
   ) -> SessionDetail {
     guard extensionsPending,
-      sessionID == selectedSessionID,
-      let selectedSession
+      let visibleDetail = visiblePresentedSessionDetail(sessionID: sessionID)
     else {
       return detail
     }
@@ -17,9 +58,9 @@ extension HarnessMonitorStore {
       session: detail.session,
       agents: detail.agents,
       tasks: detail.tasks,
-      signals: selectedSession.signals,
-      observer: selectedSession.observer,
-      agentActivity: selectedSession.agentActivity
+      signals: visibleDetail.signals,
+      observer: visibleDetail.observer,
+      agentActivity: visibleDetail.agentActivity
     )
   }
 
