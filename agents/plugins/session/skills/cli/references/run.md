@@ -49,9 +49,9 @@ Sources: `cargo run --quiet -- run resume --help`; `cargo run --quiet -- run sta
 | `--run-id <RUN_ID>` | Resolve a run from session context |
 | `--run-root <RUN_ROOT>` | Change the parent directory used to resolve `--run-id` |
 
-Resolution priority for run roots is: explicit `--run-root`, then `suite_dir/runs`, then the XDG harness runs directory.
+For recovery commands, resolution is: `--run-dir` first; otherwise `--run-root` + `--run-id`; otherwise the current-run pointer. `--run-id` without `--run-root` errors instead of searching fallback roots.
 
-Sources: `cargo run --quiet -- run resume --help`; `src/run/args.rs:5-17`; `src/run/commands/shared.rs:31-55`.
+Sources: `cargo run --quiet -- run resume --help`; `src/run/args.rs:5-17`; `src/run/resolve.rs:17-55`.
 
 ## Recovery-adjacent commands
 
@@ -63,4 +63,4 @@ Sources: `cargo run --quiet -- run resume --help`; `src/run/args.rs:5-17`; `src/
 
 `runner-state --event` currently accepts: `cluster-prepared`, `preflight-started`, `preflight-captured`, `preflight-failed`, `failure-manifest`, `manifest-fix-run-only`, `manifest-fix-suite-and-run`, `manifest-fix-skip-step`, `manifest-fix-stop-run`, `suite-fix-resumed`, `abort`, `suspend`, `resume-run`, `closeout-started`, `run-completed`.
 
-Sources: `cargo run --quiet -- run runner-state --help`; `cargo run --quiet -- run report --help`; `cargo run --quiet -- run task --help`; `src/run/commands/runner_state.rs:21-70`.
+Sources: `cargo run --quiet -- run runner-state --help`; `cargo run --quiet -- run report --help`; `cargo run --quiet -- run task --help`; `src/run/commands/runner_state.rs:21-70`; `src/run/commands/report.rs`; `src/run/commands/task.rs`.
