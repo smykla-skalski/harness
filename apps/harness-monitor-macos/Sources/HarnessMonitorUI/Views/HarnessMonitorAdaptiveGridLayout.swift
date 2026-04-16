@@ -82,10 +82,12 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
 
   func updateCache(_ cache: inout Cache, subviews: Subviews) {
     let cachedSubviewCount = cache.measurementKey?.subviewCount
-    guard Self.shouldInvalidateCache(
-      cachedSubviewCount: cachedSubviewCount,
-      newSubviewCount: subviews.count
-    ) else {
+    guard
+      Self.shouldInvalidateCache(
+        cachedSubviewCount: cachedSubviewCount,
+        newSubviewCount: subviews.count
+      )
+    else {
       return
     }
     cache = Cache()

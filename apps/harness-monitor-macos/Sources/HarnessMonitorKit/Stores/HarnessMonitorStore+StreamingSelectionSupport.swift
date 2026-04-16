@@ -75,7 +75,7 @@ extension HarnessMonitorStore {
         self.pendingSelectedSessionRefreshFallback?.sessionID == sessionID,
         self.pendingSelectedSessionRefreshFallback?.token == token,
         self.selectedSessionID == sessionID,
-        (self.selectedSession != nil || self.isSelectionLoading),
+        self.selectedSession != nil || self.isSelectionLoading,
         let client = self.client
       else {
         return

@@ -43,10 +43,11 @@ private struct InteractiveCardHoverModifier: ViewModifier {
         )
       )
       .onHover { isHovering in
-        guard let nextHoverState = InteractiveCardHoverState.resolve(
-          current: isHovered,
-          isHovering: isHovering
-        )
+        guard
+          let nextHoverState = InteractiveCardHoverState.resolve(
+            current: isHovered,
+            isHovering: isHovering
+          )
         else {
           return
         }

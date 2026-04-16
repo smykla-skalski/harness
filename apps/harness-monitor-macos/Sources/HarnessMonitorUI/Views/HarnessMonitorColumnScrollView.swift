@@ -62,6 +62,25 @@ struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: Vi
     constrainContentWidth: Bool = false,
     readableWidth: Bool = false,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    @ViewBuilder overlay: () -> Overlay,
+    @ViewBuilder content: () -> Content
+  ) where Underlay == EmptyView {
+    self.horizontalPadding = horizontalPadding
+    self.verticalPadding = verticalPadding
+    self.constrainContentWidth = constrainContentWidth
+    self.readableWidth = readableWidth
+    self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.content = content()
+    underlay = nil
+    self.overlay = overlay()
+  }
+
+  init(
+    horizontalPadding: CGFloat = 24,
+    verticalPadding: CGFloat = 24,
+    constrainContentWidth: Bool = false,
+    readableWidth: Bool = false,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content

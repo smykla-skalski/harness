@@ -261,18 +261,18 @@ private struct CodexFlowOverlayBleedMeasurement {
   }
 }
 
-private extension RGBColor {
-  func distance(to other: Self) -> Double {
+extension RGBColor {
+  fileprivate func distance(to other: Self) -> Double {
     abs(red - other.red) + abs(green - other.green) + abs(blue - other.blue)
   }
 
-  var debugDescription: String {
+  fileprivate var debugDescription: String {
     String(format: "r=%.4f g=%.4f b=%.4f", red, green, blue)
   }
 }
 
-private extension HarnessMonitorUITestCase {
-  func attachDiagnostic(_ text: String, named name: String) {
+extension HarnessMonitorUITestCase {
+  fileprivate func attachDiagnostic(_ text: String, named name: String) {
     let attachment = XCTAttachment(string: text)
     attachment.name = name
     attachment.lifetime = .keepAlways

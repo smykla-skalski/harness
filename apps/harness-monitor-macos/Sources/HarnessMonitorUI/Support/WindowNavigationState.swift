@@ -1,3 +1,4 @@
+import Observation
 import SwiftUI
 
 @MainActor
@@ -68,8 +69,9 @@ private final class WindowNavigationHandlers {
 }
 
 @MainActor
-public final class WindowCommandRoutingState: ObservableObject {
-  @Published public var activeScope: WindowNavigationScope?
+@Observable
+public final class WindowCommandRoutingState {
+  public var activeScope: WindowNavigationScope?
   private var activeWindowID: ObjectIdentifier?
 
   public init(activeScope: WindowNavigationScope? = nil) {
@@ -94,8 +96,9 @@ public final class WindowCommandRoutingState: ObservableObject {
 }
 
 @MainActor
-public final class AgentTuiWindowNavigationBridge: ObservableObject {
-  @Published public var state = WindowNavigationState()
+@Observable
+public final class AgentTuiWindowNavigationBridge {
+  public var state = WindowNavigationState()
 
   public init() {}
 

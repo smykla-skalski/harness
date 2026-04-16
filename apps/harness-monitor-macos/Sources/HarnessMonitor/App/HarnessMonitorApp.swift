@@ -14,8 +14,8 @@ struct HarnessMonitorApp: App {
   private let notificationController: HarnessMonitorUserNotificationController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
-  @StateObject private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
-  @StateObject private var windowCommandRouting: WindowCommandRoutingState
+  @State private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var preferencesSelectedSection: PreferencesSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
@@ -37,8 +37,8 @@ struct HarnessMonitorApp: App {
     self.notificationController = notificationController
     perfScenario = configuration.perfScenario
     _store = State(initialValue: configuration.store)
-    _agentTuiNavigationBridge = StateObject(wrappedValue: AgentTuiWindowNavigationBridge())
-    _windowCommandRouting = StateObject(wrappedValue: WindowCommandRoutingState())
+    _agentTuiNavigationBridge = State(initialValue: AgentTuiWindowNavigationBridge())
+    _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
   }
 

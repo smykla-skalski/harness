@@ -250,7 +250,8 @@ struct HarnessMonitorStoreInspectorTests {
   func inspectorLookupIndexResolvesSelectedContentAndActionActors() {
     let index = HarnessMonitorStore.InspectorLookupIndex(detail: PreviewFixtures.detail)
 
-    switch index.primaryContent(for: .task(PreviewFixtures.tasks[0].taskId), isPersistenceAvailable: true)
+    switch index.primaryContent(
+      for: .task(PreviewFixtures.tasks[0].taskId), isPersistenceAvailable: true)
     {
     case .task(let selection):
       #expect(selection.task.taskId == PreviewFixtures.tasks[0].taskId)

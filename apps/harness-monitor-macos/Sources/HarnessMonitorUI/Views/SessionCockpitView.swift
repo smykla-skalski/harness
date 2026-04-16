@@ -42,66 +42,68 @@ struct SessionCockpitView: View {
     HarnessMonitorColumnScrollView(
       verticalPadding: HarnessMonitorTheme.spacingXL,
       constrainContentWidth: true,
-      underlay: {
-        SessionStatusCornerBackdrop(
-          status: detail.session.status,
-          isStale: isSessionStatusStale
-        )
-      },
       overlay: {
         SessionStatusCornerOverlay(
           status: detail.session.status,
           isStale: isSessionStatusStale
         )
-      }
-    ) {
-      VStack(alignment: .leading, spacing: 16) {
-        SessionCockpitHeaderCard(
-          store: store,
-          detail: detail,
-          isSessionReadOnly: isSessionReadOnly,
-          observeSelectedSession: { Task { await store.observeSelectedSession() } },
-          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-          inspectObserver: store.inspectObserver
-        )
-        SessionMetricGrid(
-          metrics: detail.session.metrics
-        )
-        SessionActionDock(
-          detail: detail,
-          inspectTask: store.inspect(taskID:),
-          inspectAgent: store.inspect(agentID:),
-          inspectObserver: store.inspectObserver,
-          openAgentTui: { openWindow(id: HarnessMonitorWindowID.agentTui) },
-          isCodexFlowAvailable: store.isCodexFlowAvailable,
-          openCodexFlow: store.presentCodexFlowSheet
-        )
-        HarnessMonitorAdaptiveGridLayout(
-          minimumColumnWidth: 340,
-          maximumColumns: 2,
-          spacing: 16
-        ) {
-          taskSection
-          agentSection
-        }
-        SessionCockpitSignalsSection(
-          store: store,
-          signals: detail.signals,
-          isExtensionsLoading: isExtensionsLoading,
-          isSessionReadOnly: isSessionReadOnly
-        )
-        SessionCockpitTimelineSection(
-          sessionID: detail.session.sessionId,
-          timeline: timeline,
-          timelineWindow: timelineWindow,
-          isTimelineLoading: isTimelineLoading,
-          loadPage: { page, pageSize in
-            await store.loadSelectedTimelinePage(page: page, pageSize: pageSize)
+      },
+      content: {
+        VStack(alignment: .leading, spacing: 16) {
+          SessionCockpitHeaderCard(
+            store: store,
+            detail: detail,
+            isSessionReadOnly: isSessionReadOnly,
+            observeSelectedSession: { Task { await store.observeSelectedSession() } },
+            requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+            inspectObserver: store.inspectObserver
+          )
+          SessionMetricGrid(
+            metrics: detail.session.metrics
+          )
+          SessionActionDock(
+            detail: detail,
+            inspectTask: store.inspect(taskID:),
+            inspectAgent: store.inspect(agentID:),
+            inspectObserver: store.inspectObserver,
+            openAgentTui: { openWindow(id: HarnessMonitorWindowID.agentTui) },
+            isCodexFlowAvailable: store.isCodexFlowAvailable,
+            openCodexFlow: store.presentCodexFlowSheet
+          )
+          HarnessMonitorAdaptiveGridLayout(
+            minimumColumnWidth: 340,
+            maximumColumns: 2,
+            spacing: 16
+          ) {
+            taskSection
+            agentSection
           }
-        )
+          SessionCockpitSignalsSection(
+            store: store,
+            signals: detail.signals,
+            isExtensionsLoading: isExtensionsLoading,
+            isSessionReadOnly: isSessionReadOnly
+          )
+          SessionCockpitTimelineSection(
+            sessionID: detail.session.sessionId,
+            timeline: timeline,
+            timelineWindow: timelineWindow,
+            isTimelineLoading: isTimelineLoading,
+            loadPage: { page, pageSize in
+              await store.loadSelectedTimelinePage(page: page, pageSize: pageSize)
+            }
+          )
+        }
+        .padding(.top, SessionCockpitLayout.statusHeaderClearance)
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .padding(.top, SessionCockpitLayout.statusHeaderClearance)
-      .frame(maxWidth: .infinity, alignment: .leading)
+    )
+    .background(alignment: .topLeading) {
+      SessionStatusCornerBackdrop(
+        status: detail.session.status,
+        isStale: isSessionStatusStale
+      )
+      .ignoresSafeArea(.container, edges: .top)
     }
   }
 

@@ -20,14 +20,14 @@ struct SessionsBoardRecentSessionsSection: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .frame(maxWidth: .infinity, alignment: .leading)
       } else {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-            ForEach(sessions.prefix(8)) { session in
-              DashboardSessionCard(
-                store: store,
-                session: session
-              )
-            }
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          ForEach(sessions.prefix(8)) { session in
+            DashboardSessionCard(
+              store: store,
+              session: session
+            )
           }
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
@@ -70,15 +70,15 @@ private struct DashboardSessionCard: View {
                 session.title.isEmpty
                   ? HarnessMonitorTheme.tertiaryInk
                   : HarnessMonitorTheme.ink
-               )
-               .multilineTextAlignment(.leading)
-             Spacer(minLength: 12)
-             Text(presentation.statusText)
-               .scaledFont(.caption2.weight(.bold))
-               .foregroundStyle(statusColor(for: presentation.statusTone))
-           }
-           HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-             Text(sessionMetadata(session))
+              )
+              .multilineTextAlignment(.leading)
+            Spacer(minLength: 12)
+            Text(presentation.statusText)
+              .scaledFont(.caption2.weight(.bold))
+              .foregroundStyle(statusColor(for: presentation.statusTone))
+          }
+          HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
+            Text(sessionMetadata(session))
               .scaledFont(.caption.monospaced())
               .truncationMode(.middle)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
