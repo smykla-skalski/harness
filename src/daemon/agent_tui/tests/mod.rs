@@ -64,6 +64,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
             &AgentTuiStartRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec!["test-harness".into()],
                 name: Some("PTY worker".into()),
                 prompt: None,

@@ -294,6 +294,7 @@ pub(super) fn join_db_codex_worker(
             &SessionJoinRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec![],
                 name: None,
                 project_dir: project.to_string_lossy().into(),
@@ -309,6 +310,58 @@ pub(super) fn join_db_codex_worker(
         .find(|agent_id| agent_id.starts_with("codex-"))
         .expect("worker id")
         .clone()
+}
+
+pub(super) fn start_direct_session(
+    db: &crate::daemon::db::DaemonDb,
+    project: &Path,
+    session_id: &str,
+    title: &str,
+    context: &str,
+    policy_preset: Option<&str>,
+) -> crate::session::types::SessionState {
+    use crate::daemon::protocol::SessionStartRequest;
+
+    start_session_direct(
+        &SessionStartRequest {
+            title: title.into(),
+            context: context.into(),
+            runtime: "claude".into(),
+            session_id: Some(session_id.into()),
+            project_dir: project.to_string_lossy().into(),
+            policy_preset: policy_preset.map(ToString::to_string),
+        },
+        Some(db),
+    )
+    .expect("start direct session")
+}
+
+pub(super) fn join_direct_codex(
+    db: &crate::daemon::db::DaemonDb,
+    project: &Path,
+    session_id: &str,
+    runtime_session_id: &str,
+    role: SessionRole,
+    fallback_role: Option<SessionRole>,
+    name: Option<&str>,
+) -> Result<crate::session::types::SessionState, CliError> {
+    use crate::daemon::protocol::SessionJoinRequest;
+
+    temp_env::with_vars([("CODEX_SESSION_ID", Some(runtime_session_id))], || {
+        join_session_direct(
+            session_id,
+            &SessionJoinRequest {
+                runtime: "codex".into(),
+                role,
+                fallback_role,
+                capabilities: vec![],
+                name: name.map(ToString::to_string),
+                project_dir: project.to_string_lossy().into(),
+                persona: None,
+            },
+            Some(db),
+        )
+    })
 }
 
 pub(super) fn setup_db_with_project(project: &Path) -> crate::daemon::db::DaemonDb {

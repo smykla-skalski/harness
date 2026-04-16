@@ -31,42 +31,37 @@ fn create_task_db_direct_writes_to_sqlite() {
 }
 
 #[test]
-fn join_session_direct_rejects_leader_role() {
+fn join_session_direct_downgrades_leader_role_to_fallback_when_leader_exists() {
     with_temp_project(|project| {
-        use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
-
         let db = setup_db_with_project(project);
-        start_session_direct(
-            &SessionStartRequest {
-                title: "leader join denied".into(),
-                context: "daemon joins cannot claim leader".into(),
-                runtime: "claude".into(),
-                session_id: Some("leader-join-denied".into()),
-                project_dir: project.to_string_lossy().into(),
-            },
-            Some(&db),
+        let started = start_direct_session(
+            &db,
+            project,
+            "leader-join-fallback",
+            "leader join fallback",
+            "leader joins downgrade to fallback",
+            Some("swarm-default"),
+        );
+        let original_leader_id = started.leader_id.clone();
+
+        let joined = join_direct_codex(
+            &db,
+            project,
+            "leader-join-fallback",
+            "leader-join-improver",
+            SessionRole::Leader,
+            Some(SessionRole::Improver),
+            Some("fallback improver"),
         )
-        .expect("start session");
+        .expect("leader join should downgrade to fallback role");
 
-        let result =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("leader-join-worker"))], || {
-                join_session_direct(
-                    "leader-join-denied",
-                    &SessionJoinRequest {
-                        runtime: "codex".into(),
-                        role: SessionRole::Leader,
-                        capabilities: vec![],
-                        name: Some("spoofed leader".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        persona: None,
-                    },
-                    Some(&db),
-                )
-            });
-
-        let error = result.expect_err("leader join should be rejected");
-        assert_eq!(error.code(), "KSRCLI092");
-        assert!(error.message().contains("leader"));
+        let joined_agent = joined
+            .agents
+            .values()
+            .find(|agent| agent.agent_id.starts_with("codex-"))
+            .expect("joined agent");
+        assert_eq!(joined_agent.role, SessionRole::Improver);
+        assert_eq!(joined.leader_id, original_leader_id);
     });
 }
 
@@ -166,6 +161,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                         runtime: "claude".into(),
                         session_id: Some("daemon-async-remove".into()),
                         project_dir: project.to_string_lossy().into(),
+                        policy_preset: None,
                     },
                     &async_db,
                 )
@@ -177,6 +173,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: None,
                         project_dir: project.to_string_lossy().into(),
@@ -232,6 +229,7 @@ fn start_session_db_direct_creates_in_sqlite() {
                 runtime: "claude".into(),
                 session_id: Some("daemon-start-1".into()),
                 project_dir: project.to_string_lossy().into(),
+                policy_preset: None,
             },
             Some(&db),
         )
@@ -269,6 +267,7 @@ fn end_session_async_direct_marks_inactive() {
                         runtime: "claude".into(),
                         session_id: Some("daemon-async-end".into()),
                         project_dir: project.to_string_lossy().into(),
+                        policy_preset: None,
                     },
                     &async_db,
                 )
@@ -280,6 +279,7 @@ fn end_session_async_direct_marks_inactive() {
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: None,
                         project_dir: project.to_string_lossy().into(),
@@ -336,6 +336,7 @@ fn start_session_db_direct_registers_fresh_project_for_discovery() {
                 runtime: "claude".into(),
                 session_id: Some("daemon-start-fresh".into()),
                 project_dir: canonical_project.to_string_lossy().into_owned(),
+                policy_preset: None,
             },
             Some(&db),
         )
@@ -377,6 +378,7 @@ fn join_session_db_direct_adds_agent() {
                 runtime: "claude".into(),
                 session_id: Some("daemon-join-1".into()),
                 project_dir: project.to_string_lossy().into(),
+                policy_preset: None,
             },
             Some(&db),
         )
@@ -387,6 +389,7 @@ fn join_session_db_direct_adds_agent() {
             &SessionJoinRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec![],
                 name: None,
                 project_dir: project.to_string_lossy().into(),
@@ -426,6 +429,7 @@ fn start_session_direct_async_creates_in_sqlite() {
                     runtime: "claude".into(),
                     session_id: Some("daemon-async-start-1".into()),
                     project_dir: project.to_string_lossy().into(),
+                    policy_preset: None,
                 },
                 &async_db,
             )
@@ -471,6 +475,7 @@ fn join_session_direct_async_adds_agent() {
                         runtime: "claude".into(),
                         session_id: Some("daemon-async-join-1".into()),
                         project_dir: project.to_string_lossy().into(),
+                        policy_preset: None,
                     },
                     &async_db,
                 )
@@ -482,6 +487,7 @@ fn join_session_direct_async_adds_agent() {
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: None,
                         project_dir: project.to_string_lossy().into(),

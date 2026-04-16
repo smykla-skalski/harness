@@ -83,6 +83,7 @@ fn post_observe_session_uses_async_db_when_sync_db_is_unavailable() {
                         &SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec!["general".into()],
                             name: Some("HTTP Async Observe Worker".into()),
                             project_dir: project_dir.to_string_lossy().into_owned(),

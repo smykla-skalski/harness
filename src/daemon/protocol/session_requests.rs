@@ -99,12 +99,16 @@ pub struct SessionStartRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     pub project_dir: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_preset: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionJoinRequest {
     pub runtime: String,
     pub role: SessionRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_role: Option<SessionRole>,
     #[serde(default)]
     pub capabilities: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

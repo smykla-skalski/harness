@@ -28,6 +28,7 @@ async fn join_http_worker(
         Json(SessionJoinRequest {
             runtime: "codex".into(),
             role: SessionRole::Worker,
+            fallback_role: None,
             capabilities: vec!["general".into()],
             name: Some(name.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),

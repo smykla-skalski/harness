@@ -82,6 +82,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                     runtime: "claude".into(),
                     session_id: Some("daemon-active-signal".into()),
                     project_dir: project.to_string_lossy().into(),
+                    policy_preset: None,
                 },
                 Some(&db_guard),
             )
@@ -106,6 +107,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
+                    fallback_role: None,
                     capabilities: vec![],
                     name: Some("idle worker".into()),
                     prompt: None,
@@ -129,6 +131,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                 &SessionJoinRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
+                    fallback_role: None,
                     capabilities: vec![
                         "agent-tui".into(),
                         format!("agent-tui:{}", snapshot.tui_id),
@@ -202,6 +205,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                     runtime: "claude".into(),
                     session_id: Some("daemon-timed-signal".into()),
                     project_dir: project.to_string_lossy().into(),
+                    policy_preset: None,
                 },
                 Some(&db_guard),
             )
@@ -226,6 +230,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
+                    fallback_role: None,
                     capabilities: vec![],
                     name: Some("sleepy worker".into()),
                     prompt: None,
@@ -248,6 +253,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                 &SessionJoinRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
+                    fallback_role: None,
                     capabilities: vec![
                         "agent-tui".into(),
                         format!("agent-tui:{}", snapshot.tui_id),

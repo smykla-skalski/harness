@@ -6,8 +6,8 @@ use super::{
     create_initial_session, ensure_known_runtime, log_agent_joined, log_agent_removed,
     log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
     prepare_remove_agent_leave_signal, protocol, refresh_session, release_agent_tasks,
-    require_active, require_removable_agent, resolve_registered_runtime, slice, storage, utc_now,
-    write_prepared_leave_signals,
+    require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime, slice,
+    storage, utc_now, write_prepared_leave_signals,
 };
 
 /// Start a new orchestration session and register the caller as leader.
@@ -24,6 +24,24 @@ pub fn start_session(
     runtime_name: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<SessionState, CliError> {
+    start_session_with_policy(context, title, project_dir, runtime_name, session_id, None)
+}
+
+/// Start a new session with an optional policy preset for the leader.
+///
+/// # Errors
+/// Returns `CliError` on storage failures.
+///
+/// # Panics
+/// Panics if the new session state has no leader.
+pub fn start_session_with_policy(
+    context: &str,
+    title: &str,
+    project_dir: &Path,
+    runtime_name: Option<&str>,
+    session_id: Option<&str>,
+    policy_preset: Option<&str>,
+) -> Result<SessionState, CliError> {
     let runtime_name = runtime_name.ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(
             "session start requires --runtime for leader session tracking".to_string(),
@@ -38,6 +56,7 @@ pub fn start_session(
             runtime: runtime_name.to_string(),
             session_id: session_id.map(ToString::to_string),
             project_dir: project_dir.to_string_lossy().into_owned(),
+            policy_preset: policy_preset.map(ToString::to_string),
         });
     }
 
@@ -57,6 +76,7 @@ pub fn start_session(
         leader_agent_session_id.as_deref(),
         &now,
         project_dir,
+        policy_preset,
     )?;
     let leader_id = state
         .leader_id
@@ -92,6 +112,39 @@ pub fn join_session(
     project_dir: &Path,
     persona: Option<&str>,
 ) -> Result<SessionState, CliError> {
+    join_session_with_fallback(
+        session_id,
+        role,
+        None,
+        runtime_name,
+        capabilities,
+        name,
+        project_dir,
+        persona,
+    )
+}
+
+/// Register an agent into an existing session with an optional fallback role.
+///
+/// # Errors
+/// Returns `CliError` if the session is not active or on storage failures.
+///
+/// # Panics
+/// Panics if the agent ID was not recorded during the update.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "session join transport needs explicit fallback metadata without hiding inputs in a struct"
+)]
+pub fn join_session_with_fallback(
+    session_id: &str,
+    role: SessionRole,
+    fallback_role: Option<SessionRole>,
+    runtime_name: &str,
+    capabilities: &[String],
+    name: Option<&str>,
+    project_dir: &Path,
+    persona: Option<&str>,
+) -> Result<SessionState, CliError> {
     ensure_known_runtime(runtime_name, "agent join requires a known runtime")?;
     if let Some(client) = DaemonClient::try_connect() {
         return client.join_session(
@@ -99,6 +152,7 @@ pub fn join_session(
             &protocol::SessionJoinRequest {
                 runtime: runtime_name.to_string(),
                 role,
+                fallback_role,
                 capabilities: capabilities.to_vec(),
                 name: name.map(ToString::to_string),
                 project_dir: project_dir.to_string_lossy().into_owned(),
@@ -120,13 +174,15 @@ pub fn join_session(
         agents_service::resolve_known_session_id(joined_runtime, project_dir, None)?;
     let now = utc_now();
     let mut joined_agent_id = None;
+    let mut joined_role = role;
 
     let state = storage::update_state(project_dir, session_id, |state| {
+        joined_role = resolve_join_role(state, role, fallback_role)?;
         let agent_id = apply_join_session(
             state,
             &display_name,
             runtime_name,
-            role,
+            joined_role,
             capabilities,
             agent_session_id.as_deref(),
             &now,
@@ -140,7 +196,7 @@ pub fn join_session(
     storage::append_log_entry(
         project_dir,
         session_id,
-        log_agent_joined(&agent_id, role, runtime_name),
+        log_agent_joined(&agent_id, joined_role, runtime_name),
         None,
         None,
     )?;

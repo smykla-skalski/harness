@@ -91,6 +91,36 @@ fn parse_session_join() {
 }
 
 #[test]
+fn parse_session_join_with_fallback_role() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "join",
+        "sess-123",
+        "--role",
+        "leader",
+        "--fallback-role",
+        "improver",
+        "--runtime",
+        "codex",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command: crate::session::transport::SessionCommand::Join(args),
+        } => {
+            assert_eq!(args.session_id, "sess-123");
+            assert_eq!(args.role, crate::session::types::SessionRole::Leader);
+            assert_eq!(
+                args.fallback_role,
+                Some(crate::session::types::SessionRole::Improver)
+            );
+        }
+        _ => panic!("expected Session Join"),
+    }
+}
+
+#[test]
 fn parse_session_task_create() {
     let cli = Cli::try_parse_from([
         "harness",

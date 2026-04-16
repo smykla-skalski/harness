@@ -39,6 +39,7 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                         Json(SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec!["general".into()],
                             name: Some("Async Role Worker".into()),
                             project_dir: project_dir.to_string_lossy().into_owned(),
@@ -117,6 +118,7 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
                         Json(SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec!["general".into()],
                             name: Some("Async Transfer Worker".into()),
                             project_dir: project_dir.to_string_lossy().into_owned(),

@@ -225,6 +225,8 @@ pub struct AgentTuiStartRequest {
     pub runtime: String,
     #[serde(default = "default_agent_tui_role")]
     pub role: SessionRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_role: Option<SessionRole>,
     #[serde(default)]
     pub capabilities: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

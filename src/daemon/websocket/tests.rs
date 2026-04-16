@@ -147,6 +147,7 @@ pub(super) async fn start_async_session(
             runtime: "claude".into(),
             session_id: Some(session_id.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),
+            policy_preset: None,
         },
         async_db.as_ref(),
     )
@@ -166,6 +167,7 @@ pub(super) async fn join_async_worker(
         &SessionJoinRequest {
             runtime: "codex".into(),
             role: SessionRole::Worker,
+            fallback_role: None,
             capabilities: vec!["general".into()],
             name: Some(name.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),
