@@ -6,9 +6,12 @@ use std::path::{Path, PathBuf};
 
 use portable_pty::CommandBuilder;
 
-use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
-use crate::errors::CliError;
+use crate::agents::runtime::{
+    AgentRuntime, InitialPromptDelivery, hook_agent_for_runtime_name, runtime_for_name,
+};
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
+use crate::setup::wrapper;
 use crate::workspace::dirs_home;
 
 use super::READINESS_TIMEOUT;
@@ -27,6 +30,7 @@ pub(crate) fn spawn_agent_tui_process(
     size: AgentTuiSize,
     auto_join_prompt: Option<String>,
 ) -> Result<AgentTuiProcess, CliError> {
+    ensure_runtime_bootstrap(&profile.runtime, project_dir)?;
     let mut env = BTreeMap::new();
     env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
@@ -51,6 +55,16 @@ pub(crate) fn spawn_agent_tui_process(
     spec.cli_prompt = cli_prompt;
     spec.screen_text_fallback = screen_text_fallback;
     PortablePtyAgentTuiBackend.spawn(spec)
+}
+
+pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Result<(), CliError> {
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    wrapper::main(project_dir, &path_env)?;
+    let agent = hook_agent_for_runtime_name(runtime).ok_or_else(|| {
+        CliErrorKind::workflow_parse(format!("unsupported agent TUI runtime '{runtime}'"))
+    })?;
+    let _ = wrapper::write_agent_bootstrap(project_dir, agent)?;
+    Ok(())
 }
 
 #[expect(

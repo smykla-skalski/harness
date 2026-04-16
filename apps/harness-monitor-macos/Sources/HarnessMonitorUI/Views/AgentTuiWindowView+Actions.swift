@@ -152,13 +152,18 @@ extension AgentTuiWindowView {
       return
     }
     guard
-      let terminalSize = TerminalViewportSizing.terminalSize(
+      let measuredTerminalSize = TerminalViewportSizing.terminalSize(
         for: viewportSize,
         fontScale: fontScale
       )
     else {
       return
     }
+    let resizeBaseline = viewModel.pendingViewportResizeTarget ?? tui.size
+    let terminalSize = TerminalViewportSizing.stabilizedAutomaticSize(
+      measured: measuredTerminalSize,
+      baseline: resizeBaseline
+    )
     if viewModel.rows != terminalSize.rows {
       viewModel.rows = terminalSize.rows
     }
