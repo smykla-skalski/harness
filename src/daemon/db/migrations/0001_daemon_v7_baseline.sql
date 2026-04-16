@@ -4,7 +4,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '7');
+INSERT INTO schema_meta (key, value) VALUES ('version', '8');
 
 -- Discovered projects
 CREATE TABLE projects (

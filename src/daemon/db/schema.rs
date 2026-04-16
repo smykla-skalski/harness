@@ -58,7 +58,8 @@ impl DaemonDb {
 
     fn run_migrations(&self) -> Result<(), CliError> {
         let version = self.schema_version()?;
-        let crosses_v7 = matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6");
+        let needs_ledger_backfill =
+            matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7");
         let should_reclaim_space = match version.as_str() {
             "1" => {
                 self.conn
@@ -109,13 +110,28 @@ impl DaemonDb {
             _ => false,
         };
 
-        if crosses_v7 {
-            self.backfill_legacy_timelines()?;
+        if needs_ledger_backfill {
+            self.migrate_v7_to_v8()?;
         }
 
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;
         }
+        Ok(())
+    }
+
+    fn migrate_v7_to_v8(&self) -> Result<(), CliError> {
+        // v7 databases created before the backfill shipped have empty ledger
+        // rows even when the legacy source tables still hold conversation
+        // history. Rebuild every session's ledger, then stamp v8 so the
+        // upgrade is one-shot and idempotent across restarts.
+        self.backfill_legacy_timelines()?;
+        self.conn
+            .execute(
+                "UPDATE schema_meta SET value = '8' WHERE key = 'version'",
+                [],
+            )
+            .map_err(|error| db_error(format!("bump schema version to v8: {error}")))?;
         Ok(())
     }
 }
@@ -336,8 +352,8 @@ fn migrate_v6_to_v7(conn: &Connection) -> Result<(), CliError> {
     )
     .map_err(|error| db_error(format!("migrate v6 -> v7 timeline ledger: {error}")))?;
     conn.execute(
-        "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
-        [SCHEMA_VERSION],
+        "UPDATE schema_meta SET value = '7' WHERE key = 'version'",
+        [],
     )
     .map_err(|error| db_error(format!("bump schema version to v7: {error}")))?;
     Ok(())
