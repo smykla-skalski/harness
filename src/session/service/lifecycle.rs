@@ -410,41 +410,18 @@ pub fn transfer_leader(
 /// # Errors
 /// Returns `CliError` on storage failures or if the agent is already inactive.
 pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.leave_session(
+            session_id,
+            &protocol::SessionLeaveRequest {
+                agent_id: agent_id.to_string(),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
-    storage::update_state(project_dir, session_id, |state| {
-        require_active(state)?;
-        let departing_leader = state.leader_id.as_deref() == Some(agent_id);
-        if !departing_leader {
-            require_removable_agent(state, agent_id)?;
-        }
-
-        let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "agent '{agent_id}' not found"
-            )))
-        })?;
-        if !agent.status.is_alive() {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "agent '{agent_id}' is already {}",
-                agent_status_label(agent.status)
-            ))
-            .into());
-        }
-
-        agent.status = AgentStatus::Disconnected;
-        now.clone_into(&mut agent.updated_at);
-        agent.last_activity_at = Some(now.clone());
-        agent.current_task_id = None;
-
-        release_agent_tasks(state, agent_id, &now);
-
-        clear_pending_leader_transfer(state, agent_id);
-        if departing_leader {
-            super::promote_or_degrade(state, &now);
-        }
-        refresh_session(state, &now);
-        Ok(())
-    })?;
+    storage::update_state(project_dir, session_id, |state| apply_leave_session(state, agent_id, &now))?;
 
     storage::append_log_entry(
         project_dir,
@@ -456,5 +433,44 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
         None,
     )?;
 
+    Ok(())
+}
+
+pub(crate) fn apply_leave_session(
+    state: &mut SessionState,
+    agent_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    require_active(state)?;
+    let departing_leader = state.leader_id.as_deref() == Some(agent_id);
+    if !departing_leader {
+        require_removable_agent(state, agent_id)?;
+    }
+
+    let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    if !agent.status.is_alive() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is already {}",
+            agent_status_label(agent.status)
+        ))
+        .into());
+    }
+
+    agent.status = AgentStatus::Disconnected;
+    now.clone_into(&mut agent.updated_at);
+    agent.last_activity_at = Some(now.to_string());
+    agent.current_task_id = None;
+
+    release_agent_tasks(state, agent_id, now);
+
+    clear_pending_leader_transfer(state, agent_id);
+    if departing_leader {
+        super::promote_or_degrade(state, now);
+    }
+    refresh_session(state, now);
     Ok(())
 }

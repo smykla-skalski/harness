@@ -9,8 +9,8 @@ use axum::{Json, Router};
 use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, ObserveSessionRequest, SessionDetail, SessionEndRequest,
-    SessionJoinRequest, SessionMutationResponse, SessionStartRequest, TimelineCursor,
-    TimelineWindowRequest, TimelineWindowResponse,
+    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
+    TimelineCursor, TimelineWindowRequest, TimelineWindowResponse,
 };
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
@@ -30,6 +30,7 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
         .route("/v1/sessions/{session_id}/stream", get(stream_session))
         .route("/v1/sessions/{session_id}/join", post(post_session_join))
         .route("/v1/sessions/{session_id}/end", post(post_end_session))
+        .route("/v1/sessions/{session_id}/leave", post(post_leave_session))
         .route(
             "/v1/sessions/{session_id}/observe",
             post(post_observe_session),
@@ -211,6 +212,24 @@ pub(super) async fn post_end_session(
     timed_json("POST", "/v1/sessions/{id}/end", &request_id, start, result)
 }
 
+pub(super) async fn post_leave_session(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SessionLeaveRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = leave_session_response(&state, &session_id, &request).await;
+    if result.is_ok() {
+        broadcast_session_end(&state, &session_id).await;
+    }
+    timed_json("POST", "/v1/sessions/{id}/leave", &request_id, start, result)
+}
+
 pub(super) async fn post_observe_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -354,6 +373,19 @@ async fn end_session_response(
     let db = ensure_shared_db(&state.db)?;
     let db_guard = db.lock().expect("db lock");
     service::end_session(session_id, request, Some(&db_guard))
+}
+
+async fn leave_session_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SessionLeaveRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::leave_session_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = db.lock().expect("db lock");
+    service::leave_session(session_id, request, Some(&db_guard))
 }
 
 async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {

@@ -260,6 +260,87 @@ fn manager_auto_join_prompt_in_transcript() {
 }
 
 #[test]
+fn manager_start_threads_leader_recovery_prompt_into_process_args() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project_dir = tmp.path().join("project");
+    fs_err::create_dir_all(&project_dir).expect("project dir");
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = crate::daemon::index::DiscoveredProject {
+        project_id: "project-recovery-prompt".into(),
+        name: "project".into(),
+        project_dir: Some(project_dir.clone()),
+        repository_root: Some(project_dir.clone()),
+        checkout_id: "checkout-recovery-prompt".into(),
+        checkout_name: "Directory".into(),
+        context_root: tmp.path().join("context"),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    db.sync_project(&project).expect("sync project");
+    let state = session_service::build_new_session(
+        "leader recovery prompt test",
+        "recovery prompt",
+        "sess-recovery-prompt",
+        "claude",
+        None,
+        &utc_now(),
+    );
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    let db_slot = Arc::new(OnceLock::new());
+    db_slot
+        .set(Arc::new(Mutex::new(db)))
+        .expect("install test db");
+    let (sender, _receiver) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+    let snapshot = manager
+        .start(
+            "sess-recovery-prompt",
+            &AgentTuiStartRequest {
+                runtime: "codex".into(),
+                role: SessionRole::Leader,
+                fallback_role: None,
+                capabilities: vec!["policy-preset:swarm-default".into()],
+                name: Some("Recovered codex".into()),
+                prompt: None,
+                project_dir: None,
+                persona: None,
+                argv: vec![
+                    "sh".into(),
+                    "-c".into(),
+                    "printf '%s\\n' \"$@\"; cat".into(),
+                    "sh".into(),
+                ],
+                rows: 5,
+                cols: 80,
+            },
+        )
+        .expect("start");
+
+    wait_until(WAIT_TIMEOUT, || {
+        let screen = manager
+            .get(&snapshot.tui_id)
+            .expect("refresh snapshot")
+            .screen
+            .text;
+        screen.contains("--role leader") && screen.contains("policy-preset:swarm-default")
+    });
+
+    let refreshed = manager.get(&snapshot.tui_id).expect("refresh snapshot");
+    assert!(refreshed.screen.text.contains("/harness:session:join"));
+    assert!(refreshed.screen.text.contains("--role leader"));
+    assert!(
+        refreshed
+            .screen
+            .text
+            .contains("policy-preset:swarm-default")
+    );
+
+    manager.stop(&snapshot.tui_id).expect("stop");
+}
+
+#[test]
 fn baseline_snapshot_reports_running_state() {
     let status = AgentTuiStatus::Running;
     assert_eq!(status.as_str(), "running");
