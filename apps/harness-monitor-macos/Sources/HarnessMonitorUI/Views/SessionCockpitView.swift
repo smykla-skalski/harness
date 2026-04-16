@@ -41,14 +41,8 @@ struct SessionCockpitView: View {
   var body: some View {
     HarnessMonitorColumnScrollView(
       verticalPadding: HarnessMonitorTheme.spacingXL,
-      constrainContentWidth: true,
-      overlay: {
-        SessionStatusCornerOverlay(
-          status: detail.session.status,
-          isStale: isSessionStatusStale
-        )
-      },
-      content: {
+      constrainContentWidth: true
+    ) {
         VStack(alignment: .leading, spacing: 16) {
           SessionCockpitHeaderCard(
             store: store,
@@ -94,16 +88,7 @@ struct SessionCockpitView: View {
             }
           )
         }
-        .padding(.top, SessionCockpitLayout.statusHeaderClearance)
         .frame(maxWidth: .infinity, alignment: .leading)
-      }
-    )
-    .background(alignment: .topLeading) {
-      SessionStatusCornerBackdrop(
-        status: detail.session.status,
-        isStale: isSessionStatusStale
-      )
-      .ignoresSafeArea(.container, edges: .top)
     }
   }
 
