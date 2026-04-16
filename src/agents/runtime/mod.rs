@@ -343,7 +343,7 @@ mod tests {
 
         let cases = [
             (HookAgent::Claude, InitialPromptDelivery::CliPositional),
-            (HookAgent::Codex, InitialPromptDelivery::CliPositional),
+            (HookAgent::Codex, InitialPromptDelivery::PtySend),
             (
                 HookAgent::Gemini,
                 InitialPromptDelivery::CliFlag("--prompt-interactive"),

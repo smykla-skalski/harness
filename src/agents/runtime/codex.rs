@@ -73,6 +73,6 @@ impl AgentRuntime for CodexRuntime {
     }
 
     fn initial_prompt_delivery(&self) -> super::InitialPromptDelivery {
-        super::InitialPromptDelivery::CliPositional
+        super::InitialPromptDelivery::PtySend
     }
 }

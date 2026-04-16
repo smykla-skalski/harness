@@ -9,11 +9,132 @@ use crate::daemon::agent_tui::{
 };
 use crate::session::types::SessionRole;
 
+use super::super::spawn::ensure_runtime_bootstrap;
 use super::super::{
     build_auto_join_prompt, resolved_command_argv, send_initial_prompt, signal_readiness_ready,
-    skill_directory_flags,
+    skill_directory_flags, spawn_agent_tui_process,
 };
 use super::support::{WAIT_TIMEOUT, spawn_shell_with_readiness};
+
+#[test]
+fn ensure_runtime_bootstrap_writes_runtime_assets_for_all_supported_agents() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let project = tmp.path().join("project");
+    let home_env = home.to_string_lossy().into_owned();
+    fs_err::create_dir_all(&home).expect("home dir");
+    fs_err::create_dir_all(home.join(".local")).expect("home local dir");
+    fs_err::create_dir_all(&project).expect("project dir");
+
+    temp_env::with_var("HOME", Some(home_env.as_str()), || {
+        for (runtime, expected_paths) in [
+            (
+                "claude",
+                vec![
+                    ".claude/settings.json",
+                    ".claude/plugins/harness/skills/join/SKILL.md",
+                ],
+            ),
+            (
+                "codex",
+                vec![
+                    ".codex/hooks.json",
+                    ".codex/config.toml",
+                    ".agents/skills/harness-session-join/SKILL.md",
+                    "plugins/harness/skills/join/SKILL.md",
+                ],
+            ),
+            (
+                "gemini",
+                vec![
+                    ".gemini/settings.json",
+                    ".gemini/commands/harness/session/join.toml",
+                ],
+            ),
+            (
+                "copilot",
+                vec![
+                    ".github/hooks/harness.json",
+                    "plugins/harness/skills/join/SKILL.md",
+                ],
+            ),
+            (
+                "vibe",
+                vec![
+                    ".vibe/hooks.json",
+                    ".vibe/plugins/harness/skills/join/SKILL.md",
+                ],
+            ),
+            (
+                "opencode",
+                vec![
+                    ".opencode/hooks.json",
+                    ".opencode/plugins/harness/skills/join/SKILL.md",
+                ],
+            ),
+        ] {
+            ensure_runtime_bootstrap(runtime, &project)
+                .unwrap_or_else(|error| panic!("bootstrap {runtime}: {error}"));
+
+            for relative_path in expected_paths {
+                assert!(
+                    project.join(relative_path).is_file(),
+                    "expected {runtime} bootstrap to write {relative_path}"
+                );
+            }
+        }
+    });
+
+    assert!(
+        home.join(".local").join("bin").join("harness").is_file(),
+        "bootstrap should install the harness wrapper into the user bin dir"
+    );
+}
+
+#[test]
+fn spawn_agent_tui_process_bootstraps_runtime_assets_before_launch() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let project = tmp.path().join("project");
+    let home_env = home.to_string_lossy().into_owned();
+    fs_err::create_dir_all(&home).expect("home dir");
+    fs_err::create_dir_all(home.join(".local")).expect("home local dir");
+    fs_err::create_dir_all(&project).expect("project dir");
+
+    temp_env::with_var("HOME", Some(home_env.as_str()), || {
+        let profile =
+            AgentTuiLaunchProfile::from_argv("codex", vec!["sh".into(), "-c".into(), "cat".into()])
+                .expect("profile");
+        let process = spawn_agent_tui_process(
+            "sess-bootstrap-spawn",
+            "agent-tui-bootstrap",
+            profile,
+            &project,
+            AgentTuiSize { rows: 5, cols: 40 },
+            None,
+        )
+        .expect("spawn process");
+
+        assert!(
+            project.join(".codex").join("hooks.json").is_file(),
+            "spawn should bootstrap Codex hooks before launch"
+        );
+        assert!(
+            project
+                .join(".agents")
+                .join("skills")
+                .join("harness-session-join")
+                .join("SKILL.md")
+                .is_file(),
+            "spawn should bootstrap the direct join skill before launch"
+        );
+
+        process.kill().expect("kill process");
+        let _ = process
+            .wait_timeout(Duration::from_millis(200))
+            .expect("wait after kill");
+    });
+}
 
 #[test]
 fn skill_directory_flags_claude_returns_plugin_dir() {
