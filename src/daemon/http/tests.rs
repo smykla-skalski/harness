@@ -372,6 +372,7 @@ pub(super) fn sample_session_state() -> SessionState {
         title: "sess-test-1".into(),
         context: "http timeline scope fixture".into(),
         status: SessionStatus::Active,
+        policy: Default::default(),
         created_at: "2026-04-13T19:00:00Z".into(),
         updated_at: "2026-04-13T19:00:00Z".into(),
         agents,

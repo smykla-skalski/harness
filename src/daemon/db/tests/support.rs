@@ -148,6 +148,7 @@ pub(super) fn sample_session_state() -> SessionState {
         title: "test title".into(),
         context: "test session".into(),
         status: SessionStatus::Active,
+        policy: Default::default(),
         created_at: "2026-04-03T12:00:00Z".into(),
         updated_at: "2026-04-03T12:05:00Z".into(),
         agents,
@@ -322,6 +323,7 @@ pub(super) fn performance_session_state(
         } else {
             SessionStatus::Active
         },
+        policy: Default::default(),
         created_at: timestamp.clone(),
         updated_at: timestamp.clone(),
         agents,

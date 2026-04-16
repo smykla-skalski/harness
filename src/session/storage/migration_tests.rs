@@ -4,6 +4,7 @@ use crate::session::types::CURRENT_VERSION;
 
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
+    migrate_v6_to_v7,
 };
 use super::registry::{ProjectOriginRecord, merge_project_origin};
 
@@ -130,8 +131,49 @@ fn migrate_v5_to_v6_stamps_current_schema() {
     }))
     .expect("migrate v5");
 
-    assert_eq!(migrated["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(migrated["schema_version"], json!(6));
     assert_eq!(migrated["title"], json!("session title"));
+}
+
+#[test]
+fn migrate_v6_to_v7_backfills_swarm_policy() {
+    let migrated = migrate_v6_to_v7(json!({
+        "schema_version": 6,
+        "state_version": 3,
+        "session_id": "sess-1",
+        "title": "session title",
+        "context": "session goal",
+        "status": "active",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "agents": {},
+        "tasks": {},
+        "leader_id": null,
+        "archived_at": null,
+        "last_activity_at": null,
+        "observe_id": null,
+        "pending_leader_transfer": null,
+        "metrics": {
+            "agent_count": 0,
+            "active_agent_count": 0,
+            "idle_agent_count": 0,
+            "open_task_count": 0,
+            "in_progress_task_count": 0,
+            "blocked_task_count": 0,
+            "completed_task_count": 0
+        }
+    }))
+    .expect("migrate v6");
+
+    assert_eq!(migrated["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(
+        migrated["policy"]["leader_join"]["require_explicit_fallback_role"],
+        json!(true)
+    );
+    assert_eq!(
+        migrated["policy"]["degraded_recovery"]["preset_id"],
+        json!("swarm-default")
+    );
 }
 
 #[test]

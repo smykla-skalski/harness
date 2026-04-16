@@ -1,5 +1,6 @@
 mod agents;
 mod events;
+mod policy;
 mod state;
 mod tasks;
 
@@ -18,6 +19,7 @@ pub use agents::{
     AgentPersona, AgentRegistration, AgentStatus, PendingLeaderTransfer, PersonaSymbol, SessionRole,
 };
 pub use events::{SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionTransition};
+pub use policy::{AutoPromotionPolicy, LeaderJoinPolicy, LeaderRecoveryPolicy, SessionPolicy};
 pub use state::{
     CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus,
 };

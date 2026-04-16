@@ -237,6 +237,7 @@ fn sample_state_for_runtime(
         title: "test session".into(),
         context: "test goal".into(),
         status: SessionStatus::Active,
+        policy: Default::default(),
         created_at: "2026-03-28T14:00:00Z".into(),
         updated_at: "2026-03-28T14:05:00Z".into(),
         agents,
