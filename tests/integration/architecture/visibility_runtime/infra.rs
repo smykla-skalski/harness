@@ -1,9 +1,10 @@
 use super::*;
+use super::super::helpers::{read_repo_file, repo_path_exists};
 
 #[test]
 fn infra_environment_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let environment = fs::read_to_string(root.join("src/infra/environment.rs")).unwrap();
+    let environment = read_repo_file(root, "src/infra/environment.rs");
 
     for needle in ["merge_env_prepends_build_artifacts_to_path", "mod tests {"] {
         assert!(
@@ -13,7 +14,7 @@ fn infra_environment_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/infra/environment/tests.rs").exists(),
+        repo_path_exists(root, "src/infra/environment/tests.rs"),
         "infra environment split test module should exist"
     );
 }
@@ -21,7 +22,7 @@ fn infra_environment_root_stays_prod_only() {
 #[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
+    let docker_mod = read_repo_file(root, "src/infra/blocks/docker/mod.rs");
 
     for needle in [
         "impl ContainerRuntime for DockerContainerRuntime",
@@ -42,7 +43,7 @@ fn docker_block_root_stays_a_facade() {
         "src/infra/blocks/docker/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "docker block split module should exist: {path}"
         );
     }
@@ -51,7 +52,7 @@ fn docker_block_root_stays_a_facade() {
 #[test]
 fn compose_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let compose_mod = fs::read_to_string(root.join("src/infra/blocks/compose/mod.rs")).unwrap();
+    let compose_mod = read_repo_file(root, "src/infra/blocks/compose/mod.rs");
 
     for needle in [
         "pub struct DockerComposeOrchestrator",
@@ -71,7 +72,7 @@ fn compose_block_root_stays_a_facade() {
         "src/infra/blocks/compose/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "compose block split module should exist: {path}"
         );
     }
@@ -80,7 +81,7 @@ fn compose_block_root_stays_a_facade() {
 #[test]
 fn build_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let build_mod = fs::read_to_string(root.join("src/infra/blocks/build.rs")).unwrap();
+    let build_mod = read_repo_file(root, "src/infra/blocks/build.rs");
 
     for needle in [
         "pub struct BuildTarget {",
@@ -101,7 +102,7 @@ fn build_block_root_stays_a_facade() {
         "src/infra/blocks/build/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "build block split module should exist: {path}"
         );
     }
@@ -149,7 +150,7 @@ fn infra_small_roots_stay_prod_only() {
             "src/infra/blocks/envoy/tests.rs",
         ),
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         for needle in needles {
             assert!(
                 !contents.contains(needle),
@@ -157,7 +158,7 @@ fn infra_small_roots_stay_prod_only() {
             );
         }
         assert!(
-            root.join(split_path).exists(),
+            repo_path_exists(root, split_path),
             "infra split test module should exist: {split_path}"
         );
     }
@@ -166,8 +167,7 @@ fn infra_small_roots_stay_prod_only() {
 #[test]
 fn versioned_json_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let versioned_json =
-        fs::read_to_string(root.join("src/infra/persistence/versioned_json.rs")).unwrap();
+    let versioned_json = read_repo_file(root, "src/infra/persistence/versioned_json.rs");
 
     for needle in [
         "fn load_returns_none_when_file_missing(",
@@ -181,8 +181,7 @@ fn versioned_json_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/infra/persistence/versioned_json/tests.rs")
-            .exists(),
+        repo_path_exists(root, "src/infra/persistence/versioned_json/tests.rs"),
         "versioned json split test module should exist"
     );
 }
@@ -190,7 +189,7 @@ fn versioned_json_root_stays_prod_only() {
 #[test]
 fn infra_io_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let infra_io = fs::read_to_string(root.join("src/infra/io/mod.rs")).unwrap();
+    let infra_io = read_repo_file(root, "src/infra/io/mod.rs");
 
     for needle in [
         "fn write_and_read_json(",
@@ -204,7 +203,7 @@ fn infra_io_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/infra/io/tests.rs").exists(),
+        repo_path_exists(root, "src/infra/io/tests.rs"),
         "infra io split test module should exist"
     );
 }
@@ -212,7 +211,7 @@ fn infra_io_root_stays_prod_only() {
 #[test]
 fn kubernetes_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let kubernetes_mod = fs::read_to_string(root.join("src/infra/blocks/kubernetes.rs")).unwrap();
+    let kubernetes_mod = read_repo_file(root, "src/infra/blocks/kubernetes.rs");
 
     for needle in [
         "serde_json::from_str(&result.stdout)",
@@ -233,7 +232,7 @@ fn kubernetes_block_root_stays_a_facade() {
         "src/infra/blocks/kubernetes/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "kubernetes block split module should exist: {path}"
         );
     }
@@ -242,7 +241,7 @@ fn kubernetes_block_root_stays_a_facade() {
 #[test]
 fn http_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let http_mod = fs::read_to_string(root.join("src/infra/blocks/http.rs")).unwrap();
+    let http_mod = read_repo_file(root, "src/infra/blocks/http.rs");
 
     for needle in [
         "impl HttpClient for ReqwestHttpClient",
@@ -263,7 +262,7 @@ fn http_block_root_stays_a_facade() {
         "src/infra/blocks/http/types.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "http block split module should exist: {path}"
         );
     }

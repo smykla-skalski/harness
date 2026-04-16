@@ -1,9 +1,10 @@
 use super::*;
+use super::super::helpers::{read_repo_file, repo_path_exists};
 
 #[test]
 fn run_report_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let report = fs::read_to_string(root.join("src/run/report.rs")).unwrap();
+    let report = read_repo_file(root, "src/run/report.rs");
 
     for needle in [
         "pub enum Verdict",
@@ -25,7 +26,7 @@ fn run_report_root_stays_prod_only() {
         "src/run/report/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "run report split module should exist: {path}"
         );
     }
@@ -34,7 +35,7 @@ fn run_report_root_stays_prod_only() {
 #[test]
 fn run_workflow_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workflow = fs::read_to_string(root.join("src/run/workflow/mod.rs")).unwrap();
+    let workflow = read_repo_file(root, "src/run/workflow/mod.rs");
 
     for needle in [
         "fn runner_phase_display(",
@@ -48,7 +49,7 @@ fn run_workflow_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/workflow/tests.rs").exists(),
+        repo_path_exists(root, "src/run/workflow/tests.rs"),
         "run workflow split test module should exist"
     );
 }
@@ -56,7 +57,7 @@ fn run_workflow_root_stays_prod_only() {
 #[test]
 fn run_task_output_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let task_output = fs::read_to_string(root.join("src/run/services/task_output.rs")).unwrap();
+    let task_output = read_repo_file(root, "src/run/services/task_output.rs");
 
     for needle in [
         "fn extract_plain_text_line(",
@@ -70,7 +71,7 @@ fn run_task_output_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/services/task_output/tests.rs").exists(),
+        repo_path_exists(root, "src/run/services/task_output/tests.rs"),
         "run task_output split test module should exist"
     );
 }
@@ -78,7 +79,7 @@ fn run_task_output_root_stays_prod_only() {
 #[test]
 fn run_prepared_suite_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let prepared_suite = fs::read_to_string(root.join("src/run/prepared_suite/mod.rs")).unwrap();
+    let prepared_suite = read_repo_file(root, "src/run/prepared_suite/mod.rs");
 
     for needle in [
         "fn prepared_suite_digests_tracking_defaults(",
@@ -92,7 +93,7 @@ fn run_prepared_suite_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/prepared_suite/tests.rs").exists(),
+        repo_path_exists(root, "src/run/prepared_suite/tests.rs"),
         "run prepared_suite split test module should exist"
     );
 }
@@ -100,7 +101,7 @@ fn run_prepared_suite_root_stays_prod_only() {
 #[test]
 fn run_validated_layout_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let validated = fs::read_to_string(root.join("src/run/context/validated.rs")).unwrap();
+    let validated = read_repo_file(root, "src/run/context/validated.rs");
 
     for needle in [
         "fn validated_layout_succeeds_for_existing_dir(",
@@ -114,7 +115,7 @@ fn run_validated_layout_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/context/validated/tests.rs").exists(),
+        repo_path_exists(root, "src/run/context/validated/tests.rs"),
         "run validated-layout split test module should exist"
     );
 }
@@ -122,7 +123,7 @@ fn run_validated_layout_root_stays_prod_only() {
 #[test]
 fn run_services_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let run_services = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
+    let run_services = read_repo_file(root, "src/run/services/mod.rs");
 
     for needle in [
         "fn write_suite(",
@@ -136,7 +137,7 @@ fn run_services_root_stays_a_facade() {
     }
 
     assert!(
-        root.join("src/run/services/tests.rs").exists(),
+        repo_path_exists(root, "src/run/services/tests.rs"),
         "run services split test module should exist"
     );
 }
@@ -144,7 +145,7 @@ fn run_services_root_stays_a_facade() {
 #[test]
 fn run_audit_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let run_audit = fs::read_to_string(root.join("src/run/audit/mod.rs")).unwrap();
+    let run_audit = read_repo_file(root, "src/run/audit/mod.rs");
 
     for needle in [
         "fn sample_status(",
@@ -158,7 +159,7 @@ fn run_audit_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/audit/tests.rs").exists(),
+        repo_path_exists(root, "src/run/audit/tests.rs"),
         "run audit split test module should exist"
     );
 }
@@ -166,7 +167,7 @@ fn run_audit_root_stays_prod_only() {
 #[test]
 fn run_resolve_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let resolve_mod = fs::read_to_string(root.join("src/run/resolve.rs")).unwrap();
+    let resolve_mod = read_repo_file(root, "src/run/resolve.rs");
 
     for needle in [
         "fn resolve_run_directory_with_existing_dir()",
@@ -180,7 +181,7 @@ fn run_resolve_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/resolve/tests.rs").exists(),
+        repo_path_exists(root, "src/run/resolve/tests.rs"),
         "run resolve split test module should exist"
     );
 }
@@ -188,7 +189,7 @@ fn run_resolve_root_stays_prod_only() {
 #[test]
 fn run_state_capture_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let state_capture = fs::read_to_string(root.join("src/run/state_capture.rs")).unwrap();
+    let state_capture = read_repo_file(root, "src/run/state_capture.rs");
 
     for needle in [
         "fn dataplane_collection_extracts_known_fields()",
@@ -202,7 +203,7 @@ fn run_state_capture_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/run/state_capture/tests.rs").exists(),
+        repo_path_exists(root, "src/run/state_capture/tests.rs"),
         "run state_capture split test module should exist"
     );
 }

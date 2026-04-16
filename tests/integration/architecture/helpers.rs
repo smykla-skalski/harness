@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub(super) fn assert_file_lacks_needles(contents: &str, message_prefix: &str, needles: &[&str]) {
     for needle in needles {
@@ -32,7 +32,30 @@ pub(super) fn assert_docs_contain_needles(docs: &[&str], message_prefix: &str, n
 }
 
 pub(super) fn read_repo_file(root: &Path, path: &str) -> String {
-    fs::read_to_string(root.join(path)).unwrap()
+    let resolved = resolve_repo_path(root, path).unwrap_or_else(|| {
+        panic!("repo path not found: {path}");
+    });
+    fs::read_to_string(resolved).unwrap()
+}
+
+pub(super) fn repo_path_exists(root: &Path, path: &str) -> bool {
+    resolve_repo_path(root, path).is_some()
+}
+
+fn resolve_repo_path(root: &Path, path: &str) -> Option<PathBuf> {
+    candidate_repo_paths(root, path)
+        .into_iter()
+        .find(|candidate| candidate.exists())
+}
+
+fn candidate_repo_paths(root: &Path, path: &str) -> Vec<PathBuf> {
+    let mut candidates = vec![root.join(path)];
+    if let Some(base) = path.strip_suffix(".rs") {
+        candidates.push(root.join(base).join("mod.rs"));
+    } else {
+        candidates.push(root.join(path).join("mod.rs"));
+    }
+    candidates
 }
 
 pub(super) fn collect_hits_in_paths<F>(

@@ -3,12 +3,13 @@ use std::path::Path;
 
 use super::{
     assert_file_contains_needles, assert_file_lacks_needles, collect_hits_in_paths, read_repo_file,
+    repo_path_exists,
 };
 
 #[test]
 fn create_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let create = fs::read_to_string(root.join("src/create/mod.rs")).unwrap();
+    let create = read_repo_file(root, "src/create/mod.rs");
 
     for needle in [
         "fn suite_path_joins_suite_md()",
@@ -22,7 +23,7 @@ fn create_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/create/tests.rs").exists(),
+        repo_path_exists(root, "src/create/tests.rs"),
         "create split test module should exist"
     );
 }
