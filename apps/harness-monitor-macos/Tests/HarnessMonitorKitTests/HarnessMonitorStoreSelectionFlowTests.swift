@@ -1,6 +1,6 @@
 import Observation
-import Testing
 import SwiftData
+import Testing
 
 @testable import HarnessMonitorKit
 
@@ -222,12 +222,16 @@ struct HarnessMonitorStoreSelectionFlowTests {
 
     #expect(store.selectedSession?.session.sessionId == summary.sessionId)
     #expect(store.timeline == cachedTimeline)
-    #expect(store.isShowingCachedData)
+    // Cache acts as a scaffold while the live fetch is still in flight; the
+    // persistence banner must not fire just because a scaffold is on screen.
+    #expect(store.isShowingCachedData == false)
+    #expect(store.sessionDataAvailability == .live)
 
     await selectionTask.value
 
     #expect(store.timeline == liveTimeline)
     #expect(store.isShowingCachedData == false)
+    #expect(store.sessionDataAvailability == .live)
   }
 
   @Test("Selecting a cached session validates the latest window with the cached revision")
