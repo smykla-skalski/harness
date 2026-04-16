@@ -33,6 +33,59 @@ fn remove_agent_returns_tasks() {
 }
 
 #[test]
+fn assign_task_keeps_task_open_until_worker_starts() {
+    with_temp_project(|project| {
+        let state =
+            start_session("test", "", project, Some("claude"), Some("assign-open")).expect("start");
+        let leader_id = state.leader_id.expect("leader id");
+        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("assign-worker"))], || {
+            join_session(
+                "assign-open",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join")
+        });
+        let worker_id = joined
+            .agents
+            .keys()
+            .find(|id| id.starts_with("codex-"))
+            .expect("worker id")
+            .clone();
+        let task = create_task(
+            "assign-open",
+            "observer follow-up",
+            Some("wait for the worker to actually start"),
+            TaskSeverity::Medium,
+            &leader_id,
+            project,
+        )
+        .expect("task");
+
+        assign_task(
+            "assign-open",
+            &task.task_id,
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect("assign");
+
+        let state = session_status("assign-open", project).expect("status");
+        let task = state.tasks.get(&task.task_id).expect("task");
+        assert_eq!(task.status, TaskStatus::Open);
+        assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
+        assert!(task.queued_at.is_none());
+        let worker = state.agents.get(&worker_id).expect("worker");
+        assert_eq!(worker.current_task_id.as_deref(), Some(task.task_id.as_str()));
+    });
+}
+
+#[test]
 fn drop_task_queues_for_busy_worker() {
     with_temp_project(|project| {
         let state = start_session("test", "", project, Some("claude"), Some("drop-queue-busy"))
