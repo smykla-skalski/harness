@@ -1,6 +1,13 @@
 import Foundation
 import SwiftData
 
+public extension VersionedSchema {
+  static var versionString: String {
+    let version = versionIdentifier
+    return "\(version.major).\(version.minor).\(version.patch)"
+  }
+}
+
 public enum HarnessMonitorSchemaV1: VersionedSchema {
   public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
@@ -46,11 +53,6 @@ public enum HarnessMonitorSchemaV2: VersionedSchema {
 public enum HarnessMonitorSchemaV3: VersionedSchema {
   public static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
 
-  public static var versionString: String {
-    let version = versionIdentifier
-    return "\(version.major).\(version.minor).\(version.patch)"
-  }
-
   public static var models: [any PersistentModel.Type] {
     [
       Self.CachedProject.self,
@@ -72,11 +74,6 @@ public enum HarnessMonitorSchemaV3: VersionedSchema {
 public enum HarnessMonitorSchemaV4: VersionedSchema {
   public static var versionIdentifier: Schema.Version { Schema.Version(4, 0, 0) }
 
-  public static var versionString: String {
-    let version = versionIdentifier
-    return "\(version.major).\(version.minor).\(version.patch)"
-  }
-
   public static var models: [any PersistentModel.Type] {
     [
       Self.CachedProject.self,
@@ -97,11 +94,6 @@ public enum HarnessMonitorSchemaV4: VersionedSchema {
 
 public enum HarnessMonitorSchemaV5: VersionedSchema {
   public static var versionIdentifier: Schema.Version { Schema.Version(5, 0, 0) }
-
-  public static var versionString: String {
-    let version = versionIdentifier
-    return "\(version.major).\(version.minor).\(version.patch)"
-  }
 
   public static var models: [any PersistentModel.Type] {
     [
@@ -182,3 +174,5 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     toVersion: HarnessMonitorSchemaV5.self
   )
 }
+
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV5
