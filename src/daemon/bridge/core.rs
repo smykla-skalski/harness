@@ -5,9 +5,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::broadcast;
 
-use crate::daemon::agent_tui::{AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiSnapshotContext};
+use crate::daemon::agent_tui::{
+    AgentTuiAttachState, AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiSnapshotContext,
+};
 use crate::errors::{CliError, CliErrorKind};
 
 use super::types::{BridgeCapability, PersistedBridgeConfig};
@@ -90,11 +91,7 @@ pub(super) enum BridgeRequest {
 
 pub(super) enum BridgeHandleResult {
     Response(BridgeResponse),
-    AttachStream(
-        BridgeResponse,
-        Arc<AgentTuiProcess>,
-        broadcast::Receiver<Vec<u8>>,
-    ),
+    AttachStream(BridgeResponse, Arc<AgentTuiProcess>, AgentTuiAttachState),
 }
 
 impl From<BridgeResponse> for BridgeHandleResult {

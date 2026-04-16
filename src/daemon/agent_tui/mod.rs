@@ -39,7 +39,7 @@ pub use screen::{TerminalScreenParser, TerminalScreenSnapshot};
 #[allow(unused_imports)]
 pub(crate) use manager::ActiveAgentTui;
 #[allow(unused_imports)]
-pub(crate) use process::{AgentTuiSnapshotContext, snapshot_from_process};
+pub(crate) use process::{AgentTuiAttachState, AgentTuiSnapshotContext, snapshot_from_process};
 #[allow(unused_imports)]
 pub(crate) use readiness::{ReadinessSignal, signal_readiness_ready};
 #[allow(unused_imports)]
