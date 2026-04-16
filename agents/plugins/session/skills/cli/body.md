@@ -1,6 +1,17 @@
 # Harness CLI reference
 
-Use this skill as the entrypoint for `harness` CLI guidance from the repo's
-actual command surface. Until richer references land here, use
-`harness ... --help` plus repo source to answer command, flag, and recovery-flow
-questions accurately.
+## What this skill is for
+
+Use this skill to answer `harness` CLI questions from checked-in references backed by live command help and Clap source.
+
+## How to answer
+
+1. Read the relevant file in `references/` first.
+2. If the reference is missing detail or may be stale, run `cargo run --quiet -- ... --help` for the exact command path.
+3. Cite the exact reference file, help command, and source file you used.
+4. Do not invent commands, flags, defaults, or hidden behavior.
+
+## Reference map
+
+- `references/top-level-and-hidden.md` — visible top-level commands, hidden top-level commands, global `--delay`
+- `references/setup-create.md` — `setup` and `create` command surfaces, key flags, bootstrap/generate shortcuts
