@@ -3,12 +3,14 @@ use clap::Subcommand;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
+mod attach;
 mod session_commands;
 mod signal;
 mod support;
 mod task;
 mod tui;
 
+pub use attach::TuiAttachArgs;
 pub use session_commands::{
     SessionAssignArgs, SessionEndArgs, SessionJoinArgs, SessionLeaveArgs, SessionListArgs,
     SessionObserveArgs, SessionRemoveArgs, SessionStartArgs, SessionStatusArgs, SessionSyncArgs,
@@ -97,6 +99,8 @@ pub enum SessionSignalCommand {
 pub enum SessionTuiCommand {
     /// Start an agent runtime in a managed PTY.
     Start(TuiStartArgs),
+    /// Attach to an active managed TUI process.
+    Attach(TuiAttachArgs),
     /// List managed TUIs for a session.
     List(TuiListArgs),
     /// Show the latest snapshot for one managed TUI.
@@ -156,6 +160,7 @@ impl Execute for SessionTuiCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
             Self::Start(args) => args.execute(context),
+            Self::Attach(args) => args.execute(context),
             Self::List(args) => args.execute(context),
             Self::Show(args) => args.execute(context),
             Self::Input(args) => args.execute(context),

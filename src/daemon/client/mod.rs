@@ -21,6 +21,18 @@ pub struct DaemonClient {
     http: reqwest::Client,
 }
 
+impl DaemonClient {
+    #[must_use]
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    #[must_use]
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+}
+
 const HEALTH_TIMEOUT: Duration = Duration::from_millis(500);
 const API_READY_TIMEOUT: Duration = Duration::from_secs(2);
 const API_READY_INTERVAL: Duration = Duration::from_millis(100);
