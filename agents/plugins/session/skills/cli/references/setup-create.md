@@ -5,6 +5,7 @@
 | Command | Purpose | Key surface |
 | --- | --- | --- |
 | `setup bootstrap` | Install or refresh the repo-aware harness wrapper and write agent bootstrap config | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...` |
+| `setup agents` | Setup entrypoint for harness-managed agent asset commands | Subcommand: `generate` |
 | `setup agents generate` | Generate checked-in multi-agent skills and plugin assets | `--check`, `--target <TARGET>` |
 | `setup kuma` | Kuma-specific setup entrypoint | Subcommand: `cluster` |
 | `setup gateway` | Check, install, or uninstall Gateway API CRDs | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` |

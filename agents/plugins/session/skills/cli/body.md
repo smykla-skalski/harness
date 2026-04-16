@@ -7,7 +7,7 @@ Use this skill to answer `harness` CLI questions from checked-in references back
 ## How to answer
 
 1. Read the relevant file in `references/` first.
-2. If the reference is missing detail or may be stale, run `cargo run --quiet -- ... --help` for the exact command path.
+2. If the reference is missing detail or may be stale, run `harness ... --help` for the exact command path.
 3. Cite the exact reference file, help command, and source file you used.
 4. Do not invent commands, flags, defaults, or hidden behavior.
 
