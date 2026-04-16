@@ -52,6 +52,42 @@ extension HarnessMonitorContentSelectionTests {
     #expect(slice.presentedTimeline == PreviewFixtures.timeline)
   }
 
+  @Test(
+    "presentedSessionDetail retains refreshed signals when the same session identity stays selected"
+  )
+  func presentedSessionDetailRetainsRefreshedSignalsForStableSessionIdentity() async {
+    let slice = HarnessMonitorStore.ContentSessionDetailSlice()
+
+    slice.apply(
+      HarnessMonitorStore.ContentSessionDetailState(
+        selectedSessionDetail: PreviewFixtures.signalRegressionPrimaryCoreDetail,
+        timeline: PreviewFixtures.timeline,
+        retainPresentedDetailWhenSelectionClears: true
+      ),
+      selectedSessionSummary: PreviewFixtures.summary
+    )
+
+    slice.apply(
+      HarnessMonitorStore.ContentSessionDetailState(
+        selectedSessionDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline,
+        retainPresentedDetailWhenSelectionClears: true
+      ),
+      selectedSessionSummary: PreviewFixtures.summary
+    )
+
+    slice.apply(
+      HarnessMonitorStore.ContentSessionDetailState(
+        selectedSessionDetail: nil,
+        timeline: [],
+        retainPresentedDetailWhenSelectionClears: true
+      ),
+      selectedSessionSummary: PreviewFixtures.summary
+    )
+
+    #expect(slice.presentedSessionDetail?.signals == PreviewFixtures.signals)
+  }
+
   @Test("Content session detail state tracks selected session detail and timeline")
   func contentSessionDetailStateTracksSelectedSessionDetailAndTimeline() async {
     let store = await makeBootstrappedStore()

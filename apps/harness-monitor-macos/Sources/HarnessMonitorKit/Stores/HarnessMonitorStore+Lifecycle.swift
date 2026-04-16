@@ -20,6 +20,7 @@ extension HarnessMonitorStore {
 
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
+      let expectsDeferredExtensions = detailScope == "core"
       let measuredDetail = try await Self.measureOperation {
         try await client.sessionDetail(id: sessionID, scope: detailScope)
       }
@@ -32,16 +33,22 @@ extension HarnessMonitorStore {
         detail = detail.merging(extensions: buffered)
         pendingExtensions = nil
         isExtensionsLoading = false
+      } else {
+        detail = sessionDetailPreservingSelectedExtensions(
+          sessionID: sessionID,
+          detail: detail,
+          extensionsPending: expectsDeferredExtensions
+        )
       }
       detail = sessionDetailPreservingFresherSelectedSummary(
         sessionID: sessionID,
         detail: detail
       )
 
-      let preserveVisibleTimeline =
-        selectedSession?.session.sessionId == sessionID && !timeline.isEmpty
-      let preservedTimeline = preserveVisibleTimeline ? timeline : []
-      let preservedTimelineWindow = preserveVisibleTimeline ? timelineWindow : nil
+      let preservedTimelineSnapshot = visiblePresentedTimelineSnapshot(sessionID: sessionID)
+      let preserveVisibleTimeline = preservedTimelineSnapshot != nil
+      let preservedTimeline = preservedTimelineSnapshot?.timeline ?? []
+      let preservedTimelineWindow = preservedTimelineSnapshot?.timelineWindow
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
