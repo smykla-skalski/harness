@@ -54,17 +54,17 @@ pub(super) fn create_work_items_for_issues(
     let Some(actor_id) = actor_id.filter(|value| !value.trim().is_empty()) else {
         return Ok(());
     };
-    let mut known_titles: HashSet<String> = state
+    let mut known_issue_ids: HashSet<String> = state
         .tasks
         .values()
-        .map(|task| task.title.clone())
+        .filter_map(|task| task.observe_issue_id.clone())
         .collect();
 
     for issue in issues {
-        let title = format!("[{}] {}", issue.code, issue.summary);
-        if !known_titles.insert(title.clone()) {
+        if !known_issue_ids.insert(issue.id.clone()) {
             continue;
         }
+        let title = format!("[{}] {}", issue.code, issue.summary);
         let spec = TaskSpec {
             title: &title,
             context: Some(&issue.details),

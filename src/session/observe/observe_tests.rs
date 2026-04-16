@@ -137,7 +137,7 @@ fn observe_without_actor_stays_read_only() {
 }
 
 #[test]
-fn observe_deduplicates_titles_created_in_same_pass() {
+fn observe_keeps_distinct_issue_ids_when_titles_match() {
     with_temp_project(|project| {
         let state =
             service::start_session("observe test", "", project, Some("claude"), Some("sess-3"))
@@ -152,11 +152,48 @@ fn observe_deduplicates_titles_created_in_same_pass() {
             .expect("create deduplicated tasks");
 
         let tasks = service::list_tasks("sess-3", None, project).expect("list tasks");
-        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks.len(), 2);
         assert_eq!(
             tasks[0].severity,
             TaskSeverity::Critical,
             "task severity should follow the issue severity",
         );
+    });
+}
+
+#[test]
+fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
+    with_temp_project(|project| {
+        let state =
+            service::start_session("observe test", "", project, Some("claude"), Some("sess-4"))
+                .expect("start session");
+        let leader_id = state.leader_id.clone().expect("leader id");
+        let issue = infrastructure_issue("fingerprint-a");
+
+        create_work_items_for_issues(
+            std::slice::from_ref(&issue),
+            "sess-4",
+            &state,
+            project,
+            Some(&leader_id),
+        )
+        .expect("create initial task");
+
+        let reloaded = service::session_status("sess-4", project).expect("reload session");
+        let mut updated_issue = issue.clone();
+        updated_issue.summary = "Harness infrastructure issue renamed after retry".to_string();
+
+        create_work_items_for_issues(
+            std::slice::from_ref(&updated_issue),
+            "sess-4",
+            &reloaded,
+            project,
+            Some(&leader_id),
+        )
+        .expect("skip duplicate issue");
+
+        let tasks = service::list_tasks("sess-4", None, project).expect("list tasks");
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].observe_issue_id.as_deref(), Some(issue.id.as_str()));
     });
 }

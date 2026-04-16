@@ -4,7 +4,7 @@ use super::{
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
     generate_signal_id, next_task_id, protocol, refresh_session, require_active,
-    require_active_target_agent, require_permission, start_next_locked_task_for_worker,
+    require_active_worker_target_agent, require_permission, start_next_locked_task_for_worker,
     start_task_for_agent, task_not_found, touch_agent,
 };
 
@@ -34,6 +34,7 @@ pub(crate) fn apply_create_task(
         notes: Vec::new(),
         suggested_fix: spec.suggested_fix.map(ToString::to_string),
         source: spec.source,
+        observe_issue_id: spec.observe_issue_id.map(ToString::to_string),
         blocked_reason: None,
         completed_at: None,
         checkpoint_summary: None,
@@ -54,7 +55,7 @@ pub(crate) fn apply_assign_task(
 ) -> Result<(), CliError> {
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::AssignTask)?;
-    require_active_target_agent(state, agent_id)?;
+    require_active_worker_target_agent(state, agent_id)?;
 
     let previous_assignee = state
         .tasks

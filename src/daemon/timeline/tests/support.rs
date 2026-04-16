@@ -224,6 +224,7 @@ fn sample_state_for_runtime(
             notes: Vec::new(),
             suggested_fix: None,
             source: crate::session::types::TaskSource::Manual,
+            observe_issue_id: None,
             blocked_reason: None,
             completed_at: None,
             checkpoint_summary: None,

@@ -27,6 +27,8 @@ pub struct WorkItem {
     #[serde(default)]
     pub source: TaskSource,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observe_issue_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<String>,
