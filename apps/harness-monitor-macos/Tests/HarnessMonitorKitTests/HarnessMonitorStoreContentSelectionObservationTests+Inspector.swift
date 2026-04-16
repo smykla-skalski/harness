@@ -58,8 +58,8 @@ extension HarnessMonitorContentSelectionTests {
   }
 
   @Test(
-    "Selected-session summary refresh clears retained cockpit until fresh detail arrives")
-  func selectedSessionSummaryRefreshClearsRetainedCockpitUntilFreshDetailArrives() async {
+    "Selected-session summary refresh keeps the prior cockpit visible while fresh detail reloads")
+  func selectedSessionSummaryRefreshKeepsCockpitVisibleWhileFreshDetailReloads() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
@@ -97,8 +97,8 @@ extension HarnessMonitorContentSelectionTests {
     #expect(store.contentUI.session.selectedSessionSummary == updatedSummary)
     #expect(store.selectedSession == nil)
     #expect(store.contentUI.sessionDetail.selectedSessionDetail == nil)
-    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
-    #expect(store.contentUI.sessionDetail.presentedTimeline.isEmpty)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == PreviewFixtures.detail)
+    #expect(store.contentUI.sessionDetail.presentedTimeline == PreviewFixtures.timeline)
     #expect(store.contentUI.session.isSelectionLoading)
   }
 
