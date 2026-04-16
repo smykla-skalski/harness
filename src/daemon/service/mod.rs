@@ -16,8 +16,7 @@ use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionRole, SessionState, SessionStatus,
-    SessionTransition, TaskSource,
+    AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
 };
 use crate::session::{
     observe as session_observe, service as session_service, storage as session_storage,

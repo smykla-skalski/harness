@@ -13,6 +13,7 @@ fn session_start_request_round_trips() {
         runtime: "claude".into(),
         session_id: Some("my-session".into()),
         project_dir: "/tmp/project".into(),
+        policy_preset: Some("swarm-default".into()),
     };
     let json = serde_json::to_value(&request).expect("serialize");
     assert_eq!(json["title"], "auth fix session");
@@ -20,11 +21,13 @@ fn session_start_request_round_trips() {
     assert_eq!(json["runtime"], "claude");
     assert_eq!(json["session_id"], "my-session");
     assert_eq!(json["project_dir"], "/tmp/project");
+    assert_eq!(json["policy_preset"], "swarm-default");
 
     let back: SessionStartRequest = serde_json::from_value(json).expect("deserialize");
     assert_eq!(back.title, "auth fix session");
     assert_eq!(back.context, "fix auth bug");
     assert_eq!(back.session_id.as_deref(), Some("my-session"));
+    assert_eq!(back.policy_preset.as_deref(), Some("swarm-default"));
 }
 
 #[test]
@@ -36,6 +39,7 @@ fn session_start_request_optional_session_id() {
     });
     let request: SessionStartRequest = serde_json::from_value(json).expect("deserialize");
     assert!(request.session_id.is_none());
+    assert!(request.policy_preset.is_none());
 
     let serialized = serde_json::to_value(&request).expect("serialize");
     assert!(serialized.get("session_id").is_none());
@@ -46,6 +50,7 @@ fn session_join_request_round_trips() {
     let request = SessionJoinRequest {
         runtime: "codex".into(),
         role: SessionRole::Worker,
+        fallback_role: Some(SessionRole::Observer),
         capabilities: vec!["general".into()],
         name: Some("codex worker".into()),
         project_dir: "/tmp/project".into(),
@@ -57,6 +62,7 @@ fn session_join_request_round_trips() {
     let back: SessionJoinRequest = serde_json::from_value(json).expect("deserialize");
     assert_eq!(back.runtime, "codex");
     assert_eq!(back.role, SessionRole::Worker);
+    assert_eq!(back.fallback_role, Some(SessionRole::Observer));
     assert_eq!(back.capabilities, vec!["general"]);
 }
 
@@ -69,6 +75,7 @@ fn session_join_request_defaults_empty_capabilities() {
     });
     let request: SessionJoinRequest = serde_json::from_value(json).expect("deserialize");
     assert!(request.capabilities.is_empty());
+    assert!(request.fallback_role.is_none());
     assert!(request.name.is_none());
 }
 

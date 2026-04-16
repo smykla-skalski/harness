@@ -106,8 +106,8 @@ mod tasks;
 mod tests;
 
 pub use lifecycle::{
-    assign_role, end_session, join_session, leave_session, remove_agent, start_session,
-    transfer_leader,
+    assign_role, end_session, join_session, join_session_with_fallback, leave_session,
+    remove_agent, start_session, start_session_with_policy, transfer_leader,
 };
 pub use liveness::{LivenessSyncResult, sync_agent_liveness};
 pub use queries::{

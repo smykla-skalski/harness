@@ -60,6 +60,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                         runtime: "claude".into(),
                         session_id: Some("daemon-async-signal-send".into()),
                         project_dir: project.to_string_lossy().into(),
+                        policy_preset: None,
                     },
                     &async_db,
                 )
@@ -71,6 +72,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: None,
                         project_dir: project.to_string_lossy().into(),
@@ -135,6 +137,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                             runtime: "claude".into(),
                             session_id: Some("daemon-async-signal-cancel".into()),
                             project_dir: project.to_string_lossy().into(),
+                            policy_preset: None,
                         },
                         &async_db,
                     )
@@ -146,6 +149,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                         &crate::daemon::protocol::SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec![],
                             name: None,
                             project_dir: project.to_string_lossy().into(),
@@ -221,6 +225,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                         runtime: "claude".into(),
                         session_id: Some("daemon-async-signal-ack".into()),
                         project_dir: project.to_string_lossy().into(),
+                        policy_preset: None,
                     },
                     &async_db,
                 )
@@ -232,6 +237,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
+                        fallback_role: None,
                         capabilities: vec![],
                         name: None,
                         project_dir: project.to_string_lossy().into(),
@@ -313,6 +319,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                             runtime: "claude".into(),
                             session_id: Some("daemon-async-signal-expired".into()),
                             project_dir: project.to_string_lossy().into(),
+                            policy_preset: None,
                         },
                         &async_db,
                     )
@@ -324,6 +331,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                         &crate::daemon::protocol::SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec![],
                             name: None,
                             project_dir: project.to_string_lossy().into(),

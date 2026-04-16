@@ -1,7 +1,7 @@
 use super::{
-    CliError, CliErrorKind, Path, SessionRole, SessionState, agents_service, build_log_entry,
-    index, record_signal_ack, resolve_hook_agent, session_not_found, session_service,
-    session_storage, utc_now,
+    CliError, CliErrorKind, Path, SessionState, agents_service, build_log_entry, index,
+    record_signal_ack, resolve_hook_agent, session_not_found, session_service, session_storage,
+    utc_now,
 };
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
@@ -30,13 +30,14 @@ pub fn start_session_direct(
         .clone()
         .unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().format("%Y%m%d%H%M%S%f")));
 
-    let state = session_service::build_new_session(
+    let state = session_service::build_new_session_with_policy(
         &request.context,
         &request.title,
         &session_id,
         runtime_name,
         leader_agent_session_id.as_deref(),
         &now,
+        request.policy_preset.as_deref(),
     );
 
     if let Some(db) = db {
@@ -88,13 +89,14 @@ pub(crate) async fn start_session_direct_async(
         .clone()
         .unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().format("%Y%m%d%H%M%S%f")));
 
-    let state = session_service::build_new_session(
+    let state = session_service::build_new_session_with_policy(
         &request.context,
         &request.title,
         &session_id,
         runtime_name,
         leader_agent_session_id.as_deref(),
         &now,
+        request.policy_preset.as_deref(),
     );
 
     let project_id = ensure_project_registered_async(async_db, project_dir).await?;
@@ -142,12 +144,6 @@ pub fn join_session_direct(
     request: &super::protocol::SessionJoinRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
-    if request.role == SessionRole::Leader {
-        return Err(CliErrorKind::session_agent_conflict(
-            "daemon join requests cannot claim the leader role",
-        )
-        .into());
-    }
     let display_name = request
         .name
         .clone()
@@ -162,11 +158,13 @@ pub fn join_session_direct(
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
         let now = utc_now();
+        let joined_role =
+            session_service::resolve_join_role(&state, request.role, request.fallback_role)?;
         let agent_id = session_service::apply_join_session(
             &mut state,
             &display_name,
             &request.runtime,
-            request.role,
+            joined_role,
             &request.capabilities,
             agent_session_id.as_deref(),
             &now,
@@ -178,7 +176,7 @@ pub fn join_session_direct(
         db.save_session_state(&project_id, &state)?;
         db.append_log_entry(&build_log_entry(
             session_id,
-            session_service::log_agent_joined(&agent_id, request.role, &request.runtime),
+            session_service::log_agent_joined(&agent_id, joined_role, &request.runtime),
             None,
             None,
         ))?;
@@ -188,9 +186,10 @@ pub fn join_session_direct(
     }
 
     // File-based fallback
-    session_service::join_session(
+    session_service::join_session_with_fallback(
         session_id,
         request.role,
+        request.fallback_role,
         &request.runtime,
         &request.capabilities,
         request.name.as_deref(),
@@ -209,12 +208,6 @@ pub(crate) async fn join_session_direct_async(
     request: &super::protocol::SessionJoinRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    if request.role == SessionRole::Leader {
-        return Err(CliErrorKind::session_agent_conflict(
-            "daemon join requests cannot claim the leader role",
-        )
-        .into());
-    }
     let display_name = request
         .name
         .clone()
@@ -230,11 +223,13 @@ pub(crate) async fn join_session_direct_async(
         .await?
         .ok_or_else(|| session_not_found(session_id))?;
     let now = utc_now();
+    let joined_role =
+        session_service::resolve_join_role(&resolved.state, request.role, request.fallback_role)?;
     let agent_id = session_service::apply_join_session(
         &mut resolved.state,
         &display_name,
         &request.runtime,
-        request.role,
+        joined_role,
         &request.capabilities,
         agent_session_id.as_deref(),
         &now,
@@ -246,7 +241,7 @@ pub(crate) async fn join_session_direct_async(
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
-            session_service::log_agent_joined(&agent_id, request.role, &request.runtime),
+            session_service::log_agent_joined(&agent_id, joined_role, &request.runtime),
             None,
             None,
         ))

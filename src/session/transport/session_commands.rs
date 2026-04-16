@@ -25,17 +25,21 @@ pub struct SessionStartArgs {
     /// Explicit session ID (auto-generated if omitted).
     #[arg(long)]
     pub session_id: Option<String>,
+    /// Session policy preset.
+    #[arg(long)]
+    pub policy_preset: Option<String>,
 }
 
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
-        let state = service::start_session(
+        let state = service::start_session_with_policy(
             &self.context,
             &self.title,
             project.as_ref(),
             self.runtime.map(agent_to_str),
             self.session_id.as_deref(),
+            self.policy_preset.as_deref(),
         )?;
         print_json(&state)?;
         Ok(0)
@@ -52,6 +56,9 @@ pub struct SessionJoinArgs {
     /// Agent runtime.
     #[arg(long, value_enum)]
     pub runtime: HookAgent,
+    /// Fallback role to use when joining as leader and a leader already exists.
+    #[arg(long, value_enum)]
+    pub fallback_role: Option<SessionRole>,
     /// Comma-separated capability tags.
     #[arg(long)]
     pub capabilities: Option<String>,
@@ -83,9 +90,10 @@ impl Execute for SessionJoinArgs {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        let state = service::join_session(
+        let state = service::join_session_with_fallback(
             &self.session_id,
             self.role,
+            self.fallback_role,
             agent_to_str(self.runtime),
             &capabilities,
             self.name.as_deref(),

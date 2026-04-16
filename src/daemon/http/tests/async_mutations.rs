@@ -100,6 +100,7 @@ pub(super) async fn start_async_http_session(
             runtime: "claude".into(),
             session_id: Some(session_id.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),
+            policy_preset: None,
         }),
     )
     .await;
@@ -178,6 +179,7 @@ fn post_session_join_uses_async_db_when_sync_db_is_unavailable() {
                         Json(SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec!["general".into()],
                             name: Some("Async HTTP Worker".into()),
                             project_dir: project_dir.to_string_lossy().into_owned(),
@@ -279,6 +281,7 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
                         Json(SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
+                            fallback_role: None,
                             capabilities: vec!["general".into()],
                             name: Some("Async Task Worker".into()),
                             project_dir: project_dir.to_string_lossy().into_owned(),

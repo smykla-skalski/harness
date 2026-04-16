@@ -7,6 +7,10 @@ use super::{
 };
 use crate::session::types::SessionPolicy;
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "session creation threads transport fields through file-backed persistence"
+)]
 pub(crate) fn create_initial_session(
     context: &str,
     title: &str,
@@ -15,6 +19,7 @@ pub(crate) fn create_initial_session(
     agent_session_id: Option<&str>,
     now: &str,
     project_dir: &Path,
+    policy_preset: Option<&str>,
 ) -> Result<SessionState, CliError> {
     if let Some(session_id) = session_id
         .filter(|value| !value.trim().is_empty())
@@ -27,6 +32,7 @@ pub(crate) fn create_initial_session(
             runtime_name,
             agent_session_id,
             now,
+            policy_preset,
         );
         if !storage::create_state(project_dir, &session_id, &candidate)? {
             return Err(CliErrorKind::session_agent_conflict(format!(
@@ -46,6 +52,7 @@ pub(crate) fn create_initial_session(
             runtime_name,
             agent_session_id,
             now,
+            policy_preset,
         );
         if storage::create_state(project_dir, &session_id, &candidate)? {
             return Ok(candidate);
@@ -191,6 +198,7 @@ pub(crate) fn build_initial_state(
     runtime_name: &str,
     agent_session_id: Option<&str>,
     now: &str,
+    policy_preset: Option<&str>,
 ) -> SessionState {
     let leader_id = format!("{runtime_name}-leader");
     let mut agents = BTreeMap::new();
@@ -220,7 +228,7 @@ pub(crate) fn build_initial_state(
         title: title.to_string(),
         context: context.to_string(),
         status: SessionStatus::Active,
-        policy: SessionPolicy::default(),
+        policy: policy_for_preset(policy_preset),
         created_at: now.to_string(),
         updated_at: now.to_string(),
         agents,
@@ -234,6 +242,10 @@ pub(crate) fn build_initial_state(
     };
     refresh_session(&mut state, now);
     state
+}
+
+fn policy_for_preset(_policy_preset: Option<&str>) -> SessionPolicy {
+    SessionPolicy::default()
 }
 
 pub(crate) fn require_active_target_agent(

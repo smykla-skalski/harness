@@ -55,6 +55,7 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
             &AgentTuiStartRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec![],
                 name: Some("Transcript refresh".into()),
                 prompt: None,
@@ -149,6 +150,7 @@ fn manager_start_does_not_pre_register() {
             &AgentTuiStartRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
+                fallback_role: None,
                 capabilities: vec![],
                 name: None,
                 prompt: None,
@@ -220,6 +222,7 @@ fn manager_auto_join_prompt_in_transcript() {
             &AgentTuiStartRequest {
                 runtime: "gemini".into(),
                 role: SessionRole::Observer,
+                fallback_role: None,
                 capabilities: vec!["my-cap".into()],
                 name: Some("auto join agent".into()),
                 prompt: None,
@@ -236,6 +239,7 @@ fn manager_auto_join_prompt_in_transcript() {
         "gemini",
         "sess-auto-join",
         SessionRole::Observer,
+        None,
         &["my-cap".to_string()],
         &snapshot.tui_id,
         Some("auto join agent"),

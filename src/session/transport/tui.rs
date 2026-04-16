@@ -22,6 +22,9 @@ pub struct TuiStartArgs {
     /// Role to register the managed TUI agent as.
     #[arg(long, value_enum, default_value = "worker")]
     pub role: SessionRole,
+    /// Fallback role to use when joining as leader and a leader already exists.
+    #[arg(long, value_enum)]
+    pub fallback_role: Option<SessionRole>,
     /// Capability tag. May be repeated or comma-separated.
     #[arg(long = "capability")]
     pub capabilities: Vec<String>,
@@ -53,6 +56,7 @@ impl Execute for TuiStartArgs {
         let request = AgentTuiStartRequest {
             runtime: agent_to_str(self.runtime).to_string(),
             role: self.role,
+            fallback_role: self.fallback_role,
             capabilities: capability_args(&self.capabilities),
             name: self.name.clone(),
             prompt: self.prompt.clone(),
