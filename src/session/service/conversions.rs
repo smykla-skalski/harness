@@ -2,6 +2,7 @@ use super::{
     BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, DaemonClient, ResolvedRuntimeSessionAgent,
     SessionState, SessionStatus, protocol, runtime_session_matches_agent,
 };
+use crate::session::types::SessionPolicy;
 
 pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
     let agents = detail
@@ -21,7 +22,7 @@ pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> Sessi
         title: detail.session.title.clone(),
         context: detail.session.context.clone(),
         status: detail.session.status,
-        policy: Default::default(),
+        policy: SessionPolicy::default(),
         created_at: detail.session.created_at.clone(),
         updated_at: detail.session.updated_at.clone(),
         agents,
@@ -47,7 +48,7 @@ pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> Se
         title: summary.title.clone(),
         context: summary.context.clone(),
         status: summary.status,
-        policy: Default::default(),
+        policy: SessionPolicy::default(),
         created_at: summary.created_at.clone(),
         updated_at: summary.updated_at.clone(),
         agents: BTreeMap::new(),
