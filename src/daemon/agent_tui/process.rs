@@ -63,8 +63,7 @@ pub struct AgentTuiProcess {
     transcript: Shared<Vec<u8>>,
     persisted_transcript_len: Shared<usize>,
     screen: Shared<TerminalScreenParser>,
-    #[allow(dead_code)]
-    pub(crate) broadcast_tx: broadcast::Sender<Vec<u8>>,
+    pub(crate) broadcast_rx: broadcast::Receiver<Vec<u8>>,
     reader_thread: Option<JoinHandle<()>>,
     readiness: ReadinessSignal,
 }
@@ -92,7 +91,7 @@ impl AgentTuiProcess {
             CliErrorKind::workflow_io(format!("take agent TUI PTY writer: {error}"))
         })?;
 
-        let (broadcast_tx, _) = broadcast::channel(1024);
+        let (broadcast_tx, broadcast_rx) = broadcast::channel(1024);
         let transcript = Arc::new(Mutex::new(Vec::new()));
         let persisted_transcript_len = Arc::new(Mutex::new(0_usize));
         let screen = Arc::new(Mutex::new(TerminalScreenParser::new(spec.size)));
@@ -104,7 +103,7 @@ impl AgentTuiProcess {
             spec.readiness_pattern,
             spec.screen_text_fallback,
             Arc::clone(&readiness),
-            broadcast_tx.clone(),
+            broadcast_tx,
         );
 
         Ok(Self {
@@ -114,7 +113,7 @@ impl AgentTuiProcess {
             transcript,
             persisted_transcript_len,
             screen,
-            broadcast_tx,
+            broadcast_rx,
             reader_thread: Some(reader_thread),
             readiness,
         })

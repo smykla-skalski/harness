@@ -9,6 +9,7 @@ mod detached;
 mod helpers;
 mod runtime;
 mod server;
+mod stream_handler;
 mod types;
 
 #[allow(unused_imports)]

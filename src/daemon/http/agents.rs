@@ -47,6 +47,7 @@ pub(super) fn agent_tui_routes() -> Router<DaemonHttpState> {
         )
         .route("/v1/agent-tuis/{tui_id}/stop", post(post_agent_tui_stop))
         .route("/v1/agent-tuis/{tui_id}/ready", post(post_agent_tui_ready))
+        .route("/v1/agent-tuis/{tui_id}/attach", get(get_agent_tui_attach))
 }
 
 pub(super) async fn post_role_change(
@@ -337,4 +338,132 @@ async fn post_agent_tui_ready(
         start,
         state.agent_tui_manager.signal_ready(&tui_id),
     )
+}
+
+#[expect(clippy::absolute_paths, reason = "axum::extract::ws::WebSocketUpgrade")]
+#[expect(clippy::too_many_lines, reason = "tokio select proxying loop")]
+pub(super) async fn get_agent_tui_attach(
+    Path(tui_id): Path<String>,
+    headers: HeaderMap,
+    ws: axum::extract::ws::WebSocketUpgrade,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+
+    if state.agent_tui_manager.state.sandboxed {
+        let stream_result = tokio::task::block_in_place(|| {
+            crate::daemon::bridge::BridgeClient::for_capability(
+                crate::daemon::bridge::BridgeCapability::AgentTui,
+            )
+            .and_then(|c| c.agent_tui_attach(&tui_id))
+        });
+
+        let stream = match stream_result {
+            Ok(s) => s,
+            Err(e) => {
+                return super::response::timed_json(
+                    "GET",
+                    "/v1/agent-tuis/{id}/attach",
+                    &request_id,
+                    start,
+                    Err::<(), _>(e),
+                );
+            }
+        };
+
+        if let Err(e) = stream.set_nonblocking(true) {
+            return super::response::timed_json(
+                "GET",
+                "/v1/agent-tuis/{id}/attach",
+                &request_id,
+                start,
+                Err::<(), _>(CliError::from(crate::errors::CliErrorKind::workflow_io(
+                    e.to_string(),
+                ))),
+            );
+        }
+
+        let mut tokio_stream = match tokio::net::UnixStream::from_std(stream) {
+            Ok(s) => s,
+            Err(e) => {
+                return super::response::timed_json(
+                    "GET",
+                    "/v1/agent-tuis/{id}/attach",
+                    &request_id,
+                    start,
+                    Err::<(), _>(CliError::from(crate::errors::CliErrorKind::workflow_io(
+                        e.to_string(),
+                    ))),
+                );
+            }
+        };
+
+        return ws.on_upgrade(move |mut socket: axum::extract::ws::WebSocket| async move {
+            let mut buf = [0u8; 4096];
+            loop {
+                tokio::select! {
+                    msg = socket.recv() => {
+                        use tokio::io::AsyncWriteExt;
+                        if let Some(Ok(axum::extract::ws::Message::Binary(bytes))) = msg {
+                            if tokio_stream.write_all(&bytes).await.is_err() { break; }
+                        } else if let Some(Ok(axum::extract::ws::Message::Text(text))) = msg {
+                            if tokio_stream.write_all(text.as_bytes()).await.is_err() { break; }
+                        } else { break; }
+                    }
+                    res = tokio::io::AsyncReadExt::read(&mut tokio_stream, &mut buf) => {
+                        match res {
+                            Ok(0) | Err(_) => break,
+                            Ok(n) => {
+                                if socket.send(axum::extract::ws::Message::Binary(buf[..n].to_vec().into())).await.is_err() { break; }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    let process = match state.agent_tui_manager.active_process(&tui_id) {
+        Ok(p) => p,
+        Err(e) => {
+            return super::response::timed_json(
+                "GET",
+                "/v1/agent-tuis/{id}/attach",
+                &request_id,
+                start,
+                Err::<(), _>(e),
+            );
+        }
+    };
+
+    let rx = process.broadcast_rx.resubscribe();
+    ws.on_upgrade(move |mut socket: axum::extract::ws::WebSocket| async move {
+        let mut rx = rx;
+        loop {
+            tokio::select! {
+                msg = socket.recv() => {
+                    if let Some(Ok(axum::extract::ws::Message::Binary(bytes))) = msg {
+                        if process.write_bytes(&bytes).is_err() { break; }
+                    } else if let Some(Ok(axum::extract::ws::Message::Text(text))) = msg {
+                        if process.write_bytes(text.as_bytes()).is_err() { break; }
+                    } else { break; }
+                }
+                res = rx.recv() => {
+                    match res {
+                        Ok(bytes) => {
+                            let bytes: Vec<u8> = bytes;
+                            if socket.send(axum::extract::ws::Message::Binary(bytes.into())).await.is_err() { break; }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
+        }
+    })
 }
