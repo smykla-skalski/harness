@@ -37,7 +37,10 @@ extension HarnessMonitorStore {
 
     cancelSelectedTimelinePageLoad()
     withUISyncBatch {
-      selection.retainPresentedDetailWhenSelectionClears = false
+      // Keep retention enabled so the detail scene stays mounted while the
+      // refresh fallback refetches fresh data; dropping retention here would
+      // flip the cockpit back to the dashboard mid-switch whenever a global
+      // sessionsUpdated event lands for the newly selected session.
       selectedSession = nil
       timeline = []
       timelineWindow = nil
