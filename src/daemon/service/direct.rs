@@ -15,6 +15,7 @@ pub fn start_session_direct(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
     let runtime_name = &request.runtime;
+    session_service::validate_policy_preset(request.policy_preset.as_deref())?;
     let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "session start requires a known runtime, got '{runtime_name}'"
@@ -75,6 +76,7 @@ pub(crate) async fn start_session_direct_async(
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
     let runtime_name = &request.runtime;
+    session_service::validate_policy_preset(request.policy_preset.as_deref())?;
     let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "session start requires a known runtime, got '{runtime_name}'"
