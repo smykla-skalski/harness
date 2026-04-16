@@ -1,8 +1,10 @@
 use super::{
-    CliError, DaemonClient, Path, PathBuf, SessionMetrics, SessionState, SessionStatus,
+    CliError, CliErrorKind, DaemonClient, Path, PathBuf, SessionMetrics, SessionRole,
+    SessionState, SessionStatus, validate_policy_preset,
     daemon_index, detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals,
     storage, summary_to_session_state,
 };
+use crate::daemon::agent_tui::AgentTuiStartRequest;
 
 /// Load the current session state.
 ///
@@ -20,6 +22,59 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
     let mut state = load_state_or_err(session_id, project_dir)?;
     state.metrics = SessionMetrics::recalculate(&state);
     Ok(state)
+}
+
+/// Build the managed TUI start request used for preset-driven leader recovery.
+///
+/// # Errors
+/// Returns `CliError` when the preset is unsupported, the session is not
+/// leaderless degraded, or the session policy does not allow the requested
+/// recovery preset.
+pub fn build_recovery_tui_request(
+    session_id: &str,
+    preset: &str,
+    runtime_name: &str,
+    project_dir: &Path,
+) -> Result<AgentTuiStartRequest, CliError> {
+    validate_policy_preset(Some(preset))?;
+    let state = session_status(session_id, project_dir)?;
+    if state.status != SessionStatus::LeaderlessDegraded {
+        return Err(CliErrorKind::session_agent_conflict(
+            "leader recovery is only valid for leaderless_degraded sessions".to_string(),
+        )
+        .into());
+    }
+
+    let expected_preset = state
+        .policy
+        .degraded_recovery
+        .preset_id
+        .as_deref()
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(
+                "session does not allow preset-managed leader recovery".to_string(),
+            ))
+        })?;
+    if expected_preset != preset {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "session requires recovery preset '{expected_preset}', got '{preset}'"
+        ))
+        .into());
+    }
+
+    Ok(AgentTuiStartRequest {
+        runtime: runtime_name.to_string(),
+        role: SessionRole::Leader,
+        fallback_role: None,
+        capabilities: vec![format!("policy-preset:{preset}")],
+        name: Some(format!("Recovered {runtime_name}")),
+        prompt: None,
+        project_dir: Some(project_dir.to_string_lossy().into_owned()),
+        argv: Vec::new(),
+        rows: 30,
+        cols: 120,
+        persona: None,
+    })
 }
 
 /// List sessions for a project.

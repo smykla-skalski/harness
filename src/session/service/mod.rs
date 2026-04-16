@@ -111,7 +111,8 @@ pub use lifecycle::{
 };
 pub use liveness::{LivenessSyncResult, sync_agent_liveness};
 pub use queries::{
-    list_sessions, list_sessions_global, resolve_session_project_dir, session_status,
+    build_recovery_tui_request, list_sessions, list_sessions_global,
+    resolve_session_project_dir, session_status,
 };
 pub use signals::{
     cancel_signal, list_signals, record_signal_acknowledgment,

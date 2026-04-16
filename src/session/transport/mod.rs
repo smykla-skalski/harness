@@ -4,6 +4,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
 mod attach;
+mod recover;
 mod session_commands;
 mod signal;
 mod support;
@@ -11,6 +12,7 @@ mod task;
 mod tui;
 
 pub use attach::TuiAttachArgs;
+pub use recover::SessionRecoverLeaderArgs;
 pub use session_commands::{
     SessionAssignArgs, SessionEndArgs, SessionJoinArgs, SessionLeaveArgs, SessionListArgs,
     SessionObserveArgs, SessionRemoveArgs, SessionStartArgs, SessionStatusArgs, SessionSyncArgs,
@@ -38,6 +40,8 @@ pub enum SessionCommand {
     Remove(SessionRemoveArgs),
     /// Transfer leader role to another agent.
     TransferLeader(SessionTransferLeaderArgs),
+    /// Recover a leaderless degraded session with a managed leader TUI.
+    RecoverLeader(SessionRecoverLeaderArgs),
     /// Task management.
     Task {
         #[command(subcommand)]
@@ -122,6 +126,7 @@ impl Execute for SessionCommand {
             Self::Assign(args) => args.execute(context),
             Self::Remove(args) => args.execute(context),
             Self::TransferLeader(args) => args.execute(context),
+            Self::RecoverLeader(args) => args.execute(context),
             Self::Task { command } => command.execute(context),
             Self::Signal { command } => command.execute(context),
             Self::Tui { command } => command.execute(context),

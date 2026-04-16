@@ -9,6 +9,7 @@ use harness_testkit::with_isolated_harness_env;
 use super::super::helpers::*;
 
 mod persona;
+mod recovery;
 
 fn session_cmd(command: SessionCommand) -> Command {
     Command::Session { command }
