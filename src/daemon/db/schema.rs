@@ -1,5 +1,5 @@
 use super::schema_sql::{AGENT_TUIS_SCHEMA, CODEX_RUNS_SCHEMA, CREATE_SCHEMA};
-use super::{CliError, Connection, DaemonDb, Path, SCHEMA_VERSION, db_error};
+use super::{CliError, Connection, DaemonDb, Path, db_error};
 
 impl DaemonDb {
     /// Open the daemon database at `path`, applying pragmas and running any
@@ -51,7 +51,6 @@ impl DaemonDb {
     fn ensure_schema(&self) -> Result<(), CliError> {
         if !schema_exists(&self.conn)? {
             create_schema(&self.conn)?;
-            return Ok(());
         }
         self.run_migrations()
     }
@@ -307,7 +306,7 @@ fn migrate_v5_to_v6(conn: &Connection) -> Result<(), CliError> {
     .map_err(|error| db_error(format!("seed change tracking sequence state: {error}")))?;
     conn.execute(
         "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
-        [SCHEMA_VERSION],
+        ["6"],
     )
     .map_err(|error| db_error(format!("bump schema version to v6: {error}")))?;
     Ok(())
@@ -400,4 +399,38 @@ fn apply_pragmas(conn: &Connection) -> Result<(), CliError> {
          PRAGMA cache_size = -8000;",
     )
     .map_err(|error| db_error(format!("set database pragmas: {error}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrate_v5_to_v6_stamps_intermediate_version() {
+        let conn = Connection::open_in_memory().expect("open sqlite");
+        conn.execute_batch(
+            "CREATE TABLE schema_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                ) WITHOUT ROWID;
+                INSERT INTO schema_meta (key, value) VALUES ('version', '5');
+                CREATE TABLE change_tracking (
+                    scope TEXT PRIMARY KEY,
+                    version INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                ) WITHOUT ROWID;",
+        )
+        .expect("seed v5 schema");
+
+        migrate_v5_to_v6(&conn).expect("migrate v5 to v6");
+
+        let version: String = conn
+            .query_row(
+                "SELECT value FROM schema_meta WHERE key = 'version'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read schema version");
+        assert_eq!(version, "6");
+    }
 }
