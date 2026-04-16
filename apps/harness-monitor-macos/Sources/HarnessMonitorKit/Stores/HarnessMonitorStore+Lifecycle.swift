@@ -214,14 +214,14 @@ extension HarnessMonitorStore {
       )
 
       let preserveVisibleTimeline =
-        isShowingCachedData && selectedSession?.session.sessionId == sessionID
+        selectedSession?.session.sessionId == sessionID && !timeline.isEmpty
       let preservedTimelineWindow = preserveVisibleTimeline ? timelineWindow : nil
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
         timeline: preserveVisibleTimeline ? timeline : [],
         timelineWindow: preservedTimelineWindow,
-        showingCachedData: preserveVisibleTimeline
+        showingCachedData: false
       )
       isTimelineLoading = !preserveVisibleTimeline
 
