@@ -205,7 +205,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "7";
+pub(crate) const SCHEMA_VERSION: &str = "8";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]
