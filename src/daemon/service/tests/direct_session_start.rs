@@ -90,3 +90,30 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
         );
     });
 }
+
+#[test]
+fn start_session_direct_rejects_unknown_policy_preset() {
+    with_temp_project(|project| {
+        let db = setup_db_with_project(project);
+        let error = start_session_direct(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "unknown preset".into(),
+                context: "should be rejected".into(),
+                runtime: "claude".into(),
+                session_id: Some("unknown-policy-preset".into()),
+                project_dir: project.to_string_lossy().into_owned(),
+                policy_preset: Some("swarm-future".into()),
+            },
+            Some(&db),
+        )
+        .expect_err("unknown preset should be rejected");
+
+        assert_eq!(error.code(), "KSRCLI092");
+        assert!(
+            error
+                .to_string()
+                .contains("unknown session policy preset 'swarm-future'"),
+            "unexpected error: {error}"
+        );
+    });
+}
