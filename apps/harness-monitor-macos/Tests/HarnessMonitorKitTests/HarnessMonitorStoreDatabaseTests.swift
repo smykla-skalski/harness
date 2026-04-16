@@ -29,6 +29,12 @@ struct HarnessMonitorStoreDatabaseTests {
 
   // MARK: - Statistics
 
+  @Test("Current schema alias stays aligned with the latest cache schema")
+  func currentSchemaAliasTracksLatestVersion() {
+    #expect(HarnessMonitorCurrentSchema.versionIdentifier == HarnessMonitorSchemaV5.versionIdentifier)
+    #expect(HarnessMonitorCurrentSchema.versionString == "5.0.0")
+  }
+
   @Test("gatherDatabaseStatistics returns correct counts for empty store")
   func gatherStatisticsEmpty() async {
     let store = makeStore()

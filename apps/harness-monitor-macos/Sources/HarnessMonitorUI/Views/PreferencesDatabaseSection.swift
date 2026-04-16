@@ -296,7 +296,7 @@ struct PreferencesDatabaseSection: View {
           HarnessMonitorAccessibility.preferencesMetricCard("Persistence Error")
         )
       }
-      LabeledContent("Schema Version", value: HarnessMonitorSchemaV3.versionString)
+      LabeledContent("Schema Version", value: HarnessMonitorCurrentSchema.versionString)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.preferencesMetricCard("Schema Version")
         )

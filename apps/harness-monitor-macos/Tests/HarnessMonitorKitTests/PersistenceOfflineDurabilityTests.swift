@@ -197,7 +197,7 @@ struct PersistenceOfflineDurabilityTests {
     #expect(reopenedStore.lastPersistedSnapshotAt != nil)
   }
 
-  @Test("Live SwiftData store migrates V1 cache records into the V2 repo and worktree schema")
+  @Test("Live SwiftData store migrates V1 cache records into the current repo and worktree schema")
   func liveStoreMigratesV1CacheRecords() throws {
     let root = FileManager.default.temporaryDirectory
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
