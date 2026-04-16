@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use super::helpers::{collect_hits_in_tree, matches_extension};
+use super::helpers::{collect_hits_in_tree, matches_extension, read_repo_file, repo_path_exists};
 
 #[test]
 fn new_domain_roots_exist() {
@@ -61,7 +61,7 @@ fn cluster_topology_is_owned_by_kernel() {
         "kernel topology module should exist"
     );
 
-    let platform_mod = fs::read_to_string(root.join("src/platform/mod.rs")).unwrap();
+    let platform_mod = read_repo_file(root, "src/platform/mod.rs");
     assert!(
         !platform_mod.contains("pub mod cluster;"),
         "src/platform/mod.rs should not publicly expose a cluster topology module"
@@ -90,7 +90,7 @@ fn cluster_topology_is_owned_by_kernel() {
         "tests/integration/cluster/mod.rs",
         "tests/integration/universal.rs",
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         if contents.contains("platform::cluster::") {
             hits.push(format!("{path} still depends on platform::cluster"));
         }
@@ -110,7 +110,7 @@ fn cluster_topology_is_owned_by_kernel() {
 #[test]
 fn platform_compose_root_is_thin() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let compose_mod = fs::read_to_string(root.join("src/platform/compose/mod.rs")).unwrap();
+    let compose_mod = read_repo_file(root, "src/platform/compose/mod.rs");
 
     for needle in [
         "fn bridge_network(",
@@ -126,7 +126,7 @@ fn platform_compose_root_is_thin() {
     }
 
     assert!(
-        root.join("src/platform/compose/tests.rs").exists(),
+        repo_path_exists(root, "src/platform/compose/tests.rs"),
         "platform compose split test module should exist"
     );
 }
@@ -134,7 +134,7 @@ fn platform_compose_root_is_thin() {
 #[test]
 fn run_specs_root_is_thin() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let specs_mod = fs::read_to_string(root.join("src/run/specs/mod.rs")).unwrap();
+    let specs_mod = read_repo_file(root, "src/run/specs/mod.rs");
 
     for needle in [
         "fn effective_requires(",
@@ -149,7 +149,7 @@ fn run_specs_root_is_thin() {
     }
 
     assert!(
-        root.join("src/run/specs/tests.rs").exists(),
+        repo_path_exists(root, "src/run/specs/tests.rs"),
         "run specs split test module should exist"
     );
 }
@@ -157,7 +157,7 @@ fn run_specs_root_is_thin() {
 #[test]
 fn platform_module_stays_internal_to_the_crate() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let lib_rs = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let lib_rs = read_repo_file(root, "src/lib.rs");
     assert!(
         !lib_rs.contains("pub mod platform;"),
         "src/lib.rs should not expose platform as a public crate surface"
@@ -174,7 +174,7 @@ fn platform_module_stays_internal_to_the_crate() {
         "tests/integration/compact/mod.rs",
         "tests/integration/commands/session_stop.rs",
     ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
+        let contents = read_repo_file(root, path);
         assert!(
             !contents.contains("harness::platform::"),
             "{path} should not depend on the internal platform module"
@@ -220,7 +220,7 @@ fn internal_code_uses_kernel_command_intent_instead_of_legacy_shell_parse() {
 #[test]
 fn app_context_stays_app_wiring_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let contents = fs::read_to_string(root.join("src/app/command_context.rs")).unwrap();
+    let contents = read_repo_file(root, "src/app/command_context.rs");
 
     for needle in [
         "RunAggregate",
@@ -242,7 +242,7 @@ fn app_context_stays_app_wiring_only() {
 #[test]
 fn workspace_session_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let session = fs::read_to_string(root.join("src/workspace/session.rs")).unwrap();
+    let session = read_repo_file(root, "src/workspace/session.rs");
 
     for needle in ["fn data_root_prefers_xdg_data_home()", "mod tests {"] {
         assert!(
@@ -252,7 +252,7 @@ fn workspace_session_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/workspace/session/tests.rs").exists(),
+        repo_path_exists(root, "src/workspace/session/tests.rs"),
         "workspace session split test module should exist"
     );
 }

@@ -1,9 +1,10 @@
 use super::*;
+use super::super::helpers::{read_repo_file, repo_path_exists};
 
 #[test]
 fn guard_bash_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let guard_bash_mod = fs::read_to_string(root.join("src/hooks/guard_bash/mod.rs")).unwrap();
+    let guard_bash_mod = read_repo_file(root, "src/hooks/guard_bash/mod.rs");
 
     for needle in [
         "fn denies_direct_kubectl(",
@@ -17,7 +18,7 @@ fn guard_bash_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/hooks/guard_bash/tests.rs").exists(),
+        repo_path_exists(root, "src/hooks/guard_bash/tests.rs"),
         "guard_bash split test module should exist"
     );
 }
@@ -25,7 +26,7 @@ fn guard_bash_root_stays_prod_only() {
 #[test]
 fn verify_bash_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let verify_bash = fs::read_to_string(root.join("src/hooks/verify_bash.rs")).unwrap();
+    let verify_bash = read_repo_file(root, "src/hooks/verify_bash.rs");
 
     for needle in [
         "fn subcommand_artifacts_apply(",
@@ -39,7 +40,7 @@ fn verify_bash_root_stays_prod_only() {
     }
 
     assert!(
-        root.join("src/hooks/verify_bash/tests.rs").exists(),
+        repo_path_exists(root, "src/hooks/verify_bash/tests.rs"),
         "verify_bash split test module should exist"
     );
 }
@@ -47,7 +48,7 @@ fn verify_bash_root_stays_prod_only() {
 #[test]
 fn runner_policy_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let runner_policy = fs::read_to_string(root.join("src/hooks/runner_policy.rs")).unwrap();
+    let runner_policy = read_repo_file(root, "src/hooks/runner_policy.rs");
 
     for needle in [
         "pub enum LegacyScript {",
@@ -72,7 +73,7 @@ fn runner_policy_root_stays_a_facade() {
         "src/hooks/runner_policy/tests.rs",
     ] {
         assert!(
-            root.join(path).exists(),
+            repo_path_exists(root, path),
             "runner_policy split module should exist: {path}"
         );
     }
