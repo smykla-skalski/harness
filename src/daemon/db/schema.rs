@@ -1,5 +1,18 @@
 use super::schema_sql::{AGENT_TUIS_SCHEMA, CODEX_RUNS_SCHEMA, CREATE_SCHEMA};
 use super::{CliError, Connection, DaemonDb, Path, db_error};
+use rusqlite::ffi::ErrorCode;
+use rusqlite::{Transaction, TransactionBehavior};
+use std::thread;
+use std::time::{Duration, Instant};
+
+#[cfg(test)]
+use std::sync::{Arc, Mutex};
+
+#[cfg(test)]
+type SchemaInitHook = dyn Fn() + Send + Sync + 'static;
+
+#[cfg(test)]
+static SCHEMA_INIT_HOOK: Mutex<Option<Arc<SchemaInitHook>>> = Mutex::new(None);
 
 impl DaemonDb {
     /// Open the daemon database at `path`, applying pragmas and running any
@@ -49,9 +62,14 @@ impl DaemonDb {
     }
 
     fn ensure_schema(&self) -> Result<(), CliError> {
-        if !schema_exists(&self.conn)? {
-            create_schema(&self.conn)?;
+        let transaction = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)
+            .map_err(|error| db_error(format!("begin schema bootstrap transaction: {error}")))?;
+        if !schema_exists(&transaction)? {
+            create_schema(&transaction)?;
         }
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit schema bootstrap transaction: {error}")))?;
         self.run_migrations()
     }
 
@@ -170,8 +188,27 @@ fn column_exists(conn: &Connection, table_name: &str, column_name: &str) -> Resu
 
 fn create_schema(conn: &Connection) -> Result<(), CliError> {
     emit_schema_init_info();
+    run_schema_init_hook();
     conn.execute_batch(CREATE_SCHEMA)
         .map_err(|error| db_error(format!("create daemon database schema: {error}")))
+}
+
+#[cfg(test)]
+pub(crate) fn set_schema_init_hook(hook: Option<Arc<SchemaInitHook>>) {
+    *SCHEMA_INIT_HOOK
+        .lock()
+        .expect("schema init hook mutex poisoned") = hook;
+}
+
+fn run_schema_init_hook() {
+    #[cfg(test)]
+    if let Some(hook) = SCHEMA_INIT_HOOK
+        .lock()
+        .expect("schema init hook mutex poisoned")
+        .clone()
+    {
+        hook();
+    }
 }
 
 fn migrate_v2_to_v3(conn: &Connection) -> Result<bool, CliError> {
@@ -391,14 +428,37 @@ fn emit_schema_init_info() {
 }
 
 fn apply_pragmas(conn: &Connection) -> Result<(), CliError> {
+    conn.busy_timeout(Duration::from_secs(5))
+        .map_err(|error| db_error(format!("set database busy timeout: {error}")))?;
+    configure_journal_mode(conn)?;
     conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA synchronous = NORMAL;
+        "PRAGMA synchronous = NORMAL;
          PRAGMA foreign_keys = ON;
-         PRAGMA busy_timeout = 5000;
          PRAGMA cache_size = -8000;",
     )
     .map_err(|error| db_error(format!("set database pragmas: {error}")))
+}
+
+fn configure_journal_mode(conn: &Connection) -> Result<(), CliError> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match conn.query_row("PRAGMA journal_mode = WAL", [], |row| row.get::<_, String>(0)) {
+            Ok(_) => return Ok(()),
+            Err(error)
+                if pragma_error_is_retryable(&error) && Instant::now() < deadline =>
+            {
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => return Err(db_error(format!("set database journal mode: {error}"))),
+        }
+    }
+}
+
+fn pragma_error_is_retryable(error: &rusqlite::Error) -> bool {
+    matches!(
+        error.sqlite_error_code(),
+        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+    )
 }
 
 #[cfg(test)]

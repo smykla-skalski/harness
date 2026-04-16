@@ -1,4 +1,6 @@
 use super::*;
+use std::sync::{Arc, Barrier};
+use std::thread;
 
 /// Minimal `projects` + `sessions` DDL that the v6 -> v7 migration expects to
 /// exist before it can seed the timeline ledger.
@@ -64,6 +66,49 @@ fn open_existing_db_is_idempotent() {
 
     let db2 = DaemonDb::open(&path).expect("second open");
     assert_eq!(db2.schema_version().expect("version"), SCHEMA_VERSION);
+}
+
+#[test]
+fn concurrent_open_on_fresh_db_serializes_schema_bootstrap() {
+    struct SchemaInitHookGuard;
+
+    impl SchemaInitHookGuard {
+        fn install(hook: Arc<dyn Fn() + Send + Sync + 'static>) -> Self {
+            set_schema_init_hook(Some(hook));
+            Self
+        }
+    }
+
+    impl Drop for SchemaInitHookGuard {
+        fn drop(&mut self) {
+            set_schema_init_hook(None);
+        }
+    }
+
+    let _hook = SchemaInitHookGuard::install(Arc::new(|| {
+        thread::sleep(Duration::from_millis(50));
+    }));
+
+    for attempt in 0..4 {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let path = tmp.path().join(format!("harness-{attempt}.db"));
+        let start = Arc::new(Barrier::new(8));
+        let mut handles = Vec::new();
+
+        for _ in 0..8 {
+            let path = path.clone();
+            let start = Arc::clone(&start);
+            handles.push(thread::spawn(move || {
+                start.wait();
+                let db = DaemonDb::open(&path).expect("open concurrent db");
+                db.schema_version().expect("schema version")
+            }));
+        }
+
+        for handle in handles {
+            assert_eq!(handle.join().expect("join open thread"), SCHEMA_VERSION);
+        }
+    }
 }
 
 #[test]

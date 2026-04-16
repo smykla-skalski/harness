@@ -61,6 +61,8 @@ mod timeline_store;
 mod writes;
 
 pub(crate) use async_pool::AsyncDaemonDb;
+#[cfg(test)]
+pub(crate) use schema::set_schema_init_hook;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
