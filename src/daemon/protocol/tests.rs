@@ -80,6 +80,18 @@ fn session_join_request_defaults_empty_capabilities() {
 }
 
 #[test]
+fn session_leave_request_round_trips() {
+    let request = SessionLeaveRequest {
+        agent_id: "codex-leader".into(),
+    };
+    let json = serde_json::to_value(&request).expect("serialize");
+    assert_eq!(json["agent_id"], "codex-leader");
+
+    let back: SessionLeaveRequest = serde_json::from_value(json).expect("deserialize");
+    assert_eq!(back.agent_id, "codex-leader");
+}
+
+#[test]
 fn signal_ack_request_round_trips() {
     let request = SignalAckRequest {
         agent_id: "codex-worker".into(),

@@ -77,6 +77,11 @@ pub struct SessionEndRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionLeaveRequest {
+    pub agent_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignalSendRequest {
     pub actor: String,
     pub agent_id: String,

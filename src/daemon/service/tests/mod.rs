@@ -32,6 +32,7 @@ mod direct_session_bootstrap;
 mod direct_session_leader;
 mod direct_session_start;
 mod direct_sessions;
+mod leave;
 mod observe;
 mod session_liveness;
 mod session_reads;

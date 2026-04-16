@@ -41,7 +41,7 @@ use super::protocol::TimelineCursor;
 use super::protocol::{
     AgentRemoveRequest, DaemonControlResponse, DaemonDiagnosticsReport, HealthResponse,
     LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
-    ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
+    ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest, SessionLeaveRequest,
     SessionExtensionsPayload, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
     SetLogLevelRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
@@ -208,6 +208,7 @@ use crate::daemon::voice;
 use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod direct;
+mod leave;
 mod mutations;
 mod mutations_async;
 mod observe_async;
@@ -233,11 +234,13 @@ pub use mutations::{
     assign_task, change_role, checkpoint_task, create_task, drop_task, end_session, remove_agent,
     transfer_leader, update_task, update_task_queue_policy,
 };
+pub use leave::leave_session;
 pub(crate) use mutations_async::{
     assign_task_async, change_role_async, checkpoint_task_async, create_task_async,
     drop_task_async, end_session_async, remove_agent_async, transfer_leader_async,
     update_task_async, update_task_queue_policy_async,
 };
+pub(crate) use leave::leave_session_async;
 pub use observe_stream::{
     broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,
     broadcast_session_updated_core, broadcast_sessions_updated, global_stream_initial_events,

@@ -4,7 +4,8 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
-    SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
+    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
+    SessionSummary,
     SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
     TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
 };
@@ -47,6 +48,14 @@ impl DaemonClient {
         request: &SessionEndRequest,
     ) -> Result<SessionDetail, CliError> {
         self.post(&format!("/v1/sessions/{session_id}/end"), request)
+    }
+
+    pub fn leave_session(
+        &self,
+        session_id: &str,
+        request: &SessionLeaveRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(&format!("/v1/sessions/{session_id}/leave"), request)
     }
 
     pub fn assign_role(
