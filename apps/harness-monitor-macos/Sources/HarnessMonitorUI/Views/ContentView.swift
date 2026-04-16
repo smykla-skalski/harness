@@ -24,6 +24,8 @@ public struct ContentView<CornerContent: View>: View {
   @State private var shouldIgnoreNextInspectorMeasurement = false
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var pendingDetailColumnWidth: CGFloat?
+  @State private var sidebarColumnWidth: CGFloat = 260
+  @State private var detailColumnLeadingEdge: CGFloat = 260
   @State private var isLayoutAnimating = false
   @State private var layoutSuppressionTask: Task<Void, Never>?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -51,6 +53,10 @@ public struct ContentView<CornerContent: View>: View {
         applyInspectorVisibilityChange(to: newValue, source: .framework)
       }
     )
+  }
+
+  private var statusBackdropDetail: SessionDetail? {
+    contentSessionDetail.presentedSessionDetail
   }
 
   @MainActor
@@ -115,7 +121,17 @@ public struct ContentView<CornerContent: View>: View {
       )
     }
     .background(contentBackground)
+    .background(alignment: .topLeading) {
+      if let detail = statusBackdropDetail {
+        ContentStatusBackdrop(
+          status: detail.session.status,
+          isStale: contentChrome.sessionDataAvailability != .live,
+          titleLeadingEdge: detailColumnLeadingEdge
+        )
+      }
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .coordinateSpace(name: "contentRoot")
     .modifier(
       HarnessMonitorConfirmationDialogModifier(
         store: store,
@@ -186,6 +202,11 @@ public struct ContentView<CornerContent: View>: View {
       sidebarVisible: columnVisibility != .detailOnly,
       focusParticipationEnabled: isStartupFocusParticipationEnabled
     )
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      updateSidebarColumnWidth(width)
+    }
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }
 
@@ -204,6 +225,12 @@ public struct ContentView<CornerContent: View>: View {
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       onDetailColumnWidthChange: updateDetailColumnWidth
     )
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.frame(in: .named("contentRoot")).minX
+    } action: { minX in
+      guard abs(minX - detailColumnLeadingEdge) >= 1 else { return }
+      detailColumnLeadingEdge = minX
+    }
     .inspector(isPresented: inspectorPresentationBinding) {
       inspectorColumn
     }
@@ -258,6 +285,13 @@ public struct ContentView<CornerContent: View>: View {
     }
     pendingDetailColumnWidth = nil
     detailColumnWidth = nextWidth
+  }
+
+  private func updateSidebarColumnWidth(_ width: CGFloat) {
+    guard !isLayoutAnimating, abs(width - sidebarColumnWidth) >= 1 else {
+      return
+    }
+    sidebarColumnWidth = width
   }
 
   private func updateInspectorWidth(_ width: CGFloat) {

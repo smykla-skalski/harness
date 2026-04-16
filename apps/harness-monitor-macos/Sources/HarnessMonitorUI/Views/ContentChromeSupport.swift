@@ -153,7 +153,7 @@ private struct SessionStatusCornerBounds: View {
   }
 }
 
-struct SessionStatusCornerBackdrop: View {
+public struct SessionStatusCornerBackdrop: View {
   let status: SessionStatus
   let isStale: Bool
 
@@ -167,7 +167,7 @@ struct SessionStatusCornerBackdrop: View {
   }
 
   private var tintOpacity: Double {
-    colorSchemeContrast == .increased ? 0.55 : 0.45
+    colorSchemeContrast == .increased ? 0.28 : 0.22
   }
 
   private var tintGradient: some View {
@@ -201,7 +201,12 @@ struct SessionStatusCornerBackdrop: View {
       .mask { backdropMask }
   }
 
-  var body: some View {
+  public init(status: SessionStatus, isStale: Bool) {
+    self.status = status
+    self.isStale = isStale
+  }
+
+  public var body: some View {
     SessionStatusCornerBounds(status: status, isStale: isStale)
       .background {
         statusBackdrop
