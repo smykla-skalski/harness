@@ -2,10 +2,12 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::{AgentRegistration, AgentStatus, PendingLeaderTransfer, TaskStatus, WorkItem};
+use super::{
+    AgentRegistration, AgentStatus, PendingLeaderTransfer, SessionPolicy, TaskStatus, WorkItem,
+};
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 6;
+pub const CURRENT_VERSION: u32 = 7;
 
 /// Server-derived principal for daemon-authenticated control-plane mutations.
 ///
@@ -29,6 +31,8 @@ pub struct SessionState {
     /// Human-readable session goal.
     pub context: String,
     pub status: SessionStatus,
+    #[serde(default)]
+    pub policy: SessionPolicy,
     pub created_at: String,
     pub updated_at: String,
     /// Registered agents keyed by agent ID.
@@ -63,6 +67,7 @@ pub struct SessionState {
 pub enum SessionStatus {
     Active,
     Paused,
+    LeaderlessDegraded,
     Ended,
 }
 

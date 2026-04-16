@@ -8,6 +8,7 @@ use crate::workspace::utc_now;
 use super::files;
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
+    migrate_v6_to_v7,
 };
 
 /// Build a `VersionedJsonRepository` for the session state file.
@@ -23,6 +24,7 @@ fn state_repository(
                 Box::new(migrate_v3_to_v4),
                 Box::new(migrate_v4_to_v5),
                 Box::new(migrate_v5_to_v6),
+                Box::new(migrate_v6_to_v7),
             ]),
     )
 }

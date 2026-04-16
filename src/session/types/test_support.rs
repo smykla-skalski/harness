@@ -53,6 +53,7 @@ pub(super) fn session_state(
         title: "test title".into(),
         context: "ctx".into(),
         status: SessionStatus::Active,
+        policy: Default::default(),
         created_at: "2026-03-28T12:00:00Z".into(),
         updated_at: "2026-03-28T12:00:00Z".into(),
         agents,

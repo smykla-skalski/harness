@@ -84,10 +84,19 @@ fn load_state_migrates_v3_state_and_persists_current_schema() {
                 .expect("state present");
             assert_eq!(loaded.schema_version, CURRENT_VERSION);
             assert_eq!(loaded.title, "legacy context");
+            assert!(loaded.policy.leader_join.require_explicit_fallback_role);
+            assert_eq!(
+                loaded.policy.degraded_recovery.preset_id.as_deref(),
+                Some("swarm-default")
+            );
 
             let persisted: Value = read_json_typed(&state_file).expect("read migrated state");
             assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
             assert_eq!(persisted["title"], json!("legacy context"));
+            assert_eq!(
+                persisted["policy"]["degraded_recovery"]["preset_id"],
+                json!("swarm-default")
+            );
         },
     );
 }
