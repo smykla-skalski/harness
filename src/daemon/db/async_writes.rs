@@ -3,8 +3,8 @@ use sqlx::{Sqlite, Transaction, query, query_scalar};
 use super::{
     AgentRegistration, AsyncDaemonDb, BTreeMap, CliError, DiscoveredProject, SessionLogEntry,
     SessionState, SessionStatus, StoredTimelineEntry, TaskCheckpoint, WorkItem, daemon_timeline,
-    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope, stored_timeline_entry,
-    u64_from_i64, utc_now,
+    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope,
+    session_status_db_label, stored_timeline_entry, u64_from_i64, utc_now,
 };
 
 const UPSERT_PROJECT_SQL: &str = "INSERT INTO projects (
@@ -312,6 +312,7 @@ impl AsyncDaemonDb {
             .pending_leader_transfer
             .as_ref()
             .and_then(|transfer| serde_json::to_string(transfer).ok());
+        let status = session_status_db_label(state.status)?;
         let is_active = i32::from(state.status == SessionStatus::Active);
 
         let mut transaction =
@@ -326,7 +327,7 @@ impl AsyncDaemonDb {
             .bind(i64_from_u64(state.state_version))
             .bind(&state.title)
             .bind(&state.context)
-            .bind(format!("{:?}", state.status).to_lowercase())
+            .bind(status)
             .bind(state.leader_id.as_deref())
             .bind(state.observe_id.as_deref())
             .bind(&state.created_at)
