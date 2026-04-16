@@ -60,7 +60,7 @@ fn spawn_db_watch_loop(
         });
 
         let mut ticker = tokio_interval(interval);
-        let mut last_change_seq: i64 = 0;
+        let mut last_change_seq = current_change_sequence(&db);
         let mut pending_paths = PendingWatchPaths::default();
         let mut resolve_cache = RuntimeSessionResolveCache::default();
 
@@ -92,6 +92,14 @@ fn spawn_db_watch_loop(
             emit_watch_changes(&sender, changes, Some(&db), async_db.get()).await;
         }
     })
+}
+
+fn current_change_sequence(db: &Arc<Mutex<DaemonDb>>) -> i64 {
+    let Ok(db_guard) = db.lock() else {
+        return 0;
+    };
+
+    db_guard.current_change_sequence().unwrap_or(0)
 }
 
 fn spawn_legacy_watch_loop(

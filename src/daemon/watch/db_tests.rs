@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use tempfile::tempdir;
 
@@ -164,4 +165,36 @@ async fn emit_watch_changes_prefers_async_broadcast_builders() {
         receiver.recv().await.expect("session_extensions").event,
         "session_extensions"
     );
+}
+
+#[test]
+fn spawn_watch_loop_does_not_replay_historical_changes_on_startup() {
+    let tmp = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(tmp.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let db_path = tmp.path().join("watch-startup.db");
+            let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open db")));
+            {
+                let db_guard = db.lock().expect("db lock");
+                db_guard.bump_change("global").expect("bump global");
+                db_guard
+                    .bump_change("stale-session")
+                    .expect("bump stale session");
+            }
+
+            let (sender, mut receiver) = tokio::sync::broadcast::channel(8);
+            let async_db = Arc::new(std::sync::OnceLock::new());
+            let handle =
+                super::spawn_watch_loop(sender, Duration::from_millis(25), Some(db), async_db);
+
+            let result = tokio::time::timeout(Duration::from_millis(150), receiver.recv()).await;
+            handle.abort();
+
+            assert!(
+                result.is_err(),
+                "historical change-tracking rows should not replay on startup: {result:?}"
+            );
+        });
+    });
 }

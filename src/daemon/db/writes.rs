@@ -306,6 +306,20 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("commit change bump transaction: {error}")))?;
         Ok(())
     }
+
+    /// Return the most recent change-tracking sequence value.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn current_change_sequence(&self) -> Result<i64, CliError> {
+        self.conn
+            .query_row(
+                "SELECT last_seq FROM change_tracking_state WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|error| db_error(format!("read current change sequence: {error}")))
+    }
 }
 
 fn replace_agents(
