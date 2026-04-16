@@ -314,5 +314,6 @@ fn copilot_harness_plugin_includes_cli_skill() {
         .expect("Copilot harness CLI skill should be planned");
 
     assert!(rendered.contains("name: cli"));
-    assert!(rendered.contains("Until richer references land here"));
+    assert!(rendered.contains("# Harness CLI reference"));
+    assert!(rendered.contains("references/top-level-and-hidden.md"));
 }
