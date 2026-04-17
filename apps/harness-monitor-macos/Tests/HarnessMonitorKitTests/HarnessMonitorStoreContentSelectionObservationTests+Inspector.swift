@@ -404,28 +404,4 @@ extension HarnessMonitorContentSelectionTests {
     #expect(store.selectedSession == PreviewFixtures.detail)
     #expect(store.isSelectionLoading == false)
   }
-
-  private func alternateSummary() -> SessionSummary {
-    SessionSummary(
-      projectId: PreviewFixtures.summary.projectId,
-      projectName: PreviewFixtures.summary.projectName,
-      projectDir: PreviewFixtures.summary.projectDir,
-      contextRoot: PreviewFixtures.summary.contextRoot,
-      checkoutId: PreviewFixtures.summary.checkoutId,
-      checkoutRoot: PreviewFixtures.summary.checkoutRoot,
-      isWorktree: PreviewFixtures.summary.isWorktree,
-      worktreeName: PreviewFixtures.summary.worktreeName,
-      sessionId: "session-alternate",
-      title: "Alternate session",
-      context: "A different selection target",
-      status: PreviewFixtures.summary.status,
-      createdAt: "2026-03-28T14:20:00Z",
-      updatedAt: "2026-03-28T14:20:00Z",
-      lastActivityAt: "2026-03-28T14:20:00Z",
-      leaderId: PreviewFixtures.summary.leaderId,
-      observeId: nil,
-      pendingLeaderTransfer: nil,
-      metrics: PreviewFixtures.summary.metrics
-    )
-  }
 }

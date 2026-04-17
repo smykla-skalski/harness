@@ -11,10 +11,11 @@ extension HarnessMonitorStore {
       loadedTimeline: loadedTimeline,
       timelineWindow: loadedWindow
     )
-    guard let newestCursor = loadedWindow.newestCursor
-      ?? loadedTimeline.first.map({
-        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
-      })
+    guard
+      let newestCursor = loadedWindow.newestCursor
+        ?? loadedTimeline.first.map({
+          TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+        })
     else {
       let latestWindow = try await fetchSelectedTimelineLatestWindow(
         using: client,

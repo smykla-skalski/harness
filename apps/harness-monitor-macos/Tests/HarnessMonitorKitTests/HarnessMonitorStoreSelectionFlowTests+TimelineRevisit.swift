@@ -82,7 +82,9 @@ extension HarnessMonitorStoreSelectionFlowTests {
     let revisitTask = Task { await store.selectSession(firstSummary.sessionId) }
     try await Task.sleep(for: .milliseconds(60))
 
-    #expect(store.contentUI.sessionDetail.presentedSessionDetail?.session.sessionId == firstSummary.sessionId)
+    #expect(
+      store.contentUI.sessionDetail.presentedSessionDetail?.session.sessionId
+        == firstSummary.sessionId)
     #expect(store.contentUI.sessionDetail.presentedTimeline == firstTimeline)
     #expect(store.contentUI.sessionDetail.isTimelineLoading == false)
 

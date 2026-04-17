@@ -58,55 +58,22 @@ extension HarnessMonitorStore {
       )
       beginTimelineLoadingGate(hasVisibleTimeline: preserveVisibleTimeline)
 
-      let resolvedTimeline: [TimelineEntry]
-      let resolvedTimelineWindow: TimelineWindowResponse?
-      if preserveVisibleTimeline, let preservedTimelineWindow {
-        let refreshed = try await refreshSelectedTimelineDelta(
+      guard
+        let resolvedTimeline = try await resolveSelectedTimeline(
           using: client,
           sessionID: sessionID,
-          loadedTimeline: preservedTimeline,
-          loadedWindow: preservedTimelineWindow
+          requestID: requestID,
+          preservedTimelineSnapshot: preservedTimelineSnapshot
         )
-        try Task.checkCancellation()
-        guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-        resolvedTimeline = refreshed.timeline
-        resolvedTimelineWindow = refreshed.timelineWindow
-      } else {
-        let timelineRequest = TimelineWindowRequest.latest(
-          limit: selectedTimelineRequestLimit(
-            loadedTimeline: preservedTimeline,
-            timelineWindow: preservedTimelineWindow
-          )
-        )
-        let measuredTimeline = try await Self.measureOperation {
-          try await client.timelineWindow(
-            sessionID: sessionID,
-            request: timelineRequest
-          ) { [weak self] batch, batchIndex, _ in
-            await MainActor.run {
-              guard let entries = batch.entries else { return }
-              self?.applyTimelineBatch(
-                entries,
-                timelineWindow: batch.metadataOnly,
-                index: batchIndex,
-                requestID: requestID,
-                sessionID: sessionID
-              )
-            }
-          }
-        }
-        try Task.checkCancellation()
-        guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-        recordRequestSuccess()
-        resolvedTimeline = measuredTimeline.value.entries ?? timeline
-        resolvedTimelineWindow = measuredTimeline.value.metadataOnly
+      else {
+        return
       }
 
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: detail,
-        timeline: resolvedTimeline,
-        timelineWindow: resolvedTimelineWindow,
+        timeline: resolvedTimeline.timeline,
+        timelineWindow: resolvedTimeline.timelineWindow,
         showingCachedData: false
       )
       finishTimelineLoadingGateIfCurrent(requestID: requestID, sessionID: sessionID)
@@ -114,8 +81,8 @@ extension HarnessMonitorStore {
         scheduleCacheWrite { service in
           await service.cacheSessionDetail(
             detail,
-            timeline: resolvedTimeline,
-            timelineWindow: resolvedTimelineWindow
+            timeline: resolvedTimeline.timeline,
+            timelineWindow: resolvedTimeline.timelineWindow
           )
         }
       }
@@ -129,6 +96,61 @@ extension HarnessMonitorStore {
     } catch {
       await handleSessionLoadError(error, requestID: requestID, sessionID: sessionID)
     }
+  }
+
+  private func resolveSelectedTimeline(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    requestID: UInt64,
+    preservedTimelineSnapshot: (
+      timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?
+    )?
+  ) async throws -> (timeline: [TimelineEntry], timelineWindow: TimelineWindowResponse?)? {
+    let preservedTimeline = preservedTimelineSnapshot?.timeline ?? []
+    let preservedTimelineWindow = preservedTimelineSnapshot?.timelineWindow
+    if let preservedTimelineWindow {
+      let refreshed = try await refreshSelectedTimelineDelta(
+        using: client,
+        sessionID: sessionID,
+        loadedTimeline: preservedTimeline,
+        loadedWindow: preservedTimelineWindow
+      )
+      try Task.checkCancellation()
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return nil
+      }
+      return (refreshed.timeline, refreshed.timelineWindow)
+    }
+
+    let timelineRequest = TimelineWindowRequest.latest(
+      limit: selectedTimelineRequestLimit(
+        loadedTimeline: preservedTimeline,
+        timelineWindow: preservedTimelineWindow
+      )
+    )
+    let measuredTimeline = try await Self.measureOperation {
+      try await client.timelineWindow(
+        sessionID: sessionID,
+        request: timelineRequest
+      ) { [weak self] batch, batchIndex, _ in
+        await MainActor.run {
+          guard let entries = batch.entries else { return }
+          self?.applyTimelineBatch(
+            entries,
+            timelineWindow: batch.metadataOnly,
+            index: batchIndex,
+            requestID: requestID,
+            sessionID: sessionID
+          )
+        }
+      }
+    }
+    try Task.checkCancellation()
+    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+      return nil
+    }
+    recordRequestSuccess()
+    return (measuredTimeline.value.entries ?? timeline, measuredTimeline.value.metadataOnly)
   }
 
   private func startSessionSecondaryHydration(
