@@ -10,93 +10,95 @@ use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
-use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until};
+use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
 
 #[test]
 fn manager_publishes_terminal_output_without_manual_refresh() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let project_dir = tmp.path().join("project");
-    let context_root = tmp.path().join("context-root");
-    fs_err::create_dir_all(&project_dir).expect("project dir");
-    let db = DaemonDb::open_in_memory().expect("open db");
-    let project = crate::daemon::index::DiscoveredProject {
-        project_id: "project-tui-live-refresh".into(),
-        name: "project".into(),
-        project_dir: Some(project_dir.clone()),
-        repository_root: Some(project_dir.clone()),
-        checkout_id: "checkout-tui-live-refresh".into(),
-        checkout_name: "Directory".into(),
-        context_root,
-        is_worktree: false,
-        worktree_name: None,
-    };
-    db.sync_project(&project).expect("sync project");
-    let state = session_service::build_new_session(
-        "live refresh tui test",
-        "managed tui",
-        "sess-tui-live-refresh",
-        "claude",
-        None,
-        &utc_now(),
-    );
-    db.sync_session(&project.project_id, &state)
-        .expect("sync session");
-
-    let db_slot = Arc::new(OnceLock::new());
-    db_slot
-        .set(Arc::new(Mutex::new(db)))
-        .expect("install test db");
-    let (sender, mut receiver) = broadcast::channel(8);
-    let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
-    let snapshot = manager
-        .start(
+    with_agent_tui_home(tmp.path(), || {
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-live-refresh".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-live-refresh".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "live refresh tui test",
+            "managed tui",
             "sess-tui-live-refresh",
-            &crate::daemon::agent_tui::AgentTuiStartRequest {
-                runtime: "codex".into(),
-                role: SessionRole::Worker,
-                fallback_role: None,
-                capabilities: vec![],
-                name: Some("Delayed output".into()),
-                prompt: None,
-                project_dir: None,
-                persona: None,
-                argv: vec![
-                    "sh".into(),
-                    "-c".into(),
-                    "sleep 0.2; printf 'agent-ready\\n'; sleep 0.2".into(),
-                ],
-                rows: 30,
-                cols: 120,
-            },
-        )
-        .expect("start manager TUI");
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
 
-    let mut updated_snapshot: Option<AgentTuiSnapshot> = None;
-    wait_until(WAIT_TIMEOUT, || {
-        loop {
-            match receiver.try_recv() {
-                Ok(event) if event.event == "agent_tui_updated" => {
-                    if let Ok(event_snapshot) =
-                        serde_json::from_value::<AgentTuiSnapshot>(event.payload)
-                    {
-                        if event_snapshot.tui_id == snapshot.tui_id
-                            && event_snapshot.screen.text.contains("agent-ready")
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, mut receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = manager
+            .start(
+                "sess-tui-live-refresh",
+                &crate::daemon::agent_tui::AgentTuiStartRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    fallback_role: None,
+                    capabilities: vec![],
+                    name: Some("Delayed output".into()),
+                    prompt: None,
+                    project_dir: None,
+                    persona: None,
+                    argv: vec![
+                        "sh".into(),
+                        "-c".into(),
+                        "sleep 0.2; printf 'agent-ready\\n'; sleep 0.2".into(),
+                    ],
+                    rows: 30,
+                    cols: 120,
+                },
+            )
+            .expect("start manager TUI");
+
+        let mut updated_snapshot: Option<AgentTuiSnapshot> = None;
+        wait_until(WAIT_TIMEOUT, || {
+            loop {
+                match receiver.try_recv() {
+                    Ok(event) if event.event == "agent_tui_updated" => {
+                        if let Ok(event_snapshot) =
+                            serde_json::from_value::<AgentTuiSnapshot>(event.payload)
                         {
-                            updated_snapshot = Some(event_snapshot);
-                            return true;
+                            if event_snapshot.tui_id == snapshot.tui_id
+                                && event_snapshot.screen.text.contains("agent-ready")
+                            {
+                                updated_snapshot = Some(event_snapshot);
+                                return true;
+                            }
                         }
                     }
+                    Ok(_) => {}
+                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {}
+                    Err(_) => break,
                 }
-                Ok(_) => {}
-                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {}
-                Err(_) => break,
             }
-        }
-        false
+            false
+        });
+        let updated_snapshot = updated_snapshot.expect("updated snapshot");
+        assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
+        assert!(updated_snapshot.screen.text.contains("agent-ready"));
     });
-    let updated_snapshot = updated_snapshot.expect("updated snapshot");
-    assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
-    assert!(updated_snapshot.screen.text.contains("agent-ready"));
 }
 
 #[test]

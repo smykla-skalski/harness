@@ -359,7 +359,10 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
     );
     let degraded: SessionState =
         serde_json::from_slice(&status_output.stdout).expect("parse degraded status");
-    assert_eq!(degraded.status, harness::session::types::SessionStatus::LeaderlessDegraded);
+    assert_eq!(
+        degraded.status,
+        harness::session::types::SessionStatus::LeaderlessDegraded
+    );
 
     let recover_output = run_harness_with_timeout(
         &home,
@@ -386,6 +389,15 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
         serde_json::from_slice(&recover_output.stdout).expect("parse recover start");
     assert_eq!(started.status, AgentTuiStatus::Running);
     assert_eq!(started.session_id, session.session_id);
+
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+    let (ready_status, ready_body) = post_json(
+        &endpoint,
+        &token,
+        &format!("/v1/agent-tuis/{}/ready", started.tui_id),
+        json!({}),
+    );
+    assert_eq!(ready_status, 200, "unexpected ready body: {ready_body}");
 
     let shown = wait_for_tui_prompt(&home, &xdg, &started.tui_id);
     assert!(shown.screen.text.contains("/harness:session:join"));

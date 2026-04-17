@@ -116,3 +116,15 @@ pub(super) fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool)
     }
     assert!(condition(), "condition should become true before timeout");
 }
+
+pub(super) fn with_agent_tui_home<T>(base: &Path, action: impl FnOnce() -> T) -> T {
+    let home = base.join("home");
+    fs_err::create_dir_all(&home).expect("create agent tui home");
+    temp_env::with_vars(
+        [
+            ("HOME", Some(home.as_path())),
+            ("HARNESS_HOST_HOME", Some(home.as_path())),
+        ],
+        action,
+    )
+}
