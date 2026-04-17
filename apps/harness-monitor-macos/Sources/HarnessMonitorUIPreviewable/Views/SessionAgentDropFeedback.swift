@@ -158,21 +158,12 @@ struct AgentTaskDropFeedbackOverlay: View {
           .blur(radius: 28)
       }
       .overlay {
-        VStack(spacing: HarnessMonitorTheme.spacingXS) {
-          HStack(spacing: HarnessMonitorTheme.spacingXS) {
-            Image(systemName: feedback.systemImage)
-              .imageScale(.small)
-            Text(feedback.title)
-              .scaledFont(.caption.weight(.bold))
-          }
-          .lineLimit(2)
-          Text(feedback.detail)
-            .scaledFont(.caption2.weight(.semibold))
-            .lineLimit(2)
+        ViewThatFits(in: .vertical) {
+          compactFeedbackContent(showsDetail: true)
+          compactFeedbackContent(showsDetail: false)
         }
-        .multilineTextAlignment(.center)
-        .foregroundStyle(feedback.tint)
         .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+        .padding(.vertical, HarnessMonitorTheme.spacingSM)
       }
       .clipShape(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
@@ -185,5 +176,30 @@ struct AgentTaskDropFeedbackOverlay: View {
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(feedback.title)
       .accessibilityValue(feedback.detail)
+  }
+
+  @ViewBuilder
+  private func compactFeedbackContent(showsDetail: Bool) -> some View {
+    VStack(spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: feedback.systemImage)
+          .imageScale(.small)
+        Text(feedback.title)
+          .scaledFont(.caption.weight(.bold))
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .minimumScaleFactor(0.8)
+      }
+      if showsDetail {
+        Text(feedback.detail)
+          .scaledFont(.caption2.weight(.semibold))
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .minimumScaleFactor(0.8)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .multilineTextAlignment(.center)
+    .foregroundStyle(feedback.tint)
   }
 }
