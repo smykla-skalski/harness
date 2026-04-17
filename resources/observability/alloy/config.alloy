@@ -17,7 +17,6 @@ otelcol.receiver.otlp "harness" {
     traces = [
       otelcol.processor.batch.traces.input,
       otelcol.connector.spanmetrics.harness.input,
-      otelcol.connector.servicegraph.harness.input,
     ]
   }
 }
@@ -93,16 +92,6 @@ otelcol.connector.spanmetrics "harness" {
   dimension {
     name = "hook.event"
   }
-
-  output {
-    metrics = [
-      otelcol.exporter.prometheus.harness.input,
-    ]
-  }
-}
-
-otelcol.connector.servicegraph "harness" {
-  dimensions = ["http.method"]
 
   output {
     metrics = [

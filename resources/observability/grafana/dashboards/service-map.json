@@ -8,24 +8,24 @@
     {
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
+      "includeVars": true,
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "Metrics Drilldown",
+      "title": "System Overview",
       "type": "link",
-      "url": "/a/grafana-metricsdrilldown-app/drilldown"
+      "url": "/d/harness-system-overview"
     },
     {
       "asDropdown": false,
       "icon": "external link",
       "includeVars": false,
-      "keepTime": true,
+      "keepTime": false,
       "tags": [],
       "targetBlank": false,
-      "title": "Logs Drilldown",
+      "title": "Tempo Explore Service Graph",
       "type": "link",
-      "url": "/a/grafana-lokiexplore-app/explore"
+      "url": "/explore?schemaVersion=1&panes=%7B%22A%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22uid%22%3A%22tempo%22%2C%22type%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22serviceMap%22%2C%22filters%22%3A%5B%5D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-30m%22%2C%22to%22%3A%22now%22%7D%7D%7D"
     },
     {
       "asDropdown": false,
@@ -37,37 +37,31 @@
       "title": "Traces Drilldown",
       "type": "link",
       "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Service Map",
-      "type": "link",
-      "url": "/d/harness-service-map"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Profiles Drilldown",
-      "type": "link",
-      "url": "/a/grafana-pyroscope-app/explore"
     }
   ],
   "panels": [
+    {
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "content": "## Harness Service Map\nTempo Explore's Service Graph is the authoritative topology surface for this stack.\nUse the link above to open the built-in graph, then use this dashboard for supporting edge RED metrics scoped to the Harness runtimes.\n\nTempo metrics-generator owns `traces_service_graph_*` and `traces_spanmetrics_*`.\nAlloy still exports the repo's `harness.spanmetrics_*` metrics for the existing custom dashboards, but it no longer emits duplicate `traces_service_graph_*` series.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "13.0.1",
+      "title": "Authoritative View",
+      "type": "text"
+    },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Total traced span throughput across the selected harness services.",
+      "description": "Total cross-service request rate from Tempo service-graph metrics for the selected Harness services.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -82,11 +76,11 @@
               },
               {
                 "color": "orange",
-                "value": 5
+                "value": 1
               },
               {
                 "color": "red",
-                "value": 25
+                "value": 5
               }
             ]
           },
@@ -98,15 +92,15 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 4
       },
-      "id": 1,
+      "id": 2,
       "links": [
         {
-          "keepTime": true,
+          "keepTime": false,
           "targetBlank": false,
-          "title": "Open Metrics Drilldown",
-          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+          "title": "Open Tempo Explore Service Graph",
+          "url": "/explore?schemaVersion=1&panes=%7B%22A%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22uid%22%3A%22tempo%22%2C%22type%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22serviceMap%22%2C%22filters%22%3A%5B%5D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-30m%22%2C%22to%22%3A%22now%22%7D%7D%7D"
         }
       ],
       "options": {
@@ -126,11 +120,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_spanmetrics_calls_total{service_name=~\"${service_name:regex}\"}[5m]))",
+          "expr": "sum(rate(traces_service_graph_request_total{client=~\"${service_name:regex}\",server=~\"${service_name:regex}\"}[5m])) or on() vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Span Rate",
+      "title": "Edge Request Rate",
       "type": "stat"
     },
     {
@@ -138,7 +132,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Non-allow hook outcomes. This should normally stay near zero.",
+      "description": "Failed cross-service requests from Tempo service-graph metrics.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -161,7 +155,7 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "reqps"
         },
         "overrides": []
       },
@@ -169,17 +163,9 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 0
+        "y": 4
       },
-      "id": 2,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Runtime Dashboard",
-          "url": "/d/harness-runtime-execution"
-        }
-      ],
+      "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -197,11 +183,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m])) or on() vector(0)",
+          "expr": "sum(rate(traces_service_graph_request_failed_total{client=~\"${service_name:regex}\",server=~\"${service_name:regex}\"}[5m])) or on() vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Hook Blocks / s",
+      "title": "Failed Edge Rate",
       "type": "stat"
     },
     {
@@ -209,7 +195,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Daemon server latency using the current millisecond histogram family.",
+      "description": "Number of active Harness-to-Harness service edges currently observed.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -224,15 +210,15 @@
               },
               {
                 "color": "orange",
-                "value": 100
+                "value": 5
               },
               {
                 "color": "red",
-                "value": 300
+                "value": 15
               }
             ]
           },
-          "unit": "ms"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -240,17 +226,9 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 4
       },
-      "id": 3,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Daemon Transport Dashboard",
-          "url": "/d/harness-daemon-transport"
-        }
-      ],
+      "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -268,11 +246,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))",
+          "expr": "count(sum by (client, server) (rate(traces_service_graph_request_total{client=~\"${service_name:regex}\",server=~\"${service_name:regex}\"}[5m])) > 0) or on() vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Daemon HTTP p95",
+      "title": "Observed Edges",
       "type": "stat"
     },
     {
@@ -280,7 +258,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Monitor client latency using the real harness-monitor histogram family.",
+      "description": "Tempo span-metrics throughput for server spans emitted by the selected Harness services.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -295,15 +273,15 @@
               },
               {
                 "color": "orange",
-                "value": 150
+                "value": 1
               },
               {
                 "color": "red",
-                "value": 500
+                "value": 5
               }
             ]
           },
-          "unit": "ms"
+          "unit": "reqps"
         },
         "overrides": []
       },
@@ -311,60 +289,6 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 0
-      },
-      "id": 4,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Monitor Dashboard",
-          "url": "/d/harness-monitor-client"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value_and_name"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Monitor HTTP p95",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cross-service traced throughput grouped by service_name.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
         "y": 4
       },
       "id": 5,
@@ -377,81 +301,49 @@
         }
       ],
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum by (service_name) (rate(harness_spanmetrics_calls_total{service_name=~\"${service_name:regex}\"}[5m]))",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Cross-Service Span Rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cross-service p95 latency derived from the current spanmetrics histogram family.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ms"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "id": 6,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Metrics Drilldown",
-          "url": "/a/grafana-metricsdrilldown-app/drilldown"
-        }
-      ],
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "textMode": "value_and_name"
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(harness_spanmetrics_duration_milliseconds_bucket{service_name=~\"${service_name:regex}\"}[5m])))",
-          "legendFormat": "{{service_name}}",
+          "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\",span_kind=\"SPAN_KIND_SERVER\"}[5m])) or on() vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Cross-Service Span p95",
-      "type": "timeseries"
+      "title": "Server Span Rate",
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Error-oriented signals across hooks, daemon client transport, and monitor HTTP requests.",
+      "description": "Per-edge request rate using Tempo service-graph metrics.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "ops"
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "reqps"
         },
         "overrides": []
       },
@@ -459,77 +351,198 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 8
       },
-      "id": 7,
+      "id": 6,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m])) or on() vector(0)",
-          "legendFormat": "hook blocks",
+          "expr": "sum by (client, server) (rate(traces_service_graph_request_total{client=~\"${service_name:regex}\",server=~\"${service_name:regex}\"}[5m]))",
+          "legendFormat": "{{client}} -> {{server}}",
           "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "sum(rate(harness_daemon_client_requests_total{error=\"true\"}[5m])) or on() vector(0)",
-          "legendFormat": "daemon client errors",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "sum(rate(harness_monitor_http_requests_total{request_failed=\"true\"}[5m])) or on() vector(0)",
-          "legendFormat": "monitor failed requests",
-          "refId": "C"
         }
       ],
-      "title": "Error Signals",
+      "title": "Request Rate by Edge",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
-      "description": "Logs filtered for the selected services and severity levels. Use this as the landing page for drilldown into failure detail.",
+      "description": "Per-edge failed request rate using Tempo service-graph metrics.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 8
       },
-      "id": 8,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore"
-        }
-      ],
+      "id": 7,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showLabels": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "{service_name=~\"${service_name:regex}\", level=~\"${level:regex}\"} |~ \"(?i)error|fail|denied|panic\"",
-          "queryType": "range",
+          "expr": "sum by (client, server) (rate(traces_service_graph_request_failed_total{client=~\"${service_name:regex}\",server=~\"${service_name:regex}\"}[5m]))",
+          "legendFormat": "{{client}} -> {{server}}",
           "refId": "A"
         }
       ],
-      "title": "Error Logs",
-      "type": "logs"
+      "title": "Failed Request Rate by Edge",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Server-side p95 latency for each observed Harness service edge.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le, client, server) (rate(traces_service_graph_request_server_seconds_bucket{client=~\"${service_name:regex}\",server=~\"${service_name:regex}\"}[5m])))",
+          "legendFormat": "{{client}} -> {{server}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Server p95 by Edge",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Highest-throughput server spans from Tempo span metrics.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk(10, sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\",span_kind=\"SPAN_KIND_SERVER\"}[5m])))",
+          "legendFormat": "{{service}} :: {{span_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Server Spans",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -538,7 +551,7 @@
   "tags": [
     "harness",
     "observability",
-    "overview"
+    "service-map"
   ],
   "templating": {
     "list": [
@@ -554,22 +567,7 @@
         "multi": true,
         "name": "service_name",
         "options": [],
-        "query": "harness-cli,harness-hook,harness-daemon,harness-bridge,harness-monitor",
-        "type": "custom"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "label": "Level",
-        "multi": true,
-        "name": "level",
-        "options": [],
-        "query": "debug,info,warn,error",
+        "query": "harness-monitor,harness-daemon,harness-cli,harness-hook,harness-bridge",
         "type": "custom"
       }
     ]
@@ -578,7 +576,7 @@
     "from": "now-6h",
     "to": "now"
   },
-  "title": "Harness System Overview",
-  "uid": "harness-system-overview",
+  "title": "Harness Service Map",
+  "uid": "harness-service-map",
   "version": 1
 }
