@@ -1,10 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-REPO_ROOT="$(CDPATH= cd -- "$ROOT/../.." && pwd)"
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 DESTINATION="${XCODEBUILD_DESTINATION:-platform=macOS}"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/tmp/xcode-derived}"
+XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$ROOT/Scripts/xcodebuild-with-lock.sh}"
 FORMAT_CONFIG="$ROOT/.swift-format"
 SWIFT_BIN="${SWIFT_BIN:-$(command -v swift || true)}"
 SWIFTLINT_BIN="${SWIFTLINT_BIN:-$(command -v swiftlint || true)}"
@@ -17,6 +18,11 @@ fi
 
 if [ -z "${SWIFTLINT_BIN}" ]; then
   echo "swiftlint is required on PATH" >&2
+  exit 1
+fi
+
+if [ ! -x "${XCODEBUILD_RUNNER}" ]; then
+  echo "xcodebuild runner is not executable: ${XCODEBUILD_RUNNER}" >&2
   exit 1
 fi
 
@@ -44,7 +50,7 @@ mkdir -p "$SWIFTLINT_CACHE_PATH"
   "$ROOT/Tests/HarnessMonitorKitTests" \
   "$ROOT/Tests/HarnessMonitorUITests"
 
-xcodebuild \
+"$XCODEBUILD_RUNNER" \
   -project "$ROOT/HarnessMonitor.xcodeproj" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
