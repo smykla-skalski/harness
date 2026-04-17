@@ -274,6 +274,69 @@ fn reassignable_drop_starts_on_free_worker() {
 }
 
 #[test]
+fn observer_can_create_task_in_leaderless_degraded_session() {
+    with_temp_project(|project| {
+        start_session(
+            "degraded observer triage",
+            "",
+            project,
+            Some("claude"),
+            Some("degraded-observer-task"),
+        )
+        .expect("start");
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("degraded-observer"), || {
+            join_session(
+                "degraded-observer-task",
+                SessionRole::Observer,
+                "codex",
+                &["triage".into()],
+                Some("observer"),
+                project,
+                None,
+            )
+        })
+        .expect("join observer");
+        let observer_id = joined
+            .agents
+            .values()
+            .find(|agent| agent.role == SessionRole::Observer)
+            .expect("observer")
+            .agent_id
+            .clone();
+
+        storage::update_state(project, "degraded-observer-task", |state| {
+            let previous_leader = state.leader_id.take().expect("leader");
+            state.status = SessionStatus::LeaderlessDegraded;
+            let leader = state
+                .agents
+                .get_mut(&previous_leader)
+                .expect("leader registration");
+            leader.status = AgentStatus::Disconnected;
+            Ok(())
+        })
+        .expect("degrade session");
+
+        let task = create_task(
+            "degraded-observer-task",
+            "capture degraded finding",
+            Some("observer should still be able to record triage"),
+            TaskSeverity::High,
+            &observer_id,
+            project,
+        )
+        .expect("observer creates task in degraded session");
+
+        let state = session_status("degraded-observer-task", project).expect("status");
+        assert_eq!(state.status, SessionStatus::LeaderlessDegraded);
+        assert_eq!(state.tasks.len(), 1);
+        assert_eq!(
+            state.tasks[&task.task_id].created_by.as_deref(),
+            Some(observer_id.as_str())
+        );
+    });
+}
+
+#[test]
 fn locked_queue_advances_when_worker_finishes_current_task() {
     with_temp_project(|project| {
         let state = start_session(
