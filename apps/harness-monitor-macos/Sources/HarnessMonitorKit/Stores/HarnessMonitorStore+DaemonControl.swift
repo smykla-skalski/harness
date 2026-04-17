@@ -268,10 +268,56 @@ extension HarnessMonitorStore {
     isReconnecting = false
   }
 
+  public func suspendLiveConnectionForAppInactivity() async {
+    guard
+      client != nil
+        || globalStreamTask != nil
+        || connectionProbeTask != nil
+        || isBootstrapping
+        || isReconnecting
+    else {
+      return
+    }
+    guard isAppLifecycleSuspended == false else {
+      return
+    }
+
+    isAppLifecycleSuspended = true
+    stopManifestWatcher()
+    stopAllStreams()
+
+    guard let client else {
+      connectionState = .idle
+      return
+    }
+
+    self.client = nil
+    await client.shutdown()
+    connectionState = .idle
+  }
+
+  public func resumeLiveConnectionAfterAppActivation() async {
+    guard isAppLifecycleSuspended else {
+      return
+    }
+
+    isAppLifecycleSuspended = false
+    guard isBootstrapping == false else {
+      return
+    }
+    guard isReconnecting == false else {
+      reconnectRequestedDuringReconnect = true
+      return
+    }
+
+    await reconnect()
+  }
+
   public func prepareForTermination() async {
     toast.dismissAll()
     stopAllStreams()
     stopManifestWatcher()
+    isAppLifecycleSuspended = false
 
     guard let client else {
       return
