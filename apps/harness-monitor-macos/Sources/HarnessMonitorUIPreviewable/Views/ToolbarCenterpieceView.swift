@@ -39,101 +39,15 @@ struct ToolbarCenterpieceModel: Equatable {
   let workspaceName: String
   let destinationName: String
   let destinationSystemImage: String
-  let metrics: [ToolbarCenterpieceMetric]
 
   static let preview = Self(
     workspaceName: "Harness Monitor",
     destinationName: "My Mac",
-    destinationSystemImage: "laptopcomputer",
-    metrics: [
-      .init(kind: .projects, value: 1),
-      .init(kind: .sessions, value: 1),
-      .init(kind: .openWork, value: 2),
-      .init(kind: .blocked, value: 1),
-    ]
+    destinationSystemImage: "laptopcomputer"
   )
 
   var accessibilityLabel: String {
     "\(workspaceName), \(destinationName)"
-  }
-
-  var accessibilityValue: String {
-    metrics
-      .map { "\($0.kind.accessibilityKey)=\($0.value)" }
-      .joined(separator: ", ")
-  }
-}
-
-struct ToolbarCenterpieceMetric: Equatable {
-  let kind: ToolbarCenterpieceMetricKind
-  let value: Int
-}
-
-enum ToolbarCenterpieceMetricKind: String, CaseIterable {
-  case projects
-  case worktrees
-  case sessions
-  case openWork
-  case blocked
-
-  var accessibilityKey: String {
-    switch self {
-    case .projects:
-      "projects"
-    case .worktrees:
-      "worktrees"
-    case .sessions:
-      "sessions"
-    case .openWork:
-      "openWork"
-    case .blocked:
-      "blocked"
-    }
-  }
-
-  var title: String {
-    switch self {
-    case .projects:
-      "Projects"
-    case .worktrees:
-      "Worktrees"
-    case .sessions:
-      "Sessions"
-    case .openWork:
-      "Open"
-    case .blocked:
-      "Blocked"
-    }
-  }
-
-  var tint: Color {
-    switch self {
-    case .projects:
-      HarnessMonitorTheme.accent
-    case .worktrees:
-      HarnessMonitorTheme.warmAccent
-    case .sessions:
-      HarnessMonitorTheme.success
-    case .openWork:
-      HarnessMonitorTheme.warmAccent
-    case .blocked:
-      HarnessMonitorTheme.danger
-    }
-  }
-
-  var symbolName: String {
-    switch self {
-    case .projects:
-      "folder.fill"
-    case .worktrees:
-      "square.3.layers.3d.down.right"
-    case .sessions:
-      "rectangle.stack.fill"
-    case .openWork:
-      "checklist"
-    case .blocked:
-      "exclamationmark.triangle.fill"
-    }
   }
 }
 
@@ -155,19 +69,6 @@ public enum ToolbarCenterpieceDisplayMode: String {
       .compressed
     }
   }
-
-  var metricSpacing: CGFloat {
-    switch self {
-    case .standard:
-      8
-    case .compact:
-      6
-    case .compressed:
-      4
-    }
-  }
-
-  var showsMetricLabels: Bool { false }
 
   var principalHorizontalOffset: CGFloat {
     switch self {
@@ -244,10 +145,7 @@ struct ToolbarCenterpieceView: View {
   var statusMessages: [ToolbarStatusMessage] = []
   var connectionState: HarnessMonitorStore.ConnectionState = .idle
   private static let toolbarHeight: CGFloat = 32
-  // Leading inset matches the vertical centering gap inside the glass capsule
-  // so the first metric token sits at equal distance from the bubble's inner
-  // surface on all sides.
-  private static let metricsLeadingInset: CGFloat = 12
+  private static let statusLeadingInset: CGFloat = 12
   private static let daemonTrailingInset: CGFloat = 10
 
   init(
@@ -270,10 +168,6 @@ struct ToolbarCenterpieceView: View {
         .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceFrame)
 
       HStack(spacing: 0) {
-        ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
-          .fixedSize(horizontal: true, vertical: false)
-          .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceMetricsFrame)
-
         Spacer(minLength: 0)
 
         if !statusMessages.isEmpty {
@@ -288,7 +182,7 @@ struct ToolbarCenterpieceView: View {
 
         daemonStatusDot
       }
-      .padding(.leading, Self.metricsLeadingInset)
+      .padding(.leading, Self.statusLeadingInset)
       .padding(.trailing, Self.daemonTrailingInset)
     }
     .frame(
@@ -299,7 +193,6 @@ struct ToolbarCenterpieceView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
     .accessibilityLabel(model.accessibilityLabel)
-    .accessibilityValue(model.accessibilityValue)
     .help("Live harness summary")
   }
 

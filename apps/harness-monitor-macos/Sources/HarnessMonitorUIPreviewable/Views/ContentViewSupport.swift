@@ -144,21 +144,10 @@ extension HarnessMonitorStore {
 
 extension HarnessMonitorStore.ContentToolbarSlice {
   fileprivate var toolbarCenterpieceModel: ToolbarCenterpieceModel {
-    var metrics: [ToolbarCenterpieceMetric] = [
-      .init(kind: .projects, value: toolbarMetrics.projectCount),
-      .init(kind: .sessions, value: toolbarMetrics.sessionCount),
-      .init(kind: .openWork, value: toolbarMetrics.openWorkCount),
-      .init(kind: .blocked, value: toolbarMetrics.blockedCount),
-    ]
-    if toolbarMetrics.worktreeCount > 0 {
-      metrics.insert(.init(kind: .worktrees, value: toolbarMetrics.worktreeCount), at: 1)
-    }
-
-    return ToolbarCenterpieceModel(
+    ToolbarCenterpieceModel(
       workspaceName: "Harness Monitor",
       destinationName: "My Mac",
-      destinationSystemImage: "laptopcomputer",
-      metrics: metrics
+      destinationSystemImage: "laptopcomputer"
     )
   }
 
@@ -247,21 +236,6 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
       toolbarUI: toolbarUI,
       showInspector: showInspector,
       setInspectorVisibility: setInspectorVisibility
-    )
-  }
-}
-
-public struct ContentToolbarAccessibilityMarker: View {
-  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-
-  public init(toolbarUI: HarnessMonitorStore.ContentToolbarSlice) {
-    self.toolbarUI = toolbarUI
-  }
-
-  public var body: some View {
-    AccessibilityTextMarker(
-      identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
-      text: toolbarUI.toolbarCenterpieceModel.accessibilityValue
     )
   }
 }

@@ -21,29 +21,27 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testDashboardUsesToolbarSummaryInsteadOfMetricCards() throws {
+  func testDashboardUsesSidebarFooterSummaryInsteadOfMetricCards() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
     let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
-    let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
-    let centerpieceState = element(in: app, identifier: Accessibility.toolbarCenterpieceState)
+    let sidebarFooterState = element(in: app, identifier: Accessibility.sidebarFooterState)
     let boardMetricElements = app.descendants(matching: .any).matching(
       NSPredicate(format: "identifier BEGINSWITH %@", "harness.board.metric.")
     )
 
     XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarFooterState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
-      centerpieceState.label,
-      "projects=1, worktrees=0, sessions=1, openWork=2, blocked=1"
+      sidebarFooterState.label,
+      "projects=1, sessions=1, openWork=2, blocked=1"
     )
     XCTAssertEqual(
       boardMetricElements.count,
       0,
-      "Expected dashboard summary metrics to render only in the toolbar centerpiece"
+      "Expected dashboard summary metrics to render only in the sidebar footer"
     )
   }
 
