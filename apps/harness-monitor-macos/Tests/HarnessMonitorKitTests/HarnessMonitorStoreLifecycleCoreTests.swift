@@ -123,7 +123,8 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == ["core"])
   }
 
-  @Test("Session selection keeps cached signals visible when websocket core detail omits extensions")
+  @Test(
+    "Session selection keeps cached signals visible when websocket core detail omits extensions")
   func sessionSelectionKeepsCachedSignalsVisibleWhenWebsocketCoreDetailOmitsExtensions()
     async throws
   {
@@ -158,7 +159,8 @@ struct HarnessMonitorStoreLifecycleCoreTests {
 
     #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == ["core"])
     #expect(store.selectedSession?.signals == PreviewFixtures.signals)
-    #expect(store.contentUI.sessionDetail.presentedSessionDetail?.signals == PreviewFixtures.signals)
+    #expect(
+      store.contentUI.sessionDetail.presentedSessionDetail?.signals == PreviewFixtures.signals)
   }
 
   @Test("Session selection keeps full detail scope on HTTP transport")

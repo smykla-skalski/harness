@@ -244,7 +244,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(store.selectedSession?.signals == PreviewFixtures.signals)
     #expect(store.selectedSession?.agentActivity == PreviewFixtures.agentActivity)
     #expect(store.timeline == PreviewFixtures.timeline)
-    #expect(store.contentUI.sessionDetail.presentedSessionDetail?.signals == PreviewFixtures.signals)
+    #expect(
+      store.contentUI.sessionDetail.presentedSessionDetail?.signals == PreviewFixtures.signals)
     #expect(
       store.contentUI.sessionDetail.presentedSessionDetail?.agentActivity
         == PreviewFixtures.agentActivity
