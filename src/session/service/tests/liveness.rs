@@ -22,10 +22,11 @@ fn sync_liveness_transitions_stale_agent_to_disconnected() {
 
         let state = session_status("sync-1", project).expect("status");
         let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+        age_agent_activity(project, "sync-1", &worker_id, 1_200);
 
-        // Write a log file for the worker with old mtime (600s > 300s threshold)
+        // Write a log file for the worker with old mtime beyond the interactive timeout.
         let log_path = write_agent_log_file(project, "codex", "worker-sess");
-        set_log_mtime_seconds_ago(&log_path, 600);
+        set_log_mtime_seconds_ago(&log_path, 1_200);
 
         // Write a fresh log for the leader
         write_agent_log_file(project, "claude", "test-service");
@@ -97,9 +98,10 @@ fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
         let state = session_status("sync-legacy", project).expect("status");
         let worker = state.agents.get(&worker_id).expect("worker");
         assert!(worker.agent_session_id.is_none());
+        age_agent_activity(project, "sync-legacy", &worker_id, 1_200);
 
         let legacy_worker_log = write_agent_log_file(project, "codex", "sync-legacy");
-        set_log_mtime_seconds_ago(&legacy_worker_log, 600);
+        set_log_mtime_seconds_ago(&legacy_worker_log, 1_200);
         write_agent_log_file(project, "claude", "test-service");
 
         let result = sync_agent_liveness("sync-legacy", project).expect("sync");
@@ -120,13 +122,14 @@ fn sync_liveness_marks_session_leaderless_degraded_when_dead_leader_has_no_succe
             start_session("test", "", project, Some("claude"), Some("sync-leader")).expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
         let leader = state.agents.get(&leader_id).expect("leader agent");
+        age_agent_activity(project, "sync-leader", &leader_id, 1_200);
 
         let leader_log = write_agent_log_file(
             project,
             "claude",
             leader.agent_session_id.as_deref().expect("leader session"),
         );
-        set_log_mtime_seconds_ago(&leader_log, 600);
+        set_log_mtime_seconds_ago(&leader_log, 1_200);
 
         let result = sync_agent_liveness("sync-leader", project).expect("sync");
 
@@ -161,6 +164,7 @@ fn sync_liveness_promotes_highest_priority_successor_within_same_role() {
         .expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
         let leader = state.agents.get(&leader_id).expect("leader agent");
+        age_agent_activity(project, "sync-promote-priority", &leader_id, 1_200);
 
         temp_env::with_var("CODEX_SESSION_ID", Some("preferred-improver"), || {
             join_session(
@@ -206,7 +210,7 @@ fn sync_liveness_promotes_highest_priority_successor_within_same_role() {
             "claude",
             leader.agent_session_id.as_deref().expect("leader session"),
         );
-        set_log_mtime_seconds_ago(&leader_log, 600);
+        set_log_mtime_seconds_ago(&leader_log, 1_200);
         for agent in current
             .agents
             .values()
@@ -277,10 +281,11 @@ fn sync_liveness_returns_dead_agent_task_to_open() {
             project,
         )
         .expect("start");
+        age_agent_activity(project, "sync-3", &worker_id, 1_200);
 
         // Make the worker agent stale
         let log_path = write_agent_log_file(project, "codex", "worker-sess-3");
-        set_log_mtime_seconds_ago(&log_path, 600);
+        set_log_mtime_seconds_ago(&log_path, 1_200);
 
         // Keep leader alive
         write_agent_log_file(project, "claude", "test-service");
@@ -321,9 +326,13 @@ fn sync_liveness_seven_agents_six_die() {
         }
 
         // Make all 6 workers stale
+        let state = session_status("sync-4", project).expect("status");
+        for worker in state.agents.values().filter(|agent| agent.runtime == "codex") {
+            age_agent_activity(project, "sync-4", &worker.agent_id, 1_200);
+        }
         for i in 1..=6 {
             let log_path = write_agent_log_file(project, "codex", &format!("worker-{i}"));
-            set_log_mtime_seconds_ago(&log_path, 600);
+            set_log_mtime_seconds_ago(&log_path, 1_200);
         }
 
         // Keep leader alive

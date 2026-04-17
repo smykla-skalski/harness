@@ -31,6 +31,26 @@ impl Default for LivenessConfig {
     }
 }
 
+impl LivenessConfig {
+    #[must_use]
+    pub const fn interactive() -> Self {
+        Self {
+            active_threshold_seconds: 90,
+            unresponsive_timeout_seconds: 900,
+        }
+    }
+
+    #[must_use]
+    pub fn for_runtime_name(runtime_name: &str) -> Self {
+        match runtime_name {
+            "claude" | "codex" | "gemini" | "copilot" | "opencode" | "vibe" => {
+                Self::interactive()
+            }
+            _ => Self::default(),
+        }
+    }
+}
+
 /// Determine the liveness status from a last-activity timestamp string.
 ///
 /// Returns `Unresponsive` if the timestamp is `None` or unparseable.
