@@ -45,7 +45,6 @@ extension DaemonController {
     var immediateError: (any Error)?
     var skipFinalBootstrapProbe = false
     var managedStaleManifestTracker = ManagedStaleManifestTracker()
-    var managedHelperMismatchTracker = ManagedStaleManifestTracker()
     var refreshedManagedLaunchAgentDuringWarmUp = false
   }
 
@@ -168,11 +167,9 @@ extension DaemonController {
     state: inout WarmUpLoopState
   ) throws -> WarmUpIterationOutcome? {
     guard ownership == .managed else {
-      state.managedHelperMismatchTracker.reset()
       return nil
     }
     guard launchAgentManager.registrationState() == .enabled else {
-      state.managedHelperMismatchTracker.reset()
       return nil
     }
     guard
@@ -180,72 +177,29 @@ extension DaemonController {
       let currentStamp = try managedLaunchAgentCurrentBundleStamp(),
       publishedStamp != currentStamp
     else {
-      state.managedHelperMismatchTracker.reset()
       return nil
     }
 
-    let mismatchSignature = Self.managedHelperMismatchSignature(
-      for: manifest,
-      publishedStamp: publishedStamp,
-      currentStamp: currentStamp
-    )
-    let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
-    state.lastError = DaemonControlError.daemonDidNotStart
-
     if state.refreshedManagedLaunchAgentDuringWarmUp == false {
       HarnessMonitorLogger.lifecycle.notice(
-        "Managed daemon helper identity mismatch; refreshing launch agent before trusting manifest"
+        "Managed daemon helper identity mismatch; refreshing launch agent in background"
       )
       try refreshManagedLaunchAgent(currentStamp: currentStamp)
       state.refreshedManagedLaunchAgentDuringWarmUp = true
-      state.managedHelperMismatchTracker.reset()
-      return .continueLoop
+      Self.signalProcessToExit(pid: manifest.pid)
     }
 
-    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
-    if state.managedHelperMismatchTracker.expired(
-      signature: mismatchSignature,
-      now: ContinuousClock.now,
-      gracePeriod: managedStaleManifestGracePeriod
-    ) {
-      let timeoutMessage = Self.warmUpManagedHelperStampRewriteTimeoutMessage(
-        path: manifestPath,
-        gracePeriod: gracePeriod
-      )
-      HarnessMonitorLogger.lifecycle.error(
-        "\(timeoutMessage, privacy: .public)"
-      )
-      state.immediateError = DaemonControlError.daemonDidNotStart
-      state.skipFinalBootstrapProbe = true
-      return .stopLoop
-    }
-
+    // After triggering refresh, proceed with the old daemon immediately.
+    // The old daemon is functional (version already validated above).
+    // When it exits, the manifest watcher will trigger reconnection.
     HarnessMonitorLogger.lifecycle.trace(
-      "\(Self.warmUpWaitingForManagedHelperStampRewriteMessage(path: manifestPath), privacy: .public)"
+      "Proceeding with current daemon pid=\(manifest.pid, privacy: .public) while refresh cycles in background"
     )
-    return .continueLoop
+    return nil
   }
 
   static func managedStaleManifestSignature(for manifest: DaemonManifest) -> String {
     "\(manifest.pid)|\(manifest.endpoint)|\(manifest.startedAt)"
-  }
-
-  static func managedHelperMismatchSignature(
-    for manifest: DaemonManifest,
-    publishedStamp: ManagedLaunchAgentBundleStamp,
-    currentStamp: ManagedLaunchAgentBundleStamp
-  ) -> String {
-    [
-      String(manifest.pid),
-      manifest.endpoint,
-      manifest.startedAt,
-      publishedStamp.helperPath,
-      String(publishedStamp.deviceIdentifier),
-      String(publishedStamp.inode),
-      currentStamp.helperPath,
-      String(currentStamp.deviceIdentifier),
-      String(currentStamp.inode),
-    ].joined(separator: "|")
   }
 
   static func warmUpObservedManifestMessage(pid: Int, endpoint: String) -> String {
@@ -267,17 +221,6 @@ extension DaemonController {
     "Warm-up aborting managed stale manifest wait at \(path) grace-period=\(gracePeriod)"
   }
 
-  static func warmUpManagedHelperStampRewriteTimeoutMessage(
-    path: String,
-    gracePeriod: String
-  ) -> String {
-    "Warm-up aborting managed helper stamp rewrite wait at \(path) grace-period=\(gracePeriod)"
-  }
-
-  static func warmUpWaitingForManagedHelperStampRewriteMessage(path: String) -> String {
-    "Warm-up waiting for managed daemon to publish refreshed helper stamp at \(path)"
-  }
-
   static func processIsAlive(pid: Int) -> Bool? {
     guard pid > 0 else {
       return nil
@@ -294,6 +237,15 @@ extension DaemonController {
       return true
     default:
       return nil
+    }
+  }
+
+  static func signalProcessToExit(pid: Int) {
+    guard pid > 0 else { return }
+    if kill(pid_t(pid), SIGTERM) == 0 {
+      HarnessMonitorLogger.lifecycle.trace(
+        "Sent SIGTERM to stale daemon pid=\(pid, privacy: .public)"
+      )
     }
   }
 
