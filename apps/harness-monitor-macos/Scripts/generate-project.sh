@@ -6,10 +6,6 @@ REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 XCODEGEN_BIN="${XCODEGEN_BIN:-$(command -v xcodegen || true)}"
 BUILD_SERVER_VERSION="1.3.0"
 
-if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
-  "$REPO_ROOT/scripts/version.sh" sync-monitor
-fi
-
 if [ -z "${XCODEGEN_BIN}" ]; then
   echo "xcodegen is required on PATH or via XCODEGEN_BIN" >&2
   exit 1
@@ -40,6 +36,10 @@ sed -i '' \
 for scheme in "$SCHEMES_DIR"/*.xcscheme; do
   sed -i '' -E 's/LastUpgradeVersion *= *"1430"/LastUpgradeVersion = "2640"/g' "$scheme"
 done
+
+if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
+  "$REPO_ROOT/scripts/version.sh" sync-monitor
+fi
 
 write_build_server_config() {
   local config_path="$1"
