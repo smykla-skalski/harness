@@ -27,6 +27,7 @@ struct HarnessMonitorObservabilityConfigTests {
           "http_endpoint": "http://127.0.0.1:4318",
           "grafana_url": "http://127.0.0.1:3000",
           "pyroscope_url": "http://127.0.0.1:4040",
+          "monitor_smoke_enabled": true,
           "headers": {
             "x-harness-env": "local"
           }
@@ -46,6 +47,7 @@ struct HarnessMonitorObservabilityConfigTests {
     #expect(config.grpcEndpoint?.absoluteString == "http://127.0.0.1:4317")
     #expect(config.httpSignalEndpoints == nil)
     #expect(config.pyroscopeURL?.absoluteString == "http://127.0.0.1:4040")
+    #expect(config.monitorSmokeEnabled)
     #expect(config.headers["x-harness-env"] == "local")
   }
 
@@ -80,6 +82,7 @@ struct HarnessMonitorObservabilityConfigTests {
         == "http://127.0.0.1:4318/v1/logs"
     )
     #expect(config.pyroscopeURL?.absoluteString == "http://127.0.0.1:4404")
+    #expect(config.monitorSmokeEnabled == false)
     #expect(config.headers["x-harness-env"] == "local")
     #expect(config.headers["x-tenant"] == "test")
   }
@@ -122,6 +125,44 @@ struct HarnessMonitorObservabilityConfigTests {
     #expect(config.source == .environment)
     #expect(config.transport == .grpc)
     #expect(config.grpcEndpoint?.absoluteString == "http://10.0.0.9:14317")
+    #expect(config.monitorSmokeEnabled == false)
+  }
+
+  @Test("Shared config without smoke flag defaults the smoke lane off")
+  func sharedConfigWithoutSmokeFlagDefaultsSmokeLaneOff() throws {
+    let tempDirectory = try temporaryDirectory()
+
+    let configURL =
+      tempDirectory
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("observability", isDirectory: true)
+      .appendingPathComponent("config.json")
+    try FileManager.default.createDirectory(
+      at: configURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try writeSharedConfig(
+      to: configURL,
+      body: """
+        {
+          "enabled": true,
+          "grpc_endpoint": "http://127.0.0.1:4317",
+          "http_endpoint": "http://127.0.0.1:4318",
+          "headers": {}
+        }
+        """
+    )
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": tempDirectory.path],
+      homeDirectory: tempDirectory
+    )
+
+    let resolvedConfig = try HarnessMonitorObservabilityConfig.resolve(using: environment)
+    let config = try #require(resolvedConfig)
+
+    #expect(config.source == .sharedFile)
+    #expect(config.transport == .grpc)
+    #expect(config.monitorSmokeEnabled == false)
   }
 
   private func temporaryDirectory() throws -> URL {
