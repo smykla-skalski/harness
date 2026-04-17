@@ -15,6 +15,34 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "4FA94D124B8AEDED3C2831AA"
+               BuildableName = "HarnessMonitorKit.framework"
+               BlueprintName = "HarnessMonitorKit"
+               ReferencedContainer = "container:HarnessMonitor.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "946061DC4ACDFD20EFBE9D80"
+               BuildableName = "HarnessMonitorPreviewHost.app"
+               BlueprintName = "HarnessMonitorPreviewHost"
+               ReferencedContainer = "container:HarnessMonitor.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "5614B52E9F09FC69910284A6"
                BuildableName = "HarnessMonitorUIPreviewable.framework"
                BlueprintName = "HarnessMonitorUIPreviewable"
@@ -32,9 +60,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5614B52E9F09FC69910284A6"
-            BuildableName = "HarnessMonitorUIPreviewable.framework"
-            BlueprintName = "HarnessMonitorUIPreviewable"
+            BlueprintIdentifier = "946061DC4ACDFD20EFBE9D80"
+            BuildableName = "HarnessMonitorPreviewHost.app"
+            BlueprintName = "HarnessMonitorPreviewHost"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -53,15 +81,16 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <MacroExpansion>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5614B52E9F09FC69910284A6"
-            BuildableName = "HarnessMonitorUIPreviewable.framework"
-            BlueprintName = "HarnessMonitorUIPreviewable"
+            BlueprintIdentifier = "946061DC4ACDFD20EFBE9D80"
+            BuildableName = "HarnessMonitorPreviewHost.app"
+            BlueprintName = "HarnessMonitorPreviewHost"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
-      </MacroExpansion>
+      </BuildableProductRunnable>
       <CommandLineArguments>
       </CommandLineArguments>
    </LaunchAction>
@@ -71,15 +100,16 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <MacroExpansion>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5614B52E9F09FC69910284A6"
-            BuildableName = "HarnessMonitorUIPreviewable.framework"
-            BlueprintName = "HarnessMonitorUIPreviewable"
+            BlueprintIdentifier = "946061DC4ACDFD20EFBE9D80"
+            BuildableName = "HarnessMonitorPreviewHost.app"
+            BlueprintName = "HarnessMonitorPreviewHost"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
-      </MacroExpansion>
+      </BuildableProductRunnable>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Preview">
