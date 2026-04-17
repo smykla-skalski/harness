@@ -2,7 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
-@testable import HarnessMonitorUI
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Background thumbnail cache")
 struct BackgroundThumbnailCacheTests {

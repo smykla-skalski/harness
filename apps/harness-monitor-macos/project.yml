@@ -99,28 +99,6 @@ targets:
           ENABLE_MODULE_VERIFIER: NO
           ONLY_ACTIVE_ARCH: YES
           SWIFT_ENABLE_EAGER_LINKING: NO
-  HarnessMonitorUI:
-    type: framework
-    platform: macOS
-    deploymentTarget: "26.0"
-    sources:
-      - Sources/HarnessMonitorUI
-    dependencies:
-      - target: HarnessMonitorKit
-      - target: HarnessMonitorUIPreviewable
-      - package: Textual
-    settings:
-      base:
-        CODE_SIGN_STYLE: Automatic
-        CODE_SIGNING_ALLOWED: YES
-        DEVELOPMENT_TEAM: Q498EB36N4
-        ENABLE_MODULE_VERIFIER: YES
-        MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
-        MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS: "gnu17 gnu++20"
-        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.ui
-      configs:
-        Preview:
-          ENABLE_MODULE_VERIFIER: NO
   HarnessMonitor:
     type: application
     platform: macOS
@@ -131,7 +109,6 @@ targets:
       - Resources/PrivacyInfo.xcprivacy
     dependencies:
       - target: HarnessMonitorKit
-      - target: HarnessMonitorUI
       - target: HarnessMonitorUIPreviewable
       - package: Lottie
     postBuildScripts:
@@ -159,7 +136,6 @@ targets:
           - $(PROJECT_DIR)/Scripts/run-xcode-build-server.sh
           - $(PROJECT_DIR)/Sources/HarnessMonitor
           - $(PROJECT_DIR)/Sources/HarnessMonitorKit
-          - $(PROJECT_DIR)/Sources/HarnessMonitorUI
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist
         script: |
@@ -199,7 +175,7 @@ targets:
               root / "Scripts" / "run-xcode-build-server.sh",
               root / "Sources" / "HarnessMonitor",
               root / "Sources" / "HarnessMonitorKit",
-              root / "Sources" / "HarnessMonitorUI",
+              root / "Sources" / "HarnessMonitorUIPreviewable",
           ]
           digest = hashlib.sha256()
 
@@ -312,7 +288,6 @@ targets:
       - Resources/PrivacyInfo.xcprivacy
     dependencies:
       - target: HarnessMonitorKit
-      - target: HarnessMonitorUI
       - target: HarnessMonitorUIPreviewable
       - package: Lottie
     postBuildScripts:
@@ -341,7 +316,7 @@ targets:
           - $(PROJECT_DIR)/Scripts/run-xcode-build-server.sh
           - $(PROJECT_DIR)/Sources/HarnessMonitor
           - $(PROJECT_DIR)/Sources/HarnessMonitorKit
-          - $(PROJECT_DIR)/Sources/HarnessMonitorUI
+          - $(PROJECT_DIR)/Sources/HarnessMonitorUIPreviewable
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist
         script: |
@@ -382,7 +357,7 @@ targets:
               root / "Scripts" / "run-xcode-build-server.sh",
               root / "Sources" / "HarnessMonitor",
               root / "Sources" / "HarnessMonitorKit",
-              root / "Sources" / "HarnessMonitorUI",
+              root / "Sources" / "HarnessMonitorUIPreviewable",
           ]
           digest = hashlib.sha256()
 
@@ -493,7 +468,7 @@ targets:
       - Tests/HarnessMonitorKitTests
     dependencies:
       - target: HarnessMonitorKit
-      - target: HarnessMonitorUI
+      - target: HarnessMonitorUIPreviewable
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -542,7 +517,6 @@ schemes:
       targets:
         HarnessMonitor: all
         HarnessMonitorKit: all
-        HarnessMonitorUI: all
         HarnessMonitorUIPreviewable: all
     test:
       gatherCoverageData: true
@@ -558,7 +532,6 @@ schemes:
       targets:
         HarnessMonitor: all
         HarnessMonitorKit: all
-        HarnessMonitorUI: all
         HarnessMonitorUIPreviewable: all
     run:
       environmentVariables:
@@ -583,7 +556,6 @@ schemes:
     build:
       config: Preview
       targets:
-        HarnessMonitorUI: all
         HarnessMonitorUIPreviewable: all
     run:
       config: Preview
