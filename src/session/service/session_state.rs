@@ -71,6 +71,10 @@ pub(crate) fn find_agent_by_tui_marker(
     let marker = capabilities
         .iter()
         .find(|capability| capability.starts_with("agent-tui:agent-tui-"))?;
+    find_agent_by_capability(state, marker)
+}
+
+fn find_agent_by_capability(state: &SessionState, capability: &str) -> Option<String> {
     state
         .agents
         .values()
@@ -78,7 +82,7 @@ pub(crate) fn find_agent_by_tui_marker(
             agent
                 .capabilities
                 .iter()
-                .any(|capability| capability == marker)
+                .any(|agent_capability| agent_capability == capability)
         })
         .map(|agent| agent.agent_id.clone())
 }
@@ -142,6 +146,43 @@ pub(crate) fn apply_join_session(
     }
     refresh_session(state, now);
     Ok(agent_id)
+}
+
+pub(crate) fn apply_register_agent_runtime_session(
+    state: &mut SessionState,
+    runtime_name: &str,
+    tui_id: &str,
+    agent_session_id: &str,
+    now: &str,
+) -> Result<bool, CliError> {
+    let marker = format!("agent-tui:{tui_id}");
+    let Some(agent_id) = find_agent_by_capability(state, &marker) else {
+        return Ok(false);
+    };
+    let current_agent_session_id = {
+        let agent = state
+            .agents
+            .get(&agent_id)
+            .expect("marker lookup resolved agent");
+        if agent.runtime != runtime_name {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "agent '{agent_id}' uses runtime '{}' but runtime session registration requested '{}'",
+                agent.runtime, runtime_name
+            ))
+            .into());
+        }
+        agent.agent_session_id.clone()
+    };
+    if current_agent_session_id.as_deref() == Some(agent_session_id) {
+        return Ok(false);
+    }
+    touch_agent(state, &agent_id, now);
+    let agent = state
+        .agents
+        .get_mut(&agent_id)
+        .expect("marker lookup resolved mutable agent");
+    agent.agent_session_id = Some(agent_session_id.to_string());
+    Ok(true)
 }
 
 pub(crate) fn resolve_join_role(

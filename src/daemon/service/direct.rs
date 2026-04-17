@@ -254,6 +254,74 @@ pub(crate) async fn join_session_direct_async(
     Ok(resolved.state)
 }
 
+/// Register a managed agent's runtime session ID through the daemon mutation path.
+///
+/// # Errors
+/// Returns `CliError` when the session lookup, state mutation, or persistence fails.
+pub fn register_agent_runtime_session_direct(
+    session_id: &str,
+    request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<bool, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
+    {
+        let now = utc_now();
+        let registered = session_service::apply_register_agent_runtime_session(
+            &mut state,
+            &request.runtime,
+            &request.tui_id,
+            &request.agent_session_id,
+            &now,
+        )?;
+        if !registered {
+            return Ok(false);
+        }
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return Ok(true);
+    }
+
+    session_service::register_agent_runtime_session(
+        session_id,
+        &request.runtime,
+        &request.tui_id,
+        &request.agent_session_id,
+        Path::new(&request.project_dir),
+    )
+}
+
+pub(crate) async fn register_agent_runtime_session_direct_async(
+    session_id: &str,
+    request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<bool, CliError> {
+    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
+        return Ok(false);
+    };
+    let now = utc_now();
+    let registered = session_service::apply_register_agent_runtime_session(
+        &mut resolved.state,
+        &request.runtime,
+        &request.tui_id,
+        &request.agent_session_id,
+        &now,
+    )?;
+    if !registered {
+        return Ok(false);
+    }
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    async_db.bump_change(session_id).await?;
+    async_db.bump_change("global").await?;
+    Ok(true)
+}
+
 /// Update a session title, writing directly to `SQLite`.
 ///
 /// # Errors
