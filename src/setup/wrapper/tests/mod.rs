@@ -52,6 +52,22 @@ fn choose_install_dir_prefers_local_bin_on_path() {
 }
 
 #[test]
+fn choose_install_dir_falls_back_to_local_bin_when_local_dir_is_missing() {
+    let dir = tempfile::tempdir().unwrap();
+    let expected = dir
+        .path()
+        .canonicalize()
+        .unwrap_or_else(|_| dir.path().to_path_buf())
+        .join(".local")
+        .join("bin");
+
+    let (chosen, on_path) = choose_install_dir_with_home("/usr/bin:/bin", dir.path()).unwrap();
+
+    assert_eq!(chosen, expected);
+    assert!(!on_path);
+}
+
+#[test]
 fn install_wrapper_creates_executable_file() {
     let dir = tempfile::tempdir().unwrap();
     let target_dir = dir.path().join("bin");

@@ -131,7 +131,7 @@ fn is_installable(path: &Path) -> bool {
     }
 
     if let Some(parent) = path.parent() {
-        return parent.exists() && is_installable(parent);
+        return is_installable(parent);
     }
     false
 }
