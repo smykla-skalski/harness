@@ -5,26 +5,83 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
-  func testActiveBannerTintCarriesIntoDetailToolbarAtSplitBoundary() throws {
-    let measurement = measureSplitBoundaryTint(
+  func testActiveBackdropTintsDetailWithoutChangingSidebarBoundaryChrome() throws {
+    let dashboardMeasurement = measureSplitBoundaryTint(
       additionalEnvironment: [
-        "HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit",
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing",
+        "HARNESS_MONITOR_KEEP_ANIMATIONS": "1",
+      ]
+    )
+    let cockpitMeasurement = measureSplitBoundaryTint(
+      selectsPreviewSession: true,
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing",
         "HARNESS_MONITOR_KEEP_ANIMATIONS": "1",
       ]
     )
 
     XCTAssertGreaterThan(
-      measurement.sidebar.greenDominance,
-      0.01,
-      "Sidebar sample did not pick up the active-banner tint: \(measurement.debugDescription)"
-    )
-    XCTAssertGreaterThan(
-      measurement.detail.greenDominance,
-      measurement.sidebar.greenDominance * 0.6,
+      cockpitMeasurement.detailToolbar.greenDominance,
+      0.03,
       """
       Detail toolbar lost too much of the active-banner tint at the split boundary: \
-      \(measurement.debugDescription)
+      \(cockpitMeasurement.debugDescription)
       """
+    )
+    XCTAssertLessThan(
+      cockpitMeasurement.sidebarToolbar.distance(to: dashboardMeasurement.sidebarToolbar),
+      0.01,
+      """
+      Sidebar toolbar chrome at x=260, y=10 should stay aligned with the \
+      dashboard baseline when the cockpit backdrop is active.
+
+      dashboard: \(dashboardMeasurement.debugDescription)
+      cockpit: \(cockpitMeasurement.debugDescription)
+      """
+    )
+    XCTAssertLessThan(
+      cockpitMeasurement.sidebarBelowToolbar.distance(
+        to: dashboardMeasurement.sidebarBelowToolbar
+      ),
+      0.01,
+      """
+      Sidebar content just below the toolbar should stay aligned with the \
+      dashboard baseline when the cockpit backdrop is active.
+
+      dashboard: \(dashboardMeasurement.debugDescription)
+      cockpit: \(cockpitMeasurement.debugDescription)
+      """
+    )
+  }
+
+  func testDashboardDoesNotRenderStatusCornerChrome() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing",
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "960",
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_HEIGHT": "720",
+      ]
+    )
+    let toolbarChromeState = element(in: app, identifier: Accessibility.toolbarChromeState)
+    let statusCorner = frameElement(
+      in: app,
+      identifier: Accessibility.sessionStatusCornerFrame
+    )
+
+    XCTAssertTrue(
+      toolbarChromeState.waitForExistence(timeout: Self.actionTimeout),
+      "The dashboard scenario should expose toolbar chrome state markers"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        toolbarChromeState.label.contains("windowTitle=Dashboard")
+      },
+      "The dashboard scenario should keep the main window in dashboard mode"
+    )
+    XCTAssertFalse(
+      statusCorner.exists,
+      "Dashboard should not render cockpit-only status corner chrome"
     )
   }
 
@@ -102,7 +159,11 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let app = launch(
       mode: "preview",
       additionalEnvironment: additionalEnvironment.merging(
-        ["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE": "1"]
+        [
+          "HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE": "1",
+          "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "960",
+          "HARNESS_MONITOR_UI_MAIN_WINDOW_HEIGHT": "720",
+        ]
       ) { _, new in new }
     )
     let toolbar = mainWindow(in: app).toolbars.firstMatch
@@ -135,20 +196,49 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
   }
 
   private func measureSplitBoundaryTint(
+    selectsPreviewSession: Bool = false,
     additionalEnvironment: [String: String]
   ) -> SplitBoundaryTintMeasurement {
     let app = launch(
       mode: "preview",
       additionalEnvironment: additionalEnvironment.merging(
-        ["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE": "1"]
+        [
+          "HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE": "1",
+          "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "960",
+          "HARNESS_MONITOR_UI_MAIN_WINDOW_HEIGHT": "720",
+        ]
       ) { _, new in new }
     )
+    let toolbarChromeState = element(in: app, identifier: Accessibility.toolbarChromeState)
+    let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
+
+    if selectsPreviewSession {
+      XCTAssertTrue(toolbarChromeState.waitForExistence(timeout: Self.actionTimeout))
+      XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.actionTimeout))
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          toolbarChromeState.label.contains("windowTitle=Dashboard")
+        },
+        "The split-boundary regression must start from the dashboard before selecting a session"
+      )
+      let sessionRow = previewSessionTrigger(in: app)
+      XCTAssertTrue(waitForElement(sessionRow, timeout: Self.actionTimeout))
+      tapPreviewSession(in: app)
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          toolbarChromeState.label.contains("windowTitle=Cockpit")
+        },
+        "Selecting the preview session should switch the window into cockpit mode"
+      )
+    }
+
     let window = mainWindow(in: app)
     let toolbar = window.toolbars.firstMatch
     let sidebar = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let contentRoot = frameElement(in: app, identifier: Accessibility.contentRootFrame)
 
     XCTAssertTrue(toolbar.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sidebar.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(contentRoot.waitForExistence(timeout: Self.actionTimeout))
 
@@ -168,29 +258,62 @@ final class HarnessMonitorToolbarGlassUITests: HarnessMonitorUITestCase {
     let sidebarFrame = sidebar.frame
     let contentFrame = contentRoot.frame
 
-    let sidebarRect = CGRect(
-      x: max(sidebarFrame.maxX - windowOrigin.x - 72, 0),
-      y: max(toolbarFrame.minY - windowOrigin.y + 8, 0),
-      width: 56,
-      height: max(toolbarFrame.height - 16, 1)
+    let toolbarProbeHeight = 2.0
+    let sidebarProbeX = max(sidebarFrame.maxX - windowOrigin.x - 8, 0)
+    let detailProbeX = max(contentFrame.minX - windowOrigin.x + 8, 0)
+    let toolbarProbeY = max(toolbarFrame.minY - windowOrigin.y + 10, 0)
+    let belowToolbarProbeY = max(toolbarFrame.maxY - windowOrigin.y + 1, 0)
+
+    let sidebarToolbarRect = CGRect(
+      x: sidebarProbeX,
+      y: toolbarProbeY,
+      width: 2,
+      height: toolbarProbeHeight
     )
-    let detailRect = CGRect(
-      x: max(contentFrame.minX - windowOrigin.x + 24, 0),
-      y: max(toolbarFrame.minY - windowOrigin.y + 8, 0),
-      width: 56,
-      height: max(toolbarFrame.height - 16, 1)
+    let sidebarBelowToolbarRect = CGRect(
+      x: sidebarProbeX,
+      y: belowToolbarProbeY,
+      width: 2,
+      height: 2
+    )
+    let detailToolbarRect = CGRect(
+      x: detailProbeX,
+      y: toolbarProbeY,
+      width: 4,
+      height: toolbarProbeHeight
     )
 
-    let sidebarColor = sampleAverageColor(
+    let sidebarToolbarColor = sampleAverageColor(
       image: cgImage,
-      rect: scaledRect(sidebarRect, scaleX: scaleX, scaleY: scaleY)
+      rect: scaledRect(sidebarToolbarRect, scaleX: scaleX, scaleY: scaleY)
     )
-    let detailColor = sampleAverageColor(
+    let sidebarBelowToolbarColor = sampleAverageColor(
       image: cgImage,
-      rect: scaledRect(detailRect, scaleX: scaleX, scaleY: scaleY)
+      rect: scaledRect(
+        sidebarBelowToolbarRect,
+        scaleX: scaleX,
+        scaleY: scaleY
+      )
+    )
+    let detailToolbarColor = sampleAverageColor(
+      image: cgImage,
+      rect: scaledRect(detailToolbarRect, scaleX: scaleX, scaleY: scaleY)
     )
 
-    let measurement = SplitBoundaryTintMeasurement(sidebar: sidebarColor, detail: detailColor)
+    let debugContext =
+      """
+      appChromeState=\(appChromeState.label)
+      toolbarChromeState=\(toolbarChromeState.label)
+      sidebarFrame=\(NSStringFromRect(sidebarFrame))
+      contentFrame=\(NSStringFromRect(contentFrame))
+      toolbarFrame=\(NSStringFromRect(toolbarFrame))
+      """
+    let measurement = SplitBoundaryTintMeasurement(
+      sidebarToolbar: sidebarToolbarColor,
+      sidebarBelowToolbar: sidebarBelowToolbarColor,
+      detailToolbar: detailToolbarColor,
+      debugContext: debugContext
+    )
     attachDiagnostic(measurement.debugDescription, named: "split-boundary-tint")
     attachWindowScreenshot(in: app, named: "split-boundary-tint")
     return measurement
