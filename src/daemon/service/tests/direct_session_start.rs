@@ -53,10 +53,11 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
                     &utc_now(),
                     Some("swarm-default"),
                 );
-                let body = serde_json::to_string(
-                    &crate::daemon::protocol::SessionMutationResponse { state },
-                )
-                .expect("serialize response");
+                let body =
+                    serde_json::to_string(&crate::daemon::protocol::SessionMutationResponse {
+                        state,
+                    })
+                    .expect("serialize response");
                 write_http_response(&mut stream, "200 OK", "application/json", &body);
             }
         });

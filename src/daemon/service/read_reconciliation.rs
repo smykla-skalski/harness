@@ -5,8 +5,8 @@ use crate::session::types::{SessionState, SessionStatus};
 use super::{
     AckResult, CliError, Path, PathBuf, ResolvedSession, SessionTransition, SignalAck,
     SignalAckRequest, build_log_entry, effective_project_dir, index,
-    record_signal_ack_direct_async, session_not_found, session_service, session_storage, snapshot,
-    utc_now, write_signal_ack,
+    record_signal_ack_direct_async, session_not_found, session_service, snapshot, utc_now,
+    write_signal_ack,
 };
 
 pub(crate) fn liveness_project_dir_for_resolved(
@@ -15,11 +15,10 @@ pub(crate) fn liveness_project_dir_for_resolved(
     if resolved.state.status != SessionStatus::Active || !session_has_live_agents(&resolved.state) {
         return Ok(None);
     }
-    let project_dir = effective_project_dir(resolved).to_path_buf();
-    if session_storage::load_state(&project_dir, &resolved.state.session_id)?.is_none() {
-        return Ok(None);
-    }
-    Ok(Some(project_dir))
+    // Keep the liveness path active even after the file-backed state disappears.
+    // Otherwise imported sessions can remain falsely "active" in the daemon DB
+    // forever once their last state/log artifacts are gone.
+    Ok(Some(effective_project_dir(resolved).to_path_buf()))
 }
 
 pub(crate) fn sync_resolved_liveness(
@@ -29,8 +28,11 @@ pub(crate) fn sync_resolved_liveness(
 ) -> Result<bool, CliError> {
     let now = utc_now();
     let mut result = session_service::LivenessSyncResult::default();
-    let activity_map =
-        session_service::collect_agent_activity(&resolved.state.session_id, project_dir)?;
+    let activity_map = session_service::collect_agent_activity_from_state(
+        &resolved.state,
+        &resolved.state.session_id,
+        project_dir,
+    );
     let changed = session_service::apply_liveness_transitions(
         &mut resolved.state,
         &activity_map,
@@ -76,8 +78,11 @@ pub(crate) async fn sync_resolved_liveness_async(
 ) -> Result<bool, CliError> {
     let now = utc_now();
     let mut result = session_service::LivenessSyncResult::default();
-    let activity_map =
-        session_service::collect_agent_activity(&resolved.state.session_id, project_dir)?;
+    let activity_map = session_service::collect_agent_activity_from_state(
+        &resolved.state,
+        &resolved.state.session_id,
+        project_dir,
+    );
     let changed = session_service::apply_liveness_transitions(
         &mut resolved.state,
         &activity_map,

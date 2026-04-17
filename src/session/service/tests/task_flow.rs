@@ -81,7 +81,10 @@ fn assign_task_keeps_task_open_until_worker_starts() {
         assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
         assert!(task.queued_at.is_none());
         let worker = state.agents.get(&worker_id).expect("worker");
-        assert_eq!(worker.current_task_id.as_deref(), Some(task.task_id.as_str()));
+        assert_eq!(
+            worker.current_task_id.as_deref(),
+            Some(task.task_id.as_str())
+        );
     });
 }
 

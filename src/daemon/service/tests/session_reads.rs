@@ -14,7 +14,11 @@ fn session_detail_promotes_live_worker_and_hides_dead_leader() {
         let project_id = index::discovered_project_for_checkout(project).project_id;
         db.sync_session(&project_id, &fixture.state).expect("sync");
         let detail = session_detail(&fixture.state.session_id, Some(&db)).expect("session detail");
-        let promoted_leader_id = detail.session.leader_id.as_deref().expect("promoted leader");
+        let promoted_leader_id = detail
+            .session
+            .leader_id
+            .as_deref()
+            .expect("promoted leader");
         assert_eq!(detail.session.status, SessionStatus::Active);
         assert_eq!(detail.session.metrics.agent_count, 1);
         assert_eq!(detail.session.metrics.active_agent_count, 1);
@@ -141,7 +145,11 @@ fn session_detail_async_promotes_live_worker_and_hides_dead_leader() {
             let detail = session_detail_async(&fixture.state.session_id, Some(async_db.as_ref()))
                 .await
                 .expect("session detail");
-            let promoted_leader_id = detail.session.leader_id.as_deref().expect("promoted leader");
+            let promoted_leader_id = detail
+                .session
+                .leader_id
+                .as_deref()
+                .expect("promoted leader");
             assert_eq!(detail.session.status, SessionStatus::Active);
             assert_eq!(detail.session.metrics.agent_count, 1);
             assert_eq!(detail.session.metrics.active_agent_count, 1);

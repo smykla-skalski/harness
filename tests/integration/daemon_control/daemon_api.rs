@@ -154,7 +154,10 @@ fn session_api_issue(endpoint: &str, token_path: &str) -> Option<String> {
             .await
         {
             Ok(response) if response.status().is_success() => None,
-            Ok(response) => Some(format!("session API returned HTTP {} from {url}", response.status())),
+            Ok(response) => Some(format!(
+                "session API returned HTTP {} from {url}",
+                response.status()
+            )),
             Err(error) => Some(format!("session API request failed for {url}: {error}")),
         }
     })

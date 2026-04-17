@@ -227,7 +227,13 @@ pub(super) async fn post_leave_session(
     if result.is_ok() {
         broadcast_session_end(&state, &session_id).await;
     }
-    timed_json("POST", "/v1/sessions/{id}/leave", &request_id, start, result)
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/leave",
+        &request_id,
+        start,
+        result,
+    )
 }
 
 pub(super) async fn post_observe_session(

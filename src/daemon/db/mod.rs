@@ -61,8 +61,6 @@ mod timeline_store;
 mod writes;
 
 pub(crate) use async_pool::AsyncDaemonDb;
-#[cfg(test)]
-pub(crate) use schema::set_schema_init_hook;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
@@ -71,6 +69,8 @@ use conversation::{
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
 pub(crate) use runtime::ensure_shared_db;
+#[cfg(test)]
+pub(crate) use schema::set_schema_init_hook;
 pub(crate) use signals::ExpiredPendingSignalIndexRecord;
 #[allow(unused_imports)]
 use signals::derive_effective_signal_status;

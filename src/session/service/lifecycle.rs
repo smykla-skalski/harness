@@ -421,7 +421,9 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
     }
 
     let now = utc_now();
-    storage::update_state(project_dir, session_id, |state| apply_leave_session(state, agent_id, &now))?;
+    storage::update_state(project_dir, session_id, |state| {
+        apply_leave_session(state, agent_id, &now)
+    })?;
 
     storage::append_log_entry(
         project_dir,

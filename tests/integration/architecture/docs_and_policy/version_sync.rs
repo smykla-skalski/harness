@@ -141,7 +141,10 @@ fn docs_describe_automatic_version_sync_workflow() {
 #[test]
 fn monitor_project_generation_syncs_versions_after_xcodegen() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let script = read_repo_file(root, "apps/harness-monitor-macos/Scripts/generate-project.sh");
+    let script = read_repo_file(
+        root,
+        "apps/harness-monitor-macos/Scripts/generate-project.sh",
+    );
     let xcodegen_index = script
         .find("\"$XCODEGEN_BIN\" generate --spec \"$ROOT/project.yml\" --project \"$ROOT\"")
         .expect("generate-project.sh should invoke xcodegen");

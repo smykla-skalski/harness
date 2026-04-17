@@ -24,13 +24,9 @@ fn recover_leader_builds_managed_tui_request_from_policy_preset() {
         let updated = service::session_status("recover-1", &project).expect("status");
         assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
 
-        let request = service::build_recovery_tui_request(
-            "recover-1",
-            "swarm-default",
-            "codex",
-            &project,
-        )
-        .expect("build recovery request");
+        let request =
+            service::build_recovery_tui_request("recover-1", "swarm-default", "codex", &project)
+                .expect("build recovery request");
         assert_eq!(request.runtime, "codex");
         assert_eq!(request.role, SessionRole::Leader);
         assert_eq!(

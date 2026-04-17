@@ -191,7 +191,12 @@ fn sync_liveness_promotes_highest_priority_successor_within_same_role() {
         let preferred_id = current
             .agents
             .values()
-            .find(|agent| agent.capabilities.iter().any(|capability| capability == "priority:90"))
+            .find(|agent| {
+                agent
+                    .capabilities
+                    .iter()
+                    .any(|capability| capability == "priority:90")
+            })
             .expect("preferred improver")
             .agent_id
             .clone();
@@ -463,7 +468,10 @@ fn leave_session_marks_session_leaderless_degraded_without_successor() {
 
         let updated = session_status("leave-degraded", project).expect("status");
         assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
-        assert!(updated.leader_id.is_none(), "no replacement leader should exist");
+        assert!(
+            updated.leader_id.is_none(),
+            "no replacement leader should exist"
+        );
         assert_eq!(
             updated.agents.get(&leader_id).expect("leader").status,
             AgentStatus::Disconnected

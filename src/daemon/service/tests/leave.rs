@@ -24,7 +24,10 @@ fn leave_session_db_direct_marks_leaderless_degraded_without_successor() {
             .expect("state present");
         assert_eq!(db_state.status, SessionStatus::LeaderlessDegraded);
         assert!(db_state.leader_id.is_none());
-        assert_eq!(db_state.agents[&leader_id].status, AgentStatus::Disconnected);
+        assert_eq!(
+            db_state.agents[&leader_id].status,
+            AgentStatus::Disconnected
+        );
     });
 }
 

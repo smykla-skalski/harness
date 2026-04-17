@@ -64,19 +64,20 @@ impl TuiAttachArgs {
                         .map(|b| String::from_utf8_lossy(b).into_owned())
                         .unwrap_or_default();
                     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&body)
-                        && let Some(error) = parsed.get("error") {
-                            let msg = error
-                                .get("message")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("unknown error");
-                            let code = error
-                                .get("code")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("WORKFLOW_IO");
-                            return Err(CliError::from(CliErrorKind::workflow_io(format!(
-                                "[{code}] {msg}"
-                            ))));
-                        }
+                        && let Some(error) = parsed.get("error")
+                    {
+                        let msg = error
+                            .get("message")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown error");
+                        let code = error
+                            .get("code")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("WORKFLOW_IO");
+                        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                            "[{code}] {msg}"
+                        ))));
+                    }
                     return Err(CliError::from(CliErrorKind::workflow_io(format!(
                         "failed to connect to daemon websocket: HTTP error {}: {body}",
                         response.status()

@@ -1,5 +1,5 @@
-use super::*;
 use super::super::helpers::{read_repo_file, repo_path_exists};
+use super::*;
 
 #[test]
 fn run_report_root_stays_prod_only() {

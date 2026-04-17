@@ -53,9 +53,10 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
             .expect("build request")
     });
 
-    let current_state =
-        with_bridge_env(tmp.path(), &host_home, || service::session_status("bridge-recovery", &project))
-            .expect("session status");
+    let current_state = with_bridge_env(tmp.path(), &host_home, || {
+        service::session_status("bridge-recovery", &project)
+    })
+    .expect("session status");
     let db_path = tmp.path().join("daemon.sqlite3");
     let db = DaemonDb::open(&db_path).expect("open daemon db");
     let discovered = harness::daemon::index::discovered_project_for_checkout(&project);
