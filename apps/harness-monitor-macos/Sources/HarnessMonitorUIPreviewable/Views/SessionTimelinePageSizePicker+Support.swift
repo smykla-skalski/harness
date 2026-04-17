@@ -120,6 +120,25 @@ enum SessionTimelinePagination {
   }
 }
 
+struct SessionTimelinePageDisplay: Equatable, Sendable {
+  let page: Int
+  let entries: [TimelineEntry]
+  let placeholderCount: Int
+  let rangeText: String
+  let pageStatusText: String
+  let isWaitingForRequestedPage: Bool
+}
+
+struct SessionTimelineRetainedPage: Equatable, Sendable {
+  let sessionID: String
+  let pageSize: Int
+  let display: SessionTimelinePageDisplay
+
+  func matches(sessionID: String, pageSize: Int) -> Bool {
+    self.sessionID == sessionID && self.pageSize == pageSize
+  }
+}
+
 struct SessionTimelinePresentation {
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
@@ -134,11 +153,7 @@ struct SessionTimelinePresentation {
   }
 
   var resolvedCurrentPage: Int {
-    SessionTimelinePagination.clampedPage(
-      currentPage,
-      itemCount: totalCount,
-      pageSize: pageSize
-    )
+    currentDisplay.page
   }
 
   var pageCount: Int {
@@ -146,22 +161,11 @@ struct SessionTimelinePresentation {
   }
 
   var rangeText: String {
-    if totalCount == 0 {
-      return isLoading ? "Loading latest activity" : "Showing 0-0 of 0"
-    }
-
-    // While loading, advertise the intended window so placeholders and pagination
-    // read as a coherent waiting state. When idle, mirror what is actually on
-    // screen so the header never claims rows the list body cannot render.
-    if !isLoading, entries.isEmpty {
-      return "Showing 0-0 of \(totalCount)"
-    }
-
-    return "Showing \(visibleRange.lowerBound + 1)-\(visibleRange.upperBound) of \(totalCount)"
+    currentDisplay.rangeText
   }
 
   var pageStatusText: String {
-    "Page \(resolvedCurrentPage + 1) of \(pageCount)"
+    currentDisplay.pageStatusText
   }
 
   func interactivePage(forRequestedPage requestedPage: Int) -> Int {
@@ -181,10 +185,61 @@ struct SessionTimelinePresentation {
   /// stale "Showing 0-0 of N" cards self-heal instead of waiting for the user
   /// to change page size or reselect the session.
   var needsRefresh: Bool {
-    !isLoading && totalCount > 0 && entries.isEmpty
+    !isLoading && totalCount > 0 && currentDisplay.entries.isEmpty
   }
 
   var entries: [TimelineEntry] {
+    currentDisplay.entries
+  }
+
+  var placeholderCount: Int {
+    currentDisplay.placeholderCount
+  }
+
+  func display(forRequestedPage requestedPage: Int) -> SessionTimelinePageDisplay {
+    let resolvedPage = interactivePage(forRequestedPage: requestedPage)
+    let visibleRange = visibleRange(for: resolvedPage)
+    let entries = entries(in: visibleRange)
+    return SessionTimelinePageDisplay(
+      page: resolvedPage,
+      entries: entries,
+      placeholderCount: placeholderCount(for: visibleRange, entries: entries),
+      rangeText: rangeText(for: visibleRange, entries: entries),
+      pageStatusText: "Page \(resolvedPage + 1) of \(pageCount)",
+      isWaitingForRequestedPage: isWaitingForRequestedPage(
+        visibleRange: visibleRange,
+        entries: entries
+      )
+    )
+  }
+
+  func visibleDisplay(
+    forRequestedPage requestedPage: Int,
+    sessionID: String,
+    pageSize: Int,
+    retainedPage: SessionTimelineRetainedPage?
+  ) -> SessionTimelinePageDisplay {
+    let display = display(forRequestedPage: requestedPage)
+    guard display.isWaitingForRequestedPage,
+      let retainedPage,
+      retainedPage.matches(sessionID: sessionID, pageSize: pageSize)
+    else {
+      return display
+    }
+    return retainedPage.display
+  }
+
+  private var currentDisplay: SessionTimelinePageDisplay {
+    display(forRequestedPage: currentPage)
+  }
+
+  private func visibleRange(for page: Int) -> Range<Int> {
+    let lowerBound = page * pageSize
+    let upperBound = min(totalCount, lowerBound + pageSize)
+    return lowerBound..<upperBound
+  }
+
+  private func entries(in visibleRange: Range<Int>) -> [TimelineEntry] {
     guard loadedCount > visibleRange.lowerBound else {
       return []
     }
@@ -193,7 +248,10 @@ struct SessionTimelinePresentation {
     return Array(timeline[visibleRange.lowerBound..<loadedUpperBound])
   }
 
-  var placeholderCount: Int {
+  private func placeholderCount(
+    for visibleRange: Range<Int>,
+    entries: [TimelineEntry]
+  ) -> Int {
     guard isLoading else {
       return 0
     }
@@ -205,10 +263,29 @@ struct SessionTimelinePresentation {
     return max(0, visibleRange.count - entries.count)
   }
 
-  private var visibleRange: Range<Int> {
-    let lowerBound = resolvedCurrentPage * pageSize
-    let upperBound = min(totalCount, lowerBound + pageSize)
-    return lowerBound..<upperBound
+  private func rangeText(
+    for visibleRange: Range<Int>,
+    entries: [TimelineEntry]
+  ) -> String {
+    if totalCount == 0 {
+      return isLoading ? "Loading latest activity" : "Showing 0-0 of 0"
+    }
+
+    if !isLoading, entries.isEmpty {
+      return "Showing 0-0 of \(totalCount)"
+    }
+
+    return "Showing \(visibleRange.lowerBound + 1)-\(visibleRange.upperBound) of \(totalCount)"
+  }
+
+  private func isWaitingForRequestedPage(
+    visibleRange: Range<Int>,
+    entries: [TimelineEntry]
+  ) -> Bool {
+    totalCount > 0
+      && loadedCount > 0
+      && entries.isEmpty
+      && visibleRange.lowerBound >= loadedCount
   }
 }
 

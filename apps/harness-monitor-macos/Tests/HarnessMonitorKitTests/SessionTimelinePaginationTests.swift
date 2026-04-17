@@ -163,6 +163,77 @@ struct SessionTimelinePaginationTests {
     #expect(!presentation.needsRefresh)
   }
 
+  @Test("Presentation keeps the last visible page while hydration reloads only the latest prefix")
+  func presentationKeepsTheLastVisiblePageWhileHydrationReloadsOnlyTheLatestPrefix() {
+    let retainedPage = SessionTimelineRetainedPage(
+      sessionID: "sess-pagination",
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      display: SessionTimelinePageDisplay(
+        page: 2,
+        entries: makeTimelineEntries(count: 10, startingAt: 20),
+        placeholderCount: 0,
+        rangeText: "Showing 21-30 of 42",
+        pageStatusText: "Page 3 of 5",
+        isWaitingForRequestedPage: false
+      )
+    )
+    let presentation = SessionTimelinePresentation(
+      timeline: makeTimelineEntries(count: 10),
+      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
+      currentPage: 2,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    let display = presentation.visibleDisplay(
+      forRequestedPage: 2,
+      sessionID: "sess-pagination",
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      retainedPage: retainedPage
+    )
+
+    #expect(display.page == 2)
+    #expect(display.entries.map(\.entryId) == retainedPage.display.entries.map(\.entryId))
+    #expect(display.rangeText == retainedPage.display.rangeText)
+    #expect(display.pageStatusText == retainedPage.display.pageStatusText)
+    #expect(display.placeholderCount == 0)
+  }
+
+  @Test("Presentation clears retained pages when the session changes")
+  func presentationClearsRetainedPagesWhenTheSessionChanges() {
+    let retainedPage = SessionTimelineRetainedPage(
+      sessionID: "sess-previous",
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      display: SessionTimelinePageDisplay(
+        page: 1,
+        entries: makeTimelineEntries(count: 10, startingAt: 10),
+        placeholderCount: 0,
+        rangeText: "Showing 11-20 of 42",
+        pageStatusText: "Page 2 of 5",
+        isWaitingForRequestedPage: false
+      )
+    )
+    let presentation = SessionTimelinePresentation(
+      timeline: makeTimelineEntries(count: 10),
+      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
+      currentPage: 1,
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      isLoading: false
+    )
+
+    let display = presentation.visibleDisplay(
+      forRequestedPage: 1,
+      sessionID: "sess-current",
+      pageSize: SessionTimelinePageSize.ten.rawValue,
+      retainedPage: retainedPage
+    )
+
+    #expect(display.page == 1)
+    #expect(display.entries.isEmpty)
+    #expect(display.rangeText == "Showing 0-0 of 42")
+    #expect(display.pageStatusText == "Page 2 of 5")
+  }
+
   @Test("Timeline content identity changes when the selected session changes")
   func timelineContentIdentityChangesWhenSessionChanges() {
     let primary = SessionTimelineContentIdentity(sessionID: "sess-primary")
@@ -179,16 +250,17 @@ struct SessionTimelinePaginationTests {
     #expect(firstPage == laterPage)
   }
 
-  private func makeTimelineEntries(count: Int) -> [TimelineEntry] {
+  private func makeTimelineEntries(count: Int, startingAt startIndex: Int = 0) -> [TimelineEntry] {
     (0..<count).map { index in
-      TimelineEntry(
-        entryId: "timeline-entry-\(index)",
-        recordedAt: String(format: "2026-04-14T10:%02d:00Z", 59 - index),
+      let entryIndex = startIndex + index
+      return TimelineEntry(
+        entryId: "timeline-entry-\(entryIndex)",
+        recordedAt: String(format: "2026-04-14T10:%02d:00Z", 59 - entryIndex),
         kind: "task_checkpoint",
         sessionId: "sess-pagination",
         agentId: "worker-pagination",
         taskId: nil,
-        summary: "Timeline entry \(index)",
+        summary: "Timeline entry \(entryIndex)",
         payload: .object([:])
       )
     }

@@ -35,6 +35,7 @@ struct SessionCockpitTimelineSection: View {
   private var reduceMotion
   @State private var currentPage = 0
   @State private var pageSize = SessionTimelinePageSize.defaultSize
+  @State private var retainedPage: SessionTimelineRetainedPage?
 
   private var presentation: SessionTimelinePresentation {
     SessionTimelinePresentation(
@@ -46,17 +47,32 @@ struct SessionCockpitTimelineSection: View {
     )
   }
 
-  private var currentEntries: [TimelineEntry] { presentation.entries }
+  private var requestedDisplay: SessionTimelinePageDisplay {
+    presentation.display(forRequestedPage: currentPage)
+  }
 
-  private var placeholderCount: Int { presentation.placeholderCount }
+  private var visibleDisplay: SessionTimelinePageDisplay {
+    presentation.visibleDisplay(
+      forRequestedPage: currentPage,
+      sessionID: sessionID,
+      pageSize: pageSize.rawValue,
+      retainedPage: retainedPage
+    )
+  }
+
+  private var currentEntries: [TimelineEntry] { visibleDisplay.entries }
+
+  private var placeholderCount: Int { visibleDisplay.placeholderCount }
 
   private var pageCount: Int { presentation.pageCount }
 
-  private var resolvedCurrentPage: Int { presentation.resolvedCurrentPage }
+  private var requestedPage: Int { requestedDisplay.page }
 
-  private var pageStatusText: String { presentation.pageStatusText }
+  private var visiblePage: Int { visibleDisplay.page }
 
-  private var pageRangeText: String { presentation.rangeText }
+  private var pageStatusText: String { visibleDisplay.pageStatusText }
+
+  private var pageRangeText: String { visibleDisplay.rangeText }
 
   private var showsPagination: Bool { presentation.showsPagination }
 
@@ -94,15 +110,15 @@ struct SessionCockpitTimelineSection: View {
 
           if showsPagination {
             SessionTimelinePaginationFooter(
-              currentPage: resolvedCurrentPage,
+              currentPage: visiblePage,
               pageCount: pageCount,
               pageStatusText: pageStatusText,
               visiblePages: SessionTimelinePagination.visiblePages(
-                currentPage: resolvedCurrentPage,
+                currentPage: visiblePage,
                 pageCount: pageCount
               ),
-              goToPreviousPage: { changePage(to: resolvedCurrentPage - 1) },
-              goToNextPage: { changePage(to: resolvedCurrentPage + 1) },
+              goToPreviousPage: { changePage(to: visiblePage - 1) },
+              goToNextPage: { changePage(to: visiblePage + 1) },
               goToPage: changePage(to:)
             )
             .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
@@ -119,10 +135,12 @@ struct SessionCockpitTimelineSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: sessionID) { _, _ in
+          retainedPage = nil
           updateCurrentPageIfNeeded(0, animated: false)
           requestVisiblePageIfNeeded(page: 0)
         }
         .onChange(of: pageSize) { oldPageSize, newPageSize in
+          retainedPage = nil
           let rebasedPage = SessionTimelinePagination.rebasedPage(
             currentPage,
             itemCount: presentation.totalCount,
@@ -133,7 +151,8 @@ struct SessionCockpitTimelineSection: View {
           requestVisiblePageIfNeeded(page: rebasedPage)
         }
         .onChange(of: timeline.count) { _, _ in
-          requestVisiblePageIfNeeded(page: resolvedCurrentPage)
+          rememberVisiblePageIfNeeded()
+          requestVisiblePageIfNeeded(page: requestedPage)
         }
         .onChange(of: presentation.needsRefresh, initial: true) { _, needsRefresh in
           // Safety net: if metadata reports entries but the list arrived empty
@@ -141,7 +160,13 @@ struct SessionCockpitTimelineSection: View {
           // an unchanged revision while we had nothing loaded, etc.) reload
           // the page so the user never sees a frozen "Showing 0-0 of N" card.
           guard needsRefresh else { return }
-          requestVisiblePageIfNeeded(page: resolvedCurrentPage)
+          requestVisiblePageIfNeeded(page: requestedPage)
+        }
+        .onAppear {
+          rememberVisiblePageIfNeeded()
+        }
+        .onChange(of: requestedDisplay) { _, _ in
+          rememberVisiblePageIfNeeded()
         }
       }
     }
@@ -211,6 +236,22 @@ struct SessionCockpitTimelineSection: View {
     Task {
       await loadPage(targetPage, pageSize.rawValue)
     }
+  }
+
+  private func rememberVisiblePageIfNeeded() {
+    guard !requestedDisplay.entries.isEmpty else {
+      return
+    }
+
+    let snapshot = SessionTimelineRetainedPage(
+      sessionID: sessionID,
+      pageSize: pageSize.rawValue,
+      display: requestedDisplay
+    )
+    guard retainedPage != snapshot else {
+      return
+    }
+    retainedPage = snapshot
   }
 }
 
