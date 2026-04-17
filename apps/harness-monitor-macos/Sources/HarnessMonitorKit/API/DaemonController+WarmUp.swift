@@ -193,7 +193,10 @@ extension DaemonController {
     // The old daemon is functional (version already validated above).
     // When it exits, the manifest watcher will trigger reconnection.
     HarnessMonitorLogger.lifecycle.trace(
-      "Proceeding with current daemon pid=\(manifest.pid, privacy: .public) while refresh cycles in background"
+      """
+      Proceeding with current daemon pid=\(manifest.pid, privacy: .public) \
+      while refresh cycles in background
+      """
     )
     return nil
   }

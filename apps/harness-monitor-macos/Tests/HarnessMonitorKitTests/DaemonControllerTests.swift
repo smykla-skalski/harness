@@ -162,60 +162,62 @@ struct DaemonControllerTests {
       fileSize: 16_384,
       modificationTimeIntervalSince1970: 1_713_000_000
     )
+    let liveEndpoint = "http://127.0.0.1:65533"
 
-    try await withTempDaemonFixture(
-      pid: UInt32(getpid()),
-      endpoint: "http://127.0.0.1:65534",
-      binaryStamp: staleManifestStamp
-    ) { environment in
-      let client = PreviewHarnessClient()
-      let liveEndpoint = "http://127.0.0.1:65533"
-      try writeManagedLaunchAgentBundleStampFixture(currentStamp, environment: environment)
-      let manager = HookedLaunchAgentManager(
-        state: .enabled,
-        onRegister: {
-          try rewriteTempDaemonFixtureManifest(
-            environment: environment,
-            pid: UInt32(getpid()),
-            endpoint: liveEndpoint,
-            startedAt: "2026-04-14T13:22:13Z",
-            binaryStamp: DaemonBinaryStampFixture(
+    try await withSignalIgnoringSleepProcessPID { livePID in
+      try await withTempDaemonFixture(
+        pid: livePID,
+        endpoint: liveEndpoint,
+        binaryStamp: staleManifestStamp
+      ) { environment in
+        let client = PreviewHarnessClient()
+        try writeManagedLaunchAgentBundleStampFixture(currentStamp, environment: environment)
+        let manager = HookedLaunchAgentManager(
+          state: .enabled,
+          onRegister: {
+            try rewriteTempDaemonFixtureManifest(
+              environment: environment,
+              pid: livePID,
+              endpoint: liveEndpoint,
+              startedAt: "2026-04-14T13:22:13Z",
+              binaryStamp: DaemonBinaryStampFixture(
+                helperPath: currentStamp.helperPath,
+                deviceIdentifier: currentStamp.deviceIdentifier,
+                inode: currentStamp.inode,
+                fileSize: currentStamp.fileSize,
+                modificationTimeIntervalSince1970: currentStamp.modificationTimeIntervalSince1970
+              )
+            )
+          }
+        )
+        let probedEndpoints = EndpointProbeRecorder()
+        let controller = DaemonController(
+          environment: environment,
+          launchAgentManager: manager,
+          ownership: .managed,
+          sessionFactory: { _ in client },
+          endpointProbe: { endpoint in
+            await probedEndpoints.record(endpoint.absoluteString)
+            return endpoint.absoluteString == liveEndpoint
+          },
+          managedLaunchAgentCurrentBundleStamp: {
+            ManagedLaunchAgentBundleStamp(
               helperPath: currentStamp.helperPath,
               deviceIdentifier: currentStamp.deviceIdentifier,
               inode: currentStamp.inode,
               fileSize: currentStamp.fileSize,
               modificationTimeIntervalSince1970: currentStamp.modificationTimeIntervalSince1970
             )
-          )
-        }
-      )
-      let probedEndpoints = EndpointProbeRecorder()
-      let controller = DaemonController(
-        environment: environment,
-        launchAgentManager: manager,
-        ownership: .managed,
-        sessionFactory: { _ in client },
-        endpointProbe: { endpoint in
-          await probedEndpoints.record(endpoint.absoluteString)
-          return endpoint.absoluteString == liveEndpoint
-        },
-        managedLaunchAgentCurrentBundleStamp: {
-          ManagedLaunchAgentBundleStamp(
-            helperPath: currentStamp.helperPath,
-            deviceIdentifier: currentStamp.deviceIdentifier,
-            inode: currentStamp.inode,
-            fileSize: currentStamp.fileSize,
-            modificationTimeIntervalSince1970: currentStamp.modificationTimeIntervalSince1970
-          )
-        }
-      )
+          }
+        )
 
-      let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+        let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
 
-      #expect(bootstrappedClient as AnyObject === client as AnyObject)
-      #expect(manager.unregisterCallCount == 1)
-      #expect(manager.registerCallCount == 1)
-      #expect(await probedEndpoints.values() == [liveEndpoint])
+        #expect(bootstrappedClient as AnyObject === client as AnyObject)
+        #expect(manager.unregisterCallCount == 1)
+        #expect(manager.registerCallCount == 1)
+        #expect(await probedEndpoints.values() == [liveEndpoint])
+      }
     }
   }
 
