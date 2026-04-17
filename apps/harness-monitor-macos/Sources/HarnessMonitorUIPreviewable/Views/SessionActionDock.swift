@@ -75,8 +75,7 @@ struct SessionActionDock: View {
     }
   }
 
-  @ViewBuilder
-  private var codexFlowButton: some View {
+  @ViewBuilder private var codexFlowButton: some View {
     if isCodexFlowAvailable {
       flowButton(
         title: "Codex Flow",
@@ -115,7 +114,12 @@ struct SessionActionDock: View {
       )
       .fill(HarnessMonitorTheme.ink.opacity(0.03))
     }
-    .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous))
+    .contentShape(
+      RoundedRectangle(
+        cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+        style: .continuous
+      )
+    )
     .optionalAccessibilityIdentifier(HarnessMonitorAccessibility.codexFlowButton)
     .help("Codex Flow")
     .accessibilityLabel("Codex Flow")

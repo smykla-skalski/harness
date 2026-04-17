@@ -153,7 +153,8 @@ extension PreviewFixtures {
     worktreeName: summary.worktreeName,
     sessionId: "sess-harness-empty",
     title: "Harness Monitor Empty Cockpit",
-    context: "Preview the compact cockpit placeholders without tasks, agents, signals, or timeline activity.",
+    context:
+      "Preview the compact cockpit placeholders without tasks, agents, signals, or timeline activity.",
     status: .active,
     createdAt: "2026-03-28T14:05:00Z",
     updatedAt: "2026-03-28T14:20:00Z",
