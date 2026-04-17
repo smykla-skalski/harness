@@ -29,6 +29,12 @@ extension HarnessMonitorStore {
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
+    if isAppLifecycleSuspended {
+      await client.shutdown()
+      self.client = nil
+      connectionState = .idle
+      return
+    }
     self.client = client
     withUISyncBatch {
       connectionState = .connecting

@@ -61,6 +61,32 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     launchMode == .live
   }
 
+  func applicationDidResignActive(_ notification: Notification) {
+    guard launchMode == .live, let store else {
+      return
+    }
+
+    Task { @MainActor [weak self] in
+      guard self?.terminationTask == nil else {
+        return
+      }
+      await store.suspendLiveConnectionForAppInactivity()
+    }
+  }
+
+  func applicationDidBecomeActive(_ notification: Notification) {
+    guard launchMode == .live, let store else {
+      return
+    }
+
+    Task { @MainActor [weak self] in
+      guard self?.terminationTask == nil else {
+        return
+      }
+      await store.resumeLiveConnectionAfterAppActivation()
+    }
+  }
+
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     guard terminationTask == nil else {
       return .terminateLater
