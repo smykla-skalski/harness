@@ -1,3 +1,5 @@
+import Foundation
+
 struct ToolbarGlassMeasurement {
   let initial: ToolbarGlassStats
   let afterClose: ToolbarGlassStats
@@ -31,6 +33,17 @@ struct ToolbarAverageColor {
     green - max(red, blue)
   }
 
+  func distance(to other: Self) -> Double {
+    let deltaRed = red - other.red
+    let deltaGreen = green - other.green
+    let deltaBlue = blue - other.blue
+    return sqrt(
+      (deltaRed * deltaRed)
+        + (deltaGreen * deltaGreen)
+        + (deltaBlue * deltaBlue)
+    )
+  }
+
   var debugDescription: String {
     String(
       format: "r=%.4f g=%.4f b=%.4f greenDominance=%.4f",
@@ -43,12 +56,32 @@ struct ToolbarAverageColor {
 }
 
 struct SplitBoundaryTintMeasurement {
-  let sidebar: ToolbarAverageColor
-  let detail: ToolbarAverageColor
+  let sidebarToolbar: ToolbarAverageColor
+  let sidebarBelowToolbar: ToolbarAverageColor
+  let detailToolbar: ToolbarAverageColor
+  let debugContext: String
 
-  static let zero = Self(sidebar: .zero, detail: .zero)
+  static let zero = Self(
+    sidebarToolbar: .zero,
+    sidebarBelowToolbar: .zero,
+    detailToolbar: .zero,
+    debugContext: ""
+  )
+
+  var sidebarSeamDistance: Double {
+    sidebarToolbar.distance(to: sidebarBelowToolbar)
+  }
 
   var debugDescription: String {
-    "sidebar[\(sidebar.debugDescription)] detail[\(detail.debugDescription)]"
+    let summary = """
+    sidebarToolbar[\(sidebarToolbar.debugDescription)] \
+    sidebarBelowToolbar[\(sidebarBelowToolbar.debugDescription)] \
+    detailToolbar[\(detailToolbar.debugDescription)] \
+    sidebarSeamDistance=\(String(format: "%.4f", sidebarSeamDistance))
+    """
+    guard !debugContext.isEmpty else {
+      return summary
+    }
+    return "\(summary) \(debugContext)"
   }
 }
