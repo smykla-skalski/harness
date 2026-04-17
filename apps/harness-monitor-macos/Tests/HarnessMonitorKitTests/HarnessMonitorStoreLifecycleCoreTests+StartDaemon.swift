@@ -208,12 +208,19 @@ extension HarnessMonitorStoreLifecycleCoreTests {
   func appInactivitySuspendsLiveDaemonConnection() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
+    store.appInactivitySuspendDelay = .milliseconds(50)
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
     let selectedSessionID = store.selectedSessionID
     let selectedSession = store.selectedSession
 
     await store.suspendLiveConnectionForAppInactivity()
+
+    #expect(store.connectionState == .online)
+    #expect(store.client != nil)
+    #expect(client.shutdownCallCount() == 0)
+
+    try? await Task.sleep(for: .milliseconds(100))
 
     #expect(store.connectionState == .idle)
     #expect(store.client == nil)
@@ -225,11 +232,29 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.shutdownCallCount() == 1)
   }
 
+  @Test("App activation cancels a pending inactivity suspend")
+  func appActivationCancelsPendingInactivitySuspend() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.appInactivitySuspendDelay = .milliseconds(50)
+
+    await store.suspendLiveConnectionForAppInactivity()
+    await store.resumeLiveConnectionAfterAppActivation()
+    try? await Task.sleep(for: .milliseconds(100))
+
+    #expect(store.connectionState == .online)
+    #expect(store.client != nil)
+    #expect(store.globalStreamTask != nil)
+    #expect(store.connectionProbeTask != nil)
+    #expect(client.shutdownCallCount() == 0)
+  }
+
   @Test("App activation restores a daemon connection suspended for inactivity")
   func appActivationRestoresSuspendedDaemonConnection() async {
     let client = RecordingHarnessClient()
     let daemon = RecordingDaemonController(client: client)
     let store = HarnessMonitorStore(daemonController: daemon)
+    store.appInactivitySuspendDelay = .zero
 
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)

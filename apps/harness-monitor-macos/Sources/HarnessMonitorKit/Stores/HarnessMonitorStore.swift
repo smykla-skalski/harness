@@ -85,6 +85,7 @@ public final class HarnessMonitorStore {
   var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
+  var appInactivitySuspendDelay: Duration = .seconds(5)
   var timelineMinimumLoadingDuration: Duration = .milliseconds(500)
   @ObservationIgnored var timelineLoadingGateClock: any TimelineLoadingGateClock =
     LiveContinuousClockSource()
@@ -100,6 +101,7 @@ public final class HarnessMonitorStore {
   var sessionStreamTask: Task<Void, Never>?
   var connectionProbeTask: Task<Void, Never>?
   var sessionPushFallbackTask: Task<Void, Never>?
+  @ObservationIgnored var appInactivitySuspendTask: Task<Void, Never>?
   @ObservationIgnored var selectedSessionRefreshFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?
