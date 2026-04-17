@@ -19,13 +19,13 @@ struct SessionCockpitEmptyStateRow: View {
     var message: String {
       switch self {
       case .tasks:
-        "No tasks yet"
+        "No tasks right now"
       case .agents:
-        "No agents yet"
+        "No agents right now"
       case .signals:
-        "No signals yet"
+        "No signals right now"
       case .timeline:
-        "No activity yet"
+        "No activity right now"
       }
     }
 
