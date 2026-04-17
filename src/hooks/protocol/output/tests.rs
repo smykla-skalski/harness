@@ -59,6 +59,44 @@ fn pre_tool_use_deny_has_permission_decision() {
 }
 
 #[test]
+fn pre_tool_use_allow_with_additional_context_is_emitted() {
+    let output = render_normalized_hook_output(
+        HookType::PreToolUse,
+        &NormalizedHookResult::allow().with_additional_context("deliver signal before tool"),
+    );
+    let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(value["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+    assert_eq!(
+        value["hookSpecificOutput"]["permissionDecision"],
+        "allow"
+    );
+    assert_eq!(
+        value["hookSpecificOutput"]["additionalContext"],
+        "deliver signal before tool"
+    );
+}
+
+#[test]
+fn pre_tool_use_allow_with_updated_input_is_emitted() {
+    let mut result = NormalizedHookResult::allow();
+    result.updated_input = Some(serde_json::json!({
+        "command": "echo injected",
+    }));
+
+    let output = render_normalized_hook_output(HookType::PreToolUse, &result);
+    let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(value["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+    assert_eq!(
+        value["hookSpecificOutput"]["permissionDecision"],
+        "allow"
+    );
+    assert_eq!(
+        value["hookSpecificOutput"]["updatedInput"]["command"],
+        "echo injected"
+    );
+}
+
+#[test]
 fn blocking_deny_has_block_decision() {
     let r = HookResult::deny("KSR007", "incomplete");
     let output = render_hook_output(HookType::Blocking, &r);
