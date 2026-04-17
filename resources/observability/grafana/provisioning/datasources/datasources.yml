@@ -16,12 +16,15 @@ datasources:
     url: http://loki:3100
     editable: false
     jsonData:
+      httpHeaderName1: X-Scope-OrgID
       maxLines: 5000
       derivedFields:
         - datasourceUid: tempo
           matcherRegex: trace_id=\"?([0-9a-f]{32})\"?
           name: TraceID
           url: ${__value.raw}
+    secureJsonData:
+      httpHeaderValue1: "1"
 
   - name: Tempo
     uid: tempo
@@ -53,3 +56,10 @@ datasources:
             query: sum(rate(harness_hook_outcomes_total[5m]))
           - name: Daemon HTTP rate
             query: sum(rate(harness_daemon_http_requests_total[5m]))
+
+  - name: Pyroscope
+    uid: pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    url: http://pyroscope:4040
+    editable: false
