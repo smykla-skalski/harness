@@ -334,6 +334,11 @@ extension HarnessMonitorStore {
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
     public var searchFocusRequest = 0
+    public var projectCount = 0
+    public var worktreeCount = 0
+    public var sessionCount = 0
+    public var openWorkCount = 0
+    public var blockedCount = 0
   }
 
   public struct InspectorUIState: Equatable {

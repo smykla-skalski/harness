@@ -211,6 +211,11 @@ extension HarnessMonitorStore {
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
     public var searchFocusRequest = 0
+    public var projectCount = 0
+    public var worktreeCount = 0
+    public var sessionCount = 0
+    public var openWorkCount = 0
+    public var blockedCount = 0
 
     public init() {}
 
@@ -229,6 +234,21 @@ extension HarnessMonitorStore {
       }
       if searchFocusRequest != state.searchFocusRequest {
         searchFocusRequest = state.searchFocusRequest
+      }
+      if projectCount != state.projectCount {
+        projectCount = state.projectCount
+      }
+      if worktreeCount != state.worktreeCount {
+        worktreeCount = state.worktreeCount
+      }
+      if sessionCount != state.sessionCount {
+        sessionCount = state.sessionCount
+      }
+      if openWorkCount != state.openWorkCount {
+        openWorkCount = state.openWorkCount
+      }
+      if blockedCount != state.blockedCount {
+        blockedCount = state.blockedCount
       }
     }
   }
