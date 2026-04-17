@@ -62,4 +62,34 @@ struct HarnessMonitorLaunchModeTests {
       ]) == .empty
     )
   }
+
+  @Test("Visible windows keep the live connection active on app resign active")
+  func visibleWindowsKeepLiveConnectionActive() {
+    #expect(
+      HarnessMonitorAppVisibilityPolicy.shouldSuspendLiveConnection(
+        appIsHidden: false,
+        hasVisibleNonMiniaturizedWindows: true
+      ) == false
+    )
+  }
+
+  @Test("Hidden app suspends the live connection on app resign active")
+  func hiddenAppSuspendsLiveConnection() {
+    #expect(
+      HarnessMonitorAppVisibilityPolicy.shouldSuspendLiveConnection(
+        appIsHidden: true,
+        hasVisibleNonMiniaturizedWindows: true
+      )
+    )
+  }
+
+  @Test("No visible windows suspend the live connection on app resign active")
+  func noVisibleWindowsSuspendLiveConnection() {
+    #expect(
+      HarnessMonitorAppVisibilityPolicy.shouldSuspendLiveConnection(
+        appIsHidden: false,
+        hasVisibleNonMiniaturizedWindows: false
+      )
+    )
+  }
 }
