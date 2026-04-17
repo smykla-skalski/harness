@@ -22,6 +22,8 @@ resolve_repo_root() {
 }
 
 repo_root="$(resolve_repo_root)"
+cd "$repo_root"
+
 if [ -n "${CARGO_TARGET_DIR:-}" ]; then
   target_dir="$CARGO_TARGET_DIR"
 elif [ -n "${TARGET_TEMP_DIR:-}" ]; then
@@ -84,6 +86,31 @@ if [ ! -x "$daemon_source" ]; then
   exit 1
 fi
 
+validate_daemon_version() {
+  local daemon_path="$1"
+  local expected_version="$2"
+
+  if [ -z "$expected_version" ]; then
+    return
+  fi
+
+  local actual_version
+  actual_version="$("$daemon_path" --version | /usr/bin/awk 'NR==1 { print $2 }')"
+  if [ -z "$actual_version" ]; then
+    printf 'Unable to determine Harness daemon helper version: %s\n' "$daemon_path" >&2
+    exit 1
+  fi
+
+  if [ "$actual_version" != "$expected_version" ]; then
+    printf \
+      'Harness daemon helper version mismatch: bundled helper is %s but app expects %s (%s)\n' \
+      "$actual_version" \
+      "$expected_version" \
+      "$daemon_path" >&2
+    exit 1
+  fi
+}
+
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
@@ -92,6 +119,8 @@ plist_target="$launch_agents_dir/io.harnessmonitor.daemon.plist"
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
 /bin/cp "$daemon_source" "$daemon_target"
 /bin/chmod 755 "$daemon_target"
+/usr/bin/xattr -dr com.apple.provenance "$daemon_target" 2>/dev/null || true
+/usr/bin/xattr -dr com.apple.quarantine "$daemon_target" 2>/dev/null || true
 /bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" "$plist_target"
 /usr/bin/plutil -lint "$plist_target"
 
@@ -99,6 +128,8 @@ if ! /usr/bin/otool -l "$daemon_target" | /usr/bin/grep -q "__info_plist"; then
   printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target" >&2
   exit 1
 fi
+
+validate_daemon_version "$daemon_target" "${MARKETING_VERSION:-}"
 
 if [ "${CODE_SIGNING_ALLOWED:-NO}" = "YES" ] \
   && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] \

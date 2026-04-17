@@ -142,6 +142,8 @@ targets:
       - name: Bundle Daemon Agent
         basedOnDependencyAnalysis: false
         inputFiles:
+          - $(PROJECT_DIR)/../../Cargo.toml
+          - $(PROJECT_DIR)/../../Cargo.lock
           - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
           - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist
           - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist
@@ -321,6 +323,8 @@ targets:
       - name: Bundle Daemon Agent
         basedOnDependencyAnalysis: false
         inputFiles:
+          - $(PROJECT_DIR)/../../Cargo.toml
+          - $(PROJECT_DIR)/../../Cargo.lock
           - $(PROJECT_DIR)/HarnessMonitorDaemon.entitlements
           - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist
           - $(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist
