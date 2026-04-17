@@ -15,20 +15,6 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "5BAE209C0B17ED30E7953ED3"
-               BuildableName = "HarnessMonitorUI.framework"
-               BlueprintName = "HarnessMonitorUI"
-               ReferencedContainer = "container:HarnessMonitor.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "5614B52E9F09FC69910284A6"
                BuildableName = "HarnessMonitorUIPreviewable.framework"
                BlueprintName = "HarnessMonitorUIPreviewable"
@@ -46,9 +32,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5BAE209C0B17ED30E7953ED3"
-            BuildableName = "HarnessMonitorUI.framework"
-            BlueprintName = "HarnessMonitorUI"
+            BlueprintIdentifier = "5614B52E9F09FC69910284A6"
+            BuildableName = "HarnessMonitorUIPreviewable.framework"
+            BlueprintName = "HarnessMonitorUIPreviewable"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -70,9 +56,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5BAE209C0B17ED30E7953ED3"
-            BuildableName = "HarnessMonitorUI.framework"
-            BlueprintName = "HarnessMonitorUI"
+            BlueprintIdentifier = "5614B52E9F09FC69910284A6"
+            BuildableName = "HarnessMonitorUIPreviewable.framework"
+            BlueprintName = "HarnessMonitorUIPreviewable"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -88,9 +74,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5BAE209C0B17ED30E7953ED3"
-            BuildableName = "HarnessMonitorUI.framework"
-            BlueprintName = "HarnessMonitorUI"
+            BlueprintIdentifier = "5614B52E9F09FC69910284A6"
+            BuildableName = "HarnessMonitorUIPreviewable.framework"
+            BlueprintName = "HarnessMonitorUIPreviewable"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
