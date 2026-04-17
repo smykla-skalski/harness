@@ -79,7 +79,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     let shown = with_bridge_env(tmp.path(), &host_home, || {
         wait_for_bridge_prompt(&manager, &snapshot.tui_id)
     });
-    assert!(shown.screen.text.contains("/harness:session:join"));
+    assert!(shown.screen.text.contains("$harness:session:join"));
     assert!(shown.screen.text.contains("--role leader"));
     assert!(shown.screen.text.contains("policy-preset:swarm-default"));
 

@@ -212,6 +212,10 @@ fn build_auto_join_prompt_includes_markers() {
         prompt.contains("agent-tui:agent-tui-abc"),
         "should contain marker capability"
     );
+    assert!(
+        prompt.starts_with("$harness:session:join sess-123"),
+        "codex should use the direct skill prefix: {prompt}"
+    );
     assert!(prompt.contains("worker"), "should contain role");
     assert!(prompt.contains("codex"), "should contain runtime");
 }
@@ -367,7 +371,7 @@ fn build_auto_join_prompt_includes_policy_preset_for_leader_recovery() {
         Some("Recovered codex"),
         None,
     );
-    assert!(prompt.contains("/harness:session:join sess-recover"));
+    assert!(prompt.contains("$harness:session:join sess-recover"));
     assert!(prompt.contains("--role leader"));
     assert!(prompt.contains("policy-preset:swarm-default"));
 }
@@ -401,13 +405,13 @@ fn cli_positional_appends_prompt_to_argv() {
     )
     .expect("spec");
     spec.prompt_delivery = InitialPromptDelivery::CliPositional;
-    spec.cli_prompt = Some("/harness:session:join test-session".into());
+    spec.cli_prompt = Some("$harness:session:join test-session".into());
 
     let argv = resolved_command_argv(&spec);
     let last = argv.last().expect("last arg");
     assert_eq!(
         last.to_str().expect("utf8"),
-        "/harness:session:join test-session"
+        "$harness:session:join test-session"
     );
 }
 
