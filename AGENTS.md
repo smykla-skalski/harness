@@ -35,6 +35,17 @@ Harness Monitor app validation expectations:
 - The Harness Monitor targets run a strict Swift Quality Gate on every build with warnings-as-errors. Expect style/lint failures such as oversized view bodies and fix the source instead of bypassing the gate.
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 
+## Agent asset architecture
+
+`agents/skills/` and `agents/plugins/` are the only canonical cross-runtime skill and plugin sources in this repo.
+
+`local-skills/claude/` holds Claude-only project-local skill sources. The generator symlinks each subdirectory into `.claude/skills/` so Claude Code picks them up. This works around the `.claude/rules/` auto-load bug - edits to the source files are live immediately.
+
+Every directory under `.claude/`, `.agents/`, `.gemini/`, `.vibe/`, `.opencode/`, `.github/hooks/`, and `plugins/` that holds agent assets is a managed output root. The renderer owns these directories. Each contains an `AGENTS.md` marker it emits. Do not hand-edit files inside managed roots.
+
+- `harness setup agents generate` - renders skill/plugin assets from canonical sources into all managed roots
+- `harness setup bootstrap` - writes runtime config files (`.claude/settings.json`, `.codex/hooks.json`, `.codex/config.toml`, `.gemini/settings.json`, `.github/hooks/harness.json`, `.vibe/hooks.json`, `.opencode/hooks.json`) and syncs the Claude plugin cache
+
 ## Architecture
 
 Harness is a test orchestration framework for Kubernetes/Kuma. It enforces tracked, user-story-first testing through state machines and hook-based guardrails.
