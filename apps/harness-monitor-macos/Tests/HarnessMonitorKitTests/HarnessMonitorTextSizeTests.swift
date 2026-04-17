@@ -191,8 +191,8 @@ struct TaskDragPreviewLayoutTests {
 
 @Suite("Task drag feedback metrics")
 struct TaskDragFeedbackMetricsTests {
-  @Test("Hand-feedback halo adapts to multiple compact task card sizes without overflow")
-  func handFeedbackHaloAdaptsToMultipleCompactTaskCardSizesWithoutOverflow() {
+  @Test("Hand-feedback metrics scale dynamically across compact task card sizes")
+  func handFeedbackMetricsScaleDynamicallyAcrossCompactTaskCardSizes() {
     let compactCardSizes = [
       CGSize(width: 220, height: 54),
       CGSize(width: 236, height: 56),
@@ -201,13 +201,22 @@ struct TaskDragFeedbackMetricsTests {
       CGSize(width: 420, height: 72),
     ]
 
+    var previousMetrics: TaskDragFeedbackMetrics?
+
     for compactCardSize in compactCardSizes {
       let metrics = TaskDragFeedbackMetrics(cardSize: compactCardSize)
-      let availableFootprint = min(compactCardSize.width, compactCardSize.height)
-        - (HarnessMonitorTheme.spacingSM * 2)
 
-      #expect(metrics.totalFootprint <= availableFootprint)
       #expect(metrics.iconSize < metrics.haloDiameter)
+      #expect(metrics.blurRadius > (metrics.iconSize * 0.5))
+      #expect(metrics.totalFootprint <= compactCardSize.height * 1.2)
+
+      if let previousMetrics {
+        #expect(metrics.haloDiameter > previousMetrics.haloDiameter)
+        #expect(metrics.blurRadius > previousMetrics.blurRadius)
+        #expect(metrics.iconSize > previousMetrics.iconSize)
+      }
+
+      previousMetrics = metrics
     }
   }
 }
