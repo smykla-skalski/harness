@@ -72,6 +72,8 @@ private struct DashboardSessionCard: View {
                   : HarnessMonitorTheme.ink
               )
               .multilineTextAlignment(.leading)
+              .lineLimit(1)
+              .truncationMode(.tail)
             Spacer(minLength: 12)
             Text(presentation.statusText)
               .scaledFont(.caption2.weight(.bold))
@@ -93,6 +95,7 @@ private struct DashboardSessionCard: View {
               .animation(.easeInOut(duration: 0.15), value: isHovered)
           }
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(HarnessMonitorTheme.cardPadding)
