@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-public extension VersionedSchema {
-  static var versionString: String {
+extension VersionedSchema {
+  public static var versionString: String {
     let version = versionIdentifier
     return "\(version.major).\(version.minor).\(version.patch)"
   }
