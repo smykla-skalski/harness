@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use super::*;
+use crate::session::storage;
 
 #[test]
 fn list_sessions_reads_cached_liveness_state_within_ttl() {
@@ -46,8 +47,18 @@ fn list_sessions_skips_liveness_disk_probe_when_db_session_has_no_live_agents() 
             "daemon dead-session summaries",
             "daemon-dead-session-summaries",
         );
-        set_log_mtime_seconds_ago(&fixture.leader_log, 600);
-        set_log_mtime_seconds_ago(&fixture.worker_log, 600);
+        let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
+        storage::update_state(project, &fixture.state.session_id, |state| {
+            state.last_activity_at = Some(stale.clone());
+            for agent in state.agents.values_mut() {
+                agent.last_activity_at = Some(stale.clone());
+                agent.updated_at = stale.clone();
+            }
+            Ok(())
+        })
+        .expect("age session activity");
+        set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
+        set_log_mtime_seconds_ago(&fixture.worker_log, 1_200);
 
         let liveness = session_service::sync_agent_liveness(&fixture.state.session_id, project)
             .expect("sync dead liveness");
@@ -82,7 +93,7 @@ fn list_sessions_reconciles_orphaned_active_session_without_state_file() {
             "daemon orphaned liveness summaries",
             "daemon-orphaned-liveness-summaries",
         );
-        let stale = (chrono::Utc::now() - chrono::Duration::seconds(600)).to_rfc3339();
+        let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
         let mut stale_state = fixture.state.clone();
         stale.clone_into(&mut stale_state.updated_at);
         stale_state.last_activity_at = Some(stale.clone());
@@ -138,7 +149,7 @@ fn session_detail_async_reconciles_orphaned_active_session_without_state_file() 
             "daemon async orphaned liveness detail",
             "daemon-async-orphaned-liveness-detail",
         );
-        let stale = (chrono::Utc::now() - chrono::Duration::seconds(600)).to_rfc3339();
+        let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
         let mut stale_state = fixture.state.clone();
         stale.clone_into(&mut stale_state.updated_at);
         stale_state.last_activity_at = Some(stale.clone());
