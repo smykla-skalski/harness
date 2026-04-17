@@ -22,6 +22,7 @@ pub(crate) mod platform;
 pub mod run;
 pub mod session;
 pub mod setup;
+pub mod telemetry;
 pub(crate) mod suite_defaults;
 pub mod workspace;
 

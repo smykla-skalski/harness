@@ -27,6 +27,12 @@ extension HarnessMonitorStoreLifecycleCoreTests {
         == "/v1/sessions/sess-http-summary/timeline"
     )
     #expect(SummaryTimelineURLProtocol.lastRequestURL?.query == "scope=summary")
+    #expect(
+      SummaryTimelineURLProtocol.lastRequestHeaders?["X-Request-Id"]?.isEmpty == false
+    )
+    #expect(
+      SummaryTimelineURLProtocol.lastRequestHeaders?["traceparent"]?.isEmpty == false
+    )
   }
 
   @Test("API client timeline window adds viewport query parameters")
@@ -62,14 +68,20 @@ extension HarnessMonitorStoreLifecycleCoreTests {
 private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable {
   private static let lock = NSLock()
   nonisolated(unsafe) private static var requestURL: URL?
+  nonisolated(unsafe) private static var requestHeaders: [String: String]?
 
   static var lastRequestURL: URL? {
     lock.withLock { requestURL }
   }
 
+  static var lastRequestHeaders: [String: String]? {
+    lock.withLock { requestHeaders }
+  }
+
   static func reset() {
     lock.withLock {
       requestURL = nil
+      requestHeaders = nil
     }
   }
 
@@ -89,6 +101,7 @@ private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable
 
     Self.lock.withLock {
       Self.requestURL = requestURL
+      Self.requestHeaders = request.allHTTPHeaderFields
     }
 
     guard

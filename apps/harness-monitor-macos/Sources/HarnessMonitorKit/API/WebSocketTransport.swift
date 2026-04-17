@@ -67,15 +67,38 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
       throw WebSocketTransportError.connectionClosed
     }
     let wsURL = wsEndpoint()
+    let span = HarnessMonitorTelemetry.shared.startSpan(
+      name: "daemon.websocket.connect",
+      kind: .client,
+      attributes: [
+        "transport.kind": .string("websocket"),
+        "server.address": .string(wsURL.host ?? "127.0.0.1"),
+        "server.port": .int(wsURL.port ?? 80),
+      ]
+    )
+    defer { span.end() }
+
     HarnessMonitorLogger.websocket.info(
       "WebSocket connecting to \(wsURL.absoluteString, privacy: .public)")
     var request = URLRequest(url: wsURL)
     request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
+    let requestID = HarnessMonitorTelemetry.shared.decorate(&request, spanContext: span.context)
+    span.setAttribute(key: "harness.request_id", value: requestID)
     let task = session.webSocketTask(with: request)
     webSocketTask = task
     task.resume()
     startReceiveLoop()
     startHeartbeat()
+    HarnessMonitorTelemetry.shared.recordWebSocketConnect(outcome: "started")
+    HarnessMonitorTelemetry.shared.emitLog(
+      name: "daemon.websocket.connect",
+      severity: .info,
+      body: "WebSocket connect started",
+      attributes: [
+        "request.id": .string(requestID),
+        "url.absolute": .string(wsURL.absoluteString),
+      ]
+    )
   }
 
   public func disconnect() {

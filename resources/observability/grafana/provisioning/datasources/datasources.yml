@@ -1,0 +1,55 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 5000
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: trace_id=\"?([0-9a-f]{32})\"?
+          name: TraceID
+          url: ${__value.raw}
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      serviceMap:
+        datasourceUid: prometheus
+      tracesToLogsV2:
+        datasourceUid: loki
+        customQuery: true
+        filterByTraceID: true
+        filterBySpanID: true
+        spanStartTimeShift: -10m
+        spanEndTimeShift: 10m
+        query: '{service_name=~".+"} |= ""'
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: -10m
+        spanEndTimeShift: 10m
+        queries:
+          - name: Hook rate
+            query: sum(rate(harness_hook_outcomes_total[5m]))
+          - name: Daemon HTTP rate
+            query: sum(rate(harness_daemon_http_requests_total[5m]))

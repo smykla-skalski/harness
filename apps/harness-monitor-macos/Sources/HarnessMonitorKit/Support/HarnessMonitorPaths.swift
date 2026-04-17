@@ -32,16 +32,8 @@ public enum HarnessMonitorPaths {
   }
 
   public static func dataRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
-    let daemonDataHomeValue = environment.values[
-      HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    if let daemonDataHomeValue, !daemonDataHomeValue.isEmpty {
-      return URL(fileURLWithPath: daemonDataHomeValue, isDirectory: true)
-    }
-
-    let value = environment.values["XDG_DATA_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let value, !value.isEmpty {
-      return URL(fileURLWithPath: value, isDirectory: true)
+    if let configuredRoot = configuredDataHomeRoot(using: environment) {
+      return configuredRoot
     }
 
     if let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
@@ -79,6 +71,18 @@ public enum HarnessMonitorPaths {
   private static func sharedObservabilityRoot(
     using environment: HarnessMonitorEnvironment
   ) -> URL {
+    if let configuredRoot = configuredDataHomeRoot(using: environment) {
+      return configuredRoot
+    }
+
+    return environment.homeDirectory
+      .appendingPathComponent("Library", isDirectory: true)
+      .appendingPathComponent("Application Support", isDirectory: true)
+  }
+
+  private static func configuredDataHomeRoot(
+    using environment: HarnessMonitorEnvironment
+  ) -> URL? {
     let daemonDataHomeValue = environment.values[
       HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -92,9 +96,7 @@ public enum HarnessMonitorPaths {
       return URL(fileURLWithPath: xdgDataHomeValue, isDirectory: true)
     }
 
-    return environment.homeDirectory
-      .appendingPathComponent("Library", isDirectory: true)
-      .appendingPathComponent("Application Support", isDirectory: true)
+    return nil
   }
 
   public static func harnessRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {

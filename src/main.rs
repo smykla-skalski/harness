@@ -1,44 +1,25 @@
-use std::io;
 use std::process::ExitCode;
-
-use tracing_subscriber::fmt::time::ChronoUtc;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::reload;
 
 use harness::app::cli;
 use harness::errors;
 
 fn main() -> ExitCode {
-    let filter = harness::resolved_log_filter_from_env();
-    let (filter_layer, handle) = reload::Layer::new(filter);
-    harness::set_log_filter_handle(handle);
+    let telemetry_guard = match harness::telemetry::init_tracing_subscriber() {
+        Ok(guard) => guard,
+        Err(error) => {
+            eprintln!("{}", errors::render_error(&error));
+            return ExitCode::from(u8::try_from(error.exit_code()).unwrap_or(1));
+        }
+    };
 
-    if std::env::var("HARNESS_LOG_FORMAT").ok().as_deref() == Some("json") {
-        tracing_subscriber::registry()
-            .with(filter_layer)
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .json()
-                    .with_writer(io::stderr),
-            )
-            .init();
-    } else {
-        tracing_subscriber::registry()
-            .with(filter_layer)
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .with_writer(io::stderr)
-                    .with_target(false)
-                    .with_timer(ChronoUtc::rfc_3339()),
-            )
-            .init();
-    }
-
-    match cli::run() {
+    let exit_code = match cli::run() {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(error) => {
             eprintln!("{}", errors::render_error(&error));
             ExitCode::from(u8::try_from(error.exit_code()).unwrap_or(1))
         }
-    }
+    };
+
+    drop(telemetry_guard);
+    exit_code
 }

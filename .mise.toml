@@ -79,3 +79,31 @@ run = "apps/harness-monitor-macos/Scripts/preview-render.sh"
 [tasks."preview:smoke"]
 description = "Render every entry in apps/harness-monitor-macos/Previews.json; fails on any timeout/crash"
 run = "apps/harness-monitor-macos/Scripts/preview-smoke.sh"
+
+[tasks."observability:start"]
+description = "Start the local Grafana, Alloy, Tempo, Loki, and Prometheus stack and write the shared harness observability config"
+run = "./scripts/observability.sh start"
+
+[tasks."observability:stop"]
+description = "Stop the local observability stack and remove the shared harness observability config"
+run = "./scripts/observability.sh stop"
+
+[tasks."observability:status"]
+description = "Show local observability stack status"
+run = "./scripts/observability.sh status"
+
+[tasks."observability:logs"]
+description = "Tail local observability stack logs"
+run = "./scripts/observability.sh logs"
+
+[tasks."observability:open"]
+description = "Open the local Grafana instance"
+run = "./scripts/observability.sh open"
+
+[tasks."observability:reset"]
+description = "Stop the local observability stack, drop its Docker volumes, and remove the shared harness observability config"
+run = "./scripts/observability.sh reset"
+
+[tasks."observability:smoke"]
+description = "Start the local observability stack, emit smoke telemetry, and verify traces, metrics, and logs arrive"
+run = "./scripts/observability.sh smoke"
