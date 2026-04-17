@@ -106,6 +106,28 @@ When no codex bridge is running in managed mode, `POST /v1/sessions/{id}/codex-r
 
 Minimum codex version for WebSocket transport: `rust-v0.102.0+`.
 
+## Preview authoring
+
+All `#Preview` blocks live in `HarnessMonitorUIPreviewable`. Previews render through the dedicated `HarnessMonitorPreviewHost` app target via the `HarnessMonitorUIPreviews` scheme. The host links only `HarnessMonitorKit` + `HarnessMonitorUIPreviewable` - no Lottie, no daemon signaling, no main-app dependencies.
+
+Rules:
+
+- Previewable views must NOT take closure properties (`let onTap: () -> Void`). Use `HarnessAsyncActionButton.StoreAction` or `@Environment(\.openWindow)` for actions.
+- Every `#Preview` that exercises `@Query` or other SwiftData-backed views must inject `.modelContainer(PreviewFixtures.previewContainer())` (or equivalent fixture container).
+- Allocate no `DateFormatter`/`JSONEncoder`/`NumberFormatter` in view bodies - use static `@MainActor` lets.
+- Never wrap `#Preview` in `#if DEBUG` - DEBUG is already defined in preview builds, this is noise.
+- Add canonical screens to `Previews.json` when you add a new top-level surface. Run `mise run preview:smoke` before merging view-layer changes.
+- If a `#Preview` crashes with `TableViewListCore_Mac2.swift:5170`, mark with a TODO referencing the macOS 26 SwiftUI bug and comment out the offending preview - don't hack around it.
+
+CLI verification:
+
+```bash
+mise run preview:render -- --id ContentView       # render one curated view
+mise run preview:smoke                            # render every entry in Previews.json
+```
+
+Both scripts require `xcode-cli` (`npm install -g xcode-cli`), `jq`, and an Xcode tab open on this project. Output lands in `tmp/previews/`.
+
 ## Gotchas
 
 - `HarnessMonitor.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.
