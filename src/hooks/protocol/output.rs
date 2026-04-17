@@ -8,17 +8,24 @@ use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
 #[derive(Serialize)]
 struct PermissionHookOutput<'a> {
     #[serde(rename = "hookSpecificOutput")]
-    hook_specific_output: PermissionHookSpecificOutput<'a>,
+    hook_specific_output: PreToolUseSpecificOutput<'a>,
 }
 
 #[derive(Serialize)]
-struct PermissionHookSpecificOutput<'a> {
+struct PreToolUseSpecificOutput<'a> {
     #[serde(rename = "hookEventName")]
     hook_event_name: &'static str,
     #[serde(rename = "permissionDecision")]
     permission_decision: &'static str,
-    #[serde(rename = "permissionDecisionReason")]
-    permission_decision_reason: &'a str,
+    #[serde(
+        rename = "permissionDecisionReason",
+        skip_serializing_if = "Option::is_none"
+    )]
+    permission_decision_reason: Option<&'a str>,
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
+    additional_context: Option<&'a str>,
+    #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")]
+    updated_input: Option<&'a Value>,
 }
 
 #[derive(Serialize)]
@@ -90,17 +97,26 @@ pub fn render_hook_message(result: &HookResult) -> String {
 }
 
 fn render_pre_tool_use_output_normalized(result: &NormalizedHookResult) -> String {
-    if result.decision == NormalizedDecision::Allow {
-        return String::new();
-    }
-    let message = result.display_message();
+    let permission_decision = match result.decision {
+        NormalizedDecision::Allow => "allow",
+        _ => "deny",
+    };
+    let permission_decision_reason = pre_tool_use_permission_reason(result);
     render_json(&PermissionHookOutput {
-        hook_specific_output: PermissionHookSpecificOutput {
+        hook_specific_output: PreToolUseSpecificOutput {
             hook_event_name: "PreToolUse",
-            permission_decision: "deny",
-            permission_decision_reason: &message,
+            permission_decision,
+            permission_decision_reason: permission_decision_reason.as_deref(),
+            additional_context: result.additional_context.as_deref(),
+            updated_input: result.updated_input.as_ref(),
         },
     })
+}
+
+fn pre_tool_use_permission_reason(result: &NormalizedHookResult) -> Option<String> {
+    let has_reason = result.reason.as_deref().is_some_and(|reason| !reason.is_empty())
+        || result.code.is_some();
+    has_reason.then(|| result.display_message())
 }
 
 fn render_blocking_hook_output_normalized(result: &NormalizedHookResult) -> String {
