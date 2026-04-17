@@ -31,6 +31,7 @@ use super::response::{map_json, request_activity_log_level};
 use super::sessions::{
     SessionScopeQuery, get_session, get_sessions, get_timeline, post_end_session,
     post_observe_session, post_session_join, post_session_start,
+    post_session_title,
 };
 use super::signals::{post_cancel_signal, post_send_signal, post_signal_ack};
 use super::tasks::{

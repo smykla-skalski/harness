@@ -4,8 +4,8 @@ use axum::http::StatusCode;
 use tempfile::tempdir;
 
 use crate::daemon::protocol::{
-    AgentRemoveRequest, SessionEndRequest, SessionJoinRequest, TaskCreateRequest, TaskDropRequest,
-    TaskDropTarget, TaskQueuePolicyRequest, TaskUpdateRequest,
+    AgentRemoveRequest, SessionEndRequest, SessionJoinRequest, SessionTitleRequest,
+    TaskCreateRequest, TaskDropRequest, TaskDropTarget, TaskQueuePolicyRequest, TaskUpdateRequest,
 };
 use crate::session::types::{SessionRole, TaskQueuePolicy, TaskSeverity, TaskStatus};
 use harness_testkit::with_isolated_harness_env;
@@ -83,6 +83,50 @@ async fn create_http_task(
         .and_then(|task| task["task_id"].as_str())
         .expect("task id")
         .to_string()
+}
+
+#[test]
+fn post_session_title_uses_async_db_when_sync_db_is_unavailable() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        temp_env::with_var("CLAUDE_SESSION_ID", Some("http-async-title-leader"), || {
+            let project_dir = sandbox.path().join("project");
+            init_git_project(&project_dir);
+
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = sandbox.path().join("daemon.sqlite");
+                let state = test_http_state_with_empty_async_db(&db_path).await;
+                let _ =
+                    start_async_http_session(state.clone(), &project_dir, "http-async-title").await;
+
+                let response = post_session_title(
+                    axum::extract::Path("http-async-title".to_owned()),
+                    auth_headers(),
+                    State(state.clone()),
+                    Json(SessionTitleRequest {
+                        title: "retitled through async route".into(),
+                    }),
+                )
+                .await;
+
+                let (status, body) = response_json(response).await;
+                assert_eq!(status, StatusCode::OK);
+                assert_eq!(
+                    body["state"]["title"].as_str(),
+                    Some("retitled through async route")
+                );
+
+                let async_db = state.async_db.get().expect("async db");
+                let resolved = async_db
+                    .resolve_session("http-async-title")
+                    .await
+                    .expect("resolve session")
+                    .expect("session present");
+                assert_eq!(resolved.state.title, "retitled through async route");
+            });
+        });
+    });
 }
 
 #[test]

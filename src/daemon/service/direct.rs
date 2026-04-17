@@ -254,6 +254,53 @@ pub(crate) async fn join_session_direct_async(
     Ok(resolved.state)
 }
 
+/// Update a session title, writing directly to `SQLite`.
+///
+/// # Errors
+/// Returns `CliError` when the session is unknown or DB operations fail.
+pub fn update_session_title_direct(
+    session_id: &str,
+    request: &super::protocol::SessionTitleRequest,
+    db: &super::db::DaemonDb,
+) -> Result<SessionState, CliError> {
+    let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+        return Err(session_not_found(session_id));
+    };
+
+    state.state_version += 1;
+    session_service::apply_update_session_title(&mut state, &request.title, &utc_now())?;
+    let project_id = db
+        .project_id_for_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    db.save_session_state(&project_id, &state)?;
+    db.bump_change(session_id)?;
+    db.bump_change("global")?;
+    Ok(state)
+}
+
+/// Update a session title through the canonical async daemon DB.
+///
+/// # Errors
+/// Returns `CliError` when the session is unknown or async DB operations fail.
+pub(crate) async fn update_session_title_direct_async(
+    session_id: &str,
+    request: &super::protocol::SessionTitleRequest,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<SessionState, CliError> {
+    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
+        return Err(session_not_found(session_id));
+    };
+
+    resolved.state.state_version += 1;
+    session_service::apply_update_session_title(&mut resolved.state, &request.title, &utc_now())?;
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    async_db.bump_change(session_id).await?;
+    async_db.bump_change("global").await?;
+    Ok(resolved.state)
+}
+
 /// Mark a session agent as disconnected, writing directly to `SQLite` when a
 /// DB is available.
 ///

@@ -4,7 +4,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
-use crate::session::{observe, service, storage};
+use crate::session::{observe, service};
 
 use super::support::{agent_to_str, print_json, resolve_project_dir};
 
@@ -337,13 +337,8 @@ pub struct SessionTitleArgs {
 
 impl Execute for SessionTitleArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let local_project = resolve_project_dir(self.project_dir.as_deref());
-        let project =
-            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        let state = storage::update_state(&project, &self.session_id, |state| {
-            state.title.clone_from(&self.title);
-            Ok(())
-        })?;
+        let project = resolve_project_dir(self.project_dir.as_deref());
+        let state = service::update_session_title(&self.session_id, &self.title, project.as_ref())?;
         print_json(&state)?;
         Ok(0)
     }
@@ -439,3 +434,7 @@ impl Execute for SessionListArgs {
         Ok(0)
     }
 }
+
+#[cfg(test)]
+#[path = "session_commands/tests.rs"]
+mod tests;

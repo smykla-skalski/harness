@@ -10,7 +10,7 @@ use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, ObserveSessionRequest, SessionDetail, SessionEndRequest,
     SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
-    TimelineCursor, TimelineWindowRequest, TimelineWindowResponse,
+    SessionTitleRequest, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse,
 };
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
@@ -29,6 +29,7 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
         .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
         .route("/v1/sessions/{session_id}/stream", get(stream_session))
         .route("/v1/sessions/{session_id}/join", post(post_session_join))
+        .route("/v1/sessions/{session_id}/title", post(post_session_title))
         .route("/v1/sessions/{session_id}/end", post(post_end_session))
         .route("/v1/sessions/{session_id}/leave", post(post_leave_session))
         .route(
@@ -327,6 +328,24 @@ pub(super) async fn post_session_join(
     timed_json("POST", "/v1/sessions/{id}/join", &request_id, start, result)
 }
 
+pub(super) async fn post_session_title(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SessionTitleRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = title_session_response(&state, &session_id, &request).await;
+    if result.is_ok() {
+        broadcast_session_title(&state, &session_id).await;
+    }
+    timed_json("POST", "/v1/sessions/{id}/title", &request_id, start, result)
+}
+
 async fn start_session_response(
     state: &DaemonHttpState,
     request: &SessionStartRequest,
@@ -368,6 +387,22 @@ async fn join_session_response(
         .map(session_mutation_response)
 }
 
+async fn title_session_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SessionTitleRequest,
+) -> Result<SessionMutationResponse, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::update_session_title_direct_async(session_id, request, async_db.as_ref())
+            .await
+            .map(session_mutation_response);
+    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = db.lock().expect("db lock");
+    service::update_session_title_direct(session_id, request, &db_guard)
+        .map(session_mutation_response)
+}
+
 async fn end_session_response(
     state: &DaemonHttpState,
     session_id: &str,
@@ -395,6 +430,22 @@ async fn leave_session_response(
 }
 
 async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {
+    if let Some(async_db) = state.async_db.get() {
+        service::broadcast_session_snapshot_async(
+            &state.sender,
+            session_id,
+            Some(async_db.as_ref()),
+        )
+        .await;
+        return;
+    }
+    if let Ok(db) = ensure_shared_db(&state.db) {
+        let db_guard = db.lock().expect("db lock");
+        service::broadcast_session_snapshot(&state.sender, session_id, Some(&db_guard));
+    }
+}
+
+async fn broadcast_session_title(state: &DaemonHttpState, session_id: &str) {
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_session_snapshot_async(
             &state.sender,
