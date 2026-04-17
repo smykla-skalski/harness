@@ -6,10 +6,6 @@
       "source": "./harness"
     },
     {
-      "name": "observe",
-      "source": "./observe"
-    },
-    {
       "name": "suite",
       "source": "./suite"
     }
