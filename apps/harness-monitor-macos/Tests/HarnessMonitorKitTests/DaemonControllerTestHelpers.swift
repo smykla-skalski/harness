@@ -88,6 +88,23 @@ func rewriteTempDaemonFixtureManifest(
   try manifestData.write(to: HarnessMonitorPaths.manifestURL(using: environment))
 }
 
+func withSignalIgnoringSleepProcessPID(
+  durationSeconds: Int = 60,
+  perform: (UInt32) async throws -> Void
+) async throws {
+  let process = Process()
+  process.executableURL = URL(fileURLWithPath: "/bin/sh")
+  process.arguments = ["-c", "trap '' TERM; sleep \(durationSeconds)"]
+  try process.run()
+  defer {
+    if process.isRunning {
+      kill(process.processIdentifier, SIGKILL)
+      process.waitUntilExit()
+    }
+  }
+  try await perform(UInt32(process.processIdentifier))
+}
+
 struct DaemonBinaryStampFixture: Codable, Equatable {
   let helperPath: String
   let deviceIdentifier: UInt64

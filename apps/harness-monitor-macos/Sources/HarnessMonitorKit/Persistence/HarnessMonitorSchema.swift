@@ -128,40 +128,14 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5]
   }
 
-  static let migrateV1toV2 = MigrationStage.custom(
+  static let migrateV1toV2 = MigrationStage.lightweight(
     fromVersion: HarnessMonitorSchemaV1.self,
-    toVersion: HarnessMonitorSchemaV2.self,
-    willMigrate: nil,
-    didMigrate: { context in
-      let projects = try context.fetch(FetchDescriptor<HarnessMonitorSchemaV2.CachedProject>())
-      for project in projects {
-        project.worktreesData = Data()
-      }
-
-      let sessions = try context.fetch(FetchDescriptor<HarnessMonitorSchemaV2.CachedSession>())
-      for session in sessions {
-        session.checkoutId = session.projectId
-        session.checkoutRoot = session.projectDir ?? session.contextRoot
-        session.isWorktree = false
-        session.worktreeName = nil
-      }
-
-      try context.save()
-    }
+    toVersion: HarnessMonitorSchemaV2.self
   )
 
-  static let migrateV2toV3 = MigrationStage.custom(
+  static let migrateV2toV3 = MigrationStage.lightweight(
     fromVersion: HarnessMonitorSchemaV2.self,
-    toVersion: HarnessMonitorSchemaV3.self,
-    willMigrate: nil,
-    didMigrate: { context in
-      let sessions = try context.fetch(FetchDescriptor<HarnessMonitorSchemaV3.CachedSession>())
-      for session in sessions {
-        session.title = ""
-      }
-
-      try context.save()
-    }
+    toVersion: HarnessMonitorSchemaV3.self
   )
 
   static let migrateV3toV4 = MigrationStage.lightweight(

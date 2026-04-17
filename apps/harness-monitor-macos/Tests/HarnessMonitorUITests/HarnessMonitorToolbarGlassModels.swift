@@ -74,11 +74,11 @@ struct SplitBoundaryTintMeasurement {
 
   var debugDescription: String {
     let summary = """
-    sidebarToolbar[\(sidebarToolbar.debugDescription)] \
-    sidebarBelowToolbar[\(sidebarBelowToolbar.debugDescription)] \
-    detailToolbar[\(detailToolbar.debugDescription)] \
-    sidebarSeamDistance=\(String(format: "%.4f", sidebarSeamDistance))
-    """
+      sidebarToolbar[\(sidebarToolbar.debugDescription)] \
+      sidebarBelowToolbar[\(sidebarBelowToolbar.debugDescription)] \
+      detailToolbar[\(detailToolbar.debugDescription)] \
+      sidebarSeamDistance=\(String(format: "%.4f", sidebarSeamDistance))
+      """
     guard !debugContext.isEmpty else {
       return summary
     }
