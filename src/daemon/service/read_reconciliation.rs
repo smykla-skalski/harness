@@ -9,9 +9,7 @@ use super::{
     write_signal_ack,
 };
 
-pub(crate) fn liveness_project_dir_for_resolved(
-    resolved: &ResolvedSession,
-) -> Option<PathBuf> {
+pub(crate) fn liveness_project_dir_for_resolved(resolved: &ResolvedSession) -> Option<PathBuf> {
     if resolved.state.status != SessionStatus::Active || !session_has_live_agents(&resolved.state) {
         return None;
     }

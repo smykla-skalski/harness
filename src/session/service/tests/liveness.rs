@@ -327,7 +327,11 @@ fn sync_liveness_seven_agents_six_die() {
 
         // Make all 6 workers stale
         let state = session_status("sync-4", project).expect("status");
-        for worker in state.agents.values().filter(|agent| agent.runtime == "codex") {
+        for worker in state
+            .agents
+            .values()
+            .filter(|agent| agent.runtime == "codex")
+        {
             age_agent_activity(project, "sync-4", &worker.agent_id, 1_200);
         }
         for i in 1..=6 {

@@ -3,8 +3,14 @@ use super::*;
 #[test]
 fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
     with_temp_project(|project| {
-        start_session("test", "", project, Some("claude"), Some("sync-interactive-idle"))
-            .expect("start");
+        start_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("sync-interactive-idle"),
+        )
+        .expect("start");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("interactive-worker"), || {
             join_session(
@@ -46,8 +52,14 @@ fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
 #[test]
 fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
     with_temp_project(|project| {
-        start_session("test", "", project, Some("claude"), Some("sync-state-activity"))
-            .expect("start");
+        start_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("sync-state-activity"),
+        )
+        .expect("start");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("state-activity-worker"), || {
             join_session(
@@ -98,9 +110,14 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
 #[test]
 fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
     with_temp_project(|project| {
-        let state =
-            start_session("test", "", project, Some("claude"), Some("sync-pending-signal"))
-                .expect("start");
+        let state = start_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("sync-pending-signal"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("pending-signal-worker"), || {
@@ -119,10 +136,7 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
         let state = session_status("sync-pending-signal", project).expect("status");
         let worker = find_agent_by_runtime(&state, "codex");
         let worker_id = worker.agent_id.clone();
-        let worker_session_id = worker
-            .agent_session_id
-            .clone()
-            .expect("worker session id");
+        let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
         age_agent_activity(project, "sync-pending-signal", &worker_id, 1_200);
 
         let log_path = write_agent_log_file(project, "codex", &worker_session_id);

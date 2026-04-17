@@ -2,15 +2,15 @@ use super::*;
 
 #[test]
 fn skill_name_short_does_not_fire() {
-    // Short names (new, run, observe) are the correct convention in SKILL.md
+    // Short names (new, run, harness) are the correct convention in SKILL.md
     let mut state = make_state();
     let block = serde_json::json!({
         "type": "tool_use",
         "id": "t1",
         "name": "Write",
         "input": {
-            "file_path": "/data/.claude/plugins/observe/skills/observe/SKILL.md",
-            "content": "---\nname: observe\n---\nSome content"
+            "file_path": "/data/.claude/plugins/harness/skills/harness/SKILL.md",
+            "content": "---\nname: harness\n---\nSome content"
         }
     });
     let issues = check_tool_use_for_issues(10, &block, &mut state);
@@ -18,7 +18,7 @@ fn skill_name_short_does_not_fire() {
         !issues
             .iter()
             .any(|i| i.code == IssueCode::ShortSkillNameInSkillFile),
-        "short name 'observe' should not trigger ShortSkillNameInSkillFile"
+        "short name 'harness' should not trigger ShortSkillNameInSkillFile"
     );
 }
 

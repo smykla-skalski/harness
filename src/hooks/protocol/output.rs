@@ -114,7 +114,10 @@ fn render_pre_tool_use_output_normalized(result: &NormalizedHookResult) -> Strin
 }
 
 fn pre_tool_use_permission_reason(result: &NormalizedHookResult) -> Option<String> {
-    let has_reason = result.reason.as_deref().is_some_and(|reason| !reason.is_empty())
+    let has_reason = result
+        .reason
+        .as_deref()
+        .is_some_and(|reason| !reason.is_empty())
         || result.code.is_some();
     has_reason.then(|| result.display_message())
 }

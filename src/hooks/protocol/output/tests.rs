@@ -66,10 +66,7 @@ fn pre_tool_use_allow_with_additional_context_is_emitted() {
     );
     let value: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert_eq!(value["hookSpecificOutput"]["hookEventName"], "PreToolUse");
-    assert_eq!(
-        value["hookSpecificOutput"]["permissionDecision"],
-        "allow"
-    );
+    assert_eq!(value["hookSpecificOutput"]["permissionDecision"], "allow");
     assert_eq!(
         value["hookSpecificOutput"]["additionalContext"],
         "deliver signal before tool"
@@ -86,10 +83,7 @@ fn pre_tool_use_allow_with_updated_input_is_emitted() {
     let output = render_normalized_hook_output(HookType::PreToolUse, &result);
     let value: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert_eq!(value["hookSpecificOutput"]["hookEventName"], "PreToolUse");
-    assert_eq!(
-        value["hookSpecificOutput"]["permissionDecision"],
-        "allow"
-    );
+    assert_eq!(value["hookSpecificOutput"]["permissionDecision"], "allow");
     assert_eq!(
         value["hookSpecificOutput"]["updatedInput"]["command"],
         "echo injected"
