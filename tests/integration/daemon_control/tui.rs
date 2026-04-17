@@ -400,7 +400,7 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
     assert_eq!(ready_status, 200, "unexpected ready body: {ready_body}");
 
     let shown = wait_for_tui_prompt(&home, &xdg, &started.tui_id);
-    assert!(shown.screen.text.contains("/harness:session:join"));
+    assert!(shown.screen.text.contains("$harness:session:join"));
     assert!(shown.screen.text.contains("--role leader"));
     assert!(shown.screen.text.contains("policy-preset:swarm-default"));
 

@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 use portable_pty::CommandBuilder;
 
 use crate::agents::runtime::{
-    AgentRuntime, InitialPromptDelivery, hook_agent_for_runtime_name, runtime_for_name,
+    AgentRuntime, InitialPromptDelivery, direct_skill_invocation, hook_agent_for_runtime_name,
+    runtime_for_name,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
@@ -160,9 +161,10 @@ pub(crate) fn build_auto_join_prompt(
         };
         format!(" --fallback-role {value}")
     });
+    let join_skill = direct_skill_invocation(runtime, "harness:session:join");
 
     format!(
-        "/harness:session:join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
+        "{join_skill} {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
     )
 }
 
