@@ -67,6 +67,10 @@ extension WebSocketTransport {
       store.register(id: id, continuation: continuation)
       task.send(.string(text)) { error in
         if let error {
+          let errorDescription = error.localizedDescription
+          HarnessMonitorLogger.websocket.warning(
+            "WebSocket send failed for \(method, privacy: .public): \(errorDescription, privacy: .public)"
+          )
           Task { await self.clearResponseBatchHandler(for: id) }
           store.fail(id: id, error: error)
         }
@@ -92,6 +96,10 @@ extension WebSocketTransport {
           try await self.handleMessage(message)
         } catch {
           if Task.isCancelled { return }
+          let errorDescription = error.localizedDescription
+          HarnessMonitorLogger.websocket.warning(
+            "WebSocket receive loop error (attempt \(attempt)): \(errorDescription, privacy: .public)"
+          )
           self.pending.failAll(error: error)
           await self.clearResponseBatchHandlers()
           await self.clearPartialFrames()

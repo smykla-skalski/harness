@@ -386,6 +386,59 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(elapsed < .milliseconds(550))
   }
 
+
+  @Test("Bootstrap goes offline when snapshot endpoints fail persistently throughout the grace period")
+  func bootstrapGoesOfflineWhenSnapshotEndpointsFailPersistently() async {
+    let client = RecordingHarnessClient()
+    let persistentErrors: [any Error] = (0..<20).map { _ in
+      HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
+    }
+    client.configureDiagnosticsErrors(persistentErrors)
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .milliseconds(50)
+    store.initialConnectRefreshRetryInterval = .milliseconds(5)
+
+    await store.bootstrap()
+
+    if case .offline(let reason) = store.connectionState {
+      #expect(reason.contains("503") || reason.contains("warming up"))
+    } else {
+      Issue.record("expected offline state, got \(store.connectionState)")
+    }
+    #expect(client.readCallCount(.diagnostics) >= 2)
+    #expect(
+      store.connectionEvents.contains { event in
+        event.detail.contains("startup snapshot is still warming up")
+      }
+    )
+  }
+
+  @Test("Bootstrap retry logs include the actual error for diagnosis")
+  func bootstrapRetryLogsIncludeActualError() async {
+    let client = RecordingHarnessClient()
+    client.configureDiagnosticsErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "test error message xyz123"),
+      HarnessMonitorAPIError.server(code: 503, message: "test error message xyz123"),
+    ])
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .milliseconds(50)
+    store.initialConnectRefreshRetryInterval = .milliseconds(5)
+
+    await store.bootstrap()
+
+    let retryEvent = store.connectionEvents.first { event in
+      event.detail.contains("startup snapshot is still warming up")
+    }
+    #expect(retryEvent != nil)
+    if let retryEvent {
+      #expect(
+        retryEvent.detail.contains("xyz123"),
+        "Retry message should include actual error: \(retryEvent.detail)"
+      )
   @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
   func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
     let daemon = RecordingDaemonController(

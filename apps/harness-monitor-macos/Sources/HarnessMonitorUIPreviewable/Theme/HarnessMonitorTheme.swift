@@ -52,6 +52,8 @@ func statusColor(for status: SessionStatus) -> Color {
     HarnessMonitorTheme.success
   case .paused:
     HarnessMonitorTheme.caution
+  case .leaderlessDegraded:
+    HarnessMonitorTheme.caution
   case .ended:
     HarnessMonitorTheme.ink.opacity(0.55)
   }
