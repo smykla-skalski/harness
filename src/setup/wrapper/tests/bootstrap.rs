@@ -88,31 +88,22 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
     let dir = tempfile::tempdir().unwrap();
     let written = write_agent_bootstrap(dir.path(), HookAgent::Codex).unwrap();
 
-    let session_start_skill = dir
-        .path()
-        .join(".agents")
-        .join("skills")
-        .join("harness-session-start")
-        .join("SKILL.md");
     let plugin_skill = dir
         .path()
         .join("plugins")
         .join("harness")
         .join("skills")
-        .join("start")
+        .join("harness")
         .join("SKILL.md");
     let hooks_path = dir.path().join(".codex").join("hooks.json");
     let config_path = dir.path().join(".codex").join("config.toml");
 
-    assert!(written.contains(&session_start_skill));
     assert!(written.contains(&plugin_skill));
     assert!(written.contains(&hooks_path));
     assert!(written.contains(&config_path));
 
-    let skill = fs::read_to_string(session_start_skill).unwrap();
-    assert!(skill.contains("name: harness:session:start"));
-    let plugin_skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(plugin_skill.contains("name: session:start"));
+    let skill = fs::read_to_string(plugin_skill).unwrap();
+    assert!(skill.contains("name: harness"));
     assert_codex_hooks(&fs::read_to_string(hooks_path).unwrap());
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"audit-turn\""));
@@ -132,13 +123,13 @@ fn write_agent_bootstrap_writes_claude_plugin_assets() {
         .join("plugins")
         .join("harness")
         .join("skills")
-        .join("start")
+        .join("harness")
         .join("SKILL.md");
 
     assert!(written.contains(&settings_path));
     assert!(written.contains(&plugin_skill));
     let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: session:start"));
+    assert!(skill.contains("name: harness"));
 }
 
 #[test]
@@ -152,13 +143,12 @@ fn write_agent_bootstrap_writes_gemini_session_command() {
         .join(".gemini")
         .join("commands")
         .join("harness")
-        .join("session")
-        .join("start.toml");
+        .join("harness.toml");
 
     assert!(written.contains(&settings_path));
     assert!(written.contains(&command_path));
     let command = fs::read_to_string(command_path).unwrap();
-    assert!(command.contains("harness session start"));
+    assert!(command.contains("harness session"));
 }
 
 #[test]
@@ -173,13 +163,13 @@ fn write_agent_bootstrap_writes_opencode_plugin_assets() {
         .join("plugins")
         .join("harness")
         .join("skills")
-        .join("start")
+        .join("harness")
         .join("SKILL.md");
 
     assert!(written.contains(&hooks_path));
     assert!(written.contains(&plugin_skill));
     let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: session:start"));
+    assert!(skill.contains("name: harness"));
 }
 
 #[test]
@@ -194,13 +184,13 @@ fn write_agent_bootstrap_writes_vibe_plugin_assets() {
         .join("plugins")
         .join("harness")
         .join("skills")
-        .join("start")
+        .join("harness")
         .join("SKILL.md");
 
     assert!(written.contains(&hooks_path));
     assert!(written.contains(&plugin_skill));
     let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: session:start"));
+    assert!(skill.contains("name: harness"));
 }
 
 #[test]
@@ -218,7 +208,7 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
         .join("plugins")
         .join("harness")
         .join("skills")
-        .join("start")
+        .join("harness")
         .join("SKILL.md");
 
     assert!(written.contains(&config_path));
@@ -233,5 +223,5 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
         )
     );
     let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: session:start"));
+    assert!(skill.contains("name: harness"));
 }
