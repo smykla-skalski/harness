@@ -25,6 +25,8 @@ public struct DaemonController: DaemonControlling {
 
   let environment: HarnessMonitorEnvironment
   let sessionFactory: @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
+  let webSocketBootstrapper:
+    @Sendable (HarnessMonitorConnection) async -> (any HarnessMonitorClientProtocol)?
   let transportPreference: TransportPreference
   let launchAgentManager: any DaemonLaunchAgentManaging
   let ownership: DaemonOwnership
@@ -42,6 +44,19 @@ public struct DaemonController: DaemonControlling {
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
         HarnessMonitorAPIClient(connection: $0)
+      },
+    webSocketBootstrapper:
+      @escaping @Sendable (HarnessMonitorConnection) async
+      -> (any HarnessMonitorClientProtocol)? = {
+        let transport = WebSocketTransport(connection: $0)
+        do {
+          try await transport.connect()
+          _ = try await transport.health()
+          return transport
+        } catch {
+          await transport.shutdown()
+          return nil
+        }
       },
     endpointProbe: @escaping @Sendable (URL) async -> Bool = {
       await Self.defaultEndpointProbe($0)
@@ -69,6 +84,7 @@ public struct DaemonController: DaemonControlling {
     self.launchAgentManager = launchAgentManager
     self.ownership = ownership
     self.sessionFactory = sessionFactory
+    self.webSocketBootstrapper = webSocketBootstrapper
     self.endpointProbe = endpointProbe
     self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
     self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
@@ -97,7 +113,8 @@ public struct DaemonController: DaemonControlling {
     _ = try await httpClient.health()
 
     if transportPreference != .http {
-      if let wsClient = try? await bootstrapWebSocket(connection: connection) {
+      if let wsClient = await webSocketBootstrapper(connection) {
+        await httpClient.shutdown()
         HarnessMonitorLogger.lifecycle.trace(
           "Upgraded daemon transport to WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
         )
@@ -109,20 +126,6 @@ public struct DaemonController: DaemonControlling {
     }
 
     return httpClient
-  }
-
-  func bootstrapWebSocket(
-    connection: HarnessMonitorConnection
-  ) async throws -> WebSocketTransport {
-    let transport = WebSocketTransport(connection: connection)
-    do {
-      try await transport.connect()
-      _ = try await transport.health()
-      return transport
-    } catch {
-      await transport.shutdown()
-      throw error
-    }
   }
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {

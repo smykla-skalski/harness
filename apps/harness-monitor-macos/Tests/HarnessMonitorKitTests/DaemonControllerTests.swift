@@ -77,6 +77,28 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test("bootstrapClient shuts down the probe HTTP client after a WebSocket upgrade")
+  func bootstrapClientShutsDownProbeHTTPClientAfterWebSocketUpgrade() async throws {
+    try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
+      let httpClient = RecordingHarnessClient()
+      let webSocketClient = RecordingHarnessClient()
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { _ in httpClient },
+        webSocketBootstrapper: { _ in webSocketClient }
+      )
+
+      let client = try await controller.bootstrapClient()
+
+      #expect(client as AnyObject === webSocketClient as AnyObject)
+      #expect(httpClient.readCallCount(.health) == 1)
+      #expect(httpClient.shutdownCallCount() == 1)
+      #expect(webSocketClient.shutdownCallCount() == 0)
+    }
+  }
+
   @Test("awaitManifestWarmUp waits for managed manifest rewrite while the stale pid is still alive")
   func awaitManifestWarmUpWaitsForManagedManifestRewriteWhilePidIsAlive() async throws {
     try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
