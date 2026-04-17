@@ -1,3 +1,7 @@
+use serde_json::json;
+
+use crate::session::types::SessionMetrics;
+
 use super::*;
 
 #[test]
@@ -106,6 +110,137 @@ fn sync_session_replaces_agents_on_update() {
         )
         .expect("count agents");
     assert_eq!(agent_count, 0);
+}
+
+#[test]
+fn sync_session_canonicalizes_active_sessions_without_leader() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+
+    let mut state = sample_session_state();
+    state.agents.clear();
+    state.leader_id = None;
+    state.status = SessionStatus::Active;
+    state.metrics = SessionMetrics::recalculate(&state);
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    let (stored_status, stored_leader_id): (String, Option<String>) = db
+        .conn
+        .query_row(
+            "SELECT status, leader_id
+                 FROM sessions
+                 WHERE session_id = ?1",
+            [&state.session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("query persisted session");
+    assert_eq!(stored_status, "leaderless_degraded");
+    assert!(stored_leader_id.is_none());
+
+    let loaded = db
+        .load_session_state(&state.session_id)
+        .expect("load session")
+        .expect("session present");
+    assert_eq!(loaded.status, SessionStatus::LeaderlessDegraded);
+    assert!(loaded.leader_id.is_none());
+    assert_eq!(loaded.schema_version, crate::session::types::CURRENT_VERSION);
+
+    let summaries = db.list_session_summaries_full().expect("session summaries");
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].status, SessionStatus::LeaderlessDegraded);
+    assert!(summaries[0].leader_id.is_none());
+}
+
+#[test]
+fn list_session_summaries_repair_legacy_active_rows_and_state_payloads() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+
+    let mut state = sample_session_state();
+    state.agents.clear();
+    state.leader_id = None;
+    state.status = SessionStatus::Active;
+    state.metrics = SessionMetrics::recalculate(&state);
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    let legacy_payload = json!({
+        "schema_version": 6,
+        "state_version": 1,
+        "session_id": state.session_id.clone(),
+        "title": state.title.clone(),
+        "context": state.context.clone(),
+        "status": "active",
+        "created_at": state.created_at.clone(),
+        "updated_at": state.updated_at.clone(),
+        "agents": {},
+        "tasks": {},
+        "leader_id": null,
+        "archived_at": null,
+        "last_activity_at": state.last_activity_at.clone(),
+        "observe_id": state.observe_id.clone(),
+        "pending_leader_transfer": null,
+        "metrics": {
+            "agent_count": 0,
+            "active_agent_count": 0,
+            "idle_agent_count": 0,
+            "open_task_count": 0,
+            "in_progress_task_count": 0,
+            "blocked_task_count": 0,
+            "completed_task_count": 0
+        }
+    })
+    .to_string();
+    db.conn
+        .execute(
+            "UPDATE sessions
+             SET status = 'active',
+                 leader_id = NULL,
+                 metrics_json = ?1,
+                 state_json = ?2,
+                 is_active = 1
+             WHERE session_id = ?3",
+            rusqlite::params![
+                json!({
+                    "agent_count": 0,
+                    "active_agent_count": 0,
+                    "idle_agent_count": 0,
+                    "open_task_count": 0,
+                    "in_progress_task_count": 0,
+                    "blocked_task_count": 0,
+                    "completed_task_count": 0
+                })
+                .to_string(),
+                legacy_payload,
+                state.session_id.clone(),
+            ],
+        )
+        .expect("corrupt session row");
+
+    let summaries = db.list_session_summaries_full().expect("session summaries");
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].status, SessionStatus::LeaderlessDegraded);
+    assert!(summaries[0].leader_id.is_none());
+
+    let (stored_status, stored_state_json): (String, String) = db
+        .conn
+        .query_row(
+            "SELECT status, state_json
+                 FROM sessions
+                WHERE session_id = ?1",
+            [&state.session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("load repaired row");
+    let repaired_state: SessionState =
+        serde_json::from_str(&stored_state_json).expect("parse repaired state");
+    assert_eq!(stored_status, "leaderless_degraded");
+    assert_eq!(repaired_state.status, SessionStatus::LeaderlessDegraded);
+    assert!(repaired_state.leader_id.is_none());
+    assert_eq!(repaired_state.schema_version, crate::session::types::CURRENT_VERSION);
 }
 
 #[test]

@@ -77,6 +77,8 @@ impl DaemonDb {
         let version = self.schema_version()?;
         let needs_ledger_backfill =
             matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7");
+        let needs_session_repair =
+            matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8");
         let should_reclaim_space = match version.as_str() {
             "1" => {
                 self.conn
@@ -130,6 +132,9 @@ impl DaemonDb {
         if needs_ledger_backfill {
             self.migrate_v7_to_v8()?;
         }
+        if needs_session_repair {
+            self.migrate_v8_to_v9()?;
+        }
 
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;
@@ -149,6 +154,17 @@ impl DaemonDb {
                 [],
             )
             .map_err(|error| db_error(format!("bump schema version to v8: {error}")))?;
+        Ok(())
+    }
+
+    fn migrate_v8_to_v9(&self) -> Result<(), CliError> {
+        super::schema_repairs::repair_stale_active_sessions_without_leader(self)?;
+        self.conn
+            .execute(
+                "UPDATE schema_meta SET value = '9' WHERE key = 'version'",
+                [],
+            )
+            .map_err(|error| db_error(format!("bump schema version to v9: {error}")))?;
         Ok(())
     }
 }

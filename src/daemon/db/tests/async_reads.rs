@@ -1,3 +1,4 @@
+use serde_json::json;
 use tempfile::tempdir;
 
 use super::*;
@@ -115,6 +116,99 @@ async fn list_session_summaries_preserves_leaderless_degraded_status() {
 
     assert_eq!(summaries.len(), 1);
     assert_eq!(summaries[0].status, SessionStatus::LeaderlessDegraded);
+}
+
+#[tokio::test]
+async fn list_session_summaries_repairs_legacy_active_rows() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    let project = sample_project();
+    sync_db.sync_project(&project).expect("sync project");
+    let mut state = sample_session_state();
+    state.agents.clear();
+    state.leader_id = None;
+    state.status = SessionStatus::Active;
+    sync_db
+        .save_session_state(&project.project_id, &state)
+        .expect("save session state");
+    sync_db
+        .conn
+        .execute(
+            "UPDATE sessions
+             SET status = 'active',
+                 leader_id = NULL,
+                 metrics_json = ?1,
+                 state_json = ?2,
+                 is_active = 1
+             WHERE session_id = ?3",
+            rusqlite::params![
+                json!({
+                    "agent_count": 0,
+                    "active_agent_count": 0,
+                    "idle_agent_count": 0,
+                    "open_task_count": 0,
+                    "in_progress_task_count": 0,
+                    "blocked_task_count": 0,
+                    "completed_task_count": 0
+                })
+                .to_string(),
+                json!({
+                    "schema_version": 6,
+                    "state_version": 1,
+                    "session_id": state.session_id.clone(),
+                    "title": state.title.clone(),
+                    "context": state.context.clone(),
+                    "status": "active",
+                    "created_at": state.created_at.clone(),
+                    "updated_at": state.updated_at.clone(),
+                    "agents": {},
+                    "tasks": {},
+                    "leader_id": null,
+                    "archived_at": null,
+                    "last_activity_at": state.last_activity_at.clone(),
+                    "observe_id": state.observe_id.clone(),
+                    "pending_leader_transfer": null,
+                    "metrics": {
+                        "agent_count": 0,
+                        "active_agent_count": 0,
+                        "idle_agent_count": 0,
+                        "open_task_count": 0,
+                        "in_progress_task_count": 0,
+                        "blocked_task_count": 0,
+                        "completed_task_count": 0
+                    }
+                })
+                .to_string(),
+                state.session_id.clone(),
+            ],
+        )
+        .expect("corrupt legacy session row");
+    drop(sync_db);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db");
+    let summaries = async_db
+        .list_session_summaries()
+        .await
+        .expect("load async session summaries");
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].status, SessionStatus::LeaderlessDegraded);
+    assert!(summaries[0].leader_id.is_none());
+    drop(async_db);
+
+    let sync_db = DaemonDb::open(&db_path).expect("reopen sync daemon db");
+    let repaired = sync_db
+        .load_session_state(&state.session_id)
+        .expect("load repaired session")
+        .expect("session present");
+    assert_eq!(repaired.status, SessionStatus::LeaderlessDegraded);
+    assert!(repaired.leader_id.is_none());
+    assert_eq!(
+        repaired.schema_version,
+        crate::session::types::CURRENT_VERSION
+    );
 }
 
 fn sample_tool_result_event() -> crate::agents::runtime::event::ConversationEvent {

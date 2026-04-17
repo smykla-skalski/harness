@@ -2,8 +2,8 @@ use super::{
     AgentRegistration, AgentStatus, BTreeMap, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, CliError,
     CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND, LeaveSignalRecord, Path, SessionAction,
     SessionMetrics, SessionRole, SessionState, SessionStatus, TaskStatus, agent_status_label,
-    build_signal, fmt, generate_session_id, is_permitted, refresh_session, runtime,
-    runtime_capabilities, storage,
+    build_signal, fmt, generate_session_id, is_permitted, promote_or_degrade, refresh_session,
+    runtime, runtime_capabilities, storage,
 };
 use crate::session::types::SessionPolicy;
 
@@ -74,6 +74,27 @@ pub(crate) fn require_active(state: &SessionState) -> Result<(), CliError> {
         .into());
     }
     Ok(())
+}
+
+/// Canonicalize a persisted session that is still marked active without a
+/// leader.
+///
+/// Historical rows can hit this shape when the leader field was missing or
+/// truncated. The canonical fallback is the same logic used during live
+/// leader recovery: promote a live successor if one exists, otherwise
+/// degrade the session out of `active`.
+pub(crate) fn canonicalize_active_session_without_leader(
+    state: &mut SessionState,
+    now: &str,
+) -> bool {
+    if state.status != SessionStatus::Active || state.leader_id.is_some() {
+        return false;
+    }
+
+    state.schema_version = CURRENT_VERSION;
+    promote_or_degrade(state, now);
+    refresh_session(state, now);
+    true
 }
 
 pub(crate) fn require_task_creation_state(state: &SessionState) -> Result<(), CliError> {

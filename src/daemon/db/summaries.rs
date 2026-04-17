@@ -1,8 +1,9 @@
 use super::{
     BTreeMap, CliError, DaemonDb, DiscoveredProject, Path, PathBuf, SessionState, daemon_index,
-    daemon_protocol, db_error, parse_session_status_db_label, project_context_dir,
-    project_context_id, usize_from_i64,
+    daemon_protocol, db_error, project_context_dir, project_context_id, usize_from_i64,
 };
+use crate::session::service::canonicalize_active_session_without_leader;
+use crate::workspace::utc_now;
 
 impl DaemonDb {
     /// Return the number of sessions in the database.
@@ -151,7 +152,7 @@ impl DaemonDb {
                 "SELECT
                     s.session_id, s.title, s.context, s.status, s.created_at, s.updated_at,
                     s.last_activity_at, s.leader_id, s.observe_id,
-                    s.pending_leader_transfer, s.metrics_json,
+                    s.pending_leader_transfer, s.metrics_json, s.state_json,
                     p.project_id, p.name, p.project_dir, p.repository_root, p.context_root,
                     p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name
                  FROM sessions s
@@ -174,23 +175,27 @@ impl DaemonDb {
                     observe_id: row.get(8)?,
                     pending_leader_transfer_json: row.get(9)?,
                     metrics_json: row.get(10)?,
-                    project_id: row.get(11)?,
-                    project_name: row.get(12)?,
-                    project_dir: row.get(13)?,
-                    repository_root: row.get(14)?,
-                    context_root: row.get(15)?,
-                    checkout_id: row.get(16)?,
-                    checkout_name: row.get(17)?,
-                    is_worktree: row.get(18)?,
-                    worktree_name: row.get(19)?,
+                    state_json: row.get(11)?,
+                    project_id: row.get(12)?,
+                    project_name: row.get(13)?,
+                    project_dir: row.get(14)?,
+                    repository_root: row.get(15)?,
+                    context_root: row.get(16)?,
+                    checkout_id: row.get(17)?,
+                    checkout_name: row.get(18)?,
+                    is_worktree: row.get(19)?,
+                    worktree_name: row.get(20)?,
                 })
             })
             .map_err(|error| db_error(format!("query session summaries: {error}")))?;
 
+        let all_rows: Vec<SessionSummaryRow> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read session row: {error}")))?;
+
         let mut summaries = Vec::new();
-        for row in rows {
-            let row = row.map_err(|error| db_error(format!("read session row: {error}")))?;
-            summaries.push(row.into_summary());
+        for row in all_rows {
+            summaries.push(row.into_summary(self)?);
         }
         Ok(summaries)
     }
@@ -203,21 +208,29 @@ impl DaemonDb {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT s.state_json FROM sessions s
+                "SELECT s.project_id, s.state_json FROM sessions s
                  JOIN projects p ON p.project_id = s.project_id
                  ORDER BY s.updated_at DESC",
             )
             .map_err(|error| db_error(format!("prepare session list: {error}")))?;
 
         let rows = statement
-            .query_map([], |row| row.get::<_, String>(0))
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
             .map_err(|error| db_error(format!("query session list: {error}")))?;
 
+        let all_rows: Vec<(String, String)> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read session row: {error}")))?;
+
         let mut sessions = Vec::new();
-        for row in rows {
-            let json = row.map_err(|error| db_error(format!("read session row: {error}")))?;
-            let state: SessionState = serde_json::from_str(&json)
+        for (project_id, json) in all_rows {
+            let mut state: SessionState = serde_json::from_str(&json)
                 .map_err(|error| db_error(format!("parse session state: {error}")))?;
+            if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+                self.sync_session(&project_id, &state)?;
+            }
             sessions.push(state);
         }
         Ok(sessions)
@@ -268,7 +281,7 @@ impl DaemonDb {
                 is_worktree,
                 worktree_name,
             )) => {
-                let state: SessionState = serde_json::from_str(&state_json)
+                let mut state: SessionState = serde_json::from_str(&state_json)
                     .map_err(|error| db_error(format!("parse session state: {error}")))?;
                 let project = DiscoveredProject {
                     project_id,
@@ -281,6 +294,9 @@ impl DaemonDb {
                     is_worktree,
                     worktree_name,
                 };
+                if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+                    self.sync_session(&project.project_id, &state)?;
+                }
                 Ok(Some(daemon_index::ResolvedSession { project, state }))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -303,6 +319,7 @@ struct ProjectRow {
     total_session_count: usize,
 }
 
+#[allow(dead_code)]
 struct SessionSummaryRow {
     session_id: String,
     title: String,
@@ -315,6 +332,7 @@ struct SessionSummaryRow {
     observe_id: Option<String>,
     pending_leader_transfer_json: Option<String>,
     metrics_json: String,
+    state_json: String,
     project_id: String,
     project_name: String,
     project_dir: Option<String>,
@@ -345,47 +363,53 @@ impl ProjectRow {
 }
 
 impl SessionSummaryRow {
-    fn into_summary(self) -> daemon_protocol::SessionSummary {
-        use daemon_protocol::SessionSummary;
-
-        let status = parse_session_status_db_label(&self.status);
-        let pending_leader_transfer = self
-            .pending_leader_transfer_json
-            .and_then(|json| serde_json::from_str(&json).ok());
-        let metrics = serde_json::from_str(&self.metrics_json).unwrap_or_default();
-        let checkout_root = self.project_dir.clone().unwrap_or_default();
-        let project_id = summary_project_id(&self.project_id, self.repository_root.as_deref());
-        let project_name =
-            summary_project_name(&self.project_name, self.repository_root.as_deref());
-        let project_dir =
-            summary_project_dir(self.project_dir.as_deref(), self.repository_root.as_deref());
-        let context_root =
-            summary_context_root(&self.context_root, self.repository_root.as_deref());
-        let worktree_name = self
-            .worktree_name
-            .or_else(|| self.is_worktree.then_some(self.checkout_name));
-
-        SessionSummary {
-            project_id,
-            project_name,
-            project_dir,
-            context_root,
+    fn into_summary(self, db: &DaemonDb) -> Result<daemon_protocol::SessionSummary, CliError> {
+        let mut state: SessionState = serde_json::from_str(&self.state_json)
+            .map_err(|error| db_error(format!("parse session state: {error}")))?;
+        let project = DiscoveredProject {
+            project_id: self.project_id,
+            name: self.project_name,
+            project_dir: self.project_dir.as_deref().map(PathBuf::from),
+            repository_root: self.repository_root.as_deref().map(PathBuf::from),
             checkout_id: self.checkout_id,
-            checkout_root,
+            checkout_name: self.checkout_name,
+            context_root: PathBuf::from(self.context_root),
             is_worktree: self.is_worktree,
-            worktree_name,
-            session_id: self.session_id,
-            title: self.title,
-            context: self.context,
-            status,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            last_activity_at: self.last_activity_at,
-            leader_id: self.leader_id,
-            observe_id: self.observe_id,
-            pending_leader_transfer,
-            metrics,
+            worktree_name: self.worktree_name,
+        };
+        if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+            db.sync_session(&project.project_id, &state)?;
         }
+        let pending_leader_transfer = state.pending_leader_transfer.clone();
+        let worktree_name = project
+            .worktree_name
+            .clone()
+            .or_else(|| project.is_worktree.then_some(project.checkout_name.clone()));
+
+        Ok(daemon_protocol::SessionSummary {
+            project_id: project.summary_project_id(),
+            project_name: project.summary_project_name(),
+            project_dir: project.summary_project_dir(),
+            context_root: project.summary_context_root(),
+            checkout_id: project.checkout_id.clone(),
+            checkout_root: project
+                .project_dir
+                .as_ref()
+                .map_or_else(String::new, |path| path.display().to_string()),
+            is_worktree: project.is_worktree,
+            worktree_name,
+            session_id: state.session_id,
+            title: state.title,
+            context: state.context,
+            status: state.status,
+            created_at: state.created_at,
+            updated_at: state.updated_at,
+            last_activity_at: state.last_activity_at,
+            leader_id: state.leader_id,
+            observe_id: state.observe_id,
+            pending_leader_transfer,
+            metrics: state.metrics,
+        })
     }
 }
 

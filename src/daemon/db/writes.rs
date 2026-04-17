@@ -5,6 +5,7 @@ use super::{
     session_status_db_label, stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry,
     utc_now,
 };
+use crate::session::service::canonicalize_active_session_without_leader;
 
 impl DaemonDb {
     /// Upsert a discovered project into the database.
@@ -61,16 +62,20 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        let state_json = serde_json::to_string(state)
+        let now = utc_now();
+        let mut canonical_state = state.clone();
+        canonicalize_active_session_without_leader(&mut canonical_state, &now);
+
+        let state_json = serde_json::to_string(&canonical_state)
             .map_err(|error| db_error(format!("serialize session state: {error}")))?;
-        let metrics_json = serde_json::to_string(&state.metrics)
+        let metrics_json = serde_json::to_string(&canonical_state.metrics)
             .map_err(|error| db_error(format!("serialize session metrics: {error}")))?;
-        let pending_transfer_json = state
+        let pending_transfer_json = canonical_state
             .pending_leader_transfer
             .as_ref()
             .and_then(|transfer| serde_json::to_string(transfer).ok());
-        let status = session_status_db_label(state.status)?;
-        let is_active = i32::from(state.status == SessionStatus::Active);
+        let status = session_status_db_label(canonical_state.status)?;
+        let is_active = i32::from(canonical_state.status == SessionStatus::Active);
 
         let transaction = self
             .conn
@@ -102,19 +107,19 @@ impl DaemonDb {
                     state_json = excluded.state_json,
                     is_active = excluded.is_active",
                 rusqlite::params![
-                    state.session_id,
+                    canonical_state.session_id,
                     project_id,
-                    state.schema_version,
-                    i64_from_u64(state.state_version),
-                    state.title,
-                    state.context,
+                    canonical_state.schema_version,
+                    i64_from_u64(canonical_state.state_version),
+                    canonical_state.title,
+                    canonical_state.context,
                     status,
-                    state.leader_id,
-                    state.observe_id,
-                    state.created_at,
-                    state.updated_at,
-                    state.last_activity_at,
-                    state.archived_at,
+                    canonical_state.leader_id,
+                    canonical_state.observe_id,
+                    canonical_state.created_at,
+                    canonical_state.updated_at,
+                    canonical_state.last_activity_at,
+                    canonical_state.archived_at,
                     pending_transfer_json,
                     metrics_json,
                     state_json,
@@ -123,8 +128,8 @@ impl DaemonDb {
             )
             .map_err(|error| db_error(format!("upsert session: {error}")))?;
 
-        replace_agents(&transaction, &state.session_id, &state.agents)?;
-        replace_tasks(&transaction, &state.session_id, &state.tasks)?;
+        replace_agents(&transaction, &canonical_state.session_id, &canonical_state.agents)?;
+        replace_tasks(&transaction, &canonical_state.session_id, &canonical_state.tasks)?;
         transaction
             .execute(
                 "INSERT INTO session_timeline_state (
@@ -132,7 +137,7 @@ impl DaemonDb {
                     oldest_recorded_at, integrity_hash, updated_at
                 ) VALUES (?1, 0, 0, NULL, NULL, '', ?2)
                 ON CONFLICT(session_id) DO NOTHING",
-                rusqlite::params![state.session_id, state.updated_at],
+                rusqlite::params![canonical_state.session_id, canonical_state.updated_at],
             )
             .map_err(|error| db_error(format!("ensure session timeline state: {error}")))?;
 

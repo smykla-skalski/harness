@@ -6,7 +6,7 @@ use super::{
     db_error, extract_transition_kind, i64_from_u64, normalize_change_scope,
     session_status_db_label, stored_timeline_entry, u64_from_i64, utc_now,
 };
-
+use crate::session::service::canonicalize_active_session_without_leader;
 const UPSERT_PROJECT_SQL: &str = "INSERT INTO projects (
     project_id, name, project_dir, repository_root, checkout_id,
     checkout_name, context_root, is_worktree, worktree_name,
@@ -302,37 +302,39 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit async change bump transaction: {error}")))?;
         Ok(())
     }
-
     async fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        let state_json = serde_json::to_string(state)
+        let now = utc_now();
+        let mut canonical_state = state.clone();
+        canonicalize_active_session_without_leader(&mut canonical_state, &now);
+        let state_json = serde_json::to_string(&canonical_state)
             .map_err(|error| db_error(format!("serialize async session state: {error}")))?;
-        let metrics_json = serde_json::to_string(&state.metrics)
+        let metrics_json = serde_json::to_string(&canonical_state.metrics)
             .map_err(|error| db_error(format!("serialize async session metrics: {error}")))?;
-        let pending_transfer_json = state
+        let pending_transfer_json = canonical_state
             .pending_leader_transfer
             .as_ref()
             .and_then(|transfer| serde_json::to_string(transfer).ok());
-        let status = session_status_db_label(state.status)?;
-        let is_active = i32::from(state.status == SessionStatus::Active);
+        let status = session_status_db_label(canonical_state.status)?;
+        let is_active = i32::from(canonical_state.status == SessionStatus::Active);
 
         let mut transaction =
             self.pool().begin().await.map_err(|error| {
                 db_error(format!("begin async session sync transaction: {error}"))
             })?;
         query(UPSERT_SESSION_SQL)
-            .bind(&state.session_id)
+            .bind(&canonical_state.session_id)
             .bind(project_id)
-            .bind(state.schema_version)
-            .bind(i64_from_u64(state.state_version))
-            .bind(&state.title)
-            .bind(&state.context)
+            .bind(canonical_state.schema_version)
+            .bind(i64_from_u64(canonical_state.state_version))
+            .bind(&canonical_state.title)
+            .bind(&canonical_state.context)
             .bind(status)
-            .bind(state.leader_id.as_deref())
-            .bind(state.observe_id.as_deref())
-            .bind(&state.created_at)
-            .bind(&state.updated_at)
-            .bind(state.last_activity_at.as_deref())
-            .bind(state.archived_at.as_deref())
+            .bind(canonical_state.leader_id.as_deref())
+            .bind(canonical_state.observe_id.as_deref())
+            .bind(&canonical_state.created_at)
+            .bind(&canonical_state.updated_at)
+            .bind(canonical_state.last_activity_at.as_deref())
+            .bind(canonical_state.archived_at.as_deref())
             .bind(pending_transfer_json.as_deref())
             .bind(metrics_json)
             .bind(state_json)
@@ -341,15 +343,14 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("upsert async session: {error}")))?;
 
-        replace_agents(&mut transaction, &state.session_id, &state.agents).await?;
-        replace_tasks(&mut transaction, &state.session_id, &state.tasks).await?;
+        replace_agents(&mut transaction, &canonical_state.session_id, &canonical_state.agents).await?;
+        replace_tasks(&mut transaction, &canonical_state.session_id, &canonical_state.tasks).await?;
         query(ENSURE_SESSION_TIMELINE_STATE_SQL)
-            .bind(&state.session_id)
-            .bind(&state.updated_at)
+            .bind(&canonical_state.session_id)
+            .bind(&canonical_state.updated_at)
             .execute(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("ensure async session timeline state: {error}")))?;
-
         transaction
             .commit()
             .await
@@ -357,7 +358,6 @@ impl AsyncDaemonDb {
         Ok(())
     }
 }
-
 async fn replace_agents(
     transaction: &mut Transaction<'_, Sqlite>,
     session_id: &str,

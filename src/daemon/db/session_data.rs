@@ -2,6 +2,8 @@ use std::path::Path;
 
 use crate::daemon::index as daemon_index;
 use crate::session::storage as session_storage;
+use crate::session::service::canonicalize_active_session_without_leader;
+use crate::workspace::utc_now;
 
 use super::{
     CliError, DaemonDb, SessionLogEntry, SessionState, TaskCheckpoint, db_error, u64_from_i64,
@@ -47,15 +49,18 @@ impl DaemonDb {
     /// Returns [`CliError`] on SQL or parse failures.
     pub fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
         let result = self.conn.query_row(
-            "SELECT state_json FROM sessions WHERE session_id = ?1",
+            "SELECT project_id, state_json FROM sessions WHERE session_id = ?1",
             [session_id],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         );
 
         match result {
-            Ok(json) => {
-                let state: SessionState = serde_json::from_str(&json)
+            Ok((project_id, json)) => {
+                let mut state: SessionState = serde_json::from_str(&json)
                     .map_err(|error| db_error(format!("parse session state: {error}")))?;
+                if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+                    self.sync_session(&project_id, &state)?;
+                }
                 Ok(Some(state))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
