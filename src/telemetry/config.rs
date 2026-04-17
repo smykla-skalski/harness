@@ -59,6 +59,8 @@ pub struct SharedObservabilityConfig {
     #[serde(default)]
     pub prometheus_url: Option<String>,
     #[serde(default)]
+    pub pyroscope_url: Option<String>,
+    #[serde(default)]
     pub headers: BTreeMap<String, String>,
 }
 
@@ -68,6 +70,7 @@ pub struct ResolvedTelemetryConfig {
     pub protocol: ExportProtocol,
     pub endpoint: String,
     pub grafana_url: Option<String>,
+    pub pyroscope_url: Option<String>,
     pub headers: BTreeMap<String, String>,
 }
 
@@ -112,6 +115,7 @@ pub fn resolve_telemetry_config() -> Result<Option<ResolvedTelemetryConfig>, Cli
             protocol: ExportProtocol::Grpc,
             endpoint: DEFAULT_OTLP_GRPC_ENDPOINT.to_string(),
             grafana_url: None,
+            pyroscope_url: None,
             headers: BTreeMap::new(),
         }));
     }
@@ -130,6 +134,7 @@ fn resolve_from_explicit_env() -> Option<ResolvedTelemetryConfig> {
         protocol,
         endpoint,
         grafana_url: normalized_env_value("HARNESS_OTEL_GRAFANA_URL"),
+        pyroscope_url: normalized_env_value("HARNESS_OTEL_PYROSCOPE_URL"),
         headers,
     })
 }
@@ -156,6 +161,7 @@ fn resolve_from_shared_file() -> Result<Option<ResolvedTelemetryConfig>, CliErro
         protocol,
         endpoint,
         grafana_url: shared.grafana_url,
+        pyroscope_url: shared.pyroscope_url,
         headers: shared.headers,
     }))
 }
@@ -246,6 +252,7 @@ mod tests {
             tempo_url: None,
             loki_url: None,
             prometheus_url: None,
+            pyroscope_url: Some("http://127.0.0.1:4040".to_string()),
             headers: BTreeMap::from([("x-harness-env".to_string(), "local".to_string())]),
         };
 
@@ -268,6 +275,7 @@ mod tests {
                 assert_eq!(resolved.protocol, ExportProtocol::Grpc);
                 assert_eq!(resolved.endpoint, config.grpc_endpoint);
                 assert_eq!(resolved.grafana_url, config.grafana_url);
+                assert_eq!(resolved.pyroscope_url, config.pyroscope_url);
                 assert_eq!(resolved.headers, config.headers);
             },
         );
@@ -286,6 +294,7 @@ mod tests {
             tempo_url: None,
             loki_url: None,
             prometheus_url: None,
+            pyroscope_url: Some("http://127.0.0.1:4040".to_string()),
             headers: BTreeMap::from([("x-harness-env".to_string(), "file".to_string())]),
         };
 
@@ -298,6 +307,7 @@ mod tests {
                     "OTEL_EXPORTER_OTLP_HEADERS",
                     Some("authorization=Bearer abc123,x-harness-env=env"),
                 ),
+                ("HARNESS_OTEL_PYROSCOPE_URL", Some("http://127.0.0.1:4404")),
                 ("HARNESS_OTEL_EXPORT", None),
             ],
             || {
@@ -310,6 +320,7 @@ mod tests {
                 assert_eq!(resolved.source, TelemetryConfigSource::Environment);
                 assert_eq!(resolved.protocol, ExportProtocol::HttpProtobuf);
                 assert_eq!(resolved.endpoint, "http://collector.example:55681");
+                assert_eq!(resolved.pyroscope_url, Some("http://127.0.0.1:4404".to_string()));
                 assert_eq!(
                     resolved.headers,
                     BTreeMap::from([
@@ -343,6 +354,7 @@ mod tests {
                 assert_eq!(resolved.source, TelemetryConfigSource::Toggle);
                 assert_eq!(resolved.protocol, ExportProtocol::Grpc);
                 assert_eq!(resolved.endpoint, DEFAULT_OTLP_GRPC_ENDPOINT);
+                assert_eq!(resolved.pyroscope_url, None);
                 assert!(resolved.headers.is_empty());
             },
         );
