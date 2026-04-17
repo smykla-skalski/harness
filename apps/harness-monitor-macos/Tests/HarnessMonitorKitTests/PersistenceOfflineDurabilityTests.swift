@@ -44,6 +44,44 @@ struct PersistenceOfflineDurabilityTests {
     return try ModelContainer(for: schema, configurations: [config])
   }
 
+  private func seedV1Store(
+    at url: URL,
+    metricsData: Data,
+    sessionCount: Int = 1
+  ) throws {
+    let container = try makeV1Container(at: url)
+    let project = HarnessMonitorSchemaV1.CachedProject(
+      projectId: "proj-1",
+      name: "Harness",
+      projectDir: "/tmp/harness",
+      contextRoot: "/tmp/harness-context",
+      activeSessionCount: 1,
+      totalSessionCount: sessionCount
+    )
+
+    container.mainContext.insert(project)
+    for index in 0..<sessionCount {
+      let session = HarnessMonitorSchemaV1.CachedSession(
+        sessionId: sessionCount == 1 ? "sess-1" : "sess-\(index)",
+        projectId: "proj-1",
+        projectName: "Harness",
+        projectDir: "/tmp/harness",
+        contextRoot: "/tmp/harness-context",
+        context: sessionCount == 1 ? "Migrated session" : "Migrated session \(index)",
+        statusRaw: SessionStatus.active.rawValue,
+        createdAt: "2026-04-03T12:00:00Z",
+        updatedAt: "2026-04-03T12:05:00Z",
+        lastActivityAt: "2026-04-03T12:05:00Z",
+        leaderId: sessionCount == 1 ? "leader-1" : "leader-\(index)",
+        observeId: sessionCount == 1 ? "observe-1" : "observe-\(index)",
+        metricsData: metricsData
+      )
+      container.mainContext.insert(session)
+    }
+
+    try container.mainContext.save()
+  }
+
   @Test("Stopping the daemon keeps the selected persisted snapshot readable")
   func stopDaemonKeepsSelectedPersistedSnapshotReadable() async throws {
     let client = RecordingHarnessClient()
@@ -225,51 +263,24 @@ struct PersistenceOfflineDurabilityTests {
         completedTaskCount: 4
       ))
 
-    do {
-      let v1Container = try makeV1Container(at: storeURL)
-      let project = HarnessMonitorSchemaV1.CachedProject(
-        projectId: "proj-1",
-        name: "Harness",
-        projectDir: "/tmp/harness",
-        contextRoot: "/tmp/harness-context",
-        activeSessionCount: 1,
-        totalSessionCount: 1
-      )
-      let session = HarnessMonitorSchemaV1.CachedSession(
-        sessionId: "sess-1",
-        projectId: "proj-1",
-        projectName: "Harness",
-        projectDir: "/tmp/harness",
-        contextRoot: "/tmp/harness-context",
-        context: "Migrated session",
-        statusRaw: SessionStatus.active.rawValue,
-        createdAt: "2026-04-03T12:00:00Z",
-        updatedAt: "2026-04-03T12:05:00Z",
-        lastActivityAt: "2026-04-03T12:05:00Z",
-        leaderId: "leader-1",
-        observeId: "observe-1",
-        metricsData: metricsData
-      )
-
-      v1Container.mainContext.insert(project)
-      v1Container.mainContext.insert(session)
-      try v1Container.mainContext.save()
-    }
+    try seedV1Store(at: storeURL, metricsData: metricsData)
 
     let container = try HarnessMonitorModelContainer.live(using: environment)
     let projects = try container.mainContext.fetch(FetchDescriptor<CachedProject>())
     let sessions = try container.mainContext.fetch(FetchDescriptor<CachedSession>())
+    let migratedProject = projects.first?.toProjectSummary()
+    let migratedSession = sessions.first?.toSessionSummary()
 
     #expect(projects.count == 1)
-    #expect(projects.first?.projectId == "proj-1")
-    #expect(projects.first?.worktreesData == Data())
+    #expect(migratedProject?.projectId == "proj-1")
+    #expect(migratedProject?.worktrees == [])
 
     #expect(sessions.count == 1)
-    #expect(sessions.first?.sessionId == "sess-1")
-    #expect(sessions.first?.checkoutId == "proj-1")
-    #expect(sessions.first?.checkoutRoot == "/tmp/harness")
-    #expect(sessions.first?.isWorktree == false)
-    #expect(sessions.first?.worktreeName == nil)
+    #expect(migratedSession?.sessionId == "sess-1")
+    #expect(migratedSession?.checkoutId == "proj-1")
+    #expect(migratedSession?.checkoutRoot == "/tmp/harness")
+    #expect(migratedSession?.isWorktree == false)
+    #expect(migratedSession?.worktreeName == nil)
     #expect(sessions.first?.metricsData == metricsData)
   }
 }

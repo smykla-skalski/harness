@@ -64,6 +64,8 @@ extension CachedSession {
   }
 
   func toSessionSummary() -> SessionSummary {
+    let normalizedCheckoutId = checkoutId.isEmpty ? projectId : checkoutId
+    let normalizedCheckoutRoot = checkoutRoot.isEmpty ? (projectDir ?? contextRoot) : checkoutRoot
     let metrics =
       (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))
       ?? SessionMetrics(
@@ -87,8 +89,8 @@ extension CachedSession {
       projectName: projectName,
       projectDir: projectDir,
       contextRoot: contextRoot,
-      checkoutId: checkoutId,
-      checkoutRoot: checkoutRoot,
+      checkoutId: normalizedCheckoutId,
+      checkoutRoot: normalizedCheckoutRoot,
       isWorktree: isWorktree,
       worktreeName: worktreeName,
       sessionId: sessionId,
