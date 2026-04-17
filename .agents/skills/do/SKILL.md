@@ -24,6 +24,7 @@ Treat that as a hard constraint, not a style preference.
 4. **Performance is sacred.** Do not add avoidable allocations, synchronous work on async paths, unnecessary copies, or slower hot-path behavior. Measure or inspect carefully when the touched path is performance-sensitive.
 5. **TDD is mandatory.** Write the failing test first, see it fail, implement the fix, and see it pass.
 6. **Best practices are not optional.** Follow the repo conventions, language idioms, framework guidance, and documented patterns. If you are unsure, verify instead of guessing.
+7. **No version bumps in worktrees.** Never modify `Cargo.toml` version, run `version.sh`, or touch any version surface inside a feature worktree. Multiple agents work in parallel on separate worktrees - version bumps in worktrees cause merge conflicts when branches land. The version bump happens on `main` after merge, gated behind user approval (see step 10a).
 
 ## Workflow
 
@@ -257,6 +258,30 @@ If the main checkout has unrelated local changes, stop and ask the user before m
 Show the resulting commit list and done-bar results to the user before pushing and closing the issue. If the user asks to hold or revise, go back to the worktree, make the requested changes, and repeat the rebase and merge verification.
 
 If the user explicitly says not to push or not to close yet, stop at the last approved point and report the current state clearly.
+
+### 10a. Version bump (on main, after merge)
+
+After the commits land on `main`, evaluate whether the change warrants a version bump. Read the semver policy in CLAUDE.md and determine the appropriate bump level (major, minor, or patch).
+
+Use `user approval prompt` to present the recommendation:
+
+- Question: "The changes from #`<number>` are on `main`. I'd classify this as a `<level>` bump (`<current>` -> `<proposed>`). Want me to bump the version?"
+- Option 1: **Bump version** - "Run `./scripts/version.sh set <proposed>` and commit"
+- Option 2: **Skip** - "I'll handle versioning separately"
+- Option 3: **Different version** - "I want a different version number"
+
+If the user picks "Bump version":
+
+```bash
+./scripts/version.sh set <proposed>
+mise run version:check
+git add -A
+git commit -m "chore(version): bump to <proposed>"
+```
+
+If they pick "Different version", ask for the number, then run the same commands with their value. If they pick "Skip", move on without touching any version surfaces.
+
+This step exists because worktrees must never contain version bumps - parallel agents would create conflicting changes across worktrees. The bump always happens on `main` after the feature work has landed.
 
 ### 11. Clean up the worktree
 
