@@ -77,6 +77,7 @@ public struct ProjectSummary: Codable, Equatable, Identifiable, Sendable {
 public enum SessionStatus: String, Codable, CaseIterable, Sendable {
   case active
   case paused
+  case leaderlessDegraded = "leaderless_degraded"
   case ended
 
   public var title: String {
@@ -85,6 +86,8 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
       "Active"
     case .paused:
       "Paused"
+    case .leaderlessDegraded:
+      "Leaderless"
     case .ended:
       "Ended"
     }
