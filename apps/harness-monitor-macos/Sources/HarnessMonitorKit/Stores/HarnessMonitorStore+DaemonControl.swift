@@ -1,6 +1,41 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private var hasLiveConnectionActivity: Bool {
+    client != nil
+      || globalStreamTask != nil
+      || connectionProbeTask != nil
+      || isBootstrapping
+      || isReconnecting
+  }
+
+  private func cancelPendingAppInactivitySuspend() {
+    appInactivitySuspendTask?.cancel()
+    appInactivitySuspendTask = nil
+  }
+
+  private func performAppInactivitySuspend() async {
+    guard hasLiveConnectionActivity else {
+      return
+    }
+    guard isAppLifecycleSuspended == false else {
+      return
+    }
+
+    isAppLifecycleSuspended = true
+    stopManifestWatcher()
+    stopAllStreams()
+
+    guard let client else {
+      connectionState = .idle
+      return
+    }
+
+    self.client = nil
+    await client.shutdown()
+    connectionState = .idle
+  }
+
   func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
     var registrationState = await daemonController.launchAgentRegistrationState()
     if registrationState == .notRegistered || registrationState == .notFound {
@@ -269,34 +304,34 @@ extension HarnessMonitorStore {
   }
 
   public func suspendLiveConnectionForAppInactivity() async {
-    guard
-      client != nil
-        || globalStreamTask != nil
-        || connectionProbeTask != nil
-        || isBootstrapping
-        || isReconnecting
-    else {
+    guard hasLiveConnectionActivity else {
       return
     }
     guard isAppLifecycleSuspended == false else {
       return
     }
-
-    isAppLifecycleSuspended = true
-    stopManifestWatcher()
-    stopAllStreams()
-
-    guard let client else {
-      connectionState = .idle
+    guard appInactivitySuspendTask == nil else {
       return
     }
 
-    self.client = nil
-    await client.shutdown()
-    connectionState = .idle
+    guard appInactivitySuspendDelay > .zero else {
+      await performAppInactivitySuspend()
+      return
+    }
+
+    let delay = appInactivitySuspendDelay
+    appInactivitySuspendTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: delay)
+      guard let self, !Task.isCancelled else {
+        return
+      }
+      self.appInactivitySuspendTask = nil
+      await self.performAppInactivitySuspend()
+    }
   }
 
   public func resumeLiveConnectionAfterAppActivation() async {
+    cancelPendingAppInactivitySuspend()
     guard isAppLifecycleSuspended else {
       return
     }
@@ -315,6 +350,7 @@ extension HarnessMonitorStore {
 
   public func prepareForTermination() async {
     toast.dismissAll()
+    cancelPendingAppInactivitySuspend()
     stopAllStreams()
     stopManifestWatcher()
     isAppLifecycleSuspended = false
