@@ -1,13 +1,19 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use axum::extract::MatchedPath;
 use axum::Router;
+use axum::body::Body;
+use axum::http::Request;
+use axum::middleware::{self, Next};
+use axum::response::Response;
 use tokio::net::TcpListener;
 #[cfg(test)]
 use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, watch};
 #[cfg(test)]
 use tokio::task::block_in_place;
+use tracing::field::{display, Empty};
 
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
@@ -16,6 +22,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
+use crate::telemetry::{apply_parent_context_from_headers, current_trace_id};
 
 mod agents;
 mod auth;
@@ -176,4 +183,34 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(signals::signal_routes())
         .merge(codex::codex_routes())
         .merge(voice::voice_routes())
+        .layer(middleware::from_fn(trace_http_request))
+}
+
+async fn trace_http_request(request: Request<Body>, next: Next) -> Response {
+    let method = request.method().to_string();
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map_or_else(|| request.uri().path().to_string(), |matched| matched.as_str().to_string());
+    let request_id = response::extract_request_id(request.headers());
+    let span = tracing::info_span!(
+        "harness.daemon.http.request",
+        http_method = %method,
+        http_route = %route,
+        request_id = %request_id,
+        http_status_code = Empty,
+        duration_ms = Empty,
+        trace_id = Empty
+    );
+    apply_parent_context_from_headers(&span, request.headers());
+    let _guard = span.enter();
+    if let Some(trace_id) = current_trace_id() {
+        span.record("trace_id", display(trace_id));
+    }
+    let response = next.run(request).await;
+    span.record(
+        "http_status_code",
+        display(response.status().as_u16()),
+    );
+    response
 }

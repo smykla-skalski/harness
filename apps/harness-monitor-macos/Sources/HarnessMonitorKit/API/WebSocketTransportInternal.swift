@@ -54,7 +54,20 @@ extension WebSocketTransport {
     guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
+    let span = HarnessMonitorTelemetry.shared.startSpan(
+      name: "daemon.websocket.rpc",
+      kind: .client,
+      attributes: [
+        "transport.kind": .string("websocket"),
+        "rpc.system": .string("harness-daemon"),
+        "rpc.method": .string(method),
+      ]
+    )
+    defer { span.end() }
+
+    let startedAt = ContinuousClock.now
     let id = UUID().uuidString
+    span.setAttribute(key: "rpc.request_id", value: id)
     let request = WsRequest(id: id, method: method, params: params)
     let data = try encoder.encode(request)
     let text = String(data: data, encoding: .utf8) ?? "{}"
@@ -63,18 +76,48 @@ extension WebSocketTransport {
     if let onSemanticBatch {
       responseBatchHandlers[id] = onSemanticBatch
     }
-    return try await withCheckedThrowingContinuation { continuation in
-      store.register(id: id, continuation: continuation)
-      task.send(.string(text)) { error in
-        if let error {
-          let errorDescription = error.localizedDescription
-          HarnessMonitorLogger.websocket.warning(
-            "WebSocket send failed for \(method, privacy: .public): \(errorDescription, privacy: .public)"
-          )
-          Task { await self.clearResponseBatchHandler(for: id) }
-          store.fail(id: id, error: error)
+    do {
+      let result = try await withCheckedThrowingContinuation { continuation in
+        store.register(id: id, continuation: continuation)
+        task.send(.string(text)) { error in
+          if let error {
+            let errorDescription = error.localizedDescription
+            HarnessMonitorLogger.websocket.warning(
+              "WebSocket send failed for \(method, privacy: .public): \(errorDescription, privacy: .public)"
+            )
+            Task { await self.clearResponseBatchHandler(for: id) }
+            store.fail(id: id, error: error)
+          }
         }
       }
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: ContinuousClock.now))
+      HarnessMonitorTelemetry.shared.recordWebSocketRPC(
+        method: method,
+        durationMs: durationMs,
+        failed: false
+      )
+      return result
+    } catch {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: ContinuousClock.now))
+      span.status = .error(description: error.localizedDescription)
+      HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      HarnessMonitorTelemetry.shared.recordWebSocketRPC(
+        method: method,
+        durationMs: durationMs,
+        failed: true
+      )
+      HarnessMonitorTelemetry.shared.emitLog(
+        name: "daemon.websocket.rpc.failed",
+        severity: .error,
+        body: "WebSocket RPC failed",
+        attributes: [
+          "rpc.method": .string(method),
+          "rpc.request_id": .string(id),
+          "request.duration_ms": .double(durationMs),
+          "error.message": .string(error.localizedDescription),
+        ]
+      )
+      throw error
     }
   }
 
@@ -143,12 +186,23 @@ extension WebSocketTransport {
       "Bearer \(connection.token)",
       forHTTPHeaderField: "Authorization"
     )
+    let requestID = HarnessMonitorTelemetry.shared.decorate(&request)
     let task = session.webSocketTask(with: request)
     webSocketTask = task
     task.resume()
     startHeartbeat()
     try await resubscribe()
     emitReconnectReadyEvents()
+    HarnessMonitorTelemetry.shared.recordWebSocketConnect(outcome: "reconnect")
+    HarnessMonitorTelemetry.shared.emitLog(
+      name: "daemon.websocket.reconnect",
+      severity: .info,
+      body: "WebSocket reconnect completed",
+      attributes: [
+        "request.id": .string(requestID),
+        "url.absolute": .string(wsURL.absoluteString),
+      ]
+    )
   }
 
   func resubscribe() async throws {

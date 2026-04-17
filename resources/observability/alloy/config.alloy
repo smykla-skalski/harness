@@ -1,0 +1,142 @@
+otelcol.receiver.otlp "harness" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    logs = [
+      otelcol.processor.attributes.logs_labels.input,
+    ]
+    metrics = [
+      otelcol.processor.batch.metrics.input,
+    ]
+    traces = [
+      otelcol.processor.batch.traces.input,
+      otelcol.connector.spanmetrics.harness.input,
+      otelcol.connector.servicegraph.harness.input,
+    ]
+  }
+}
+
+otelcol.processor.attributes "logs_labels" {
+  action {
+    key    = "loki.resource.labels"
+    action = "insert"
+    value  = "service.name, service.namespace, service.version, deployment.environment.name"
+  }
+
+  action {
+    key    = "loki.attribute.labels"
+    action = "insert"
+    value  = "request_id, http_method, http_route, hook_name, hook_event, outcome"
+  }
+
+  output {
+    logs = [
+      otelcol.processor.batch.logs.input,
+    ]
+  }
+}
+
+otelcol.processor.batch "logs" {
+  output {
+    logs = [
+      otelcol.exporter.loki.harness.input,
+    ]
+  }
+}
+
+otelcol.processor.batch "metrics" {
+  output {
+    metrics = [
+      otelcol.exporter.prometheus.harness.input,
+    ]
+  }
+}
+
+otelcol.processor.batch "traces" {
+  output {
+    traces = [
+      otelcol.exporter.otlp.tempo.input,
+    ]
+  }
+}
+
+otelcol.connector.spanmetrics "harness" {
+  namespace = "harness.spanmetrics"
+  resource_metrics_key_attributes = [
+    "service.name",
+    "service.namespace",
+    "service.version",
+  ]
+
+  histogram {
+    explicit {}
+  }
+
+  dimension {
+    name = "http.method"
+  }
+
+  dimension {
+    name = "http.route"
+  }
+
+  dimension {
+    name = "hook.name"
+  }
+
+  dimension {
+    name = "hook.event"
+  }
+
+  output {
+    metrics = [
+      otelcol.exporter.prometheus.harness.input,
+    ]
+  }
+}
+
+otelcol.connector.servicegraph "harness" {
+  dimensions = ["http.method"]
+
+  output {
+    metrics = [
+      otelcol.exporter.prometheus.harness.input,
+    ]
+  }
+}
+
+otelcol.exporter.prometheus "harness" {
+  forward_to = [prometheus.remote_write.harness.receiver]
+}
+
+prometheus.remote_write "harness" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure             = true
+      insecure_skip_verify = true
+    }
+  }
+}
+
+otelcol.exporter.loki "harness" {
+  forward_to = [loki.write.harness.receiver]
+}
+
+loki.write "harness" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

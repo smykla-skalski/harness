@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "24.1.11"
+version = "24.2.0"
 edition = "2024"
 rust-version = "1.94"
 include = [
@@ -49,6 +49,12 @@ base64 = "0.22.1"
 futures-util = "0.3.31"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "json"] }
+opentelemetry = { version = "0.31.0", default-features = false, features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "0.31.0", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.31.1", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic", "http-proto", "reqwest-client"] }
+tracing-opentelemetry = { version = "0.32.1", default-features = false }
+opentelemetry-appender-tracing = "0.31.1"
+tonic = { version = "0.14.1", default-features = false }
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 gix-discover = { version = "0.49.0", features = ["sha1"] }

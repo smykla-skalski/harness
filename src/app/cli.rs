@@ -2,6 +2,7 @@ use std::thread;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
+use tracing::field::{display, Empty};
 
 use crate::agents::transport::AgentsCommand;
 use crate::app::command_context::{AppContext, Execute};
@@ -25,6 +26,7 @@ use crate::setup::{
     AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs,
     PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
+use crate::telemetry::{current_trace_id, runtime_service_from_current_process};
 
 /// Harness CLI.
 #[derive(Debug, Parser)]
@@ -180,6 +182,23 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
     }
 }
 
+fn command_name(command: &Command) -> &'static str {
+    match command {
+        Command::Hook(_) => "hook",
+        Command::Run { .. } => "run",
+        Command::Create { .. } => "create",
+        Command::Setup { .. } => "setup",
+        Command::Agents { .. } => "agents",
+        Command::SessionStart(_) => "session-start",
+        Command::SessionStop(_) => "session-stop",
+        Command::PreCompact(_) => "pre-compact",
+        Command::Observe(_) => "observe",
+        Command::Session { .. } => "session",
+        Command::Daemon { .. } => "daemon",
+        Command::Bridge { .. } => "bridge",
+    }
+}
+
 fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError> {
     match command {
         RunCommand::Start(args) => args.execute(ctx),
@@ -235,12 +254,37 @@ fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliEr
 /// and never surface as `CliError`.
 pub fn run() -> Result<i32, CliError> {
     let cli = Cli::parse();
-    if cli.delay > 0.0 {
-        thread::sleep(Duration::from_secs_f64(cli.delay));
+    apply_cli_delay(cli.delay);
+    let service = runtime_service_from_current_process();
+    let command_name = command_name(&cli.command);
+    let span = tracing::info_span!(
+        "harness.command",
+        command = command_name,
+        service = service.service_name(),
+        delay_seconds = cli.delay,
+        trace_id = Empty
+    );
+    let _guard = span.enter();
+    record_trace_id(&span);
+    command_exit_code(&cli.command)
+}
+
+fn apply_cli_delay(delay_seconds: f64) {
+    if delay_seconds > 0.0 {
+        thread::sleep(Duration::from_secs_f64(delay_seconds));
     }
-    match cli.command {
-        Command::Hook(ref args) => Ok(hooks::run_hook_command(args.agent, &args.skill, &args.hook)),
-        ref other => dispatch(other),
+}
+
+fn record_trace_id(span: &tracing::Span) {
+    if let Some(trace_id) = current_trace_id() {
+        span.record("trace_id", display(trace_id));
+    }
+}
+
+fn command_exit_code(command: &Command) -> Result<i32, CliError> {
+    match command {
+        Command::Hook(args) => Ok(hooks::run_hook_command(args.agent, &args.skill, &args.hook)),
+        other => dispatch(other),
     }
 }
 

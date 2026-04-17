@@ -19,6 +19,7 @@ struct HarnessMonitorAppConfiguration {
   let mainWindowDefaultSize: CGSize
   let perfScenario: HarnessMonitorPerfScenario?
   let preferencesInitialSection: PreferencesSection
+  let environment: HarnessMonitorEnvironment
 
   @MainActor
   static func resolve() -> Self {
@@ -81,7 +82,8 @@ struct HarnessMonitorAppConfiguration {
         isUITesting: isUITesting
       ),
       perfScenario: perfScenario,
-      preferencesInitialSection: perfScenario?.initialPreferencesSection ?? .general
+      preferencesInitialSection: perfScenario?.initialPreferencesSection ?? .general,
+      environment: resolvedEnvironment
     )
   }
 

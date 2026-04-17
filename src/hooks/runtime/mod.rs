@@ -1,19 +1,27 @@
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use crate::agents::runtime;
-use crate::agents::service::record_hook_event;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::workspace::utc_now;
 use tracing::callsite::Identifier as CallsiteIdentifier;
+use tracing::field::Empty;
 
 use super::adapters::{HookAgent, adapter_for};
-use super::application::{GuardContext, prepare_normalized_context};
+use super::application::GuardContext;
 use super::protocol::context::NormalizedEvent;
 use super::protocol::hook_result::HookResult;
 use super::protocol::result::NormalizedHookResult;
-use super::registry::{Hook, HookEngine};
+use super::registry::Hook;
 use super::{HookCommand, HookOutcome, HookType};
+use observation::{
+    HookRunMetadata, acknowledged_signal_lines, find_pending_signals_with_trace,
+    finish_hook_observation, prepare_hook_execution, project_dir_for_signal_context, read_hook_payload,
+    record_hook_event_failure, record_trace_id, resolve_signal_session_with_trace,
+};
+
+mod observation;
 
 pub(crate) fn hook_runtime_result(hook: &dyn Hook, code: &str, message: &str) -> HookResult {
     if hook.hook_type().is_guard() {
@@ -137,54 +145,72 @@ fn read_hook_input_bytes(hook: &HookCommand) -> Result<Vec<u8>, CliError> {
 
 /// Execute a hook command through the layered adapter/engine stack.
 #[must_use]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i32 {
+    let started_at = Instant::now();
     let hook_impl = hook.hook();
     let hook_name = hook.name();
     let event = default_event_for_command(hook);
-    let raw = match read_hook_input_bytes(hook) {
+    let span = tracing::info_span!(
+        "harness.hook.command",
+        hook_name = hook_name,
+        skill = skill,
+        agent = ?agent,
+        event = Empty,
+        runtime_session_id = Empty,
+        outcome = Empty,
+        duration_ms = Empty,
+        trace_id = Empty
+    );
+    let _guard = span.enter();
+    record_trace_id(&span);
+    let metadata = HookRunMetadata {
+        agent,
+        skill,
+        hook,
+        hook_impl,
+        hook_name,
+        span: &span,
+        started_at,
+    };
+    let raw = match read_hook_payload(&metadata, &event) {
         Ok(raw) => raw,
-        Err(error) => {
-            let message = format!("`{hook_name}` received invalid hook payload: {error}");
-            return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
-        }
+        Err(exit_code) => return exit_code,
     };
 
-    let adapter = adapter_for(agent);
-    let normalized = match adapter.parse_input(&raw) {
-        Ok(context) => prepare_normalized_context(context, skill, event),
-        Err(error) => {
-            let message = format!("`{hook_name}` received invalid hook payload: {error}");
-            return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
-        }
-    };
-    let normalized_for_record = normalized.clone();
-    let render_event = normalized.event.clone();
-
-    let result = match HookEngine::execute(hook_impl, normalized) {
-        Ok(result) => result,
-        Err(error) => {
-            let detail = format_hook_error_detail(hook_impl, &error);
-            NormalizedHookResult::from_hook_result(hook_runtime_result(
-                hook_impl, "KSH002", &detail,
-            ))
-        }
+    let execution = match prepare_hook_execution(&metadata, event, raw.as_slice()) {
+        Ok(execution) => execution,
+        Err(exit_code) => return exit_code,
     };
 
-    let result = inject_pending_signals(agent, &normalized_for_record, result);
-
-    if should_record_hook_event(hook)
-        && let Err(error) =
-            record_hook_event(agent, skill, hook_name, &normalized_for_record, &result)
-    {
-        let message = format!("`{hook_name}` failed to record agent event: {error}");
-        return render_runtime_error(agent, hook_impl, &render_event, "KSH003", &message);
+    if let Some(exit_code) = record_hook_event_failure(&metadata, &execution) {
+        return exit_code;
     }
 
-    let rendered = adapter.render_output(&result, &render_event);
+    finish_hook_observation(
+        &span,
+        hook_name,
+        &execution.render_event_name,
+        hook_outcome_label(&execution.result),
+        started_at,
+    );
+    let rendered = adapter_for(agent).render_output(&execution.result, &execution.render_event);
     if !rendered.stdout.is_empty() {
         print!("{}", rendered.stdout);
     }
     rendered.exit_code
+}
+
+fn hook_outcome_label(result: &NormalizedHookResult) -> &'static str {
+    match result.decision {
+        super::protocol::result::NormalizedDecision::Allow => "allow",
+        super::protocol::result::NormalizedDecision::Deny => "deny",
+        super::protocol::result::NormalizedDecision::Warn => "warn",
+        super::protocol::result::NormalizedDecision::Info => "info",
+    }
 }
 
 /// Check for pending signals on `BeforeToolUse` events and inject context.
@@ -216,15 +242,11 @@ fn collect_signal_context(
     if runtime_session_id.trim().is_empty() {
         return None;
     }
-    let project_dir = context
-        .session
-        .cwd
-        .as_deref()
-        .unwrap_or_else(|| Path::new("."));
-
+    let project_dir = project_dir_for_signal_context(context);
     let agent_runtime = runtime::runtime_for(agent);
-    let resolved_session = resolve_signal_session(agent_runtime, project_dir, runtime_session_id);
-    let (signal_dir, signals) = find_pending_signals(
+    let resolved_session =
+        resolve_signal_session_with_trace(agent_runtime, project_dir, runtime_session_id);
+    let (signal_dir, signals) = find_pending_signals_with_trace(
         agent_runtime,
         project_dir,
         runtime_session_id,
@@ -232,14 +254,7 @@ fn collect_signal_context(
     )?;
     let ids = derive_signal_ids(agent_runtime, runtime_session_id, resolved_session.as_ref());
     let now = utc_now();
-    let lines: Vec<String> = signals
-        .iter()
-        .filter_map(|signal| {
-            let result = acknowledge_signal(&signal_dir, signal, &ids, project_dir, &now);
-            (result != runtime::signal::AckResult::Expired)
-                .then(|| format!("[signal:{}] {}", signal.command, signal.payload.message))
-        })
-        .collect();
+    let lines = acknowledged_signal_lines(&signal_dir, &signals, &ids, project_dir, &now);
     (!lines.is_empty()).then(|| lines.join("\n"))
 }
 

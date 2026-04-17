@@ -10,10 +10,12 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval as tokio_interval};
+use tracing::field::{display, Empty};
 use tracing::{debug, info};
 
 use crate::daemon::http::{self, DaemonHttpState};
 use crate::daemon::protocol::StreamEvent;
+use crate::telemetry::current_trace_id;
 
 use super::dispatch::handle_message;
 use super::relay::relay_broadcast;
@@ -50,7 +52,23 @@ pub async fn ws_upgrade_handler(
     if let Err(response) = http::require_auth(&headers, &state) {
         return *response;
     }
-    ws.on_upgrade(move |socket| handle_connection(socket, state))
+    let request_id = headers
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let connection_span = tracing::info_span!(
+        "harness.daemon.websocket.connection",
+        request_id = %request_id,
+        trace_id = Empty
+    );
+    if let Some(trace_id) = current_trace_id() {
+        connection_span.record("trace_id", display(trace_id));
+    }
+    ws.on_upgrade(move |socket| async move {
+        let _guard = connection_span.enter();
+        handle_connection(socket, state).await;
+    })
 }
 
 #[expect(
