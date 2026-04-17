@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::env::{join_paths, split_paths, var_os};
+use std::env::{join_paths, split_paths, var, var_os};
 use std::ffi::OsString;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ use crate::agents::runtime::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
 use crate::setup::wrapper;
-use crate::workspace::dirs_home;
+use crate::workspace::{dirs_home, host_home_dir};
 
 use super::READINESS_TIMEOUT;
 use super::input::{AgentTuiInput, AgentTuiKey};
@@ -58,8 +58,8 @@ pub(crate) fn spawn_agent_tui_process(
 }
 
 pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Result<(), CliError> {
-    let path_env = std::env::var("PATH").unwrap_or_default();
-    wrapper::main(project_dir, &path_env)?;
+    let path_env = var("PATH").unwrap_or_default();
+    wrapper::main_with_home(project_dir, &path_env, &host_home_dir())?;
     let agent = hook_agent_for_runtime_name(runtime).ok_or_else(|| {
         CliErrorKind::workflow_parse(format!("unsupported agent TUI runtime '{runtime}'"))
     })?;
