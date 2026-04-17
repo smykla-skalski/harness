@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "devDependencies": {
-    "@opencode-ai/plugin": "1.4.6",
+    "@opencode-ai/plugin": "1.4.7",
     "@types/node": "25.6.0"
   }
 }
