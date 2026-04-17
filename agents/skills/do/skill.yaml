@@ -1,8 +1,0 @@
-name: do
-description: >-
-  Implement a GitHub issue end to end with worktree isolation, test-first changes,
-  explicit done-bar verification, and final push-and-close hygiene. Use when the
-  user says "do", "implement", "work on", "pick up", "tackle", "close this issue",
-  or provides a GitHub issue number or URL that should be implemented in this
-  repository.
-allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write, Skill
