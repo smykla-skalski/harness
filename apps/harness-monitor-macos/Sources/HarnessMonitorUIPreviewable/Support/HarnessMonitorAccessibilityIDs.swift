@@ -298,6 +298,10 @@ public enum HarnessMonitorAccessibility {
     "harness.session.signal.\(slug(signalID))"
   }
 
+  public static func sessionEmptyState(_ section: String) -> String {
+    "harness.session.empty-state.\(slug(section))"
+  }
+
   public static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
     "harness.sheet.codex-flow.approval.\(slug(approvalID)).\(slug(decision))"
   }

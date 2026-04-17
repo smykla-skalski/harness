@@ -81,12 +81,7 @@ struct SessionCockpitTimelineSection: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if presentation.totalCount == 0 && isTimelineLoading == false {
-        ContentUnavailableView {
-          Label("No activity yet", systemImage: "clock")
-        } description: {
-          Text("Timeline entries appear as agents work on tasks.")
-        }
-        .frame(maxWidth: .infinity)
+        SessionCockpitEmptyStateRow(section: .timeline)
       } else {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
           SessionTimelinePageSummary(

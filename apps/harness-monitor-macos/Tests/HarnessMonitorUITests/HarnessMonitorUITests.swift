@@ -70,6 +70,29 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(signals.exists)
   }
 
+  func testEmptyCockpitShowsSharedEmptyStateRowsAcrossAllSections() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "empty-cockpit"]
+    )
+
+    let tasksEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("tasks"))
+    let agentsEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("agents"))
+    let signalsEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("signals"))
+    let timelineEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("timeline"))
+
+    XCTAssertTrue(tasksEmpty.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(agentsEmpty.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(signalsEmpty.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(timelineEmpty.waitForExistence(timeout: Self.actionTimeout))
+
+    XCTAssertEqual(tasksEmpty.label, "No tasks yet")
+    XCTAssertEqual(agentsEmpty.label, "No agents yet")
+    XCTAssertEqual(signalsEmpty.label, "No signals yet")
+    XCTAssertEqual(timelineEmpty.label, "No activity yet")
+    XCTAssertFalse(element(in: app, identifier: Accessibility.sessionTimelinePagination).exists)
+  }
+
   func testTaskDropCockpitStartsWithoutPreDragFeedback() throws {
     let app = launch(
       mode: "preview",

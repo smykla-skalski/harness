@@ -16,6 +16,7 @@ enum HarnessMonitorAppStoreFactory {
     case dashboardLanding = "dashboard-landing"
     case dashboard
     case cockpit
+    case emptyCockpit = "empty-cockpit"
     case toolbarCountRegression = "toolbar-count-regression"
     case agentTuiOverflow = "agent-tui-overflow"
     case taskDrop = "task-drop"
@@ -41,6 +42,8 @@ enum HarnessMonitorAppStoreFactory {
         .dashboardLoaded
       case .cockpit:
         .cockpitLoaded
+      case .emptyCockpit:
+        .emptyCockpit
       case .toolbarCountRegression:
         .toolbarCountRegression
       case .agentTuiOverflow:

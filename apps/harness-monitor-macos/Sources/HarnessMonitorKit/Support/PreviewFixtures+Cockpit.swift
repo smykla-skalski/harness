@@ -142,6 +142,44 @@ extension PreviewFixtures {
     agentActivity: agentActivity
   )
 
+  public static let emptyCockpitSummary = SessionSummary(
+    projectId: summary.projectId,
+    projectName: summary.projectName,
+    projectDir: summary.projectDir,
+    contextRoot: summary.contextRoot,
+    checkoutId: summary.checkoutId,
+    checkoutRoot: summary.checkoutRoot,
+    isWorktree: summary.isWorktree,
+    worktreeName: summary.worktreeName,
+    sessionId: "sess-harness-empty",
+    title: "Harness Monitor Empty Cockpit",
+    context: "Preview the compact cockpit placeholders without tasks, agents, signals, or timeline activity.",
+    status: .active,
+    createdAt: "2026-03-28T14:05:00Z",
+    updatedAt: "2026-03-28T14:20:00Z",
+    lastActivityAt: nil,
+    leaderId: nil,
+    observeId: nil,
+    pendingLeaderTransfer: nil,
+    metrics: SessionMetrics(
+      agentCount: 0,
+      activeAgentCount: 0,
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      completedTaskCount: 0
+    )
+  )
+
+  public static let emptyCockpitDetail = sessionDetail(
+    session: emptyCockpitSummary,
+    agents: [],
+    tasks: [],
+    signals: [],
+    observer: nil,
+    agentActivity: []
+  )
+
   public static let timeline = [
     TimelineEntry(
       entryId: "codex-worker-codex-tool-result-4",
