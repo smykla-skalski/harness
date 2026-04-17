@@ -87,6 +87,22 @@ extension HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  func recoverManagedBootstrapFailure(from error: any Error) async -> Bool {
+    startManifestWatcher()
+
+    if let client = try? await daemonController.bootstrapClient() {
+      await connect(using: client)
+      return true
+    }
+
+    let message = error.localizedDescription
+    markConnectionOffline(message)
+    presentFailureFeedback(message)
+    await restorePersistedSessionState()
+    return false
+  }
+
   func applyLaunchAgentOfflineState(reason: String) async {
     let launchAgent = await daemonController.launchAgentSnapshot()
     daemonStatus = DaemonStatusReport(
@@ -141,10 +157,10 @@ extension HarnessMonitorStore {
       let client = try await awaitManagedDaemonWarmUpWithRecovery()
       await connect(using: client)
     } catch {
-      markConnectionOffline(error.localizedDescription)
-      presentFailureFeedback(error.localizedDescription)
-      startManifestWatcher()
-      await restorePersistedSessionState()
+      let recovered = await recoverManagedBootstrapFailure(from: error)
+      guard !recovered else {
+        return
+      }
     }
   }
 
@@ -200,10 +216,25 @@ extension HarnessMonitorStore {
     }
   }
 
+  func replayQueuedReconnectAfterBootstrapIfNeeded() {
+    guard reconnectRequestedDuringReconnect, isReconnecting == false else {
+      return
+    }
+
+    reconnectRequestedDuringReconnect = false
+    appendConnectionEvent(
+      kind: .reconnecting,
+      detail: "Replaying daemon reconnect request queued during bootstrap"
+    )
+    Task { @MainActor [weak self] in
+      await self?.reconnect()
+    }
+  }
+
   public func reconnect() async {
     // If a bootstrap is already running (e.g. the watcher fired mid-warm-up
-    // in external mode), record the request so bootstrap can replay it and
-    // return; avoids re-entering bootstrap from the MainActor hop.
+    // in external mode), record the request so the current bootstrap/reconnect
+    // pass can replay it after settling; avoids re-entering from the MainActor hop.
     if isBootstrapping || isReconnecting {
       reconnectRequestedDuringReconnect = true
       return
@@ -225,12 +256,12 @@ extension HarnessMonitorStore {
       hasBootstrapped = true
       await bootstrap()
 
-      guard reconnectRequestedDuringReconnect, connectionState != .online else {
+      guard reconnectRequestedDuringReconnect else {
         break
       }
       // A manifest change was detected during bootstrap - the attempt above
-      // likely used a stale endpoint. Give the daemon a moment to accept
-      // connections on the new port before retrying.
+      // may have used a stale endpoint or missed a later reconnect request.
+      // Give the daemon a moment to accept connections on the new port before retrying.
       try? await Task.sleep(for: .milliseconds(500))
     } while true
 
