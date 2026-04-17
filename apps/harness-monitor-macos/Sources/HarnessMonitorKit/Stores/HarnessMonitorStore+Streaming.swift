@@ -8,6 +8,9 @@ extension HarnessMonitorStore {
 
   func startGlobalStream(using client: any HarnessMonitorClientProtocol) {
     stopGlobalStream()
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     globalStreamTask = Task { @MainActor [weak self] in
       guard let self else {
         return
@@ -54,6 +57,10 @@ extension HarnessMonitorStore {
   }
 
   func startSessionStream(using client: any HarnessMonitorClientProtocol, sessionID: String) {
+    guard maintainsLiveDaemonObservation else {
+      stopSessionStream()
+      return
+    }
     subscribedSessionIDs = [sessionID]
     stopSessionStream(resetSubscriptions: false)
     sessionStreamTask = Task { @MainActor [weak self] in
@@ -251,6 +258,9 @@ extension HarnessMonitorStore {
 
   func startManifestWatcher() {
     stopManifestWatcher()
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     let daemonRoot = manifestURL.deletingLastPathComponent()
     // The dispatch source opens the daemon directory; create it first so the
     // watcher still starts when the dev daemon has never run yet. This is

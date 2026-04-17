@@ -124,6 +124,26 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.timeline == PreviewFixtures.timeline)
   }
 
+  @Test("Preview daemon bootstrap skips live connection telemetry")
+  func previewDaemonBootstrapSkipsLiveConnectionTelemetry() async {
+    let store = HarnessMonitorStore(
+      daemonController: PreviewDaemonController(mode: .populated)
+    )
+
+    await store.bootstrapIfNeeded()
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.connectionState == .online)
+    #expect(store.connectionEvents.isEmpty)
+    #expect(store.connectionMetrics.connectedSince == nil)
+    #expect(store.connectionMetrics.messagesReceived == 0)
+    #expect(store.connectionMetrics.messagesSent == 0)
+    #expect(store.manifestWatcher == nil)
+    #expect(store.connectionProbeTask == nil)
+    #expect(store.globalStreamTask == nil)
+    #expect(store.sessionStreamTask == nil)
+  }
+
   @Test("Dashboard landing preview bootstraps without auto-selecting a session")
   func dashboardLandingPreviewBootstrapsWithoutAutoSelectingSession() async {
     let store = HarnessMonitorStore(
