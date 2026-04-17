@@ -10,11 +10,6 @@
       "source": "./harness"
     },
     {
-      "description": "Harness session observer and classifier",
-      "name": "observe",
-      "source": "./observe"
-    },
-    {
       "description": "Harness suite create and execution",
       "name": "suite",
       "source": "./suite"

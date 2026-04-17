@@ -101,7 +101,7 @@ Derived surfaces maintained by `scripts/version.sh`:
 Additional version notes:
 
 - `.claude/plugins/suite/.claude-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
-- `.claude/plugins/observe/.claude-plugin/plugin.json` - bump only when observe plugin content changes (SKILL.md, agent config, references); harness-only changes do not require a plugin version bump
+- `.claude/plugins/harness/.claude-plugin/plugin.json` - bump only when harness plugin content changes (SKILL.md, agent config, references); harness-only changes do not require a plugin version bump
 - `src/observe/output.rs` sources the SARIF `driver.version` from `env!("CARGO_PKG_VERSION")`; do not replace that with a manual version string
 - `src/bootstrap.rs` - update only versioned plugin fixtures and cache-path expectations in tests when they intentionally track the released version; this file consumes the plugin version but is not a canonical version source
 - `src/cli.rs` uses Clap's derived `version`, so it follows the root `Cargo.toml` version automatically and should not get a manual version string
