@@ -74,6 +74,30 @@ targets:
       configs:
         Preview:
           ENABLE_MODULE_VERIFIER: NO
+  HarnessMonitorUIPreviewable:
+    type: framework
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessMonitorUIPreviewable
+    dependencies:
+      - target: HarnessMonitorKit
+      - package: Textual
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: Q498EB36N4
+        ENABLE_MODULE_VERIFIER: YES
+        MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
+        MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS: "gnu17 gnu++20"
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.ui.previewable
+      configs:
+        Preview:
+          COMPILER_INDEX_STORE_ENABLE: NO
+          ENABLE_MODULE_VERIFIER: NO
+          ONLY_ACTIVE_ARCH: YES
+          SWIFT_ENABLE_EAGER_LINKING: NO
   HarnessMonitorUI:
     type: framework
     platform: macOS
@@ -82,6 +106,7 @@ targets:
       - Sources/HarnessMonitorUI
     dependencies:
       - target: HarnessMonitorKit
+      - target: HarnessMonitorUIPreviewable
       - package: Textual
     settings:
       base:
@@ -106,6 +131,7 @@ targets:
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
+      - target: HarnessMonitorUIPreviewable
       - package: Lottie
     postBuildScripts:
       - name: Bundle Daemon Agent
@@ -286,6 +312,7 @@ targets:
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUI
+      - target: HarnessMonitorUIPreviewable
       - package: Lottie
     postBuildScripts:
       - name: Bundle Daemon Agent
@@ -515,6 +542,7 @@ schemes:
         HarnessMonitor: all
         HarnessMonitorKit: all
         HarnessMonitorUI: all
+        HarnessMonitorUIPreviewable: all
     test:
       gatherCoverageData: true
       environmentVariables:
@@ -530,6 +558,7 @@ schemes:
         HarnessMonitor: all
         HarnessMonitorKit: all
         HarnessMonitorUI: all
+        HarnessMonitorUIPreviewable: all
     run:
       environmentVariables:
         - variable: HARNESS_MONITOR_EXTERNAL_DAEMON
@@ -538,11 +567,23 @@ schemes:
         - variable: HARNESS_BOOTSTRAP_TIMEOUT_SECONDS
           value: "60"
           isEnabled: true
+  HarnessMonitorUIPreviewable:
+    build:
+      config: Preview
+      targets:
+        HarnessMonitorUIPreviewable: all
+    run:
+      config: Preview
+    test:
+      config: Preview
+    analyze:
+      config: Preview
   HarnessMonitorUIPreviews:
     build:
       config: Preview
       targets:
         HarnessMonitorUI: all
+        HarnessMonitorUIPreviewable: all
     run:
       config: Preview
     test:
