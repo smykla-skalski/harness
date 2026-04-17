@@ -90,10 +90,10 @@ run_once() {
   local classification="unknown"
   local stderr_file="$OUT_DIR/$entry_id.stderr"
   started=$(date +%s)
-  if xcode-cli preview "$entry_file" \
+  if (cd "$PROJECT_DIR" && xcode-cli preview "$entry_file" \
       --index "$entry_index" \
       --render-timeout "$TIMEOUT" \
-      --out "$png_path" \
+      --out "$png_path") \
       > "$stderr_file" 2>&1; then
     rc=0
   else
