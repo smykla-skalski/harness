@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct ContentFloatingOverlay: View {

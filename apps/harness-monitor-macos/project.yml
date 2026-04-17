@@ -83,6 +83,7 @@ targets:
     dependencies:
       - target: HarnessMonitorKit
       - package: Textual
+      - sdk: SwiftData.framework
     settings:
       base:
         CODE_SIGN_STYLE: Automatic

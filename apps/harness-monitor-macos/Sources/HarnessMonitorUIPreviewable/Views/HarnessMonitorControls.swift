@@ -208,30 +208,30 @@ private enum HarnessMonitorProminentButtonContrast {
 }
 
 extension View {
-  func harnessActionButtonStyle(
+  public func harnessActionButtonStyle(
     variant: HarnessMonitorAsyncActionButton.Variant,
     tint: Color? = nil
   ) -> some View {
     modifier(HarnessMonitorActionButtonStyleModifier(variant: variant, tint: tint))
   }
 
-  func harnessAccessoryButtonStyle(
+  public func harnessAccessoryButtonStyle(
     tint: Color = .secondary
   ) -> some View {
     modifier(HarnessMonitorAccessoryButtonStyle(tint: tint))
   }
 
-  func harnessFlatActionButtonStyle(
+  public func harnessFlatActionButtonStyle(
     tint: Color = HarnessMonitorTheme.controlBorder
   ) -> some View {
     buttonStyle(HarnessMonitorFlatActionButtonStyle(tint: tint))
   }
 
-  func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
+  public func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
     modifier(HarnessMonitorFilterChipStyle(isSelected: isSelected))
   }
 
-  func harnessDismissButtonStyle() -> some View {
+  public func harnessDismissButtonStyle() -> some View {
     modifier(HarnessMonitorSystemButtonChromeModifier(style: .borderless, tint: nil))
   }
 }

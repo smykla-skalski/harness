@@ -1,23 +1,23 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct HarnessInlineActionButton: View {
-  typealias Action = HarnessMonitorActionButton.Action
+public struct HarnessInlineActionButton: View {
+  public typealias Action = HarnessMonitorActionButton.Action
 
-  let title: String
-  let actionID: InspectorActionID
-  let store: HarnessMonitorStore
-  let variant: HarnessMonitorAsyncActionButton.Variant
-  let tint: Color?
-  let isExternallyDisabled: Bool
-  let accessibilityIdentifier: String?
-  let help: String
-  let action: Action
+  public let title: String
+  public let actionID: InspectorActionID
+  public let store: HarnessMonitorStore
+  public let variant: HarnessMonitorAsyncActionButton.Variant
+  public let tint: Color?
+  public let isExternallyDisabled: Bool
+  public let accessibilityIdentifier: String?
+  public let help: String
+  public let action: Action
 
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
-  init(
+  public init(
     title: String,
     actionID: InspectorActionID,
     store: HarnessMonitorStore,
@@ -47,7 +47,7 @@ struct HarnessInlineActionButton: View {
     store.inFlightActionID != nil && !isLoading
   }
 
-  var body: some View {
+  public var body: some View {
     Button(action: action) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         if isLoading {

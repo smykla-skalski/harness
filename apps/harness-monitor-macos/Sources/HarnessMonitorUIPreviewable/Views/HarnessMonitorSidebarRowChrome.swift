@@ -67,14 +67,14 @@ private struct SidebarRowHoverModifier: ViewModifier {
 }
 
 extension View {
-  func harnessSidebarRowButtonStyle(
+  public func harnessSidebarRowButtonStyle(
     cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusLG,
     tint: Color = HarnessMonitorTheme.accent
   ) -> some View {
     modifier(SidebarRowHoverModifier(cornerRadius: cornerRadius, tint: tint))
   }
 
-  func harnessSidebarDisclosureButtonStyle(
+  public func harnessSidebarDisclosureButtonStyle(
     cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusLG,
     tint: Color = HarnessMonitorTheme.accent
   ) -> some View {

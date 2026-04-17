@@ -12,7 +12,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
 
   public var id: String { rawValue }
 
-  var title: String {
+  public var title: String {
     switch self {
     case .general: "General"
     case .appearance: "Appearance"
@@ -25,7 +25,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     }
   }
 
-  var systemImage: String {
+  public var systemImage: String {
     switch self {
     case .general: "gearshape"
     case .appearance: "paintbrush"
@@ -39,11 +39,11 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   }
 }
 
-enum PreferencesChromeMetrics {
-  static let sidebarMinWidth: CGFloat = 200
-  static let sidebarIdealWidth: CGFloat = 210
-  static let sidebarMaxWidth: CGFloat = 240
-  static let sidebarMinRowHeight: CGFloat = 30
+public enum PreferencesChromeMetrics {
+  public static let sidebarMinWidth: CGFloat = 200
+  public static let sidebarIdealWidth: CGFloat = 210
+  public static let sidebarMaxWidth: CGFloat = 240
+  public static let sidebarMinRowHeight: CGFloat = 30
 }
 
 struct PreferencesDetailFormModifier: ViewModifier {
@@ -58,16 +58,20 @@ extension View {
   }
 }
 
-struct PreferencesSidebarList: View {
-  @Binding var selection: PreferencesSection
+public struct PreferencesSidebarList: View {
+  @Binding public var selection: PreferencesSection
   @Environment(\.fontScale)
   private var fontScale
+
+  public init(selection: Binding<PreferencesSection>) {
+    _selection = selection
+  }
 
   private var rowPadding: CGFloat {
     HarnessMonitorTheme.spacingXS * fontScale
   }
 
-  var body: some View {
+  public var body: some View {
     List(PreferencesSection.allCases, selection: $selection) { section in
       Label(section.title, systemImage: section.systemImage)
         .scaledFont(.body)

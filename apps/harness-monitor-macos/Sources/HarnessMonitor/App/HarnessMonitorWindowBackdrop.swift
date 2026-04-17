@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorUI
+import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct HarnessMonitorWindowBackdropModifier: ViewModifier {

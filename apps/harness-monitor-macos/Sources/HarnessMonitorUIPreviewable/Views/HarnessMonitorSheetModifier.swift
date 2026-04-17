@@ -1,11 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct HarnessMonitorSheetModifier: ViewModifier {
-  let store: HarnessMonitorStore
-  let shellUI: HarnessMonitorStore.ContentShellSlice
+public struct HarnessMonitorSheetModifier: ViewModifier {
+  public let store: HarnessMonitorStore
+  public let shellUI: HarnessMonitorStore.ContentShellSlice
 
-  func body(content: Content) -> some View {
+  public init(store: HarnessMonitorStore, shellUI: HarnessMonitorStore.ContentShellSlice) {
+    self.store = store
+    self.shellUI = shellUI
+  }
+
+  public func body(content: Content) -> some View {
     content
       .sheet(
         item: Binding(

@@ -1,8 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct ObserverInspectorCard: View {
-  let observer: ObserverSummary
+public struct ObserverInspectorCard: View {
+  public let observer: ObserverSummary
+
+  public init(observer: ObserverSummary) {
+    self.observer = observer
+  }
 
   private var facts: [InspectorFact] {
     [
@@ -15,7 +19,7 @@ struct ObserverInspectorCard: View {
     ]
   }
 
-  var body: some View {
+  public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text("Observe")
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))

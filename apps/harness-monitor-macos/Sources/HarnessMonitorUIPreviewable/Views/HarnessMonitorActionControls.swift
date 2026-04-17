@@ -1,17 +1,17 @@
 import SwiftUI
 
-struct HarnessMonitorActionButton: View {
-  typealias Action = @MainActor @Sendable () -> Void
-  typealias Variant = HarnessMonitorAsyncActionButton.Variant
+public struct HarnessMonitorActionButton: View {
+  public typealias Action = @MainActor @Sendable () -> Void
+  public typealias Variant = HarnessMonitorAsyncActionButton.Variant
 
-  let title: String
-  let tint: Color?
-  let variant: Variant
-  let accessibilityIdentifier: String
-  let fillsWidth: Bool
-  let action: Action
+  public let title: String
+  public let tint: Color?
+  public let variant: Variant
+  public let accessibilityIdentifier: String
+  public let fillsWidth: Bool
+  public let action: Action
 
-  init(
+  public init(
     title: String,
     tint: Color? = nil,
     variant: Variant,
@@ -27,7 +27,7 @@ struct HarnessMonitorActionButton: View {
     self.action = action
   }
 
-  var body: some View {
+  public var body: some View {
     Button {
       action()
     } label: {
@@ -46,27 +46,27 @@ struct HarnessMonitorActionButton: View {
   }
 }
 
-struct HarnessMonitorAsyncActionButton: View {
-  typealias Action = @MainActor @Sendable () async -> Void
+public struct HarnessMonitorAsyncActionButton: View {
+  public typealias Action = @MainActor @Sendable () async -> Void
 
-  enum Variant: Equatable {
+  public enum Variant: Equatable {
     case prominent
     case bordered
     case borderless
   }
 
-  let title: String
-  let tint: Color?
-  let variant: Variant
-  let isLoading: Bool
-  let accessibilityIdentifier: String
-  let fillsWidth: Bool
-  let action: Action
+  public let title: String
+  public let tint: Color?
+  public let variant: Variant
+  public let isLoading: Bool
+  public let accessibilityIdentifier: String
+  public let fillsWidth: Bool
+  public let action: Action
   @State private var runningTask: Task<Void, Never>?
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
-  init(
+  public init(
     title: String,
     tint: Color? = nil,
     variant: Variant,
@@ -92,7 +92,7 @@ struct HarnessMonitorAsyncActionButton: View {
     isLoading ? .secondary : tint
   }
 
-  var body: some View {
+  public var body: some View {
     Button {
       if isLoading {
         cancelAction()

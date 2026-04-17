@@ -34,7 +34,7 @@ public enum HarnessMonitorTextSize {
     return scaledFont(font, by: scale(at: index))
   }
 
-  static func scaledFont(_ font: Font, by scale: CGFloat) -> Font {
+  public static func scaledFont(_ font: Font, by scale: CGFloat) -> Font {
     scale == 1.0 ? font : font.scaled(by: scale)
   }
 
@@ -141,15 +141,15 @@ private struct HarnessMonitorFormContainerModifier: ViewModifier {
 }
 
 extension View {
-  func scaledFont(_ font: Font) -> some View {
+  public func scaledFont(_ font: Font) -> some View {
     modifier(ScaledFontModifier(font: font))
   }
 
-  func harnessNativeFormControl() -> some View {
+  public func harnessNativeFormControl() -> some View {
     modifier(HarnessMonitorNativeFormControlModifier())
   }
 
-  func harnessNativeFormContainer() -> some View {
+  public func harnessNativeFormContainer() -> some View {
     modifier(HarnessMonitorFormContainerModifier())
   }
 }

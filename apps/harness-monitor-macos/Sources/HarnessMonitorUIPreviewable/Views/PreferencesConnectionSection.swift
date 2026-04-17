@@ -1,15 +1,31 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesConnectionSection: View {
-  let connectionState: HarnessMonitorStore.ConnectionState
-  let isDiagnosticsRefreshInFlight: Bool
-  let metrics: ConnectionMetrics
-  let events: [ConnectionEvent]
-  let reconnect: @MainActor @Sendable () async -> Void
-  let refreshDiagnostics: @MainActor @Sendable () async -> Void
+public struct PreferencesConnectionSection: View {
+  public let connectionState: HarnessMonitorStore.ConnectionState
+  public let isDiagnosticsRefreshInFlight: Bool
+  public let metrics: ConnectionMetrics
+  public let events: [ConnectionEvent]
+  public let reconnect: @MainActor @Sendable () async -> Void
+  public let refreshDiagnostics: @MainActor @Sendable () async -> Void
 
-  var body: some View {
+  public init(
+    connectionState: HarnessMonitorStore.ConnectionState,
+    isDiagnosticsRefreshInFlight: Bool,
+    metrics: ConnectionMetrics,
+    events: [ConnectionEvent],
+    reconnect: @escaping @MainActor @Sendable () async -> Void,
+    refreshDiagnostics: @escaping @MainActor @Sendable () async -> Void
+  ) {
+    self.connectionState = connectionState
+    self.isDiagnosticsRefreshInFlight = isDiagnosticsRefreshInFlight
+    self.metrics = metrics
+    self.events = events
+    self.reconnect = reconnect
+    self.refreshDiagnostics = refreshDiagnostics
+  }
+
+  public var body: some View {
     Form {
       Section("Actions") {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {

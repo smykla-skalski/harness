@@ -1,8 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesDatabaseSection: View {
-  let store: HarnessMonitorStore
+public struct PreferencesDatabaseSection: View {
+  public let store: HarnessMonitorStore
+  public init(store: HarnessMonitorStore) {
+    self.store = store
+  }
+
   @State private var databaseStats: DatabaseStatistics?
   @State private var isLoadingStats = false
   @State private var isClearCacheConfirmationPresented = false
@@ -10,7 +14,7 @@ struct PreferencesDatabaseSection: View {
   @State private var isClearAllConfirmationPresented = false
   @State private var selectedStatisticsTab: StatisticsTab = .cache
 
-  var body: some View {
+  public var body: some View {
     Form {
       statisticsSection
       operationsSection

@@ -1,10 +1,14 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct HarnessMonitorFeedbackToastView: View {
-  let toast: ToastSlice
+public struct HarnessMonitorFeedbackToastView: View {
+  public let toast: ToastSlice
 
-  var body: some View {
+  public init(toast: ToastSlice) {
+    self.toast = toast
+  }
+
+  public var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingSM) {
       VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(toast.activeFeedback) { feedback in

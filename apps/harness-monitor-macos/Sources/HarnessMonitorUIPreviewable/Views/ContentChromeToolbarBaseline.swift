@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum ToolbarBaselineRegion: Hashable {
+public enum ToolbarBaselineRegion: Hashable, Sendable {
   case sidebar
 }
 
@@ -78,11 +78,11 @@ private struct ToolbarBaselineDivider: View {
 }
 
 extension View {
-  func toolbarBaselineFrame(_ region: ToolbarBaselineRegion) -> some View {
+  public func toolbarBaselineFrame(_ region: ToolbarBaselineRegion) -> some View {
     modifier(ToolbarBaselineFrameModifier(region: region))
   }
 
-  func toolbarBaselineOverlay() -> some View {
+  public func toolbarBaselineOverlay() -> some View {
     modifier(ToolbarBaselineOverlayModifier())
   }
 }

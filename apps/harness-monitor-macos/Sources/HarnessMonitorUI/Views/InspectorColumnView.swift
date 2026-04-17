@@ -1,4 +1,6 @@
 import HarnessMonitorKit
+import HarnessMonitorUIPreviewable
+import SwiftData
 import SwiftUI
 
 private enum InspectorChromeMetrics {

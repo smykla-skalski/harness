@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 
 @MainActor
-enum PreferencesPreviewSupport {
-  static let recentEvents = [
+public enum PreferencesPreviewSupport {
+  public static let recentEvents = [
     DaemonAuditEvent(
       recordedAt: "2026-03-31T12:08:43Z",
       level: "info",
@@ -20,7 +20,7 @@ enum PreferencesPreviewSupport {
     ),
   ]
 
-  static func makeStore(
+  public static func makeStore(
     scenario: HarnessMonitorPreviewStoreFactory.Scenario = .cockpitLoaded,
     events: [DaemonAuditEvent] = Self.recentEvents,
     previewFeedback: PreviewFeedback? = nil
@@ -56,7 +56,7 @@ enum PreferencesPreviewSupport {
     return store
   }
 
-  enum PreviewFeedback {
+  public enum PreviewFeedback {
     case success(String)
     case failure(String)
   }

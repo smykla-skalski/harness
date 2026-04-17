@@ -1,14 +1,28 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SidebarSessionListLinkRow: View, Equatable {
-  let session: SessionSummary
-  let presentation: HarnessMonitorStore.SessionSummaryPresentation
-  let isBookmarked: Bool
-  let lastActivityText: String
-  let fontScale: CGFloat
+public struct SidebarSessionListLinkRow: View, Equatable {
+  public let session: SessionSummary
+  public let presentation: HarnessMonitorStore.SessionSummaryPresentation
+  public let isBookmarked: Bool
+  public let lastActivityText: String
+  public let fontScale: CGFloat
 
-  var body: some View {
+  public init(
+    session: SessionSummary,
+    presentation: HarnessMonitorStore.SessionSummaryPresentation,
+    isBookmarked: Bool,
+    lastActivityText: String,
+    fontScale: CGFloat
+  ) {
+    self.session = session
+    self.presentation = presentation
+    self.isBookmarked = isBookmarked
+    self.lastActivityText = lastActivityText
+    self.fontScale = fontScale
+  }
+
+  public var body: some View {
     SidebarSessionRow(
       session: session,
       presentation: presentation,
@@ -21,7 +35,7 @@ struct SidebarSessionListLinkRow: View, Equatable {
     .contentShape(Rectangle())
   }
 
-  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+  public nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.session == rhs.session
       && lhs.presentation == rhs.presentation
       && lhs.isBookmarked == rhs.isBookmarked
@@ -30,12 +44,18 @@ struct SidebarSessionListLinkRow: View, Equatable {
   }
 }
 
-struct SidebarEmptyState: View {
-  let title: String
-  let systemImage: String
-  let message: String
+public struct SidebarEmptyState: View {
+  public let title: String
+  public let systemImage: String
+  public let message: String
 
-  var body: some View {
+  public init(title: String, systemImage: String, message: String) {
+    self.title = title
+    self.systemImage = systemImage
+    self.message = message
+  }
+
+  public var body: some View {
     VStack {
       ContentUnavailableView {
         Label(title, systemImage: systemImage)

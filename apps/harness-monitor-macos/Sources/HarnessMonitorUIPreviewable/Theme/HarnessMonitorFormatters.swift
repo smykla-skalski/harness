@@ -132,12 +132,12 @@ extension EnvironmentValues {
 }()
 
 @MainActor
-func formatTimestamp(_ value: String?) -> String {
+public func formatTimestamp(_ value: String?) -> String {
   formatTimestamp(value, configuration: .stored())
 }
 
 @MainActor
-func formatTimestamp(
+public func formatTimestamp(
   _ value: String?,
   configuration: HarnessMonitorDateTimeConfiguration
 ) -> String {
@@ -149,7 +149,7 @@ func formatTimestamp(
 }
 
 @MainActor
-func formatTimestamp(_ date: Date) -> String {
+public func formatTimestamp(_ date: Date) -> String {
   formatTimestamp(date, configuration: .stored())
 }
 
@@ -182,7 +182,7 @@ func formatTimestamp(_ date: Date) -> String {
 }()
 
 @MainActor
-func formatTimestamp(
+public func formatTimestamp(
   _ date: Date,
   configuration: HarnessMonitorDateTimeConfiguration
 ) -> String {
@@ -196,7 +196,7 @@ func formatTimestamp(
 }
 
 @MainActor
-func formatTimelineTimestamp(
+public func formatTimelineTimestamp(
   _ date: Date,
   configuration: HarnessMonitorDateTimeConfiguration
 ) -> String {
@@ -213,7 +213,7 @@ func formatTimelineTimestamp(
 }
 
 @MainActor
-func formatTimelineTimestamp(
+public func formatTimelineTimestamp(
   _ value: String?,
   configuration: HarnessMonitorDateTimeConfiguration
 ) -> String {
@@ -233,7 +233,7 @@ private func parsedTimestampDate(from value: String) -> Date? {
 private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path(
   percentEncoded: false)
 
-func abbreviateHomePath(_ path: String) -> String {
+public func abbreviateHomePath(_ path: String) -> String {
   if path.hasPrefix(homeDirectory) {
     return "~/" + path.dropFirst(homeDirectory.count)
   }

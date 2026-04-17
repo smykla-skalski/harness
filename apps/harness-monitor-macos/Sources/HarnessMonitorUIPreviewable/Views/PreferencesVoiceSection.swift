@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesVoiceSection: View {
+public struct PreferencesVoiceSection: View {
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey)
   private var localeIdentifier = HarnessMonitorVoicePreferences.defaultLocaleIdentifier
   @AppStorage(HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey)
@@ -23,6 +23,8 @@ struct PreferencesVoiceSection: View {
   private var pendingTranscriptSegmentLimit =
     HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
   @State private var localeAvailabilityState: VoiceLocaleAvailabilityState = .checking
+
+  public init() {}
 
   private var preferences: HarnessMonitorVoicePreferences {
     HarnessMonitorVoicePreferences(
@@ -63,7 +65,7 @@ struct PreferencesVoiceSection: View {
     )
   }
 
-  var body: some View {
+  public var body: some View {
     Form {
       PreferencesVoiceTranscriptionSection(
         localeIdentifier: $localeIdentifier,

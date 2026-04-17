@@ -1,14 +1,28 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SidebarToolbarFilterMenu: View {
-  let store: HarnessMonitorStore
-  let sessionFilter: HarnessMonitorStore.SessionFilter
-  let sessionFocusFilter: SessionFocusFilter
-  let sessionSortOrder: SessionSortOrder
-  let hasActiveFilters: Bool
+public struct SidebarToolbarFilterMenu: View {
+  public let store: HarnessMonitorStore
+  public let sessionFilter: HarnessMonitorStore.SessionFilter
+  public let sessionFocusFilter: SessionFocusFilter
+  public let sessionSortOrder: SessionSortOrder
+  public let hasActiveFilters: Bool
 
-  var body: some View {
+  public init(
+    store: HarnessMonitorStore,
+    sessionFilter: HarnessMonitorStore.SessionFilter,
+    sessionFocusFilter: SessionFocusFilter,
+    sessionSortOrder: SessionSortOrder,
+    hasActiveFilters: Bool
+  ) {
+    self.store = store
+    self.sessionFilter = sessionFilter
+    self.sessionFocusFilter = sessionFocusFilter
+    self.sessionSortOrder = sessionSortOrder
+    self.hasActiveFilters = hasActiveFilters
+  }
+
+  public var body: some View {
     Menu {
       Section("Status") {
         ForEach(HarnessMonitorStore.SessionFilter.allCases) { filter in

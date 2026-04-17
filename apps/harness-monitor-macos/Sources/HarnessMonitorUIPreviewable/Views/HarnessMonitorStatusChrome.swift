@@ -185,11 +185,11 @@ struct HarnessMonitorBadge: View {
 }
 
 extension View {
-  func liveActivityBorder(isActive: Bool) -> some View {
+  public func liveActivityBorder(isActive: Bool) -> some View {
     modifier(LiveActivityBorderModifier(isActive: isActive))
   }
 
-  func harnessSelectionOutline(
+  public func harnessSelectionOutline(
     isSelected: Bool,
     cornerRadius: CGFloat,
     lineWidth: CGFloat = 1.5
@@ -203,21 +203,21 @@ extension View {
     )
   }
 
-  func harnessContentPill(tint: Color = HarnessMonitorTheme.ink) -> some View {
+  public func harnessContentPill(tint: Color = HarnessMonitorTheme.ink) -> some View {
     modifier(HarnessMonitorContentPillModifier(tint: tint))
   }
 
-  func harnessControlPill(tint: Color = HarnessMonitorTheme.ink) -> some View {
+  public func harnessControlPill(tint: Color = HarnessMonitorTheme.ink) -> some View {
     modifier(HarnessMonitorControlPillModifier(tint: tint))
   }
 
-  func harnessPillPadding() -> some View {
+  public func harnessPillPadding() -> some View {
     self
       .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
       .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
   }
 
-  func harnessCellPadding() -> some View {
+  public func harnessCellPadding() -> some View {
     self
       .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
       .padding(.vertical, HarnessMonitorTheme.itemSpacing)

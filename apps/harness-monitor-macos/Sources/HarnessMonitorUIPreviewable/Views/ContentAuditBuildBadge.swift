@@ -1,21 +1,51 @@
 import SwiftUI
 
-struct AuditBuildDisplayState {
-  let auditRunID: String
-  let auditLabel: String
-  let launchMode: String
-  let perfScenario: String
-  let previewScenario: String
-  let buildCommit: String
-  let buildDirty: String
-  let buildFingerprint: String
-  let buildStartedAtUTC: String
-  let expectedCommit: String?
-  let expectedDirty: String?
-  let expectedFingerprint: String?
-  let expectedBuildStartedAtUTC: String?
+public struct AuditBuildDisplayState {
+  public let auditRunID: String
+  public let auditLabel: String
+  public let launchMode: String
+  public let perfScenario: String
+  public let previewScenario: String
+  public let buildCommit: String
+  public let buildDirty: String
+  public let buildFingerprint: String
+  public let buildStartedAtUTC: String
+  public let expectedCommit: String?
+  public let expectedDirty: String?
+  public let expectedFingerprint: String?
+  public let expectedBuildStartedAtUTC: String?
 
-  var status: String {
+  public init(
+    auditRunID: String,
+    auditLabel: String,
+    launchMode: String,
+    perfScenario: String,
+    previewScenario: String,
+    buildCommit: String,
+    buildDirty: String,
+    buildFingerprint: String,
+    buildStartedAtUTC: String,
+    expectedCommit: String?,
+    expectedDirty: String?,
+    expectedFingerprint: String?,
+    expectedBuildStartedAtUTC: String?
+  ) {
+    self.auditRunID = auditRunID
+    self.auditLabel = auditLabel
+    self.launchMode = launchMode
+    self.perfScenario = perfScenario
+    self.previewScenario = previewScenario
+    self.buildCommit = buildCommit
+    self.buildDirty = buildDirty
+    self.buildFingerprint = buildFingerprint
+    self.buildStartedAtUTC = buildStartedAtUTC
+    self.expectedCommit = expectedCommit
+    self.expectedDirty = expectedDirty
+    self.expectedFingerprint = expectedFingerprint
+    self.expectedBuildStartedAtUTC = expectedBuildStartedAtUTC
+  }
+
+  public var status: String {
     guard let expectedCommit, let expectedDirty, let expectedFingerprint else {
       return "bundle-only"
     }
@@ -29,7 +59,7 @@ struct AuditBuildDisplayState {
     return "match"
   }
 
-  var showsVisibleBadge: Bool {
+  public var showsVisibleBadge: Bool {
     auditRunID != "none"
       || auditLabel != "none"
       || expectedFingerprint != nil
@@ -72,7 +102,7 @@ struct AuditBuildDisplayState {
       .joined(separator: "  ")
   }
 
-  var accessibilityValue: String {
+  public var accessibilityValue: String {
     [
       "auditRunID=\(auditRunID)",
       "auditLabel=\(auditLabel)",
@@ -111,10 +141,14 @@ struct AuditBuildDisplayState {
   }
 }
 
-struct AuditBuildBadge: View {
-  let state: AuditBuildDisplayState
+public struct AuditBuildBadge: View {
+  public let state: AuditBuildDisplayState
 
-  var body: some View {
+  public init(state: AuditBuildDisplayState) {
+    self.state = state
+  }
+
+  public var body: some View {
     VStack(alignment: .trailing, spacing: 2) {
       Text(state.badgeTitle)
         .font(.caption.weight(.semibold))

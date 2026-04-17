@@ -1,10 +1,14 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesHostBridgeSection: View {
-  let store: HarnessMonitorStore
+public struct PreferencesHostBridgeSection: View {
+  public let store: HarnessMonitorStore
   @State private var pendingForcedDisableCapability: String?
   @State private var pendingForcedDisableMessage = ""
+
+  public init(store: HarnessMonitorStore) {
+    self.store = store
+  }
 
   private var manifest: DaemonManifest? {
     store.daemonStatus?.manifest
@@ -19,7 +23,7 @@ struct PreferencesHostBridgeSection: View {
     return Array(Set(builtIns).union(hostBridge.capabilities.keys)).sorted()
   }
 
-  var body: some View {
+  public var body: some View {
     Form {
       Section("Host Bridge") {
         LabeledContent("Status") {

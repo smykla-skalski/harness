@@ -1,13 +1,31 @@
 import SwiftUI
 
-struct PreferencesDiagnosticsPaths {
-  let launchAgentPath: String
-  let launchAgentDomain: String?
-  let launchAgentService: String?
-  let manifestPath: String
-  let authTokenPath: String
-  let eventsPath: String
-  let databasePath: String
+public struct PreferencesDiagnosticsPaths {
+  public let launchAgentPath: String
+  public let launchAgentDomain: String?
+  public let launchAgentService: String?
+  public let manifestPath: String
+  public let authTokenPath: String
+  public let eventsPath: String
+  public let databasePath: String
+
+  public init(
+    launchAgentPath: String,
+    launchAgentDomain: String?,
+    launchAgentService: String?,
+    manifestPath: String,
+    authTokenPath: String,
+    eventsPath: String,
+    databasePath: String
+  ) {
+    self.launchAgentPath = launchAgentPath
+    self.launchAgentDomain = launchAgentDomain
+    self.launchAgentService = launchAgentService
+    self.manifestPath = manifestPath
+    self.authTokenPath = authTokenPath
+    self.eventsPath = eventsPath
+    self.databasePath = databasePath
+  }
 }
 
 struct PreferencesPathsSection: View {

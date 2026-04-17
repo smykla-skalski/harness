@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUI
+import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
