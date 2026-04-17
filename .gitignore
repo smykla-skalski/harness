@@ -36,13 +36,3 @@ apps/harness-monitor-macos/DerivedData/
 apps/harness-monitor-macos/DerivedData*
 apps/harness-monitor-macos/*.xcodeproj/xcuserdata/
 apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
-
-.claude/skills/swift-concurrency
-.claude/skills/swift-testing-expert
-.claude/skills/swift-testing-pro
-.claude/skills/swiftdata-pro
-.claude/skills/swiftui-expert-skill
-.claude/skills/swiftui-pro
-.agents/skills/swift*
-skills-lock.json
-.orphaned_at
