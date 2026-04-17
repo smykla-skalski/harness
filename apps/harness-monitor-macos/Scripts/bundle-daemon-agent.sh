@@ -87,27 +87,37 @@ if [ ! -x "$daemon_source" ]; then
   exit 1
 fi
 
-validate_daemon_version() {
-  local daemon_path="$1"
+resolve_package_version() {
+  /usr/bin/awk '
+    /^\[package\]$/ { in_package = 1; next }
+    /^\[/ && in_package { exit }
+    in_package && $1 == "version" {
+      gsub(/"/, "", $3)
+      print $3
+      exit
+    }
+  ' "$repo_root/Cargo.toml"
+}
+
+validate_package_version() {
+  local package_version="$1"
   local expected_version="$2"
 
   if [ -z "$expected_version" ]; then
     return
   fi
 
-  local actual_version
-  actual_version="$("$daemon_path" --version | /usr/bin/awk 'NR==1 { print $2 }')"
-  if [ -z "$actual_version" ]; then
-    printf 'Unable to determine Harness daemon helper version: %s\n' "$daemon_path" >&2
+  if [ -z "$package_version" ]; then
+    printf 'Unable to determine Harness package version from %s\n' "$repo_root/Cargo.toml" >&2
     exit 1
   fi
 
-  if [ "$actual_version" != "$expected_version" ]; then
+  if [ "$package_version" != "$expected_version" ]; then
     printf \
-      'Harness daemon helper version mismatch: bundled helper is %s but app expects %s (%s)\n' \
-      "$actual_version" \
+      'Harness daemon helper version mismatch: package version is %s but app expects %s\n' \
+      "$package_version" \
       "$expected_version" \
-      "$daemon_path" >&2
+      >&2
     exit 1
   fi
 }
@@ -130,7 +140,8 @@ if ! /usr/bin/otool -l "$daemon_target" | /usr/bin/grep -q "__info_plist"; then
   exit 1
 fi
 
-validate_daemon_version "$daemon_target" "${MARKETING_VERSION:-}"
+package_version="$(resolve_package_version)"
+validate_package_version "$package_version" "${MARKETING_VERSION:-}"
 
 if [ "${CODE_SIGNING_ALLOWED:-NO}" = "YES" ] \
   && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] \
