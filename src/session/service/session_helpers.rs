@@ -76,6 +76,20 @@ pub(crate) fn require_active(state: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(crate) fn require_task_creation_state(state: &SessionState) -> Result<(), CliError> {
+    if !matches!(
+        state.status,
+        SessionStatus::Active | SessionStatus::LeaderlessDegraded
+    ) {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 pub(crate) fn ensure_session_can_end(state: &SessionState) -> Result<(), CliError> {
     let active_tasks = state.tasks.values().any(|task| {
         matches!(

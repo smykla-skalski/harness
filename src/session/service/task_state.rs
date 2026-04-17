@@ -4,8 +4,8 @@ use super::{
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
     generate_signal_id, next_task_id, protocol, refresh_session, require_active,
-    require_active_worker_target_agent, require_permission, start_next_locked_task_for_worker,
-    start_task_for_agent, task_not_found, touch_agent,
+    require_active_worker_target_agent, require_permission, require_task_creation_state,
+    start_next_locked_task_for_worker, start_task_for_agent, task_not_found, touch_agent,
 };
 
 /// Create a work item. Returns the new `WorkItem`.
@@ -15,7 +15,7 @@ pub(crate) fn apply_create_task(
     actor_id: &str,
     now: &str,
 ) -> Result<WorkItem, CliError> {
-    require_active(state)?;
+    require_task_creation_state(state)?;
     require_permission(state, actor_id, SessionAction::CreateTask)?;
 
     let task_id = next_task_id(&state.tasks);

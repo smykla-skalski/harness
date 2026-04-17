@@ -12,9 +12,9 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    AgentRuntimeSessionRegistrationRequest, SessionJoinRequest, SessionStartRequest,
+    SessionJoinRequest, SessionStartRequest, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest,
 };
-use crate::daemon::protocol::{TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest};
 use crate::daemon::state::DaemonManifest;
 use crate::session::types::SessionRole;
 use harness_testkit::with_isolated_harness_env;
@@ -254,13 +254,13 @@ fn post_task_create_uses_async_db_when_sync_db_is_unavailable() {
 }
 
 #[test]
-fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
+fn post_task_create_allows_observer_in_leaderless_degraded_session() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", None::<&str>),
-                ("GEMINI_SESSION_ID", None::<&str>),
+                ("CLAUDE_SESSION_ID", Some("http-async-degraded-leader")),
+                ("CODEX_SESSION_ID", Some("http-async-degraded-observer")),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -270,73 +270,78 @@ fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
                 runtime.block_on(async {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let session_id = "http-async-runtime-session";
-                    let tui_id = "agent-tui-runtime";
-                    let _ = start_async_http_session(state.clone(), &project_dir, session_id).await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "http-async-degraded-task",
+                    )
+                    .await;
 
                     let response = post_session_join(
-                        axum::extract::Path(session_id.to_owned()),
+                        axum::extract::Path("http-async-degraded-task".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionJoinRequest {
-                            runtime: "gemini".into(),
-                            role: SessionRole::Worker,
+                            runtime: "codex".into(),
+                            role: SessionRole::Observer,
                             fallback_role: None,
-                            capabilities: vec!["agent-tui".into(), format!("agent-tui:{tui_id}")],
-                            name: Some("Async Gemini Worker".into()),
+                            capabilities: vec!["triage".into()],
+                            name: Some("Async Observer".into()),
                             project_dir: project_dir.to_string_lossy().into_owned(),
                             persona: None,
                         }),
                     )
                     .await;
-                    let (join_status, _) = response_json(response).await;
-                    assert_eq!(join_status, StatusCode::OK);
+                    let (status, _) = response_json(response).await;
+                    assert_eq!(status, StatusCode::OK);
 
                     let async_db = state.async_db.get().expect("async db");
-                    let before = async_db
-                        .resolve_session(session_id)
+                    let mut resolved = async_db
+                        .resolve_session("http-async-degraded-task")
                         .await
                         .expect("resolve session")
                         .expect("session present");
-                    let joined_worker = before
+                    let observer_id = resolved
                         .state
                         .agents
                         .values()
-                        .find(|agent| agent.runtime == "gemini")
-                        .expect("gemini worker");
-                    assert!(joined_worker.agent_session_id.is_none());
+                        .find(|agent| agent.role == SessionRole::Observer)
+                        .expect("observer")
+                        .agent_id
+                        .clone();
+                    let previous_leader = resolved.state.leader_id.take().expect("leader");
+                    resolved.state.status =
+                        crate::session::types::SessionStatus::LeaderlessDegraded;
+                    let leader = resolved
+                        .state
+                        .agents
+                        .get_mut(&previous_leader)
+                        .expect("leader registration");
+                    leader.status = crate::session::types::AgentStatus::Disconnected;
+                    async_db
+                        .save_session_state(&resolved.project.project_id, &resolved.state)
+                        .await
+                        .expect("persist degraded session");
 
-                    let response = post_runtime_session(
-                        axum::extract::Path(session_id.to_owned()),
+                    let response = post_task_create(
+                        axum::extract::Path("http-async-degraded-task".to_owned()),
                         auth_headers(),
                         State(state.clone()),
-                        Json(AgentRuntimeSessionRegistrationRequest {
-                            tui_id: tui_id.into(),
-                            runtime: "gemini".into(),
-                            agent_session_id: "gemini-runtime-2152464d".into(),
-                            project_dir: project_dir.to_string_lossy().into_owned(),
+                        Json(TaskCreateRequest {
+                            actor: observer_id,
+                            title: "degraded async http task".into(),
+                            context: Some("observer can still record findings".into()),
+                            severity: crate::session::types::TaskSeverity::High,
+                            suggested_fix: Some("preserve degraded triage".into()),
                         }),
                     )
                     .await;
 
                     let (status, body) = response_json(response).await;
                     assert_eq!(status, StatusCode::OK);
-                    assert_eq!(body["registered"].as_bool(), Some(true));
-
-                    let after = async_db
-                        .resolve_session(session_id)
-                        .await
-                        .expect("resolve session")
-                        .expect("session present");
-                    let joined_worker = after
-                        .state
-                        .agents
-                        .values()
-                        .find(|agent| agent.runtime == "gemini")
-                        .expect("gemini worker");
                     assert_eq!(
-                        joined_worker.agent_session_id.as_deref(),
-                        Some("gemini-runtime-2152464d")
+                        body["tasks"][0]["title"].as_str(),
+                        Some("degraded async http task")
                     );
                 });
             },
