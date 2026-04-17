@@ -99,6 +99,33 @@ targets:
           ENABLE_MODULE_VERIFIER: NO
           ONLY_ACTIVE_ARCH: YES
           SWIFT_ENABLE_EAGER_LINKING: NO
+  HarnessMonitorPreviewHost:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessMonitorPreviewHost
+    dependencies:
+      - target: HarnessMonitorKit
+      - target: HarnessMonitorUIPreviewable
+    entitlements:
+      path: HarnessMonitorPreviewHost.entitlements
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: Q498EB36N4
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.previews
+        PRODUCT_NAME: HarnessMonitorPreviewHost
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_LSUIElement: YES
+      configs:
+        Preview:
+          COMPILER_INDEX_STORE_ENABLE: NO
+          ENABLE_MODULE_VERIFIER: NO
+          ONLY_ACTIVE_ARCH: YES
+          SWIFT_ENABLE_EAGER_LINKING: NO
   HarnessMonitor:
     type: application
     platform: macOS
@@ -556,9 +583,12 @@ schemes:
     build:
       config: Preview
       targets:
+        HarnessMonitorPreviewHost: all
         HarnessMonitorUIPreviewable: all
+        HarnessMonitorKit: all
     run:
       config: Preview
+      executable: HarnessMonitorPreviewHost
     test:
       config: Preview
     analyze:
