@@ -41,13 +41,12 @@ struct SessionCockpitEmptyStateRow: View {
       messageLabel
       Spacer(minLength: 0)
     }
-      .accessibilityElement(children: .ignore)
-      .accessibilityLabel(Text(section.message))
-      .accessibilityIdentifier(section.accessibilityIdentifier)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text(section.message))
+    .accessibilityIdentifier(section.accessibilityIdentifier)
   }
 
-  @ViewBuilder
-  private var messageLabel: some View {
+  @ViewBuilder private var messageLabel: some View {
     if Self.usesSecondaryForeground {
       Text(section.message)
         .scaledFont(Self.baseFont)

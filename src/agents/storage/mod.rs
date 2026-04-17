@@ -463,7 +463,7 @@ fn render_canonical_line(
                 "text": result
                     .reason
                     .clone()
-                    .or_else(|| context.agent.as_ref().and_then(|agent| agent.prompt.clone()))
+                    .or_else(|| context.agent.as_ref().and_then(|agent| agent.response.clone()))
                     .unwrap_or_else(|| normalized_event_name(&context.event).to_string()),
             }],
         }),

@@ -137,7 +137,9 @@ extension PreviewHarnessClient {
       detail: PreviewFixtures.emptyCockpitDetail,
       timeline: [],
       readySessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
-      detailsBySessionID: [PreviewFixtures.emptyCockpitSummary.sessionId: PreviewFixtures.emptyCockpitDetail],
+      detailsBySessionID: [
+        PreviewFixtures.emptyCockpitSummary.sessionId: PreviewFixtures.emptyCockpitDetail
+      ],
       coreDetailsBySessionID: [:],
       timelinesBySessionID: [PreviewFixtures.emptyCockpitSummary.sessionId: []]
     )

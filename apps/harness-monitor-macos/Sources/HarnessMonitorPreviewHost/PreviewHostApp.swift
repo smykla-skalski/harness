@@ -5,7 +5,7 @@ import SwiftUI
 @main
 struct PreviewHostApp: App {
   init() {
-    Self.forceLoadedSymbolReferences.forEach { _ in }
+    for _ in Self.forceLoadedSymbolReferences {}
   }
 
   var body: some Scene {
