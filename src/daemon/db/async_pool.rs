@@ -8,6 +8,8 @@ use super::{
     BTreeMap, CliError, DiscoveredProject, Path, PathBuf, SCHEMA_VERSION, SessionState,
     async_bootstrap, daemon_index, daemon_protocol, db_error, usize_from_i64,
 };
+use crate::session::service::canonicalize_active_session_without_leader;
+use crate::workspace::utc_now;
 
 const ASYNC_DB_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
 const ASYNC_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -46,6 +48,7 @@ const SESSION_SUMMARIES_SQL: &str = "SELECT
     s.observe_id,
     s.pending_leader_transfer AS pending_leader_transfer_json,
     s.metrics_json,
+    s.state_json,
     p.project_id,
     p.name AS project_name,
     p.project_dir,
@@ -221,9 +224,11 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("query async session summaries: {error}")))?;
 
-        rows.into_iter()
-            .map(AsyncSessionSummaryRow::into_summary)
-            .collect()
+        let mut summaries = Vec::new();
+        for row in rows {
+            summaries.push(row.into_summary(self).await?);
+        }
+        Ok(summaries)
     }
 
     /// Resolve a session into a `ResolvedSession` using the canonical async DB.
@@ -234,13 +239,15 @@ impl AsyncDaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {
-        query_as::<_, AsyncResolvedSessionRow>(RESOLVE_SESSION_SQL)
+        let row = query_as::<_, AsyncResolvedSessionRow>(RESOLVE_SESSION_SQL)
             .bind(session_id)
             .fetch_optional(self.pool())
             .await
-            .map_err(|error| db_error(format!("resolve async session {session_id}: {error}")))?
-            .map(AsyncResolvedSessionRow::into_resolved_session)
-            .transpose()
+            .map_err(|error| db_error(format!("resolve async session {session_id}: {error}")))?;
+        match row {
+            Some(row) => row.into_resolved_session(self).await.map(Some),
+            None => Ok(None),
+        }
     }
 }
 
@@ -276,6 +283,7 @@ impl AsyncProjectSummaryRow {
 }
 
 #[derive(sqlx::FromRow)]
+#[allow(dead_code)]
 struct AsyncSessionSummaryRow {
     session_id: String,
     title: String,
@@ -288,6 +296,7 @@ struct AsyncSessionSummaryRow {
     observe_id: Option<String>,
     pending_leader_transfer_json: Option<String>,
     metrics_json: String,
+    state_json: String,
     project_id: String,
     project_name: String,
     project_dir: Option<String>,
@@ -300,7 +309,12 @@ struct AsyncSessionSummaryRow {
 }
 
 impl AsyncSessionSummaryRow {
-    fn into_summary(self) -> Result<daemon_protocol::SessionSummary, CliError> {
+    async fn into_summary(
+        self,
+        db: &AsyncDaemonDb,
+    ) -> Result<daemon_protocol::SessionSummary, CliError> {
+        let mut state: SessionState = serde_json::from_str(&self.state_json)
+            .map_err(|error| db_error(format!("parse session state: {error}")))?;
         let project = DiscoveredProject {
             project_id: self.project_id,
             name: self.project_name,
@@ -312,44 +326,35 @@ impl AsyncSessionSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name,
         };
-        let status = super::parse_session_status_db_label(&self.status);
-        let pending_leader_transfer = self
-            .pending_leader_transfer_json
-            .map(|json| {
-                serde_json::from_str(&json)
-                    .map_err(|error| db_error(format!("parse pending leader transfer: {error}")))
-            })
-            .transpose()?;
-        let metrics = serde_json::from_str(&self.metrics_json)
-            .map_err(|error| db_error(format!("parse session metrics: {error}")))?;
-        let checkout_root = project
-            .project_dir
-            .as_ref()
-            .map_or_else(String::new, |path| path.display().to_string());
-
+        if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+            db.save_session_state(&project.project_id, &state).await?;
+        }
         Ok(daemon_protocol::SessionSummary {
             project_id: project.summary_project_id(),
             project_name: project.summary_project_name(),
             project_dir: project.summary_project_dir(),
             context_root: project.summary_context_root(),
             checkout_id: project.checkout_id.clone(),
-            checkout_root,
+            checkout_root: project
+                .project_dir
+                .as_ref()
+                .map_or_else(String::new, |path| path.display().to_string()),
             is_worktree: project.is_worktree,
             worktree_name: project
                 .worktree_name
                 .clone()
                 .or_else(|| project.is_worktree.then_some(project.checkout_name.clone())),
-            session_id: self.session_id,
-            title: self.title,
-            context: self.context,
-            status,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            last_activity_at: self.last_activity_at,
-            leader_id: self.leader_id,
-            observe_id: self.observe_id,
-            pending_leader_transfer,
-            metrics,
+            session_id: state.session_id,
+            title: state.title,
+            context: state.context,
+            status: state.status,
+            created_at: state.created_at,
+            updated_at: state.updated_at,
+            last_activity_at: state.last_activity_at,
+            leader_id: state.leader_id,
+            observe_id: state.observe_id,
+            pending_leader_transfer: state.pending_leader_transfer,
+            metrics: state.metrics,
         })
     }
 }
@@ -369,22 +374,26 @@ struct AsyncResolvedSessionRow {
 }
 
 impl AsyncResolvedSessionRow {
-    fn into_resolved_session(self) -> Result<daemon_index::ResolvedSession, CliError> {
-        let state: SessionState = serde_json::from_str(&self.state_json)
+    async fn into_resolved_session(
+        self,
+        db: &AsyncDaemonDb,
+    ) -> Result<daemon_index::ResolvedSession, CliError> {
+        let mut state: SessionState = serde_json::from_str(&self.state_json)
             .map_err(|error| db_error(format!("parse session state: {error}")))?;
-        Ok(daemon_index::ResolvedSession {
-            project: DiscoveredProject {
-                project_id: self.project_id,
-                name: self.project_name,
-                project_dir: self.project_dir.as_deref().map(PathBuf::from),
-                repository_root: self.repository_root.as_deref().map(PathBuf::from),
-                checkout_id: self.checkout_id,
-                checkout_name: self.checkout_name,
-                context_root: PathBuf::from(self.context_root),
-                is_worktree: self.is_worktree,
-                worktree_name: self.worktree_name,
-            },
-            state,
-        })
+        let project = DiscoveredProject {
+            project_id: self.project_id,
+            name: self.project_name,
+            project_dir: self.project_dir.as_deref().map(PathBuf::from),
+            repository_root: self.repository_root.as_deref().map(PathBuf::from),
+            checkout_id: self.checkout_id,
+            checkout_name: self.checkout_name,
+            context_root: PathBuf::from(self.context_root),
+            is_worktree: self.is_worktree,
+            worktree_name: self.worktree_name,
+        };
+        if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+            db.save_session_state(&project.project_id, &state).await?;
+        }
+        Ok(daemon_index::ResolvedSession { project, state })
     }
 }
