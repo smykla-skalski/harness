@@ -250,7 +250,7 @@ fn manager_auto_join_prompt_in_transcript() {
             Some("auto join agent"),
             None,
         );
-        assert!(prompt.contains("/harness:session:join"));
+        assert!(prompt.contains("/harness:harness session join"));
         assert!(prompt.contains("sess-auto-join"));
         assert!(prompt.contains("observer"));
         assert!(prompt.contains("my-cap"));
@@ -338,7 +338,12 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
         });
 
         let refreshed = manager.get(&snapshot.tui_id).expect("refresh snapshot");
-        assert!(refreshed.screen.text.contains("$harness:session:join"));
+        assert!(
+            refreshed
+                .screen
+                .text
+                .contains("$harness:harness session join")
+        );
         assert!(refreshed.screen.text.contains("--role leader"));
         assert!(
             refreshed

@@ -161,10 +161,10 @@ pub(crate) fn build_auto_join_prompt(
         };
         format!(" --fallback-role {value}")
     });
-    let join_skill = direct_skill_invocation(runtime, "harness:session:join");
+    let harness_skill = direct_skill_invocation(runtime, "harness:harness");
 
     format!(
-        "{join_skill} {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
+        "{harness_skill} session join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
     )
 }
 
