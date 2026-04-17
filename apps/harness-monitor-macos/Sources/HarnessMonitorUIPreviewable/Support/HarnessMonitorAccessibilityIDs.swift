@@ -86,10 +86,13 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesTitle = "harness.preferences.title"
   public static let preferencesThemeModePicker = "harness.preferences.theme-mode"
   public static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
-  public static let preferencesBackgroundCollectionPicker = "harness.preferences.background-collection"
+  public static let preferencesBackgroundCollectionPicker =
+    "harness.preferences.background-collection"
   public static let preferencesBackgroundGallery = "harness.preferences.background-gallery"
-  public static let preferencesBackgroundRecentsSection = "harness.preferences.background.recents-section"
-  public static let preferencesBackgroundRecentState = "harness.preferences.background.recents-state"
+  public static let preferencesBackgroundRecentsSection =
+    "harness.preferences.background.recents-section"
+  public static let preferencesBackgroundRecentState =
+    "harness.preferences.background.recents-state"
   public static let preferencesTextSizePicker = "harness.preferences.text-size"
   public static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   public static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
@@ -102,7 +105,8 @@ public enum HarnessMonitorAccessibility {
     "harness.preferences.voice.remote-processor"
   public static let preferencesVoiceRemoteProcessorURLField =
     "harness.preferences.voice.remote-processor-url"
-  public static let preferencesVoiceInsertionModePicker = "harness.preferences.voice.insertion-mode"
+  public static let preferencesVoiceInsertionModePicker =
+    "harness.preferences.voice.insertion-mode"
   public static let preferencesVoiceAudioChunksToggle = "harness.preferences.voice.audio-chunks"
   public static let preferencesVoicePendingAudioField =
     "harness.preferences.voice.pending-audio-limit"
@@ -110,12 +114,15 @@ public enum HarnessMonitorAccessibility {
     "harness.preferences.voice.pending-transcript-limit"
   public static let preferencesVoiceStatus = "harness.preferences.voice.status"
   public static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
-  public static let preferencesNotificationsPresetPicker = "harness.preferences.notifications.preset"
-  public static let preferencesNotificationsCategoryPicker = "harness.preferences.notifications.category"
+  public static let preferencesNotificationsPresetPicker =
+    "harness.preferences.notifications.preset"
+  public static let preferencesNotificationsCategoryPicker =
+    "harness.preferences.notifications.category"
   public static let preferencesNotificationsSoundPicker = "harness.preferences.notifications.sound"
   public static let preferencesNotificationsAttachmentPicker =
     "harness.preferences.notifications.attachment"
-  public static let preferencesNotificationsTriggerPicker = "harness.preferences.notifications.trigger"
+  public static let preferencesNotificationsTriggerPicker =
+    "harness.preferences.notifications.trigger"
   public static let preferencesNotificationsSendButton = "harness.preferences.notifications.send"
   public static let navigateBackButton = "harness.toolbar.navigate-back"
   public static let navigateForwardButton = "harness.toolbar.navigate-forward"
@@ -143,10 +150,13 @@ public enum HarnessMonitorAccessibility {
   public static let actionToastFrame = "harness.action-toast.frame"
   public static let actionToastCloseButton = "harness.action-toast.close"
   public static let sessionTimelinePagination = "harness.session.timeline.pagination"
-  public static let sessionTimelinePageSizePicker = "harness.session.timeline.pagination.page-size"
-  public static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
+  public static let sessionTimelinePageSizePicker =
+    "harness.session.timeline.pagination.page-size"
+  public static let sessionTimelinePaginationPrevious =
+    "harness.session.timeline.pagination.previous"
   public static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
-  public static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
+  public static let sessionTimelinePaginationStatus =
+    "harness.session.timeline.pagination.status"
   public static let connectionCard = "harness.preferences.connection-card"
   public static let cornerOverlay = "harness.corner-overlay"
   public static let agentTuiButton = "harness.session.agent-tui"

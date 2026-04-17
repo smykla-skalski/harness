@@ -35,7 +35,7 @@ public struct SidebarSessionListLinkRow: View, Equatable {
     .contentShape(Rectangle())
   }
 
-  public nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+  nonisolated public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.session == rhs.session
       && lhs.presentation == rhs.presentation
       && lhs.isBookmarked == rhs.isBookmarked

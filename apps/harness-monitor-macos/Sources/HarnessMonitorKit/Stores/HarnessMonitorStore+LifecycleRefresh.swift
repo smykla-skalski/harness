@@ -292,17 +292,25 @@ extension HarnessMonitorStore {
   ) -> String {
     switch error {
     case .dataCorrupted(let context):
+      let path = describeCodingPath(context.codingPath)
+      let description = context.debugDescription
       return
-        "decoding failed at \(describeCodingPath(context.codingPath)): \(context.debugDescription)"
+        "decoding failed at \(path): \(description)"
     case .keyNotFound(let key, let context):
+      let path = describeCodingPath(context.codingPath + [key])
+      let description = context.debugDescription
       return
-        "missing key '\(key.stringValue)' at \(describeCodingPath(context.codingPath + [key])): \(context.debugDescription)"
+        "missing key '\(key.stringValue)' at \(path): \(description)"
     case .typeMismatch(let type, let context):
+      let path = describeCodingPath(context.codingPath)
+      let description = context.debugDescription
       return
-        "type mismatch for \(String(describing: type)) at \(describeCodingPath(context.codingPath)): \(context.debugDescription)"
+        "type mismatch for \(String(describing: type)) at \(path): \(description)"
     case .valueNotFound(let type, let context):
+      let path = describeCodingPath(context.codingPath)
+      let description = context.debugDescription
       return
-        "missing \(String(describing: type)) at \(describeCodingPath(context.codingPath)): \(context.debugDescription)"
+        "missing \(String(describing: type)) at \(path): \(description)"
     @unknown default:
       return error.localizedDescription
     }
