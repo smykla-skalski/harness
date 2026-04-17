@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesAppearanceSection: View {
-  @Binding var themeMode: HarnessMonitorThemeMode
+public struct PreferencesAppearanceSection: View {
+  @Binding public var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -14,11 +14,15 @@ struct PreferencesAppearanceSection: View {
   private var cornerAnimationEnabled = false
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
 
+  public init(themeMode: Binding<HarnessMonitorThemeMode>) {
+    _themeMode = themeMode
+  }
+
   private var selectedBackground: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
 
-  var body: some View {
+  public var body: some View {
     Form {
       Section {
         Picker("Theme mode", selection: $themeMode) {
@@ -124,29 +128,29 @@ enum BackgroundCollection {
   case native
 }
 
-struct PreferencesGeneralOverviewState {
-  enum SandboxState: Equatable {
+public struct PreferencesGeneralOverviewState {
+  public enum SandboxState: Equatable {
     case enabled
     case off
     case unknown
   }
 
-  let endpoint: String
-  let version: String
-  let launchAgentState: String
-  let launchAgentCaption: String
-  let sandboxState: SandboxState
-  let databaseSize: String
-  let sessionCount: Int
-  let startedAt: String?
-  let daemonModeLabel: String
-  let isExternalDaemon: Bool
-  let externalDaemonManifestPath: String
-  let externalDaemonProcessSummary: String?
-  let showsLaunchAgent: Bool
+  public let endpoint: String
+  public let version: String
+  public let launchAgentState: String
+  public let launchAgentCaption: String
+  public let sandboxState: SandboxState
+  public let databaseSize: String
+  public let sessionCount: Int
+  public let startedAt: String?
+  public let daemonModeLabel: String
+  public let isExternalDaemon: Bool
+  public let externalDaemonManifestPath: String
+  public let externalDaemonProcessSummary: String?
+  public let showsLaunchAgent: Bool
 
   @MainActor
-  init(store: HarnessMonitorStore) {
+  public init(store: HarnessMonitorStore) {
     let effectiveHealth = store.diagnostics?.health ?? store.health
     let launchAgent = store.daemonStatus?.launchAgent
     let manifest = store.daemonStatus?.manifest
@@ -191,15 +195,20 @@ struct PreferencesGeneralOverviewState {
   }
 }
 
-struct PreferencesGeneralSection: View {
-  let store: HarnessMonitorStore
-  let overview: PreferencesGeneralOverviewState
+public struct PreferencesGeneralSection: View {
+  public let store: HarnessMonitorStore
+  public let overview: PreferencesGeneralOverviewState
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
   private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
     .defaultCustomTimeZoneIdentifier
   @State private var isRemoveLaunchAgentConfirmationPresented = false
+
+  public init(store: HarnessMonitorStore, overview: PreferencesGeneralOverviewState) {
+    self.store = store
+    self.overview = overview
+  }
 
   private static let externalDaemonCommand = "harness daemon dev"
 
@@ -265,7 +274,7 @@ struct PreferencesGeneralSection: View {
     )
   }
 
-  var body: some View {
+  public var body: some View {
     Form {
       Section {
         Picker("Time zone", selection: $timeZoneModeRawValue) {

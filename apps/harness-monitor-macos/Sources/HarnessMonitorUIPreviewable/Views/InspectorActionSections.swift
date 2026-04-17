@@ -1,11 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct InspectorActionSections: View {
-  let store: HarnessMonitorStore
-  let context: HarnessMonitorStore.InspectorActionContext
+public struct InspectorActionSections: View {
+  public let store: HarnessMonitorStore
+  public let context: HarnessMonitorStore.InspectorActionContext
 
-  var body: some View {
+  public init(store: HarnessMonitorStore, context: HarnessMonitorStore.InspectorActionContext) {
+    self.store = store
+    self.context = context
+  }
+
+  public var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       InspectorActionStatusBanner(
         isSessionReadOnly: context.isSessionReadOnly,

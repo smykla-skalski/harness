@@ -1,16 +1,24 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct InspectorFact: Identifiable {
-  let title: String
-  let value: String
-  var id: String { title }
+public struct InspectorFact: Identifiable {
+  public let title: String
+  public let value: String
+  public var id: String { title }
+  public init(title: String, value: String) {
+    self.title = title
+    self.value = value
+  }
 }
 
-struct InspectorFactGrid: View {
-  let facts: [InspectorFact]
+public struct InspectorFactGrid: View {
+  public let facts: [InspectorFact]
 
-  var body: some View {
+  public init(facts: [InspectorFact]) {
+    self.facts = facts
+  }
+
+  public var body: some View {
     HarnessMonitorAdaptiveGridLayout(
       minimumColumnWidth: 132,
       maximumColumns: 2,
@@ -33,11 +41,16 @@ struct InspectorFactGrid: View {
   }
 }
 
-struct InspectorSection<Content: View>: View {
-  let title: String
-  @ViewBuilder let content: Content
+public struct InspectorSection<Content: View>: View {
+  public let title: String
+  @ViewBuilder public let content: Content
 
-  var body: some View {
+  public init(title: String, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.content = content()
+  }
+
+  public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       Text(title)
         .scaledFont(.caption.bold())
@@ -47,10 +60,14 @@ struct InspectorSection<Content: View>: View {
   }
 }
 
-struct InspectorBadgeColumn: View {
-  let values: [String]
+public struct InspectorBadgeColumn: View {
+  public let values: [String]
 
-  var body: some View {
+  public init(values: [String]) {
+    self.values = values
+  }
+
+  public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       ForEach(Array(values.enumerated()), id: \.offset) { _, value in
         Text(value)

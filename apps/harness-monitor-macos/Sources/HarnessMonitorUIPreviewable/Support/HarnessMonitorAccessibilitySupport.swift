@@ -130,11 +130,11 @@ private struct AccessibilityProbeModifier: ViewModifier {
 }
 
 extension View {
-  func accessibilityFrameMarker(_ identifier: String) -> some View {
+  public func accessibilityFrameMarker(_ identifier: String) -> some View {
     modifier(AccessibilityFrameMarkerModifier(identifier: identifier))
   }
 
-  func accessibilityTestProbe(
+  public func accessibilityTestProbe(
     _ identifier: String,
     label: String? = nil,
     value: String? = nil
@@ -149,7 +149,7 @@ extension View {
   }
 
   @ViewBuilder
-  func harnessUITestValue(_ value: String) -> some View {
+  public func harnessUITestValue(_ value: String) -> some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       accessibilityValue(value)
     } else {

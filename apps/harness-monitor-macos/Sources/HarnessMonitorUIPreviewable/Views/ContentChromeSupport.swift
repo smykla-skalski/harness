@@ -1,11 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
-  let store: HarnessMonitorStore
-  let shellUI: HarnessMonitorStore.ContentShellSlice
+public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
+  public let store: HarnessMonitorStore
+  public let shellUI: HarnessMonitorStore.ContentShellSlice
 
-  func body(content: Content) -> some View {
+  public init(store: HarnessMonitorStore, shellUI: HarnessMonitorStore.ContentShellSlice) {
+    self.store = store
+    self.shellUI = shellUI
+  }
+
+  public func body(content: Content) -> some View {
     content
       .confirmationDialog(
         title,
@@ -355,10 +360,14 @@ struct PersistenceUnavailableBanner: View {
   }
 }
 
-struct ContentAnnouncementsModifier: ViewModifier {
-  let shellUI: HarnessMonitorStore.ContentShellSlice
+public struct ContentAnnouncementsModifier: ViewModifier {
+  public let shellUI: HarnessMonitorStore.ContentShellSlice
 
-  func body(content: Content) -> some View {
+  public init(shellUI: HarnessMonitorStore.ContentShellSlice) {
+    self.shellUI = shellUI
+  }
+
+  public func body(content: Content) -> some View {
     content
       .onChange(of: shellUI.connectionState) { _, newState in
         guard let message = message(for: newState) else { return }

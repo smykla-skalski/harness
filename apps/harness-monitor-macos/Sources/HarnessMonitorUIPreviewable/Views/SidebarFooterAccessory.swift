@@ -1,14 +1,18 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SidebarFooterAccessory: View {
-  let metrics: ConnectionMetrics
+public struct SidebarFooterAccessory: View {
+  public let metrics: ConnectionMetrics
+
+  public init(metrics: ConnectionMetrics) {
+    self.metrics = metrics
+  }
 
   private var tint: Color {
     metrics.latencyTint
   }
 
-  var body: some View {
+  public var body: some View {
     ConnectionToolbarBadge(metrics: metrics)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.vertical, HarnessMonitorTheme.itemSpacing)

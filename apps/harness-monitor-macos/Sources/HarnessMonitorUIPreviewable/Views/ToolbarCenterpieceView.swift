@@ -137,7 +137,7 @@ enum ToolbarCenterpieceMetricKind: String, CaseIterable {
   }
 }
 
-enum ToolbarCenterpieceDisplayMode: String {
+public enum ToolbarCenterpieceDisplayMode: String {
   case standard
   case compact
   case compressed
@@ -145,7 +145,7 @@ enum ToolbarCenterpieceDisplayMode: String {
   private static let standardDetailThreshold: CGFloat = 1_050
   private static let compactDetailThreshold: CGFloat = 960
 
-  static func forDetailWidth(_ detailWidth: CGFloat) -> Self {
+  public static func forDetailWidth(_ detailWidth: CGFloat) -> Self {
     switch detailWidth {
     case Self.standardDetailThreshold...:
       .standard

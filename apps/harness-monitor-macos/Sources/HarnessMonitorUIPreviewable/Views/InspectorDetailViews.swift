@@ -1,8 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionInspectorSummaryCard: View {
-  let detail: SessionDetail
+public struct SessionInspectorSummaryCard: View {
+  public let detail: SessionDetail
+
+  public init(detail: SessionDetail) {
+    self.detail = detail
+  }
 
   private var facts: [InspectorFact] {
     [
@@ -13,7 +17,7 @@ struct SessionInspectorSummaryCard: View {
     ]
   }
 
-  var body: some View {
+  public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text("Inspector")
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
@@ -58,8 +62,12 @@ struct SessionInspectorSummaryCard: View {
   }
 }
 
-struct SignalInspectorCard: View {
-  let signal: SessionSignalRecord
+public struct SignalInspectorCard: View {
+  public let signal: SessionSignalRecord
+
+  public init(signal: SessionSignalRecord) {
+    self.signal = signal
+  }
 
   private static let expiresInStyle: Date.RelativeFormatStyle = .relative(
     presentation: .numeric,
@@ -86,7 +94,7 @@ struct SignalInspectorCard: View {
     ]
   }
 
-  var body: some View {
+  public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text(signal.signal.command)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))

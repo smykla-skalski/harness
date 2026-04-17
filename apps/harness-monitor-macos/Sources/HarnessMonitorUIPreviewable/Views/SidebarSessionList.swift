@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 
 // Accessibility helpers shared by the native sidebar list rows.
-func sessionAccessibilityLabel(
+public func sessionAccessibilityLabel(
   for session: SessionSummary,
   presentation: HarnessMonitorStore.SessionSummaryPresentation
 ) -> String {

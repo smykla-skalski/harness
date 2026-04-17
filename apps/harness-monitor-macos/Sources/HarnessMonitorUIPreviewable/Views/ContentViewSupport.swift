@@ -11,10 +11,10 @@ public struct CommandsDisplayState: Equatable {
   public let hasObserver: Bool
 }
 
-enum HarnessMonitorInspectorLayout {
-  static let minWidth: CGFloat = 320
-  static let idealWidth: CGFloat = 420
-  static let maxWidth: CGFloat = 480
+public enum HarnessMonitorInspectorLayout {
+  public static let minWidth: CGFloat = 320
+  public static let idealWidth: CGFloat = 420
+  public static let maxWidth: CGFloat = 480
 }
 
 // MARK: - Content status backdrop
@@ -25,10 +25,16 @@ private enum ContentStatusBackdropLayout {
   static let titleLeadingPadding: CGFloat = 75
 }
 
-struct ContentStatusBackdrop: View {
-  let status: SessionStatus
-  let isStale: Bool
-  let titleLeadingEdge: CGFloat
+public struct ContentStatusBackdrop: View {
+  public let status: SessionStatus
+  public let isStale: Bool
+  public let titleLeadingEdge: CGFloat
+
+  public init(status: SessionStatus, isStale: Bool, titleLeadingEdge: CGFloat) {
+    self.status = status
+    self.isStale = isStale
+    self.titleLeadingEdge = titleLeadingEdge
+  }
 
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
@@ -41,7 +47,7 @@ struct ContentStatusBackdrop: View {
     colorSchemeContrast == .increased ? 0.28 : 0.22
   }
 
-  var body: some View {
+  public var body: some View {
     let radius = ContentStatusBackdropLayout.gradientRadius
     Circle()
       .fill(
@@ -66,21 +72,21 @@ struct ContentStatusBackdrop: View {
   }
 }
 
-enum ContentInspectorVisibilitySource {
+public enum ContentInspectorVisibilitySource {
   case persistedPreference
   case explicitUserPreference
   case contextualAutoOpen
   case framework
 }
 
-struct ContentInspectorVisibilityChange: Equatable {
-  let nextPresentation: Bool
-  let persistedPreference: Bool?
-  let shouldSuppressLayoutGeometry: Bool
+public struct ContentInspectorVisibilityChange: Equatable {
+  public let nextPresentation: Bool
+  public let persistedPreference: Bool?
+  public let shouldSuppressLayoutGeometry: Bool
 }
 
-enum ContentInspectorVisibilityPolicy {
-  static func resolve(
+public enum ContentInspectorVisibilityPolicy {
+  public static func resolve(
     currentPresentation: Bool,
     currentPersistedPreference: Bool,
     nextPresentation: Bool,
@@ -163,11 +169,16 @@ extension HarnessMonitorStore.ContentToolbarSlice {
 
 // MARK: - Content toolbar items
 
-struct ContentNavigationToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
+public struct ContentNavigationToolbarItems: ToolbarContent {
+  public let store: HarnessMonitorStore
+  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
 
-  var body: some ToolbarContent {
+  public init(store: HarnessMonitorStore, toolbarUI: HarnessMonitorStore.ContentToolbarSlice) {
+    self.store = store
+    self.toolbarUI = toolbarUI
+  }
+
+  public var body: some ToolbarContent {
     ContentNavigationToolbar(
       store: store,
       canNavigateBack: toolbarUI.canNavigateBack,
@@ -176,13 +187,25 @@ struct ContentNavigationToolbarItems: ToolbarContent {
   }
 }
 
-struct ContentCenterpieceToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let displayMode: ToolbarCenterpieceDisplayMode
-  let availableDetailWidth: CGFloat
+public struct ContentCenterpieceToolbarItems: ToolbarContent {
+  public let store: HarnessMonitorStore
+  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
+  public let displayMode: ToolbarCenterpieceDisplayMode
+  public let availableDetailWidth: CGFloat
 
-  var body: some ToolbarContent {
+  public init(
+    store: HarnessMonitorStore,
+    toolbarUI: HarnessMonitorStore.ContentToolbarSlice,
+    displayMode: ToolbarCenterpieceDisplayMode,
+    availableDetailWidth: CGFloat
+  ) {
+    self.store = store
+    self.toolbarUI = toolbarUI
+    self.displayMode = displayMode
+    self.availableDetailWidth = availableDetailWidth
+  }
+
+  public var body: some ToolbarContent {
     ContentCenterpieceToolbar(
       model: toolbarUI.toolbarCenterpieceModel,
       displayMode: displayMode,
@@ -228,10 +251,14 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
   }
 }
 
-struct ContentToolbarAccessibilityMarker: View {
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
+public struct ContentToolbarAccessibilityMarker: View {
+  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
 
-  var body: some View {
+  public init(toolbarUI: HarnessMonitorStore.ContentToolbarSlice) {
+    self.toolbarUI = toolbarUI
+  }
+
+  public var body: some View {
     AccessibilityTextMarker(
       identifier: HarnessMonitorAccessibility.toolbarCenterpieceState,
       text: toolbarUI.toolbarCenterpieceModel.accessibilityValue
@@ -239,11 +266,16 @@ struct ContentToolbarAccessibilityMarker: View {
   }
 }
 
-struct ContentCornerOverlayModifier<CornerContent: View>: ViewModifier {
-  let isPresented: Bool
-  let cornerAnimationContent: CornerContent
+public struct ContentCornerOverlayModifier<CornerContent: View>: ViewModifier {
+  public let isPresented: Bool
+  public let cornerAnimationContent: CornerContent
 
-  func body(content: Content) -> some View {
+  public init(isPresented: Bool, cornerAnimationContent: CornerContent) {
+    self.isPresented = isPresented
+    self.cornerAnimationContent = cornerAnimationContent
+  }
+
+  public func body(content: Content) -> some View {
     content
       .modifier(
         HarnessCornerOverlayModifier(
@@ -265,19 +297,47 @@ struct ContentCornerOverlayModifier<CornerContent: View>: ViewModifier {
   }
 }
 
-struct ContentDetailColumn: View {
-  let store: HarnessMonitorStore
-  let toast: ToastSlice
-  let selection: HarnessMonitorStore.SelectionSlice
-  let contentChrome: HarnessMonitorStore.ContentChromeSlice
-  let contentSession: HarnessMonitorStore.ContentSessionSlice
-  let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
-  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
-  let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
-  let showInspector: Bool
-  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
-  let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  let onDetailColumnWidthChange: (CGFloat) -> Void
+public struct ContentDetailColumn: View {
+  public let store: HarnessMonitorStore
+  public let toast: ToastSlice
+  public let selection: HarnessMonitorStore.SelectionSlice
+  public let contentChrome: HarnessMonitorStore.ContentChromeSlice
+  public let contentSession: HarnessMonitorStore.ContentSessionSlice
+  public let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
+  public let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+  public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  public let showInspector: Bool
+  public let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
+  public let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
+  public let onDetailColumnWidthChange: (CGFloat) -> Void
+
+  public init(
+    store: HarnessMonitorStore,
+    toast: ToastSlice,
+    selection: HarnessMonitorStore.SelectionSlice,
+    contentChrome: HarnessMonitorStore.ContentChromeSlice,
+    contentSession: HarnessMonitorStore.ContentSessionSlice,
+    contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice,
+    contentToolbar: HarnessMonitorStore.ContentToolbarSlice,
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    showInspector: Bool,
+    setInspectorVisibility: @escaping (Bool, ContentInspectorVisibilitySource) -> Void,
+    toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration,
+    onDetailColumnWidthChange: @escaping (CGFloat) -> Void
+  ) {
+    self.store = store
+    self.toast = toast
+    self.selection = selection
+    self.contentChrome = contentChrome
+    self.contentSession = contentSession
+    self.contentSessionDetail = contentSessionDetail
+    self.contentToolbar = contentToolbar
+    self.dashboardUI = dashboardUI
+    self.showInspector = showInspector
+    self.setInspectorVisibility = setInspectorVisibility
+    self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
+    self.onDetailColumnWidthChange = onDetailColumnWidthChange
+  }
 
   private var navigationTitleText: String {
     contentSessionDetail.presentedSessionDetail != nil ? "Session Cockpit" : "Dashboard"
@@ -287,7 +347,7 @@ struct ContentDetailColumn: View {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
   }
 
-  var body: some View {
+  public var body: some View {
     ZStack {
       if toolbarGlassReproConfiguration.disablesContentDetailChrome {
         sessionContent

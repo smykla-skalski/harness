@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import HarnessMonitorUI
+import HarnessMonitorUIPreviewable
 
 enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   static let environmentKey = "HARNESS_MONITOR_PERF_SCENARIO"

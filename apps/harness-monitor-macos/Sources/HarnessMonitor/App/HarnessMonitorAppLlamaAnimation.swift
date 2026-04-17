@@ -1,4 +1,5 @@
 import HarnessMonitorUI
+import HarnessMonitorUIPreviewable
 import SwiftUI
 
 #if canImport(Lottie)

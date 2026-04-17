@@ -1,18 +1,18 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesDiagnosticsSnapshot {
-  let launchAgent: LaunchAgentStatus?
-  let tokenPresent: Bool
-  let projectCount: Int
-  let worktreeCount: Int
-  let sessionCount: Int
-  let lastEvent: DaemonAuditEvent?
-  let paths: PreferencesDiagnosticsPaths
-  let recentEvents: [DaemonAuditEvent]
+public struct PreferencesDiagnosticsSnapshot {
+  public let launchAgent: LaunchAgentStatus?
+  public let tokenPresent: Bool
+  public let projectCount: Int
+  public let worktreeCount: Int
+  public let sessionCount: Int
+  public let lastEvent: DaemonAuditEvent?
+  public let paths: PreferencesDiagnosticsPaths
+  public let recentEvents: [DaemonAuditEvent]
 
   @MainActor
-  init(store: HarnessMonitorStore) {
+  public init(store: HarnessMonitorStore) {
     let workspaceDiagnostics = store.diagnostics?.workspace ?? store.daemonStatus?.diagnostics
     let launchAgent = store.daemonStatus?.launchAgent
 
@@ -37,10 +37,14 @@ struct PreferencesDiagnosticsSnapshot {
   }
 }
 
-struct PreferencesDiagnosticsSection: View {
-  let snapshot: PreferencesDiagnosticsSnapshot
+public struct PreferencesDiagnosticsSection: View {
+  public let snapshot: PreferencesDiagnosticsSnapshot
 
-  var body: some View {
+  public init(snapshot: PreferencesDiagnosticsSnapshot) {
+    self.snapshot = snapshot
+  }
+
+  public var body: some View {
     Form {
       PreferencesDiagnosticsOverview(
         launchAgent: snapshot.launchAgent,

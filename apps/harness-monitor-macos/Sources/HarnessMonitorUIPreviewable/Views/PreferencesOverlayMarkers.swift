@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct PreferencesOverlayMarkers: View {
-  let themeMode: HarnessMonitorThemeMode
-  let selectedSection: PreferencesSection
+public struct PreferencesOverlayMarkers: View {
+  public let themeMode: HarnessMonitorThemeMode
+  public let selectedSection: PreferencesSection
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
@@ -15,6 +15,11 @@ struct PreferencesOverlayMarkers: View {
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
   private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
     .defaultCustomTimeZoneIdentifier
+
+  public init(themeMode: HarnessMonitorThemeMode, selectedSection: PreferencesSection) {
+    self.themeMode = themeMode
+    self.selectedSection = selectedSection
+  }
 
   private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
     HarnessMonitorDateTimeConfiguration(
@@ -38,7 +43,7 @@ struct PreferencesOverlayMarkers: View {
     ].joined(separator: ", ")
   }
 
-  var body: some View {
+  public var body: some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       ZStack {
         Color.clear

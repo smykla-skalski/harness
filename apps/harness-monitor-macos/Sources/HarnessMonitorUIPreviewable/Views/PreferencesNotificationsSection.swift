@@ -1,12 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PreferencesNotificationsSection: View {
-  @Bindable var notifications: HarnessMonitorUserNotificationController
+public struct PreferencesNotificationsSection: View {
+  @Bindable public var notifications: HarnessMonitorUserNotificationController
   @State private var selectedPreset: HarnessMonitorNotificationPreset = .basic
   @State private var contentFieldWidth: CGFloat = 0
 
-  var body: some View {
+  public init(notifications: HarnessMonitorUserNotificationController) {
+    self.notifications = notifications
+  }
+
+  public var body: some View {
     Form {
       statusSection
       authorizationSection

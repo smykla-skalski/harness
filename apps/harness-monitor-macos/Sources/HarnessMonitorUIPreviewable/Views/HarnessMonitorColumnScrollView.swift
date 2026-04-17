@@ -1,17 +1,17 @@
 import SwiftUI
 
-enum HarnessMonitorColumnTopScrollEdgeEffect {
+public enum HarnessMonitorColumnTopScrollEdgeEffect {
   case none
   case soft
   case hard
 }
 
-struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: View>: View {
-  let horizontalPadding: CGFloat
-  let verticalPadding: CGFloat
-  let constrainContentWidth: Bool
-  let readableWidth: Bool
-  let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
+public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: View>: View {
+  public let horizontalPadding: CGFloat
+  public let verticalPadding: CGFloat
+  public let constrainContentWidth: Bool
+  public let readableWidth: Bool
+  public let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
   private let content: Content
   private let underlay: Underlay?
   private let overlay: Overlay?
@@ -19,7 +19,7 @@ struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: Vi
   /// HIG readable content width for body text (~70 characters at body size).
   private static var readableMaxWidth: CGFloat { 680 }
 
-  init(
+  public init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
@@ -37,7 +37,7 @@ struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: Vi
     overlay = nil
   }
 
-  init(
+  public init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
@@ -56,7 +56,7 @@ struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: Vi
     overlay = nil
   }
 
-  init(
+  public init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
@@ -75,7 +75,7 @@ struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: Vi
     self.overlay = overlay()
   }
 
-  init(
+  public init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
@@ -95,7 +95,7 @@ struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: Vi
     self.overlay = overlay()
   }
 
-  var body: some View {
+  public var body: some View {
     Group {
       if readableWidth {
         GeometryReader { geometry in
