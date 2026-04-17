@@ -30,6 +30,7 @@ struct HarnessMonitorWindowRootView: View {
   private var backgroundImage: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
+
   var body: some View {
     ContentView(
       store: store,
