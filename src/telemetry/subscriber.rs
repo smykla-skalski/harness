@@ -27,12 +27,14 @@ use super::config::{
     ExportProtocol, ResolvedTelemetryConfig, RuntimeService, resolve_telemetry_config,
     runtime_service_from_current_process,
 };
+use super::profiler::DaemonProfiler;
 
 pub struct TelemetryGuard {
     async_runtime: Option<TokioRuntime>,
     tracer_provider: Option<SdkTracerProvider>,
     meter_provider: Option<SdkMeterProvider>,
     logger_provider: Option<SdkLoggerProvider>,
+    daemon_profiler: DaemonProfiler,
     export: Option<ResolvedTelemetryConfig>,
     service: RuntimeService,
 }
@@ -54,6 +56,7 @@ impl TelemetryGuard {
             tracer_provider: None,
             meter_provider: None,
             logger_provider: None,
+            daemon_profiler: DaemonProfiler::disabled(),
             export: None,
             service,
         }
@@ -66,12 +69,14 @@ impl TelemetryGuard {
         tracer_provider: SdkTracerProvider,
         meter_provider: SdkMeterProvider,
         logger_provider: SdkLoggerProvider,
+        daemon_profiler: DaemonProfiler,
     ) -> Self {
         Self {
             async_runtime: Some(async_runtime),
             tracer_provider: Some(tracer_provider),
             meter_provider: Some(meter_provider),
             logger_provider: Some(logger_provider),
+            daemon_profiler,
             export: Some(export),
             service,
         }
@@ -93,6 +98,7 @@ impl TelemetryGuard {
 
 impl Drop for TelemetryGuard {
     fn drop(&mut self) {
+        self.daemon_profiler.shutdown();
         self.shutdown();
     }
 }
@@ -197,6 +203,8 @@ fn init_subscriber_with_telemetry(
             .map_err(|error| CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")))?;
     }
 
+    let daemon_profiler = DaemonProfiler::start(service, &export);
+
     Ok(TelemetryGuard::enabled(
         service,
         export,
@@ -204,6 +212,7 @@ fn init_subscriber_with_telemetry(
         tracer_provider,
         meter_provider,
         logger_provider,
+        daemon_profiler,
     ))
 }
 
@@ -394,6 +403,7 @@ mod tests {
             protocol: ExportProtocol::Grpc,
             endpoint: "http://127.0.0.1:4317".to_string(),
             grafana_url: None,
+            pyroscope_url: None,
             headers: BTreeMap::new(),
         };
         let resource = telemetry_resource(RuntimeService::Cli);
