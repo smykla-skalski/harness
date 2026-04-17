@@ -23,6 +23,17 @@ Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
 For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `CLAUDE.md` - it covers XcodeGen, xcodebuild validation lanes, SwiftUI/UX rules, performance measurement, and daemon modes.
 
+## Agent asset architecture
+
+`agents/skills/` and `agents/plugins/` are the only canonical cross-runtime skill and plugin sources in this repo.
+
+`local-skills/claude/` holds Claude-only project-local skill sources. The generator symlinks each subdirectory into `.claude/skills/` so Claude Code picks them up. This works around the `.claude/rules/` auto-load bug - edits to the source files are live immediately.
+
+Every directory under `.claude/`, `.agents/`, `.gemini/`, `.vibe/`, `.opencode/`, `.github/hooks/`, and `plugins/` that holds agent assets is a managed output root. The renderer owns these directories. Each contains an `AGENTS.md` marker it emits. Do not hand-edit files inside managed roots.
+
+- `harness setup agents generate` - renders skill/plugin assets from canonical sources into all managed roots
+- `harness setup bootstrap` - writes runtime config files (`.claude/settings.json`, `.codex/hooks.json`, `.codex/config.toml`, `.gemini/settings.json`, `.github/hooks/harness.json`, `.vibe/hooks.json`, `.opencode/hooks.json`) and syncs the Claude plugin cache
+
 ## Architecture
 
 Harness is a test orchestration framework for Kubernetes/Kuma. It enforces tracked, user-story-first testing through state machines and hook-based guardrails.
@@ -54,7 +65,7 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - `rules.rs` - declarative denied-binary lists, make targets, etc.
 - `commands/` - 33 command handlers dispatched from CLI
 - `session/` - multi-agent orchestration: `types.rs` (SessionState, AgentRegistration, WorkItem, SessionRole), `roles.rs` (permission matrix), `storage.rs` (VersionedJsonRepository + JSONL audit log), `service.rs` (12 orchestration functions), `transport.rs` (13 CLI commands), `observe.rs` (cross-agent observation with periodic sweep)
-- `agents/runtime/` - AgentRuntime trait with 5 implementations (claude, codex, gemini, copilot, opencode), ConversationEvent types, signal protocol (write/read/acknowledge), liveness detection
+- `agents/runtime/` - AgentRuntime trait with 6 implementations (claude, codex, gemini, copilot, vibe, opencode), ConversationEvent types, signal protocol (write/read/acknowledge), liveness detection
 
 ### Data directories (XDG)
 
