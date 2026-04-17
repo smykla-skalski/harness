@@ -234,6 +234,75 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertEqual(selectedFrame.frame.height, sessionRowFrame.frame.height, accuracy: 2)
   }
 
+  func testSidebarSessionRowPublishesCompactStatIconProbes() throws {
+    let app = launch(mode: "preview")
+    let agentStat = element(in: app, identifier: Accessibility.previewSessionRowAgentStat)
+    let taskStat = element(in: app, identifier: Accessibility.previewSessionRowTaskStat)
+
+    XCTAssertTrue(
+      waitForElement(agentStat, timeout: Self.fastActionTimeout),
+      "Preview session row should publish the agent stat icon probe"
+    )
+    XCTAssertTrue(
+      waitForElement(taskStat, timeout: Self.fastActionTimeout),
+      "Preview session row should publish the task stat icon probe"
+    )
+    XCTAssertEqual(agentStat.label, "person.2.fill")
+    XCTAssertEqual(taskStat.label, "arrow.triangle.2.circlepath")
+  }
+
+  func testSidebarSessionRowKeepsStatClusterAndTimestampSeparatedAtLargeTextSize() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [HarnessMonitorSettingsUITestKeys.textSizeOverride: "6"]
+    )
+    let sidebarToggle = sidebarToggleButton(in: app)
+    let sidebarShellQuery = app.otherElements
+      .matching(identifier: Accessibility.sidebarShellFrame)
+    let sidebarShell = sidebarShellQuery.firstMatch
+    let sessionRowFrame = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
+    let statsFrame = frameElement(in: app, identifier: Accessibility.previewSessionRowStatsFrame)
+    let lastActivityFrame = frameElement(
+      in: app,
+      identifier: Accessibility.previewSessionRowLastActivityFrame
+    )
+
+    XCTAssertTrue(waitForElement(sidebarToggle, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sidebarShell, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionRowFrame, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(statsFrame, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(lastActivityFrame, timeout: Self.fastActionTimeout))
+    let initialSidebarWidth = sidebarShell.frame.width
+    XCTAssertGreaterThan(initialSidebarWidth, 200)
+
+    sidebarToggle.tap()
+
+    XCTAssertTrue(
+      waitUntil {
+        guard let collapsedSidebar = sidebarShellQuery.allElementsBoundByIndex.first else {
+          return true
+        }
+        return collapsedSidebar.frame.width < max(120, initialSidebarWidth * 0.5)
+      }
+    )
+
+    let diagnostics = """
+      row: \(sessionRowFrame.frame)
+      stats: \(statsFrame.frame)
+      lastActivity: \(lastActivityFrame.frame)
+      """
+
+    XCTAssertGreaterThanOrEqual(statsFrame.frame.minX, sessionRowFrame.frame.minX, diagnostics)
+    XCTAssertLessThanOrEqual(statsFrame.frame.maxX, sessionRowFrame.frame.maxX, diagnostics)
+    XCTAssertGreaterThanOrEqual(
+      lastActivityFrame.frame.minX,
+      sessionRowFrame.frame.minX,
+      diagnostics
+    )
+    XCTAssertLessThanOrEqual(lastActivityFrame.frame.maxX, sessionRowFrame.frame.maxX, diagnostics)
+    XCTAssertLessThan(statsFrame.frame.maxX, lastActivityFrame.frame.minX, diagnostics)
+  }
+
   private func tapTrailingEdge(
     of element: XCUIElement,
     in app: XCUIApplication

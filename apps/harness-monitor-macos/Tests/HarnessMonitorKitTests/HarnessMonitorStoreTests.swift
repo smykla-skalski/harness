@@ -273,7 +273,9 @@ struct HarnessMonitorStoreTests {
 
     #expect(presentation.statusText == "Leaderless")
     #expect(presentation.statusTone == .caution)
-    #expect(presentation.agentCountText == "2 known")
+    #expect(presentation.agentStat.symbolName == "person.2")
+    #expect(presentation.agentStat.valueText == "2")
+    #expect(presentation.agentStat.helpText == "2 known")
     #expect(presentation.isEstimated == false)
   }
 
@@ -303,7 +305,57 @@ struct HarnessMonitorStoreTests {
     #expect(presentation.statusText == "Active")
     #expect(presentation.statusTone == .secondary)
     #expect(presentation.isEstimated)
-    #expect(presentation.agentCountText == "2 known")
+    #expect(presentation.agentStat.symbolName == "person.2")
+    #expect(presentation.agentStat.valueText == "2")
+    #expect(presentation.agentStat.helpText == "2 known")
+  }
+
+  @Test("Live active summaries use filled agent stat icon")
+  func liveActiveSummariesUseFilledAgentStatIcon() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-live",
+        context: "Live active lane",
+        status: .active,
+        leaderId: "leader-live",
+        observeId: "observe-live",
+        openTaskCount: 1,
+        inProgressTaskCount: 2,
+        blockedTaskCount: 0,
+        activeAgentCount: 3
+      )
+    )
+
+    let presentation = store.sessionSummaryPresentation(for: summary)
+
+    #expect(presentation.agentStat.symbolName == "person.2.fill")
+    #expect(presentation.agentStat.valueText == "3")
+    #expect(presentation.agentStat.helpText == "3 active")
+  }
+
+  @Test("Task stat uses moving icon and help text")
+  func taskStatUsesMovingIconAndHelpText() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-tasks",
+        context: "Moving task lane",
+        status: .active,
+        leaderId: "leader-tasks",
+        observeId: "observe-tasks",
+        openTaskCount: 1,
+        inProgressTaskCount: 4,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+
+    let presentation = store.sessionSummaryPresentation(for: summary)
+
+    #expect(presentation.taskStat.symbolName == "arrow.triangle.2.circlepath")
+    #expect(presentation.taskStat.valueText == "4")
+    #expect(presentation.taskStat.helpText == "4 moving")
   }
 
   @Test("Agent activity presentation never shows ready for disconnected or cached agents")
