@@ -93,6 +93,7 @@ mod liveness;
 mod logging;
 mod misc;
 mod queries;
+mod runtime_registration;
 mod runtime_support;
 mod session_helpers;
 mod session_state;
@@ -115,6 +116,7 @@ pub use queries::{
     build_recovery_tui_request, list_sessions, list_sessions_global, resolve_session_project_dir,
     session_status,
 };
+pub use runtime_registration::register_agent_runtime_session;
 pub use signals::{
     cancel_signal, list_signals, record_signal_acknowledgment,
     resolve_session_agent_for_runtime_session, send_signal,

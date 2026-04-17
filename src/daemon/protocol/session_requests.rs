@@ -148,3 +148,16 @@ pub struct SignalCancelRequest {
 pub struct SessionMutationResponse {
     pub state: SessionState,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRuntimeSessionRegistrationRequest {
+    pub tui_id: String,
+    pub runtime: String,
+    pub agent_session_id: String,
+    pub project_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRuntimeSessionRegistrationResponse {
+    pub registered: bool,
+}

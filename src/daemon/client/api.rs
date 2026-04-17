@@ -3,11 +3,12 @@ use crate::daemon::agent_tui::{
     AgentTuiStartRequest,
 };
 use crate::daemon::protocol::{
-    AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
-    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
-    SessionSummary, SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskUpdateRequest,
+    AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
+    AgentRuntimeSessionRegistrationResponse, LeaderTransferRequest, RoleChangeRequest,
+    SessionDetail, SessionEndRequest, SessionJoinRequest, SessionLeaveRequest,
+    SessionMutationResponse, SessionStartRequest, SessionSummary, SessionTitleRequest,
+    SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
 };
 use crate::errors::CliError;
 use crate::session::types::{AgentPersona, SessionState};
@@ -40,6 +41,18 @@ impl DaemonClient {
         let response: SessionMutationResponse =
             self.post(&format!("/v1/sessions/{session_id}/join"), request)?;
         Ok(response.state)
+    }
+
+    pub fn register_agent_runtime_session(
+        &self,
+        session_id: &str,
+        request: &AgentRuntimeSessionRegistrationRequest,
+    ) -> Result<bool, CliError> {
+        let response: AgentRuntimeSessionRegistrationResponse = self.post(
+            &format!("/v1/sessions/{session_id}/runtime-session"),
+            request,
+        )?;
+        Ok(response.registered)
     }
 
     pub fn end_session(
