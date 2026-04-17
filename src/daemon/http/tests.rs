@@ -346,6 +346,7 @@ pub(super) fn sample_project() -> DiscoveredProject {
 }
 
 pub(super) fn sample_session_state() -> SessionState {
+    let now = chrono::Utc::now().to_rfc3339();
     let mut agents = BTreeMap::new();
     agents.insert(
         "codex-worker".into(),
@@ -355,11 +356,11 @@ pub(super) fn sample_session_state() -> SessionState {
             runtime: "codex".into(),
             role: SessionRole::Worker,
             capabilities: vec!["general".into()],
-            joined_at: "2026-04-13T19:00:00Z".into(),
-            updated_at: "2026-04-13T19:00:00Z".into(),
+            joined_at: now.clone(),
+            updated_at: now.clone(),
             status: AgentStatus::Active,
             agent_session_id: None,
-            last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+            last_activity_at: Some(now.clone()),
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
@@ -374,13 +375,13 @@ pub(super) fn sample_session_state() -> SessionState {
         context: "http timeline scope fixture".into(),
         status: SessionStatus::Active,
         policy: Default::default(),
-        created_at: "2026-04-13T19:00:00Z".into(),
-        updated_at: "2026-04-13T19:00:00Z".into(),
+        created_at: now.clone(),
+        updated_at: now.clone(),
         agents,
         tasks: BTreeMap::new(),
         leader_id: None,
         archived_at: None,
-        last_activity_at: Some("2026-04-13T19:00:00Z".into()),
+        last_activity_at: Some(now),
         observe_id: None,
         pending_leader_transfer: None,
         metrics: SessionMetrics::default(),
