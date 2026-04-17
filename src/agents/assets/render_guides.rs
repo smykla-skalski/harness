@@ -30,11 +30,13 @@ pub(super) fn render_guides(
 ) {
     for &root_rel in managed_roots {
         let root = repo_root.join(root_rel);
-        let entry = outputs.entry(root.clone()).or_insert_with(|| PlannedOutput {
-            managed_root: root.clone(),
-            files: BTreeMap::new(),
-            symlinks: BTreeMap::new(),
-        });
+        let entry = outputs
+            .entry(root.clone())
+            .or_insert_with(|| PlannedOutput {
+                managed_root: root.clone(),
+                files: BTreeMap::new(),
+                symlinks: BTreeMap::new(),
+            });
         entry
             .files
             .insert(root.join("AGENTS.md"), GUIDE_TEMPLATE.to_owned());
@@ -122,8 +124,17 @@ mod tests {
         render_guides(&repo, &[".claude/skills"], &mut outputs);
 
         let output = outputs.get(&root).unwrap();
-        assert!(output.files.contains_key(&existing_file), "existing file preserved");
-        assert!(output.files.contains_key(&root.join("AGENTS.md")), "AGENTS.md added");
-        assert!(output.files.contains_key(&root.join("CLAUDE.md")), "CLAUDE.md added");
+        assert!(
+            output.files.contains_key(&existing_file),
+            "existing file preserved"
+        );
+        assert!(
+            output.files.contains_key(&root.join("AGENTS.md")),
+            "AGENTS.md added"
+        );
+        assert!(
+            output.files.contains_key(&root.join("CLAUDE.md")),
+            "CLAUDE.md added"
+        );
     }
 }
