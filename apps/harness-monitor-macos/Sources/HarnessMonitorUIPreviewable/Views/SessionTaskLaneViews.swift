@@ -138,11 +138,13 @@ struct SessionTaskSummaryCard: View {
   }
 
   private var cardSurface: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      HStack(alignment: .top) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
         Text(task.title)
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-          .lineLimit(2)
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .layoutPriority(1)
         Spacer()
         Text(task.severity.title)
           .scaledFont(.caption.bold())
@@ -150,27 +152,22 @@ struct SessionTaskSummaryCard: View {
           .background(severityColor(for: task.severity), in: Capsule())
           .foregroundStyle(HarnessMonitorTheme.onContrast)
       }
-      Text(task.context ?? "No extra context")
-        .scaledFont(.subheadline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .multilineTextAlignment(.leading)
-        .lineLimit(2)
-      Spacer(minLength: 0)
       HStack(alignment: .firstTextBaseline) {
         Text(task.assignmentStateTitle)
           .scaledFont(.caption.weight(.bold))
           .foregroundStyle(task.assignmentStateColor)
+          .lineLimit(1)
         Spacer()
         Text(task.assignmentSummary)
           .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
+          .truncationMode(.tail)
       }
     }
     .frame(
       maxWidth: .infinity,
-      minHeight: SessionCockpitLayout.laneCardHeight,
-      alignment: .topLeading
+      alignment: .leading
     )
     .padding(HarnessMonitorTheme.cardPadding)
   }
