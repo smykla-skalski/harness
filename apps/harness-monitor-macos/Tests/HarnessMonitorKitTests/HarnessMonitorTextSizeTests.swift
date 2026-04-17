@@ -224,6 +224,23 @@ struct TaskDragFeedbackMetricsTests {
 @MainActor
 @Suite("Session task card layout")
 struct SessionTaskCardLayoutTests {
+  @Test("Compact severity badge stays on one line at narrow widths")
+  func compactSeverityBadgeStaysOnOneLineAtNarrowWidths() {
+    let task = PreviewFixtures.taskDropTask
+    let wideSize = fittingSize(
+      for: SessionTaskCompactSummaryContent(task: task)
+        .padding(HarnessMonitorTheme.cardPadding),
+      width: 320
+    )
+    let narrowSize = fittingSize(
+      for: SessionTaskCompactSummaryContent(task: task)
+        .padding(HarnessMonitorTheme.cardPadding),
+      width: 220
+    )
+
+    #expect(narrowSize.height == wideSize.height)
+  }
+
   @Test("Task card height follows the compact summary content without extra reserve space")
   func taskCardHeightFollowsCompactSummaryContent() {
     let width: CGFloat = 320
