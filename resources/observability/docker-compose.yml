@@ -1,6 +1,6 @@
 services:
   alloy:
-    image: grafana/alloy@sha256:1f40cf52adda8fab3e058f9347a5d165624ecb9fbc1527769cb744748961940d
+    image: grafana/alloy:v1.15.1@sha256:1f40cf52adda8fab3e058f9347a5d165624ecb9fbc1527769cb744748961940d
     command:
       - run
       - /etc/alloy/config.alloy
@@ -20,7 +20,7 @@ services:
       - prometheus
 
   tempo:
-    image: grafana/tempo@sha256:f95ca3f2ddcd18997459d95e5b2c756b3811e153fc833f6f932aaf61d422594a
+    image: grafana/tempo:2.10.4@sha256:a6616c9d224770c883a67b50e4941e99c5df81b076ef05f516bb7cce5a96cec0
     command:
       - -config.file=/etc/tempo/tempo.yml
     user: "0"
@@ -32,7 +32,7 @@ services:
       - "127.0.0.1:3200:3200"
 
   loki:
-    image: grafana/loki@sha256:73e905b51a7f917f7a1075e4be68759df30226e03dcb3cd2213b989cc0dc8eb4
+    image: grafana/loki:3.7.1@sha256:73e905b51a7f917f7a1075e4be68759df30226e03dcb3cd2213b989cc0dc8eb4
     command:
       - -config.file=/etc/loki/loki.yml
     user: "0"
@@ -44,7 +44,7 @@ services:
       - "127.0.0.1:3100:3100"
 
   prometheus:
-    image: prom/prometheus@sha256:5550dc63da361dc30f6fe02ac0e4dfc736ededfef3c8d12a634db04a67824d78
+    image: prom/prometheus:v3.11.2@sha256:5550dc63da361dc30f6fe02ac0e4dfc736ededfef3c8d12a634db04a67824d78
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -57,14 +57,23 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
 
+  pyroscope:
+    image: grafana/pyroscope:1.21.0@sha256:751794786ee566c6b6200272546ba0200221c6c5660a03ca3b3b3d64d6b3d557
+    command:
+      - server
+    restart: unless-stopped
+    volumes:
+      - pyroscope-data:/var/lib/pyroscope
+    ports:
+      - "127.0.0.1:4040:4040"
+
   grafana:
-    image: grafana/grafana@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    image: grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_DEFAULT_THEME: light
-      GF_INSTALL_PLUGINS: grafana-lokiexplore-app
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -75,10 +84,18 @@ services:
       - tempo
       - loki
       - prometheus
+      - pyroscope
 
 volumes:
   alloy-data:
+    name: harness-observability_alloy-data
   tempo-data:
+    name: harness-observability_tempo-data
   loki-data:
+    name: harness-observability_loki-data
   prometheus-data:
+    name: harness-observability_prometheus-data
+  pyroscope-data:
+    name: harness-observability_pyroscope-data
   grafana-data:
+    name: harness-observability_grafana-data

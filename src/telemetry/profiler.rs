@@ -1,8 +1,13 @@
+use pyroscope::backend::{BackendConfig, pprof::PprofConfig, pprof_backend};
+use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgentRunning};
+use pyroscope::PyroscopeError;
 use tracing::{info, warn};
 
 use super::config::{ResolvedTelemetryConfig, RuntimeService};
 
 const PYROSCOPE_SAMPLE_RATE_HZ: u32 = 100;
+
+type RunningAgent = PyroscopeAgent<PyroscopeAgentRunning>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DaemonProfilerSettings {
@@ -12,7 +17,7 @@ struct DaemonProfilerSettings {
 }
 
 pub struct DaemonProfiler {
-    running: Option<pyroscope::pyroscope::PyroscopeAgent<pyroscope::pyroscope::PyroscopeAgentRunning>>,
+    running: Option<RunningAgent>,
 }
 
 impl DaemonProfiler {
@@ -28,44 +33,58 @@ impl DaemonProfiler {
 
     #[must_use]
     pub fn start(service: RuntimeService, export: &ResolvedTelemetryConfig) -> Self {
-        let Some(settings) = daemon_profiler_settings(service, export) else {
-            return Self::disabled();
-        };
-
-        match build_running_agent(&settings) {
-            Ok(running) => {
-                info!(
-                    pyroscope_url = %settings.url,
-                    service_name = service.service_name(),
-                    "started daemon profiler"
-                );
-                Self {
-                    running: Some(running),
-                }
-            }
-            Err(error) => {
-                warn!(
-                    %error,
-                    pyroscope_url = %settings.url,
-                    service_name = service.service_name(),
-                    "failed to start daemon profiler"
-                );
-                Self::disabled()
-            }
-        }
+        daemon_profiler_settings(service, export)
+            .map_or_else(Self::disabled, |settings| Self::start_with_settings(service, &settings))
     }
 
     pub fn shutdown(&mut self) {
-        let Some(running) = self.running.take() else {
-            return;
-        };
-
-        match running.stop() {
-            Ok(ready) => ready.shutdown(),
-            Err(error) => {
-                warn!(%error, "failed to stop daemon profiler cleanly");
-            }
+        if let Some(running) = self.running.take() {
+            shutdown_running_agent(running);
         }
+    }
+
+    fn start_with_settings(service: RuntimeService, settings: &DaemonProfilerSettings) -> Self {
+        build_running_agent(settings).map_or_else(
+            |error| Self::start_failed(service, settings, &error),
+            |running| Self::start_succeeded(service, settings, running),
+        )
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn start_succeeded(
+        service: RuntimeService,
+        settings: &DaemonProfilerSettings,
+        running: RunningAgent,
+    ) -> Self {
+        info!(
+            pyroscope_url = %settings.url,
+            service_name = service.service_name(),
+            "started daemon profiler"
+        );
+        Self {
+            running: Some(running),
+        }
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn start_failed(
+        service: RuntimeService,
+        settings: &DaemonProfilerSettings,
+        error: &PyroscopeError,
+    ) -> Self {
+        warn!(
+            %error,
+            pyroscope_url = %settings.url,
+            service_name = service.service_name(),
+            "failed to start daemon profiler"
+        );
+        Self::disabled()
     }
 }
 
@@ -82,7 +101,6 @@ fn daemon_profiler_settings(
         url,
         application_name: service.service_name(),
         tags: vec![
-            ("service_name", service.service_name().to_string()),
             ("service_namespace", "harness".to_string()),
             ("service_version", env!("CARGO_PKG_VERSION").to_string()),
         ],
@@ -91,22 +109,19 @@ fn daemon_profiler_settings(
 
 fn build_running_agent(
     settings: &DaemonProfilerSettings,
-) -> Result<
-    pyroscope::pyroscope::PyroscopeAgent<pyroscope::pyroscope::PyroscopeAgentRunning>,
-    pyroscope::PyroscopeError,
-> {
+) -> Result<RunningAgent, PyroscopeError> {
     let tags = settings
         .tags
         .iter()
         .map(|(key, value)| (*key, value.as_str()))
         .collect::<Vec<_>>();
-    let backend = pyroscope::backend::pprof_backend(
-        pyroscope::backend::pprof::PprofConfig {
+    let backend = pprof_backend(
+        PprofConfig {
             sample_rate: PYROSCOPE_SAMPLE_RATE_HZ,
         },
-        pyroscope::backend::BackendConfig::default(),
+        BackendConfig::default(),
     );
-    let agent = pyroscope::pyroscope::PyroscopeAgentBuilder::new(
+    let agent = PyroscopeAgentBuilder::new(
         &settings.url,
         settings.application_name,
         PYROSCOPE_SAMPLE_RATE_HZ,
@@ -117,6 +132,22 @@ fn build_running_agent(
         .tags(tags)
         .build()?;
     agent.start()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn shutdown_running_agent(running: RunningAgent) {
+    if let Err(error) = stop_running_agent(running) {
+        warn!(%error, "failed to stop daemon profiler cleanly");
+    }
+}
+
+fn stop_running_agent(running: RunningAgent) -> Result<(), PyroscopeError> {
+    let ready = running.stop()?;
+    ready.shutdown();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -160,7 +191,6 @@ mod tests {
         assert_eq!(
             settings.tags,
             vec![
-                ("service_name", "harness-daemon".to_string()),
                 ("service_namespace", "harness".to_string()),
                 ("service_version", env!("CARGO_PKG_VERSION").to_string()),
             ]

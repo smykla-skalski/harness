@@ -18,11 +18,17 @@ metrics_generator:
     external_labels:
       source: tempo
       cluster: harness-local
+  processor:
+    local_blocks:
+      filter_server_spans: false
+      flush_to_storage: true
   storage:
     path: /var/lib/tempo/generator/wal
     remote_write:
       - url: http://prometheus:9090/api/v1/write
         send_exemplars: true
+  traces_storage:
+    path: /var/lib/tempo/generator/traces
 
 storage:
   trace:
@@ -38,6 +44,7 @@ overrides:
       processors:
         - service-graphs
         - span-metrics
+        - local-blocks
       generate_native_histograms: both
 
 usage_report:

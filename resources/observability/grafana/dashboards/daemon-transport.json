@@ -1,0 +1,568 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Metrics Drilldown",
+      "type": "link",
+      "url": "/a/grafana-metricsdrilldown-app/drilldown"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Logs Drilldown",
+      "type": "link",
+      "url": "/a/grafana-lokiexplore-app/explore"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Traces Drilldown",
+      "type": "link",
+      "url": "/a/grafana-exploretraces-app/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Profiles Drilldown",
+      "type": "link",
+      "url": "/a/grafana-pyroscope-app/explore"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Daemon server request throughput split from the /v1 HTTP API.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\"}[5m]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Server Req / s",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Daemon server p95 latency from the millisecond HTTP histogram family.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
+          "refId": "A"
+        }
+      ],
+      "title": "Server p95",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Daemon client throughput from hook-side transport calls into the daemon.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[5m]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Client Req / s",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Daemon client p95 latency from the hook-side millisecond histogram family.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
+          "refId": "A"
+        }
+      ],
+      "title": "Client p95",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Server throughput by route and status code.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Metrics Drilldown",
+          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (http_route, http_status_code) (rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[5m]))",
+          "legendFormat": "{{http_route}} :: {{http_status_code}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Server Rate by Route and Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Client throughput by route and status code.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (http_route, http_status_code) (rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[5m]))",
+          "legendFormat": "{{http_route}} :: {{http_status_code}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Client Rate by Route and Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Transport error rates and p95 latency on one surface.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "100 * sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\"}[5m])), 0.001)",
+          "legendFormat": "server 5xx %",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "100 * sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", error=\"true\"}[5m])) / clamp_min(sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[5m])), 0.001)",
+          "legendFormat": "client error %",
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
+          "legendFormat": "server p95 ms",
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
+          "legendFormat": "client p95 ms",
+          "refId": "D"
+        }
+      ],
+      "title": "Transport Errors and Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Daemon logs filtered by severity level.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "id": 8,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Logs Drilldown",
+          "url": "/a/grafana-lokiexplore-app/explore"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "{service_name=\"harness-daemon\", level=~\"${level:regex}\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Daemon Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "harness",
+    "observability",
+    "daemon"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(harness_daemon_http_requests_total, http_route)",
+        "includeAll": true,
+        "label": "Route",
+        "multi": true,
+        "name": "http_route",
+        "options": [],
+        "query": "label_values(harness_daemon_http_requests_total, http_route)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(harness_daemon_http_requests_total, http_status_code)",
+        "includeAll": true,
+        "label": "Status",
+        "multi": true,
+        "name": "http_status_code",
+        "options": [],
+        "query": "label_values(harness_daemon_http_requests_total, http_status_code)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "includeAll": true,
+        "label": "Level",
+        "multi": true,
+        "name": "level",
+        "options": [],
+        "query": "debug,info,warn,error",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "title": "Harness Daemon Transport",
+  "uid": "harness-daemon-transport",
+  "version": 1
+}
