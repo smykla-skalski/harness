@@ -32,6 +32,43 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(probe.didInvalidate)
   }
 
+  @Test("WebSocket transport shutdown invalidates the fallback HTTP URLSession")
+  func webSocketTransportShutdownInvalidatesFallbackHTTPSession() async {
+    let connection = HarnessMonitorConnection(
+      endpoint: URL(string: "http://127.0.0.1:9999")!,
+      token: "token"
+    )
+    let webSocketProbe = SessionInvalidationProbe()
+    let webSocketSession = URLSession(
+      configuration: .ephemeral,
+      delegate: webSocketProbe,
+      delegateQueue: nil
+    )
+    let fallbackProbe = SessionInvalidationProbe()
+    let fallbackSession = URLSession(
+      configuration: .ephemeral,
+      delegate: fallbackProbe,
+      delegateQueue: nil
+    )
+    let transport = WebSocketTransport(
+      connection: connection,
+      session: webSocketSession,
+      httpFallbackClient: HarnessMonitorAPIClient(
+        connection: connection,
+        session: fallbackSession
+      )
+    )
+
+    await transport.shutdown()
+
+    for _ in 0..<20 where !(webSocketProbe.didInvalidate && fallbackProbe.didInvalidate) {
+      try? await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(webSocketProbe.didInvalidate)
+    #expect(fallbackProbe.didInvalidate)
+  }
+
   @Test("bootstrapIfNeeded only bootstraps once")
   func bootstrapIfNeededOnlyBootstrapsOnce() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

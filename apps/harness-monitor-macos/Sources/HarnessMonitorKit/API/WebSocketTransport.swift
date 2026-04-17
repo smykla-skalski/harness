@@ -28,28 +28,38 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   ]
 
   public init(connection: HarnessMonitorConnection) {
-    self.connection = connection
-    encoder = JSONEncoder()
-    encoder.keyEncodingStrategy = .convertToSnakeCase
-    decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-    // WebSocket sessions must not have a resource timeout - the 30s
-    // default kills long-lived connections. Request timeout covers
-    // individual frame sends; heartbeat handles liveness detection.
     let configuration = URLSessionConfiguration.default
     configuration.timeoutIntervalForRequest = 15
     configuration.timeoutIntervalForResource = 0
-    session = URLSession(configuration: configuration)
+    let session = URLSession(configuration: configuration)
 
     let httpConfiguration = URLSessionConfiguration.default
     httpConfiguration.timeoutIntervalForRequest = 15
     httpConfiguration.timeoutIntervalForResource = 30
     let httpSession = URLSession(configuration: httpConfiguration)
-    httpFallbackClient = HarnessMonitorAPIClient(
+    let httpFallbackClient = HarnessMonitorAPIClient(
       connection: connection,
       session: httpSession
     )
+    self.init(
+      connection: connection,
+      session: session,
+      httpFallbackClient: httpFallbackClient
+    )
+  }
+
+  init(
+    connection: HarnessMonitorConnection,
+    session: URLSession,
+    httpFallbackClient: HarnessMonitorAPIClient
+  ) {
+    self.connection = connection
+    encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    self.session = session
+    self.httpFallbackClient = httpFallbackClient
   }
 
   public func connect() async throws {
@@ -83,6 +93,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   public func shutdown() async {
     isShutDown = true
     disconnect()
+    await httpFallbackClient.shutdown()
     session.invalidateAndCancel()
   }
 }
