@@ -49,7 +49,7 @@ CARGO_PROFILE_DEV_DEBUG=2 CARGO_PROFILE_TEST_DEBUG=2 mise run test:unit
 ### setup - environment and cluster preparation
 
 ```
-harness setup bootstrap [--agents <claude,codex,gemini,copilot,opencode>]
+harness setup bootstrap [--agents <claude,codex,gemini,copilot,vibe,opencode>]
 harness setup agents generate [--check]
 harness setup kuma <topology> <name> [flags]
 harness setup gateway [--kubeconfig <path>] [--repo-root <path>]
@@ -229,20 +229,23 @@ harness create validate
 
 ## Cross-agent sessions
 
-Harness supports Claude, Codex, Gemini, Copilot, and OpenCode through a shared authoring and runtime model.
+Harness supports Claude, Codex, Gemini, Copilot, Vibe, and OpenCode through a shared authoring and runtime model.
 
 ### Authoring
 
-Skills and plugins are written once under `agents/` and rendered into host-specific directories:
+Cross-runtime skills and plugins live under `agents/` and are rendered into host-specific directories. Claude-only project-local skills live under `local-skills/claude/` and are symlinked into `.claude/skills/` by the generator.
 
-- `.claude/` - Claude hooks, skills, settings
-- `.agents/` - cross-agent assets
-- `.gemini/` - Gemini wrapper
-- `.opencode/` - OpenCode skills and plugins
+Managed output roots (renderer-owned - do not edit directly):
+
+- `.claude/skills`, `.claude/plugins` - Claude skills and plugins
+- `.agents/skills`, `.agents/plugins` - cross-agent assets
+- `.gemini/commands` - Gemini wrapper
+- `.vibe/skills`, `.vibe/plugins` - Vibe skills and plugins
+- `.opencode/skills`, `.opencode/plugins` - OpenCode skills and plugins
 - `plugins/` - agent plugin definitions
 - `.github/hooks/` - GitHub integration hooks
 
-Treat those rendered directories as generated output. The source of truth is `agents/`.
+Each managed root contains an `AGENTS.md` marker emitted by the renderer. The source of truth is `agents/` (cross-runtime) and `local-skills/claude/` (Claude-only).
 
 ```bash
 harness setup agents generate        # render agents/ into host directories
