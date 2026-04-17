@@ -52,6 +52,7 @@ mod diagnostics;
 mod imports;
 mod runtime;
 mod schema;
+mod schema_repairs;
 mod schema_sql;
 mod session_data;
 mod signals;
@@ -109,6 +110,7 @@ pub(crate) fn session_status_db_label(status: SessionStatus) -> Result<String, C
 }
 
 #[must_use]
+#[allow(dead_code)]
 pub(crate) fn parse_session_status_db_label(status: &str) -> SessionStatus {
     serde_json::from_value(serde_json::Value::String(status.to_string()))
         .unwrap_or(SessionStatus::Ended)
@@ -223,7 +225,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "8";
+pub(crate) const SCHEMA_VERSION: &str = "9";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

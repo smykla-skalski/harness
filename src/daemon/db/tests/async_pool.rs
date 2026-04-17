@@ -1,4 +1,5 @@
 use sqlx::query_scalar;
+use serde_json::json;
 use tempfile::tempdir;
 
 use super::*;
@@ -23,7 +24,7 @@ async fn connect_reads_current_schema_version() {
             .expect("async schema version"),
         SCHEMA_VERSION
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
 }
 
 #[tokio::test]
@@ -45,7 +46,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
         async_db.health_counts().await.expect("async health counts"),
         (0, 0, 0)
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
 }
 
 #[tokio::test]
@@ -127,7 +128,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
         async_db.health_counts().await.expect("async health counts"),
         (1, 0, 1)
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
 }
 
 #[tokio::test]
@@ -168,7 +169,103 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
             .expect("async schema version"),
         SCHEMA_VERSION
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+}
+
+#[tokio::test]
+async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let session_id = {
+        let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+        let project = sample_project();
+        sync_db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        sync_db
+            .sync_session(&project.project_id, &state)
+            .expect("sync session");
+        sync_db
+            .conn
+            .execute(
+                "UPDATE sessions
+                 SET status = 'active',
+                     leader_id = NULL,
+                     metrics_json = ?1,
+                     state_json = ?2,
+                     is_active = 1
+                 WHERE session_id = ?3",
+                rusqlite::params![
+                    json!({
+                        "agent_count": 0,
+                        "active_agent_count": 0,
+                        "idle_agent_count": 0,
+                        "open_task_count": 0,
+                        "in_progress_task_count": 0,
+                        "blocked_task_count": 0,
+                        "completed_task_count": 0
+                    })
+                    .to_string(),
+                    json!({
+                        "schema_version": 6,
+                        "state_version": 1,
+                        "session_id": state.session_id.clone(),
+                        "title": state.title.clone(),
+                        "context": state.context.clone(),
+                        "status": "active",
+                        "created_at": state.created_at.clone(),
+                        "updated_at": state.updated_at.clone(),
+                        "agents": {},
+                        "tasks": {},
+                        "leader_id": null,
+                        "archived_at": null,
+                        "last_activity_at": state.last_activity_at.clone(),
+                        "observe_id": state.observe_id.clone(),
+                        "pending_leader_transfer": null,
+                        "metrics": {
+                            "agent_count": 0,
+                            "active_agent_count": 0,
+                            "idle_agent_count": 0,
+                            "open_task_count": 0,
+                            "in_progress_task_count": 0,
+                            "blocked_task_count": 0,
+                            "completed_task_count": 0
+                        }
+                    })
+                    .to_string(),
+                    state.session_id.clone(),
+                ],
+            )
+            .expect("corrupt v8 row");
+        sync_db
+            .conn
+            .execute(
+                "UPDATE schema_meta SET value = '8' WHERE key = 'version'",
+                [],
+            )
+            .expect("downgrade schema");
+        state.session_id
+    };
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db");
+    assert_eq!(
+        async_db
+            .schema_version()
+            .await
+            .expect("async schema version"),
+        SCHEMA_VERSION
+    );
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+    drop(async_db);
+
+    let sync_db = DaemonDb::open(&db_path).expect("reopen sync daemon db");
+    let repaired = sync_db
+        .load_session_state(&session_id)
+        .expect("load repaired session")
+        .expect("session present");
+    assert_eq!(repaired.status, SessionStatus::LeaderlessDegraded);
+    assert!(repaired.leader_id.is_none());
 }
 
 #[test]
