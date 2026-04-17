@@ -90,10 +90,12 @@ fn render_codex_plugin_outputs(
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
     let base = repo_root.join("plugins").join(&plugin.source.name);
+    let manifest = render_plugin_manifest(&plugin.source);
     files.insert(
         base.join(".codex-plugin").join("plugin.json"),
-        render_plugin_manifest(&plugin.source),
+        manifest.clone(),
     );
+    files.insert(base.join(".claude-plugin").join("plugin.json"), manifest);
     copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
     render_plugin_skill_markdown(RenderTarget::Portable, plugin, &base, files)?;
     files.insert(

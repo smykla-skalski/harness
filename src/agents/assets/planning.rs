@@ -7,7 +7,9 @@ use crate::setup::wrapper::planned_agent_bootstrap_files;
 
 use super::files::managed_root_for_path;
 use super::loading::{load_plugin_sources, load_skill_sources};
-use super::model::{AgentAssetTarget, PlannedOutput, RenderTarget, MANAGED_ROOTS, selected_targets};
+use super::model::{
+    AgentAssetTarget, MANAGED_ROOTS, PlannedOutput, RenderTarget, selected_targets,
+};
 use super::render_guides::render_guides;
 use super::render_local_skills::render_local_skills;
 use super::render_plugins::render_plugin_outputs;
@@ -94,10 +96,7 @@ pub(super) fn rebase_planned_outputs(
                 .symlinks
                 .into_iter()
                 .map(|(link, target)| {
-                    Ok((
-                        rebase_output_path(source_root, output_root, &link)?,
-                        target,
-                    ))
+                    Ok((rebase_output_path(source_root, output_root, &link)?, target))
                 })
                 .collect::<Result<BTreeMap<_, _>, CliError>>()?;
             Ok(PlannedOutput {
