@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::fs::{Permissions, create_dir_all, metadata, remove_file, set_permissions};
+use std::fs::{Permissions, create_dir_all, metadata, read_link, remove_file, set_permissions};
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 
@@ -59,7 +59,7 @@ fn write_symlink(link: &Path, target: &Path) -> Result<(), CliError> {
     }
     // Replace atomically if the link already exists but points elsewhere, or is a plain file.
     if link.exists() || link.symlink_metadata().is_ok() {
-        let existing_target = std::fs::read_link(link).ok();
+        let existing_target = read_link(link).ok();
         if existing_target.as_deref() == Some(target) {
             return Ok(());
         }
@@ -103,7 +103,7 @@ fn expected_output_drift(output: &PlannedOutput) -> Vec<String> {
         .collect();
 
     for (link, expected_target) in &output.symlinks {
-        match std::fs::read_link(link) {
+        match read_link(link) {
             Ok(actual_target) if actual_target == *expected_target => {}
             Ok(_) => drift.push(format!("symlink drift: {}", link.display())),
             Err(_) => drift.push(format!("missing symlink: {}", link.display())),
@@ -147,4 +147,109 @@ fn path_is_executable(path: &Path) -> bool {
 
 pub(super) fn io_err(error: &impl ToString) -> CliError {
     CliErrorKind::workflow_io(error.to_string()).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::fs::create_dir_all;
+    use std::os::unix::fs::symlink;
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn make_output(tmp: &TempDir) -> PlannedOutput {
+        PlannedOutput {
+            managed_root: tmp.path().to_owned(),
+            files: BTreeMap::new(),
+            symlinks: BTreeMap::new(),
+        }
+    }
+
+    // --- expected_output_drift symlink checks ---
+
+    #[test]
+    fn symlink_present_and_correct_no_drift() {
+        let tmp = TempDir::new().unwrap();
+        let link = tmp.path().join("link");
+        let target = PathBuf::from("../some/target");
+        symlink(&target, &link).unwrap();
+
+        let mut output = make_output(&tmp);
+        output.symlinks.insert(link, target);
+
+        assert!(expected_output_drift(&output).is_empty());
+    }
+
+    #[test]
+    fn symlink_missing_reports_drift() {
+        let tmp = TempDir::new().unwrap();
+        let link = tmp.path().join("missing-link");
+        let target = PathBuf::from("../some/target");
+
+        let mut output = make_output(&tmp);
+        output.symlinks.insert(link.clone(), target);
+
+        let drift = expected_output_drift(&output);
+        assert_eq!(drift.len(), 1);
+        assert!(drift[0].starts_with("missing symlink:"), "{:?}", drift[0]);
+    }
+
+    #[test]
+    fn symlink_wrong_target_reports_drift() {
+        let tmp = TempDir::new().unwrap();
+        let link = tmp.path().join("link");
+        symlink(PathBuf::from("../wrong/target"), &link).unwrap();
+
+        let expected_target = PathBuf::from("../correct/target");
+        let mut output = make_output(&tmp);
+        output.symlinks.insert(link.clone(), expected_target);
+
+        let drift = expected_output_drift(&output);
+        assert_eq!(drift.len(), 1);
+        assert!(drift[0].starts_with("symlink drift:"), "{:?}", drift[0]);
+    }
+
+    // --- unexpected_output_drift symlink checks ---
+
+    #[test]
+    fn planned_symlink_not_reported_as_unexpected() {
+        let tmp = TempDir::new().unwrap();
+        let managed_root = tmp.path().join("root");
+        create_dir_all(&managed_root).unwrap();
+        let link = managed_root.join("link");
+        symlink(PathBuf::from("../target"), &link).unwrap();
+
+        let output = PlannedOutput {
+            managed_root: managed_root.clone(),
+            files: BTreeMap::new(),
+            symlinks: BTreeMap::from([(link, PathBuf::from("../target"))]),
+        };
+
+        let drift = unexpected_output_drift(&output).unwrap();
+        assert!(
+            drift.is_empty(),
+            "planned symlink reported unexpected: {drift:?}"
+        );
+    }
+
+    #[test]
+    fn unplanned_symlink_reported_as_unexpected() {
+        let tmp = TempDir::new().unwrap();
+        let managed_root = tmp.path().join("root");
+        create_dir_all(&managed_root).unwrap();
+        let link = managed_root.join("stale-link");
+        symlink(PathBuf::from("../target"), &link).unwrap();
+
+        let output = PlannedOutput {
+            managed_root: managed_root.clone(),
+            files: BTreeMap::new(),
+            symlinks: BTreeMap::new(),
+        };
+
+        let drift = unexpected_output_drift(&output).unwrap();
+        assert_eq!(drift.len(), 1);
+        assert!(drift[0].starts_with("unexpected:"), "{:?}", drift[0]);
+    }
 }
