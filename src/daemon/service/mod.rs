@@ -226,9 +226,11 @@ mod sync_support;
 
 pub use direct::{
     disconnect_agent_direct, join_session_direct, record_signal_ack_direct, start_session_direct,
+    update_session_title_direct,
 };
 pub(crate) use direct::{
     disconnect_agent_direct_async, join_session_direct_async, start_session_direct_async,
+    update_session_title_direct_async,
 };
 pub use leave::leave_session;
 pub(crate) use leave::leave_session_async;
