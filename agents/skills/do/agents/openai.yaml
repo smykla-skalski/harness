@@ -1,6 +1,0 @@
-interface:
-  display_name: "do"
-  short_description: "Implement a GitHub issue end to end in this repo"
-  default_prompt: "Use $do to read a GitHub issue, define a done bar, implement it in an isolated worktree with TDD, verify the result, then push and close it for this repository."
-policy:
-  allow_implicit_invocation: false

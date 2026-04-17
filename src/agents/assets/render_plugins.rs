@@ -232,7 +232,15 @@ fn render_codex_marketplace(repo_root: &Path) -> Result<String, CliError> {
         .map(|plugin| {
             serde_json::json!({
                 "name": plugin.name,
-                "source": format!("./{}", plugin.name),
+                "source": {
+                    "source": "local",
+                    "path": format!("./plugins/{}", plugin.name),
+                },
+                "policy": {
+                    "installation": "AVAILABLE",
+                    "authentication": "ON_INSTALL",
+                },
+                "category": "Productivity",
             })
         })
         .collect();

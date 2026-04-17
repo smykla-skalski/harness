@@ -2,12 +2,28 @@
   "name": "harness",
   "plugins": [
     {
+      "category": "Productivity",
       "name": "harness",
-      "source": "./harness"
+      "policy": {
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
+      },
+      "source": {
+        "path": "./plugins/harness",
+        "source": "local"
+      }
     },
     {
+      "category": "Productivity",
       "name": "suite",
-      "source": "./suite"
+      "policy": {
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
+      },
+      "source": {
+        "path": "./plugins/suite",
+        "source": "local"
+      }
     }
   ]
 }
