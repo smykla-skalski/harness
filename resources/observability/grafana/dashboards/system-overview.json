@@ -31,12 +31,12 @@
       "asDropdown": false,
       "icon": "external link",
       "includeVars": false,
-      "keepTime": true,
+      "keepTime": false,
       "tags": [],
       "targetBlank": false,
       "title": "Traces Drilldown",
       "type": "link",
-      "url": "/a/grafana-exploretraces-app/"
+      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
     },
     {
       "asDropdown": false,
@@ -186,7 +186,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m]))",
+          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m])) or on() vector(0)",
           "refId": "A"
         }
       ],
@@ -257,7 +257,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m])))",
+          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))",
           "refId": "A"
         }
       ],
@@ -328,7 +328,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m])))",
+          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))",
           "refId": "A"
         }
       ],
@@ -359,10 +359,10 @@
       "id": 5,
       "links": [
         {
-          "keepTime": true,
+          "keepTime": false,
           "targetBlank": false,
           "title": "Open Traces Drilldown",
-          "url": "/a/grafana-exploretraces-app/"
+          "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
         }
       ],
       "options": {
@@ -460,19 +460,19 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (hook_name) (rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m]))",
-          "legendFormat": "hook {{hook_name}}",
+          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m])) or on() vector(0)",
+          "legendFormat": "hook blocks",
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_daemon_client_requests_total{error=\"true\"}[5m]))",
+          "expr": "sum(rate(harness_daemon_client_requests_total{error=\"true\"}[5m])) or on() vector(0)",
           "legendFormat": "daemon client errors",
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_monitor_http_requests_total{request_failed=\"true\"}[5m]))",
+          "expr": "sum(rate(harness_monitor_http_requests_total{request_failed=\"true\"}[5m])) or on() vector(0)",
           "legendFormat": "monitor failed requests",
           "refId": "C"
         }
@@ -532,7 +532,7 @@
   "templating": {
     "list": [
       {
-        "allValue": ".*",
+        "allValue": ".+",
         "current": {
           "selected": true,
           "text": "All",
