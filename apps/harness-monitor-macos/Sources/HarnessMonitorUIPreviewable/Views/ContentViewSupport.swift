@@ -202,25 +202,6 @@ public struct ContentCenterpieceToolbarItems: ToolbarContent {
       statusMessages: toolbarUI.toolbarStatusMessages,
       connectionState: toolbarUI.connectionState
     )
-
-    ToolbarItemGroup(placement: .principal) {
-      Button {
-        store.sleepPreventionEnabled.toggle()
-      } label: {
-        Label(
-          toolbarUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: toolbarUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
-        )
-      }
-      .tint(toolbarUI.sleepPreventionEnabled ? .orange : nil)
-      .help(
-        toolbarUI.sleepPreventionEnabled
-          ? "Preventing sleep - click to disable"
-          : "Allow sleep - click to prevent"
-      )
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
-    }
-    .sharedBackgroundVisibility(.hidden)
   }
 }
 
@@ -396,6 +377,22 @@ struct InspectorToolbarActions: ToolbarContent {
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
+      Button {
+        store.sleepPreventionEnabled.toggle()
+      } label: {
+        Label(
+          toolbarUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
+          systemImage: toolbarUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+        )
+      }
+      .tint(toolbarUI.sleepPreventionEnabled ? .orange : nil)
+      .help(
+        toolbarUI.sleepPreventionEnabled
+          ? "Click to allow system sleep"
+          : "Prevent sleep while sessions are active"
+      )
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
+
       RefreshToolbarButton(isRefreshing: toolbarUI.isRefreshing) {
         Task { await store.refresh() }
       }
