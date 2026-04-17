@@ -138,7 +138,17 @@ extension DaemonController {
     state: inout WarmUpLoopState
   ) -> WarmUpIterationOutcome {
     state.lastError = DaemonControlError.daemonDidNotStart
+    let staleSignature = Self.managedStaleManifestSignature(for: manifest)
+    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
     if Self.processIsAlive(pid: manifest.pid) == false {
+      if state.refreshedManagedLaunchAgentDuringWarmUp {
+        return handleManagedReplacementManifestWait(
+          signature: staleSignature,
+          path: path,
+          gracePeriod: gracePeriod,
+          state: &state
+        )
+      }
       state.skipFinalBootstrapProbe = true
       state.immediateError = DaemonControlError.daemonDidNotStart
       let pid = manifest.pid
@@ -147,8 +157,6 @@ extension DaemonController {
       )
       return .stopLoop
     }
-    let staleSignature = Self.managedStaleManifestSignature(for: manifest)
-    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
     if state.managedStaleManifestTracker.expired(
       signature: staleSignature,
       now: ContinuousClock.now,
@@ -165,6 +173,35 @@ extension DaemonController {
     }
     HarnessMonitorLogger.lifecycle.trace(
       "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
+    )
+    return .continueLoop
+  }
+
+  func handleManagedReplacementManifestWait(
+    signature: String,
+    path: String,
+    gracePeriod: String,
+    state: inout WarmUpLoopState
+  ) -> WarmUpIterationOutcome {
+    if state.managedStaleManifestTracker.expired(
+      signature: signature,
+      now: ContinuousClock.now,
+      gracePeriod: managedStaleManifestGracePeriod
+    ) {
+      state.skipFinalBootstrapProbe = true
+      state.immediateError = DaemonControlError.daemonDidNotStart
+      let timeoutMessage = Self.warmUpManagedReplacementManifestTimeoutMessage(
+        path: path,
+        gracePeriod: gracePeriod
+      )
+      HarnessMonitorLogger.lifecycle.error(
+        "\(timeoutMessage, privacy: .public)"
+      )
+      return .stopLoop
+    }
+
+    HarnessMonitorLogger.lifecycle.trace(
+      "\(Self.warmUpManagedReplacementManifestWaitMessage(path: path), privacy: .public)"
     )
     return .continueLoop
   }
@@ -307,6 +344,17 @@ extension DaemonController {
     gracePeriod: String
   ) -> String {
     "Warm-up aborting managed stale manifest wait at \(path) grace-period=\(gracePeriod)"
+  }
+
+  static func warmUpManagedReplacementManifestWaitMessage(path: String) -> String {
+    "Warm-up waiting for managed daemon replacement manifest at \(path) after launch-agent refresh"
+  }
+
+  static func warmUpManagedReplacementManifestTimeoutMessage(
+    path: String,
+    gracePeriod: String
+  ) -> String {
+    "Warm-up aborting managed daemon replacement wait at \(path) grace-period=\(gracePeriod)"
   }
 
   static func warmUpManagedVersionMismatchWaitMessage(
