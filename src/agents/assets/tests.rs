@@ -59,22 +59,24 @@ fn agent_assets_round_trip_smoke_covers_public_surface() {
 
     let written = write_agent_target_outputs(project_root, AgentAssetTarget::All)
         .expect("asset write succeeds");
-    let claude_alias = project_root
+    let claude_harness_skill = project_root
         .join(".claude")
+        .join("plugins")
+        .join("harness")
         .join("skills")
-        .join("harness-session-start")
+        .join("harness")
         .join("SKILL.md");
-    let codex_alias = project_root
-        .join(".agents")
+    let codex_harness_skill = project_root
+        .join("plugins")
+        .join("harness")
         .join("skills")
-        .join("harness-session-start")
+        .join("harness")
         .join("SKILL.md");
     let gemini_command = project_root
         .join(".gemini")
         .join("commands")
         .join("harness")
-        .join("session")
-        .join("start.toml");
+        .join("harness.toml");
     let copilot_hook = project_root
         .join(".github")
         .join("hooks")
@@ -83,20 +85,20 @@ fn agent_assets_round_trip_smoke_covers_public_surface() {
         .join("plugins")
         .join("suite")
         .join("plugin.json");
-    assert!(written.contains(&claude_alias));
-    assert!(written.contains(&codex_alias));
+    assert!(written.contains(&claude_harness_skill));
+    assert!(written.contains(&codex_harness_skill));
     assert!(written.contains(&gemini_command));
     assert!(written.contains(&copilot_hook));
     assert!(written.contains(&portable_suite_plugin));
     assert!(
-        read_text(&codex_alias)
-            .expect("codex alias reads")
-            .contains("name: harness:session:start")
+        read_text(&codex_harness_skill)
+            .expect("codex harness skill reads")
+            .contains("name: harness")
     );
     assert!(
         read_text(&gemini_command)
             .expect("gemini command reads")
-            .contains("harness session start")
+            .contains("harness session")
     );
 
     let suite_written = write_suite_plugin_outputs(project_root).expect("suite plugin writes");
@@ -223,26 +225,26 @@ fn harness_plugin_is_in_codex_marketplace() {
 }
 
 #[test]
-fn codex_session_skill_aliases_are_planned() {
+fn codex_harness_plugin_skill_is_planned() {
     let planned =
         plan_outputs(&repo_root(), AgentAssetTarget::Codex).expect("assets plan succeeds");
-    let alias = repo_root()
-        .join(".agents")
+    let skill = repo_root()
+        .join("plugins")
+        .join("harness")
         .join("skills")
-        .join("harness-session-start")
+        .join("harness")
         .join("SKILL.md");
     let rendered = planned
         .iter()
-        .find_map(|output| output.files.get(&alias))
-        .expect("harness:session:start alias should be planned");
+        .find_map(|output| output.files.get(&skill))
+        .expect("harness plugin skill should be planned");
 
-    assert!(rendered.contains("name: harness:session:start"));
-    assert!(!rendered.contains("AskUserQuestion"));
-    assert!(rendered.contains("ask the user first"));
+    assert!(rendered.contains("name: harness"));
+    assert!(rendered.contains("session join"));
 }
 
 #[test]
-fn claude_session_plugin_skill_is_namespaced_under_harness() {
+fn claude_harness_plugin_skill_is_planned() {
     let planned =
         plan_outputs(&repo_root(), AgentAssetTarget::Claude).expect("assets plan succeeds");
     let skill = repo_root()
@@ -250,52 +252,33 @@ fn claude_session_plugin_skill_is_namespaced_under_harness() {
         .join("plugins")
         .join("harness")
         .join("skills")
-        .join("start")
+        .join("harness")
         .join("SKILL.md");
     let rendered = planned
         .iter()
         .find_map(|output| output.files.get(&skill))
-        .expect("Claude harness session skill should be planned");
+        .expect("Claude harness plugin skill should be planned");
 
-    assert!(rendered.contains("name: session:start"));
+    assert!(rendered.contains("name: harness"));
     assert!(rendered.contains("AskUserQuestion"));
 }
 
 #[test]
-fn claude_session_skill_aliases_are_planned() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Claude).expect("assets plan succeeds");
-    let alias = repo_root()
-        .join(".claude")
-        .join("skills")
-        .join("harness-session-start")
-        .join("SKILL.md");
-    let rendered = planned
-        .iter()
-        .find_map(|output| output.files.get(&alias))
-        .expect("harness:session:start alias should be planned for Claude");
-
-    assert!(rendered.contains("name: harness:session:start"));
-    assert!(rendered.contains("AskUserQuestion"));
-}
-
-#[test]
-fn gemini_session_plugin_command_is_namespaced_under_harness() {
+fn gemini_harness_plugin_command_is_namespaced_under_harness() {
     let planned =
         plan_outputs(&repo_root(), AgentAssetTarget::Gemini).expect("assets plan succeeds");
     let command = repo_root()
         .join(".gemini")
         .join("commands")
         .join("harness")
-        .join("session")
-        .join("start.toml");
+        .join("harness.toml");
     let rendered = planned
         .iter()
         .find_map(|output| output.files.get(&command))
-        .expect("Gemini harness session command should be planned");
+        .expect("Gemini harness command should be planned");
 
-    assert!(rendered.contains("Start a new multi-agent orchestration session."));
-    assert!(rendered.contains("harness session start"));
+    assert!(rendered.contains("multi-agent session"));
+    assert!(rendered.contains("harness session"));
 }
 
 #[test]
