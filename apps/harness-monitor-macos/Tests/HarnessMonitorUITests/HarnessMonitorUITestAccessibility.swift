@@ -236,7 +236,7 @@ enum HarnessMonitorUITestAccessibility {
     "harness.sheet.agent-tui.persona.\(identifier)"
   }
   static let codexFlowButton = "harness.session.codex-flow"
-  static let codexFlowWIPBadge = "harness.session.codex-flow.wip"
+  static let codexFlowPlaceholderIcon = "harness.session.codex-flow.placeholder-icon"
   static let codexFlowSheet = "harness.sheet.codex-flow"
   static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
   static let codexFlowPromptVoiceButton = "harness.sheet.codex-flow.prompt.voice"

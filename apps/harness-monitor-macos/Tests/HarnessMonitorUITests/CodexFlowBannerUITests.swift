@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 private enum CodexFlowSheetAccessibility {
   static let sheet = "harness.sheet.codex-flow"
   static let flowButton = "harness.session.codex-flow"
-  static let wipBadge = "harness.session.codex-flow.wip"
+  static let placeholderIcon = "harness.session.codex-flow.placeholder-icon"
 }
 
 @MainActor
@@ -86,21 +86,23 @@ final class CodexFlowBannerUITests: HarnessMonitorUITestCase {
 
 @MainActor
 final class CodexFlowDockUITests: HarnessMonitorUITestCase {
-  func testCodexFlowButtonShowsWIPBadgeAndCannotOpenSheet() throws {
-    try skipCodexFlowWhileWIP()
-
+  func testCodexFlowPlaceholderShowsHammerIconAndCannotOpenSheet() throws {
     let app = launchInCockpitPreview()
 
     app.activate()
-    let trigger = button(in: app, identifier: CodexFlowSheetAccessibility.flowButton)
-    let wipBadge = element(in: app, identifier: CodexFlowSheetAccessibility.wipBadge)
+    let trigger = element(in: app, identifier: CodexFlowSheetAccessibility.flowButton)
+    let placeholderIcon = element(in: app, identifier: CodexFlowSheetAccessibility.placeholderIcon)
+    let wipBadge = app.descendants(matching: .any)["harness.session.codex-flow.wip"]
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        trigger.exists && !trigger.frame.isEmpty && wipBadge.exists
+        trigger.exists && !trigger.frame.isEmpty && placeholderIcon.exists
       },
-      "Codex Flow dock button should stay visible in cockpit preview even while it is disabled"
+      "Codex Flow placeholder should stay visible in cockpit preview while the flow is unavailable"
     )
-    XCTAssertFalse(trigger.isEnabled, "Codex Flow should remain disabled while the feature is WIP")
+    XCTAssertFalse(
+      waitUntil(timeout: Self.fastActionTimeout) { wipBadge.exists },
+      "WIP badge should not be rendered for the minimal Codex Flow placeholder"
+    )
 
     if let coordinate = centerCoordinate(in: app, for: trigger) {
       coordinate.tap()
@@ -114,10 +116,6 @@ final class CodexFlowDockUITests: HarnessMonitorUITestCase {
       "Tapping the disabled Codex Flow region should not open the sheet"
     )
   }
-}
-
-private func skipCodexFlowWhileWIP() throws {
-  throw XCTSkip("Codex Flow is temporarily disabled while the feature remains WIP.")
 }
 
 extension CodexFlowBannerUITests {
