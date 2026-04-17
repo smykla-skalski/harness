@@ -8,6 +8,7 @@ use support::*;
 mod basics;
 mod leave_signals;
 mod liveness;
+mod liveness_interactive;
 mod permissions;
 mod signal_reconciliation;
 mod signals;

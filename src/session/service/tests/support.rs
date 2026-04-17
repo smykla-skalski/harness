@@ -31,6 +31,22 @@ pub(super) fn set_log_mtime_seconds_ago(path: &std::path::Path, seconds: u64) {
         .expect("set mtime");
 }
 
+pub(super) fn age_agent_activity(
+    project: &Path,
+    session_id: &str,
+    agent_id: &str,
+    seconds: i64,
+) {
+    let stale = (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339();
+    storage::update_state(project, session_id, |state| {
+        let agent = state.agents.get_mut(agent_id).expect("agent");
+        agent.last_activity_at = Some(stale.clone());
+        agent.updated_at = stale.clone();
+        Ok(())
+    })
+    .expect("age agent activity");
+}
+
 pub(super) fn write_agent_log_file(project: &Path, runtime: &str, session_id: &str) -> PathBuf {
     let log_path = crate::workspace::project_context_dir(project)
         .join(format!("agents/sessions/{runtime}/{session_id}/raw.jsonl"));
