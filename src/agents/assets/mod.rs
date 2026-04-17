@@ -8,6 +8,8 @@ mod loading;
 mod model;
 mod planning;
 mod render_common;
+mod render_guides;
+mod render_local_skills;
 mod render_plugins;
 mod render_skills;
 mod rewrite;
@@ -78,6 +80,7 @@ pub fn write_suite_plugin_outputs(project_root: &Path) -> Result<Vec<PathBuf>, C
     let planned = PlannedOutput {
         managed_root: project_root.join(".claude").join("plugins"),
         files,
+        symlinks: BTreeMap::new(),
     };
     let written = planned.files.keys().cloned().collect::<Vec<_>>();
     write_outputs(&[planned])?;

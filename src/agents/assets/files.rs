@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
-use std::fs::{Permissions, metadata, set_permissions};
-use std::os::unix::fs::PermissionsExt;
+use std::fs::{Permissions, create_dir_all, metadata, remove_file, set_permissions};
+use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
@@ -46,8 +46,26 @@ pub(super) fn write_outputs(planned: &[PlannedOutput]) -> Result<(), CliError> {
                     .map_err(|error| io_err(&error))?;
             }
         }
+        for (link, target) in &output.symlinks {
+            write_symlink(link, target)?;
+        }
     }
     Ok(())
+}
+
+fn write_symlink(link: &Path, target: &Path) -> Result<(), CliError> {
+    if let Some(parent) = link.parent() {
+        create_dir_all(parent).map_err(|error| io_err(&error))?;
+    }
+    // Replace atomically if the link already exists but points elsewhere, or is a plain file.
+    if link.exists() || link.symlink_metadata().is_ok() {
+        let existing_target = std::fs::read_link(link).ok();
+        if existing_target.as_deref() == Some(target) {
+            return Ok(());
+        }
+        remove_file(link).map_err(|error| io_err(&error))?;
+    }
+    symlink(target, link).map_err(|error| io_err(&error))
 }
 
 pub(super) fn ensure_outputs_match(planned: &[PlannedOutput]) -> Result<(), CliError> {
@@ -68,7 +86,7 @@ pub(super) fn ensure_outputs_match(planned: &[PlannedOutput]) -> Result<(), CliE
 }
 
 fn expected_output_drift(output: &PlannedOutput) -> Vec<String> {
-    output
+    let mut drift: Vec<String> = output
         .files
         .iter()
         .filter_map(|(path, expected)| match read_text(path) {
@@ -82,7 +100,17 @@ fn expected_output_drift(output: &PlannedOutput) -> Vec<String> {
             Ok(_) => Some(format!("drift: {}", path.display())),
             Err(_) => Some(format!("missing: {}", path.display())),
         })
-        .collect()
+        .collect();
+
+    for (link, expected_target) in &output.symlinks {
+        match std::fs::read_link(link) {
+            Ok(actual_target) if actual_target == *expected_target => {}
+            Ok(_) => drift.push(format!("symlink drift: {}", link.display())),
+            Err(_) => drift.push(format!("missing symlink: {}", link.display())),
+        }
+    }
+
+    drift
 }
 
 fn unexpected_output_drift(output: &PlannedOutput) -> Result<Vec<String>, CliError> {
@@ -90,15 +118,20 @@ fn unexpected_output_drift(output: &PlannedOutput) -> Result<Vec<String>, CliErr
         return Ok(Vec::new());
     }
 
-    let expected_paths: BTreeSet<&Path> = output.files.keys().map(PathBuf::as_path).collect();
+    let expected_files: BTreeSet<&Path> = output.files.keys().map(PathBuf::as_path).collect();
+    let expected_symlinks: BTreeSet<&Path> = output.symlinks.keys().map(PathBuf::as_path).collect();
     let mut drift = Vec::new();
-    for entry in WalkDir::new(&output.managed_root).min_depth(1) {
+    for entry in WalkDir::new(&output.managed_root)
+        .min_depth(1)
+        .follow_links(false)
+    {
         let entry = entry.map_err(|error| io_err(&error))?;
         if entry.file_type().is_dir() {
             continue;
         }
-        if !expected_paths.contains(entry.path()) {
-            drift.push(format!("unexpected: {}", entry.path().display()));
+        let path = entry.path();
+        if !expected_files.contains(path) && !expected_symlinks.contains(path) {
+            drift.push(format!("unexpected: {}", path.display()));
         }
     }
     Ok(drift)
