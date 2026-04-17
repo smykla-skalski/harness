@@ -6,6 +6,7 @@ APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 PROJECT_PATH="$APP_ROOT/HarnessMonitor.xcodeproj"
 DERIVED_DATA_PATH="$REPO_ROOT/tmp/xcode-derived"
+XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$APP_ROOT/Scripts/xcodebuild-with-lock.sh}"
 SHIPPING_SCHEME="HarnessMonitor"
 HOST_SCHEME="HarnessMonitorUITestHost"
 HOST_BUNDLE_ID="io.harnessmonitor.app.ui-testing"
@@ -52,6 +53,11 @@ AUDIT_DAEMON_BUNDLE_MODE="unknown"
 AUDIT_DAEMON_CARGO_TARGET_DIR=""
 AUDIT_BUILD_ARCH=""
 RETAINED_RUN_SIZE_BUDGET_KIB=10240
+
+if [[ ! -x "$XCODEBUILD_RUNNER" ]]; then
+  echo "xcodebuild runner is not executable: $XCODEBUILD_RUNNER" >&2
+  exit 1
+fi
 
 ALL_SCENARIOS=(
   "launch-dashboard"
@@ -216,7 +222,7 @@ build_release_targets() {
 
   if [[ "$FORCE_CLEAN" == "1" ]]; then
     if [[ "$BUILD_SHIPPING" == "1" ]]; then
-      xcodebuild \
+      "$XCODEBUILD_RUNNER" \
         -project "$PROJECT_PATH" \
         -scheme "$SHIPPING_SCHEME" \
         -configuration Release \
@@ -227,7 +233,7 @@ build_release_targets() {
         -quiet
     fi
 
-    xcodebuild \
+    "$XCODEBUILD_RUNNER" \
       -project "$PROJECT_PATH" \
       -scheme "$HOST_SCHEME" \
       -configuration Release \
@@ -239,7 +245,7 @@ build_release_targets() {
   fi
 
   if [[ "$BUILD_SHIPPING" == "1" ]]; then
-    xcodebuild \
+    "$XCODEBUILD_RUNNER" \
       -project "$PROJECT_PATH" \
       -scheme "$SHIPPING_SCHEME" \
       -configuration Release \
@@ -255,7 +261,7 @@ build_release_targets() {
       -quiet
   fi
 
-  xcodebuild \
+  "$XCODEBUILD_RUNNER" \
     -project "$PROJECT_PATH" \
     -scheme "$HOST_SCHEME" \
     -configuration Release \
