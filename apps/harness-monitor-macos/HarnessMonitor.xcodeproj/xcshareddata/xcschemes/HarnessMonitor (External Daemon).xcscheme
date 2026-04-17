@@ -89,6 +89,16 @@
       </BuildableProductRunnable>
       <EnvironmentVariables>
          <EnvironmentVariable
+            key = "HARNESS_OTEL_EXPORT"
+            value = "1"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "OTEL_EXPORTER_OTLP_ENDPOINT"
+            value = "http://127.0.0.1:4317"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
             key = "HARNESS_MONITOR_EXTERNAL_DAEMON"
             value = "1"
             isEnabled = "YES">
