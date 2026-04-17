@@ -13,6 +13,21 @@ use crate::infra::io::validate_safe_segment;
 pub(super) const SKILLS_ROOT: &str = "agents/skills";
 pub(super) const PLUGINS_ROOT: &str = "agents/plugins";
 
+/// Every directory managed exclusively by the renderer.  Order is stable.
+pub(super) const MANAGED_ROOTS: &[&str] = &[
+    ".claude/skills",
+    ".claude/plugins",
+    ".agents/skills",
+    ".agents/plugins",
+    ".gemini/commands",
+    ".github/hooks",
+    ".vibe/skills",
+    ".vibe/plugins",
+    ".opencode/skills",
+    ".opencode/plugins",
+    "plugins",
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[value(rename_all = "kebab-case")]
 pub enum AgentAssetTarget {
@@ -82,6 +97,8 @@ pub(super) struct PluginDefinition {
 pub(super) struct PlannedOutput {
     pub(super) managed_root: PathBuf,
     pub(super) files: BTreeMap<PathBuf, String>,
+    /// Symlinks to create: link path → target path (relative).
+    pub(super) symlinks: BTreeMap<PathBuf, PathBuf>,
 }
 
 pub(super) fn repo_root() -> PathBuf {
