@@ -51,7 +51,7 @@ extension HarnessMonitorStore {
         .inspector,
       ])
     case .daemonStatus:
-      scheduleUISync([.contentToolbar, .contentDashboard])
+      scheduleUISync([.contentToolbar, .contentDashboard, .sidebar])
     case .refreshState, .daemonActivity:
       scheduleUISync([.contentToolbar, .contentDashboard])
     case .persistedDataAvailability:
@@ -87,7 +87,7 @@ extension HarnessMonitorStore {
   private func handleSessionIndexChange(_ change: SessionIndexSlice.Change) {
     switch change {
     case .snapshot:
-      scheduleUISync([.contentToolbar, .contentChrome, .contentSession, .inspector])
+      scheduleUISync([.contentToolbar, .contentChrome, .contentSession, .inspector, .sidebar])
     case .summaryProjection(let sessionID):
       var areas: Set<UISyncArea> = [.contentToolbar]
       if shouldSyncSelectedSessionLoadingChrome(for: sessionID) {
@@ -281,7 +281,12 @@ extension HarnessMonitorStore {
         selectedSessionID: selection.selectedSessionID,
         isPersistenceAvailable: isPersistenceAvailable,
         bookmarkedSessionIds: userData.bookmarkedSessionIds,
-        searchFocusRequest: sidebarUI.searchFocusRequest
+        searchFocusRequest: sidebarUI.searchFocusRequest,
+        projectCount: indexedProjectCount,
+        worktreeCount: indexedWorktreeCount,
+        sessionCount: indexedSessionCount,
+        openWorkCount: sessionIndex.totalOpenWorkCount,
+        blockedCount: sessionIndex.totalBlockedCount
       )
     )
   }
