@@ -3,8 +3,10 @@ use std::time::Instant;
 use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
+use tracing::field::display;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::telemetry::record_daemon_http_metrics;
 
 pub(super) fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
     match result {
@@ -79,6 +81,10 @@ pub(super) fn timed_json<T: serde::Serialize>(
         Err(error) if error.code() == "KSRCLI092" => 409,
         Err(_) => 400,
     };
+    record_daemon_http_metrics(method, path, status, duration_ms);
+    let span = tracing::Span::current();
+    span.record("http_status_code", display(status));
+    span.record("duration_ms", display(duration_ms));
     log_request(method, path, status, duration_ms, request_id);
     map_json(result)
 }

@@ -28,6 +28,7 @@ struct HarnessMonitorApp: App {
     ])
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
+    HarnessMonitorTelemetry.shared.bootstrap(using: configuration.environment)
     container = configuration.container
     isUITesting = configuration.isUITesting
     launchMode = configuration.launchMode

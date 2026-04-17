@@ -16,6 +16,10 @@ struct HarnessMonitorPathsTests {
       HarnessMonitorPaths.manifestURL(using: environment).path
         == "/tmp/harness-xdg/harness/daemon/manifest.json"
     )
+    #expect(
+      HarnessMonitorPaths.sharedObservabilityConfigURL(using: environment).path
+        == "/tmp/harness-xdg/harness/observability/config.json"
+    )
   }
 
   @Test("Uses daemon data home before XDG data home")
@@ -87,6 +91,19 @@ struct HarnessMonitorPathsTests {
     #expect(
       HarnessMonitorPaths.authTokenURL(using: environment).path
         == "/Users/example/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/daemon/auth-token"
+    )
+  }
+
+  @Test("Shared observability config defaults to Application Support")
+  func sharedObservabilityConfigDefaultsToApplicationSupport() {
+    let environment = HarnessMonitorEnvironment(
+      values: [:],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+
+    #expect(
+      HarnessMonitorPaths.sharedObservabilityConfigURL(using: environment).path
+        == "/Users/example/Library/Application Support/harness/observability/config.json"
     )
   }
 

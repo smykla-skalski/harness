@@ -60,29 +60,106 @@ extension HarnessMonitorAPIClient {
   }
 
   func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
-    let start = ContinuousClock.now
-    let (data, response) = try await session.data(for: request)
-    let elapsed = start.duration(to: .now)
-    let durationMs =
-      elapsed.components.seconds * 1000
-      + Int64(elapsed.components.attoseconds / 1_000_000_000_000_000)
     let method = request.httpMethod ?? "?"
     let path = request.url?.path ?? "?"
+    let span = HarnessMonitorTelemetry.shared.startSpan(
+      name: "daemon.http.request",
+      kind: .client,
+      attributes: [
+        "transport.kind": .string("http"),
+        "http.request.method": .string(method),
+        "url.path": .string(path),
+      ]
+    )
+    defer { span.end() }
+
+    var request = request
+    let requestID = HarnessMonitorTelemetry.shared.decorate(&request, spanContext: span.context)
+    span.setAttribute(key: "harness.request_id", value: requestID)
+
+    let start = ContinuousClock.now
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch {
+      let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      span.status = .error(description: error.localizedDescription)
+      HarnessMonitorTelemetry.shared.recordHTTPRequest(
+        method: method,
+        path: path,
+        statusCode: nil,
+        durationMs: durationMs,
+        failed: true
+      )
+      HarnessMonitorTelemetry.shared.emitLog(
+        name: "daemon.http.request.failed",
+        severity: .error,
+        body: "\(method) \(path) failed",
+        attributes: [
+          "request.id": .string(requestID),
+          "request.duration_ms": .double(durationMs),
+          "error.message": .string(error.localizedDescription),
+        ]
+      )
+      throw error
+    }
+
+    let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
     guard let httpResponse = response as? HTTPURLResponse else {
       HarnessMonitorLogger.api.error(
         "Invalid response for \(method, privacy: .public) \(path, privacy: .public)"
       )
-      throw HarnessMonitorAPIError.invalidResponse
+      span.status = .error(description: "invalid response")
+      let invalidResponse = HarnessMonitorAPIError.invalidResponse
+      HarnessMonitorTelemetry.shared.recordError(invalidResponse, on: span)
+      HarnessMonitorTelemetry.shared.recordHTTPRequest(
+        method: method,
+        path: path,
+        statusCode: nil,
+        durationMs: durationMs,
+        failed: true
+      )
+      throw invalidResponse
     }
 
+    span.setAttribute(key: "http.response.status_code", value: httpResponse.statusCode)
     HarnessMonitorLogger.api.debug(
-      "\(method, privacy: .public) \(path, privacy: .public) -> \(httpResponse.statusCode) (\(durationMs)ms)"
+      "\(method, privacy: .public) \(path, privacy: .public) -> \(httpResponse.statusCode) (\(Int64(durationMs))ms)"
     )
 
     guard (200..<300).contains(httpResponse.statusCode) else {
-      throw try decodeError(statusCode: httpResponse.statusCode, data: data)
+      let error = try decodeError(statusCode: httpResponse.statusCode, data: data)
+      span.status = .error(description: error.localizedDescription)
+      HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      HarnessMonitorTelemetry.shared.recordHTTPRequest(
+        method: method,
+        path: path,
+        statusCode: httpResponse.statusCode,
+        durationMs: durationMs,
+        failed: true
+      )
+      HarnessMonitorTelemetry.shared.emitLog(
+        name: "daemon.http.request.rejected",
+        severity: .warn,
+        body: "\(method) \(path) returned \(httpResponse.statusCode)",
+        attributes: [
+          "request.id": .string(requestID),
+          "request.duration_ms": .double(durationMs),
+          "http.response.status_code": .int(httpResponse.statusCode),
+        ]
+      )
+      throw error
     }
 
+    HarnessMonitorTelemetry.shared.recordHTTPRequest(
+      method: method,
+      path: path,
+      statusCode: httpResponse.statusCode,
+      durationMs: durationMs,
+      failed: false
+    )
     return try decoder.decode(Response.self, from: data)
   }
 
@@ -90,13 +167,54 @@ extension HarnessMonitorAPIClient {
     AsyncThrowingStream { continuation in
       let task = Task {
         do {
-          let request = try makeRequest(path: path)
+          let baseRequest = try makeRequest(path: path)
+          let method = baseRequest.httpMethod ?? "GET"
+          let span = HarnessMonitorTelemetry.shared.startSpan(
+            name: "daemon.http.stream",
+            kind: .client,
+            attributes: [
+              "transport.kind": .string("http"),
+              "http.request.method": .string(method),
+              "url.path": .string(path),
+              "stream.kind": .string("sse"),
+            ]
+          )
+          defer { span.end() }
+
+          var request = baseRequest
+          let requestID = HarnessMonitorTelemetry.shared.decorate(
+            &request,
+            spanContext: span.context
+          )
+          span.setAttribute(key: "harness.request_id", value: requestID)
+
+          let start = ContinuousClock.now
           let (bytes, response) = try await session.bytes(for: request)
+          let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
           guard let httpResponse = response as? HTTPURLResponse,
             (200..<300).contains(httpResponse.statusCode)
           else {
-            throw HarnessMonitorAPIError.invalidResponse
+            let error = HarnessMonitorAPIError.invalidResponse
+            span.status = .error(description: error.localizedDescription)
+            HarnessMonitorTelemetry.shared.recordError(error, on: span)
+            HarnessMonitorTelemetry.shared.recordHTTPRequest(
+              method: method,
+              path: path,
+              statusCode: (response as? HTTPURLResponse)?.statusCode,
+              durationMs: durationMs,
+              failed: true
+            )
+            throw error
           }
+
+          span.setAttribute(key: "http.response.status_code", value: httpResponse.statusCode)
+          HarnessMonitorTelemetry.shared.recordHTTPRequest(
+            method: method,
+            path: path,
+            statusCode: httpResponse.statusCode,
+            durationMs: durationMs,
+            failed: false
+          )
 
           var parser = ServerSentEventParser()
           for try await line in bytes.lines {
@@ -173,4 +291,5 @@ extension HarnessMonitorAPIClient {
     let message = String(data: data, encoding: .utf8) ?? "Unknown daemon error"
     return .server(code: statusCode, message: message)
   }
+
 }
