@@ -20,6 +20,7 @@ __pycache__/
 .klaudiush/
 .opencode/
 .vibe/
+skills-lock.json
 
 # IDE / language server
 .idea/
