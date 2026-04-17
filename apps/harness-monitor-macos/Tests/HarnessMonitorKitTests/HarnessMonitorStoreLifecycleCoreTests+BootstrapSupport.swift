@@ -5,6 +5,7 @@ import Foundation
 actor DelayedWarmUpDaemonController: DaemonControlling {
   private let client: any HarnessMonitorClientProtocol
   private let warmUpDelay: Duration
+  private var warmUpCallCount = 0
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
@@ -85,7 +86,12 @@ actor DelayedWarmUpDaemonController: DaemonControlling {
   func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
+    warmUpCallCount += 1
     try await Task.sleep(for: warmUpDelay)
     return client
+  }
+
+  func recordedWarmUpCallCount() -> Int {
+    warmUpCallCount
   }
 }

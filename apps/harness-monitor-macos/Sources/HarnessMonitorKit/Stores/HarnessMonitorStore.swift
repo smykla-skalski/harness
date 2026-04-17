@@ -218,7 +218,10 @@ public final class HarnessMonitorStore {
     connectionState = .connecting
 
     isBootstrapping = true
-    defer { isBootstrapping = false }
+    defer {
+      isBootstrapping = false
+      replayQueuedReconnectAfterBootstrapIfNeeded()
+    }
 
     switch daemonOwnership {
     case .external:
@@ -256,10 +259,10 @@ public final class HarnessMonitorStore {
       let client = try await awaitManagedDaemonWarmUpWithRecovery()
       await connect(using: client)
     } catch {
-      markConnectionOffline(error.localizedDescription)
-      presentFailureFeedback(error.localizedDescription)
-      startManifestWatcher()
-      await restorePersistedSessionState()
+      let recovered = await recoverManagedBootstrapFailure(from: error)
+      guard !recovered else {
+        return
+      }
     }
   }
 

@@ -76,6 +76,20 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
   }
 
+  @Test("startDaemon recovers when the daemon becomes healthy after warm-up gives up")
+  func startDaemonRecoversWhenDaemonBecomesHealthyAfterWarmUpFailure() async {
+    let daemon = ManagedWarmUpLateBootstrapDaemonController()
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.startDaemon()
+
+    #expect(store.connectionState == .online)
+    #expect(
+      await daemon.recordedOperations()
+        == ["warm-up", "remove", "register", "warm-up", "bootstrap"]
+    )
+  }
+
   @Test("startDaemon refreshes the managed launch agent after a daemon version mismatch")
   func startDaemonRefreshesManagedLaunchAgentAfterDaemonVersionMismatch() async {
     let daemon = ManagedDaemonVersionRecoveryDaemonController()
@@ -146,6 +160,26 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       await daemon.recordedOperations()
         == ["warm-up", "remove", "register", "warm-up", "warm-up"]
     )
+  }
+
+  @Test("reconnect replays a request queued while reconnect is already in flight")
+  func reconnectReplaysQueuedRequestAfterCurrentAttemptConnects() async {
+    let daemon = DelayedWarmUpDaemonController(warmUpDelay: .milliseconds(250))
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+    #expect(await daemon.recordedWarmUpCallCount() == 1)
+
+    let reconnectTask = Task { @MainActor in
+      await store.reconnect()
+    }
+
+    try? await Task.sleep(for: .milliseconds(50))
+    await store.reconnect()
+    await reconnectTask.value
+
+    #expect(store.connectionState == .online)
+    #expect(await daemon.recordedWarmUpCallCount() == 3)
   }
 
   @Test("Prepare for termination cancels background work and shuts down the client")
