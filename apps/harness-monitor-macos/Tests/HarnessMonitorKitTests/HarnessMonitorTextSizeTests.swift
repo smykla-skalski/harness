@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -75,6 +77,49 @@ struct HarnessMonitorTextSizeTests {
   @Test("No change when magnification is exactly 1.0")
   func noChangeAtExactlyOne() {
     #expect(HarnessMonitorTextSize.indexDelta(forMagnification: 1.0, currentIndex: 3) == 0)
+  }
+}
+
+@MainActor
+@Suite("Session cockpit empty state row")
+struct SessionCockpitEmptyStateRowTests {
+  @Test("Tasks placeholder uses the shared message and secondary styling contract")
+  func tasksPlaceholderUsesSharedMessageAndSecondaryStylingContract() {
+    #expect(SessionCockpitEmptyStateRow.Section.tasks.message == "No tasks yet")
+    #expect(SessionCockpitEmptyStateRow.usesSecondaryForeground)
+  }
+
+  @Test("Tasks placeholder scales across the smallest and largest text sizes")
+  func tasksPlaceholderScalesAcrossSmallestAndLargestTextSizes() {
+    let minimumScale = HarnessMonitorTextSize.scale(at: 0)
+    let maximumScale = HarnessMonitorTextSize.scale(at: HarnessMonitorTextSize.scales.count - 1)
+    let minimumSize = fittingSize(for: .tasks, scale: minimumScale)
+    let maximumSize = fittingSize(for: .tasks, scale: maximumScale)
+
+    #expect(minimumSize.height > 0)
+    #expect(maximumSize.height >= minimumSize.height)
+    #expect(maximumSize.width > minimumSize.width)
+  }
+
+  private func fittingSize(
+    for section: SessionCockpitEmptyStateRow.Section,
+    scale: CGFloat
+  ) -> CGSize {
+    let host = hostingView(for: section, scale: scale)
+    return host.fittingSize
+  }
+
+  private func hostingView(
+    for section: SessionCockpitEmptyStateRow.Section,
+    scale: CGFloat
+  ) -> NSHostingView<some View> {
+    let host = NSHostingView(
+      rootView: SessionCockpitEmptyStateRow(section: section)
+        .environment(\.fontScale, scale)
+    )
+    host.frame = CGRect(x: 0, y: 0, width: 480, height: 120)
+    host.layoutSubtreeIfNeeded()
+    return host
   }
 }
 

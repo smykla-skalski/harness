@@ -97,7 +97,6 @@ struct SessionCockpitView: View {
       store: store,
       sessionID: detail.session.sessionId,
       tasks: detail.tasks,
-      companionAgentCount: detail.agents.count,
       inspectTask: store.inspect(taskID:)
     )
   }

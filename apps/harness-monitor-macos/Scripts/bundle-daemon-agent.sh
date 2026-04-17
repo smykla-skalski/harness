@@ -12,7 +12,8 @@ fi
 resolve_repo_root() {
   local candidate="$PROJECT_DIR"
   while [ "$candidate" != "/" ]; do
-    if [ -d "$candidate/.git" ]; then
+    # Git worktrees expose `.git` as a file, not a directory.
+    if [ -e "$candidate/.git" ]; then
       printf '%s\n' "$candidate"
       return
     fi
