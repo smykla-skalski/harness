@@ -233,6 +233,22 @@ public enum HarnessMonitorAccessibility {
     "\(sessionRow(sessionID)).selection.frame"
   }
 
+  static func sessionRowAgentStat(_ sessionID: String) -> String {
+    "\(sessionRow(sessionID)).stat.agent"
+  }
+
+  static func sessionRowTaskStat(_ sessionID: String) -> String {
+    "\(sessionRow(sessionID)).stat.task"
+  }
+
+  static func sessionRowStatsFrame(_ sessionID: String) -> String {
+    "\(sessionRow(sessionID)).stats.frame"
+  }
+
+  static func sessionRowLastActivityFrame(_ sessionID: String) -> String {
+    "\(sessionRow(sessionID)).last-activity.frame"
+  }
+
   static func projectHeader(_ projectID: String) -> String {
     "harness.sidebar.project-header.\(slug(projectID))"
   }
