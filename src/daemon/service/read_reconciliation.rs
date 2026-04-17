@@ -11,14 +11,14 @@ use super::{
 
 pub(crate) fn liveness_project_dir_for_resolved(
     resolved: &ResolvedSession,
-) -> Result<Option<PathBuf>, CliError> {
+) -> Option<PathBuf> {
     if resolved.state.status != SessionStatus::Active || !session_has_live_agents(&resolved.state) {
-        return Ok(None);
+        return None;
     }
     // Keep the liveness path active even after the file-backed state disappears.
     // Otherwise imported sessions can remain falsely "active" in the daemon DB
     // forever once their last state/log artifacts are gone.
-    Ok(Some(effective_project_dir(resolved).to_path_buf()))
+    Some(effective_project_dir(resolved).to_path_buf())
 }
 
 pub(crate) fn sync_resolved_liveness(

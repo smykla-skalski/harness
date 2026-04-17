@@ -501,7 +501,6 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       #expect(retryEvent.detail.contains("leaderless_degraded"))
     }
   }
-
   @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
   func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
     let daemon = RecordingDaemonController(

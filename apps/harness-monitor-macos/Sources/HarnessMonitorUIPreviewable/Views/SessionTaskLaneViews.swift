@@ -20,16 +20,7 @@ struct SessionTaskListSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let tasks: [WorkItem]
-  let companionAgentCount: Int
   let inspectTask: (String) -> Void
-
-  private var emptyStateMinHeight: CGFloat {
-    let visibleAgentCards = max(companionAgentCount, 1)
-    let cardHeights = CGFloat(visibleAgentCards) * SessionCockpitLayout.laneCardFootprint
-    let interCardSpacing =
-      CGFloat(max(visibleAgentCards - 1, 0)) * HarnessMonitorTheme.sectionSpacing
-    return cardHeights + interCardSpacing
-  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -37,17 +28,7 @@ struct SessionTaskListSection: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if tasks.isEmpty {
-        ContentUnavailableView {
-          Label("No tasks yet", systemImage: "checklist")
-        } description: {
-          Text("Create a task from the Action Console in the inspector.")
-        }
-        .foregroundStyle(.tertiary)
-        .frame(
-          maxWidth: .infinity,
-          minHeight: emptyStateMinHeight,
-          alignment: .center
-        )
+        SessionCockpitEmptyStateRow(section: .tasks)
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(tasks) { task in

@@ -251,6 +251,10 @@ enum HarnessMonitorUITestAccessibility {
   static let codexFlowEnableBridgeButton = "harness.sheet.codex-flow.enable-bridge"
   static let codexFlowCopyCommandButton = "harness.sheet.codex-flow.copy-command"
 
+  static func sessionEmptyState(_ section: String) -> String {
+    "harness.session.empty-state.\(slug(section))"
+  }
+
   static func preferencesSectionButton(_ key: String) -> String {
     "harness.preferences.section.\(key)"
   }

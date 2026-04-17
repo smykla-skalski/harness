@@ -18,6 +18,21 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.isBookmarked(sessionId: PreviewFixtures.summary.sessionId))
   }
 
+  @Test("Preview store factory preloads the empty cockpit state without bootstrap")
+  func previewStoreFactoryPreloadsEmptyCockpitState() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .emptyCockpit)
+
+    #expect(store.connectionState == .online)
+    #expect(store.selectedSessionID == PreviewFixtures.emptyCockpitSummary.sessionId)
+    #expect(store.selectedSession == PreviewFixtures.emptyCockpitDetail)
+    #expect(store.timeline.isEmpty)
+    #expect(store.sessions == [PreviewFixtures.emptyCockpitSummary])
+    #expect(store.groupedSessions.count == 1)
+    #expect(store.selectedSession?.agents.isEmpty == true)
+    #expect(store.selectedSession?.tasks.isEmpty == true)
+    #expect(store.selectedSession?.signals.isEmpty == true)
+  }
+
   @Test("Preview store factory seeds offline cached state")
   func previewStoreFactorySeedsOfflineCachedState() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .offlineCached)

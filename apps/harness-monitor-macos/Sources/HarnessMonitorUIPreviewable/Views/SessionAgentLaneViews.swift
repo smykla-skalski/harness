@@ -16,11 +16,7 @@ struct SessionAgentListSection: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if agents.isEmpty {
-        ContentUnavailableView {
-          Label("No agents registered", systemImage: "person.2")
-        } description: {
-          Text("Agents appear here when they join the session.")
-        }
+        SessionCockpitEmptyStateRow(section: .agents)
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(agents) { agent in

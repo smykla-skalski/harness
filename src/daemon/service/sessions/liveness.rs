@@ -116,7 +116,7 @@ pub(super) fn reconcile_session_liveness_for_read(
         return Ok(());
     };
     refresh_resolved_session_from_files_if_newer(db, &mut resolved)?;
-    let Some(project_dir) = liveness_project_dir_for_resolved(&resolved)? else {
+    let Some(project_dir) = liveness_project_dir_for_resolved(&resolved) else {
         return Ok(());
     };
     let _ = sync_resolved_liveness(db, &mut resolved, &project_dir)?;
@@ -133,7 +133,7 @@ pub(super) async fn reconcile_session_liveness_for_read_async(
     let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
         return Ok(());
     };
-    let Some(project_dir) = liveness_project_dir_for_resolved(&resolved)? else {
+    let Some(project_dir) = liveness_project_dir_for_resolved(&resolved) else {
         return Ok(());
     };
     let _ = sync_resolved_liveness_async(async_db, &mut resolved, &project_dir).await?;

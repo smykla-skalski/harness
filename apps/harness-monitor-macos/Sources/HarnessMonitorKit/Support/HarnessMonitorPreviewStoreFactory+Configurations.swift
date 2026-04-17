@@ -10,6 +10,8 @@ extension HarnessMonitorPreviewStoreFactory {
       return dashboardConfiguration()
     case .cockpitLoaded:
       return cockpitConfiguration()
+    case .emptyCockpit:
+      return emptyCockpitConfiguration()
     case .toolbarCountRegression:
       return toolbarCountRegressionConfiguration()
     case .agentTuiOverflow:
@@ -72,6 +74,23 @@ extension HarnessMonitorPreviewStoreFactory {
         selectedSessionID: PreviewFixtures.summary.sessionId,
         selectedDetail: PreviewFixtures.detail,
         timeline: PreviewFixtures.timeline
+      )
+    )
+  }
+
+  static func emptyCockpitConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.emptyCockpit
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
+    return liveConfiguration(
+      mode: .populated,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [PreviewFixtures.emptyCockpitSummary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+        selectedDetail: PreviewFixtures.emptyCockpitDetail,
+        timeline: []
       )
     )
   }

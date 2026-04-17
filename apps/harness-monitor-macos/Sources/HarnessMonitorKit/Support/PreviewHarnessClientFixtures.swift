@@ -122,6 +122,26 @@ extension PreviewHarnessClient {
       timelinesBySessionID: [:]
     )
 
+    public static let emptyCockpit = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: PreviewFixtures.projects,
+      sessions: [PreviewFixtures.emptyCockpitSummary],
+      detail: PreviewFixtures.emptyCockpitDetail,
+      timeline: [],
+      readySessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+      detailsBySessionID: [PreviewFixtures.emptyCockpitSummary.sessionId: PreviewFixtures.emptyCockpitDetail],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [PreviewFixtures.emptyCockpitSummary.sessionId: []]
+    )
+
     public static let empty = Self(
       health: HealthResponse(
         status: "ok",
