@@ -289,6 +289,7 @@ mod tests {
             id: "req-1".into(),
             method: "health".into(),
             params: serde_json::json!({}),
+            trace_context: None,
         };
 
         let response = dispatch_read_query(&request, &state).await;
@@ -313,6 +314,7 @@ mod tests {
             id: "req-agent-tuis".into(),
             method: "session.agent_tuis".into(),
             params: serde_json::json!({ "session_id": "sess-test-1" }),
+            trace_context: None,
         };
 
         let response = dispatch_read_query(&request, &state).await;
@@ -334,6 +336,7 @@ mod tests {
             id: "req-agent-tui".into(),
             method: "agent_tui.detail".into(),
             params: serde_json::json!({ "tui_id": "tui-2" }),
+            trace_context: None,
         };
 
         let response = dispatch_read_query(&request, &state).await;
@@ -355,6 +358,7 @@ mod tests {
                 "session_id": "sess-test-1",
                 "scope": "summary",
             }),
+            trace_context: None,
         };
 
         let response = dispatch_read_query(&request, &state).await;
@@ -386,6 +390,7 @@ mod tests {
                 "session_id": "sess-test-1",
                 "scope": "summary",
             }),
+            trace_context: None,
         };
 
         let response = dispatch_read_query(&request, &state).await;

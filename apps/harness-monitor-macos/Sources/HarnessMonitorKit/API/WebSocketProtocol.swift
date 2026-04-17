@@ -5,6 +5,19 @@ struct WsRequest: Codable, Sendable {
   let id: String
   let method: String
   let params: JSONValue?
+  let traceContext: [String: String]?
+
+  init(
+    id: String,
+    method: String,
+    params: JSONValue?,
+    traceContext: [String: String]? = nil
+  ) {
+    self.id = id
+    self.method = method
+    self.params = params
+    self.traceContext = traceContext
+  }
 }
 
 struct WsFrame: Codable, Sendable {
