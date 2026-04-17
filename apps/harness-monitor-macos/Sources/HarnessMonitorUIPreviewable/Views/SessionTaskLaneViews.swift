@@ -267,13 +267,19 @@ struct TaskDragFeedbackMetrics {
 
   init(cardSize: CGSize) {
     let minimumDimension = max(1, min(cardSize.width, cardSize.height))
-    let maximumFootprint = max(18, minimumDimension - (HarnessMonitorTheme.spacingSM * 2))
-    let blurScale: CGFloat = 0.16
+    // Let the glow bleed beyond the compact card's inner footprint; the overlay is clipped
+    // to the card chrome, so the larger blur reads stronger without overflowing the row.
+    let glowBleedAllowance = minimumDimension * 0.28
+    let maximumFootprint = max(
+      24,
+      minimumDimension - (HarnessMonitorTheme.spacingSM * 2) + glowBleedAllowance
+    )
+    let blurScale: CGFloat = 0.32
     let maximumHalo = maximumFootprint / (1 + (blurScale * 2))
 
-    haloDiameter = max(20, min(maximumHalo, minimumDimension * 0.62))
-    blurRadius = haloDiameter * blurScale
-    iconSize = min(max(14, haloDiameter * 0.38), minimumDimension * 0.28)
+    haloDiameter = max(24, min(maximumHalo, minimumDimension * 0.76))
+    blurRadius = max(8, haloDiameter * blurScale)
+    iconSize = min(max(16, haloDiameter * 0.52), minimumDimension * 0.42)
   }
 }
 
