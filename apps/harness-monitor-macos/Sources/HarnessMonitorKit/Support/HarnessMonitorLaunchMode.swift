@@ -29,3 +29,12 @@ public enum HarnessMonitorLaunchMode: String, Equatable, Sendable {
     self.init(environment: environment.values)
   }
 }
+
+public enum HarnessMonitorAppVisibilityPolicy {
+  public static func shouldSuspendLiveConnection(
+    appIsHidden: Bool,
+    hasVisibleNonMiniaturizedWindows: Bool
+  ) -> Bool {
+    appIsHidden || hasVisibleNonMiniaturizedWindows == false
+  }
+}

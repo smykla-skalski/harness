@@ -65,6 +65,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     guard launchMode == .live, let store else {
       return
     }
+    guard shouldSuspendLiveConnectionOnResignActive() else {
+      return
+    }
 
     Task { @MainActor [weak self] in
       guard self?.terminationTask == nil else {
@@ -140,6 +143,15 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     signal(handledSignal, SIG_DFL)
     kill(getpid(), handledSignal)
     _exit(128 + handledSignal)
+  }
+
+  private func shouldSuspendLiveConnectionOnResignActive() -> Bool {
+    HarnessMonitorAppVisibilityPolicy.shouldSuspendLiveConnection(
+      appIsHidden: NSApplication.shared.isHidden,
+      hasVisibleNonMiniaturizedWindows: NSApplication.shared.windows.contains { window in
+        window.isVisible && !window.isMiniaturized
+      }
+    )
   }
 
   private static func launchEnvironment() -> [String: String] {
