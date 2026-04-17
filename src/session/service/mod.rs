@@ -105,15 +105,15 @@ mod tasks;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use lifecycle::apply_leave_session;
 pub use lifecycle::{
     assign_role, end_session, join_session, join_session_with_fallback, leave_session,
     remove_agent, start_session, start_session_with_policy, transfer_leader,
 };
-pub(crate) use lifecycle::apply_leave_session;
 pub use liveness::{LivenessSyncResult, sync_agent_liveness};
 pub use queries::{
-    build_recovery_tui_request, list_sessions, list_sessions_global,
-    resolve_session_project_dir, session_status,
+    build_recovery_tui_request, list_sessions, list_sessions_global, resolve_session_project_dir,
+    session_status,
 };
 pub use signals::{
     cancel_signal, list_signals, record_signal_acknowledgment,

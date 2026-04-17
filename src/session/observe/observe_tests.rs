@@ -194,6 +194,9 @@ fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
 
         let tasks = service::list_tasks("sess-4", None, project).expect("list tasks");
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].observe_issue_id.as_deref(), Some(issue.id.as_str()));
+        assert_eq!(
+            tasks[0].observe_issue_id.as_deref(),
+            Some(issue.id.as_str())
+        );
     });
 }

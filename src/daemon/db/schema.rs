@@ -442,11 +442,11 @@ fn apply_pragmas(conn: &Connection) -> Result<(), CliError> {
 fn configure_journal_mode(conn: &Connection) -> Result<(), CliError> {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        match conn.query_row("PRAGMA journal_mode = WAL", [], |row| row.get::<_, String>(0)) {
+        match conn.query_row("PRAGMA journal_mode = WAL", [], |row| {
+            row.get::<_, String>(0)
+        }) {
             Ok(_) => return Ok(()),
-            Err(error)
-                if pragma_error_is_retryable(&error) && Instant::now() < deadline =>
-            {
+            Err(error) if pragma_error_is_retryable(&error) && Instant::now() < deadline => {
                 thread::sleep(Duration::from_millis(50));
             }
             Err(error) => return Err(db_error(format!("set database journal mode: {error}"))),

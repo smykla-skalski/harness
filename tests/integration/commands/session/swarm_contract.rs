@@ -2,13 +2,12 @@ use clap::Parser;
 use harness::app::cli::Cli;
 use harness::session::service;
 use harness::session::transport::{
-    SessionCommand, SessionTaskCommand, SessionTransferLeaderArgs, TaskAssignArgs,
-    TaskCreateArgs,
+    SessionCommand, SessionTaskCommand, SessionTransferLeaderArgs, TaskAssignArgs, TaskCreateArgs,
 };
 use harness::session::types::{SessionRole, TaskSeverity, TaskStatus};
 
-use crate::integration::helpers::run_command;
 use super::{session_cmd, with_session_test_env};
+use crate::integration::helpers::run_command;
 
 #[test]
 fn leader_request_with_fallback_stays_non_leader_until_transfer() {
@@ -73,7 +72,10 @@ fn leader_request_with_fallback_stays_non_leader_until_transfer() {
         assert_eq!(exit_code, 0);
 
         let updated = service::session_status("swarm-fallback-1", &project).expect("status");
-        assert_eq!(updated.leader_id.as_deref(), Some(improver.agent_id.as_str()));
+        assert_eq!(
+            updated.leader_id.as_deref(),
+            Some(improver.agent_id.as_str())
+        );
     });
 }
 

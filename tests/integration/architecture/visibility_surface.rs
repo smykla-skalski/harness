@@ -287,8 +287,7 @@ fn kernel_command_intent_root_stays_a_facade() {
         !root.join("src/kernel/command_intent.rs").exists(),
         "legacy flat kernel command-intent module should not exist"
     );
-    let command_intent_mod =
-        read_repo_file(root, "src/kernel/command_intent/mod.rs");
+    let command_intent_mod = read_repo_file(root, "src/kernel/command_intent/mod.rs");
 
     for needle in [
         "pub struct ParsedCommand {",

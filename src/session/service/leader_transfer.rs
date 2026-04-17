@@ -177,7 +177,8 @@ pub(crate) fn update_leader_roles(
 }
 
 fn capability_priority(agent: &AgentRegistration) -> i32 {
-    agent.capabilities
+    agent
+        .capabilities
         .iter()
         .filter_map(|capability| capability.strip_prefix("priority:"))
         .filter_map(|value| value.parse::<i32>().ok())

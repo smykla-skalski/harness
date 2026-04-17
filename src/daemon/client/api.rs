@@ -5,8 +5,7 @@ use crate::daemon::agent_tui::{
 use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
-    SessionSummary,
-    SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
+    SessionSummary, SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
     TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
 };
 use crate::errors::CliError;

@@ -74,6 +74,18 @@ pub(crate) fn collect_agent_activity(
     project_dir: &Path,
 ) -> Result<Vec<AgentActivityRecord>, CliError> {
     let state = load_state_or_err(session_id, project_dir)?;
+    Ok(collect_agent_activity_from_state(
+        &state,
+        session_id,
+        project_dir,
+    ))
+}
+
+pub(crate) fn collect_agent_activity_from_state(
+    state: &SessionState,
+    session_id: &str,
+    project_dir: &Path,
+) -> Vec<AgentActivityRecord> {
     let mut records = Vec::new();
     for agent in state.agents.values() {
         if !agent.status.is_alive() {
@@ -93,7 +105,7 @@ pub(crate) fn collect_agent_activity(
             agent_session_id: agent.agent_session_id.clone(),
         });
     }
-    Ok(records)
+    records
 }
 
 pub(crate) fn apply_liveness_transitions(

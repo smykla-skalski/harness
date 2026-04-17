@@ -44,9 +44,13 @@ pub fn permissions_for(role: SessionRole) -> HashSet<SessionAction> {
         SessionRole::Leader => ALL_ACTIONS,
         SessionRole::Observer => &[ObserveSession, ViewStatus, CreateTask, TransferLeader],
         SessionRole::Worker => &[CreateTask, UpdateTaskStatus, ObserveSession, ViewStatus],
-        SessionRole::Reviewer | SessionRole::Improver => {
-            &[CreateTask, UpdateTaskStatus, SendSignal, ObserveSession, ViewStatus]
-        }
+        SessionRole::Reviewer | SessionRole::Improver => &[
+            CreateTask,
+            UpdateTaskStatus,
+            SendSignal,
+            ObserveSession,
+            ViewStatus,
+        ],
     };
     actions.iter().copied().collect()
 }
