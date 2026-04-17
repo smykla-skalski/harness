@@ -100,19 +100,19 @@ struct ContentDetailChrome<Content: View>: View {
     VStack(spacing: 0) {
       if let persistenceError {
         PersistenceUnavailableBanner(message: persistenceError)
-        chromeDivider
+        chromeDivider(tint: HarnessMonitorTheme.caution)
       }
       if isStale {
         SessionDataAvailabilityBanner(availability: sessionDataAvailability)
-        chromeDivider
+        chromeDivider(tint: HarnessMonitorTheme.caution)
       }
     }
     .background(Color(nsColor: .windowBackgroundColor))
   }
 
-  private var chromeDivider: some View {
+  private func chromeDivider(tint: Color) -> some View {
     Rectangle()
-      .fill(HarnessMonitorTheme.controlBorder.opacity(0.9))
+      .fill(tint.opacity(0.35))
       .frame(height: 1)
       .accessibilityHidden(true)
   }
