@@ -8,7 +8,8 @@ fn session_detail_promotes_live_worker_and_hides_dead_leader() {
             "daemon leaderless detail",
             "daemon-leaderless-detail",
         );
-        set_log_mtime_seconds_ago(&fixture.leader_log, 600);
+        set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
+        age_leader_state_activity(project, &fixture.state.session_id, 1_200);
 
         let db = setup_db_with_project(project);
         let project_id = index::discovered_project_for_checkout(project).project_id;
@@ -41,7 +42,8 @@ fn list_sessions_db_promotes_live_worker_and_excludes_dead_members() {
             "daemon leaderless summaries",
             "daemon-leaderless-summaries",
         );
-        set_log_mtime_seconds_ago(&fixture.leader_log, 600);
+        set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
+        age_leader_state_activity(project, &fixture.state.session_id, 1_200);
 
         let db = setup_db_with_session(project, &fixture.state.session_id);
 
@@ -85,7 +87,8 @@ fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
             "daemon async leaderless summaries",
             "daemon-async-leaderless-summaries",
         );
-        set_log_mtime_seconds_ago(&fixture.leader_log, 600);
+        set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
+        age_leader_state_activity(project, &fixture.state.session_id, 1_200);
 
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
@@ -137,7 +140,8 @@ fn session_detail_async_promotes_live_worker_and_hides_dead_leader() {
             "daemon async leaderless detail",
             "daemon-async-leaderless-detail",
         );
-        set_log_mtime_seconds_ago(&fixture.leader_log, 600);
+        set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
+        age_leader_state_activity(project, &fixture.state.session_id, 1_200);
 
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
