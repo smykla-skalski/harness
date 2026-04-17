@@ -87,6 +87,14 @@ mod tests {
     }
 
     #[test]
+    fn observer_can_create_tasks() {
+        assert!(is_permitted(
+            SessionRole::Observer,
+            SessionAction::CreateTask
+        ));
+    }
+
+    #[test]
     fn observer_can_transfer_leader() {
         assert!(is_permitted(
             SessionRole::Observer,
@@ -123,6 +131,22 @@ mod tests {
         assert!(is_permitted(
             SessionRole::Reviewer,
             SessionAction::SendSignal
+        ));
+    }
+
+    #[test]
+    fn reviewer_can_create_tasks() {
+        assert!(is_permitted(
+            SessionRole::Reviewer,
+            SessionAction::CreateTask
+        ));
+    }
+
+    #[test]
+    fn improver_can_create_tasks() {
+        assert!(is_permitted(
+            SessionRole::Improver,
+            SessionAction::CreateTask
         ));
     }
 
