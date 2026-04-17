@@ -67,8 +67,8 @@ private enum HarnessMonitorHTTPSignal: String {
   case logs
 }
 
-private extension HarnessMonitorObservabilityConfig {
-  static func resolveFromEnvironment(
+extension HarnessMonitorObservabilityConfig {
+  fileprivate static func resolveFromEnvironment(
     using environment: HarnessMonitorEnvironment
   ) -> Self? {
     let values = environment.values
@@ -129,7 +129,7 @@ private extension HarnessMonitorObservabilityConfig {
     }
   }
 
-  static func resolveFromSharedFile(
+  fileprivate static func resolveFromSharedFile(
     using environment: HarnessMonitorEnvironment,
     loadData: (URL) throws -> Data
   ) throws -> Self? {
@@ -186,7 +186,7 @@ private extension HarnessMonitorObservabilityConfig {
     }
   }
 
-  static func defaultToggleConfig(
+  fileprivate static func defaultToggleConfig(
     using environment: HarnessMonitorEnvironment
   ) -> Self? {
     let transport = resolveTransport(
@@ -230,7 +230,7 @@ private extension HarnessMonitorObservabilityConfig {
     }
   }
 
-  static func resolveTransport(
+  fileprivate static func resolveTransport(
     protocolOverride: String?,
     baseEndpoint: URL?,
     tracesEndpoint: URL?,
@@ -249,7 +249,7 @@ private extension HarnessMonitorObservabilityConfig {
     return .grpc
   }
 
-  static func resolveHTTPSignalEndpoints(
+  fileprivate static func resolveHTTPSignalEndpoints(
     baseEndpoint: URL?,
     tracesEndpoint: URL?,
     metricsEndpoint: URL?,
@@ -268,7 +268,7 @@ private extension HarnessMonitorObservabilityConfig {
     )
   }
 
-  static func defaultHTTPSignalEndpoints(
+  fileprivate static func defaultHTTPSignalEndpoints(
     from baseEndpoint: URL
   ) -> HarnessMonitorHTTPSignalEndpoints {
     let signalRoot = defaultHTTPSignalRoot(from: baseEndpoint)
@@ -279,7 +279,7 @@ private extension HarnessMonitorObservabilityConfig {
     )
   }
 
-  static func defaultHTTPSignalRoot(from baseEndpoint: URL) -> URL {
+  fileprivate static func defaultHTTPSignalRoot(from baseEndpoint: URL) -> URL {
     let lastComponent = baseEndpoint.lastPathComponent.lowercased()
     if lastComponent == HarnessMonitorHTTPSignal.traces.rawValue
       || lastComponent == HarnessMonitorHTTPSignal.metrics.rawValue
@@ -293,14 +293,14 @@ private extension HarnessMonitorObservabilityConfig {
     return baseEndpoint.appendingPathComponent("v1", isDirectory: true)
   }
 
-  static func append(
+  fileprivate static func append(
     signal: HarnessMonitorHTTPSignal,
     to baseURL: URL
   ) -> URL {
     baseURL.appendingPathComponent(signal.rawValue)
   }
 
-  static func shouldInferHTTPTransport(from baseEndpoint: URL) -> Bool {
+  fileprivate static func shouldInferHTTPTransport(from baseEndpoint: URL) -> Bool {
     if baseEndpoint.port == 4318 {
       return true
     }

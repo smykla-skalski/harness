@@ -1,4 +1,5 @@
 import Foundation
+import OpenTelemetryApi
 
 struct EmptyBody: Encodable {}
 
@@ -84,50 +85,29 @@ extension HarnessMonitorAPIClient {
       (data, response) = try await session.data(for: request)
     } catch {
       let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordError(error, on: span)
-      span.status = .error(description: error.localizedDescription)
-      HarnessMonitorTelemetry.shared.recordHTTPRequest(
-        method: method,
-        path: path,
-        statusCode: nil,
+      recordTransportFailure(
+        error,
+        request: request,
+        requestID: requestID,
         durationMs: durationMs,
-        failed: true
-      )
-      HarnessMonitorTelemetry.shared.emitLog(
-        name: "daemon.http.request.failed",
-        severity: .error,
-        body: "\(method) \(path) failed",
-        attributes: [
-          "request.id": .string(requestID),
-          "request.duration_ms": .double(durationMs),
-          "error.message": .string(error.localizedDescription),
-        ]
+        span: span
       )
       throw error
     }
 
     let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
     guard let httpResponse = response as? HTTPURLResponse else {
-      HarnessMonitorLogger.api.error(
-        "Invalid response for \(method, privacy: .public) \(path, privacy: .public)"
-      )
-      span.status = .error(description: "invalid response")
-      let invalidResponse = HarnessMonitorAPIError.invalidResponse
-      HarnessMonitorTelemetry.shared.recordError(invalidResponse, on: span)
-      HarnessMonitorTelemetry.shared.recordHTTPRequest(
+      let invalidResponse = recordInvalidHTTPResponse(
         method: method,
         path: path,
-        statusCode: nil,
         durationMs: durationMs,
-        failed: true
+        span: span
       )
       throw invalidResponse
     }
 
     span.setAttribute(key: "http.response.status_code", value: httpResponse.statusCode)
-    HarnessMonitorLogger.api.debug(
-      "\(method, privacy: .public) \(path, privacy: .public) -> \(httpResponse.statusCode) (\(Int64(durationMs))ms)"
-    )
+    logHTTPResponse(method: method, path: path, response: httpResponse, durationMs: durationMs)
 
     guard (200..<300).contains(httpResponse.statusCode) else {
       let error = try decodeError(statusCode: httpResponse.statusCode, data: data)
@@ -161,6 +141,72 @@ extension HarnessMonitorAPIClient {
       failed: false
     )
     return try decoder.decode(Response.self, from: data)
+  }
+
+  private func recordTransportFailure(
+    _ error: any Error,
+    request: URLRequest,
+    requestID: String,
+    durationMs: Double,
+    span: any Span
+  ) {
+    let method = request.httpMethod ?? "?"
+    let path = request.url?.path ?? "?"
+    HarnessMonitorTelemetry.shared.recordError(error, on: span)
+    span.status = .error(description: error.localizedDescription)
+    HarnessMonitorTelemetry.shared.recordHTTPRequest(
+      method: method,
+      path: path,
+      statusCode: nil,
+      durationMs: durationMs,
+      failed: true
+    )
+    HarnessMonitorTelemetry.shared.emitLog(
+      name: "daemon.http.request.failed",
+      severity: .error,
+      body: "\(method) \(path) failed",
+      attributes: [
+        "request.id": .string(requestID),
+        "request.duration_ms": .double(durationMs),
+        "error.message": .string(error.localizedDescription),
+      ]
+    )
+  }
+
+  private func recordInvalidHTTPResponse(
+    method: String,
+    path: String,
+    durationMs: Double,
+    span: any Span
+  ) -> HarnessMonitorAPIError {
+    HarnessMonitorLogger.api.error(
+      "Invalid response for \(method, privacy: .public) \(path, privacy: .public)"
+    )
+    let invalidResponse = HarnessMonitorAPIError.invalidResponse
+    span.status = .error(description: "invalid response")
+    HarnessMonitorTelemetry.shared.recordError(invalidResponse, on: span)
+    HarnessMonitorTelemetry.shared.recordHTTPRequest(
+      method: method,
+      path: path,
+      statusCode: nil,
+      durationMs: durationMs,
+      failed: true
+    )
+    return invalidResponse
+  }
+
+  private func logHTTPResponse(
+    method: String,
+    path: String,
+    response: HTTPURLResponse,
+    durationMs: Double
+  ) {
+    HarnessMonitorLogger.api.debug(
+      """
+      \(method, privacy: .public) \(path, privacy: .public) \
+      -> \(response.statusCode) (\(Int64(durationMs))ms)
+      """
+    )
   }
 
   func stream(_ path: String) -> DaemonPushEventStream {
