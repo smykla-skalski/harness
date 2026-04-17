@@ -95,11 +95,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return .terminateLater
     }
     guard let store else {
+      HarnessMonitorTelemetry.shared.shutdown()
       return .terminateNow
     }
 
     terminationTask = Task { @MainActor [weak self] in
-      await store.prepareForTermination()
+      await self?.prepareForTermination(using: store)
       self?.terminationTask = nil
       sender.reply(toApplicationShouldTerminate: true)
     }
@@ -131,12 +132,21 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     terminationTask = Task { @MainActor [weak self] in
-      if let store = self?.store {
-        await store.prepareForTermination()
+      if let self {
+        await self.prepareForTermination(using: self.store)
+      } else {
+        HarnessMonitorTelemetry.shared.shutdown()
       }
       self?.terminationTask = nil
       self?.terminateProcess(for: handledSignal)
     }
+  }
+
+  private func prepareForTermination(using store: HarnessMonitorStore?) async {
+    if let store {
+      await store.prepareForTermination()
+    }
+    HarnessMonitorTelemetry.shared.shutdown()
   }
 
   private func terminateProcess(for handledSignal: Int32) {
