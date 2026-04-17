@@ -202,6 +202,8 @@ struct SessionTaskCompactSummaryContent: View {
         Spacer(minLength: HarnessMonitorTheme.spacingXS)
         Text(task.severity.title)
           .scaledFont(.caption.bold())
+          .lineLimit(1)
+          .fixedSize(horizontal: true, vertical: false)
           .harnessPillPadding()
           .background(severityColor(for: task.severity), in: Capsule())
           .foregroundStyle(HarnessMonitorTheme.onContrast)
