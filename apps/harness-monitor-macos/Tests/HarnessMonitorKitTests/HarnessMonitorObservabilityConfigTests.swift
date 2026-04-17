@@ -26,6 +26,7 @@ struct HarnessMonitorObservabilityConfigTests {
           "grpc_endpoint": "http://127.0.0.1:4317",
           "http_endpoint": "http://127.0.0.1:4318",
           "grafana_url": "http://127.0.0.1:3000",
+          "pyroscope_url": "http://127.0.0.1:4040",
           "headers": {
             "x-harness-env": "local"
           }
@@ -44,6 +45,7 @@ struct HarnessMonitorObservabilityConfigTests {
     #expect(config.transport == .grpc)
     #expect(config.grpcEndpoint?.absoluteString == "http://127.0.0.1:4317")
     #expect(config.httpSignalEndpoints == nil)
+    #expect(config.pyroscopeURL?.absoluteString == "http://127.0.0.1:4040")
     #expect(config.headers["x-harness-env"] == "local")
   }
 
@@ -54,6 +56,7 @@ struct HarnessMonitorObservabilityConfigTests {
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:4318",
         "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
         "OTEL_EXPORTER_OTLP_HEADERS": "x-harness-env=local,x-tenant=test",
+        "HARNESS_OTEL_PYROSCOPE_URL": "http://127.0.0.1:4404",
       ],
       homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
     )
@@ -76,6 +79,7 @@ struct HarnessMonitorObservabilityConfigTests {
       config.httpSignalEndpoints?.logs.absoluteString
         == "http://127.0.0.1:4318/v1/logs"
     )
+    #expect(config.pyroscopeURL?.absoluteString == "http://127.0.0.1:4404")
     #expect(config.headers["x-harness-env"] == "local")
     #expect(config.headers["x-tenant"] == "test")
   }

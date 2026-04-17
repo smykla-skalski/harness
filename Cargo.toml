@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "24.2.2"
+version = "24.3.0"
 edition = "2024"
 rust-version = "1.94"
 include = [
@@ -55,6 +55,7 @@ opentelemetry-otlp = { version = "0.31.1", default-features = false, features = 
 tracing-opentelemetry = { version = "0.32.1", default-features = false }
 opentelemetry-appender-tracing = "0.31.1"
 tonic = { version = "0.14.1", default-features = false }
+pyroscope = { version = "2.0.0", features = ["backend-pprof-rs"] }
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 gix-discover = { version = "0.49.0", features = ["sha1"] }

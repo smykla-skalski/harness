@@ -23,6 +23,7 @@ struct HarnessMonitorObservabilityConfig: Equatable, Sendable {
   let grpcEndpoint: URL?
   let httpSignalEndpoints: HarnessMonitorHTTPSignalEndpoints?
   let grafanaURL: URL?
+  let pyroscopeURL: URL?
   let headers: [String: String]
 
   static func resolve(
@@ -50,6 +51,7 @@ private struct SharedObservabilityFile: Decodable {
   let grpcEndpoint: String
   let httpEndpoint: String
   let grafanaURL: String?
+  let pyroscopeURL: String?
   let headers: [String: String]
 
   enum CodingKeys: String, CodingKey {
@@ -57,6 +59,7 @@ private struct SharedObservabilityFile: Decodable {
     case grpcEndpoint = "grpc_endpoint"
     case httpEndpoint = "http_endpoint"
     case grafanaURL = "grafana_url"
+    case pyroscopeURL = "pyroscope_url"
     case headers
   }
 }
@@ -104,6 +107,7 @@ extension HarnessMonitorObservabilityConfig {
         grpcEndpoint: endpoint,
         httpSignalEndpoints: nil,
         grafanaURL: url(from: values["HARNESS_OTEL_GRAFANA_URL"]),
+        pyroscopeURL: url(from: values["HARNESS_OTEL_PYROSCOPE_URL"]),
         headers: headers
       )
     case .httpProtobuf:
@@ -124,6 +128,7 @@ extension HarnessMonitorObservabilityConfig {
         grpcEndpoint: nil,
         httpSignalEndpoints: endpoints,
         grafanaURL: url(from: values["HARNESS_OTEL_GRAFANA_URL"]),
+        pyroscopeURL: url(from: values["HARNESS_OTEL_PYROSCOPE_URL"]),
         headers: headers
       )
     }
@@ -160,6 +165,7 @@ extension HarnessMonitorObservabilityConfig {
         grpcEndpoint: url(from: sharedFile.grpcEndpoint),
         httpSignalEndpoints: nil,
         grafanaURL: url(from: sharedFile.grafanaURL),
+        pyroscopeURL: url(from: sharedFile.pyroscopeURL),
         headers: sharedFile.headers
       )
     case .httpProtobuf:
@@ -181,6 +187,7 @@ extension HarnessMonitorObservabilityConfig {
         grpcEndpoint: nil,
         httpSignalEndpoints: endpoints,
         grafanaURL: url(from: sharedFile.grafanaURL),
+        pyroscopeURL: url(from: sharedFile.pyroscopeURL),
         headers: sharedFile.headers
       )
     }
@@ -205,6 +212,7 @@ extension HarnessMonitorObservabilityConfig {
         grpcEndpoint: URL(string: "http://127.0.0.1:4317"),
         httpSignalEndpoints: nil,
         grafanaURL: nil,
+        pyroscopeURL: nil,
         headers: [:]
       )
     case .httpProtobuf:
@@ -225,6 +233,7 @@ extension HarnessMonitorObservabilityConfig {
         grpcEndpoint: nil,
         httpSignalEndpoints: endpoints,
         grafanaURL: nil,
+        pyroscopeURL: nil,
         headers: [:]
       )
     }

@@ -1,5 +1,6 @@
 mod config;
 mod metrics;
+mod profiler;
 mod subscriber;
 
 pub use config::{
@@ -12,4 +13,5 @@ pub use metrics::{
     apply_parent_context_from_headers, current_trace_headers, current_trace_id,
     record_daemon_client_metrics, record_daemon_http_metrics, record_hook_metrics,
 };
+pub use profiler::DaemonProfiler;
 pub use subscriber::{TelemetryGuard, init_tracing_subscriber};
