@@ -43,9 +43,7 @@ impl LivenessConfig {
     #[must_use]
     pub fn for_runtime_name(runtime_name: &str) -> Self {
         match runtime_name {
-            "claude" | "codex" | "gemini" | "copilot" | "opencode" | "vibe" => {
-                Self::interactive()
-            }
+            "claude" | "codex" | "gemini" | "copilot" | "opencode" | "vibe" => Self::interactive(),
             _ => Self::default(),
         }
     }

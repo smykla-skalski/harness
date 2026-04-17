@@ -2,8 +2,8 @@ use super::{
     AgentRegistration, AgentStatus, CliError, LivenessConfig, Path, SessionState,
     SessionTransition, TaskQueuePolicy, TaskStatus, agent_runtime_session_id,
     clear_pending_leader_transfer, load_state_or_err, promote_or_degrade, read_pending_signals,
-    refresh_session, require_active, runtime, signal_context_root, signal_matches_session,
-    signal_dirs_for_agent_in_context_root, storage, utc_now,
+    refresh_session, require_active, runtime, signal_context_root,
+    signal_dirs_for_agent_in_context_root, signal_matches_session, storage, utc_now,
 };
 
 /// Result of a liveness synchronization pass.
@@ -108,12 +108,7 @@ pub(crate) fn collect_agent_activity_from_state(
             state_last_activity: agent.last_activity_at.clone(),
             runtime_name: agent.runtime.clone(),
             agent_session_id: agent.agent_session_id.clone(),
-            has_pending_signals: has_pending_signals(
-                agent_runtime,
-                state,
-                agent,
-                &context_root,
-            ),
+            has_pending_signals: has_pending_signals(agent_runtime, state, agent, &context_root),
         });
     }
     records
@@ -215,13 +210,7 @@ fn signal_dir_has_pending_session_signal(
 ) -> bool {
     match read_pending_signals(signal_dir) {
         Ok(pending) => pending.into_iter().any(|signal| {
-            signal_matches_session(
-                &signal,
-                None,
-                session_id,
-                agent_id,
-                signal_session_id,
-            )
+            signal_matches_session(&signal, None, session_id, agent_id, signal_session_id)
         }),
         Err(error) => {
             warn_pending_signal_inspection_failure(runtime_name, signal_dir, agent_id, &error);
