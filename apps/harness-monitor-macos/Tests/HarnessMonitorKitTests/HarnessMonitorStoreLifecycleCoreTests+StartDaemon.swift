@@ -204,4 +204,45 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.shutdownCallCount() == 1)
   }
 
+  @Test("App inactivity suspends the live daemon connection without clearing selection")
+  func appInactivitySuspendsLiveDaemonConnection() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let selectedSessionID = store.selectedSessionID
+    let selectedSession = store.selectedSession
+
+    await store.suspendLiveConnectionForAppInactivity()
+
+    #expect(store.connectionState == .idle)
+    #expect(store.client == nil)
+    #expect(store.globalStreamTask == nil)
+    #expect(store.sessionStreamTask == nil)
+    #expect(store.connectionProbeTask == nil)
+    #expect(store.selectedSessionID == selectedSessionID)
+    #expect(store.selectedSession == selectedSession)
+    #expect(client.shutdownCallCount() == 1)
+  }
+
+  @Test("App activation restores a daemon connection suspended for inactivity")
+  func appActivationRestoresSuspendedDaemonConnection() async {
+    let client = RecordingHarnessClient()
+    let daemon = RecordingDaemonController(client: client)
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    await store.suspendLiveConnectionForAppInactivity()
+
+    await store.resumeLiveConnectionAfterAppActivation()
+
+    #expect(store.connectionState == .online)
+    #expect(store.client != nil)
+    #expect(store.globalStreamTask != nil)
+    #expect(store.sessionStreamTask != nil)
+    #expect(store.connectionProbeTask != nil)
+    #expect(client.shutdownCallCount() == 1)
+  }
+
 }
