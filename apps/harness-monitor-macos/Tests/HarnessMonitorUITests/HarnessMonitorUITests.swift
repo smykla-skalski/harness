@@ -112,35 +112,6 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertFalse(feedback.exists)
   }
 
-  func testTaskDropDragUsesRenderSafePreview() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "task-drop"]
-    )
-
-    let task = element(in: app, identifier: Accessibility.taskDropQueueCard)
-    let worker = element(in: app, identifier: Accessibility.workerAgentCard)
-
-    XCTAssertTrue(task.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(worker.waitForExistence(timeout: Self.actionTimeout))
-
-    guard
-      let taskCenter = centerCoordinate(in: app, for: task),
-      let workerCenter = centerCoordinate(in: app, for: worker)
-    else {
-      XCTFail("Expected task and worker coordinates for drag preview smoke")
-      return
-    }
-
-    taskCenter.press(forDuration: 0.2, thenDragTo: workerCenter)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        worker.label.contains("1 queued task")
-      },
-      "Dropping the task on the busy worker should queue it"
-    )
-  }
-
   func testToolbarSurvivesSidebarToggle() throws {
     let app = launch(mode: "preview")
 

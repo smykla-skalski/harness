@@ -84,6 +84,9 @@ struct SessionTaskSummaryCard: View {
           .transition(.opacity)
       }
     }
+    .clipShape(
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+    )
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
         .strokeBorder(
@@ -94,7 +97,7 @@ struct SessionTaskSummaryCard: View {
     .opacity(isDragging ? 0.82 : 1)
     .scaleEffect(isDragging ? 0.985 : 1)
     .draggable(dragPayload) {
-      TaskDragPreview(taskID: task.taskId)
+      TaskDragPreviewCard(task: task)
     }
     .onDragSessionUpdated { session in
       updateDragSession(session)
@@ -138,38 +141,12 @@ struct SessionTaskSummaryCard: View {
   }
 
   private var cardSurface: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text(task.title)
-          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .layoutPriority(1)
-        Spacer()
-        Text(task.severity.title)
-          .scaledFont(.caption.bold())
-          .harnessPillPadding()
-          .background(severityColor(for: task.severity), in: Capsule())
-          .foregroundStyle(HarnessMonitorTheme.onContrast)
-      }
-      HStack(alignment: .firstTextBaseline) {
-        Text(task.assignmentStateTitle)
-          .scaledFont(.caption.weight(.bold))
-          .foregroundStyle(task.assignmentStateColor)
-          .lineLimit(1)
-        Spacer()
-        Text(task.assignmentSummary)
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
-          .truncationMode(.tail)
-      }
-    }
-    .frame(
-      maxWidth: .infinity,
-      alignment: .leading
-    )
-    .padding(HarnessMonitorTheme.cardPadding)
+    SessionTaskCompactSummaryContent(task: task)
+      .frame(
+        maxWidth: .infinity,
+        alignment: .leading
+      )
+      .padding(HarnessMonitorTheme.cardPadding)
   }
 }
 
@@ -186,18 +163,22 @@ struct SessionTaskSummaryCard: View {
 
 private struct TaskDraggingOverlay: View {
   var body: some View {
-    ZStack {
-      Color.clear
-        .harnessDragFeedbackSurface(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-          tint: HarnessMonitorTheme.accent
-        )
-      Circle()
-        .fill(HarnessMonitorTheme.accent.opacity(0.32))
-        .frame(width: 112, height: 112)
-        .blur(radius: 24)
-      TaskDragGestureIcon(size: 44)
-        .foregroundStyle(HarnessMonitorTheme.accent)
+    GeometryReader { proxy in
+      let metrics = TaskDragFeedbackMetrics(cardSize: proxy.size)
+      ZStack {
+        Color.clear
+          .harnessDragFeedbackSurface(
+            cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+            tint: HarnessMonitorTheme.accent
+          )
+        Circle()
+          .fill(HarnessMonitorTheme.accent.opacity(0.32))
+          .frame(width: metrics.haloDiameter, height: metrics.haloDiameter)
+          .blur(radius: metrics.blurRadius)
+        TaskDragGestureIcon(size: metrics.iconSize)
+          .foregroundStyle(HarnessMonitorTheme.accent)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .clipShape(
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
@@ -207,27 +188,92 @@ private struct TaskDraggingOverlay: View {
   }
 }
 
-private struct TaskDragPreview: View {
-  let taskID: String
+struct SessionTaskCompactSummaryContent: View {
+  let task: WorkItem
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
+        Text(task.title)
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .layoutPriority(1)
+        Spacer(minLength: HarnessMonitorTheme.spacingXS)
+        Text(task.severity.title)
+          .scaledFont(.caption.bold())
+          .harnessPillPadding()
+          .background(severityColor(for: task.severity), in: Capsule())
+          .foregroundStyle(HarnessMonitorTheme.onContrast)
+      }
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
+        Text(task.assignmentStateTitle)
+          .scaledFont(.caption.weight(.bold))
+          .foregroundStyle(task.assignmentStateColor)
+          .lineLimit(1)
+        Spacer(minLength: HarnessMonitorTheme.spacingXS)
+        Text(task.assignmentSummary)
+          .scaledFont(.caption.monospaced())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+          .truncationMode(.tail)
+      }
+    }
+  }
+}
+
+struct TaskDragPreviewCard: View {
+  let task: WorkItem
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
       Image(systemName: "list.bullet.clipboard")
         .imageScale(.small)
         .foregroundStyle(HarnessMonitorTheme.accent)
-      Text(taskID)
-        .scaledFont(.caption2.monospaced())
+      Text(task.title)
+        .scaledFont(.caption.weight(.bold))
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .layoutPriority(1)
+      Text(task.severity.title)
+        .scaledFont(.caption2.bold())
+        .harnessPillPadding()
+        .background(severityColor(for: task.severity), in: Capsule())
+        .foregroundStyle(HarnessMonitorTheme.onContrast)
+        .fixedSize()
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .harnessDragFeedbackSurface(
-      cornerRadius: 8,
+      cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
       tint: HarnessMonitorTheme.accent
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
         .stroke(HarnessMonitorTheme.accent.opacity(0.5), lineWidth: 1)
     }
+    .frame(maxWidth: 320, alignment: .leading)
+  }
+}
+
+struct TaskDragFeedbackMetrics {
+  let haloDiameter: CGFloat
+  let blurRadius: CGFloat
+  let iconSize: CGFloat
+
+  var totalFootprint: CGFloat {
+    haloDiameter + (blurRadius * 2)
+  }
+
+  init(cardSize: CGSize) {
+    let minimumDimension = max(1, min(cardSize.width, cardSize.height))
+    let maximumFootprint = max(18, minimumDimension - (HarnessMonitorTheme.spacingSM * 2))
+    let blurScale: CGFloat = 0.16
+    let maximumHalo = maximumFootprint / (1 + (blurScale * 2))
+
+    haloDiameter = max(20, min(maximumHalo, minimumDimension * 0.62))
+    blurRadius = haloDiameter * blurScale
+    iconSize = min(max(14, haloDiameter * 0.38), minimumDimension * 0.28)
   }
 }
 

@@ -123,6 +123,131 @@ struct SessionCockpitEmptyStateRowTests {
   }
 }
 
+@MainActor
+@Suite("Agent task drop feedback layout")
+struct AgentTaskDropFeedbackLayoutTests {
+  @Test("Drop feedback stays within the worker-card height at the largest text size")
+  func dropFeedbackStaysWithinWorkerCardHeightAtLargestTextSize() {
+    let feedback = AgentTaskDropFeedback(
+      agent: PreviewFixtures.agents[1],
+      queuedTaskCount: 3,
+      isSessionReadOnly: false
+    )
+    let maximumScale = HarnessMonitorTextSize.scale(at: HarnessMonitorTextSize.scales.count - 1)
+    let fittingSize = fittingSize(
+      for: feedback,
+      width: 220,
+      scale: maximumScale
+    )
+
+    #expect(fittingSize.height <= SessionCockpitLayout.laneCardHeight)
+  }
+
+  private func fittingSize(
+    for feedback: AgentTaskDropFeedback,
+    width: CGFloat,
+    scale: CGFloat
+  ) -> CGSize {
+    let host = NSHostingView(
+      rootView: AgentTaskDropFeedbackOverlay(feedback: feedback)
+        .environment(\.fontScale, scale)
+    )
+    host.frame = CGRect(
+      x: 0,
+      y: 0,
+      width: width,
+      height: SessionCockpitLayout.laneCardHeight
+    )
+    host.layoutSubtreeIfNeeded()
+    return host.fittingSize
+  }
+}
+
+@MainActor
+@Suite("Task drag preview layout")
+struct TaskDragPreviewLayoutTests {
+  @Test("Drag preview keeps a compact render-safe footprint")
+  func dragPreviewKeepsACompactRenderSafeFootprint() {
+    let task = PreviewFixtures.taskDropTask
+    let previewSize = fittingSize(
+      for: TaskDragPreviewCard(task: task),
+      width: 480
+    )
+
+    #expect(previewSize.width <= 320)
+    #expect(previewSize.height < SessionCockpitLayout.laneCardHeight)
+  }
+
+  private func fittingSize<Content: View>(
+    for view: Content,
+    width: CGFloat
+  ) -> CGSize {
+    let host = NSHostingView(rootView: view)
+    host.frame = CGRect(x: 0, y: 0, width: width, height: 240)
+    host.layoutSubtreeIfNeeded()
+    return host.fittingSize
+  }
+}
+
+@Suite("Task drag feedback metrics")
+struct TaskDragFeedbackMetricsTests {
+  @Test("Hand-feedback halo adapts to multiple compact task card sizes without overflow")
+  func handFeedbackHaloAdaptsToMultipleCompactTaskCardSizesWithoutOverflow() {
+    let compactCardSizes = [
+      CGSize(width: 220, height: 54),
+      CGSize(width: 236, height: 56),
+      CGSize(width: 280, height: 60),
+      CGSize(width: 320, height: 62),
+      CGSize(width: 420, height: 72),
+    ]
+
+    for compactCardSize in compactCardSizes {
+      let metrics = TaskDragFeedbackMetrics(cardSize: compactCardSize)
+      let availableFootprint = min(compactCardSize.width, compactCardSize.height)
+        - (HarnessMonitorTheme.spacingSM * 2)
+
+      #expect(metrics.totalFootprint <= availableFootprint)
+      #expect(metrics.iconSize < metrics.haloDiameter)
+    }
+  }
+}
+
+@MainActor
+@Suite("Session task card layout")
+struct SessionTaskCardLayoutTests {
+  @Test("Task card height follows the compact summary content without extra reserve space")
+  func taskCardHeightFollowsCompactSummaryContent() {
+    let width: CGFloat = 320
+    let task = PreviewFixtures.taskDropTask
+    let cardSize = fittingSize(
+      for: SessionTaskSummaryCard(
+        store: HarnessMonitorPreviewStoreFactory.makeStore(for: .taskDropCockpit),
+        sessionID: PreviewFixtures.summary.sessionId,
+        task: task,
+        inspectTask: { _ in }
+      ),
+      width: width
+    )
+    let contentSize = fittingSize(
+      for: SessionTaskCompactSummaryContent(task: task)
+        .padding(HarnessMonitorTheme.cardPadding),
+      width: width
+    )
+
+    #expect(cardSize.height == contentSize.height)
+  }
+
+  private func fittingSize<Content: View>(
+    for view: Content,
+    width: CGFloat
+  ) -> CGSize {
+    let host = NSHostingView(rootView: view)
+    host.frame = CGRect(x: 0, y: 0, width: width, height: 240)
+    host.layoutSubtreeIfNeeded()
+    return host.fittingSize
+  }
+}
+
 @Suite("SessionTimelinePagination page adjustment")
 struct SessionTimelinePaginationTests {
   @Test("Adjusted page returns nil when the clamped page is unchanged")

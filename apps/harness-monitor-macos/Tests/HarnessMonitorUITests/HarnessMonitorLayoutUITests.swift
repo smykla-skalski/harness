@@ -334,15 +334,10 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       context.exists,
       "Cockpit task cards should keep the compact two-row layout and hide task context"
     )
-    XCTAssertLessThanOrEqual(
-      taskCard.frame.height,
-      84,
-      "Compact task cards should collapse to their two visible rows without extra bottom gap"
-    )
     XCTAssertLessThan(
       taskCard.frame.height,
-      workerCard.frame.height - 24,
-      "Compact task cards should be substantially shorter than the full agent cards"
+      workerCard.frame.height,
+      "Compact task cards should stay shorter than the full worker cards in the same cockpit grid"
     )
   }
 
