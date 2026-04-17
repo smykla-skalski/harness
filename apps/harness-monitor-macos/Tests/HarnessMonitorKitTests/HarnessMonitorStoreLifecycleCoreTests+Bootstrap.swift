@@ -386,6 +386,30 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(elapsed < .milliseconds(550))
   }
 
+  @Test("Bootstrap keeps the UI live while the first startup snapshot retries behind healthy daemon probes")
+  func bootstrapRetriesInitialSnapshotWarmUpAfterHealthSucceeds() async {
+    let client = RecordingHarnessClient()
+    client.configureDiagnosticsErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
+    ])
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .milliseconds(50)
+    store.initialConnectRefreshRetryInterval = .milliseconds(1)
+
+    await store.bootstrap()
+
+    #expect(store.connectionState == .online)
+    #expect(store.contentUI.toolbar.connectionState == .online)
+    #expect(store.contentUI.chrome.sessionDataAvailability == .live)
+    #expect(client.readCallCount(.diagnostics) == 2)
+    #expect(
+      store.connectionEvents.contains { event in
+        event.detail.contains("startup snapshot is still warming up")
+      }
+    )
+  }
 
   @Test("Bootstrap goes offline when snapshot endpoints fail persistently throughout the grace period")
   func bootstrapGoesOfflineWhenSnapshotEndpointsFailPersistently() async {
@@ -439,6 +463,45 @@ extension HarnessMonitorStoreLifecycleCoreTests {
         retryEvent.detail.contains("xyz123"),
         "Retry message should include actual error: \(retryEvent.detail)"
       )
+    }
+  }
+
+  @Test("Bootstrap retry logs identify the failing startup snapshot component and decode path")
+  func bootstrapRetryLogsIdentifyFailingSnapshotComponentAndDecodePath() async {
+    let client = RecordingHarnessClient()
+    client.configureSessionsErrors([
+      DecodingError.dataCorrupted(
+        .init(
+          codingPath: [
+            SnapshotCodingKey(intValue: 0)!,
+            SnapshotCodingKey(stringValue: "status")!,
+          ],
+          debugDescription:
+            "Cannot initialize SessionStatus from invalid String value leaderless_degraded"
+        )
+      )
+    ])
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .milliseconds(50)
+    store.initialConnectRefreshRetryInterval = .milliseconds(5)
+
+    await store.bootstrap()
+
+    #expect(store.connectionState == .online)
+
+    let retryEvent = store.connectionEvents.first { event in
+      event.detail.contains("startup snapshot is still warming up")
+    }
+    #expect(retryEvent != nil)
+    if let retryEvent {
+      #expect(retryEvent.detail.contains("Startup snapshot sessions failed"))
+      #expect(retryEvent.detail.contains("[0].status"))
+      #expect(retryEvent.detail.contains("leaderless_degraded"))
+    }
+  }
+
   @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
   func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
     let daemon = RecordingDaemonController(
@@ -488,4 +551,19 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedWarmUpCallCount() == 2)
   }
 
+}
+
+private struct SnapshotCodingKey: CodingKey, Sendable {
+  let stringValue: String
+  let intValue: Int?
+
+  init?(stringValue: String) {
+    self.stringValue = stringValue
+    intValue = nil
+  }
+
+  init?(intValue: Int) {
+    stringValue = String(intValue)
+    self.intValue = intValue
+  }
 }

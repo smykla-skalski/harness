@@ -28,6 +28,9 @@ extension RecordingHarnessClient {
 
   func diagnostics() async throws -> DaemonDiagnosticsReport {
     recordReadCall(.diagnostics)
+    if let error = dequeueDiagnosticsError() {
+      throw error
+    }
     try await sleepIfNeeded(configuredDiagnosticsDelay())
     return DaemonDiagnosticsReport(
       health: try await health(),
@@ -79,6 +82,9 @@ extension RecordingHarnessClient {
 
   func projects() async throws -> [ProjectSummary] {
     recordReadCall(.projects)
+    if let error = dequeueProjectsError() {
+      throw error
+    }
     try await sleepIfNeeded(configuredProjectsDelay())
     return configuredProjects() ?? [
       ProjectSummary(
@@ -94,6 +100,9 @@ extension RecordingHarnessClient {
 
   func sessions() async throws -> [SessionSummary] {
     recordReadCall(.sessions)
+    if let error = dequeueSessionsError() {
+      throw error
+    }
     try await sleepIfNeeded(configuredSessionsDelay())
     return configuredSessions() ?? [detail.session]
   }

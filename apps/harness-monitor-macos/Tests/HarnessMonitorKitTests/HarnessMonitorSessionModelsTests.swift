@@ -304,4 +304,48 @@ struct HarnessMonitorSessionModelsTests {
     #expect(detail.signals[0].signal.payload.relatedFiles.isEmpty)
     #expect(detail.signals[0].signal.payload.metadata == .object([:]))
   }
+
+  @Test("SessionStatus accepts leaderless degraded daemon wire value")
+  func sessionStatusAcceptsLeaderlessDegradedWireValue() {
+    #expect(SessionStatus(rawValue: "leaderless_degraded") != nil)
+  }
+
+  @Test("Session summary decoding accepts leaderless degraded daemon payloads")
+  func sessionSummaryDecodingAcceptsLeaderlessDegradedPayloads() throws {
+    let json = """
+      {
+        "project_id": "project-890e1bdc449e2a7b",
+        "project_name": "kuma",
+        "project_dir": "/tmp/project",
+        "context_root": "/tmp/project/context",
+        "checkout_id": "project-9fe5ce4237976a0a",
+        "checkout_root": "/tmp/project/.claude/worktrees/fix-motb-dangling-accesslog",
+        "is_worktree": true,
+        "worktree_name": "fix-motb-dangling-accesslog",
+        "session_id": "sess-20260402100345527324000",
+        "title": "Create a test suite",
+        "context": "Create a test suite",
+        "status": "leaderless_degraded",
+        "created_at": "2026-04-02T10:03:45Z",
+        "updated_at": "2026-04-17T08:14:49Z",
+        "last_activity_at": "2026-04-17T08:14:49Z",
+        "leader_id": null,
+        "observe_id": "observe-sess-20260402100345527324000",
+        "pending_leader_transfer": null,
+        "metrics": {
+          "agent_count": 0,
+          "active_agent_count": 0,
+          "open_task_count": 1,
+          "in_progress_task_count": 0,
+          "blocked_task_count": 0,
+          "completed_task_count": 0
+        }
+      }
+      """
+
+    let summary = try decoder.decode(SessionSummary.self, from: Data(json.utf8))
+
+    #expect(summary.status.rawValue == "leaderless_degraded")
+    #expect(summary.leaderId == nil)
+  }
 }

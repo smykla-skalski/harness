@@ -31,15 +31,33 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureDiagnosticsErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedDiagnosticsErrors = errors
+    }
+  }
+
   func configureProjectsDelay(_ delay: Duration?) {
     lock.withLock {
       projectsDelay = delay
     }
   }
 
+  func configureProjectsErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedProjectsErrors = errors
+    }
+  }
+
   func configureSessionsDelay(_ delay: Duration?) {
     lock.withLock {
       sessionsDelay = delay
+    }
+  }
+
+  func configureSessionsErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedSessionsErrors = errors
     }
   }
 
@@ -318,6 +336,33 @@ extension RecordingHarnessClient {
   func configuredDiagnosticsDelay() -> Duration? { lock.withLock { diagnosticsDelay } }
   func configuredProjectsDelay() -> Duration? { lock.withLock { projectsDelay } }
   func configuredSessionsDelay() -> Duration? { lock.withLock { sessionsDelay } }
+
+  func dequeueDiagnosticsError() -> (any Error)? {
+    lock.withLock {
+      guard !queuedDiagnosticsErrors.isEmpty else {
+        return nil
+      }
+      return queuedDiagnosticsErrors.removeFirst()
+    }
+  }
+
+  func dequeueProjectsError() -> (any Error)? {
+    lock.withLock {
+      guard !queuedProjectsErrors.isEmpty else {
+        return nil
+      }
+      return queuedProjectsErrors.removeFirst()
+    }
+  }
+
+  func dequeueSessionsError() -> (any Error)? {
+    lock.withLock {
+      guard !queuedSessionsErrors.isEmpty else {
+        return nil
+      }
+      return queuedSessionsErrors.removeFirst()
+    }
+  }
   func configuredMutationDelay() -> Duration? { lock.withLock { mutationDelay } }
   func configuredProjects() -> [ProjectSummary]? { lock.withLock { projectSummariesStorage } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { sessionSummariesStorage } }

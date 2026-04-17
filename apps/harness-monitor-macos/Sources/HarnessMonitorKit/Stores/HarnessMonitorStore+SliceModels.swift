@@ -223,7 +223,9 @@ extension HarnessMonitorStore {
     for summary: SessionSummary
   ) -> SessionSummaryPresentation {
     let isEstimated = sessionCatalogIsEstimated
-    let isLeaderless = summary.status != .ended && summary.leaderId == nil
+    let isLeaderless =
+      summary.status == .leaderlessDegraded
+      || (summary.status == .active && summary.leaderId == nil)
 
     let statusText = isLeaderless ? "Leaderless" : summary.status.title
     let statusTone: StatusMessageTone
@@ -235,6 +237,8 @@ extension HarnessMonitorStore {
       switch summary.status {
       case .active:
         statusTone = .success
+      case .leaderlessDegraded:
+        statusTone = .caution
       case .paused:
         statusTone = .caution
       case .ended:

@@ -122,6 +122,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var diagnosticsDelay: Duration?
   var projectsDelay: Duration?
   var sessionsDelay: Duration?
+  var queuedDiagnosticsErrors: [any Error] = []
+  var queuedProjectsErrors: [any Error] = []
+  var queuedSessionsErrors: [any Error] = []
   var mutationDelay: Duration?
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
