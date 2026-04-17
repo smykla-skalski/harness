@@ -339,7 +339,20 @@ private struct SidebarSessionListColumn: View {
 private struct SidebarFooterMetricsBridge: View {
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
 
+  private var summary: SidebarFooterSummary {
+    SidebarFooterSummary(
+      projectCount: sidebarUI.projectCount,
+      worktreeCount: sidebarUI.worktreeCount,
+      sessionCount: sidebarUI.sessionCount,
+      openWorkCount: sidebarUI.openWorkCount,
+      blockedCount: sidebarUI.blockedCount
+    )
+  }
+
   var body: some View {
-    SidebarFooterAccessory(metrics: sidebarUI.connectionMetrics)
+    SidebarFooterAccessory(
+      metrics: sidebarUI.connectionMetrics,
+      summary: summary
+    )
   }
 }

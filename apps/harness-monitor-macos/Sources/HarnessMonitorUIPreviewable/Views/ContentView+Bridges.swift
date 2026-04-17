@@ -81,7 +81,6 @@ struct ContentAccessibilityOverlayBridge: View {
             contentSession: contentSession,
             contentSessionDetail: contentSessionDetail
           )
-          ContentToolbarAccessibilityMarker(toolbarUI: contentToolbar)
           AccessibilityTextMarker(
             identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
             text: toolbarCenterpieceDisplayMode.rawValue

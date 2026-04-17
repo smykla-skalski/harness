@@ -5,13 +5,10 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 private struct ToolbarCenterpieceMetrics {
   let toolbarFrame: CGRect
   let centerpieceFrame: CGRect
-  let metricsFrame: CGRect
   let statusTickerFrame: CGRect
   let statusTickerContentFrame: CGRect
   let centerOffset: CGFloat
   let verticalOffset: CGFloat
-  let leadingInset: CGFloat
-  let interiorGap: CGFloat
   let trailingInset: CGFloat
   let statusLeadingInset: CGFloat
   let statusTrailingInset: CGFloat
@@ -20,13 +17,10 @@ private struct ToolbarCenterpieceMetrics {
     """
     toolbar: \(toolbarFrame)
     centerpieceFrame: \(centerpieceFrame)
-    metricsFrame: \(metricsFrame)
     statusTicker: \(statusTickerFrame)
     statusTickerContent: \(statusTickerContentFrame)
     centerOffset: \(centerOffset)
     verticalOffset: \(verticalOffset)
-    leadingInset: \(leadingInset)
-    interiorGap: \(interiorGap)
     trailingInset: \(trailingInset)
     statusLeadingInset: \(statusLeadingInset)
     statusTrailingInset: \(statusTrailingInset)
@@ -39,17 +33,14 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "empty")
     let metrics = try toolbarCenterpieceMetrics(in: app)
 
-    let expectedLeadingInset: CGFloat = 12
-    let leadingInsetTolerance: CGFloat = 1
     let expectedTrailingInset: CGFloat = 4
+    let trailingInsetTolerance: CGFloat = 1
     let expectedStatusHorizontalInset: CGFloat = 12
     let statusInsetTolerance: CGFloat = 1
     let shouldCaptureDiagnostics =
       metrics.centerOffset > 120
       || metrics.verticalOffset > 8
-      || abs(metrics.leadingInset - expectedLeadingInset) > leadingInsetTolerance
-      || metrics.interiorGap < 20
-      || abs(metrics.trailingInset - expectedTrailingInset) > leadingInsetTolerance
+      || abs(metrics.trailingInset - expectedTrailingInset) > trailingInsetTolerance
       || abs(metrics.statusLeadingInset - expectedStatusHorizontalInset) > statusInsetTolerance
       || abs(metrics.statusTrailingInset - expectedStatusHorizontalInset) > statusInsetTolerance
       || metrics.centerpieceFrame.width < 180
@@ -65,7 +56,7 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThanOrEqual(
       metrics.centerpieceFrame.width,
       180,
-      "Expected the toolbar centerpiece to keep the stats visible in a compact capsule"
+      "Expected the toolbar centerpiece to keep a compact capsule"
     )
     XCTAssertLessThanOrEqual(
       metrics.centerOffset,
@@ -78,28 +69,13 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
       "Expected the toolbar centerpiece to stay vertically centered in the toolbar"
     )
     XCTAssertGreaterThanOrEqual(
-      metrics.leadingInset,
-      expectedLeadingInset - leadingInsetTolerance,
-      "Expected the metrics row to keep the calculated leading inset inside the centerpiece capsule"
-    )
-    XCTAssertLessThanOrEqual(
-      metrics.leadingInset,
-      expectedLeadingInset + leadingInsetTolerance,
-      "Expected the metrics row leading inset to match the capsule height-derived target"
-    )
-    XCTAssertGreaterThanOrEqual(
-      metrics.interiorGap,
-      20,
-      "Expected the metrics row and status ticker to keep a visible interior gap"
-    )
-    XCTAssertGreaterThanOrEqual(
       metrics.trailingInset,
-      expectedTrailingInset - leadingInsetTolerance,
+      expectedTrailingInset - trailingInsetTolerance,
       "Expected the status ticker host to sit flush to the trailing edge"
     )
     XCTAssertLessThanOrEqual(
       metrics.trailingInset,
-      expectedTrailingInset + leadingInsetTolerance,
+      expectedTrailingInset + trailingInsetTolerance,
       "Expected the status ticker host trailing inset to stay near zero"
     )
     XCTAssertGreaterThanOrEqual(
@@ -150,33 +126,33 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testToolbarCenterpieceReportsPreviewMetrics() throws {
+  func testSidebarFooterReportsPreviewMetrics() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
-    let centerpieceState = element(in: app, identifier: Accessibility.toolbarCenterpieceState)
+    let sidebarFooterState = element(in: app, identifier: Accessibility.sidebarFooterState)
 
     XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(sidebarFooterState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(centerpiece.label, "Harness Monitor, My Mac")
-    XCTAssertEqual(centerpieceState.label, "projects=1, sessions=1, openWork=2, blocked=1")
+    XCTAssertEqual(sidebarFooterState.label, "projects=1, sessions=1, openWork=2, blocked=1")
   }
 
-  func testToolbarCenterpieceUsesOnlySessionBackedProjectsAndWorktrees() throws {
+  func testSidebarFooterUsesOnlySessionBackedProjectsAndWorktrees() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "toolbar-count-regression"]
     )
-    let centerpieceState = element(in: app, identifier: Accessibility.toolbarCenterpieceState)
+    let sidebarFooterState = element(in: app, identifier: Accessibility.sidebarFooterState)
     let sidebarState = element(in: app, identifier: Accessibility.sidebarSessionListState)
 
-    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(sidebarFooterState.waitForExistence(timeout: Self.fastActionTimeout))
     XCTAssertTrue(sidebarState.waitForExistence(timeout: Self.fastActionTimeout))
     XCTAssertEqual(sidebarState.label, "projects=2, worktrees=2, sessions=3")
     XCTAssertEqual(
-      centerpieceState.label,
+      sidebarFooterState.label,
       "projects=2, worktrees=2, sessions=3, openWork=4, blocked=1"
     )
   }
@@ -191,7 +167,6 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     let window = mainWindow(in: app)
     let toolbar = window.toolbars.firstMatch
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
-    let centerpieceState = element(in: app, identifier: Accessibility.toolbarCenterpieceState)
     let centerpieceMode = element(in: app, identifier: Accessibility.toolbarCenterpieceMode)
     let toolbarChromeState = element(in: app, identifier: Accessibility.toolbarChromeState)
     let backButtons = app.toolbars.buttons.matching(identifier: Accessibility.navigateBackButton)
@@ -230,7 +205,6 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
       let centerpieceGap = centerpiece.frame.minX - title.frame.maxX
 
       return centerpiece.frame.width > 140
-        && centerpieceState.exists
         && centerpieceMode.exists
         && toolbarChromeState.exists
         && toolbarChromeState.label.contains("toolbarTitle=native-window")
@@ -248,7 +222,6 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
         toolbar: \(toolbar.frame)
         centerpiece exists: \(centerpiece.exists)
         centerpiece frame: \(centerpiece.exists ? String(describing: centerpiece.frame) : "missing")
-        centerpiece state: \(centerpieceState.exists ? centerpieceState.label : "missing")
         centerpiece mode: \(centerpieceMode.exists ? centerpieceMode.label : "missing")
         toolbar chrome: \(toolbarChromeState.exists ? toolbarChromeState.label : "missing")
         title frame: \(title.exists ? String(describing: title.frame) : "missing")
@@ -263,7 +236,6 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     }
 
     XCTAssertTrue(didCompact, "Expected the narrow toolbar to keep the centerpiece visible")
-    XCTAssertEqual(centerpieceState.label, "projects=1, sessions=1, openWork=2, blocked=1")
   }
 
   func testToolbarStatusTickerRendersInPreview() throws {
@@ -286,8 +258,6 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     let toolbar = window.toolbars.firstMatch
     let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
     let centerpieceFrame = frameElement(in: app, identifier: Accessibility.toolbarCenterpieceFrame)
-    let metricsFrame = frameElement(
-      in: app, identifier: Accessibility.toolbarCenterpieceMetricsFrame)
     let statusTicker = frameElement(in: app, identifier: Accessibility.toolbarStatusTickerFrame)
     let statusTickerContent = frameElement(
       in: app,
@@ -300,18 +270,14 @@ final class HarnessMonitorToolbarCenterpieceUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(centerpieceFrame.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(statusTicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(statusTickerContent.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(metricsFrame.waitForExistence(timeout: Self.actionTimeout))
 
     return ToolbarCenterpieceMetrics(
       toolbarFrame: toolbar.frame,
       centerpieceFrame: centerpieceFrame.frame,
-      metricsFrame: metricsFrame.frame,
       statusTickerFrame: statusTicker.frame,
       statusTickerContentFrame: statusTickerContent.frame,
       centerOffset: abs(centerpieceFrame.frame.midX - toolbar.frame.midX),
       verticalOffset: abs(centerpieceFrame.frame.midY - toolbar.frame.midY),
-      leadingInset: metricsFrame.frame.minX - centerpieceFrame.frame.minX,
-      interiorGap: statusTicker.frame.minX - metricsFrame.frame.maxX,
       trailingInset: centerpieceFrame.frame.maxX - statusTicker.frame.maxX,
       statusLeadingInset: statusTickerContent.frame.minX - statusTicker.frame.minX,
       statusTrailingInset: statusTicker.frame.maxX - statusTickerContent.frame.maxX

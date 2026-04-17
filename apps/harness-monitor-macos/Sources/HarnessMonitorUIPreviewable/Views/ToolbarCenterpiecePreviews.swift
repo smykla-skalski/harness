@@ -13,13 +13,7 @@ import SwiftUI
       model: ToolbarCenterpieceModel(
         workspaceName: "Harness Monitor",
         destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: [
-          .init(kind: .projects, value: 11),
-          .init(kind: .sessions, value: 1),
-          .init(kind: .openWork, value: 4),
-          .init(kind: .blocked, value: 1),
-        ]
+        destinationSystemImage: "laptopcomputer"
       ),
       displayMode: .compact,
       statusMessages: [
@@ -61,54 +55,6 @@ import SwiftUI
         .background(.quaternary, in: Capsule())
       }
     }
-  }
-  .padding(24)
-}
-
-#Preview("Centerpiece - Varying Metrics") {
-  VStack(spacing: 16) {
-    ToolbarCenterpieceView(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: [
-          .init(kind: .projects, value: 1),
-          .init(kind: .blocked, value: 0),
-        ]
-      ),
-      displayMode: .compact
-    )
-    .background(.quaternary, in: Capsule())
-
-    ToolbarCenterpieceView(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: [
-          .init(kind: .projects, value: 11),
-          .init(kind: .sessions, value: 1),
-          .init(kind: .openWork, value: 4),
-          .init(kind: .blocked, value: 1),
-        ]
-      ),
-      displayMode: .compact
-    )
-    .background(.quaternary, in: Capsule())
-
-    ToolbarCenterpieceView(
-      model: ToolbarCenterpieceModel(
-        workspaceName: "Harness Monitor",
-        destinationName: "My Mac",
-        destinationSystemImage: "laptopcomputer",
-        metrics: ToolbarCenterpieceMetricKind.allCases.map {
-          .init(kind: $0, value: 999)
-        }
-      ),
-      displayMode: .compact
-    )
-    .background(.quaternary, in: Capsule())
   }
   .padding(24)
 }

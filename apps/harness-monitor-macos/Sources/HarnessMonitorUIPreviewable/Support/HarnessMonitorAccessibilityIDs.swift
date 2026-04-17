@@ -31,6 +31,9 @@ public enum HarnessMonitorAccessibility {
   public static let sessionFilterGroup = "harness.sidebar.filter-group"
   public static let sidebarSortPicker = "harness.sidebar.picker.sort"
   public static let sidebarFocusPicker = "harness.sidebar.picker.focus"
+  public static let sidebarFooter = "harness.sidebar.footer"
+  public static let sidebarFooterState = "harness.sidebar.footer.state"
+  public static let sidebarFooterMetricsFrame = "harness.sidebar.footer.metrics.frame"
 
   public static func sidebarFilterChip(_ filter: String) -> String {
     "harness.sidebar.filter-chip.\(slug(filter))"
@@ -118,9 +121,7 @@ public enum HarnessMonitorAccessibility {
   public static let navigateForwardButton = "harness.toolbar.navigate-forward"
   public static let toolbarCenterpiece = "harness.toolbar.centerpiece"
   public static let toolbarCenterpieceFrame = "harness.toolbar.centerpiece.frame"
-  public static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
   public static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
-  public static let toolbarCenterpieceMetricsFrame = "harness.toolbar.centerpiece.metrics.frame"
   public static let toolbarStatusTicker = "harness.toolbar.status-ticker"
   public static let toolbarStatusTickerFrame = "harness.toolbar.status-ticker.frame"
   public static let toolbarStatusTickerContentFrame = "harness.toolbar.status-ticker.content.frame"
