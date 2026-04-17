@@ -11,7 +11,9 @@ use tokio::sync::broadcast;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+use crate::daemon::protocol::{
+    AgentRuntimeSessionRegistrationRequest, SessionJoinRequest, SessionStartRequest,
+};
 use crate::daemon::protocol::{TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest};
 use crate::daemon::state::DaemonManifest;
 use crate::session::types::SessionRole;
@@ -248,6 +250,97 @@ fn post_task_create_uses_async_db_when_sync_db_is_unavailable() {
                 assert_eq!(body["tasks"][0]["title"].as_str(), Some("async http task"));
             });
         });
+    });
+}
+
+#[test]
+fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        temp_env::with_vars(
+            [
+                ("CLAUDE_SESSION_ID", None::<&str>),
+                ("GEMINI_SESSION_ID", None::<&str>),
+            ],
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
+
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_http_state_with_empty_async_db(&db_path).await;
+                    let session_id = "http-async-runtime-session";
+                    let tui_id = "agent-tui-runtime";
+                    let _ = start_async_http_session(state.clone(), &project_dir, session_id).await;
+
+                    let response = post_session_join(
+                        axum::extract::Path(session_id.to_owned()),
+                        auth_headers(),
+                        State(state.clone()),
+                        Json(SessionJoinRequest {
+                            runtime: "gemini".into(),
+                            role: SessionRole::Worker,
+                            fallback_role: None,
+                            capabilities: vec!["agent-tui".into(), format!("agent-tui:{tui_id}")],
+                            name: Some("Async Gemini Worker".into()),
+                            project_dir: project_dir.to_string_lossy().into_owned(),
+                            persona: None,
+                        }),
+                    )
+                    .await;
+                    let (join_status, _) = response_json(response).await;
+                    assert_eq!(join_status, StatusCode::OK);
+
+                    let async_db = state.async_db.get().expect("async db");
+                    let before = async_db
+                        .resolve_session(session_id)
+                        .await
+                        .expect("resolve session")
+                        .expect("session present");
+                    let joined_worker = before
+                        .state
+                        .agents
+                        .values()
+                        .find(|agent| agent.runtime == "gemini")
+                        .expect("gemini worker");
+                    assert!(joined_worker.agent_session_id.is_none());
+
+                    let response = post_runtime_session(
+                        axum::extract::Path(session_id.to_owned()),
+                        auth_headers(),
+                        State(state.clone()),
+                        Json(AgentRuntimeSessionRegistrationRequest {
+                            tui_id: tui_id.into(),
+                            runtime: "gemini".into(),
+                            agent_session_id: "gemini-runtime-2152464d".into(),
+                            project_dir: project_dir.to_string_lossy().into_owned(),
+                        }),
+                    )
+                    .await;
+
+                    let (status, body) = response_json(response).await;
+                    assert_eq!(status, StatusCode::OK);
+                    assert_eq!(body["registered"].as_bool(), Some(true));
+
+                    let after = async_db
+                        .resolve_session(session_id)
+                        .await
+                        .expect("resolve session")
+                        .expect("session present");
+                    let joined_worker = after
+                        .state
+                        .agents
+                        .values()
+                        .find(|agent| agent.runtime == "gemini")
+                        .expect("gemini worker");
+                    assert_eq!(
+                        joined_worker.agent_session_id.as_deref(),
+                        Some("gemini-runtime-2152464d")
+                    );
+                });
+            },
+        );
     });
 }
 

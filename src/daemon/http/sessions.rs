@@ -19,6 +19,7 @@ use crate::session::types::SessionState;
 
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
+use super::runtime_session::post_runtime_session;
 use super::stream::stream_session;
 use super::{DaemonHttpState, require_async_db};
 
@@ -29,6 +30,10 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
         .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
         .route("/v1/sessions/{session_id}/stream", get(stream_session))
         .route("/v1/sessions/{session_id}/join", post(post_session_join))
+        .route(
+            "/v1/sessions/{session_id}/runtime-session",
+            post(post_runtime_session),
+        )
         .route("/v1/sessions/{session_id}/title", post(post_session_title))
         .route("/v1/sessions/{session_id}/end", post(post_end_session))
         .route("/v1/sessions/{session_id}/leave", post(post_leave_session))
@@ -278,7 +283,7 @@ async fn observe_session_response(
     service::observe_session(session_id, request, db_ref)
 }
 
-async fn broadcast_observe_session(state: &DaemonHttpState, session_id: &str) {
+pub(super) async fn broadcast_observe_session(state: &DaemonHttpState, session_id: &str) {
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_session_snapshot_async(
             &state.sender,
@@ -343,7 +348,13 @@ pub(super) async fn post_session_title(
     if result.is_ok() {
         broadcast_session_title(&state, &session_id).await;
     }
-    timed_json("POST", "/v1/sessions/{id}/title", &request_id, start, result)
+    timed_json(
+        "POST",
+        "/v1/sessions/{id}/title",
+        &request_id,
+        start,
+        result,
+    )
 }
 
 async fn start_session_response(

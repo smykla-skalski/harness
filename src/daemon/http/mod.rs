@@ -22,6 +22,7 @@ mod auth;
 mod codex;
 mod core;
 mod response;
+mod runtime_session;
 mod sessions;
 mod signals;
 mod stream;
