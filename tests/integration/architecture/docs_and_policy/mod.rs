@@ -309,8 +309,8 @@ fn repo_contains_no_legacy_observe_doctor_scan_action() {
     hits.extend(collect_hits_in_paths(
         root,
         &[
-            ".claude/plugins/observe/skills/observe/SKILL.md",
-            ".claude/plugins/observe/skills/observe/references/command-surface.md",
+            ".claude/plugins/harness/skills/harness/SKILL.md",
+            ".claude/plugins/harness/skills/harness/references/observe-commands.md",
             "README.md",
             "ARCHITECTURE.md",
         ],
@@ -339,10 +339,10 @@ fn canonical_observe_sources_avoid_host_owned_runtime_paths() {
     let hits = collect_hits_in_paths(
         root,
         &[
-            "agents/skills/observe/body.md",
-            "agents/skills/observe/agents/deep-analyst.md",
-            "agents/skills/observe/references/issue-taxonomy.md",
-            "agents/skills/observe/references/overrides.md",
+            "agents/plugins/harness/skills/harness/body.md",
+            "agents/plugins/harness/skills/harness/agents/deep-analyst.md",
+            "agents/plugins/harness/skills/harness/references/issue-taxonomy.md",
+            "agents/plugins/harness/skills/harness/references/observe-overrides.md",
         ],
         &needles,
         |path, needle| {

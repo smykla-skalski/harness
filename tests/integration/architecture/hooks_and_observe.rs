@@ -404,14 +404,14 @@ fn observe_scan_root_stays_prod_only() {
 fn observe_skill_matches_current_cli_surface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docs = [
-        read_repo_file(root, ".claude/plugins/observe/skills/observe/SKILL.md"),
+        read_repo_file(root, ".claude/plugins/harness/skills/harness/SKILL.md"),
         read_repo_file(
             root,
-            ".claude/plugins/observe/skills/observe/references/overrides.md",
+            ".claude/plugins/harness/skills/harness/references/observe-overrides.md",
         ),
         read_repo_file(
             root,
-            ".claude/plugins/observe/skills/observe/references/command-surface.md",
+            ".claude/plugins/harness/skills/harness/references/observe-commands.md",
         ),
     ];
     let all_docs: Vec<&str> = docs.iter().map(String::as_str).collect();
