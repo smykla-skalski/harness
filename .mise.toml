@@ -37,9 +37,13 @@ run = "./scripts/cargo-local.sh test --test integration -- --ignored --test-thre
 description = "Run all fast tests"
 depends = ["test:unit", "test:integration"]
 
+[tasks."check:agent-assets"]
+description = "Verify generated agent assets are in sync with sources"
+run = "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"
+
 [tasks.check]
 description = "Type-check without building"
-run = ["./scripts/version.sh check", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib"]
+run = ["./scripts/version.sh check", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib", "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
