@@ -67,3 +67,11 @@ run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 [tasks."monitor:macos:test"]
 description = "Generate, lint, and test the Harness Monitor macOS app"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
+
+[tasks."preview:render"]
+description = "Render one SwiftUI preview via xcode-cli (args: --id <EntryID> or --file <path> [--index N])"
+run = "apps/harness-monitor-macos/Scripts/preview-render.sh"
+
+[tasks."preview:smoke"]
+description = "Render every entry in apps/harness-monitor-macos/Previews.json; fails on any timeout/crash"
+run = "apps/harness-monitor-macos/Scripts/preview-smoke.sh"

@@ -1,0 +1,126 @@
+{
+  "scheme": "HarnessMonitorUIPreviews",
+  "configuration": "Preview",
+  "entries": [
+    {
+      "id": "ContentView",
+      "description": "Main content shell with sidebar + detail",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/ContentViewCanvasPreviews.swift",
+      "index": 0
+    },
+    {
+      "id": "PreferencesView",
+      "description": "Preferences root window",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/PreferencesViewPreviews.swift",
+      "index": 0
+    },
+    {
+      "id": "AgentTuiWindowView",
+      "description": "Agent TUI window with terminal + sidebar",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/AgentTuiWindowViewPreviews.swift",
+      "index": 0
+    },
+    {
+      "id": "ToolbarCenterpiece",
+      "description": "Toolbar metrics + status ticker",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/ToolbarCenterpiecePreviews.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionsBoardView",
+      "description": "Dashboard with sessions grid",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionsBoardView.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionCockpitView",
+      "description": "Session cockpit detail",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitView.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionCockpitHeaderCard",
+      "description": "Session header card with status + metrics",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitHeaderCard.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionCockpitTimelineSection",
+      "description": "Session timeline with paged events",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitTimelineSection.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionCockpitActivitySections",
+      "description": "Session activity + signals panels",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitActivitySections.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionAgentLaneViews",
+      "description": "Agent lane with tasks + drop zones",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionAgentLaneViews.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionTaskLaneViews",
+      "description": "Task lane card variations",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionTaskLaneViews.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionMetricGrid",
+      "description": "Metric tiles grid",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionMetricGrid.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionActionDock",
+      "description": "Session action dock buttons",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionActionDock.swift",
+      "index": 0
+    },
+    {
+      "id": "SessionsBoardRecentSessionsSection",
+      "description": "Recent sessions overflow section",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionsBoardRecentSessionsSection.swift",
+      "index": 0
+    },
+    {
+      "id": "InspectorColumnView",
+      "description": "Inspector column content",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/InspectorColumnView.swift",
+      "index": 0
+    },
+    {
+      "id": "SidebarSessionRow",
+      "description": "Sidebar session row variants",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SidebarSessionRow.swift",
+      "index": 0
+    },
+    {
+      "id": "SidebarFooterAccessory",
+      "description": "Sidebar footer status bar",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SidebarFooterAccessory.swift",
+      "index": 0
+    },
+    {
+      "id": "ToolbarStatusTickerView",
+      "description": "Toolbar status ticker rotating messages",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/ToolbarStatusTickerView.swift",
+      "index": 0
+    },
+    {
+      "id": "ConnectionViews",
+      "description": "Connection status banners",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/ConnectionViews.swift",
+      "index": 0
+    },
+    {
+      "id": "ContentSessionSurface",
+      "description": "Session surface container",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/ContentSessionSurface.swift",
+      "index": 0
+    }
+  ]
+}
