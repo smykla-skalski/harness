@@ -90,6 +90,21 @@ pub(super) fn set_log_mtime_seconds_ago(path: &Path, seconds: u64) {
         .expect("set mtime");
 }
 
+pub(super) fn age_leader_state_activity(project: &Path, session_id: &str, seconds: i64) {
+    let stale = (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339();
+    crate::session::storage::update_state(project, session_id, |state| {
+        let leader_id = state.leader_id.clone();
+        if let Some(leader_id) = leader_id
+            && let Some(leader) = state.agents.get_mut(&leader_id)
+        {
+            leader.last_activity_at = Some(stale.clone());
+            stale.clone_into(&mut leader.updated_at);
+        }
+        Ok(())
+    })
+    .expect("age leader state activity");
+}
+
 pub(super) struct SessionReadFixture {
     pub(super) state: crate::session::types::SessionState,
     pub(super) leader_log: PathBuf,
