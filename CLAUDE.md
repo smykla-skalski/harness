@@ -88,7 +88,7 @@ Automatic sync workflow:
 
 - bump the canonical version with `./scripts/version.sh set <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
 - `mise run version:check` verifies every derived version surface and runs as part of `mise run check`
-- `apps/harness-monitor-macos/Scripts/generate-project.sh` automatically syncs the monitor version metadata from the root package version before it invokes XcodeGen
+- `apps/harness-monitor-macos/Scripts/generate-project.sh` regenerates the project, then resyncs the monitor version metadata from the root package version so XcodeGen cannot reintroduce stale build numbers
 
 Derived surfaces maintained by `scripts/version.sh`:
 
