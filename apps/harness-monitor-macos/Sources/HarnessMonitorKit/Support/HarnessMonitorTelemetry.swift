@@ -1,5 +1,6 @@
 import Foundation
 import OpenTelemetryApi
+import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 
 private struct HarnessMonitorHeaderSetter: Setter {
@@ -14,7 +15,8 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
   struct State {
     var bootstrapped = false
     var instruments: HarnessMonitorTelemetryInstruments?
-    var grpcResources: HarnessMonitorGRPCResources?
+    var exportControl: HarnessMonitorTelemetryExportControl?
+    var httpExporterSessionOverride: URLSession?
   }
 
   let stateLock = NSLock()
@@ -59,13 +61,14 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       )
     }
 
-    let meterProvider = registerProviders(resource: resource, config: config)
+    let registration = registerProviders(resource: resource, config: config)
 
     let instruments = HarnessMonitorTelemetryInstruments(
-      meterProvider: meterProvider
+      meterProvider: registration.meterProvider
     )
     stateLock.withLock {
       state.instruments = instruments
+      state.exportControl = registration.exportControl
     }
 
     emitLog(
@@ -88,7 +91,9 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     request.setValue(requestID, forHTTPHeaderField: "X-Request-Id")
 
     var carrier: [String: String] = [:]
-    let activeSpanContext = spanContext ?? OpenTelemetry.instance.contextProvider.activeSpan?.context
+    let activeSpanContext =
+      spanContext
+      ?? OpenTelemetry.instance.contextProvider.activeSpan?.context
     if let activeSpanContext, activeSpanContext.isValid {
       OpenTelemetry.instance.propagators.textMapPropagator.inject(
         spanContext: activeSpanContext,
@@ -191,5 +196,46 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       .setBody(.string(body))
       .setAttributes(attributes)
       .emit()
+  }
+
+  func shutdown() {
+    let exportControl = stateLock.withLock { () -> HarnessMonitorTelemetryExportControl? in
+      let exportControl = state.exportControl
+      state.exportControl = nil
+      return exportControl
+    }
+    exportControl?.forceFlush()
+    exportControl?.shutdown()
+  }
+
+  func setHTTPExporterSessionForTests(_ session: URLSession?) {
+    stateLock.withLock {
+      state.httpExporterSessionOverride = session
+    }
+  }
+
+  func resetForTests() {
+    let exportControl = stateLock.withLock { () -> HarnessMonitorTelemetryExportControl? in
+      let exportControl = state.exportControl
+      state = State()
+      return exportControl
+    }
+
+    exportControl?.shutdown()
+    OpenTelemetry.registerTracerProvider(tracerProvider: DefaultTracerProvider.instance)
+    OpenTelemetry.registerLoggerProvider(loggerProvider: DefaultLoggerProvider.instance)
+    OpenTelemetry.registerMeterProvider(meterProvider: DefaultMeterProvider.instance)
+    OpenTelemetry.registerPropagators(
+      textPropagators: [W3CTraceContextPropagator()],
+      baggagePropagator: W3CBaggagePropagator()
+    )
+  }
+
+  func makeHTTPExporterClient() -> any HTTPClient {
+    let session = stateLock.withLock { state.httpExporterSessionOverride }
+    guard let session else {
+      return BaseHTTPClient()
+    }
+    return BaseHTTPClient(session: session)
   }
 }

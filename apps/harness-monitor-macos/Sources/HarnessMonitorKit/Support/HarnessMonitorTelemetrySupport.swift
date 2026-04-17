@@ -54,6 +54,16 @@ final class HarnessMonitorDoubleHistogramRecorder: @unchecked Sendable {
   }
 }
 
+struct HarnessMonitorTelemetryExportControl {
+  let forceFlush: () -> Void
+  let shutdown: () -> Void
+}
+
+struct HarnessMonitorTelemetryRegistration {
+  let meterProvider: any MeterProvider
+  let exportControl: HarnessMonitorTelemetryExportControl?
+}
+
 final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
   private let httpRequestCounter: HarnessMonitorLongCounterRecorder
   private let httpRequestDuration: HarnessMonitorDoubleHistogramRecorder
@@ -61,14 +71,21 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
   private let websocketRPCDuration: HarnessMonitorDoubleHistogramRecorder
 
   init(meterProvider: any MeterProvider) {
-    let meter = meterProvider.meterBuilder(name: HarnessMonitorTelemetryConstants.meterScope).build()
+    let meter =
+      meterProvider
+      .meterBuilder(name: HarnessMonitorTelemetryConstants.meterScope)
+      .build()
 
     let httpCounter = meter.counterBuilder(name: "harness_monitor_http_requests_total").build()
     let httpDuration = meter.histogramBuilder(name: "harness_monitor_http_request_duration_ms")
       .build()
-    let websocketCounter = meter.counterBuilder(name: "harness_monitor_websocket_connects_total")
+    let websocketCounter =
+      meter
+      .counterBuilder(name: "harness_monitor_websocket_connects_total")
       .build()
-    let websocketDuration = meter.histogramBuilder(name: "harness_monitor_websocket_rpc_duration_ms")
+    let websocketDuration =
+      meter
+      .histogramBuilder(name: "harness_monitor_websocket_rpc_duration_ms")
       .build()
 
     httpRequestCounter = HarnessMonitorLongCounterRecorder(counter: httpCounter)
@@ -134,19 +151,11 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
   }
 }
 
-final class HarnessMonitorGRPCResources: @unchecked Sendable {
-  let group: MultiThreadedEventLoopGroup
-
-  init(group: MultiThreadedEventLoopGroup) {
-    self.group = group
-  }
-}
-
 extension HarnessMonitorTelemetry {
   func registerProviders(
     resource: Resource,
     config: HarnessMonitorObservabilityConfig?
-  ) -> any MeterProvider {
+  ) -> HarnessMonitorTelemetryRegistration {
     if let config {
       return registerExportingProviders(resource: resource, config: config)
     }
@@ -161,13 +170,16 @@ extension HarnessMonitorTelemetry {
         .with(resource: resource)
         .build()
     )
-    return OpenTelemetry.instance.meterProvider
+    return HarnessMonitorTelemetryRegistration(
+      meterProvider: OpenTelemetry.instance.meterProvider,
+      exportControl: nil
+    )
   }
 
   func registerExportingProviders(
     resource: Resource,
     config: HarnessMonitorObservabilityConfig
-  ) -> any MeterProvider {
+  ) -> HarnessMonitorTelemetryRegistration {
     let otlpHeaders = config.headers.map { ($0.key, $0.value) }
     let otlpConfig = OtlpConfiguration(
       timeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds,
@@ -184,10 +196,6 @@ extension HarnessMonitorTelemetry {
 
       let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
       let channel = makeGRPCChannel(endpoint: grpcEndpoint, group: group)
-      stateLock.withLock {
-        state.grpcResources = HarnessMonitorGRPCResources(group: group)
-      }
-
       let traceExporter = OtlpTraceExporter(
         channel: channel,
         config: otlpConfig,
@@ -207,33 +215,39 @@ extension HarnessMonitorTelemetry {
         resource: resource,
         traceExporter: traceExporter,
         logExporter: logExporter,
-        metricExporter: metricExporter
+        metricExporter: metricExporter,
+        exportControl: makeExportControl(group: group)
       )
     case .httpProtobuf:
       guard let endpoints = config.httpSignalEndpoints else {
         return registerProviders(resource: resource, config: nil)
       }
 
+      let httpClient = makeHTTPExporterClient()
       let traceExporter = OtlpHttpTraceExporter(
         endpoint: endpoints.traces,
         config: otlpConfig,
+        httpClient: httpClient,
         envVarHeaders: nil
       )
       let logExporter = OtlpHttpLogExporter(
         endpoint: endpoints.logs,
         config: otlpConfig,
+        httpClient: httpClient,
         envVarHeaders: nil
       )
       let metricExporter = OtlpHttpMetricExporter(
         endpoint: endpoints.metrics,
         config: otlpConfig,
+        httpClient: httpClient,
         envVarHeaders: nil
       )
       return registerProviders(
         resource: resource,
         traceExporter: traceExporter,
         logExporter: logExporter,
-        metricExporter: metricExporter
+        metricExporter: metricExporter,
+        exportControl: nil
       )
     }
   }
@@ -242,51 +256,73 @@ extension HarnessMonitorTelemetry {
     resource: Resource,
     traceExporter: some SpanExporter,
     logExporter: some LogRecordExporter,
-    metricExporter: some MetricExporter
-  ) -> any MeterProvider {
+    metricExporter: some MetricExporter,
+    exportControl: HarnessMonitorTelemetryExportControl?
+  ) -> HarnessMonitorTelemetryRegistration {
+    let spanProcessor = BatchSpanProcessor(
+      spanExporter: traceExporter,
+      scheduleDelay: HarnessMonitorTelemetryConstants.spanScheduleDelaySeconds,
+      exportTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+    )
     let tracerProvider = TracerProviderBuilder()
       .with(resource: resource)
-      .add(
-        spanProcessor: BatchSpanProcessor(
-          spanExporter: traceExporter,
-          scheduleDelay: HarnessMonitorTelemetryConstants.spanScheduleDelaySeconds,
-          exportTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
-        )
-      )
+      .add(spanProcessor: spanProcessor)
       .build()
 
+    let logProcessor = BatchLogRecordProcessor(
+      logRecordExporter: logExporter,
+      scheduleDelay: HarnessMonitorTelemetryConstants.logScheduleDelaySeconds,
+      exportTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+    )
     let loggerProvider = LoggerProviderBuilder()
       .with(resource: resource)
-      .with(
-        processors: [
-          BatchLogRecordProcessor(
-            logRecordExporter: logExporter,
-            scheduleDelay: HarnessMonitorTelemetryConstants.logScheduleDelaySeconds,
-            exportTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
-          )
-        ]
-      )
+      .with(processors: [logProcessor])
       .build()
 
+    let metricReader = PeriodicMetricReaderBuilder(exporter: metricExporter)
+      .setInterval(
+        timeInterval: HarnessMonitorTelemetryConstants.metricExportIntervalSeconds
+      )
+      .build()
     let meterProvider = MeterProviderSdk.builder()
       .setResource(resource: resource)
       .registerView(
         selector: InstrumentSelector.builder().setInstrument(name: ".*").build(),
         view: View.builder().build()
       )
-      .registerMetricReader(
-        reader: PeriodicMetricReaderBuilder(exporter: metricExporter)
-          .setInterval(
-            timeInterval: HarnessMonitorTelemetryConstants.metricExportIntervalSeconds
-          )
-          .build()
-      )
+      .registerMetricReader(reader: metricReader)
       .build()
 
     OpenTelemetry.registerTracerProvider(tracerProvider: tracerProvider)
     OpenTelemetry.registerLoggerProvider(loggerProvider: loggerProvider)
     OpenTelemetry.registerMeterProvider(meterProvider: meterProvider)
-    return meterProvider
+    let control = HarnessMonitorTelemetryExportControl(
+      forceFlush: {
+        tracerProvider.forceFlush(timeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds)
+        _ = logProcessor.forceFlush(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = meterProvider.forceFlush()
+        exportControl?.forceFlush()
+      },
+      shutdown: {
+        tracerProvider.forceFlush(timeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds)
+        _ = logProcessor.forceFlush(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = meterProvider.forceFlush()
+        tracerProvider.shutdown()
+        _ = logProcessor.shutdown(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = meterProvider.shutdown()
+        exportControl?.shutdown()
+      }
+    )
+    return HarnessMonitorTelemetryRegistration(
+      meterProvider: meterProvider,
+      exportControl: control
+    )
   }
 
   func buildResource(
@@ -329,7 +365,6 @@ extension HarnessMonitorTelemetry {
         "otel.export.enabled": .bool(false)
       ]
     }
-
     let configSource: String
     switch config.source {
     case .environment:
@@ -370,5 +405,16 @@ extension HarnessMonitorTelemetry {
 
     return ClientConnection.insecure(group: group)
       .connect(host: host, port: port)
+  }
+
+  func makeExportControl(
+    group: MultiThreadedEventLoopGroup
+  ) -> HarnessMonitorTelemetryExportControl {
+    HarnessMonitorTelemetryExportControl(
+      forceFlush: {},
+      shutdown: {
+        try? group.syncShutdownGracefully()
+      }
+    )
   }
 }

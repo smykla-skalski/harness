@@ -8,7 +8,9 @@ struct HarnessMonitorObservabilityConfigTests {
   @Test("Shared config defaults to gRPC export")
   func sharedConfigDefaultsToGrpcExport() throws {
     let tempDirectory = try temporaryDirectory()
-    let configURL = tempDirectory
+
+    let configURL =
+      tempDirectory
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("observability", isDirectory: true)
       .appendingPathComponent("config.json")
@@ -62,9 +64,18 @@ struct HarnessMonitorObservabilityConfigTests {
     #expect(config.source == .environment)
     #expect(config.transport == .httpProtobuf)
     #expect(config.grpcEndpoint == nil)
-    #expect(config.httpSignalEndpoints?.traces.absoluteString == "http://127.0.0.1:4318/v1/traces")
-    #expect(config.httpSignalEndpoints?.metrics.absoluteString == "http://127.0.0.1:4318/v1/metrics")
-    #expect(config.httpSignalEndpoints?.logs.absoluteString == "http://127.0.0.1:4318/v1/logs")
+    #expect(
+      config.httpSignalEndpoints?.traces.absoluteString
+        == "http://127.0.0.1:4318/v1/traces"
+    )
+    #expect(
+      config.httpSignalEndpoints?.metrics.absoluteString
+        == "http://127.0.0.1:4318/v1/metrics"
+    )
+    #expect(
+      config.httpSignalEndpoints?.logs.absoluteString
+        == "http://127.0.0.1:4318/v1/logs"
+    )
     #expect(config.headers["x-harness-env"] == "local")
     #expect(config.headers["x-tenant"] == "test")
   }
@@ -72,7 +83,9 @@ struct HarnessMonitorObservabilityConfigTests {
   @Test("Explicit environment keeps gRPC endpoint precedence over shared config")
   func explicitEnvironmentKeepsGrpcPrecedenceOverSharedConfig() throws {
     let tempDirectory = try temporaryDirectory()
-    let configURL = tempDirectory
+
+    let configURL =
+      tempDirectory
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("observability", isDirectory: true)
       .appendingPathComponent("config.json")
