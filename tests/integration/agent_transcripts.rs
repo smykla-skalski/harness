@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use harness::agents::service::record_hook_event;
 use harness::agents::runtime::hook_agent_for_runtime_name;
+use harness::agents::service::record_hook_event;
 use harness::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
@@ -16,7 +16,10 @@ fn with_agent_storage_env(body: impl FnOnce(&Path)) {
     std::fs::create_dir_all(&project_dir).expect("create project dir");
     temp_env::with_vars(
         [
-            ("XDG_DATA_HOME", Some(data_dir.to_str().expect("xdg data path"))),
+            (
+                "XDG_DATA_HOME",
+                Some(data_dir.to_str().expect("xdg data path")),
+            ),
             ("HOME", Some(tmp.path().to_str().expect("home path"))),
         ],
         || body(&project_dir),
@@ -37,12 +40,12 @@ fn gemini_lifecycle_transcript_uses_assistant_response_not_prompt_body() {
             agent: Some(AgentContext {
                 agent_id: None,
                 agent_type: Some("gemini".into()),
-                prompt: Some("/harness:session:join sess-123 --role reviewer".into()),
+                prompt: Some("/harness:harness session join sess-123 --role reviewer".into()),
                 response: Some("actual assistant reply".into()),
             }),
             skill: SkillContext::inactive(),
             raw: RawPayload::new(serde_json::json!({
-                "prompt": "/harness:session:join sess-123 --role reviewer",
+                "prompt": "/harness:harness session join sess-123 --role reviewer",
                 "last_assistant_message": "actual assistant reply"
             })),
         };
