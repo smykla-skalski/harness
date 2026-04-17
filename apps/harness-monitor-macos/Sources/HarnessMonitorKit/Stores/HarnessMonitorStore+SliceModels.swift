@@ -30,26 +30,42 @@ extension HarnessMonitorStore {
   }
 
   public struct SessionSummaryPresentation: Equatable, Sendable {
+    public struct SidebarStatPresentation: Equatable, Sendable {
+      public let symbolName: String
+      public let valueText: String
+      public let helpText: String
+
+      public init(
+        symbolName: String,
+        valueText: String,
+        helpText: String
+      ) {
+        self.symbolName = symbolName
+        self.valueText = valueText
+        self.helpText = helpText
+      }
+    }
+
     public let statusText: String
     public let statusTone: StatusMessageTone
     public let isEstimated: Bool
-    public let agentCountText: String
-    public let taskCountText: String
+    public let agentStat: SidebarStatPresentation
+    public let taskStat: SidebarStatPresentation
     public let accessibilityStatusText: String
 
     public init(
       statusText: String,
       statusTone: StatusMessageTone,
       isEstimated: Bool,
-      agentCountText: String,
-      taskCountText: String,
+      agentStat: SidebarStatPresentation,
+      taskStat: SidebarStatPresentation,
       accessibilityStatusText: String
     ) {
       self.statusText = statusText
       self.statusTone = statusTone
       self.isEstimated = isEstimated
-      self.agentCountText = agentCountText
-      self.taskCountText = taskCountText
+      self.agentStat = agentStat
+      self.taskStat = taskStat
       self.accessibilityStatusText = accessibilityStatusText
     }
   }
@@ -230,17 +246,35 @@ extension HarnessMonitorStore {
       !isEstimated
       && !isLeaderless
       && summary.status == .active
-    let agentCountText =
-      usesLiveAgentPhrasing
-      ? "\(summary.metrics.activeAgentCount) active"
-      : "\(summary.metrics.agentCount) known"
+    let agentStat: SessionSummaryPresentation.SidebarStatPresentation
+    if usesLiveAgentPhrasing {
+      let agentCount = summary.metrics.activeAgentCount
+      agentStat = SessionSummaryPresentation.SidebarStatPresentation(
+        symbolName: "person.2.fill",
+        valueText: "\(agentCount)",
+        helpText: "\(agentCount) active"
+      )
+    } else {
+      let agentCount = summary.metrics.agentCount
+      agentStat = SessionSummaryPresentation.SidebarStatPresentation(
+        symbolName: "person.2",
+        valueText: "\(agentCount)",
+        helpText: "\(agentCount) known"
+      )
+    }
+    let movingTaskCount = summary.metrics.inProgressTaskCount
+    let taskStat = SessionSummaryPresentation.SidebarStatPresentation(
+      symbolName: "arrow.triangle.2.circlepath",
+      valueText: "\(movingTaskCount)",
+      helpText: "\(movingTaskCount) moving"
+    )
 
     return SessionSummaryPresentation(
       statusText: statusText,
       statusTone: statusTone,
       isEstimated: isEstimated,
-      agentCountText: agentCountText,
-      taskCountText: "\(summary.metrics.inProgressTaskCount) moving",
+      agentStat: agentStat,
+      taskStat: taskStat,
       accessibilityStatusText: isEstimated ? "\(statusText), estimated" : statusText
     )
   }

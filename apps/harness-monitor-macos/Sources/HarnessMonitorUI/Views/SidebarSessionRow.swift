@@ -38,14 +38,30 @@ struct SidebarSessionRow: View {
           .font(scaled(.caption.monospaced()))
           .truncationMode(.middle)
           .foregroundStyle(.secondary)
-        HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-          footerLabel(presentation.agentCountText)
-          footerLabel(presentation.taskCountText)
-          Spacer(minLength: 0)
+        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+            footerStatBadge(
+              presentation.agentStat,
+              identifier: HarnessMonitorAccessibility.sessionRowAgentStat(session.sessionId)
+            )
+            footerStatBadge(
+              presentation.taskStat,
+              identifier: HarnessMonitorAccessibility.sessionRowTaskStat(session.sessionId)
+            )
+          }
+          .fixedSize(horizontal: true, vertical: false)
+          .accessibilityFrameMarker(
+            HarnessMonitorAccessibility.sessionRowStatsFrame(session.sessionId)
+          )
+          Spacer(minLength: HarnessMonitorTheme.spacingXS)
           Text(verbatim: lastActivityText)
             .font(scaled(.caption.weight(.medium)))
             .lineLimit(1)
+            .truncationMode(.head)
             .foregroundStyle(.secondary)
+            .accessibilityFrameMarker(
+              HarnessMonitorAccessibility.sessionRowLastActivityFrame(session.sessionId)
+            )
         }
         .frame(maxWidth: .infinity)
       }
@@ -53,11 +69,27 @@ struct SidebarSessionRow: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func footerLabel(_ value: String) -> some View {
-    Text(verbatim: value)
-      .font(scaled(.caption.weight(.medium)))
-      .lineLimit(1)
-      .foregroundStyle(.secondary)
+  private func footerStatBadge(
+    _ stat: HarnessMonitorStore.SessionSummaryPresentation.SidebarStatPresentation,
+    identifier: String
+  ) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: stat.symbolName)
+        .font(scaled(.caption.weight(.medium)))
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+      Text(verbatim: stat.valueText)
+        .font(scaled(.caption.monospacedDigit().weight(.medium)))
+        .lineLimit(1)
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+    }
+    .help(stat.helpText)
+    .accessibilityTestProbe(
+      identifier,
+      label: stat.symbolName,
+      value: stat.helpText
+    )
   }
 
   private func scaled(_ font: Font) -> Font {

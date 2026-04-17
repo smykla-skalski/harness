@@ -10,6 +10,8 @@ func sessionAccessibilityLabel(
     session.projectName,
     session.checkoutDisplayName,
     presentation.accessibilityStatusText,
+    presentation.agentStat.helpText,
+    presentation.taskStat.helpText,
     session.sessionId,
   ].joined(separator: ", ")
 }
