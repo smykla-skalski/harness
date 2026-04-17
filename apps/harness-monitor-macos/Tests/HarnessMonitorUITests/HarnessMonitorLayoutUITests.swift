@@ -318,4 +318,32 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     assertEqualHeights([leaderCard, workerCard], tolerance: 10)
   }
 
+  func testTaskDropPreviewTaskCardHidesContextAndKeepsStatusRowVisible() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "task-drop"]
+    )
+
+    let taskCard = element(in: app, identifier: Accessibility.taskDropQueueCard)
+    let workerCard = element(in: app, identifier: Accessibility.workerAgentCard)
+    let context = app.staticTexts["Drag this open task onto the busy worker card."]
+
+    XCTAssertTrue(taskCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(workerCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(
+      context.exists,
+      "Cockpit task cards should keep the compact two-row layout and hide task context"
+    )
+    XCTAssertLessThanOrEqual(
+      taskCard.frame.height,
+      84,
+      "Compact task cards should collapse to their two visible rows without extra bottom gap"
+    )
+    XCTAssertLessThan(
+      taskCard.frame.height,
+      workerCard.frame.height - 24,
+      "Compact task cards should be substantially shorter than the full agent cards"
+    )
+  }
+
 }
