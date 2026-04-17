@@ -194,20 +194,22 @@ extension HarnessMonitorTelemetry {
         return registerProviders(resource: resource, config: nil)
       }
 
-      let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-      let channel = makeGRPCChannel(endpoint: grpcEndpoint, group: group)
+      let group = PlatformSupport.makeEventLoopGroup(loopCount: 1)
+      let traceChannel = makeGRPCChannel(endpoint: grpcEndpoint, group: group)
+      let logChannel = makeGRPCChannel(endpoint: grpcEndpoint, group: group)
+      let metricChannel = makeGRPCChannel(endpoint: grpcEndpoint, group: group)
       let traceExporter = OtlpTraceExporter(
-        channel: channel,
+        channel: traceChannel,
         config: otlpConfig,
         envVarHeaders: nil
       )
       let logExporter = OtlpLogExporter(
-        channel: channel,
+        channel: logChannel,
         config: otlpConfig,
         envVarHeaders: nil
       )
       let metricExporter = OtlpMetricExporter(
-        channel: channel,
+        channel: metricChannel,
         config: otlpConfig,
         envVarHeaders: nil
       )
@@ -216,7 +218,10 @@ extension HarnessMonitorTelemetry {
         traceExporter: traceExporter,
         logExporter: logExporter,
         metricExporter: metricExporter,
-        exportControl: makeExportControl(group: group)
+        exportControl: makeExportControl(
+          channels: [traceChannel, logChannel, metricChannel],
+          group: group
+        )
       )
     case .httpProtobuf:
       guard let endpoints = config.httpSignalEndpoints else {
@@ -392,8 +397,8 @@ extension HarnessMonitorTelemetry {
 
   func makeGRPCChannel(
     endpoint: URL,
-    group: MultiThreadedEventLoopGroup
-  ) -> GRPCChannel {
+    group: EventLoopGroup
+  ) -> ClientConnection {
     let host = endpoint.host(percentEncoded: false) ?? "127.0.0.1"
     let port = endpoint.port ?? 4317
     let scheme = endpoint.scheme?.lowercased()
@@ -408,11 +413,15 @@ extension HarnessMonitorTelemetry {
   }
 
   func makeExportControl(
-    group: MultiThreadedEventLoopGroup
+    channels: [ClientConnection],
+    group: EventLoopGroup
   ) -> HarnessMonitorTelemetryExportControl {
     HarnessMonitorTelemetryExportControl(
       forceFlush: {},
       shutdown: {
+        for channel in channels {
+          _ = try? channel.close().wait()
+        }
         try? group.syncShutdownGracefully()
       }
     )

@@ -24,6 +24,7 @@ struct HarnessMonitorObservabilityConfig: Equatable, Sendable {
   let httpSignalEndpoints: HarnessMonitorHTTPSignalEndpoints?
   let grafanaURL: URL?
   let pyroscopeURL: URL?
+  let monitorSmokeEnabled: Bool
   let headers: [String: String]
 
   static func resolve(
@@ -52,6 +53,7 @@ private struct SharedObservabilityFile: Decodable {
   let httpEndpoint: String
   let grafanaURL: String?
   let pyroscopeURL: String?
+  let monitorSmokeEnabled: Bool?
   let headers: [String: String]
 
   enum CodingKeys: String, CodingKey {
@@ -60,6 +62,7 @@ private struct SharedObservabilityFile: Decodable {
     case httpEndpoint = "http_endpoint"
     case grafanaURL = "grafana_url"
     case pyroscopeURL = "pyroscope_url"
+    case monitorSmokeEnabled = "monitor_smoke_enabled"
     case headers
   }
 }
@@ -108,6 +111,7 @@ extension HarnessMonitorObservabilityConfig {
         httpSignalEndpoints: nil,
         grafanaURL: url(from: values["HARNESS_OTEL_GRAFANA_URL"]),
         pyroscopeURL: url(from: values["HARNESS_OTEL_PYROSCOPE_URL"]),
+        monitorSmokeEnabled: false,
         headers: headers
       )
     case .httpProtobuf:
@@ -129,6 +133,7 @@ extension HarnessMonitorObservabilityConfig {
         httpSignalEndpoints: endpoints,
         grafanaURL: url(from: values["HARNESS_OTEL_GRAFANA_URL"]),
         pyroscopeURL: url(from: values["HARNESS_OTEL_PYROSCOPE_URL"]),
+        monitorSmokeEnabled: false,
         headers: headers
       )
     }
@@ -166,6 +171,7 @@ extension HarnessMonitorObservabilityConfig {
         httpSignalEndpoints: nil,
         grafanaURL: url(from: sharedFile.grafanaURL),
         pyroscopeURL: url(from: sharedFile.pyroscopeURL),
+        monitorSmokeEnabled: sharedFile.monitorSmokeEnabled ?? false,
         headers: sharedFile.headers
       )
     case .httpProtobuf:
@@ -188,6 +194,7 @@ extension HarnessMonitorObservabilityConfig {
         httpSignalEndpoints: endpoints,
         grafanaURL: url(from: sharedFile.grafanaURL),
         pyroscopeURL: url(from: sharedFile.pyroscopeURL),
+        monitorSmokeEnabled: sharedFile.monitorSmokeEnabled ?? false,
         headers: sharedFile.headers
       )
     }
@@ -213,6 +220,7 @@ extension HarnessMonitorObservabilityConfig {
         httpSignalEndpoints: nil,
         grafanaURL: nil,
         pyroscopeURL: nil,
+        monitorSmokeEnabled: false,
         headers: [:]
       )
     case .httpProtobuf:
@@ -234,6 +242,7 @@ extension HarnessMonitorObservabilityConfig {
         httpSignalEndpoints: endpoints,
         grafanaURL: nil,
         pyroscopeURL: nil,
+        monitorSmokeEnabled: false,
         headers: [:]
       )
     }

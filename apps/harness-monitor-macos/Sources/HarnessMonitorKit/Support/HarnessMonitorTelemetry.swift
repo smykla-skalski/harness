@@ -198,7 +198,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       .emit()
   }
 
-  func shutdown() {
+  public func shutdown() {
     let exportControl = stateLock.withLock { () -> HarnessMonitorTelemetryExportControl? in
       let exportControl = state.exportControl
       state.exportControl = nil
