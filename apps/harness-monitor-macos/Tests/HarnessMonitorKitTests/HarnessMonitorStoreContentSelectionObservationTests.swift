@@ -240,6 +240,38 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
 
+  @Test("Sidebar summary counts reflect indexed session metrics")
+  func sidebarSummaryCountsReflectIndexedSessionMetrics() async {
+    let store = await makeBootstrappedStore()
+
+    #expect(store.sidebarUI.projectCount == store.indexedProjectCount)
+    #expect(store.sidebarUI.worktreeCount == store.indexedWorktreeCount)
+    #expect(store.sidebarUI.sessionCount == store.indexedSessionCount)
+    #expect(store.sidebarUI.openWorkCount == store.sessionIndex.totalOpenWorkCount)
+    #expect(store.sidebarUI.blockedCount == store.sessionIndex.totalBlockedCount)
+  }
+
+  @Test("Daemon status churn resyncs sidebar summary counts")
+  func daemonStatusChurnResyncsSidebarSummaryCounts() async {
+    let store = await makeBootstrappedStore()
+    guard let daemonStatus = store.daemonStatus else {
+      Issue.record("Missing daemon status after bootstrap")
+      return
+    }
+
+    store.debugResetUISyncCounts()
+    store.daemonStatus = DaemonStatusReport(
+      manifest: daemonStatus.manifest,
+      launchAgent: daemonStatus.launchAgent,
+      projectCount: daemonStatus.projectCount + 1,
+      worktreeCount: daemonStatus.worktreeCount,
+      sessionCount: daemonStatus.sessionCount,
+      diagnostics: daemonStatus.diagnostics
+    )
+
+    #expect(store.debugUISyncCount(for: .sidebar) == 1)
+  }
+
   func alternateSummary() -> SessionSummary {
     SessionSummary(
       projectId: PreviewFixtures.summary.projectId,
