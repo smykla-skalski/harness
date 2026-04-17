@@ -100,6 +100,49 @@ struct HarnessMonitorAdaptiveGridLayoutCacheTests {
   }
 }
 
+@Suite("Toolbar centerpiece display mode stabilization")
+struct ToolbarCenterpieceDisplayModeStabilizationTests {
+  @Test("Standard mode ignores single-bucket activation jitter near the compact threshold")
+  func standardModeIgnoresSingleBucketActivationJitter() {
+    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
+      current: .standard,
+      detailWidth: 1_024
+    )
+
+    #expect(stabilized == .standard)
+  }
+
+  @Test("Compact mode ignores single-bucket activation jitter near the standard threshold")
+  func compactModeIgnoresSingleBucketStandardThresholdJitter() {
+    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
+      current: .compact,
+      detailWidth: 1_056
+    )
+
+    #expect(stabilized == .compact)
+  }
+
+  @Test("Compact mode ignores single-bucket activation jitter near the compressed threshold")
+  func compactModeIgnoresSingleBucketCompressedThresholdJitter() {
+    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
+      current: .compact,
+      detailWidth: 928
+    )
+
+    #expect(stabilized == .compact)
+  }
+
+  @Test("Compressed mode only promotes after width moves beyond the compact entry band")
+  func compressedModePromotesOnlyAfterMeaningfulGrowth() {
+    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
+      current: .compressed,
+      detailWidth: 992
+    )
+
+    #expect(stabilized == .compact)
+  }
+}
+
 @Suite("Adaptive grid layout measurement key")
 struct AdaptiveGridLayoutMeasurementKeyTests {
   @Test("Measurement key normalizes invalid widths to nil")

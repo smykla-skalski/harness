@@ -23,6 +23,7 @@ public struct ContentView<CornerContent: View>: View {
   @State private var isStartupFocusParticipationEnabled = false
   @State private var shouldIgnoreNextInspectorMeasurement = false
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
+  @State private var stabilizedToolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode?
   @State private var pendingDetailColumnWidth: CGFloat?
   @State private var sidebarColumnWidth: CGFloat = 260
   @State private var detailColumnLeadingEdge: CGFloat = 260
@@ -43,7 +44,10 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
-    ToolbarCenterpieceDisplayMode.forDetailWidth(toolbarLayoutWidth)
+    ToolbarCenterpieceDisplayMode.resolve(
+      current: stabilizedToolbarCenterpieceDisplayMode,
+      detailWidth: toolbarLayoutWidth
+    )
   }
 
   private var inspectorPresentationBinding: Binding<Bool> {
@@ -265,6 +269,10 @@ public struct ContentView<CornerContent: View>: View {
         abs(pendingDetailColumnWidth - detailColumnWidth) >= 1
       {
         detailColumnWidth = pendingDetailColumnWidth
+        stabilizedToolbarCenterpieceDisplayMode = ToolbarCenterpieceDisplayMode.resolve(
+          current: stabilizedToolbarCenterpieceDisplayMode,
+          detailWidth: pendingDetailColumnWidth
+        )
       }
       self.pendingDetailColumnWidth = nil
       isLayoutAnimating = false
@@ -285,6 +293,10 @@ public struct ContentView<CornerContent: View>: View {
     }
     pendingDetailColumnWidth = nil
     detailColumnWidth = nextWidth
+    stabilizedToolbarCenterpieceDisplayMode = ToolbarCenterpieceDisplayMode.resolve(
+      current: stabilizedToolbarCenterpieceDisplayMode,
+      detailWidth: nextWidth
+    )
   }
 
   private func updateSidebarColumnWidth(_ width: CGFloat) {

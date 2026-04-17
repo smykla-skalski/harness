@@ -58,6 +58,7 @@ public enum ToolbarCenterpieceDisplayMode: String {
 
   private static let standardDetailThreshold: CGFloat = 1_050
   private static let compactDetailThreshold: CGFloat = 960
+  private static let thresholdHysteresis: CGFloat = 32
 
   public static func forDetailWidth(_ detailWidth: CGFloat) -> Self {
     switch detailWidth {
@@ -67,6 +68,36 @@ public enum ToolbarCenterpieceDisplayMode: String {
       .compact
     default:
       .compressed
+    }
+  }
+
+  public static func resolve(current: Self?, detailWidth: CGFloat) -> Self {
+    guard let current else {
+      return forDetailWidth(detailWidth)
+    }
+    return resolve(current: current, detailWidth: detailWidth)
+  }
+
+  public static func resolve(current: Self, detailWidth: CGFloat) -> Self {
+    switch current {
+    case .standard:
+      if detailWidth < standardDetailThreshold - thresholdHysteresis {
+        return .compact
+      }
+      return .standard
+    case .compact:
+      if detailWidth >= standardDetailThreshold + thresholdHysteresis {
+        return .standard
+      }
+      if detailWidth < compactDetailThreshold - thresholdHysteresis {
+        return .compressed
+      }
+      return .compact
+    case .compressed:
+      if detailWidth >= compactDetailThreshold + thresholdHysteresis {
+        return .compact
+      }
+      return .compressed
     }
   }
 
