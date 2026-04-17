@@ -36,10 +36,31 @@ extension HarnessMonitorStore {
       return
     }
     self.client = client
+    await refreshPersistedSessionMetadata()
+
+    if maintainsLiveDaemonObservation {
+      await connectLive(using: client)
+      return
+    }
+
+    do {
+      try await performPreviewConnectRefresh(using: client, preserveSelection: true)
+    } catch {
+      _ = disconnectActiveConnection()
+      markConnectionOffline(Self.describeRefreshSnapshotError(error))
+      await restorePersistedSessionState()
+      return
+    }
+
+    withUISyncBatch {
+      connectionState = .online
+    }
+  }
+
+  private func connectLive(using client: any HarnessMonitorClientProtocol) async {
     withUISyncBatch {
       connectionState = .connecting
     }
-    await refreshPersistedSessionMetadata()
 
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
     resetConnectionMetrics(for: transport)
@@ -56,7 +77,7 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       connectionState = .online
     }
-    appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.title)")
+    appendConnectionEvent(kind: .connected, detail: connectedEventDetail(for: transport))
     startConnectionProbe(using: client)
     startManifestWatcher()
     startGlobalStream(using: client)
@@ -67,7 +88,21 @@ extension HarnessMonitorStore {
     }
   }
 
+  private func performPreviewConnectRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    preserveSelection: Bool
+  ) async throws {
+    try await performPreviewRefresh(using: client, preserveSelection: preserveSelection)
+  }
+
+  private func connectedEventDetail(for transport: TransportKind) -> String {
+    "Connected via \(transport.title)"
+  }
+
   func appendConnectionEvent(kind: ConnectionEventKind, detail: String) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     let event = ConnectionEvent(kind: kind, detail: detail, transportKind: activeTransport)
     connectionEvents.append(event)
     if connectionEvents.count > 50 {
@@ -130,20 +165,23 @@ extension HarnessMonitorStore {
 
   private func performRefresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool
+    preserveSelection: Bool,
+    recordConnectionTelemetry: Bool = true
   ) async throws {
     let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
     applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
-      preserveSelection: preserveSelection
+      preserveSelection: preserveSelection,
+      recordConnectionTelemetry: recordConnectionTelemetry
     )
   }
 
   private func applyRefreshSnapshot(
     _ refreshSnapshot: RefreshSnapshot,
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool
+    preserveSelection: Bool,
+    recordConnectionTelemetry: Bool
   ) {
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
@@ -162,12 +200,14 @@ extension HarnessMonitorStore {
         measuredDiagnostics.value.health?.logLevel
         ?? HarnessMonitorLogger.defaultDaemonLogLevel
     }
-    recordRequestSuccess(
-      latencyMs: measuredDiagnostics.latencyMs,
-      updatesLatency: true
-    )
-    recordRequestSuccess()
-    recordRequestSuccess()
+    if recordConnectionTelemetry {
+      recordRequestSuccess(
+        latencyMs: measuredDiagnostics.latencyMs,
+        updatesLatency: true
+      )
+      recordRequestSuccess()
+      recordRequestSuccess()
+    }
 
     applySessionIndexSnapshot(
       projects: measuredProjects.value,
@@ -192,6 +232,19 @@ extension HarnessMonitorStore {
     schedulePersistedSnapshotHydration(
       using: client,
       sessions: measuredSessions.value
+    )
+  }
+
+  private func performPreviewRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    preserveSelection: Bool
+  ) async throws {
+    let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
+    applyRefreshSnapshot(
+      refreshSnapshot,
+      using: client,
+      preserveSelection: preserveSelection,
+      recordConnectionTelemetry: false
     )
   }
 

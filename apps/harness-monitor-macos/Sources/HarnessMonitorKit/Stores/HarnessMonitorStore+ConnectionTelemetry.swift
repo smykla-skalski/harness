@@ -178,6 +178,9 @@ extension HarnessMonitorStore {
   }
 
   func resetConnectionMetrics(for transport: TransportKind) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     activeTransport = transport
     connectionMetrics = .initial
     connectionMetrics.transportKind = transport
@@ -203,6 +206,9 @@ extension HarnessMonitorStore {
     countsTowardsTraffic: Bool = true,
     recordedAt: Date = .now
   ) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     if updatesLatency, let latencyMs {
       updateLatency(latencyMs)
     }
@@ -219,6 +225,9 @@ extension HarnessMonitorStore {
     countedInTraffic: Bool,
     recordedAt: Date = .now
   ) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     connectionMetrics.lastMessageAt = recordedAt
     guard countedInTraffic else {
       return
@@ -228,6 +237,9 @@ extension HarnessMonitorStore {
   }
 
   func recordReconnectAttempt(scope: String, nextAttempt: Int, error: any Error) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     if connectionMetrics.reconnectAttempt == 0 {
       connectionMetrics.reconnectCount += 1
     }
@@ -246,6 +258,9 @@ extension HarnessMonitorStore {
   }
 
   func recordReconnectRecovery(detail: String) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     guard connectionMetrics.reconnectAttempt > 0 else {
       return
     }
@@ -255,6 +270,9 @@ extension HarnessMonitorStore {
 
   func startConnectionProbe(using client: any HarnessMonitorClientProtocol) {
     stopConnectionProbe()
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
     connectionProbeTask = Task { @MainActor [weak self] in
       guard let self else {
         return

@@ -144,6 +144,11 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingUISyncAreas: Set<UISyncArea> = []
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
+
+  var maintainsLiveDaemonObservation: Bool {
+    !(daemonController is PreviewDaemonController)
+  }
+
   public convenience init(
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
