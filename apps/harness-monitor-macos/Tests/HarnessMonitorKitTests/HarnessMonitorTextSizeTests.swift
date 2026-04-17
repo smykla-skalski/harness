@@ -85,7 +85,7 @@ struct HarnessMonitorTextSizeTests {
 struct SessionCockpitEmptyStateRowTests {
   @Test("Tasks placeholder uses the shared message and secondary styling contract")
   func tasksPlaceholderUsesSharedMessageAndSecondaryStylingContract() {
-    #expect(SessionCockpitEmptyStateRow.Section.tasks.message == "No tasks yet")
+    #expect(SessionCockpitEmptyStateRow.Section.tasks.message == "No tasks right now")
     #expect(SessionCockpitEmptyStateRow.usesSecondaryForeground)
   }
 
