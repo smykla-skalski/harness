@@ -3,7 +3,7 @@ import Observation
 import Testing
 
 @testable import HarnessMonitorKit
-@testable import HarnessMonitorUI
+@testable import HarnessMonitorUIPreviewable
 
 @MainActor
 @Suite("Harness Monitor store navigation history")

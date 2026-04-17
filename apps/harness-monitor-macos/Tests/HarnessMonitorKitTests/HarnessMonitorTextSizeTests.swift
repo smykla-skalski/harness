@@ -2,7 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
-@testable import HarnessMonitorUI
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("HarnessMonitorTextSize magnification index delta")
 struct HarnessMonitorTextSizeTests {

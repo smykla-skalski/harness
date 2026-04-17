@@ -1,7 +1,7 @@
 import Testing
 
 @testable import HarnessMonitorKit
-@testable import HarnessMonitorUI
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Content inspector visibility policy")
 struct ContentInspectorVisibilityPolicyTests {

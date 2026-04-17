@@ -1,5 +1,4 @@
 import AppKit
-import HarnessMonitorUIPreviewable
 import SwiftUI
 
 // NSWindow draws a titlebar/toolbar separator at the AppKit level, above all

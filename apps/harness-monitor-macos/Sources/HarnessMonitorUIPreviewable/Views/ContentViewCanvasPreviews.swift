@@ -1,5 +1,4 @@
 import HarnessMonitorKit
-import HarnessMonitorUIPreviewable
 import SwiftUI
 
 #Preview("Canvas - Toolbar + Top Chrome") {

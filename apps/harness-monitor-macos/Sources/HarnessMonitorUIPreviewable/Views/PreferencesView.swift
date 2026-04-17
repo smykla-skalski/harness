@@ -1,5 +1,4 @@
 import HarnessMonitorKit
-import HarnessMonitorUIPreviewable
 import SwiftUI
 
 public struct PreferencesView: View {

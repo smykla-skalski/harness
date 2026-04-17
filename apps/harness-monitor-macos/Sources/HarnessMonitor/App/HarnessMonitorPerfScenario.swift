@@ -1,6 +1,5 @@
 import Foundation
 import HarnessMonitorKit
-import HarnessMonitorUI
 import HarnessMonitorUIPreviewable
 
 enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {

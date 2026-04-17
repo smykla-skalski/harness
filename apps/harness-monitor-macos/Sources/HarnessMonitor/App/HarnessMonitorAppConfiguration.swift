@@ -1,6 +1,5 @@
 import Foundation
 import HarnessMonitorKit
-import HarnessMonitorUI
 import HarnessMonitorUIPreviewable
 import SwiftData
 
