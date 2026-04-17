@@ -1,6 +1,0 @@
-interface:
-  display_name: "GitHub Task Issue"
-  short_description: "Draft and publish scoped GitHub task issues with semantic titles"
-  default_prompt: "Use $github-task-issue to draft a semantically titled GitHub task issue, explicitly run $humanize on the saved draft, confirm, publish, and verify it for this repo."
-policy:
-  allow_implicit_invocation: false

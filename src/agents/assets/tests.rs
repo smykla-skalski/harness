@@ -221,7 +221,8 @@ fn harness_plugin_is_in_codex_marketplace() {
         .expect("codex marketplace should be planned");
 
     assert!(rendered.contains("\"name\": \"harness\""));
-    assert!(rendered.contains("\"source\": \"./harness\""));
+    assert!(rendered.contains("\"source\": \"local\""));
+    assert!(rendered.contains("\"path\": \"./plugins/harness\""));
 }
 
 #[test]
