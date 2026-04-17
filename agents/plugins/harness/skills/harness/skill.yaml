@@ -1,0 +1,5 @@
+name: harness
+description: Use when orchestrating multi-agent sessions, observing agent behavior, managing tasks, or sending signals. First arg is top-level command (session, observe).
+argument-hint: '<session|observe> <subcommand> [options]'
+allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
+user-invocable: true
