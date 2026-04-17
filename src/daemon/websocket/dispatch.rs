@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use axum::extract::ws::Message;
 use tokio::time::Instant;
+use tracing::field::{Empty, display};
 
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
@@ -11,6 +12,7 @@ use crate::daemon::protocol::{
     TaskQueuePolicyRequest, TaskUpdateRequest, WsRequest, WsResponse,
 };
 use crate::daemon::service;
+use crate::telemetry::{apply_parent_context_from_text_map, current_trace_id};
 
 use super::connection::ConnectionState;
 use super::frames::{
@@ -61,9 +63,32 @@ pub(crate) async fn dispatch(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
     let start = Instant::now();
+    let span = tracing::info_span!(
+        "daemon.websocket.rpc",
+        otel.name = %request.method,
+        otel.kind = "server",
+        "rpc.system" = "harness-daemon",
+        "rpc.method" = %request.method,
+        "transport.kind" = "websocket",
+        request_id = %request.id,
+        duration_ms = Empty,
+        is_error = Empty,
+        "request.failed" = Empty,
+        trace_id = Empty
+    );
+    if let Some(trace_context) = &request.trace_context {
+        apply_parent_context_from_text_map(&span, trace_context);
+    }
+    let _guard = span.enter();
+    if let Some(trace_id) = current_trace_id() {
+        span.record("trace_id", display(trace_id));
+    }
     let response = dispatch_inner(request, state, connection).await;
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = response.error.is_some();
+    span.record("duration_ms", display(duration_ms));
+    span.record("is_error", display(is_error));
+    span.record("request.failed", display(is_error));
     tracing::event!(
         ws_activity_log_level(),
         method = %request.method,

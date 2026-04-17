@@ -34,6 +34,15 @@ pub fn apply_parent_context_from_headers(span: &tracing::Span, headers: &HeaderM
     let _ = span.set_parent(context);
 }
 
+pub fn apply_parent_context_from_text_map(
+    span: &tracing::Span,
+    headers: &BTreeMap<String, String>,
+) {
+    let extractor = TextMapExtractor(headers);
+    let context = global::get_text_map_propagator(|propagator| propagator.extract(&extractor));
+    let _ = span.set_parent(context);
+}
+
 #[must_use]
 pub fn current_trace_id() -> Option<String> {
     let context = tracing::Span::current().context();
@@ -95,7 +104,11 @@ fn hook_duration_histogram() -> &'static Histogram<u64> {
 }
 
 fn hook_outcome_counter() -> &'static Counter<u64> {
-    HOOK_OUTCOME_COUNTER.get_or_init(|| telemetry_meter().u64_counter("harness.hook.outcomes").build())
+    HOOK_OUTCOME_COUNTER.get_or_init(|| {
+        telemetry_meter()
+            .u64_counter("harness.hook.outcomes")
+            .build()
+    })
 }
 
 fn daemon_client_duration_histogram() -> &'static Histogram<u64> {
@@ -152,5 +165,54 @@ impl Extractor for HeaderExtractor<'_> {
 
     fn keys(&self) -> Vec<&str> {
         self.0.keys().map(HeaderName::as_str).collect()
+    }
+}
+
+struct TextMapExtractor<'a>(&'a BTreeMap<String, String>);
+
+impl Extractor for TextMapExtractor<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).map(String::as_str)
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.0.keys().map(String::as_str).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry::trace::TracerProvider as _;
+    use opentelemetry_sdk::propagation::TraceContextPropagator;
+    use opentelemetry_sdk::trace::SdkTracerProvider;
+    use tracing_subscriber::prelude::*;
+
+    use super::*;
+
+    #[test]
+    fn text_map_parent_context_preserves_trace_id() {
+        global::set_text_map_propagator(TraceContextPropagator::new());
+        let tracer_provider = SdkTracerProvider::builder().build();
+        let tracer = tracer_provider.tracer("metrics-tests");
+        let subscriber =
+            tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(tracer));
+
+        tracing::subscriber::with_default(subscriber, || {
+            let root_span = tracing::info_span!("root");
+            let _guard = root_span.enter();
+
+            let headers = current_trace_headers();
+            let root_trace_id = current_trace_id().expect("root trace id");
+
+            let child_span = tracing::info_span!("child");
+            apply_parent_context_from_text_map(&child_span, &headers);
+
+            let child_trace_id =
+                child_span.in_scope(|| current_trace_id().expect("child trace id"));
+
+            assert_eq!(root_trace_id, child_trace_id);
+        });
+
+        let _ = tracer_provider.shutdown();
     }
 }

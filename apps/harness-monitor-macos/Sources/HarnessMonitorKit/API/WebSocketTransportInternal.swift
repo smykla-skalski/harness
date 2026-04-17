@@ -1,4 +1,5 @@
 import Foundation
+import OpenTelemetryApi
 
 // MARK: - Internal transport mechanics
 
@@ -68,7 +69,12 @@ extension WebSocketTransport {
     let startedAt = ContinuousClock.now
     let id = UUID().uuidString
     span.setAttribute(key: "rpc.request_id", value: id)
-    let request = WsRequest(id: id, method: method, params: params)
+    let request = makeRequest(
+      id: id,
+      method: method,
+      params: params,
+      spanContext: span.context
+    )
     let data = try encoder.encode(request)
     let text = String(data: data, encoding: .utf8) ?? "{}"
     let task = webSocketTask
@@ -123,6 +129,21 @@ extension WebSocketTransport {
       )
       throw error
     }
+  }
+
+  func makeRequest(
+    id: String,
+    method: String,
+    params: JSONValue? = nil,
+    spanContext: SpanContext? = nil
+  ) -> WsRequest {
+    let traceContext = HarnessMonitorTelemetry.shared.traceContext(spanContext: spanContext)
+    return WsRequest(
+      id: id,
+      method: method,
+      params: params,
+      traceContext: traceContext.isEmpty ? nil : traceContext
+    )
   }
 
   /// Maximum internal WS reconnection attempts before giving up and

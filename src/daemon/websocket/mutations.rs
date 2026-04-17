@@ -310,6 +310,7 @@ mod tests {
                 "session_id": "sess-1",
                 "actor": "spoofed-leader",
             }),
+            trace_context: None,
         };
 
         let response = dispatch_mutation(&request, &state, |session_id, params, _db| {
@@ -337,6 +338,7 @@ mod tests {
                 "session_id": "sess-test-1",
                 "actor": "spoofed-leader",
             }),
+            trace_context: None,
         };
 
         let response = dispatch_mutation_prefer_async(

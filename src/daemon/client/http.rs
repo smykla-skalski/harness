@@ -2,31 +2,20 @@ use std::time::Instant;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tracing::field::{display, Empty};
+use tracing::field::{Empty, display};
 use uuid::Uuid;
 
 use super::{DaemonClient, MUTATION_TIMEOUT};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
-use crate::telemetry::{
-    current_trace_headers, current_trace_id, record_daemon_client_metrics,
-};
+use crate::telemetry::{current_trace_headers, current_trace_id, record_daemon_client_metrics};
 
 impl DaemonClient {
     pub(super) fn get<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
-        let span = tracing::info_span!(
-            "harness.daemon.client.request",
-            http_method = "GET",
-            http_route = path,
-            request_id = %request_id,
-            http_status_code = Empty,
-            duration_ms = Empty,
-            trace_id = Empty,
-            error = Empty
-        );
+        let span = client_request_span("GET", path, &request_id, &self.endpoint);
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
@@ -53,16 +42,7 @@ impl DaemonClient {
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
-        let span = tracing::info_span!(
-            "harness.daemon.client.request",
-            http_method = "POST",
-            http_route = path,
-            request_id = %request_id,
-            http_status_code = Empty,
-            duration_ms = Empty,
-            trace_id = Empty,
-            error = Empty
-        );
+        let span = client_request_span("POST", path, &request_id, &self.endpoint);
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
@@ -105,8 +85,10 @@ fn process_response<Res: DeserializeOwned>(
     log_client_request(method, path, status, start, request_id, failed);
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     span.record("http_status_code", display(status));
+    span.record("http.response.status_code", display(status));
     span.record("duration_ms", display(duration_ms));
     span.record("error", display(failed));
+    span.record("request.failed", display(failed));
 
     if failed {
         return Err(parse_error_response(&body_text, status));
@@ -138,6 +120,41 @@ fn record_trace_id(span: &tracing::Span) {
     if let Some(trace_id) = current_trace_id() {
         span.record("trace_id", display(trace_id));
     }
+}
+
+fn client_request_span(
+    method: &str,
+    path: &str,
+    request_id: &str,
+    endpoint: &str,
+) -> tracing::Span {
+    let otel_name = format!("{method} {path}");
+    let parsed_endpoint = reqwest::Url::parse(endpoint).ok();
+    tracing::info_span!(
+        "harness.daemon.client.request",
+        otel.name = %otel_name,
+        otel.kind = "client",
+        http_method = %method,
+        http_route = %path,
+        request_id = %request_id,
+        "http.request.method" = %method,
+        "http.route" = %path,
+        "url.path" = %path,
+        "server.address" = parsed_endpoint
+            .as_ref()
+            .and_then(reqwest::Url::host_str)
+            .unwrap_or(""),
+        "server.port" = parsed_endpoint
+            .as_ref()
+            .and_then(reqwest::Url::port_or_known_default)
+            .unwrap_or(0),
+        "http.response.status_code" = Empty,
+        http_status_code = Empty,
+        duration_ms = Empty,
+        trace_id = Empty,
+        "request.failed" = Empty,
+        error = Empty
+    )
 }
 
 #[expect(

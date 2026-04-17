@@ -49,6 +49,7 @@ fn websocket_async_signal_send_mutation_succeeds_without_sync_db() {
                             "message": "async websocket signal",
                             "action_hint": "task:ws-async-signal"
                         }),
+                        trace_context: None,
                     };
 
                     let response = dispatch(&request, &state, &connection).await;

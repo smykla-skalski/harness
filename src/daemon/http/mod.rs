@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
-use axum::extract::MatchedPath;
 use axum::Router;
 use axum::body::Body;
+use axum::extract::MatchedPath;
 use axum::http::Request;
 use axum::middleware::{self, Next};
 use axum::response::Response;
@@ -13,7 +14,7 @@ use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, watch};
 #[cfg(test)]
 use tokio::task::block_in_place;
-use tracing::field::{display, Empty};
+use tracing::field::{Empty, display};
 
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
@@ -188,29 +189,42 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
 
 async fn trace_http_request(request: Request<Body>, next: Next) -> Response {
     let method = request.method().to_string();
-    let route = request
-        .extensions()
-        .get::<MatchedPath>()
-        .map_or_else(|| request.uri().path().to_string(), |matched| matched.as_str().to_string());
-    let request_id = response::extract_request_id(request.headers());
-    let span = tracing::info_span!(
-        "harness.daemon.http.request",
-        http_method = %method,
-        http_route = %route,
-        request_id = %request_id,
-        http_status_code = Empty,
-        duration_ms = Empty,
-        trace_id = Empty
+    let route = request.extensions().get::<MatchedPath>().map_or_else(
+        || request.uri().path().to_string(),
+        |matched| matched.as_str().to_string(),
     );
+    let request_id = response::extract_request_id(request.headers());
+    let span = http_request_span(&method, &route, &request_id);
     apply_parent_context_from_headers(&span, request.headers());
     let _guard = span.enter();
+    let started_at = Instant::now();
     if let Some(trace_id) = current_trace_id() {
         span.record("trace_id", display(trace_id));
     }
     let response = next.run(request).await;
-    span.record(
-        "http_status_code",
-        display(response.status().as_u16()),
-    );
+    let status = response.status().as_u16();
+    let duration_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+    span.record("http_status_code", display(status));
+    span.record("duration_ms", display(duration_ms));
+    span.record("http.response.status_code", display(status));
     response
+}
+
+fn http_request_span(method: &str, route: &str, request_id: &str) -> tracing::Span {
+    let otel_name = format!("{method} {route}");
+    tracing::info_span!(
+        "harness.daemon.http.request",
+        otel.name = %otel_name,
+        otel.kind = "server",
+        http_method = %method,
+        http_route = %route,
+        request_id = %request_id,
+        "http.request.method" = %method,
+        "http.route" = %route,
+        "url.path" = %route,
+        "http.response.status_code" = Empty,
+        http_status_code = Empty,
+        duration_ms = Empty,
+        trace_id = Empty
+    )
 }

@@ -112,6 +112,7 @@ fn websocket_async_session_observe_mutation_succeeds_without_sync_db() {
                             "session_id": "ws-async-observe",
                             "actor": leader_id.clone()
                         }),
+                        trace_context: None,
                     };
 
                     let response = dispatch(&request, &state, &connection).await;
@@ -194,6 +195,7 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                         "session_id": "ws-sync-observe",
                         "actor": leader_id.clone()
                     }),
+                    trace_context: None,
                 };
 
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");

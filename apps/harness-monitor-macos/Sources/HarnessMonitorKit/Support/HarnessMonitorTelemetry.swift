@@ -90,6 +90,15 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     let requestID = UUID().uuidString
     request.setValue(requestID, forHTTPHeaderField: "X-Request-Id")
 
+    for (header, value) in traceContext(spanContext: spanContext) {
+      request.setValue(value, forHTTPHeaderField: header)
+    }
+    return requestID
+  }
+
+  func traceContext(spanContext: SpanContext? = nil) -> [String: String] {
+    bootstrap()
+
     var carrier: [String: String] = [:]
     let activeSpanContext =
       spanContext
@@ -108,11 +117,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
         setter: HarnessMonitorHeaderSetter()
       )
     }
-
-    for (header, value) in carrier {
-      request.setValue(value, forHTTPHeaderField: header)
-    }
-    return requestID
+    return carrier
   }
 
   func startSpan(
