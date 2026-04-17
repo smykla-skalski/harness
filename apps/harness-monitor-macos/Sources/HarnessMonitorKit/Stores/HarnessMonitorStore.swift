@@ -79,6 +79,8 @@ public final class HarnessMonitorStore {
   }
   var connectionProbeInterval: Duration = .seconds(10)
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
+  var initialConnectRefreshRetryGracePeriod: Duration = .seconds(2)
+  var initialConnectRefreshRetryInterval: Duration = .milliseconds(200)
   var managedLaunchAgentRefreshMinimumInterval: Duration = .seconds(10)
   var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackDelay: Duration = .seconds(5)

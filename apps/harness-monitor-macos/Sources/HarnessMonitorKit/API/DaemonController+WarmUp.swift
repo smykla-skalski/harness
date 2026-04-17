@@ -45,7 +45,9 @@ extension DaemonController {
     var immediateError: (any Error)?
     var skipFinalBootstrapProbe = false
     var managedStaleManifestTracker = ManagedStaleManifestTracker()
+    var managedVersionMismatchTracker = ManagedStaleManifestTracker()
     var refreshedManagedLaunchAgentDuringWarmUp = false
+    var signaledManagedRecoveryManifestSignature: String?
   }
 
   struct WarmUpIterationOutcome {
@@ -62,10 +64,13 @@ extension DaemonController {
     do {
       let manifest = try loadManifest()
       if let mismatch = managedDaemonVersionMismatch(for: manifest) {
-        state.lastError = mismatch
-        state.immediateError = mismatch
-        return .stopLoop
+        return try handleManagedVersionMismatch(
+          manifest: manifest,
+          mismatch: mismatch,
+          state: &state
+        )
       }
+      state.managedVersionMismatchTracker.reset()
       if let mismatchOutcome = try handleManagedLiveHelperMismatch(
         manifest: manifest,
         state: &state
@@ -88,6 +93,7 @@ extension DaemonController {
       return handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
     } catch let error as DaemonControlError {
       state.managedStaleManifestTracker.reset()
+      state.managedVersionMismatchTracker.reset()
       if case .invalidManifest = error, ownership == .external {
         state.immediateError = error
         return .stopLoop
@@ -98,6 +104,7 @@ extension DaemonController {
       )
     } catch {
       state.managedStaleManifestTracker.reset()
+      state.managedVersionMismatchTracker.reset()
       state.lastError = error
       HarnessMonitorLogger.lifecycle.trace(
         "Warm-up retry after \(error.localizedDescription, privacy: .public)"
@@ -186,8 +193,8 @@ extension DaemonController {
       )
       try refreshManagedLaunchAgent(currentStamp: currentStamp)
       state.refreshedManagedLaunchAgentDuringWarmUp = true
-      Self.signalProcessToExit(pid: manifest.pid)
     }
+    signalManagedRecoveryProcessIfNeeded(manifest: manifest, state: &state)
 
     // After triggering refresh, proceed with the old daemon immediately.
     // The old daemon is functional (version already validated above).
@@ -201,8 +208,86 @@ extension DaemonController {
     return nil
   }
 
+  func handleManagedVersionMismatch(
+    manifest: DaemonManifest,
+    mismatch: DaemonControlError,
+    state: inout WarmUpLoopState
+  ) throws -> WarmUpIterationOutcome {
+    state.lastError = mismatch
+    guard
+      ownership == .managed,
+      launchAgentManager.registrationState() == .enabled,
+      let currentStamp = try managedLaunchAgentCurrentBundleStamp()
+    else {
+      state.immediateError = mismatch
+      return .stopLoop
+    }
+    guard case .managedDaemonVersionMismatch(let expected, let actual) = mismatch else {
+      state.immediateError = mismatch
+      return .stopLoop
+    }
+
+    if state.refreshedManagedLaunchAgentDuringWarmUp == false {
+      HarnessMonitorLogger.lifecycle.notice(
+        "Managed daemon version mismatch; refreshing launch agent and waiting for replacement daemon"
+      )
+      try refreshManagedLaunchAgent(currentStamp: currentStamp)
+      state.refreshedManagedLaunchAgentDuringWarmUp = true
+    }
+    signalManagedRecoveryProcessIfNeeded(manifest: manifest, state: &state)
+
+    let path = HarnessMonitorPaths.manifestURL(using: environment).path
+    let signature = Self.managedVersionMismatchSignature(for: manifest)
+    let gracePeriod = String(describing: managedStaleManifestGracePeriod)
+    if state.managedVersionMismatchTracker.expired(
+      signature: signature,
+      now: ContinuousClock.now,
+      gracePeriod: managedStaleManifestGracePeriod
+    ) {
+      HarnessMonitorLogger.lifecycle.error(
+        """
+        \(Self.warmUpManagedVersionMismatchTimeoutMessage(
+          path: path,
+          expected: expected,
+          actual: actual,
+          gracePeriod: gracePeriod
+        ), privacy: .public)
+        """
+      )
+      state.immediateError = mismatch
+      return .stopLoop
+    }
+
+    HarnessMonitorLogger.lifecycle.trace(
+      """
+      \(Self.warmUpManagedVersionMismatchWaitMessage(
+        path: path,
+        expected: expected,
+        actual: actual
+      ), privacy: .public)
+      """
+    )
+    return .continueLoop
+  }
+
+  func signalManagedRecoveryProcessIfNeeded(
+    manifest: DaemonManifest,
+    state: inout WarmUpLoopState
+  ) {
+    let signature = Self.managedStaleManifestSignature(for: manifest)
+    guard state.signaledManagedRecoveryManifestSignature != signature else {
+      return
+    }
+    state.signaledManagedRecoveryManifestSignature = signature
+    Self.signalProcessToExit(pid: manifest.pid)
+  }
+
   static func managedStaleManifestSignature(for manifest: DaemonManifest) -> String {
     "\(manifest.pid)|\(manifest.endpoint)|\(manifest.startedAt)"
+  }
+
+  static func managedVersionMismatchSignature(for manifest: DaemonManifest) -> String {
+    "\(managedStaleManifestSignature(for: manifest))|version=\(manifest.version)"
   }
 
   static func warmUpObservedManifestMessage(pid: Int, endpoint: String) -> String {
@@ -222,6 +307,29 @@ extension DaemonController {
     gracePeriod: String
   ) -> String {
     "Warm-up aborting managed stale manifest wait at \(path) grace-period=\(gracePeriod)"
+  }
+
+  static func warmUpManagedVersionMismatchWaitMessage(
+    path: String,
+    expected: String,
+    actual: String
+  ) -> String {
+    """
+    Warm-up waiting for managed daemon version mismatch to clear at \(path) \
+    expected=\(expected) actual=\(actual)
+    """
+  }
+
+  static func warmUpManagedVersionMismatchTimeoutMessage(
+    path: String,
+    expected: String,
+    actual: String,
+    gracePeriod: String
+  ) -> String {
+    """
+    Warm-up aborting managed daemon version mismatch wait at \(path) \
+    expected=\(expected) actual=\(actual) grace-period=\(gracePeriod)
+    """
   }
 
   static func processIsAlive(pid: Int) -> Bool? {

@@ -1,6 +1,21 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private enum RefreshSnapshotSource: String, Sendable {
+    case diagnostics
+    case projects
+    case sessions
+  }
+
+  private struct RefreshSnapshotLoadError: LocalizedError, Sendable {
+    let source: RefreshSnapshotSource
+    let failureDescription: String
+
+    var errorDescription: String? {
+      "Startup snapshot \(source.rawValue) failed: \(failureDescription)"
+    }
+  }
+
   private struct RefreshSnapshot: Sendable {
     let diagnostics: MeasuredOperation<DaemonDiagnosticsReport>
     let projects: MeasuredOperation<[ProjectSummary]>
@@ -16,20 +31,26 @@ extension HarnessMonitorStore {
   func connect(using client: any HarnessMonitorClientProtocol) async {
     self.client = client
     withUISyncBatch {
-      connectionState = .online
+      connectionState = .connecting
     }
     await refreshPersistedSessionMetadata()
 
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
     resetConnectionMetrics(for: transport)
-    appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.title)")
 
-    await refresh(using: client, preserveSelection: true)
-    guard connectionState == .online else {
+    do {
+      try await performInitialConnectRefresh(using: client, preserveSelection: true)
+    } catch {
       _ = disconnectActiveConnection()
+      markConnectionOffline(Self.describeRefreshSnapshotError(error))
       await restorePersistedSessionState()
       return
     }
+
+    withUISyncBatch {
+      connectionState = .online
+    }
+    appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.title)")
     startConnectionProbe(using: client)
     startManifestWatcher()
     startGlobalStream(using: client)
@@ -64,60 +85,108 @@ extension HarnessMonitorStore {
     defer { isRefreshing = false }
 
     do {
-      let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
-      let measuredDiagnostics = refreshSnapshot.diagnostics
-      let measuredProjects = refreshSnapshot.projects
-      let measuredSessions = refreshSnapshot.sessions
-
-      withUISyncBatch {
-        diagnostics = measuredDiagnostics.value
-        health = measuredDiagnostics.value.health
-        daemonStatus = DaemonStatusReport(
-          diagnosticsReport: measuredDiagnostics.value,
-          fallbackProjectCount: measuredProjects.value.count,
-          fallbackWorktreeCount: measuredProjects.value.reduce(0) { $0 + $1.worktrees.count },
-          fallbackSessionCount: measuredSessions.value.count
-        )
-        daemonLogLevel =
-          measuredDiagnostics.value.health?.logLevel
-          ?? HarnessMonitorLogger.defaultDaemonLogLevel
-      }
-      recordRequestSuccess(
-        latencyMs: measuredDiagnostics.latencyMs,
-        updatesLatency: true
-      )
-      recordRequestSuccess()
-      recordRequestSuccess()
-
-      applySessionIndexSnapshot(
-        projects: measuredProjects.value,
-        sessions: measuredSessions.value
-      )
-
-      if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
-        let requestID = beginSessionLoad()
-        startSessionLoad(using: client, sessionID: selectedSessionID, requestID: requestID)
-      } else {
-        synchronizeActionActor()
-        if let previewReadySessionID = previewReadySessionID(
-          client: client,
-          sessions: measuredSessions.value
-        ) {
-          Task { @MainActor [weak self] in
-            await self?.selectSession(previewReadySessionID)
-          }
-        }
-      }
-
-      schedulePersistedSnapshotHydration(
-        using: client,
-        sessions: measuredSessions.value
-      )
+      try await performRefresh(using: client, preserveSelection: preserveSelection)
     } catch {
       _ = disconnectActiveConnection()
-      markConnectionOffline(error.localizedDescription)
+      markConnectionOffline(Self.describeRefreshSnapshotError(error))
       await restorePersistedSessionState()
     }
+  }
+
+  private func performInitialConnectRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    preserveSelection: Bool
+  ) async throws {
+    let deadline = ContinuousClock.now.advanced(by: initialConnectRefreshRetryGracePeriod)
+    var attempt = 0
+
+    while true {
+      do {
+        try await performRefresh(using: client, preserveSelection: preserveSelection)
+        return
+      } catch {
+        guard ContinuousClock.now < deadline else {
+          throw error
+        }
+
+        attempt += 1
+        let errorDescription = Self.describeRefreshSnapshotError(error)
+        appendConnectionEvent(
+          kind: .info,
+          detail:
+            "Daemon health is live, but the startup snapshot is still warming up "
+            + "(retry \(attempt)): \(errorDescription)"
+        )
+        try? await Task.sleep(for: initialConnectRefreshRetryInterval)
+      }
+    }
+  }
+
+  private func performRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    preserveSelection: Bool
+  ) async throws {
+    let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
+    applyRefreshSnapshot(
+      refreshSnapshot,
+      using: client,
+      preserveSelection: preserveSelection
+    )
+  }
+
+  private func applyRefreshSnapshot(
+    _ refreshSnapshot: RefreshSnapshot,
+    using client: any HarnessMonitorClientProtocol,
+    preserveSelection: Bool
+  ) {
+    let measuredDiagnostics = refreshSnapshot.diagnostics
+    let measuredProjects = refreshSnapshot.projects
+    let measuredSessions = refreshSnapshot.sessions
+
+    withUISyncBatch {
+      diagnostics = measuredDiagnostics.value
+      health = measuredDiagnostics.value.health
+      daemonStatus = DaemonStatusReport(
+        diagnosticsReport: measuredDiagnostics.value,
+        fallbackProjectCount: measuredProjects.value.count,
+        fallbackWorktreeCount: measuredProjects.value.reduce(0) { $0 + $1.worktrees.count },
+        fallbackSessionCount: measuredSessions.value.count
+      )
+      daemonLogLevel =
+        measuredDiagnostics.value.health?.logLevel
+        ?? HarnessMonitorLogger.defaultDaemonLogLevel
+    }
+    recordRequestSuccess(
+      latencyMs: measuredDiagnostics.latencyMs,
+      updatesLatency: true
+    )
+    recordRequestSuccess()
+    recordRequestSuccess()
+
+    applySessionIndexSnapshot(
+      projects: measuredProjects.value,
+      sessions: measuredSessions.value
+    )
+
+    if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
+      let requestID = beginSessionLoad()
+      startSessionLoad(using: client, sessionID: selectedSessionID, requestID: requestID)
+    } else {
+      synchronizeActionActor()
+      if let previewReadySessionID = previewReadySessionID(
+        client: client,
+        sessions: measuredSessions.value
+      ) {
+        Task { @MainActor [weak self] in
+          await self?.selectSession(previewReadySessionID)
+        }
+      }
+    }
+
+    schedulePersistedSnapshotHydration(
+      using: client,
+      sessions: measuredSessions.value
+    )
   }
 
   nonisolated private static func loadRefreshSnapshot(
@@ -128,25 +197,37 @@ extension HarnessMonitorStore {
       returning: RefreshSnapshot.self
     ) { group in
       group.addTask {
-        .diagnostics(
-          try await Self.measureOperation {
-            try await client.diagnostics()
-          }
-        )
+        do {
+          return .diagnostics(
+            try await Self.measureOperation {
+              try await client.diagnostics()
+            }
+          )
+        } catch {
+          throw Self.refreshSnapshotLoadError(source: .diagnostics, underlying: error)
+        }
       }
       group.addTask {
-        .projects(
-          try await Self.measureOperation {
-            try await client.projects()
-          }
-        )
+        do {
+          return .projects(
+            try await Self.measureOperation {
+              try await client.projects()
+            }
+          )
+        } catch {
+          throw Self.refreshSnapshotLoadError(source: .projects, underlying: error)
+        }
       }
       group.addTask {
-        .sessions(
-          try await Self.measureOperation {
-            try await client.sessions()
-          }
-        )
+        do {
+          return .sessions(
+            try await Self.measureOperation {
+              try await client.sessions()
+            }
+          )
+        } catch {
+          throw Self.refreshSnapshotLoadError(source: .sessions, underlying: error)
+        }
       }
 
       var diagnostics: MeasuredOperation<DaemonDiagnosticsReport>?
@@ -174,5 +255,74 @@ extension HarnessMonitorStore {
         sessions: sessions
       )
     }
+  }
+
+  nonisolated private static func refreshSnapshotLoadError(
+    source: RefreshSnapshotSource,
+    underlying error: any Error
+  ) -> RefreshSnapshotLoadError {
+    let wrapped = RefreshSnapshotLoadError(
+      source: source,
+      failureDescription: describeUnderlyingRefreshSnapshotError(error)
+    )
+    HarnessMonitorLogger.store.warning(
+      "\(wrapped.localizedDescription, privacy: .public)"
+    )
+    return wrapped
+  }
+
+  nonisolated private static func describeRefreshSnapshotError(_ error: any Error) -> String {
+    if let wrapped = error as? RefreshSnapshotLoadError {
+      return wrapped.localizedDescription
+    }
+    return describeUnderlyingRefreshSnapshotError(error)
+  }
+
+  nonisolated private static func describeUnderlyingRefreshSnapshotError(
+    _ error: any Error
+  ) -> String {
+    if let decodingError = error as? DecodingError {
+      return describeDecodingError(decodingError)
+    }
+    return error.localizedDescription
+  }
+
+  nonisolated private static func describeDecodingError(
+    _ error: DecodingError
+  ) -> String {
+    switch error {
+    case .dataCorrupted(let context):
+      return
+        "decoding failed at \(describeCodingPath(context.codingPath)): \(context.debugDescription)"
+    case .keyNotFound(let key, let context):
+      return
+        "missing key '\(key.stringValue)' at \(describeCodingPath(context.codingPath + [key])): \(context.debugDescription)"
+    case .typeMismatch(let type, let context):
+      return
+        "type mismatch for \(String(describing: type)) at \(describeCodingPath(context.codingPath)): \(context.debugDescription)"
+    case .valueNotFound(let type, let context):
+      return
+        "missing \(String(describing: type)) at \(describeCodingPath(context.codingPath)): \(context.debugDescription)"
+    @unknown default:
+      return error.localizedDescription
+    }
+  }
+
+  nonisolated private static func describeCodingPath(_ codingPath: [CodingKey]) -> String {
+    guard !codingPath.isEmpty else {
+      return "root"
+    }
+
+    var rendered = ""
+    for key in codingPath {
+      if let index = key.intValue {
+        rendered += "[\(index)]"
+      } else if rendered.isEmpty {
+        rendered = key.stringValue
+      } else {
+        rendered += ".\(key.stringValue)"
+      }
+    }
+    return rendered
   }
 }

@@ -31,8 +31,9 @@ extension SessionStatus {
   var sortKey: Int {
     switch self {
     case .active: 0
-    case .paused: 1
-    case .ended: 2
+    case .leaderlessDegraded: 1
+    case .paused: 2
+    case .ended: 3
     }
   }
 }
