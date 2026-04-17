@@ -283,6 +283,20 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
   }
 
+  @Test("Bootstrap recovers when the daemon becomes healthy after warm-up gives up")
+  func bootstrapRecoversWhenDaemonBecomesHealthyAfterWarmUpFailure() async {
+    let daemon = ManagedWarmUpLateBootstrapDaemonController()
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    #expect(store.connectionState == .online)
+    #expect(
+      await daemon.recordedOperations()
+        == ["warm-up", "remove", "register", "warm-up", "bootstrap"]
+    )
+  }
+
   @Test("Managed bootstrap restores cached state before warm-up completes")
   func managedBootstrapRestoresCachedStateBeforeWarmUpCompletes() async throws {
     let summary = makeSession(
@@ -395,6 +409,30 @@ extension HarnessMonitorStoreLifecycleCoreTests {
           "Managed daemon did not become healthy; refreshing the bundled launch agent")
       }
     )
+  }
+
+  @Test("Bootstrap replays a reconnect request queued during warm-up")
+  func bootstrapReplaysReconnectQueuedDuringWarmUp() async {
+    let daemon = DelayedWarmUpDaemonController(warmUpDelay: .milliseconds(250))
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    let bootstrapTask = Task { @MainActor in
+      await store.bootstrap()
+    }
+
+    try? await Task.sleep(for: .milliseconds(50))
+    await store.reconnect()
+    await bootstrapTask.value
+
+    for _ in 0..<50 {
+      if await daemon.recordedWarmUpCallCount() == 2, store.connectionState == .online {
+        break
+      }
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+
+    #expect(store.connectionState == .online)
+    #expect(await daemon.recordedWarmUpCallCount() == 2)
   }
 
 }
