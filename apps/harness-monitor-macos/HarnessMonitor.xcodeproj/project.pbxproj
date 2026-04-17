@@ -18,6 +18,7 @@
 		0424B3EDC1F74523C2D23B37 /* SessionsBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A7CA71A3E3C847117156BC1 /* SessionsBoardView.swift */; };
 		081C61568F5CE346D0FC6F8C /* BackgroundThumbnailCache+ImageProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAABC3438BE73E5F9825AAB /* BackgroundThumbnailCache+ImageProcessing.swift */; };
 		08B2EAFBE9FF52CB975BF5D4 /* HarnessMonitorPerfScenario.swift in Sources */ = {isa = PBXBuildFile; fileRef = A712613C01FF3269C9E3965B /* HarnessMonitorPerfScenario.swift */; };
+		09569CC9BB3EA411C112E3E0 /* DaemonController+WarmUpManagedLaunchAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFCE62F07CB34566547B8480 /* DaemonController+WarmUpManagedLaunchAgent.swift */; };
 		0C36F4CDDC06F57582B3D38D /* ObserverSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0143A1BACAAE538108C311B0 /* ObserverSummaryTests.swift */; };
 		0D94EDF049C1E216A1A9CAD6 /* HarnessMonitorStore+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0D11A80FACDE6DC5A420C8 /* HarnessMonitorStore+Actions.swift */; };
 		0E1D9C099E28B0E67EBD3D76 /* HarnessMonitorStoreUpdateStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3A0BB44B47C4B50A59B5CA /* HarnessMonitorStoreUpdateStreamTests.swift */; };
@@ -104,6 +105,7 @@
 		3BD114D902F496D7AECE0D45 /* HarnessMonitorSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B3196D6FBB452C021D21F8 /* HarnessMonitorSessionModels.swift */; };
 		3C13584B55CEBBDF896014DD /* AgentTuiWindowUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C578BD1C049B157D35F01D /* AgentTuiWindowUITests+Support.swift */; };
 		3C1AD738EB82EAED74C31241 /* HarnessMonitorStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0078395048BD22D435F463D7 /* HarnessMonitorStoreTests.swift */; };
+		3C41721AAA3569D744CE4181 /* RecordingHarnessClient+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB97C7E65CB3D50284F67935 /* RecordingHarnessClient+State.swift */; };
 		3C64C889D2868179B2014B07 /* HarnessMonitorStoreConfirmationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1005E2B090A946F7F6E373 /* HarnessMonitorStoreConfirmationTests.swift */; };
 		3CDE56540043CDBF78E2BCEE /* SessionTaskLaneViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54B11CBBD81FF452D0F9EE3 /* SessionTaskLaneViews.swift */; };
 		3E239E77C108D2CF85AE70E3 /* SessionTimelinePageSizePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEB6E26DFA07F7F705C8E8D /* SessionTimelinePageSizePicker.swift */; };
@@ -136,6 +138,7 @@
 		4F6BBF37BDC6EC822ED36C92 /* CachedModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4867E04ECF63D0A2715695EF /* CachedModelsTests.swift */; };
 		4FB3072D54858C30F9D11B1D /* HarnessMonitorStoreBackgroundSilenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6559A64425F33842102D3F1 /* HarnessMonitorStoreBackgroundSilenceTests.swift */; };
 		50FEA0CE3229009C7CA9B8B5 /* HarnessMonitorStore+TimelineLoadingGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BE8A078B08FCD4E912E618E /* HarnessMonitorStore+TimelineLoadingGate.swift */; };
+		5209B03C8FCEC709BF5D7491 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapHydration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E549D186274DA06027CB7037 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapHydration.swift */; };
 		52554D1686519856201E042C /* HarnessMonitorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39D2A2353B1C74810742B94C /* HarnessMonitorStore.swift */; };
 		52654506510D0DFF79D8FEBE /* PreferencesCodexSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3982F617F4174ED93A0DE4EA /* PreferencesCodexSection.swift */; };
 		52AFDE6D63CD6A5300A996DF /* RecordingHarnessClient+Timeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B918572AD5DE96BF8CE5B3A5 /* RecordingHarnessClient+Timeline.swift */; };
@@ -163,6 +166,7 @@
 		5E5A70CFBF5648EB9CCA7732 /* RecordingDaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23697760C3BFCF13C2694250 /* RecordingDaemonController.swift */; };
 		5E7FEDEFC89A8BDD761D5B34 /* RecordingHarnessClient+Base.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B66A1CA3B1BD4163C03A3E /* RecordingHarnessClient+Base.swift */; };
 		5E85F24F1EE33893D050B641 /* HarnessMonitorSignalModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6549F9E8DB8A516B84A5C19 /* HarnessMonitorSignalModels.swift */; };
+		609E24447E757EFD5A3E5DCB /* DaemonControllerTests+WarmUpSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301641DF02F46B8534914B91 /* DaemonControllerTests+WarmUpSupport.swift */; };
 		616DD8C34CC0151BD79FF4D3 /* ConnectionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 447650C240AC036E1222DB52 /* ConnectionModelsTests.swift */; };
 		61C9B7B2E063FE4E5DF3ACEA /* HarnessMonitorPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5335AEF7AC8CD954B35A91A7 /* HarnessMonitorPaths.swift */; };
 		6268054D795AA3CFD8F97C65 /* PreferencesDiagnosticsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C058C722635028DFFD6708 /* PreferencesDiagnosticsOverview.swift */; };
@@ -645,6 +649,7 @@
 		2EEB6E26DFA07F7F705C8E8D /* SessionTimelinePageSizePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelinePageSizePicker.swift; sourceTree = "<group>"; };
 		2F394511B40C7D2E7A640E9B /* HarnessMonitorSessionModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorSessionModelsTests.swift; sourceTree = "<group>"; };
 		2F86B9B18FC0D5FD2D23F03A /* HarnessMonitorStore+Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Database.swift"; sourceTree = "<group>"; };
+		301641DF02F46B8534914B91 /* DaemonControllerTests+WarmUpSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DaemonControllerTests+WarmUpSupport.swift"; sourceTree = "<group>"; };
 		305B28753BFB80FF104606E6 /* HarnessMonitorAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorAppDelegate.swift; sourceTree = "<group>"; };
 		31CB7598E60A918AACB30244 /* SidebarSessionList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSessionList.swift; sourceTree = "<group>"; };
 		32B1CDF4D57BD9CA4718F0C5 /* ToastSlice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastSlice.swift; sourceTree = "<group>"; };
@@ -857,6 +862,7 @@
 		BDBA20E344A35B5ACB7497C0 /* HarnessMonitorStore+LifecycleRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+LifecycleRefresh.swift"; sourceTree = "<group>"; };
 		BF3AC26237CCD35785DFA1DA /* HarnessMonitorStore+Signals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Signals.swift"; sourceTree = "<group>"; };
 		BFB9273C95AD4CB9AEEB651F /* AgentTuiWindowView+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentTuiWindowView+Actions.swift"; sourceTree = "<group>"; };
+		BFCE62F07CB34566547B8480 /* DaemonController+WarmUpManagedLaunchAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DaemonController+WarmUpManagedLaunchAgent.swift"; sourceTree = "<group>"; };
 		C0C578BD1C049B157D35F01D /* AgentTuiWindowUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentTuiWindowUITests+Support.swift"; sourceTree = "<group>"; };
 		C10E1481437BD4742C54F7E9 /* HarnessMonitorStore+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Diagnostics.swift"; sourceTree = "<group>"; };
 		C1D823FDAFA2150B22C6F0B8 /* AgentTuiKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTuiKeyTests.swift; sourceTree = "<group>"; };
@@ -910,6 +916,7 @@
 		DACEEDCEABB6E020D47402B9 /* HarnessMonitorStore+Voice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Voice.swift"; sourceTree = "<group>"; };
 		DAE75043F1421AC9A8AA5415 /* PreferencesPreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesPreviewSupport.swift; sourceTree = "<group>"; };
 		DB3AC84D34D868185D3DD82D /* LegacyCachedModelsV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyCachedModelsV2.swift; sourceTree = "<group>"; };
+		DB97C7E65CB3D50284F67935 /* RecordingHarnessClient+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingHarnessClient+State.swift"; sourceTree = "<group>"; };
 		DB9EAFC72DDEB37433A4D939 /* HarnessMonitorTabbedContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorTabbedContent.swift; sourceTree = "<group>"; };
 		DC069E133DFF6B922929CF23 /* HarnessMonitorInteractiveCardChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorInteractiveCardChrome.swift; sourceTree = "<group>"; };
 		DDE4DAA1ABA59225159DE0FF /* InspectorActionIDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorActionIDTests.swift; sourceTree = "<group>"; };
@@ -928,6 +935,7 @@
 		E4C458A60DC61CA1D758624B /* HarnessMonitorLaunchMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorLaunchMode.swift; sourceTree = "<group>"; };
 		E516BED803B6385A058472AD /* HarnessMonitorUserNotificationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorUserNotificationController.swift; sourceTree = "<group>"; };
 		E5170BF61AC14A40FE0E126F /* AVFAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFAudio.framework; path = System/Library/Frameworks/AVFAudio.framework; sourceTree = SDKROOT; };
+		E549D186274DA06027CB7037 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapHydration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStoreLifecycleCoreTests+BootstrapHydration.swift"; sourceTree = "<group>"; };
 		E6549F9E8DB8A516B84A5C19 /* HarnessMonitorSignalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorSignalModels.swift; sourceTree = "<group>"; };
 		E6807211DF3F800197DD895E /* HarnessMonitorStore+Selection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Selection.swift"; sourceTree = "<group>"; };
 		E8B68CDD785C6A8189191923 /* PersistencePerformanceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistencePerformanceIntegrationTests.swift; sourceTree = "<group>"; };
@@ -1211,6 +1219,7 @@
 				4C8E7C6DB6A5D8FFA0D0BD9C /* DaemonControllerTestHelpers.swift */,
 				19BBE392E8070647D7427DAD /* DaemonControllerTests.swift */,
 				377C01EA4392A37FEB55868A /* DaemonControllerTests+BootstrapAndLaunchAgent.swift */,
+				301641DF02F46B8534914B91 /* DaemonControllerTests+WarmUpSupport.swift */,
 				F7B6EF1154EFB25CF4CF6F71 /* DaemonManifestDecodingTests.swift */,
 				ABA319C6585B0E20EAF5D62B /* DaemonModelsTests.swift */,
 				4FEB72807BBDDE53F1E703BE /* DaemonPortProbeTests.swift */,
@@ -1249,6 +1258,7 @@
 				D957D8A69D7EF7185EE431CF /* HarnessMonitorStoreInspectorTests.swift */,
 				AB298FFDBFE1D7E4ED01C1EA /* HarnessMonitorStoreLifecycleCoreTests.swift */,
 				7ED0B72246E4EEF0530A5C57 /* HarnessMonitorStoreLifecycleCoreTests+Bootstrap.swift */,
+				E549D186274DA06027CB7037 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapHydration.swift */,
 				D79E19419A2CEA403429FFF5 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapSupport.swift */,
 				C1F495B7A54D354D6A29D661 /* HarnessMonitorStoreLifecycleCoreTests+HTTPClient.swift */,
 				4332DDEC0308DB088325D9C0 /* HarnessMonitorStoreLifecycleCoreTests+HydrationFixtures.swift */,
@@ -1292,6 +1302,7 @@
 				6F3B86F5C4D60F01C244C360 /* RecordingHarnessClient+Config.swift */,
 				7FC9A1B91E7E0FAAAA19E228 /* RecordingHarnessClient+Mutations.swift */,
 				FDAEA070F292BE40D84186E5 /* RecordingHarnessClient+ReadCalls.swift */,
+				DB97C7E65CB3D50284F67935 /* RecordingHarnessClient+State.swift */,
 				B918572AD5DE96BF8CE5B3A5 /* RecordingHarnessClient+Timeline.swift */,
 				8DEBC7E5C8D72E2B942812B4 /* RecordingHarnessClient+Voice.swift */,
 				86E7C6AD7FC7DC6B8F574285 /* ServerSentEventsTests.swift */,
@@ -1460,6 +1471,7 @@
 				BCDD913507B08C223A1F08B7 /* DaemonController+ManifestLoading.swift */,
 				77191A813C17EF55CB696D83 /* DaemonController+Support.swift */,
 				D36BC9D445AFEED23AA68259 /* DaemonController+WarmUp.swift */,
+				BFCE62F07CB34566547B8480 /* DaemonController+WarmUpManagedLaunchAgent.swift */,
 				EDB6E39553ECBEE96A0B17E7 /* DaemonPortProbe.swift */,
 				F0A9D351AB92A46E6DB54876 /* HarnessMonitorAPIClient.swift */,
 				FFDEED563DC0808501E9A3F9 /* HarnessMonitorAPIClient+Transport.swift */,
@@ -2033,6 +2045,7 @@
 				616DD8C34CC0151BD79FF4D3 /* ConnectionModelsTests.swift in Sources */,
 				CB7B0666C7EA8D99AF0FF5C8 /* DaemonControllerTestHelpers.swift in Sources */,
 				295E8FC3CDB68DDAB6BC49E4 /* DaemonControllerTests+BootstrapAndLaunchAgent.swift in Sources */,
+				609E24447E757EFD5A3E5DCB /* DaemonControllerTests+WarmUpSupport.swift in Sources */,
 				C2949E5EEE6FFD85CD548BA0 /* DaemonControllerTests.swift in Sources */,
 				B2FADE1182F1CEB6B7665DE3 /* DaemonManifestDecodingTests.swift in Sources */,
 				B63CB643CD3FAB3A9C73AF58 /* DaemonModelsTests.swift in Sources */,
@@ -2071,6 +2084,7 @@
 				E56779D324B7F5912C198785 /* HarnessMonitorStoreHostBridgeTests.swift in Sources */,
 				7C7E982CB93E2560A42BE5F6 /* HarnessMonitorStoreInspectorTests.swift in Sources */,
 				5E29F03C01F5C29685B7FDD9 /* HarnessMonitorStoreLifecycleCoreTests+Bootstrap.swift in Sources */,
+				5209B03C8FCEC709BF5D7491 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapHydration.swift in Sources */,
 				8E11B8E1631A42AA9554E400 /* HarnessMonitorStoreLifecycleCoreTests+BootstrapSupport.swift in Sources */,
 				BA53CBCE230109E72BBEE513 /* HarnessMonitorStoreLifecycleCoreTests+HTTPClient.swift in Sources */,
 				BD39C4E5467714B5D5992E9E /* HarnessMonitorStoreLifecycleCoreTests+HydrationFixtures.swift in Sources */,
@@ -2115,6 +2129,7 @@
 				6AA840C014CA18008F69E3FC /* RecordingHarnessClient+Config.swift in Sources */,
 				2CFF39AA6EB37A7B2A146BE3 /* RecordingHarnessClient+Mutations.swift in Sources */,
 				C4B84F3AF9320FF429C29CCD /* RecordingHarnessClient+ReadCalls.swift in Sources */,
+				3C41721AAA3569D744CE4181 /* RecordingHarnessClient+State.swift in Sources */,
 				52AFDE6D63CD6A5300A996DF /* RecordingHarnessClient+Timeline.swift in Sources */,
 				29146CC8E9E9F43534459570 /* RecordingHarnessClient+Voice.swift in Sources */,
 				AF56300AD89D3A4AA9C2071F /* ServerSentEventsTests.swift in Sources */,
@@ -2148,6 +2163,7 @@
 				5B0BC678BC7C1B8C06A93E1F /* DaemonController+ManifestLoading.swift in Sources */,
 				D8F433E3832573F175AE0905 /* DaemonController+Support.swift in Sources */,
 				71A2A15848244219FB5D9FB6 /* DaemonController+WarmUp.swift in Sources */,
+				09569CC9BB3EA411C112E3E0 /* DaemonController+WarmUpManagedLaunchAgent.swift in Sources */,
 				E4DD704B4C31371CAB816391 /* DaemonController.swift in Sources */,
 				ED62F7DA6A3D7EB5459679F0 /* DaemonModels.swift in Sources */,
 				2BBD2386BEFF0432A7F3C8E9 /* DaemonPortProbe.swift in Sources */,
@@ -2558,7 +2574,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2580,7 +2596,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 23.1.5;
+				MARKETING_VERSION = 23.1.6;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2603,7 +2619,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -2632,7 +2648,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -2710,7 +2726,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2738,7 +2754,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 23.1.5;
+				MARKETING_VERSION = 23.1.6;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2810,7 +2826,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COMPILER_INDEX_STORE_ENABLE = NO;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3024,7 +3040,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3103,7 +3119,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COMPILER_INDEX_STORE_ENABLE = NO;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3131,7 +3147,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 23.1.5;
+				MARKETING_VERSION = 23.1.6;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -3178,7 +3194,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3225,7 +3241,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23.1.5;
+				CURRENT_PROJECT_VERSION = 23.1.6;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
