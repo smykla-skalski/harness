@@ -6,8 +6,9 @@ use super::{
     create_initial_session, ensure_known_runtime, log_agent_joined, log_agent_removed,
     log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
     prepare_remove_agent_leave_signal, protocol, refresh_session, release_agent_tasks,
-    require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime, slice,
-    storage, utc_now, validate_policy_preset, write_prepared_leave_signals,
+    require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime,
+    resolve_session_project_dir, slice, storage, utc_now, validate_policy_preset,
+    write_prepared_leave_signals,
 };
 
 /// Start a new orchestration session and register the caller as leader.
@@ -438,6 +439,31 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
     Ok(())
 }
 
+/// Update a session title.
+///
+/// # Errors
+/// Returns `CliError` if the session cannot be found or persisted.
+pub fn update_session_title(
+    session_id: &str,
+    title: &str,
+    project_dir: &Path,
+) -> Result<SessionState, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        return client.update_session_title(
+            session_id,
+            &protocol::SessionTitleRequest {
+                title: title.to_string(),
+            },
+        );
+    }
+
+    let project = resolve_session_project_dir(session_id, project_dir)?;
+    let now = utc_now();
+    storage::update_state(&project, session_id, |state| {
+        apply_update_session_title(state, title, &now)
+    })
+}
+
 pub(crate) fn apply_leave_session(
     state: &mut SessionState,
     agent_id: &str,
@@ -473,6 +499,18 @@ pub(crate) fn apply_leave_session(
     if departing_leader {
         super::promote_or_degrade(state, now);
     }
+    refresh_session(state, now);
+    Ok(())
+}
+
+pub(crate) fn apply_update_session_title(
+    state: &mut SessionState,
+    title: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    require_active(state)?;
+    state.title.clear();
+    state.title.push_str(title);
     refresh_session(state, now);
     Ok(())
 }

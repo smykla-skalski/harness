@@ -36,6 +36,7 @@ mod leave;
 mod observe;
 mod session_liveness;
 mod session_reads;
+mod session_title;
 mod signal_reconciliation;
 mod signals;
 mod stream_initial_events;

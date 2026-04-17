@@ -105,10 +105,10 @@ mod tasks;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use lifecycle::apply_leave_session;
+pub(crate) use lifecycle::{apply_leave_session, apply_update_session_title};
 pub use lifecycle::{
     assign_role, end_session, join_session, join_session_with_fallback, leave_session,
-    remove_agent, start_session, start_session_with_policy, transfer_leader,
+    remove_agent, start_session, start_session_with_policy, transfer_leader, update_session_title,
 };
 pub use liveness::{LivenessSyncResult, sync_agent_liveness};
 pub use queries::{
