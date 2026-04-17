@@ -10,12 +10,12 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval as tokio_interval};
-use tracing::field::{display, Empty};
+use tracing::field::{Empty, display};
 use tracing::{debug, info};
 
 use crate::daemon::http::{self, DaemonHttpState};
 use crate::daemon::protocol::StreamEvent;
-use crate::telemetry::current_trace_id;
+use crate::telemetry::{apply_parent_context_from_headers, current_trace_id};
 
 use super::dispatch::handle_message;
 use super::relay::relay_broadcast;
@@ -57,18 +57,28 @@ pub async fn ws_upgrade_handler(
         .and_then(|value| value.to_str().ok())
         .unwrap_or("")
         .to_string();
-    let connection_span = tracing::info_span!(
-        "harness.daemon.websocket.connection",
-        request_id = %request_id,
-        trace_id = Empty
-    );
-    if let Some(trace_id) = current_trace_id() {
+    let connection_span = websocket_connection_span(&request_id);
+    apply_parent_context_from_headers(&connection_span, &headers);
+    if let Some(trace_id) = connection_span.in_scope(current_trace_id) {
         connection_span.record("trace_id", display(trace_id));
     }
     ws.on_upgrade(move |socket| async move {
         let _guard = connection_span.enter();
         handle_connection(socket, state).await;
     })
+}
+
+fn websocket_connection_span(request_id: &str) -> tracing::Span {
+    tracing::info_span!(
+        "harness.daemon.websocket.connection",
+        otel.name = "GET /v1/ws",
+        otel.kind = "server",
+        request_id = %request_id,
+        "http.request.method" = "GET",
+        "url.path" = "/v1/ws",
+        "network.protocol.name" = "websocket",
+        trace_id = Empty
+    )
 }
 
 #[expect(

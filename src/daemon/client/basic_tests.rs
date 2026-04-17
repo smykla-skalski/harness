@@ -1,8 +1,16 @@
 use std::net::TcpListener;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
+use opentelemetry::Value as OTelValue;
+use opentelemetry::global;
+use opentelemetry::trace::{SpanKind, TracerProvider as _};
+use opentelemetry_sdk::error::OTelSdkResult;
+use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_sdk::trace::{SdkTracerProvider, SpanData, SpanExporter};
+use tracing_subscriber::prelude::*;
 
 use super::DaemonClient;
 use super::connection::{
@@ -137,4 +145,102 @@ fn daemon_client_allowed_in_current_context_rejects_active_tokio_runtime() {
     runtime.block_on(async {
         assert!(!daemon_client_allowed_in_current_context());
     });
+}
+
+#[test]
+fn daemon_client_get_injects_traceparent_and_exports_client_span() {
+    global::set_text_map_propagator(TraceContextPropagator::new());
+    let exporter = TestSpanExporter::default();
+    let tracer_provider = SdkTracerProvider::builder()
+        .with_simple_exporter(exporter.clone())
+        .build();
+    let tracer = tracer_provider.tracer("daemon-client-tests");
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(tracer));
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured_request = Arc::new(Mutex::new(String::new()));
+    let server = {
+        let captured_request = Arc::clone(&captured_request);
+        thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let request = read_http_request(&mut stream);
+            *captured_request.lock().expect("capture request") = request;
+            write_http_response(&mut stream, "200 OK", "application/json", "[]");
+        })
+    };
+
+    let client = DaemonClient {
+        endpoint,
+        token: "test-token".to_string(),
+        http: reqwest::Client::new(),
+    };
+    let sessions: Vec<serde_json::Value> = client.get("/v1/sessions").expect("get sessions");
+
+    assert!(sessions.is_empty());
+    server.join().expect("server");
+    let _ = tracer_provider.force_flush();
+
+    let request = captured_request
+        .lock()
+        .expect("captured request")
+        .to_ascii_lowercase();
+    assert!(request.contains("x-request-id: "));
+    assert!(request.contains("traceparent: "));
+
+    let spans = exporter.finished_spans();
+    let request_span = find_exported_span(&spans, "GET /v1/sessions");
+
+    assert_eq!(request_span.span_kind, SpanKind::Client);
+    assert_eq!(
+        span_string_attribute(request_span, "http.route").as_deref(),
+        Some("/v1/sessions")
+    );
+    assert_eq!(
+        span_string_attribute(request_span, "url.path").as_deref(),
+        Some("/v1/sessions")
+    );
+}
+
+fn find_exported_span<'a>(spans: &'a [SpanData], name: &str) -> &'a SpanData {
+    spans
+        .iter()
+        .find(|span| span.name.as_ref() == name)
+        .unwrap_or_else(|| panic!("expected span named {name}, got {spans:#?}"))
+}
+
+fn span_string_attribute(span: &SpanData, key: &str) -> Option<String> {
+    span.attributes
+        .iter()
+        .find(|attribute| attribute.key.as_str() == key)
+        .and_then(|attribute| match &attribute.value {
+            OTelValue::String(value) => Some(value.as_str().to_string()),
+            _ => None,
+        })
+}
+
+#[derive(Clone, Debug, Default)]
+struct TestSpanExporter {
+    spans: Arc<Mutex<Vec<SpanData>>>,
+}
+
+impl TestSpanExporter {
+    fn finished_spans(&self) -> Vec<SpanData> {
+        self.spans.lock().expect("span exporter lock").clone()
+    }
+}
+
+impl SpanExporter for TestSpanExporter {
+    fn export(
+        &self,
+        batch: Vec<SpanData>,
+    ) -> impl std::future::Future<Output = OTelSdkResult> + Send {
+        let spans = Arc::clone(&self.spans);
+        async move {
+            spans.lock().expect("span exporter lock").extend(batch);
+            Ok(())
+        }
+    }
 }
