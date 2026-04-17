@@ -50,18 +50,19 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
                     .lock()
                     .expect("request capture")
                     .push(request.clone());
-                let body = serde_json::to_string(&crate::daemon::protocol::SessionMutationResponse {
-                    state: build_new_session_with_policy(
-                        "daemon title context",
-                        "renamed title",
-                        "sess-title-daemon",
-                        "claude",
-                        Some("leader-session"),
-                        &utc_now(),
-                        None,
-                    ),
-                })
-                .expect("serialize response");
+                let body =
+                    serde_json::to_string(&crate::daemon::protocol::SessionMutationResponse {
+                        state: build_new_session_with_policy(
+                            "daemon title context",
+                            "renamed title",
+                            "sess-title-daemon",
+                            "claude",
+                            Some("leader-session"),
+                            &utc_now(),
+                            None,
+                        ),
+                    })
+                    .expect("serialize response");
                 write_http_response(&mut stream, "200 OK", "application/json", &body);
             }
         });
