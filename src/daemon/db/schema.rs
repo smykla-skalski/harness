@@ -24,7 +24,10 @@ impl DaemonDb {
         let conn = Connection::open(path)
             .map_err(|error| db_error(format!("open daemon database: {error}")))?;
         apply_pragmas(&conn)?;
-        let db = Self { conn };
+        let db = Self {
+            conn,
+            path: Some(path.to_path_buf()),
+        };
         db.ensure_schema()?;
         Ok(db)
     }
@@ -35,7 +38,7 @@ impl DaemonDb {
         let conn = Connection::open_in_memory()
             .map_err(|error| db_error(format!("open in-memory database: {error}")))?;
         apply_pragmas(&conn)?;
-        let db = Self { conn };
+        let db = Self { conn, path: None };
         db.ensure_schema()?;
         Ok(db)
     }
@@ -45,13 +48,15 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on query failure.
     pub fn schema_version(&self) -> Result<String, CliError> {
-        self.conn
-            .query_row(
-                "SELECT value FROM schema_meta WHERE key = 'version'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|error| db_error(format!("read schema version: {error}")))
+        super::trace_sync_db_operation("schema_version", "read", self.path.as_deref(), || {
+            self.conn
+                .query_row(
+                    "SELECT value FROM schema_meta WHERE key = 'version'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(|error| db_error(format!("read schema version: {error}")))
+        })
     }
 
     /// Return the raw connection for advanced queries. Prefer typed methods

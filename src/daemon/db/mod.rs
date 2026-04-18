@@ -57,6 +57,7 @@ mod schema_sql;
 mod session_data;
 mod signals;
 mod summaries;
+mod telemetry;
 mod timeline;
 mod timeline_store;
 mod writes;
@@ -75,6 +76,7 @@ pub(crate) use schema::set_schema_init_hook;
 pub(crate) use signals::ExpiredPendingSignalIndexRecord;
 #[allow(unused_imports)]
 use signals::derive_effective_signal_status;
+pub(crate) use telemetry::{trace_async_db_operation, trace_sync_db_operation};
 #[allow(unused_imports)]
 use timeline::{stored_timeline_entry, stored_timeline_entry_from_row};
 #[allow(unused_imports)]
@@ -122,6 +124,7 @@ pub(crate) fn parse_session_status_db_label(status: &str) -> SessionStatus {
 /// into the database.
 pub struct DaemonDb {
     conn: Connection,
+    path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
