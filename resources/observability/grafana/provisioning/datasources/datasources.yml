@@ -16,7 +16,7 @@ datasources:
     editable: false
     jsonData:
       path: /srv/sqlite/daemon/harness.db
-      pathOptions: mode=ro
+      pathOptions: mode=ro&_busy_timeout=5000
 
   - name: SQLite Monitor
     uid: sqlite-monitor
@@ -25,7 +25,7 @@ datasources:
     editable: false
     jsonData:
       path: /srv/sqlite/monitor/harness-cache.store
-      pathOptions: mode=ro
+      pathOptions: mode=ro&_busy_timeout=5000
 
   - name: Loki
     uid: loki
