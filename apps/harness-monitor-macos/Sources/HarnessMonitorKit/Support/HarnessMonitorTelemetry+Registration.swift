@@ -8,6 +8,103 @@ import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 
 extension HarnessMonitorTelemetry {
+  func buildResource(
+    environment: HarnessMonitorEnvironment,
+    bundle: Bundle
+  ) -> Resource {
+    let serviceVersion =
+      bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+      ?? bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+      ?? "dev"
+    let launchMode = HarnessMonitorLaunchMode(environment: environment)
+    let deploymentName: String
+    switch launchMode {
+    case .live:
+      deploymentName = "local"
+    case .preview:
+      deploymentName = "preview"
+    case .empty:
+      deploymentName = "empty"
+    }
+
+    let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+    let osVersionString =
+      "\(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)"
+    let userAgent = "HarnessMonitor/\(serviceVersion) (macOS \(osVersionString))"
+
+    return EnvVarResource.get(environment: environment.values).merging(
+      other: Resource(
+        attributes: [
+          "service.namespace": .string(HarnessMonitorTelemetryConstants.serviceNamespace),
+          "service.name": .string(HarnessMonitorTelemetryConstants.serviceName),
+          "service.version": .string(serviceVersion),
+          "deployment.environment.name": .string(deploymentName),
+          "service.instance.id": .string(UUID().uuidString),
+          "os.type": .string("darwin"),
+          "os.version": .string(osVersionString),
+          "host.arch": .string(hostArchitecture()),
+          "user_agent.original": .string(userAgent),
+          "device.id": .string(kernelUUID()),
+        ]
+      )
+    )
+  }
+
+  func kernelUUID() -> String {
+    var size: Int = 0
+    sysctlbyname("kern.uuid", nil, &size, nil, 0)
+    guard size > 0 else {
+      return "unknown"
+    }
+    var uuid = [CChar](repeating: 0, count: size)
+    sysctlbyname("kern.uuid", &uuid, &size, nil, 0)
+    let data = Data(uuid.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) })
+    return String(bytes: data, encoding: .utf8) ?? "unknown"
+  }
+
+  func hostArchitecture() -> String {
+    #if arch(arm64)
+      return "arm64"
+    #elseif arch(x86_64)
+      return "x86_64"
+    #else
+      return "unknown"
+    #endif
+  }
+
+  func bootstrapAttributes(
+    config: HarnessMonitorObservabilityConfig?
+  ) -> [String: AttributeValue] {
+    guard let config else {
+      return [
+        "otel.export.enabled": .bool(false)
+      ]
+    }
+    let configSource: String
+    switch config.source {
+    case .environment:
+      configSource = "environment"
+    case .sharedFile:
+      configSource = "shared_file"
+    case .toggle:
+      configSource = "toggle"
+    }
+
+    var attributes: [String: AttributeValue] = [
+      "otel.export.enabled": .bool(true),
+      "otel.export.transport": .string(
+        config.transport == .grpc ? "grpc" : "http/protobuf"
+      ),
+      "otel.config.source": .string(configSource),
+    ]
+    if let endpoint = config.grpcEndpoint?.absoluteString {
+      attributes["otel.export.endpoint"] = .string(endpoint)
+    } else if let tracesEndpoint = config.httpSignalEndpoints?.traces.absoluteString {
+      attributes["otel.export.endpoint"] = .string(tracesEndpoint)
+    }
+    return attributes
+  }
+
   func registerProviders(
     resource: Resource,
     config: HarnessMonitorObservabilityConfig?,
@@ -215,103 +312,6 @@ extension HarnessMonitorTelemetry {
       meterProvider: meterProvider,
       exportControl: control
     )
-  }
-
-  func buildResource(
-    environment: HarnessMonitorEnvironment,
-    bundle: Bundle
-  ) -> Resource {
-    let serviceVersion =
-      bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-      ?? bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-      ?? "dev"
-    let launchMode = HarnessMonitorLaunchMode(environment: environment)
-    let deploymentName: String
-    switch launchMode {
-    case .live:
-      deploymentName = "local"
-    case .preview:
-      deploymentName = "preview"
-    case .empty:
-      deploymentName = "empty"
-    }
-
-    let osVersion = ProcessInfo.processInfo.operatingSystemVersion
-    let osVersionString =
-      "\(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)"
-    let userAgent = "HarnessMonitor/\(serviceVersion) (macOS \(osVersionString))"
-
-    return EnvVarResource.get(environment: environment.values).merging(
-      other: Resource(
-        attributes: [
-          "service.namespace": .string(HarnessMonitorTelemetryConstants.serviceNamespace),
-          "service.name": .string(HarnessMonitorTelemetryConstants.serviceName),
-          "service.version": .string(serviceVersion),
-          "deployment.environment.name": .string(deploymentName),
-          "service.instance.id": .string(UUID().uuidString),
-          "os.type": .string("darwin"),
-          "os.version": .string(osVersionString),
-          "host.arch": .string(hostArchitecture()),
-          "user_agent.original": .string(userAgent),
-          "device.id": .string(kernelUUID()),
-        ]
-      )
-    )
-  }
-
-  func kernelUUID() -> String {
-    var size: Int = 0
-    sysctlbyname("kern.uuid", nil, &size, nil, 0)
-    guard size > 0 else {
-      return "unknown"
-    }
-    var uuid = [CChar](repeating: 0, count: size)
-    sysctlbyname("kern.uuid", &uuid, &size, nil, 0)
-    let data = Data(uuid.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) })
-    return String(bytes: data, encoding: .utf8) ?? "unknown"
-  }
-
-  func hostArchitecture() -> String {
-    #if arch(arm64)
-      return "arm64"
-    #elseif arch(x86_64)
-      return "x86_64"
-    #else
-      return "unknown"
-    #endif
-  }
-
-  func bootstrapAttributes(
-    config: HarnessMonitorObservabilityConfig?
-  ) -> [String: AttributeValue] {
-    guard let config else {
-      return [
-        "otel.export.enabled": .bool(false)
-      ]
-    }
-    let configSource: String
-    switch config.source {
-    case .environment:
-      configSource = "environment"
-    case .sharedFile:
-      configSource = "shared_file"
-    case .toggle:
-      configSource = "toggle"
-    }
-
-    var attributes: [String: AttributeValue] = [
-      "otel.export.enabled": .bool(true),
-      "otel.export.transport": .string(
-        config.transport == .grpc ? "grpc" : "http/protobuf"
-      ),
-      "otel.config.source": .string(configSource),
-    ]
-    if let endpoint = config.grpcEndpoint?.absoluteString {
-      attributes["otel.export.endpoint"] = .string(endpoint)
-    } else if let tracesEndpoint = config.httpSignalEndpoints?.traces.absoluteString {
-      attributes["otel.export.endpoint"] = .string(tracesEndpoint)
-    }
-    return attributes
   }
 
   func makeGRPCChannel(

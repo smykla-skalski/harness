@@ -113,6 +113,37 @@ struct HarnessMonitorObservabilityPhase5Tests {
     )
   }
 
+  @Test("Signpost bridge exports completed async intervals without waiting for shutdown")
+  func signpostBridgeExportsCompletedAsyncIntervalsWithoutWaitingForShutdown() async throws {
+    let collector = try GRPCCollectorServer()
+    defer {
+      collector.shutdown()
+      HarnessMonitorTelemetry.shared.resetForTests()
+    }
+
+    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
+    defer { try? FileManager.default.removeItem(at: temporaryHome) }
+
+    HarnessMonitorTelemetry.shared.resetForTests()
+    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+
+    let bridge = HarnessMonitorSignpostBridge()
+    await bridge.withInterval(
+      name: "launch-dashboard",
+      flushOnCompletion: true
+    ) {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+
+    try await waitForTraceExport(timeout: .milliseconds(500)) {
+      collector.traceCollector.exportedSpans.contains { $0.name == "perf.launch-dashboard" }
+    }
+
+    #expect(
+      collector.traceCollector.exportedSpans.contains { $0.name == "perf.launch-dashboard" }
+    )
+  }
+
   // MARK: - View Signposter Tests
 
   @Test("View signposter measures view body")
