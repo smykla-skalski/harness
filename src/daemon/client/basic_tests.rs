@@ -149,6 +149,7 @@ fn daemon_client_allowed_in_current_context_rejects_active_tokio_runtime() {
 
 #[test]
 fn daemon_client_get_injects_traceparent_and_exports_client_span() {
+    let _guard = crate::telemetry::telemetry_test_guard();
     global::set_text_map_propagator(TraceContextPropagator::new());
     let exporter = TestSpanExporter::default();
     let tracer_provider = SdkTracerProvider::builder()

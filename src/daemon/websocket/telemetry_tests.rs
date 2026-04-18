@@ -1,10 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use opentelemetry::Value as OTelValue;
-use opentelemetry::global;
 use opentelemetry::trace::{SpanKind, TracerProvider as _};
 use opentelemetry_sdk::error::OTelSdkResult;
-use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::{SdkTracerProvider, SpanData, SpanExporter};
 use tracing_subscriber::prelude::*;
 
@@ -15,7 +13,8 @@ use crate::daemon::protocol::WsRequest;
 
 #[tokio::test(flavor = "current_thread")]
 async fn websocket_dispatch_uses_trace_context_parent_and_rpc_name() {
-    global::set_text_map_propagator(TraceContextPropagator::new());
+    let _guard = crate::telemetry::telemetry_test_guard();
+    crate::telemetry::install_text_map_propagator();
     let exporter = TestSpanExporter::default();
     let tracer_provider = SdkTracerProvider::builder()
         .with_simple_exporter(exporter.clone())
@@ -75,6 +74,63 @@ async fn websocket_dispatch_uses_trace_context_parent_and_rpc_name() {
     assert_eq!(
         span_string_attribute(db_span, "db.system").as_deref(),
         Some("sqlite")
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn websocket_dispatch_projects_baggage_attributes_onto_rpc_and_db_spans() {
+    let _guard = crate::telemetry::telemetry_test_guard();
+    crate::telemetry::install_text_map_propagator();
+    let exporter = TestSpanExporter::default();
+    let tracer_provider = SdkTracerProvider::builder()
+        .with_simple_exporter(exporter.clone())
+        .build();
+    let tracer = tracer_provider.tracer("daemon-websocket-tests");
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(tracer));
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+
+    let state = test_http_state_with_async_db_timeline().await;
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let request = {
+        let parent_span = tracing::info_span!("monitor.websocket.client", otel.kind = "client");
+        let _parent_guard = parent_span.enter();
+        let mut trace_context = crate::telemetry::current_trace_headers();
+        trace_context.insert(
+            "baggage".into(),
+            "session.id=sess-test-1,project.id=proj-test-9".into(),
+        );
+        WsRequest {
+            id: "req-baggage-context".into(),
+            method: "session.detail".into(),
+            params: serde_json::json!({ "session_id": "sess-test-1" }),
+            trace_context: Some(trace_context),
+        }
+    };
+
+    let response = dispatch(&request, &state, &connection).await;
+    assert!(response.error.is_none());
+
+    let _ = tracer_provider.force_flush();
+    let spans = exporter.finished_spans();
+    let rpc_span = find_exported_span(&spans, "session.detail");
+    let db_span = find_exported_span(&spans, "daemon.db.async.resolve_session");
+
+    assert_eq!(
+        span_string_attribute(rpc_span, "session.id").as_deref(),
+        Some("sess-test-1")
+    );
+    assert_eq!(
+        span_string_attribute(rpc_span, "project.id").as_deref(),
+        Some("proj-test-9")
+    );
+    assert_eq!(
+        span_string_attribute(db_span, "session.id").as_deref(),
+        Some("sess-test-1")
+    );
+    assert_eq!(
+        span_string_attribute(db_span, "project.id").as_deref(),
+        Some("proj-test-9")
     );
 }
 

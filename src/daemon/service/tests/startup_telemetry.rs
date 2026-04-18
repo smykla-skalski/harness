@@ -14,6 +14,7 @@ use tracing_subscriber::prelude::*;
 
 #[test]
 fn daemon_serve_startup_groups_db_spans_under_startup_root() {
+    let _guard = crate::telemetry::telemetry_test_guard();
     global::set_text_map_propagator(TraceContextPropagator::new());
     let exporter = TestSpanExporter::default();
     let tracer_provider = SdkTracerProvider::builder()

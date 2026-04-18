@@ -13,7 +13,6 @@ use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig, WithTonicCo
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::metrics::SdkMeterProvider;
-use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
 use tokio::runtime::{Builder as TokioRuntimeBuilder, Runtime as TokioRuntime};
 use tonic::metadata::{MetadataKey, MetadataMap, MetadataValue};
@@ -31,6 +30,7 @@ use super::config::{
     ExportProtocol, ResolvedTelemetryConfig, RuntimeService, resolve_telemetry_config,
     runtime_service_from_current_process,
 };
+use super::metrics::install_text_map_propagator;
 use super::profiler::DaemonProfiler;
 
 pub struct TelemetryGuard {
@@ -197,7 +197,7 @@ fn init_subscriber_with_telemetry(
     let (async_runtime, tracer_provider, meter_provider, logger_provider) =
         build_export_providers(&export, resource)?;
 
-    global::set_text_map_propagator(TraceContextPropagator::new());
+    install_text_map_propagator();
     global::set_tracer_provider(tracer_provider.clone());
     global::set_meter_provider(meter_provider.clone());
 
