@@ -62,43 +62,41 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidResignActive(_ notification: Notification) {
-    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+    HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
       event: "resign_active",
-      launchMode: launchMode.rawValue,
-      durationMs: nil
-    )
-
-    guard launchMode == .live, let store else {
-      return
-    }
-    guard shouldSuspendLiveConnectionOnResignActive() else {
-      return
-    }
-
-    Task { @MainActor [weak self] in
-      guard self?.terminationTask == nil else {
+      launchMode: launchMode.rawValue
+    ) {
+      guard launchMode == .live, let store else {
         return
       }
-      await store.suspendLiveConnectionForAppInactivity()
+      guard shouldSuspendLiveConnectionOnResignActive() else {
+        return
+      }
+
+      Task { @MainActor [weak self] in
+        guard self?.terminationTask == nil else {
+          return
+        }
+        await store.suspendLiveConnectionForAppInactivity()
+      }
     }
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
-    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+    HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
       event: "become_active",
-      launchMode: launchMode.rawValue,
-      durationMs: nil
-    )
-
-    guard launchMode == .live, let store else {
-      return
-    }
-
-    Task { @MainActor [weak self] in
-      guard self?.terminationTask == nil else {
+      launchMode: launchMode.rawValue
+    ) {
+      guard launchMode == .live, let store else {
         return
       }
-      await store.resumeLiveConnectionAfterAppActivation()
+
+      Task { @MainActor [weak self] in
+        guard self?.terminationTask == nil else {
+          return
+        }
+        await store.resumeLiveConnectionAfterAppActivation()
+      }
     }
   }
 
