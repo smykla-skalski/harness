@@ -16,7 +16,9 @@ use tracing::{debug, info};
 
 use crate::daemon::http::{self, DaemonHttpState};
 use crate::daemon::protocol::StreamEvent;
-use crate::telemetry::{apply_parent_context_from_headers, current_trace_id};
+use crate::telemetry::{
+    apply_parent_context_from_headers, current_trace_id, with_active_baggage,
+};
 
 use super::dispatch::handle_message;
 use super::relay::relay_broadcast;
@@ -59,14 +61,16 @@ pub async fn ws_upgrade_handler(
         .unwrap_or("")
         .to_string();
     let connection_span = websocket_connection_span(&request_id);
-    apply_parent_context_from_headers(&connection_span, &headers);
+    let baggage = apply_parent_context_from_headers(&connection_span, &headers);
     if let Some(trace_id) = connection_span.in_scope(current_trace_id) {
         connection_span.record("trace_id", display(trace_id));
     }
     ws.on_upgrade(move |socket| async move {
-        handle_connection(socket, state)
-            .instrument(connection_span.clone())
-            .await;
+        with_active_baggage(
+            baggage,
+            handle_connection(socket, state).instrument(connection_span.clone()),
+        )
+        .await;
     })
 }
 
@@ -122,11 +126,11 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                             if incoming_message_counts_as_activity(&message) {
                                 last_client_message = Instant::now();
                             }
-                            match handle_incoming_message(
+                            match Box::pin(handle_incoming_message(
                                 message,
                                 &state,
                                 &connection_dispatch,
-                            )
+                            ))
                             .await
                             {
                                 IncomingMessageAction::ContinueLoop => {}
@@ -265,7 +269,9 @@ pub(crate) async fn handle_incoming_message(
 ) -> IncomingMessageAction {
     match message {
         Message::Text(text) => {
-            IncomingMessageAction::RespondBatch(handle_message(&text, state, connection).await)
+            IncomingMessageAction::RespondBatch(
+                Box::pin(handle_message(&text, state, connection)).await,
+            )
         }
         Message::Ping(payload) => IncomingMessageAction::RespondBatch(vec![Message::Pong(payload)]),
         Message::Close(_) => IncomingMessageAction::CloseConnection,

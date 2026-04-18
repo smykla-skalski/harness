@@ -18,7 +18,9 @@ use crate::daemon::protocol::{
     TaskQueuePolicyRequest, TaskUpdateRequest, WsRequest, WsResponse,
 };
 use crate::daemon::service;
-use crate::telemetry::{apply_parent_context_from_text_map, current_trace_id};
+use crate::telemetry::{
+    apply_parent_context_from_text_map, current_trace_id, with_active_baggage, TelemetryBaggage,
+};
 use axum::extract::ws::Message;
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
@@ -41,7 +43,7 @@ pub(crate) async fn handle_message(
         }
     };
 
-    let response = dispatch(&request, state, connection).await;
+    let response = Box::pin(dispatch(&request, state, connection)).await;
     serialize_response_frames(&response).unwrap_or_else(|error| {
         serialize_error_response_frames(
             Some(&request.id),
@@ -75,15 +77,18 @@ pub(crate) async fn dispatch(
         "request.failed" = Empty,
         trace_id = Empty
     );
-    if let Some(trace_context) = &request.trace_context {
-        apply_parent_context_from_text_map(&span, trace_context);
-    }
+    let baggage = request.trace_context.as_ref().map_or_else(
+        TelemetryBaggage::default,
+        |trace_context| apply_parent_context_from_text_map(&span, trace_context),
+    );
     if let Some(trace_id) = span.in_scope(current_trace_id) {
         span.record("trace_id", display(trace_id));
     }
-    let response = dispatch_inner(request, state, connection)
-        .instrument(span.clone())
-        .await;
+    let response = Box::pin(with_active_baggage(
+        baggage,
+        dispatch_inner(request, state, connection).instrument(span.clone()),
+    ))
+    .await;
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = response.error.is_some();
     span.record("duration_ms", display(duration_ms));
@@ -501,20 +506,4 @@ fn unknown_method_response(request_id: &str, method: &str) -> WsResponse {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::daemon::protocol::WsRequest;
-
-    #[test]
-    fn websocket_activity_logging_uses_debug_level() {
-        assert_eq!(ws_activity_log_level(), tracing::Level::DEBUG);
-    }
-
-    #[test]
-    fn ws_request_deserialization() {
-        let json = r#"{"id":"abc-123","method":"health","params":{}}"#;
-        let request: WsRequest = serde_json::from_str(json).expect("deserialize");
-        assert_eq!(request.id, "abc-123");
-        assert_eq!(request.method, "health");
-    }
-}
+mod tests;

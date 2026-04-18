@@ -1,16 +1,20 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::future::Future;
 use std::path::Path;
 use std::sync::OnceLock;
 
+use opentelemetry::Context;
+use opentelemetry::baggage::BaggageExt as _;
 use axum::http::HeaderMap;
 use axum::http::header::HeaderName;
 use opentelemetry::KeyValue;
 use opentelemetry::global;
 use opentelemetry::metrics::{Counter, Gauge, Histogram, Meter};
-use opentelemetry::propagation::{Extractor, Injector};
+use opentelemetry::propagation::{Extractor, Injector, TextMapCompositePropagator};
 use opentelemetry::trace::TraceContextExt as _;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 
 static TELEMETRY_METER: OnceLock<Meter> = OnceLock::new();
 static HOOK_DURATION_HISTOGRAM: OnceLock<Histogram<u64>> = OnceLock::new();
@@ -27,6 +31,47 @@ static DAEMON_DB_FILE_SIZE_GAUGE: OnceLock<Gauge<u64>> = OnceLock::new();
 static DAEMON_DB_POOL_CONNECTION_GAUGE: OnceLock<Gauge<u64>> = OnceLock::new();
 static DAEMON_DB_HEALTH_COUNT_GAUGE: OnceLock<Gauge<u64>> = OnceLock::new();
 
+tokio::task_local! {
+    static ACTIVE_TELEMETRY_BAGGAGE: TelemetryBaggage;
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct TelemetryBaggage {
+    session_id: Option<String>,
+    project_id: Option<String>,
+}
+
+impl TelemetryBaggage {
+    fn from_context(context: &Context) -> Self {
+        Self {
+            session_id: context.baggage().get("session.id").map(ToString::to_string),
+            project_id: context.baggage().get("project.id").map(ToString::to_string),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.session_id.is_none() && self.project_id.is_none()
+    }
+
+    fn apply_to_span(&self, span: &tracing::Span) {
+        let span_context = span.context();
+        let otel_span = span_context.span();
+        if let Some(session_id) = &self.session_id {
+            otel_span.set_attribute(KeyValue::new("session.id", session_id.clone()));
+        }
+        if let Some(project_id) = &self.project_id {
+            otel_span.set_attribute(KeyValue::new("project.id", project_id.clone()));
+        }
+    }
+}
+
+pub fn install_text_map_propagator() {
+    global::set_text_map_propagator(TextMapCompositePropagator::new(vec![
+        Box::new(BaggagePropagator::new()),
+        Box::new(TraceContextPropagator::new()),
+    ]));
+}
+
 #[must_use]
 pub fn current_trace_headers() -> BTreeMap<String, String> {
     let mut injector = HeaderInjector::default();
@@ -37,19 +82,45 @@ pub fn current_trace_headers() -> BTreeMap<String, String> {
     injector.headers
 }
 
-pub fn apply_parent_context_from_headers(span: &tracing::Span, headers: &HeaderMap) {
+#[must_use]
+pub fn apply_parent_context_from_headers(
+    span: &tracing::Span,
+    headers: &HeaderMap,
+) -> TelemetryBaggage {
     let extractor = HeaderExtractor(headers);
     let context = global::get_text_map_propagator(|propagator| propagator.extract(&extractor));
-    let _ = span.set_parent(context);
+    apply_remote_context_to_span(span, context)
 }
 
+#[must_use]
 pub fn apply_parent_context_from_text_map(
     span: &tracing::Span,
     headers: &BTreeMap<String, String>,
-) {
+) -> TelemetryBaggage {
     let extractor = TextMapExtractor(headers);
     let context = global::get_text_map_propagator(|propagator| propagator.extract(&extractor));
-    let _ = span.set_parent(context);
+    apply_remote_context_to_span(span, context)
+}
+
+pub async fn with_active_baggage<T>(
+    baggage: TelemetryBaggage,
+    future: impl Future<Output = T>,
+) -> T {
+    if baggage.is_empty() {
+        future.await
+    } else {
+        ACTIVE_TELEMETRY_BAGGAGE.scope(baggage, future).await
+    }
+}
+
+pub fn apply_current_baggage_to_span(span: &tracing::Span) {
+    if let Ok(baggage) = ACTIVE_TELEMETRY_BAGGAGE.try_with(Clone::clone) {
+        baggage.apply_to_span(span);
+        return;
+    }
+
+    let context = tracing::Span::current().context();
+    TelemetryBaggage::from_context(&context).apply_to_span(span);
 }
 
 #[must_use]
@@ -171,6 +242,13 @@ pub fn record_daemon_db_health_counts(
 
 fn telemetry_meter() -> &'static Meter {
     TELEMETRY_METER.get_or_init(|| global::meter("harness"))
+}
+
+fn apply_remote_context_to_span(span: &tracing::Span, context: Context) -> TelemetryBaggage {
+    let baggage = TelemetryBaggage::from_context(&context);
+    let _ = span.set_parent(context);
+    baggage.apply_to_span(span);
+    baggage
 }
 
 fn hook_duration_histogram() -> &'static Histogram<u64> {
@@ -368,6 +446,7 @@ mod tests {
 
     #[test]
     fn text_map_parent_context_preserves_trace_id() {
+        let _guard = crate::telemetry::telemetry_test_guard();
         global::set_text_map_propagator(TraceContextPropagator::new());
         let tracer_provider = SdkTracerProvider::builder().build();
         let tracer = tracer_provider.tracer("metrics-tests");
@@ -382,7 +461,7 @@ mod tests {
             let root_trace_id = current_trace_id().expect("root trace id");
 
             let child_span = tracing::info_span!("child");
-            apply_parent_context_from_text_map(&child_span, &headers);
+            let _ = apply_parent_context_from_text_map(&child_span, &headers);
 
             let child_trace_id =
                 child_span.in_scope(|| current_trace_id().expect("child trace id"));

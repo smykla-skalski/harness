@@ -6,7 +6,7 @@ use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
 use crate::errors::CliError;
-use crate::telemetry::record_daemon_db_operation_metrics;
+use crate::telemetry::{apply_current_baggage_to_span, record_daemon_db_operation_metrics};
 
 pub(crate) fn trace_sync_db_operation<T, F>(
     operation: &str,
@@ -53,7 +53,7 @@ fn db_operation_span(
         .and_then(Path::file_name)
         .and_then(|file_name| file_name.to_str())
         .unwrap_or("memory");
-    tracing::info_span!(
+    let span = tracing::info_span!(
         "harness.daemon.db.operation",
         otel.name = %otel_name,
         otel.kind = "client",
@@ -65,7 +65,9 @@ fn db_operation_span(
         duration_ms = Empty,
         error = Empty,
         error_message = Empty
-    )
+    );
+    apply_current_baggage_to_span(&span);
+    span
 }
 
 fn finish_db_operation<T>(
