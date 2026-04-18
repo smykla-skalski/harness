@@ -99,6 +99,35 @@ struct HarnessMonitorObservabilityPhase5Tests {
     #expect(result == "hello")
   }
 
+  @Test("View signposter exports a view span with the measured view name")
+  func viewSignposterExportsViewSpanWithMeasuredViewName() async throws {
+    let collector = try GRPCCollectorServer()
+    defer {
+      collector.shutdown()
+      HarnessMonitorTelemetry.shared.resetForTests()
+    }
+
+    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
+    defer { try? FileManager.default.removeItem(at: temporaryHome) }
+
+    HarnessMonitorTelemetry.shared.resetForTests()
+    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+
+    _ = ViewBodySignposter.measure("SessionCockpitView") {
+      "profiled"
+    }
+
+    HarnessMonitorTelemetry.shared.shutdown()
+
+    try await waitForTraceExport(timeout: .seconds(3)) {
+      viewBodySpanAttributes(in: collector.traceCollector) != nil
+    }
+
+    let attributes = try #require(viewBodySpanAttributes(in: collector.traceCollector))
+    #expect(attributes["perf.signpost.name"] == "view.body")
+    #expect(attributes["harness.view.name"] == "SessionCockpitView")
+  }
+
   // MARK: - Exemplar Tests
 
   @Test("Histogram recording works with active span context")
@@ -135,4 +164,20 @@ struct HarnessMonitorObservabilityPhase5Tests {
     let metricNames = collector.metricCollector.metricNames
     #expect(metricNames.contains("harness_monitor_user_interaction_duration_ms"))
   }
+}
+
+private func viewBodySpanAttributes(
+  in collector: FakeTraceCollector
+) -> [String: String]? {
+  collector.receivedSpans
+    .flatMap(\.scopeSpans)
+    .flatMap(\.spans)
+    .first { $0.name == "perf.view.body" }
+    .map { span in
+      Dictionary(
+        uniqueKeysWithValues: span.attributes.map { attribute in
+          (attribute.key, attribute.value.stringValue)
+        }
+      )
+    }
 }
