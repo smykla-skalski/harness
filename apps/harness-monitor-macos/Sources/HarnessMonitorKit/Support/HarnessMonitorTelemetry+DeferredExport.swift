@@ -1,5 +1,8 @@
 import Foundation
+import GRPC
 import OpenTelemetryApi
+import OpenTelemetryProtocolExporterCommon
+import OpenTelemetryProtocolExporterGrpc
 import OpenTelemetrySdk
 
 struct HarnessMonitorTelemetryRegistrationPlan {
@@ -12,7 +15,8 @@ extension HarnessMonitorTelemetry {
 
   func registrationPlan(
     resource: Resource,
-    config: HarnessMonitorObservabilityConfig?
+    config: HarnessMonitorObservabilityConfig?,
+    environment: HarnessMonitorEnvironment
   ) -> HarnessMonitorTelemetryRegistrationPlan {
     guard let config else {
       return HarnessMonitorTelemetryRegistrationPlan(
@@ -23,17 +27,26 @@ extension HarnessMonitorTelemetry {
 
     guard let activation = deferredExportActivation(resource: resource, config: config) else {
       return HarnessMonitorTelemetryRegistrationPlan(
-        registration: registerExportingProviders(resource: resource, config: config),
+        registration: registerExportingProviders(
+          resource: resource,
+          config: config,
+          environment: environment
+        ),
         deferredExportActivation: nil
       )
     }
 
     let endpoint = config.grpcEndpoint?.absoluteString ?? ""
     HarnessMonitorLogger.lifecycle.notice(
-      "Deferring gRPC export until loopback collector is listening at \(endpoint, privacy: .public)"
+      "Deferring gRPC export until the loopback collector accepts OTLP traffic at \(endpoint)"
     )
     return HarnessMonitorTelemetryRegistrationPlan(
-      registration: registerProviders(resource: resource, config: nil),
+      registration: registerExportingProviders(
+        resource: resource,
+        config: config,
+        environment: environment,
+        deferredExportActivation: activation
+      ),
       deferredExportActivation: activation
     )
   }
@@ -49,7 +62,10 @@ extension HarnessMonitorTelemetry {
       return "Harness Monitor telemetry bootstrapped with exporter."
     }
     if config.transport == .grpc {
-      return "Harness Monitor telemetry bootstrapped; waiting for loopback gRPC collector."
+      return [
+        "Harness Monitor telemetry bootstrapped with persistent export buffering",
+        "while the loopback gRPC collector becomes ready for OTLP traffic.",
+      ].joined(separator: " ")
     }
     return "Harness Monitor telemetry bootstrapped with exporter."
   }
@@ -58,41 +74,10 @@ extension HarnessMonitorTelemetry {
     guard let activation = deferredActivationCandidate() else {
       return
     }
-
-    let registration = registerExportingProviders(
-      resource: activation.resource,
-      config: activation.config
-    )
-    let instruments = HarnessMonitorTelemetryInstruments(
-      meterProvider: registration.meterProvider
-    )
-
-    let activated = stateLock.withLock { () -> Bool in
-      guard state.deferredExportActivationInFlight else {
-        return false
-      }
-
-      state.instruments = instruments
-      state.exportControl = registration.exportControl
-      state.deferredExportActivation = nil
-      state.deferredExportActivationInFlight = false
-      return true
+    Task.detached(priority: .utility) { [self] in
+      let ready = otlpCollectorAcceptsTraceExports(for: activation)
+      finishDeferredExportAttempt(activation: activation, ready: ready)
     }
-    guard activated else {
-      registration.exportControl?.shutdown()
-      return
-    }
-
-    let endpoint = activation.config.grpcEndpoint?.absoluteString ?? ""
-    HarnessMonitorLogger.lifecycle.info(
-      "Activated gRPC export after collector became reachable at \(endpoint, privacy: .public)"
-    )
-    emitLog(
-      name: "observability.export.activated",
-      severity: .info,
-      body: "Telemetry activated gRPC exporter after loopback collector became reachable.",
-      attributes: activationAttributes(config: activation.config)
-    )
   }
 
   func deferredExportActivation(
@@ -198,7 +183,77 @@ extension HarnessMonitorTelemetry {
     config: HarnessMonitorObservabilityConfig
   ) -> [String: AttributeValue] {
     var attributes = bootstrapAttributes(config: config)
-    attributes["otel.export.activation_reason"] = .string("loopback_collector_available")
+    attributes["otel.export.activation_reason"] = .string("loopback_collector_accepted_otlp_export")
     return attributes
+  }
+
+  private func finishDeferredExportAttempt(
+    activation: DeferredExportActivation,
+    ready: Bool
+  ) {
+    let clock = ContinuousClock()
+    let exportControl = stateLock.withLock { () -> HarnessMonitorTelemetryExportControl? in
+      guard
+        let currentActivation = state.deferredExportActivation,
+        currentActivation.id == activation.id
+      else {
+        state.deferredExportActivationInFlight = false
+        return nil
+      }
+
+      state.deferredExportActivationInFlight = false
+      guard ready else {
+        state.deferredExportActivation?.nextProbeAfter =
+          clock.now + Self.deferredExportProbeBackoff
+        return nil
+      }
+
+      state.deferredExportActivation = nil
+      return state.exportControl
+    }
+
+    guard ready else {
+      return
+    }
+
+    exportControl?.forceFlush()
+
+    let endpoint = activation.config.grpcEndpoint?.absoluteString ?? ""
+    HarnessMonitorLogger.lifecycle.info(
+      "Activated gRPC export after collector accepted OTLP traffic at \(endpoint, privacy: .public)"
+    )
+    emitLog(
+      name: "observability.export.activated",
+      severity: .info,
+      body: "Telemetry activated gRPC exporter after the loopback collector accepted OTLP exports.",
+      attributes: activationAttributes(config: activation.config)
+    )
+  }
+
+  private func otlpCollectorAcceptsTraceExports(
+    for activation: DeferredExportActivation
+  ) -> Bool {
+    guard let endpoint = activation.config.grpcEndpoint else {
+      return false
+    }
+
+    let otlpHeaders = activation.config.headers.map { ($0.key, $0.value) }
+    let otlpConfig = OtlpConfiguration(
+      timeout: 0.25,
+      compression: .gzip,
+      headers: otlpHeaders.isEmpty ? nil : otlpHeaders,
+      exportAsJson: false
+    )
+    let group = PlatformSupport.makeEventLoopGroup(loopCount: 1)
+    let channel = makeGRPCChannel(endpoint: endpoint, group: group)
+    let exporter = OtlpTraceExporter(
+      channel: channel,
+      config: otlpConfig,
+      envVarHeaders: nil
+    )
+    let result = exporter.export(spans: [], explicitTimeout: otlpConfig.timeout)
+    exporter.shutdown(explicitTimeout: otlpConfig.timeout)
+    try? group.syncShutdownGracefully()
+    return result == .success
   }
 }

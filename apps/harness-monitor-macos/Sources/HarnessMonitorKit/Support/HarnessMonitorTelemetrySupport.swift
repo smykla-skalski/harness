@@ -21,6 +21,7 @@ func harnessMonitorDurationMilliseconds(_ duration: Duration) -> Double {
 struct HarnessMonitorTelemetryExportControl {
   let forceFlush: () -> Void
   let shutdown: () -> Void
+  let closeTransport: () -> Void
 }
 
 struct HarnessMonitorTelemetryRegistration {

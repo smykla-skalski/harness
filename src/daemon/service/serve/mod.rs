@@ -7,6 +7,10 @@ use super::{
     env, http, index, log_sandbox_startup, process_id, state, tokio_watch, utc_now, watch,
 };
 use crate::daemon::http::AsyncDaemonDbSlot;
+use crate::telemetry::current_trace_id;
+use std::time::Instant;
+use tracing::Instrument as _;
+use tracing::field::{Empty, display};
 
 use binary_stamp::current_binary_stamp;
 
@@ -64,16 +68,9 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
-    if let Err(error) = initialize_db_and_spawn_background_tasks(
-        &db,
-        &async_db,
-        sender.clone(),
-        config.poll_interval,
-    ) {
-        let _ = state::clear_manifest_for_pid(process_id());
-        return Err(error);
-    }
-    if let Err(error) = initialize_async_db(&async_db).await {
+    if let Err(error) =
+        initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await
+    {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
@@ -171,6 +168,34 @@ pub(crate) fn initialize_db_and_spawn_background_tasks(
     Ok(())
 }
 
+pub(crate) async fn initialize_startup_state(
+    db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    sender: broadcast::Sender<super::protocol::StreamEvent>,
+    poll_interval: Duration,
+) -> Result<(), CliError> {
+    let span = startup_span();
+    if let Some(trace_id) = span.in_scope(current_trace_id) {
+        span.record("trace_id", display(trace_id));
+    }
+    let started_at = Instant::now();
+    let result = async {
+        initialize_db_and_spawn_background_tasks(db_slot, async_db_slot, sender, poll_interval)?;
+        initialize_async_db(async_db_slot).await
+    }
+    .instrument(span.clone())
+    .await;
+
+    let duration_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+    span.record("duration_ms", display(duration_ms));
+    span.record("error", display(result.is_err()));
+    if let Err(error) = &result {
+        span.record("error_message", display(error));
+    }
+
+    result
+}
+
 pub(crate) async fn initialize_async_db(
     async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
 ) -> Result<(), CliError> {
@@ -178,6 +203,20 @@ pub(crate) async fn initialize_async_db(
     db.cache_startup_diagnostics().await?;
     let _ = db.health_counts().await?;
     Ok(())
+}
+
+fn startup_span() -> tracing::Span {
+    tracing::info_span!(
+        parent: None,
+        "daemon.lifecycle.startup",
+        otel.name = "daemon.lifecycle.startup",
+        otel.kind = "internal",
+        "daemon.phase" = "startup",
+        duration_ms = Empty,
+        error = Empty,
+        error_message = Empty,
+        trace_id = Empty
+    )
 }
 
 #[expect(

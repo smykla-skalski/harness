@@ -39,6 +39,7 @@ mod session_reads;
 mod session_title;
 mod signal_reconciliation;
 mod signals;
+mod startup_telemetry;
 mod stream_initial_events;
 mod task_mutations;
 mod timeline;
