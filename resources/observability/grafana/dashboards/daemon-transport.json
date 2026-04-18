@@ -1,11 +1,4 @@
 {
-  "layout": {
-    "kind": "auto-grid",
-    "spec": {
-      "maxColumns": 4,
-      "minColumnWidth": 300
-    }
-  },
   "annotations": {
     "list": [
       {
@@ -26,59 +19,81 @@
   "graphTooltip": 1,
   "links": [
     {
+      "title": "Investigation Cockpit",
+      "type": "link",
+      "url": "/d/harness-investigation-cockpit",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Metrics Drilldown",
-      "type": "link",
-      "url": "/a/grafana-metricsdrilldown-app/drilldown"
+      "tags": []
     },
     {
+      "title": "Host Machine",
+      "type": "link",
+      "url": "/d/harness-host-machine",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
+      "tags": []
+    },
+    {
+      "title": "Monitor Client",
+      "type": "link",
+      "url": "/d/harness-monitor-client",
       "keepTime": true,
-      "tags": [],
+      "includeVars": true,
       "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
+      "title": "Storage & SQLite",
+      "type": "link",
+      "url": "/d/harness-sqlite-forensics",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
+      "title": "Service Flow",
+      "type": "link",
+      "url": "/d/harness-service-map",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
       "title": "Logs Drilldown",
       "type": "link",
-      "url": "/a/grafana-lokiexplore-app/explore"
-    },
-    {
+      "url": "/a/grafana-lokiexplore-app/explore",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
+      "tags": []
+    },
+    {
       "title": "Traces Breakdown",
       "type": "link",
-      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "SQLite Forensics",
-      "type": "link",
-      "url": "/d/harness-sqlite-forensics"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
+      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown",
+      "keepTime": false,
       "includeVars": false,
-      "keepTime": true,
-      "tags": [],
       "targetBlank": false,
-      "title": "Profiles Drilldown",
-      "type": "link",
-      "url": "/a/grafana-pyroscope-app/explore"
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
     }
   ],
   "panels": [
@@ -121,6 +136,20 @@
         "y": 0
       },
       "id": 1,
+      "links": [
+        {
+          "title": "Open Investigation Cockpit",
+          "url": "/d/harness-investigation-cockpit",
+          "keepTime": true,
+          "targetBlank": false
+        },
+        {
+          "title": "Open Logs Drilldown",
+          "url": "/a/grafana-lokiexplore-app/explore",
+          "keepTime": true,
+          "targetBlank": false
+        }
+      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -184,6 +213,20 @@
         "y": 0
       },
       "id": 2,
+      "links": [
+        {
+          "title": "Open Investigation Cockpit",
+          "url": "/d/harness-investigation-cockpit",
+          "keepTime": true,
+          "targetBlank": false
+        },
+        {
+          "title": "Open Logs Drilldown",
+          "url": "/a/grafana-lokiexplore-app/explore",
+          "keepTime": true,
+          "targetBlank": false
+        }
+      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -247,6 +290,20 @@
         "y": 0
       },
       "id": 3,
+      "links": [
+        {
+          "title": "Open Investigation Cockpit",
+          "url": "/d/harness-investigation-cockpit",
+          "keepTime": true,
+          "targetBlank": false
+        },
+        {
+          "title": "Open Logs Drilldown",
+          "url": "/a/grafana-lokiexplore-app/explore",
+          "keepTime": true,
+          "targetBlank": false
+        }
+      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -310,6 +367,20 @@
         "y": 0
       },
       "id": 4,
+      "links": [
+        {
+          "title": "Open Investigation Cockpit",
+          "url": "/d/harness-investigation-cockpit",
+          "keepTime": true,
+          "targetBlank": false
+        },
+        {
+          "title": "Open Logs Drilldown",
+          "url": "/a/grafana-lokiexplore-app/explore",
+          "keepTime": true,
+          "targetBlank": false
+        }
+      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -518,7 +589,7 @@
       "type": "logs"
     }
   ],
-  "refresh": "30s",
+  "refresh": "10s",
   "schemaVersion": 39,
   "style": "dark",
   "tags": [
@@ -590,7 +661,7 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-3h",
     "to": "now"
   },
   "title": "Harness Daemon Transport",

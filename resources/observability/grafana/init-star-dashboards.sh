@@ -13,7 +13,7 @@ done
 echo "Grafana is ready"
 
 # star each dashboard
-DASHBOARDS="harness-system-overview harness-daemon-transport harness-monitor-client harness-runtime-execution harness-service-map harness-sqlite-forensics"
+DASHBOARDS="harness-investigation-cockpit harness-host-machine harness-daemon-transport harness-monitor-client harness-runtime-execution harness-sqlite-forensics harness-service-map"
 
 for uid in $DASHBOARDS; do
   # get dashboard id from uid

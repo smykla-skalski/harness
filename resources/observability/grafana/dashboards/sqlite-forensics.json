@@ -1,11 +1,4 @@
 {
-  "layout": {
-    "kind": "auto-grid",
-    "spec": {
-      "maxColumns": 4,
-      "minColumnWidth": 300
-    }
-  },
   "annotations": {
     "list": [
       {
@@ -26,70 +19,70 @@
   "graphTooltip": 1,
   "links": [
     {
+      "title": "Investigation Cockpit",
+      "type": "link",
+      "url": "/d/harness-investigation-cockpit",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "System Overview",
-      "type": "link",
-      "url": "/d/harness-system-overview"
+      "tags": []
     },
     {
+      "title": "Host Machine",
+      "type": "link",
+      "url": "/d/harness-host-machine",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
+      "tags": []
+    },
+    {
+      "title": "Runtime & Hooks",
+      "type": "link",
+      "url": "/d/harness-runtime-execution",
       "keepTime": true,
-      "tags": [],
+      "includeVars": true,
       "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
       "title": "Daemon Transport",
       "type": "link",
-      "url": "/d/harness-daemon-transport"
-    },
-    {
+      "url": "/d/harness-daemon-transport",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
+      "tags": []
+    },
+    {
       "title": "Monitor Client",
       "type": "link",
-      "url": "/d/harness-monitor-client"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
+      "url": "/d/harness-monitor-client",
       "keepTime": true,
-      "tags": [],
+      "includeVars": true,
       "targetBlank": false,
-      "title": "Metrics Drilldown",
-      "type": "link",
-      "url": "/a/grafana-metricsdrilldown-app/drilldown"
-    },
-    {
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
+      "tags": []
+    },
+    {
+      "title": "Service Flow",
+      "type": "link",
+      "url": "/d/harness-service-map",
       "keepTime": true,
-      "tags": [],
+      "includeVars": true,
       "targetBlank": false,
-      "title": "Logs Drilldown",
-      "type": "link",
-      "url": "/a/grafana-lokiexplore-app/explore"
-    },
-    {
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Traces Breakdown",
-      "type": "link",
-      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
+      "tags": []
     }
   ],
   "panels": [
@@ -107,7 +100,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -150,8 +143,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 3,
+        "w": 6,
+        "x": 6,
         "y": 0
       },
       "id": 2,
@@ -193,8 +186,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 6,
+        "w": 6,
+        "x": 12,
         "y": 0
       },
       "id": 3,
@@ -236,8 +229,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 9,
+        "w": 6,
+        "x": 18,
         "y": 0
       },
       "id": 4,
@@ -279,9 +272,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 12,
-        "y": 0
+        "w": 6,
+        "x": 0,
+        "y": 4
       },
       "id": 5,
       "options": {
@@ -322,9 +315,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 15,
-        "y": 0
+        "w": 6,
+        "x": 6,
+        "y": 4
       },
       "id": 6,
       "options": {
@@ -365,9 +358,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 18,
-        "y": 0
+        "w": 6,
+        "x": 12,
+        "y": 4
       },
       "id": 7,
       "options": {
@@ -408,9 +401,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 21,
-        "y": 0
+        "w": 6,
+        "x": 18,
+        "y": 4
       },
       "id": 8,
       "options": {
@@ -452,7 +445,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 4
+        "y": 8
       },
       "id": 9,
       "options": {
@@ -490,7 +483,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 4
+        "y": 8
       },
       "id": 10,
       "options": {
@@ -540,7 +533,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 16
       },
       "id": 11,
       "options": {
@@ -584,7 +577,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 16
       },
       "id": 12,
       "options": {
@@ -622,7 +615,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 24
       },
       "id": 13,
       "options": {
@@ -666,7 +659,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 24
       },
       "id": 14,
       "options": {
@@ -704,7 +697,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 32
       },
       "id": 15,
       "options": {
@@ -748,7 +741,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 32
       },
       "id": 16,
       "options": {
@@ -783,9 +776,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
-        "y": 36
+        "y": 40
       },
       "id": 17,
       "options": {
@@ -815,9 +808,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 36
+        "w": 12,
+        "x": 12,
+        "y": 40
       },
       "id": 18,
       "options": {
@@ -847,9 +840,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 36
+        "w": 12,
+        "x": 0,
+        "y": 48
       },
       "id": 19,
       "options": {
@@ -879,9 +872,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 44
+        "w": 12,
+        "x": 12,
+        "y": 48
       },
       "id": 20,
       "options": {
@@ -911,9 +904,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 44
+        "w": 12,
+        "x": 0,
+        "y": 56
       },
       "id": 21,
       "options": {
@@ -943,9 +936,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 44
+        "w": 12,
+        "x": 12,
+        "y": 56
       },
       "id": 22,
       "options": {
@@ -964,21 +957,22 @@
       "type": "table"
     }
   ],
-  "refresh": "30s",
+  "refresh": "10s",
   "schemaVersion": 39,
   "tags": [
     "harness",
     "observability",
+    "storage",
     "sqlite"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-3h",
     "to": "now"
   },
-  "title": "Harness SQLite Forensics",
+  "title": "Harness Storage & SQLite",
   "uid": "harness-sqlite-forensics",
   "version": 1
 }
