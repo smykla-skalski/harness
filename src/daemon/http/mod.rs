@@ -14,6 +14,7 @@ use tokio::runtime::{Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, watch};
 #[cfg(test)]
 use tokio::task::block_in_place;
+use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
@@ -196,12 +197,11 @@ async fn trace_http_request(request: Request<Body>, next: Next) -> Response {
     let request_id = response::extract_request_id(request.headers());
     let span = http_request_span(&method, &route, &request_id);
     apply_parent_context_from_headers(&span, request.headers());
-    let _guard = span.enter();
     let started_at = Instant::now();
-    if let Some(trace_id) = current_trace_id() {
+    if let Some(trace_id) = span.in_scope(current_trace_id) {
         span.record("trace_id", display(trace_id));
     }
-    let response = next.run(request).await;
+    let response = next.run(request).instrument(span.clone()).await;
     let status = response.status().as_u16();
     let duration_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
     span.record("http_status_code", display(status));
@@ -213,6 +213,7 @@ async fn trace_http_request(request: Request<Body>, next: Next) -> Response {
 fn http_request_span(method: &str, route: &str, request_id: &str) -> tracing::Span {
     let otel_name = format!("{method} {route}");
     tracing::info_span!(
+        parent: None,
         "harness.daemon.http.request",
         otel.name = %otel_name,
         otel.kind = "server",

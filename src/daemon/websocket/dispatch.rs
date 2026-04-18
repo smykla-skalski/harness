@@ -22,6 +22,7 @@ use crate::telemetry::{apply_parent_context_from_text_map, current_trace_id};
 use axum::extract::ws::Message;
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
+use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
 pub(crate) async fn handle_message(
@@ -61,6 +62,7 @@ pub(crate) async fn dispatch(
 ) -> WsResponse {
     let start = Instant::now();
     let span = tracing::info_span!(
+        parent: None,
         "daemon.websocket.rpc",
         otel.name = %request.method,
         otel.kind = "server",
@@ -76,11 +78,12 @@ pub(crate) async fn dispatch(
     if let Some(trace_context) = &request.trace_context {
         apply_parent_context_from_text_map(&span, trace_context);
     }
-    let _guard = span.enter();
-    if let Some(trace_id) = current_trace_id() {
+    if let Some(trace_id) = span.in_scope(current_trace_id) {
         span.record("trace_id", display(trace_id));
     }
-    let response = dispatch_inner(request, state, connection).await;
+    let response = dispatch_inner(request, state, connection)
+        .instrument(span.clone())
+        .await;
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = response.error.is_some();
     span.record("duration_ms", display(duration_ms));
@@ -212,7 +215,6 @@ async fn dispatch_task_lifecycle_mutation(
         _ => None,
     }
 }
-
 async fn dispatch_agent_mutation(
     request: &WsRequest,
     state: &DaemonHttpState,
@@ -237,7 +239,6 @@ async fn dispatch_session_mutation(
         _ => None,
     }
 }
-
 fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
         Ok(body) => body,
@@ -251,7 +252,6 @@ fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsRes
     };
     dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
 }
-
 async fn dispatch_task_create(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     dispatch_mutation_prefer_async(
         request,

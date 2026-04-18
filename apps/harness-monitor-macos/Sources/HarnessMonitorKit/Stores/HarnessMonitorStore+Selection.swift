@@ -111,6 +111,8 @@ extension HarnessMonitorStore {
       cancelSessionLoad()
     }
 
+    synchronizeSessionBaggage(for: sessionID)
+
     withUISyncBatch {
       recordNavigation(to: sessionID)
       cancelSessionPushFallback()
@@ -252,21 +254,25 @@ extension HarnessMonitorStore {
       )
     }
 
-    await applyCachedSessionIfAvailable(sessionID: sessionID)
+    synchronizeSessionBaggage(for: sessionID)
 
-    guard !Task.isCancelled else { return }
+    await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
+      await applyCachedSessionIfAvailable(sessionID: sessionID)
 
-    guard connectionState == .online, let client else {
-      await restorePersistedSessionSelection(sessionID: sessionID)
-      stopSessionStream()
-      return
+      guard !Task.isCancelled else { return }
+
+      guard connectionState == .online, let client else {
+        await restorePersistedSessionSelection(sessionID: sessionID)
+        stopSessionStream()
+        return
+      }
+
+      guard !Task.isCancelled else { return }
+
+      let requestID = beginSessionLoad()
+      let loadTask = startSessionLoad(using: client, sessionID: sessionID, requestID: requestID)
+      await loadTask.value
     }
-
-    guard !Task.isCancelled else { return }
-
-    let requestID = beginSessionLoad()
-    let loadTask = startSessionLoad(using: client, sessionID: sessionID, requestID: requestID)
-    await loadTask.value
   }
 
   public func loadSelectedTimelinePage(page: Int, pageSize: Int) async {

@@ -132,6 +132,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]
   var sessionDetailScopesByID: [String: [String?]] = [:]
+  var recordedTraceContextsByOperation: [String: [[String: String]]] = [:]
   var timelinesBySessionID: [String: [TimelineEntry]] = [:]
   var timelineScopesBySessionID: [String: [TimelineScope]] = [:]
   var timelineWindowRequestsBySessionID: [String: [TimelineWindowRequest]] = [:]
@@ -179,5 +180,18 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
 
   init(detail: SessionDetail = PreviewFixtures.detail) {
     detailStorage = detail
+  }
+
+  func recordActiveTraceContext(operation: String) {
+    let traceContext = HarnessMonitorTelemetry.shared.traceContext()
+    lock.withLock {
+      recordedTraceContextsByOperation[operation, default: []].append(traceContext)
+    }
+  }
+
+  func lastRecordedTraceContext(for operation: String) -> [String: String]? {
+    lock.withLock {
+      recordedTraceContextsByOperation[operation]?.last
+    }
   }
 }
