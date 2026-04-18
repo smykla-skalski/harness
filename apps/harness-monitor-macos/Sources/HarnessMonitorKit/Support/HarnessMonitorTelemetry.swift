@@ -12,10 +12,20 @@ private struct HarnessMonitorHeaderSetter: Setter {
 public final class HarnessMonitorTelemetry: @unchecked Sendable {
   public static let shared = HarnessMonitorTelemetry()
 
+  struct DeferredExportActivation {
+    let resource: Resource
+    let config: HarnessMonitorObservabilityConfig
+    let probeHost: String
+    let probePort: UInt16
+    var nextProbeAfter: ContinuousClock.Instant
+  }
+
   struct State {
     var bootstrapped = false
     var instruments: HarnessMonitorTelemetryInstruments?
     var exportControl: HarnessMonitorTelemetryExportControl?
+    var deferredExportActivation: DeferredExportActivation?
+    var deferredExportActivationInFlight = false
     var httpExporterSessionOverride: URLSession?
   }
 
@@ -37,6 +47,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     }
 
     guard shouldBootstrap else {
+      activateDeferredExportIfNeeded()
       return
     }
 
@@ -61,22 +72,25 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       )
     }
 
-    let registration = registerProviders(resource: resource, config: config)
+    let activationPlan = registrationPlan(resource: resource, config: config)
 
     let instruments = HarnessMonitorTelemetryInstruments(
-      meterProvider: registration.meterProvider
+      meterProvider: activationPlan.registration.meterProvider
     )
     stateLock.withLock {
       state.instruments = instruments
-      state.exportControl = registration.exportControl
+      state.exportControl = activationPlan.registration.exportControl
+      state.deferredExportActivation = activationPlan.deferredExportActivation
+      state.deferredExportActivationInFlight = false
     }
 
     emitLog(
       name: "observability.bootstrap",
       severity: .info,
-      body: config == nil
-        ? "Harness Monitor telemetry bootstrapped without exporter."
-        : "Harness Monitor telemetry bootstrapped with exporter.",
+      body: bootstrapMessage(
+        config: config,
+        deferredExportActivation: activationPlan.deferredExportActivation
+      ),
       attributes: bootstrapAttributes(config: config)
     )
   }
@@ -351,6 +365,8 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     let exportControl = stateLock.withLock { () -> HarnessMonitorTelemetryExportControl? in
       let exportControl = state.exportControl
       state.exportControl = nil
+      state.deferredExportActivation = nil
+      state.deferredExportActivationInFlight = false
       return exportControl
     }
     exportControl?.forceFlush()
