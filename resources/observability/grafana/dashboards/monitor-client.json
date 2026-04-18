@@ -617,7 +617,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Lifecycle event rate and user interaction rate over the current investigation window.",
+      "description": "Lifecycle and interaction observations captured in the last five minutes, including short-lived monitor clients that only export once.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -646,13 +646,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (lifecycle_event) (rate(harness_monitor_app_lifecycle_total[5m]))",
-          "legendFormat": "{{lifecycle_event}}",
+          "expr": "sum by (app_lifecycle_event) (clamp_min((last_over_time(harness_monitor_app_lifecycle_total[5m]) - last_over_time(harness_monitor_app_lifecycle_total[5m] offset 5m)) or last_over_time(harness_monitor_app_lifecycle_total[5m]), 0))",
+          "legendFormat": "{{app_lifecycle_event}}",
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_monitor_user_interactions_total[5m]))",
+          "expr": "sum(clamp_min((last_over_time(harness_monitor_user_interactions_total[5m]) - last_over_time(harness_monitor_user_interactions_total[5m] offset 5m)) or last_over_time(harness_monitor_user_interactions_total[5m]), 0))",
           "legendFormat": "user interactions",
           "refId": "B"
         }
@@ -665,7 +665,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "API errors, cache miss ratio, and cache read p95 over the current investigation window.",
+      "description": "API errors, cache miss ratio, and cache read p95 captured in the last five minutes, including short-lived monitor clients that only export once.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -693,19 +693,19 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_monitor_api_errors_total[5m]))",
+          "expr": "sum(clamp_min((last_over_time(harness_monitor_api_errors_total[5m]) - last_over_time(harness_monitor_api_errors_total[5m] offset 5m)) or last_over_time(harness_monitor_api_errors_total[5m]), 0))",
           "legendFormat": "api errors",
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "(sum(rate(harness_monitor_cache_misses_total[5m])) / clamp_min(sum(rate(harness_monitor_cache_hits_total[5m])) + sum(rate(harness_monitor_cache_misses_total[5m])), 0.000001)) * 100",
+          "expr": "(sum(clamp_min((last_over_time(harness_monitor_cache_misses_total[5m]) - last_over_time(harness_monitor_cache_misses_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_misses_total[5m]), 0)) / clamp_min(sum(clamp_min((last_over_time(harness_monitor_cache_hits_total[5m]) - last_over_time(harness_monitor_cache_hits_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_hits_total[5m]), 0)) + sum(clamp_min((last_over_time(harness_monitor_cache_misses_total[5m]) - last_over_time(harness_monitor_cache_misses_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_misses_total[5m]), 0)), 0.000001)) * 100",
           "legendFormat": "cache miss %",
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_monitor_cache_read_duration_ms_bucket[5m])))",
+          "expr": "((histogram_quantile(0.95, sum by (le) (clamp_min((last_over_time(harness_monitor_cache_read_duration_ms_bucket[5m]) - last_over_time(harness_monitor_cache_read_duration_ms_bucket[5m] offset 5m)) or last_over_time(harness_monitor_cache_read_duration_ms_bucket[5m]), 0))) and on() (sum(clamp_min((last_over_time(harness_monitor_cache_read_duration_ms_count[5m]) - last_over_time(harness_monitor_cache_read_duration_ms_count[5m] offset 5m)) or last_over_time(harness_monitor_cache_read_duration_ms_count[5m]), 0)) > 0)) or on() vector(0))",
           "legendFormat": "cache read p95",
           "refId": "C"
         }
@@ -718,7 +718,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Bootstrap p95 latency from the monitor bootstrap histogram family.",
+      "description": "Bootstrap p95 latency from the last five minutes, including short-lived monitor clients that only export once.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -769,7 +769,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_bootstrap_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_bootstrap_duration_ms_count[5m])) > 0)) or on() vector(0))",
+          "expr": "((histogram_quantile(0.95, sum by (le) (clamp_min((last_over_time(harness_monitor_bootstrap_duration_ms_bucket[5m]) - last_over_time(harness_monitor_bootstrap_duration_ms_bucket[5m] offset 5m)) or last_over_time(harness_monitor_bootstrap_duration_ms_bucket[5m]), 0))) and on() (sum(clamp_min((last_over_time(harness_monitor_bootstrap_duration_ms_count[5m]) - last_over_time(harness_monitor_bootstrap_duration_ms_count[5m] offset 5m)) or last_over_time(harness_monitor_bootstrap_duration_ms_count[5m]), 0)) > 0)) or on() vector(0))",
           "refId": "A"
         }
       ],
@@ -781,7 +781,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cache miss ratio over the last five minutes. Zero means the cache served every observed read.",
+      "description": "Cache miss ratio over the last five minutes, including short-lived monitor clients that only export once.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -832,7 +832,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((((sum(rate(harness_monitor_cache_misses_total[5m])) / clamp_min(sum(rate(harness_monitor_cache_hits_total[5m])) + sum(rate(harness_monitor_cache_misses_total[5m])), 0.000001)) * 100) or on() vector(0)))",
+          "expr": "((((sum(clamp_min((last_over_time(harness_monitor_cache_misses_total[5m]) - last_over_time(harness_monitor_cache_misses_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_misses_total[5m]), 0)) / clamp_min(sum(clamp_min((last_over_time(harness_monitor_cache_hits_total[5m]) - last_over_time(harness_monitor_cache_hits_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_hits_total[5m]), 0)) + sum(clamp_min((last_over_time(harness_monitor_cache_misses_total[5m]) - last_over_time(harness_monitor_cache_misses_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_misses_total[5m]), 0)), 0.000001)) * 100) or on() vector(0)))",
           "refId": "A"
         }
       ],
@@ -844,7 +844,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "API transport errors recorded by Harness Monitor clients in the last five minutes.",
+      "description": "API transport errors recorded in the last five minutes, including short-lived monitor clients that only export once.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -895,7 +895,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(sum(increase(harness_monitor_api_errors_total[5m])) or on() vector(0))",
+          "expr": "(sum(clamp_min((last_over_time(harness_monitor_api_errors_total[5m]) - last_over_time(harness_monitor_api_errors_total[5m] offset 5m)) or last_over_time(harness_monitor_api_errors_total[5m]), 0)) or on() vector(0))",
           "refId": "A"
         }
       ],
@@ -907,7 +907,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "User interactions recorded by live Harness Monitor clients in the last five minutes.",
+      "description": "User interactions recorded in the last five minutes, including short-lived monitor clients that only export once.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -958,11 +958,200 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(sum(increase(harness_monitor_user_interactions_total[5m])) or on() vector(0))",
+          "expr": "(sum(clamp_min((last_over_time(harness_monitor_user_interactions_total[5m]) - last_over_time(harness_monitor_user_interactions_total[5m] offset 5m)) or last_over_time(harness_monitor_user_interactions_total[5m]), 0)) or on() vector(0))",
           "refId": "A"
         }
       ],
       "title": "User Interactions / 5m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Interaction p95 latency from the last five minutes, including short-lived monitor clients that only export once.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 250
+              },
+              {
+                "color": "red",
+                "value": 750
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 20
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "((histogram_quantile(0.95, sum by (le) (clamp_min((last_over_time(harness_monitor_user_interaction_duration_ms_bucket[5m]) - last_over_time(harness_monitor_user_interaction_duration_ms_bucket[5m] offset 5m)) or last_over_time(harness_monitor_user_interaction_duration_ms_bucket[5m]), 0))) and on() (sum(clamp_min((last_over_time(harness_monitor_user_interaction_duration_ms_count[5m]) - last_over_time(harness_monitor_user_interaction_duration_ms_count[5m] offset 5m)) or last_over_time(harness_monitor_user_interaction_duration_ms_count[5m]), 0)) > 0)) or on() vector(0))",
+          "refId": "A"
+        }
+      ],
+      "title": "Interaction p95",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Decoding errors recorded in the last five minutes, including short-lived monitor clients that only export once.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 20
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "(sum(clamp_min((last_over_time(harness_monitor_decoding_errors_total[5m]) - last_over_time(harness_monitor_decoding_errors_total[5m] offset 5m)) or last_over_time(harness_monitor_decoding_errors_total[5m]), 0)) or on() vector(0))",
+          "refId": "A"
+        }
+      ],
+      "title": "Decoding Errors / 5m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Timeout errors recorded in the last five minutes, including short-lived monitor clients that only export once.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 20
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "(sum(clamp_min((last_over_time(harness_monitor_timeout_errors_total[5m]) - last_over_time(harness_monitor_timeout_errors_total[5m] offset 5m)) or last_over_time(harness_monitor_timeout_errors_total[5m]), 0)) or on() vector(0))",
+          "refId": "A"
+        }
+      ],
+      "title": "Timeout Errors / 5m",
       "type": "stat"
     },
     {
@@ -984,7 +1173,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 24
       },
       "id": 5,
       "links": [
@@ -1031,7 +1220,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 24
       },
       "id": 6,
       "options": {
@@ -1070,7 +1259,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 32
       },
       "id": 7,
       "options": {
@@ -1106,7 +1295,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 32
       },
       "id": 8,
       "links": [

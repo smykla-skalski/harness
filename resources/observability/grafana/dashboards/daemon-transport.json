@@ -256,7 +256,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Daemon client throughput from hook-side transport calls into the daemon.",
+      "description": "Cumulative daemon client requests visible in the current dashboard range. Hook-side traffic is sparse, so totals stay informative when req/s rounds to zero.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -279,7 +279,7 @@
               }
             ]
           },
-          "unit": "reqps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -321,11 +321,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[5m]))",
+          "expr": "(sum(last_over_time(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[$__range])) or on() vector(0))",
           "refId": "A"
         }
       ],
-      "title": "Client Req / s",
+      "title": "Client Requests",
       "type": "stat"
     },
     {
@@ -333,7 +333,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Daemon client p95 latency from the hook-side millisecond histogram family.",
+      "description": "Cumulative daemon client p95 latency across the current dashboard range. This keeps latency visible even when the hook-side path only emits a handful of samples.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -398,11 +398,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m]))) and on() (sum(rate(harness_daemon_client_duration_milliseconds_count{http_route=~\"${http_route:regex}\"}[5m])) > 0)) or on() vector(0))",
+          "expr": "((histogram_quantile(0.95, sum by (le) (last_over_time(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[$__range]))) and on() (sum(last_over_time(harness_daemon_client_duration_milliseconds_count{http_route=~\"${http_route:regex}\"}[$__range])) > 0)) or on() vector(0))",
           "refId": "A"
         }
       ],
-      "title": "Client p95",
+      "title": "Client p95 (cumulative)",
       "type": "stat"
     },
     {
@@ -457,13 +457,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Client throughput by route and status code.",
+      "description": "Cumulative daemon client requests by route and status code within the current dashboard range.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "reqps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -483,12 +483,12 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (http_route, http_status_code) (rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[5m]))",
+          "expr": "(sum by (http_route, http_status_code) (last_over_time(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[$__range])) or on() vector(0))",
           "legendFormat": "{{http_route}} :: {{http_status_code}}",
           "refId": "A"
         }
       ],
-      "title": "Client Rate by Route and Status",
+      "title": "Client Requests by Route and Status",
       "type": "timeseries"
     },
     {

@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
+mod dashboard_contracts;
+
 #[derive(Debug)]
 struct DashboardLink {
     title: String,
@@ -76,52 +78,6 @@ fn sqlite_exporter_query_health_panel_uses_exporter_counter_metric() {
         !expr.contains("rate(queries{"),
         "SQLite Exporter Query Health should not query the nonexistent `queries` metric: {expr}"
     );
-}
-
-#[test]
-fn monitor_dashboard_surfaces_resource_activity_gauges() {
-    let dashboard = load_dashboard("monitor-client.json");
-
-    for (title, metric) in [
-        ("Active Tasks", "sum(harness_monitor_active_tasks)"),
-        (
-            "WS Connections",
-            "sum(harness_monitor_websocket_connections)",
-        ),
-        (
-            "Resident Memory",
-            "sum(harness_monitor_memory_resident_bytes)",
-        ),
-        (
-            "Virtual Memory",
-            "sum(harness_monitor_memory_virtual_bytes)",
-        ),
-    ] {
-        let expr = panel_expr(&dashboard, title);
-        assert!(
-            expr.contains(metric),
-            "{title} should visualize {metric}, got: {expr}"
-        );
-    }
-}
-
-#[test]
-fn monitor_dashboard_surfaces_phase1_observability_metrics() {
-    let dashboard = load_dashboard("monitor-client.json");
-
-    for (title, metric_fragment) in [
-        ("Lifecycle / 5m", "harness_monitor_app_lifecycle_total"),
-        ("Bootstrap p95", "harness_monitor_bootstrap_duration_ms_bucket"),
-        ("Interactions / 5m", "harness_monitor_user_interactions_total"),
-        ("Cache Read p95", "harness_monitor_cache_read_duration_ms_bucket"),
-        ("API Errors / 5m", "harness_monitor_api_errors_total"),
-    ] {
-        let expr = panel_expr(&dashboard, title);
-        assert!(
-            expr.contains(metric_fragment),
-            "{title} should visualize {metric_fragment}, got: {expr}"
-        );
-    }
 }
 
 #[test]
@@ -331,6 +287,57 @@ fn grafana_ini_does_not_hardcode_admin_credentials() {
     );
 }
 
+#[test]
+fn daemon_transport_dashboard_surfaces_sparse_client_activity_as_cumulative_usage() {
+    let dashboard = load_dashboard("daemon-transport.json");
+
+    let request_total = panel_expr(&dashboard, "Client Requests");
+    assert!(
+        request_total.contains("last_over_time(harness_daemon_client_requests_total")
+            && request_total.contains("[$__range])"),
+        "Client Requests should surface the cumulative client counter over the visible range, got: {request_total}"
+    );
+    assert!(
+        !request_total.contains("/ 300"),
+        "Client Requests should not dilute sparse traffic into a per-second rate, got: {request_total}"
+    );
+
+    let latency_total = panel_expr(&dashboard, "Client p95 (cumulative)");
+    assert!(
+        latency_total.contains(
+            "last_over_time(harness_daemon_client_duration_milliseconds_bucket"
+        ),
+        "Client p95 (cumulative) should surface the cumulative client histogram, got: {latency_total}"
+    );
+    assert!(
+        latency_total.contains("[$__range])"),
+        "Client p95 (cumulative) should use the visible dashboard range, got: {latency_total}"
+    );
+    assert!(
+        !latency_total.contains("offset 5m"),
+        "Client p95 (cumulative) should not depend on short 5m deltas, got: {latency_total}"
+    );
+
+    let request_breakdown = panel_expr(&dashboard, "Client Requests by Route and Status");
+    assert!(
+        request_breakdown.contains(
+            "last_over_time(harness_daemon_client_requests_total"
+        ),
+        "Client Requests by Route and Status should surface cumulative client totals, got: {request_breakdown}"
+    );
+    assert!(
+        request_breakdown.contains("http_route=~\"${http_route:regex}\"")
+            && request_breakdown.contains("http_status_code=~\"${http_status_code:regex}\"")
+            && request_breakdown.contains("[$__range])"),
+        "Client Requests by Route and Status should keep the route/status filters over the visible range, got: {request_breakdown}"
+    );
+    assert!(
+        !request_breakdown.contains("/ 300"),
+        "Client Requests by Route and Status should not dilute sparse traffic into a per-second rate, got: {request_breakdown}"
+    );
+}
+
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -363,12 +370,24 @@ fn dashboard_json_paths(root: &Path) -> Vec<PathBuf> {
 }
 
 fn panel_expr(dashboard: &Value, title: &str) -> String {
+    panel_exprs(dashboard, title)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| panic!("missing panel expression for {title}"))
+}
+
+fn panel_exprs(dashboard: &Value, title: &str) -> Vec<String> {
     panel_by_title(dashboard, title)["targets"]
         .as_array()
-        .and_then(|targets| targets.first())
-        .and_then(|target| target["expr"].as_str())
-        .unwrap_or_else(|| panic!("missing panel expression for {title}"))
-        .to_string()
+        .unwrap_or_else(|| panic!("missing panel targets for {title}"))
+        .iter()
+        .map(|target| {
+            target["expr"]
+                .as_str()
+                .unwrap_or_else(|| panic!("missing panel expression for {title}"))
+                .to_string()
+        })
+        .collect()
 }
 
 fn assert_sqlite_table_panel(
