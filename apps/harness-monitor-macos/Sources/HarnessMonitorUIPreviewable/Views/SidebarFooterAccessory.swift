@@ -107,7 +107,7 @@ private struct SidebarFooterMetric: Equatable {
   let value: Int
 }
 
-private enum SidebarFooterMetricKind: String, CaseIterable {
+enum SidebarFooterMetricKind: String, CaseIterable {
   case projects
   case worktrees
   case sessions
@@ -124,33 +124,35 @@ private enum SidebarFooterMetricKind: String, CaseIterable {
     }
   }
 
-  var tint: Color {
+  var title: String {
     switch self {
-    case .projects: HarnessMonitorTheme.accent
-    case .worktrees: HarnessMonitorTheme.warmAccent
-    case .sessions: HarnessMonitorTheme.success
-    case .openWork: HarnessMonitorTheme.warmAccent
-    case .blocked: HarnessMonitorTheme.danger
+    case .projects: "Projects"
+    case .worktrees: "Worktrees"
+    case .sessions: "Sessions"
+    case .openWork: "Open Work"
+    case .blocked: "Blocked"
     }
   }
 }
 
 private struct SidebarFooterMetricToken: View {
   let metric: SidebarFooterMetric
+  private static let tokenColor = HarnessMonitorTheme.ink.opacity(0.7)
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       Image(systemName: metric.kind.symbolName)
         .font(.caption.weight(.bold))
-        .foregroundStyle(metric.kind.tint)
+        .foregroundStyle(Self.tokenColor)
         .accessibilityHidden(true)
 
       Text("\(metric.value)")
         .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
-        .foregroundStyle(metric.kind.tint)
+        .foregroundStyle(Self.tokenColor)
         .contentTransition(.numericText())
     }
     .fixedSize(horizontal: true, vertical: false)
+    .help(metric.kind.title)
   }
 }
 
