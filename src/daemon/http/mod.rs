@@ -24,7 +24,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
-use crate::telemetry::{apply_parent_context_from_headers, current_trace_id};
+use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
 mod agents;
 mod auth;
@@ -196,12 +196,12 @@ async fn trace_http_request(request: Request<Body>, next: Next) -> Response {
     );
     let request_id = response::extract_request_id(request.headers());
     let span = http_request_span(&method, &route, &request_id);
-    apply_parent_context_from_headers(&span, request.headers());
+    let baggage = apply_parent_context_from_headers(&span, request.headers());
     let started_at = Instant::now();
     if let Some(trace_id) = span.in_scope(current_trace_id) {
         span.record("trace_id", display(trace_id));
     }
-    let response = next.run(request).instrument(span.clone()).await;
+    let response = with_active_baggage(baggage, next.run(request).instrument(span.clone())).await;
     let status = response.status().as_u16();
     let duration_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
     span.record("http_status_code", display(status));

@@ -4,10 +4,8 @@ use axum::Router;
 use axum::middleware;
 use axum::routing::get;
 use opentelemetry::Value as OTelValue;
-use opentelemetry::global;
 use opentelemetry::trace::{SpanKind, TracerProvider as _};
 use opentelemetry_sdk::error::OTelSdkResult;
-use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::{SdkTracerProvider, SpanData, SpanExporter};
 use tokio::sync::Notify;
 use tokio::net::TcpListener;
@@ -15,7 +13,8 @@ use tracing_subscriber::prelude::*;
 
 #[tokio::test(flavor = "current_thread")]
 async fn trace_http_request_uses_route_name_and_parent_trace_context() {
-    global::set_text_map_propagator(TraceContextPropagator::new());
+    let _guard = crate::telemetry::telemetry_test_guard();
+    crate::telemetry::install_text_map_propagator();
     let exporter = TestSpanExporter::default();
     let tracer_provider = SdkTracerProvider::builder()
         .with_simple_exporter(exporter.clone())
@@ -80,8 +79,67 @@ async fn trace_http_request_uses_route_name_and_parent_trace_context() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn trace_http_request_projects_baggage_attributes_onto_server_span() {
+    let _guard = crate::telemetry::telemetry_test_guard();
+    crate::telemetry::install_text_map_propagator();
+    let exporter = TestSpanExporter::default();
+    let tracer_provider = SdkTracerProvider::builder()
+        .with_simple_exporter(exporter.clone())
+        .build();
+    let tracer = tracer_provider.tracer("daemon-http-tests");
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(tracer));
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+
+    let app = Router::new()
+        .route(
+            "/v1/projects/{project_id}",
+            get(|| async { axum::Json(serde_json::json!({ "ok": true })) }),
+        )
+        .layer(middleware::from_fn(crate::daemon::http::trace_http_request));
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind listener");
+    let addr = listener.local_addr().expect("listener addr");
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve router");
+    });
+
+    {
+        let parent_span = tracing::info_span!("monitor.http.client", otel.kind = "client");
+        let _parent_guard = parent_span.enter();
+        let headers = crate::telemetry::current_trace_headers();
+        let client = reqwest::Client::new();
+        let mut request = client.get(format!("http://{addr}/v1/projects/demo"));
+        for (header, value) in &headers {
+            request = request.header(header, value);
+        }
+        request = request.header("baggage", "session.id=sess-123,project.id=proj-456");
+        let response = request.send().await.expect("send request");
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+    }
+
+    server.abort();
+    let _ = server.await;
+    let _ = tracer_provider.force_flush();
+
+    let spans = exporter.finished_spans();
+    let request_span = find_exported_span(&spans, "GET /v1/projects/{project_id}");
+
+    assert_eq!(
+        span_string_attribute(request_span, "session.id").as_deref(),
+        Some("sess-123")
+    );
+    assert_eq!(
+        span_string_attribute(request_span, "project.id").as_deref(),
+        Some("proj-456")
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn trace_http_request_does_not_inherit_concurrent_request_trace_context() {
-    global::set_text_map_propagator(TraceContextPropagator::new());
+    let _guard = crate::telemetry::telemetry_test_guard();
+    crate::telemetry::install_text_map_propagator();
     let exporter = TestSpanExporter::default();
     let tracer_provider = SdkTracerProvider::builder()
         .with_simple_exporter(exporter.clone())
