@@ -129,13 +129,9 @@ fn daemon_dev_spawn_plan_defaults_app_group_when_env_unset() {
             codex_ws_url: None,
         };
         let plan = dev.spawn_plan();
-        assert_eq!(
-            plan.set_env,
-            vec![(
-                "HARNESS_APP_GROUP_ID".to_string(),
-                "com.example.custom".to_string(),
-            )]
-        );
+        assert!(plan
+            .set_env
+            .contains(&("HARNESS_APP_GROUP_ID".to_string(), "com.example.custom".to_string())));
         assert_eq!(
             plan.log_effective_app_group.as_deref(),
             Some("com.example.custom")
@@ -153,13 +149,9 @@ fn daemon_dev_spawn_plan_defaults_app_group_when_env_blank() {
             codex_ws_url: None,
         };
         let plan = dev.spawn_plan();
-        assert_eq!(
-            plan.set_env,
-            vec![(
-                "HARNESS_APP_GROUP_ID".to_string(),
-                "com.example.custom".to_string(),
-            )]
-        );
+        assert!(plan
+            .set_env
+            .contains(&("HARNESS_APP_GROUP_ID".to_string(), "com.example.custom".to_string())));
         assert_eq!(
             plan.log_effective_app_group.as_deref(),
             Some("com.example.custom")
@@ -177,7 +169,10 @@ fn daemon_dev_spawn_plan_preserves_existing_app_group_env() {
             codex_ws_url: None,
         };
         let plan = dev.spawn_plan();
-        assert!(plan.set_env.is_empty());
+        assert!(!plan
+            .set_env
+            .iter()
+            .any(|(k, _)| k == "HARNESS_APP_GROUP_ID"));
         assert!(plan.log_effective_app_group.is_none());
     });
 }

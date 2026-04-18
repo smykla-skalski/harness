@@ -238,6 +238,9 @@ impl DaemonDevArgs {
             log_effective_app_group = Some(self.app_group_id.clone());
         }
 
+        #[cfg(feature = "tokio-console")]
+        set_env.push(("HARNESS_TOKIO_CONSOLE".to_string(), "1".to_string()));
+
         DaemonDevSpawnPlan {
             args,
             set_env,
