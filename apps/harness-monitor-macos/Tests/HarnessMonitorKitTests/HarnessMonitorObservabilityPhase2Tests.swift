@@ -22,19 +22,26 @@ struct HarnessMonitorObservabilityPhase2Tests {
     HarnessMonitorTelemetry.shared.resetForTests()
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
 
-    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+    HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
       event: "resign_active",
-      launchMode: "live",
-      durationMs: nil
-    )
+      launchMode: "live"
+    ) {}
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      collector.metricCollector.hasReceivedMetrics && collector.traceCollector.hasReceivedSpans
     }
 
     let metricNames = collector.metricCollector.metricNames
     #expect(metricNames.contains("harness_monitor_app_lifecycle_total"))
+
+    let attributes = try #require(
+      lifecycleSpanAttributes(
+        in: collector.traceCollector,
+        spanName: "app.lifecycle.resign_active"
+      )
+    )
+    #expect(attributes["app.launch_mode"] == "live")
   }
 
   @Test("Application become active records lifecycle event")
@@ -51,15 +58,14 @@ struct HarnessMonitorObservabilityPhase2Tests {
     HarnessMonitorTelemetry.shared.resetForTests()
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
 
-    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+    HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
       event: "become_active",
-      launchMode: "live",
-      durationMs: nil
-    )
+      launchMode: "live"
+    ) {}
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      collector.metricCollector.hasReceivedMetrics && collector.traceCollector.hasReceivedSpans
     }
 
     let metricNames = collector.metricCollector.metricNames
@@ -72,6 +78,14 @@ struct HarnessMonitorObservabilityPhase2Tests {
       dp.attributes["app.lifecycle.event"] == "become_active"
     }
     #expect(hasActiveEvent)
+
+    let attributes = try #require(
+      lifecycleSpanAttributes(
+        in: collector.traceCollector,
+        spanName: "app.lifecycle.active"
+      )
+    )
+    #expect(attributes["app.launch_mode"] == "live")
   }
 
   @Test("Bootstrap records lifecycle event with duration")
@@ -209,39 +223,6 @@ struct HarnessMonitorObservabilityPhase2Tests {
 
   // MARK: - Span Tests
 
-  @Test("Lifecycle span is emitted for resign active")
-  func lifecycleSpanEmittedForResignActive() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "app.lifecycle.resign_active",
-      kind: .internal,
-      attributes: ["app.launch_mode": .string("live")]
-    )
-    span.end()
-    HarnessMonitorTelemetry.shared.shutdown()
-
-    try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.traceCollector.hasReceivedSpans
-    }
-
-    let spans = collector.traceCollector.exportedSpans
-    let hasResignActiveSpan = spans.contains {
-      $0.name == "app.lifecycle.resign_active"
-    }
-    #expect(hasResignActiveSpan)
-  }
-
   @Test("User action span is emitted for session mutation")
   func userActionSpanEmittedForSessionMutation() async throws {
     let collector = try GRPCCollectorServer()
@@ -310,4 +291,21 @@ struct HarnessMonitorObservabilityPhase2Tests {
     }
     #expect(hasSelectionSpan)
   }
+}
+
+private func lifecycleSpanAttributes(
+  in collector: FakeTraceCollector,
+  spanName: String
+) -> [String: String]? {
+  for span in collector.receivedSpans.flatMap(\.scopeSpans).flatMap(\.spans) {
+    guard span.name == spanName else {
+      continue
+    }
+    return Dictionary(
+      uniqueKeysWithValues: span.attributes.map { attribute in
+        (attribute.key, attribute.value.stringValue)
+      }
+    )
+  }
+  return nil
 }

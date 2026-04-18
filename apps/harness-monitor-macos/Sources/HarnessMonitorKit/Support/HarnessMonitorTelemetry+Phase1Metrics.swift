@@ -1,6 +1,22 @@
 import OpenTelemetryApi
 
 extension HarnessMonitorTelemetry {
+  @discardableResult
+  public func withAppLifecycleTransition<T>(
+    event: String,
+    launchMode: String,
+    _ operation: () throws -> T
+  ) rethrows -> T {
+    let span = startSpan(
+      name: appLifecycleSpanName(for: event),
+      kind: .internal,
+      attributes: ["app.launch_mode": .string(launchMode)]
+    )
+    recordAppLifecycleEvent(event: event, launchMode: launchMode, durationMs: nil)
+    defer { span.end() }
+    return try withActiveSpan(span, operation)
+  }
+
   public func recordAppLifecycleEvent(event: String, launchMode: String, durationMs: Double?) {
     bootstrap()
     let instruments = stateLock.withLock { state.instruments }
@@ -73,5 +89,14 @@ extension HarnessMonitorTelemetry {
     bootstrap()
     let instruments = stateLock.withLock { state.instruments }
     instruments?.recordTimeoutError(operation: operation, durationMs: durationMs)
+  }
+
+  private func appLifecycleSpanName(for event: String) -> String {
+    switch event {
+    case "become_active":
+      "app.lifecycle.active"
+    default:
+      "app.lifecycle.\(event)"
+    }
   }
 }
