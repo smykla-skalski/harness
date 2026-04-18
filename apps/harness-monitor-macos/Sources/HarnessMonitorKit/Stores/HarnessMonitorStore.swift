@@ -193,7 +193,10 @@ public final class HarnessMonitorStore {
     if let cacheService {
       self.cacheService = cacheService
     } else if let modelContainer {
-      self.cacheService = SessionCacheService(modelContainer: modelContainer)
+      self.cacheService = SessionCacheService(
+        modelContainer: modelContainer,
+        databaseURL: HarnessMonitorPaths.cacheStoreURL()
+      )
     } else {
       self.cacheService = nil
     }

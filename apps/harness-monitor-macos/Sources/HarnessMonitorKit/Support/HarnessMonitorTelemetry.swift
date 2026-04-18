@@ -185,6 +185,150 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     instruments?.recordWebSocketRPC(method: method, durationMs: durationMs, failed: failed)
   }
 
+  func withSQLiteOperation<T>(
+    operation: String,
+    access: String,
+    database: String,
+    databasePath: String? = nil,
+    _ work: () throws -> T
+  ) rethrows -> T {
+    bootstrap()
+
+    var attributes: [String: AttributeValue] = [
+      "db.system": .string("sqlite"),
+      "db.operation.name": .string(operation),
+      "db.access": .string(access),
+      "db.name": .string(database),
+    ]
+    if let databasePath {
+      attributes["db.file"] = .string((databasePath as NSString).lastPathComponent)
+    }
+
+    let span = startSpan(
+      name: "monitor.sqlite.\(operation)",
+      kind: .client,
+      attributes: attributes
+    )
+    let startedAt = ContinuousClock.now
+
+    do {
+      let result = try work()
+      let durationMs = harnessMonitorDurationMilliseconds(
+        startedAt.duration(to: ContinuousClock.now)
+      )
+      stateLock.withLock { state.instruments }?.recordSQLiteOperation(
+        operation: operation,
+        access: access,
+        database: database,
+        durationMs: durationMs,
+        failed: false
+      )
+      if let databasePath {
+        recordSQLiteFileSize(database: database, databasePath: databasePath)
+      }
+      span.end()
+      return result
+    } catch {
+      let durationMs = harnessMonitorDurationMilliseconds(
+        startedAt.duration(to: ContinuousClock.now)
+      )
+      span.status = .error(description: error.localizedDescription)
+      recordError(error, on: span)
+      stateLock.withLock { state.instruments }?.recordSQLiteOperation(
+        operation: operation,
+        access: access,
+        database: database,
+        durationMs: durationMs,
+        failed: true
+      )
+      if let databasePath {
+        recordSQLiteFileSize(database: database, databasePath: databasePath)
+      }
+      span.end()
+      throw error
+    }
+  }
+
+  func withSQLiteOperation<T>(
+    operation: String,
+    access: String,
+    database: String,
+    databasePath: String? = nil,
+    _ work: () async throws -> T
+  ) async rethrows -> T {
+    bootstrap()
+
+    var attributes: [String: AttributeValue] = [
+      "db.system": .string("sqlite"),
+      "db.operation.name": .string(operation),
+      "db.access": .string(access),
+      "db.name": .string(database),
+    ]
+    if let databasePath {
+      attributes["db.file"] = .string((databasePath as NSString).lastPathComponent)
+    }
+
+    let span = startSpan(
+      name: "monitor.sqlite.\(operation)",
+      kind: .client,
+      attributes: attributes
+    )
+    let startedAt = ContinuousClock.now
+
+    do {
+      let result = try await work()
+      let durationMs = harnessMonitorDurationMilliseconds(
+        startedAt.duration(to: ContinuousClock.now)
+      )
+      stateLock.withLock { state.instruments }?.recordSQLiteOperation(
+        operation: operation,
+        access: access,
+        database: database,
+        durationMs: durationMs,
+        failed: false
+      )
+      if let databasePath {
+        recordSQLiteFileSize(database: database, databasePath: databasePath)
+      }
+      span.end()
+      return result
+    } catch {
+      let durationMs = harnessMonitorDurationMilliseconds(
+        startedAt.duration(to: ContinuousClock.now)
+      )
+      span.status = .error(description: error.localizedDescription)
+      recordError(error, on: span)
+      stateLock.withLock { state.instruments }?.recordSQLiteOperation(
+        operation: operation,
+        access: access,
+        database: database,
+        durationMs: durationMs,
+        failed: true
+      )
+      if let databasePath {
+        recordSQLiteFileSize(database: database, databasePath: databasePath)
+      }
+      span.end()
+      throw error
+    }
+  }
+
+  func recordSQLiteFileSize(database: String, databasePath: String) {
+    let sizeBytes = swiftDataStoreSize(atPath: databasePath)
+    stateLock.withLock { state.instruments }?.recordSQLiteFileSize(
+      database: database,
+      path: databasePath,
+      sizeBytes: sizeBytes
+    )
+  }
+
+  func recordSQLiteRecordCounts(database: String, counts: [String: Int]) {
+    let instruments = stateLock.withLock { state.instruments }
+    for (entity, count) in counts {
+      instruments?.recordSQLiteRecordCount(database: database, entity: entity, count: count)
+    }
+  }
+
   func emitLog(
     name: String,
     severity: Severity,
@@ -242,5 +386,17 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       return BaseHTTPClient()
     }
     return BaseHTTPClient(session: session)
+  }
+
+  private func swiftDataStoreSize(atPath path: String) -> Int64 {
+    let paths = [path, path + "-wal", path + "-shm"]
+    var total: Int64 = 0
+    for candidate in paths {
+      let attrs = try? FileManager.default.attributesOfItem(atPath: candidate)
+      if let size = attrs?[.size] as? Int64 {
+        total += size
+      }
+    }
+    return total
   }
 }
