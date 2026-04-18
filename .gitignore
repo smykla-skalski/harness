@@ -5,6 +5,7 @@
 # Local scratch
 /tmp/
 /output/
+/.playwright-cli/
 .envrc
 
 # macOS
