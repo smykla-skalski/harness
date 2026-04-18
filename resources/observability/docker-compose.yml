@@ -86,11 +86,10 @@ services:
     user: "0"
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_DEFAULT_THEME: light
       GF_PLUGINS_PREINSTALL_SYNC: grafana-llm-app@1.0.8@https://grafana.com/api/plugins/grafana-llm-app/versions/1.0.8/download,frser-sqlite-datasource@4.0.2,bsull-console-datasource
     volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - "${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:rw"
@@ -104,6 +103,19 @@ services:
       - prometheus
       - sqlite-exporter
       - pyroscope
+
+  grafana-init:
+    image: alpine/curl:8.12.1
+    restart: "no"
+    environment:
+      GRAFANA_URL: http://grafana:3000
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: harness
+    volumes:
+      - ./grafana/init-star-dashboards.sh:/init-star-dashboards.sh:ro
+    entrypoint: ["/bin/sh", "/init-star-dashboards.sh"]
+    depends_on:
+      - grafana
 
 volumes:
   alloy-data:
