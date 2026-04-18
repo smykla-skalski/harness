@@ -84,12 +84,18 @@ fn monitor_dashboard_surfaces_resource_activity_gauges() {
 
     for (title, metric) in [
         ("Active Tasks", "sum(harness_monitor_active_tasks)"),
-        ("WS Connections", "sum(harness_monitor_websocket_connections)"),
+        (
+            "WS Connections",
+            "sum(harness_monitor_websocket_connections)",
+        ),
         (
             "Resident Memory",
             "sum(harness_monitor_memory_resident_bytes)",
         ),
-        ("Virtual Memory", "sum(harness_monitor_memory_virtual_bytes)"),
+        (
+            "Virtual Memory",
+            "sum(harness_monitor_memory_virtual_bytes)",
+        ),
     ] {
         let expr = panel_expr(&dashboard, title);
         assert!(
@@ -200,12 +206,32 @@ fn grafana_compose_installs_sqlite_plugin_and_mounts_live_databases() {
         "grafana should run as root so the sqlite plugin can query live WAL databases"
     );
     assert!(
-        volumes.contains(&"${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:rw".to_string()),
+        volumes
+            .contains(&"${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:rw".to_string()),
         "grafana should mount the daemon sqlite directory read-write"
     );
     assert!(
-        volumes.contains(&"${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:rw".to_string()),
+        volumes
+            .contains(&"${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:rw".to_string()),
         "grafana should mount the monitor sqlite directory read-write"
+    );
+    let environment = grafana
+        .environment
+        .as_ref()
+        .expect("grafana should declare environment");
+    assert_eq!(
+        environment
+            .get("GF_SECURITY_ADMIN_USER")
+            .map(String::as_str),
+        Some("${GF_SECURITY_ADMIN_USER:-admin}"),
+        "grafana should source the admin user from the observability env file"
+    );
+    assert_eq!(
+        environment
+            .get("GF_SECURITY_ADMIN_PASSWORD")
+            .map(String::as_str),
+        Some("${GF_SECURITY_ADMIN_PASSWORD:-harness}"),
+        "grafana should source the admin password from the observability env file"
     );
 }
 
@@ -233,6 +259,21 @@ fn grafana_provisions_sqlite_datasources_for_daemon_and_monitor_databases() {
     assert_eq!(
         monitor.json_data.path.as_deref(),
         Some("/srv/sqlite/monitor/harness-cache.store")
+    );
+}
+
+#[test]
+fn grafana_ini_does_not_hardcode_admin_credentials() {
+    let path = repo_root().join("resources/observability/grafana/grafana.ini");
+    let config = fs::read_to_string(&path).unwrap();
+
+    assert!(
+        !config.contains("admin_user ="),
+        "grafana.ini should not hardcode the admin user once compose provides GF_SECURITY_ADMIN_USER"
+    );
+    assert!(
+        !config.contains("admin_password ="),
+        "grafana.ini should not hardcode the admin password once compose provides GF_SECURITY_ADMIN_PASSWORD"
     );
 }
 

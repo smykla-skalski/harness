@@ -16,6 +16,39 @@ OTLP_GRPC_ENDPOINT="${HARNESS_OTLP_GRPC_ENDPOINT:-http://127.0.0.1:4317}"
 OTLP_HTTP_ENDPOINT="${HARNESS_OTLP_HTTP_ENDPOINT:-http://127.0.0.1:4318}"
 HARNESS_MONITOR_APP_GROUP_ID_DEFAULT="${HARNESS_MONITOR_APP_GROUP_ID_DEFAULT:-Q498EB36N4.io.harnessmonitor}"
 
+load_stack_env_defaults() {
+  local env_file="$STACK_ROOT/.env"
+  local had_grafana_user=false
+  local had_grafana_password=false
+  local saved_grafana_user=""
+  local saved_grafana_password=""
+
+  [ -f "$env_file" ] || return
+
+  if [ "${GF_SECURITY_ADMIN_USER+x}" = x ]; then
+    had_grafana_user=true
+    saved_grafana_user="$GF_SECURITY_ADMIN_USER"
+  fi
+  if [ "${GF_SECURITY_ADMIN_PASSWORD+x}" = x ]; then
+    had_grafana_password=true
+    saved_grafana_password="$GF_SECURITY_ADMIN_PASSWORD"
+  fi
+
+  set -a
+  # shellcheck disable=SC1090
+  . "$env_file"
+  set +a
+
+  if [ "$had_grafana_user" = true ]; then
+    export GF_SECURITY_ADMIN_USER="$saved_grafana_user"
+  fi
+  if [ "$had_grafana_password" = true ]; then
+    export GF_SECURITY_ADMIN_PASSWORD="$saved_grafana_password"
+  fi
+}
+
+load_stack_env_defaults
+
 compose() {
   prepare_sqlite_exporter_env
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
@@ -250,7 +283,7 @@ grafana_mcp_api_call() {
   shift 3
 
   curl -fsS \
-    -u "${HARNESS_GRAFANA_ADMIN_USER:-admin}:${HARNESS_GRAFANA_ADMIN_PASSWORD:-admin}" \
+    -u "${GF_SECURITY_ADMIN_USER:-admin}:${GF_SECURITY_ADMIN_PASSWORD:-harness}" \
     -H 'Content-Type: application/json' \
     -X "$method" \
     "$grafana_url$path" \
@@ -362,7 +395,7 @@ wait_for_url() {
 }
 
 grafana_api() {
-  curl -fsS -u "admin:admin" "$@"
+  curl -fsS -u "${GF_SECURITY_ADMIN_USER:-admin}:${GF_SECURITY_ADMIN_PASSWORD:-harness}" "$@"
 }
 
 wait_for_file() {

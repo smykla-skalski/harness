@@ -7,6 +7,7 @@ use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use base64::Engine as _;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
@@ -16,7 +17,8 @@ const GRAFANA_SERVICE_ACCOUNT_NAME: &str = "codex-grafana-mcp";
 const GRAFANA_SERVICE_ACCOUNT_ID: i64 = 7;
 const STALE_TOKEN: &str = "stale-token";
 const FRESH_TOKEN: &str = "fresh-token";
-const BASIC_ADMIN_AUTH: &str = "Basic YWRtaW46YWRtaW4=";
+const GRAFANA_ADMIN_USER: &str = "observability-admin";
+const GRAFANA_ADMIN_PASSWORD: &str = "observability-password";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LoggedRequest {
@@ -57,7 +59,9 @@ impl FakeGrafanaServer {
             )
             .with_state(Arc::clone(&state));
         let handle = runtime.spawn(async move {
-            axum::serve(listener, router).await.expect("serve fake grafana");
+            axum::serve(listener, router)
+                .await
+                .expect("serve fake grafana");
         });
         Self {
             base_url: format!("http://127.0.0.1:{}", addr.port()),
@@ -68,7 +72,11 @@ impl FakeGrafanaServer {
     }
 
     fn requests(&self) -> Vec<LoggedRequest> {
-        self.state.lock().expect("lock fake grafana").requests.clone()
+        self.state
+            .lock()
+            .expect("lock fake grafana")
+            .requests
+            .clone()
     }
 
     fn issued_token_count(&self) -> usize {
@@ -93,10 +101,14 @@ async fn search_dashboards(
 ) -> (StatusCode, Json<Value>) {
     record_request(&state, "GET", "/api/search", &headers);
     match authorization_header(&headers).as_deref() {
-        Some(value) if value == format!("Bearer {FRESH_TOKEN}") => {
-            (StatusCode::OK, Json(json!([{ "title": "Harness System Overview" }])))
-        }
-        _ => (StatusCode::UNAUTHORIZED, Json(json!({ "message": "Unauthorized" }))),
+        Some(value) if value == format!("Bearer {FRESH_TOKEN}") => (
+            StatusCode::OK,
+            Json(json!([{ "title": "Harness System Overview" }])),
+        ),
+        _ => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "message": "Unauthorized" })),
+        ),
     }
 }
 
@@ -146,7 +158,10 @@ async fn create_service_account(
             Json(json!({ "message": "missing basic auth" })),
         );
     }
-    state.lock().expect("lock fake grafana").service_account_exists = true;
+    state
+        .lock()
+        .expect("lock fake grafana")
+        .service_account_exists = true;
     (
         StatusCode::OK,
         Json(json!({
@@ -191,11 +206,15 @@ fn record_request(
     path: &str,
     headers: &HeaderMap,
 ) {
-    state.lock().expect("lock fake grafana").requests.push(LoggedRequest {
-        method: method.to_string(),
-        path: path.to_string(),
-        authorization: authorization_header(headers),
-    });
+    state
+        .lock()
+        .expect("lock fake grafana")
+        .requests
+        .push(LoggedRequest {
+            method: method.to_string(),
+            path: path.to_string(),
+            authorization: authorization_header(headers),
+        });
 }
 
 fn authorization_header(headers: &HeaderMap) -> Option<String> {
@@ -206,7 +225,13 @@ fn authorization_header(headers: &HeaderMap) -> Option<String> {
 }
 
 fn uses_basic_admin_auth(headers: &HeaderMap) -> bool {
-    authorization_header(headers).as_deref() == Some(BASIC_ADMIN_AUTH)
+    authorization_header(headers).as_deref() == Some(expected_basic_admin_auth().as_str())
+}
+
+fn expected_basic_admin_auth() -> String {
+    let credentials = format!("{GRAFANA_ADMIN_USER}:{GRAFANA_ADMIN_PASSWORD}");
+    let encoded = base64::engine::general_purpose::STANDARD.encode(credentials);
+    format!("Basic {encoded}")
 }
 
 fn parse_output_lines(output: &[u8]) -> Vec<String> {
@@ -224,11 +249,8 @@ fn write_fake_uvx(path: &PathBuf) {
     )
     .expect("write fake uvx");
     #[allow(clippy::permissions_set_readonly_false)]
-    std::fs::set_permissions(
-        path,
-        std::os::unix::fs::PermissionsExt::from_mode(0o755),
-    )
-    .expect("chmod fake uvx");
+    std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod fake uvx");
 }
 
 #[test]
@@ -249,6 +271,8 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
         .arg("--write-shared-config-fixture")
         .arg("false")
         .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
         .env("HOME", &home)
         .env("XDG_CONFIG_HOME", &xdg_config_home)
         .env("XDG_DATA_HOME", &xdg_data_home)
@@ -266,6 +290,8 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
         .arg(repo.join("scripts/observability.sh"))
         .arg("--install-grafana-mcp-launcher-fixture")
         .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
         .env("HOME", &home)
         .env("XDG_CONFIG_HOME", &xdg_config_home)
         .env("XDG_DATA_HOME", &xdg_data_home)
@@ -298,6 +324,8 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
     let launcher_run = Command::new(&launcher_path)
         .arg("--help")
         .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
         .env("HOME", &home)
         .env("PATH", path_env)
         .env("XDG_CONFIG_HOME", &xdg_config_home)
@@ -343,7 +371,7 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
         requests.iter().any(|request| {
             request.method == "GET"
                 && request.path == "/api/serviceaccounts/search"
-                && request.authorization.as_deref() == Some(BASIC_ADMIN_AUTH)
+                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
         }),
         "expected basic-auth service account lookup, got: {requests:?}"
     );
@@ -351,15 +379,16 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
         requests.iter().any(|request| {
             request.method == "POST"
                 && request.path == "/api/serviceaccounts"
-                && request.authorization.as_deref() == Some(BASIC_ADMIN_AUTH)
+                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
         }),
         "expected service account creation, got: {requests:?}"
     );
     assert!(
         requests.iter().any(|request| {
             request.method == "POST"
-                && request.path == format!("/api/serviceaccounts/{GRAFANA_SERVICE_ACCOUNT_ID}/tokens")
-                && request.authorization.as_deref() == Some(BASIC_ADMIN_AUTH)
+                && request.path
+                    == format!("/api/serviceaccounts/{GRAFANA_SERVICE_ACCOUNT_ID}/tokens")
+                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
         }),
         "expected token creation, got: {requests:?}"
     );
