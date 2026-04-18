@@ -116,6 +116,43 @@ fn sqlite_forensics_dashboard_includes_daemon_sqlite_tables() {
 }
 
 #[test]
+fn sqlite_forensics_dashboard_includes_monitor_sqlite_tables() {
+    let dashboard = load_dashboard("sqlite-forensics.json");
+
+    assert_sqlite_table_panel(
+        &dashboard,
+        "Monitor Cache Freshness",
+        "sqlite-monitor",
+        &[
+            "FROM ZCACHEDSESSION",
+            "datetime(ZLASTCACHEDAT + 978307200, 'unixepoch')",
+            "ORDER BY ZLASTCACHEDAT DESC",
+            "LIMIT 20",
+        ],
+    );
+    assert_sqlite_table_panel(
+        &dashboard,
+        "Cached Work Items",
+        "sqlite-monitor",
+        &[
+            "FROM ZCACHEDWORKITEM",
+            "ORDER BY ZUPDATEDAT DESC",
+            "LIMIT 20",
+        ],
+    );
+    assert_sqlite_table_panel(
+        &dashboard,
+        "Cached Agent Activity",
+        "sqlite-monitor",
+        &[
+            "FROM ZCACHEDAGENTACTIVITY",
+            "GROUP BY ZRUNTIME",
+            "ORDER BY tool_calls DESC",
+        ],
+    );
+}
+
+#[test]
 fn grafana_compose_installs_sqlite_plugin_and_mounts_live_databases() {
     let compose: ComposeFile = load_yaml_file("resources/observability/docker-compose.yml");
     let grafana = compose
