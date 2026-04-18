@@ -1,11 +1,13 @@
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
-import OSLog
 import SwiftUI
 
 @MainActor
 enum HarnessMonitorPerfDriver {
-  private static let signposter = OSSignposter(subsystem: "io.harnessmonitor", category: "perf")
+  private static let signpostBridge = HarnessMonitorSignpostBridge(
+    subsystem: "io.harnessmonitor",
+    category: "perf"
+  )
   private static let stepDelay: Duration = envMilliseconds(
     "HARNESS_MONITOR_PERF_STEP_DELAY_MS", fallback: 450
   )
@@ -30,49 +32,46 @@ enum HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async {
-    let signpostName = scenario.signpostName
-    let state = signposter.beginAnimationInterval(signpostName)
-
-    switch scenario {
-    case .launchDashboard:
-      await store.bootstrapIfNeeded()
-      await settle()
-    case .selectSessionCockpit:
-      await settle()
-      await store.selectSession(PreviewFixtures.summary.sessionId)
-      await settle()
-    case .refreshAndSearch:
-      await settle()
-      await store.refresh()
-      await runSearchPasses(
-        queries: ["timeline", "observer", "blocked"],
-        store: store
-      )
-    case .sidebarOverflowSearch:
-      await settle()
-      await runSearchPasses(
-        queries: ["sidebar", "search", "observer", "blocked", "transport"],
-        store: store
-      )
-    case .settingsBackdropCycle:
-      await openAppearanceSettings(openWindow: openWindow)
-      await cycleBackdropModes()
-    case .settingsBackgroundCycle:
-      await openAppearanceSettings(openWindow: openWindow)
-      await cycleBackgroundSelections()
-    case .timelineBurst:
-      await settle()
-      await store.selectSession(PreviewFixtures.summary.sessionId)
-      await burstTimeline(store: store)
-    case .toastOverlayChurn:
-      await settle()
-      await store.selectSession(PreviewFixtures.summary.sessionId)
-      await churnToastOverlay(store: store)
-    case .offlineCachedOpen:
-      await settle()
+    await signpostBridge.withInterval(name: scenario.signpostName) {
+      switch scenario {
+      case .launchDashboard:
+        await store.bootstrapIfNeeded()
+        await settle()
+      case .selectSessionCockpit:
+        await settle()
+        await store.selectSession(PreviewFixtures.summary.sessionId)
+        await settle()
+      case .refreshAndSearch:
+        await settle()
+        await store.refresh()
+        await runSearchPasses(
+          queries: ["timeline", "observer", "blocked"],
+          store: store
+        )
+      case .sidebarOverflowSearch:
+        await settle()
+        await runSearchPasses(
+          queries: ["sidebar", "search", "observer", "blocked", "transport"],
+          store: store
+        )
+      case .settingsBackdropCycle:
+        await openAppearanceSettings(openWindow: openWindow)
+        await cycleBackdropModes()
+      case .settingsBackgroundCycle:
+        await openAppearanceSettings(openWindow: openWindow)
+        await cycleBackgroundSelections()
+      case .timelineBurst:
+        await settle()
+        await store.selectSession(PreviewFixtures.summary.sessionId)
+        await burstTimeline(store: store)
+      case .toastOverlayChurn:
+        await settle()
+        await store.selectSession(PreviewFixtures.summary.sessionId)
+        await churnToastOverlay(store: store)
+      case .offlineCachedOpen:
+        await settle()
+      }
     }
-
-    signposter.endInterval(signpostName, state)
   }
 
   private static func settle(_ delay: Duration? = nil) async {
