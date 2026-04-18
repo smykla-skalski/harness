@@ -122,8 +122,22 @@ prepare_sqlite_exporter_env() {
   export HARNESS_SQLITE_MONITOR_DB_PATH="$monitor_db_path"
 }
 
-shared_config_path() {
+runtime_shared_config_path() {
   printf '%s/harness/observability/config.json\n' "$(resolve_data_root)"
+}
+
+monitor_shared_config_path() {
+  printf '%s/harness/observability/config.json\n' "$(resolve_monitor_data_root)"
+}
+
+shared_config_paths() {
+  local monitor_path runtime_path
+  monitor_path="$(monitor_shared_config_path)"
+  runtime_path="$(runtime_shared_config_path)"
+  printf '%s\n' "$monitor_path"
+  if [ "$runtime_path" != "$monitor_path" ]; then
+    printf '%s\n' "$runtime_path"
+  fi
 }
 
 monitor_smoke_data_home_marker_path() {
@@ -132,10 +146,12 @@ monitor_smoke_data_home_marker_path() {
 
 write_shared_config() {
   local monitor_smoke_enabled="${1:-false}"
-  local config_path
-  config_path="$(shared_config_path)"
-  mkdir -p "$(dirname "$config_path")"
-  cat >"$config_path" <<EOF
+  local config_path first_config_path
+  first_config_path=""
+  while IFS= read -r config_path; do
+    [ -n "$config_path" ] || continue
+    mkdir -p "$(dirname "$config_path")"
+    cat >"$config_path" <<EOF
 {
   "enabled": true,
   "grpc_endpoint": "${OTLP_GRPC_ENDPOINT}",
@@ -149,20 +165,26 @@ write_shared_config() {
   "headers": {}
 }
 EOF
-  printf '%s\n' "$config_path"
+    if [ -z "$first_config_path" ]; then
+      first_config_path="$config_path"
+    fi
+  done < <(shared_config_paths)
+  printf '%s\n' "$first_config_path"
 }
 
 remove_shared_config() {
   local config_path
-  config_path="$(shared_config_path)"
-  rm -f "$config_path"
+  while IFS= read -r config_path; do
+    [ -n "$config_path" ] || continue
+    rm -f "$config_path"
+  done < <(shared_config_paths)
 }
 
 write_monitor_smoke_data_home_marker() {
   local marker_path
   marker_path="$(monitor_smoke_data_home_marker_path)"
   mkdir -p "$(dirname "$marker_path")"
-  printf '%s\n' "$(resolve_data_root)" >"$marker_path"
+  printf '%s\n' "$(resolve_monitor_data_root)" >"$marker_path"
 }
 
 remove_monitor_smoke_data_home_marker() {
@@ -273,7 +295,8 @@ wipe_stack() {
 
 show_status() {
   compose ps
-  printf '\nShared config: %s\n' "$(shared_config_path)"
+  printf '\nShared config paths:\n'
+  shared_config_paths
 }
 
 show_logs() {
@@ -534,7 +557,7 @@ wait_for_tempo_service() {
   wait_for_signal \
     "$TEMPO_URL/api/search" \
     "Tempo traces for ${service_name}" \
-    "q={resource.service.name=\"${service_name}\"}"
+    "query={resource.service.name=\"${service_name}\"}"
 }
 
 wait_for_tempo_span() {
@@ -543,7 +566,7 @@ wait_for_tempo_span() {
   wait_for_signal \
     "$TEMPO_URL/api/search" \
     "Tempo span ${span_name} for ${service_name}" \
-    "q={resource.service.name=\"${service_name}\" && name=\"${span_name}\"}"
+    "query={resource.service.name=\"${service_name}\" && name=\"${span_name}\"}"
 }
 
 wait_for_loki_service() {
@@ -703,11 +726,11 @@ smoke_stack() {
   wait_for_signal \
     "$PROMETHEUS_URL/api/v1/query" \
     "Prometheus SQLite exporter daemon target" \
-    "query=sum(queries{job=\"sqlite-exporter\",database=\"daemon_db\",status=\"success\"})"
+    "query=sum(queries_total{job=\"sqlite-exporter\",database=\"daemon_db\",status=\"success\"})"
   wait_for_signal \
     "$PROMETHEUS_URL/api/v1/query" \
     "Prometheus SQLite exporter monitor target" \
-    "query=sum(queries{job=\"sqlite-exporter\",database=\"monitor_cache\",status=\"success\"})"
+    "query=sum(queries_total{job=\"sqlite-exporter\",database=\"monitor_cache\",status=\"success\"})"
   wait_for_signal \
     "$PROMETHEUS_URL/api/v1/query" \
     "Prometheus SQLite table metrics" \
@@ -731,6 +754,12 @@ smoke_stack() {
   verify_grafana_provisioning
 
   printf 'observability smoke passed\n'
+}
+
+write_shared_config_fixture() {
+  local monitor_smoke_enabled="${1:-false}"
+  write_shared_config "$monitor_smoke_enabled" >/dev/null
+  shared_config_paths
 }
 
 command="${1:-}"
@@ -759,6 +788,12 @@ case "$command" in
     ;;
   smoke)
     smoke_stack
+    ;;
+  --print-shared-config-paths)
+    shared_config_paths
+    ;;
+  --write-shared-config-fixture)
+    write_shared_config_fixture "${2:-false}"
     ;;
   *)
     cat <<'EOF' >&2

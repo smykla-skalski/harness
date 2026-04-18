@@ -60,13 +60,12 @@ services:
   sqlite-exporter:
     image: adonato/query-exporter:2.11.1
     command:
-      - --config=/config/config.yml
-      - --host=0.0.0.0
-      - --port=9560
+      - -p
+      - "9560"
       - --process-stats
     restart: unless-stopped
     volumes:
-      - ./query-exporter/config.yml:/config/config.yml:ro
+      - ./query-exporter/config.yml:/config/config.yaml:ro
       - "${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:ro"
       - "${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:ro"
     ports:
