@@ -62,6 +62,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidResignActive(_ notification: Notification) {
+    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+      event: "resign_active",
+      launchMode: launchMode.rawValue,
+      durationMs: nil
+    )
+
     guard launchMode == .live, let store else {
       return
     }
@@ -78,6 +84,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
+    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+      event: "become_active",
+      launchMode: launchMode.rawValue,
+      durationMs: nil
+    )
+
     guard launchMode == .live, let store else {
       return
     }
