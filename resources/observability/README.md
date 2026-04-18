@@ -60,9 +60,17 @@ From darwin-exporter:
 
 ### Grafana dashboards
 
-Import these dashboards for visualization:
-- [Node Exporter Mac OSX](https://grafana.com/grafana/dashboards/15797) (ID: 15797) - for Alloy metrics
-- [macOS Process Metrics](https://grafana.com/grafana/dashboards/24129) (ID: 24129) - for darwin-exporter metrics
+The local stack now provisions a repo-managed forensic suite into the `Harness Observability` folder:
+
+- `Harness Investigation Cockpit` - the landing page for short-window local slowdowns
+- `Harness Host Machine` - CPU, memory, swap, disk, filesystem, WiFi, battery, and thermal drilldown
+- `Harness Runtime & Hooks` - CLI and hook execution bottlenecks
+- `Harness Daemon Transport` - HTTP and WS transport bottlenecks
+- `Harness Monitor Client` - monitor memory, websocket, cache, and client API pressure
+- `Harness Storage & SQLite` - storage and SQLite forensic analysis
+- `Harness Service Flow` - service-edge metrics plus Tempo Explore pivots
+
+Use Tempo Explore's Service Graph for the authoritative topology view and use the suite dashboards for metric correlation, ranked offenders, and log or trace pivots.
 
 ### Submodule
 

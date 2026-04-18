@@ -1,11 +1,4 @@
 {
-  "layout": {
-    "kind": "auto-grid",
-    "spec": {
-      "maxColumns": 4,
-      "minColumnWidth": 300
-    }
-  },
   "annotations": {
     "list": [
       {
@@ -32,31 +25,9 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "Metrics Drilldown",
+      "title": "Investigation Cockpit",
       "type": "link",
-      "url": "/a/grafana-metricsdrilldown-app/drilldown"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Logs Drilldown",
-      "type": "link",
-      "url": "/a/grafana-lokiexplore-app/explore"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Traces Breakdown",
-      "type": "link",
-      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
+      "url": "/d/harness-investigation-cockpit"
     },
     {
       "asDropdown": false,
@@ -65,7 +36,40 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "SQLite Forensics",
+      "title": "Runtime & Hooks",
+      "type": "link",
+      "url": "/d/harness-runtime-execution"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Daemon Transport",
+      "type": "link",
+      "url": "/d/harness-daemon-transport"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Monitor Client",
+      "type": "link",
+      "url": "/d/harness-monitor-client"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Storage & SQLite",
       "type": "link",
       "url": "/d/harness-sqlite-forensics"
     },
@@ -76,20 +80,9 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "Service Map",
+      "title": "Service Flow",
       "type": "link",
       "url": "/d/harness-service-map"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Profiles Drilldown",
-      "type": "link",
-      "url": "/a/grafana-pyroscope-app/explore"
     }
   ],
   "panels": [
@@ -98,7 +91,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Total traced span throughput across the selected harness services.",
+      "description": "CPU busy ratio from the Alloy unix exporter.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -113,15 +106,15 @@
               },
               {
                 "color": "orange",
-                "value": 5
+                "value": 0.6
               },
               {
                 "color": "red",
-                "value": 25
+                "value": 0.85
               }
             ]
           },
-          "unit": "reqps"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -132,14 +125,6 @@
         "y": 0
       },
       "id": 1,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Metrics Drilldown",
-          "url": "/a/grafana-metricsdrilldown-app/drilldown"
-        }
-      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -157,11 +142,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_spanmetrics_calls_total{service_name=~\"${service_name:regex}\"}[5m]))",
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
           "refId": "A"
         }
       ],
-      "title": "Span Rate",
+      "title": "CPU Busy",
       "type": "stat"
     },
     {
@@ -169,7 +154,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Non-allow hook outcomes. This should normally stay near zero.",
+      "description": "Load average normalized by logical core count.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -184,7 +169,7 @@
               },
               {
                 "color": "orange",
-                "value": 0.1
+                "value": 0.7
               },
               {
                 "color": "red",
@@ -192,7 +177,7 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -203,14 +188,6 @@
         "y": 0
       },
       "id": 2,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Runtime Dashboard",
-          "url": "/d/harness-runtime-execution"
-        }
-      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -228,11 +205,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m])) or on() vector(0)",
+          "expr": "node_load1 / clamp_min(count(count by (cpu) (node_cpu_seconds_total{mode=\"idle\"})), 1)",
           "refId": "A"
         }
       ],
-      "title": "Hook Blocks / s",
+      "title": "Load / Core",
       "type": "stat"
     },
     {
@@ -240,7 +217,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Daemon server latency using the current millisecond histogram family.",
+      "description": "Memory pressure derived from active, wired, and compressed memory.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -255,15 +232,15 @@
               },
               {
                 "color": "orange",
-                "value": 100
+                "value": 0.7
               },
               {
                 "color": "red",
-                "value": 300
+                "value": 0.85
               }
             ]
           },
-          "unit": "ms"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -274,14 +251,6 @@
         "y": 0
       },
       "id": 3,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Daemon Transport Dashboard",
-          "url": "/d/harness-daemon-transport"
-        }
-      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -299,11 +268,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))",
+          "expr": "(node_memory_active_bytes + node_memory_wired_bytes + node_memory_compressed_bytes) / clamp_min(node_memory_total_bytes, 1)",
           "refId": "A"
         }
       ],
-      "title": "Daemon HTTP p95",
+      "title": "Memory Pressure",
       "type": "stat"
     },
     {
@@ -311,7 +280,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Monitor client latency using the real harness-monitor histogram family.",
+      "description": "Combined swap-in and swap-out throughput.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -326,15 +295,15 @@
               },
               {
                 "color": "orange",
-                "value": 150
+                "value": 1048576
               },
               {
                 "color": "red",
-                "value": 500
+                "value": 10485760
               }
             ]
           },
-          "unit": "ms"
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -345,14 +314,6 @@
         "y": 0
       },
       "id": 4,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Monitor Dashboard",
-          "url": "/d/harness-monitor-client"
-        }
-      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -370,11 +331,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))",
+          "expr": "sum(rate(node_memory_swapped_in_bytes_total[5m]) + rate(node_memory_swapped_out_bytes_total[5m]))",
           "refId": "A"
         }
       ],
-      "title": "Monitor HTTP p95",
+      "title": "Swap Activity",
       "type": "stat"
     },
     {
@@ -382,13 +343,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cross-service traced throughput grouped by service_name.",
+      "description": "Per-device disk busy ratio, filtered through the device selector.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "reqps"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -399,14 +360,6 @@
         "y": 4
       },
       "id": 5,
-      "links": [
-        {
-          "keepTime": false,
-          "targetBlank": false,
-          "title": "Open Traces Breakdown",
-          "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "table",
@@ -416,12 +369,12 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (service_name) (rate(harness_spanmetrics_calls_total{service_name=~\"${service_name:regex}\"}[5m]))",
-          "legendFormat": "{{service_name}}",
+          "expr": "clamp_max(rate(node_disk_read_time_seconds_total{device=~\"${disk_device:regex}\"}[5m]) + rate(node_disk_write_time_seconds_total{device=~\"${disk_device:regex}\"}[5m]), 1)",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
-      "title": "Cross-Service Span Rate",
+      "title": "Disk Busy by Device",
       "type": "timeseries"
     },
     {
@@ -429,13 +382,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cross-service p95 latency derived from the current spanmetrics histogram family.",
+      "description": "Filesystem fill ratio, filtered through the mountpoint selector.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "ms"
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -446,14 +399,6 @@
         "y": 4
       },
       "id": 6,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Metrics Drilldown",
-          "url": "/a/grafana-metricsdrilldown-app/drilldown"
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "table",
@@ -463,12 +408,12 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(harness_spanmetrics_duration_milliseconds_bucket{service_name=~\"${service_name:regex}\"}[5m])))",
-          "legendFormat": "{{service_name}}",
+          "expr": "(1 - node_filesystem_avail_bytes{mountpoint=~\"${mountpoint:regex}\",fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"} / node_filesystem_size_bytes{mountpoint=~\"${mountpoint:regex}\",fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}) * 100",
+          "legendFormat": "{{mountpoint}}",
           "refId": "A"
         }
       ],
-      "title": "Cross-Service Span p95",
+      "title": "Filesystem Fill by Mountpoint",
       "type": "timeseries"
     },
     {
@@ -476,13 +421,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Error-oriented signals across hooks, daemon client transport, and monitor HTTP requests.",
+      "description": "WiFi quality and channel contention from darwin-exporter and wdutil when available.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          },
-          "unit": "ops"
+          }
         },
         "overrides": []
       },
@@ -502,32 +446,46 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_hook_outcomes_total{hook_outcome!=\"allow\"}[5m])) or on() vector(0)",
-          "legendFormat": "hook blocks",
+          "expr": "darwin_wifi_rssi_dbm{interface=~\"${wifi_interface:regex}\"}",
+          "legendFormat": "RSSI {{interface}}",
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_daemon_client_requests_total{error=\"true\"}[5m])) or on() vector(0)",
-          "legendFormat": "daemon client errors",
+          "expr": "darwin_wifi_snr_db{interface=~\"${wifi_interface:regex}\"}",
+          "legendFormat": "SNR {{interface}}",
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(harness_monitor_http_requests_total{request_failed=\"true\"}[5m])) or on() vector(0)",
-          "legendFormat": "monitor failed requests",
+          "expr": "darwin_wifi_tx_rate_mbps{interface=~\"${wifi_interface:regex}\"}",
+          "legendFormat": "TX rate {{interface}}",
           "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "darwin_wdutil_wifi_cca_percent{interface=~\"${wifi_interface:regex}\"} or vector(0)",
+          "legendFormat": "CCA {{interface}}",
+          "refId": "D"
         }
       ],
-      "title": "Error Signals",
+      "title": "WiFi Quality",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
-      "description": "Logs filtered for the selected services and severity levels. Use this as the landing page for drilldown into failure detail.",
+      "description": "Battery health and temperature signals alongside CPU thermals.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -535,41 +493,134 @@
         "y": 12
       },
       "id": 8,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore"
-        }
-      ],
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showLabels": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "{service_name=~\"${service_name:regex}\", level=~\"${level:regex}\"} |~ \"(?i)error|fail|denied|panic\"",
-          "queryType": "range",
+          "expr": "node_power_supply_current_capacity / 100",
+          "legendFormat": "battery capacity",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "darwin_battery_health_percent / 100",
+          "legendFormat": "battery health",
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "darwin_cpu_temperature_celsius",
+          "legendFormat": "cpu temp",
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "darwin_battery_temperature_celsius",
+          "legendFormat": "battery temp",
+          "refId": "D"
+        }
+      ],
+      "title": "Battery and Temperatures",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Categorical thermal pressure state changes across the investigation window.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "darwin_thermal_pressure",
+          "legendFormat": "{{state}}",
           "refId": "A"
         }
       ],
-      "title": "Error Logs",
-      "type": "logs"
+      "title": "Thermal Pressure States",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Power and connectivity state changes for the workstation.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "node_power_supply_charging",
+          "legendFormat": "charging",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "darwin_wifi_connected{interface=~\"${wifi_interface:regex}\"}",
+          "legendFormat": "wifi connected {{interface}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Power and WiFi State",
+      "type": "state-timeline"
     }
   ],
-  "refresh": "30s",
+  "refresh": "10s",
   "schemaVersion": 39,
   "style": "dark",
   "tags": [
     "harness",
     "observability",
-    "overview"
+    "host",
+    "forensics"
   ],
   "templating": {
     "list": [
@@ -584,14 +635,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(harness_spanmetrics_calls_total, service_name)",
+        "definition": "label_values(node_disk_read_bytes_total, device)",
         "hide": 0,
         "includeAll": true,
-        "label": "Service",
+        "label": "Disk Device",
         "multi": true,
-        "name": "service_name",
+        "name": "disk_device",
         "options": [],
-        "query": "label_values(harness_spanmetrics_calls_total, service_name)",
+        "query": "label_values(node_disk_read_bytes_total, device)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -599,27 +650,62 @@
         "type": "query"
       },
       {
-        "allValue": ".*",
+        "allValue": ".+",
         "current": {
           "selected": true,
           "text": "All",
           "value": "$__all"
         },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(node_filesystem_size_bytes{fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}, mountpoint)",
+        "hide": 0,
         "includeAll": true,
-        "label": "Level",
+        "label": "Mountpoint",
         "multi": true,
-        "name": "level",
+        "name": "mountpoint",
         "options": [],
-        "query": "debug,info,warn,error",
-        "type": "custom"
+        "query": "label_values(node_filesystem_size_bytes{fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}, mountpoint)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(darwin_wifi_info, interface)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "WiFi Interface",
+        "multi": true,
+        "name": "wifi_interface",
+        "options": [],
+        "query": "label_values(darwin_wifi_info, interface)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-3h",
     "to": "now"
   },
-  "title": "Harness System Overview",
-  "uid": "harness-system-overview",
+  "title": "Harness Host Machine",
+  "uid": "harness-host-machine",
   "version": 1
 }
