@@ -201,6 +201,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment = [
       "HARNESS_MONITOR_UI_TESTS": "1",
+      Self.launchModeKey: "preview",
       "HARNESS_MONITOR_KEEP_ANIMATIONS": "1",
       "HARNESS_MONITOR_PERF_SCENARIO": scenario,
       "HARNESS_MONITOR_PREVIEW_SCENARIO": expectedPreviewScenario(for: scenario),
