@@ -83,7 +83,7 @@ services:
       start_period: 10s
 
   sqlite-exporter:
-    image: adonato/query-exporter:2.11.1
+    image: adonato/query-exporter:5.0.2
     command:
       - -p
       - "9560"
