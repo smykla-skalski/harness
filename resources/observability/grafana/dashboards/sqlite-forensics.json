@@ -750,6 +750,102 @@
       ],
       "title": "Monitor Status Rows",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite-daemon"
+      },
+      "description": "Recent daemon sessions directly from the live SQLite database.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 36
+      },
+      "id": 17,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "queryText": "SELECT session_id, title, status, last_activity_at, updated_at FROM sessions ORDER BY COALESCE(last_activity_at, updated_at) DESC LIMIT 20",
+          "queryType": "table",
+          "rawQueryText": "SELECT session_id, title, status, last_activity_at, updated_at FROM sessions ORDER BY COALESCE(last_activity_at, updated_at) DESC LIMIT 20",
+          "refId": "A",
+          "timeColumns": []
+        }
+      ],
+      "title": "Recent Daemon Sessions",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite-daemon"
+      },
+      "description": "Open daemon work items ordered by severity and freshness.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 36
+      },
+      "id": 18,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "queryText": "SELECT task_id, title, severity, status, assigned_to, updated_at FROM tasks WHERE status != 'done' ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, updated_at DESC LIMIT 20",
+          "queryType": "table",
+          "rawQueryText": "SELECT task_id, title, severity, status, assigned_to, updated_at FROM tasks WHERE status != 'done' ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, updated_at DESC LIMIT 20",
+          "refId": "A",
+          "timeColumns": []
+        }
+      ],
+      "title": "Daemon Open Tasks",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite-daemon"
+      },
+      "description": "Recent daemon event log entries from the persisted database.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 36
+      },
+      "id": 19,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "queryText": "SELECT recorded_at, level, message FROM daemon_events ORDER BY recorded_at DESC LIMIT 50",
+          "queryType": "table",
+          "rawQueryText": "SELECT recorded_at, level, message FROM daemon_events ORDER BY recorded_at DESC LIMIT 50",
+          "refId": "A",
+          "timeColumns": []
+        }
+      ],
+      "title": "Daemon Event Log",
+      "type": "table"
     }
   ],
   "refresh": "30s",
