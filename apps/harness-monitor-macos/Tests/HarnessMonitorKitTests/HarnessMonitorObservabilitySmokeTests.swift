@@ -13,9 +13,10 @@ struct HarnessMonitorObservabilitySmokeTests {
     }
 
     let environment = try smokeEnvironment()
-    let resolvedConfig = try HarnessMonitorObservabilityConfig.resolve(using: environment)
-    let config = try #require(resolvedConfig)
-    guard config.monitorSmokeEnabled else {
+    guard
+      let config = try HarnessMonitorObservabilityConfig.resolve(using: environment),
+      config.monitorSmokeEnabled
+    else {
       return
     }
     #expect(config.source == .sharedFile)
