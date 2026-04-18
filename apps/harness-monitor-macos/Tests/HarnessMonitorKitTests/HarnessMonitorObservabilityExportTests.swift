@@ -111,6 +111,16 @@ struct HarnessMonitorObservabilityGRPCExportTests {
     #expect(collector.metricCollector.metricNames.contains("harness_monitor_http_requests_total"))
     #expect(collector.metricCollector.metricNames.contains("harness_monitor_sqlite_operations_total"))
     #expect(collector.metricCollector.metricNames.contains("harness_monitor_sqlite_file_size_bytes"))
+    #expect(
+      collector.traceCollector.exportedSpans.contains {
+        $0.serviceName == "harness-monitor" && $0.name == "monitor.sqlite.open_cache_store"
+      }
+    )
+    #expect(
+      collector.traceCollector.exportedSpans.contains {
+        $0.serviceName == "harness-monitor" && $0.name == "monitor.sqlite.record_counts"
+      }
+    )
   }
 
   @Test("gRPC export keeps websocket client and daemon server spans on one trace")

@@ -57,6 +57,21 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
 
+  sqlite-exporter:
+    image: adonato/query-exporter:2.11.1
+    command:
+      - --config=/config/config.yml
+      - --host=0.0.0.0
+      - --port=9560
+      - --process-stats
+    restart: unless-stopped
+    volumes:
+      - ./query-exporter/config.yml:/config/config.yml:ro
+      - "${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:ro"
+      - "${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:ro"
+    ports:
+      - "127.0.0.1:9560:9560"
+
   pyroscope:
     image: grafana/pyroscope:1.21.0@sha256:751794786ee566c6b6200272546ba0200221c6c5660a03ca3b3b3d64d6b3d557
     command:
@@ -84,6 +99,7 @@ services:
       - tempo
       - loki
       - prometheus
+      - sqlite-exporter
       - pyroscope
 
 volumes:

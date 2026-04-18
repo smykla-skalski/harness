@@ -11,10 +11,13 @@ TEMPO_URL="${HARNESS_TEMPO_URL:-http://127.0.0.1:3200}"
 LOKI_URL="${HARNESS_LOKI_URL:-http://127.0.0.1:3100}"
 PYROSCOPE_URL="${HARNESS_PYROSCOPE_URL:-http://127.0.0.1:4040}"
 ALLOY_URL="${HARNESS_ALLOY_URL:-http://127.0.0.1:12345}"
+SQLITE_EXPORTER_URL="${HARNESS_SQLITE_EXPORTER_URL:-http://127.0.0.1:9560}"
 OTLP_GRPC_ENDPOINT="${HARNESS_OTLP_GRPC_ENDPOINT:-http://127.0.0.1:4317}"
 OTLP_HTTP_ENDPOINT="${HARNESS_OTLP_HTTP_ENDPOINT:-http://127.0.0.1:4318}"
+HARNESS_MONITOR_APP_GROUP_ID_DEFAULT="${HARNESS_MONITOR_APP_GROUP_ID_DEFAULT:-Q498EB36N4.io.harnessmonitor}"
 
 compose() {
+  prepare_sqlite_exporter_env
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
@@ -36,6 +39,87 @@ resolve_data_root() {
     return
   fi
   printf '%s\n' "${HOME}/.local/share"
+}
+
+normalize_env_value() {
+  local value="${1:-}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  [ -n "$value" ] || return 1
+  printf '%s\n' "$value"
+}
+
+resolve_daemon_db_path() {
+  local daemon_data_home app_group_id
+  daemon_data_home="$(normalize_env_value "${HARNESS_DAEMON_DATA_HOME:-}" || true)"
+  app_group_id="$(normalize_env_value "${HARNESS_APP_GROUP_ID:-}" || true)"
+  if [ -n "$daemon_data_home" ]; then
+    printf '%s/harness/daemon/harness.db\n' "$daemon_data_home"
+    return
+  fi
+  if [ -n "$app_group_id" ]; then
+    printf '%s/Library/Group Containers/%s/harness/daemon/harness.db\n' "$HOME" "$app_group_id"
+    return
+  fi
+  printf '%s/harness/daemon/harness.db\n' "$(resolve_data_root)"
+}
+
+resolve_monitor_data_root() {
+  local daemon_data_home xdg_data_home app_group_id
+  daemon_data_home="$(normalize_env_value "${HARNESS_DAEMON_DATA_HOME:-}" || true)"
+  xdg_data_home="$(normalize_env_value "${XDG_DATA_HOME:-}" || true)"
+  app_group_id="$(normalize_env_value "${HARNESS_APP_GROUP_ID:-}" || true)"
+  if [ -n "$daemon_data_home" ]; then
+    printf '%s\n' "$daemon_data_home"
+    return
+  fi
+  if [ -n "$xdg_data_home" ]; then
+    printf '%s\n' "$xdg_data_home"
+    return
+  fi
+  if [ "$(uname -s)" = "Darwin" ]; then
+    if [ -z "$app_group_id" ]; then
+      app_group_id="$HARNESS_MONITOR_APP_GROUP_ID_DEFAULT"
+    fi
+    printf '%s/Library/Group Containers/%s\n' "$HOME" "$app_group_id"
+    return
+  fi
+  printf '%s\n' "$(resolve_data_root)"
+}
+
+resolve_monitor_cache_path() {
+  printf '%s/harness/harness-cache.store\n' "$(resolve_monitor_data_root)"
+}
+
+sqlite_exporter_runtime_root() {
+  printf '%s/tmp/observability/query-exporter\n' "$ROOT"
+}
+
+prepare_sqlite_exporter_env() {
+  local runtime_root missing_root daemon_db_path monitor_db_path daemon_mount_dir monitor_mount_dir
+  runtime_root="$(sqlite_exporter_runtime_root)"
+  missing_root="$runtime_root/missing"
+  daemon_db_path="$(resolve_daemon_db_path)"
+  monitor_db_path="$(resolve_monitor_cache_path)"
+
+  mkdir -p "$missing_root/daemon" "$missing_root/monitor"
+
+  if [ -d "$(dirname "$daemon_db_path")" ]; then
+    daemon_mount_dir="$(dirname "$daemon_db_path")"
+  else
+    daemon_mount_dir="$missing_root/daemon"
+  fi
+
+  if [ -d "$(dirname "$monitor_db_path")" ]; then
+    monitor_mount_dir="$(dirname "$monitor_db_path")"
+  else
+    monitor_mount_dir="$missing_root/monitor"
+  fi
+
+  export HARNESS_SQLITE_EXPORTER_DAEMON_DIR="$daemon_mount_dir"
+  export HARNESS_SQLITE_EXPORTER_MONITOR_DIR="$monitor_mount_dir"
+  export HARNESS_SQLITE_DAEMON_DB_PATH="$daemon_db_path"
+  export HARNESS_SQLITE_MONITOR_DB_PATH="$monitor_db_path"
 }
 
 shared_config_path() {
@@ -117,6 +201,27 @@ wait_for_file() {
   done
 }
 
+verify_sqlite_exporter_visibility() {
+  local host_path="$1"
+  local container_path="$2"
+  local description="$3"
+  [ -f "$host_path" ] || return 0
+  if ! compose exec -T sqlite-exporter sh -c "test -f '$container_path'"; then
+    printf 'sqlite exporter cannot see %s: host=%s container=%s\n' \
+      "$description" "$host_path" "$container_path" >&2
+    exit 1
+  fi
+}
+
+require_sqlite_smoke_target() {
+  local path="$1"
+  local description="$2"
+  if [ ! -f "$path" ]; then
+    printf 'expected %s for observability smoke at %s\n' "$description" "$path" >&2
+    exit 1
+  fi
+}
+
 start_stack() {
   require_tool docker
   require_tool curl
@@ -127,6 +232,15 @@ start_stack() {
   wait_for_url "$PYROSCOPE_URL/ready" "Pyroscope"
   wait_for_url "$GRAFANA_URL/api/health" "Grafana"
   wait_for_url "$ALLOY_URL/-/ready" "Alloy"
+  wait_for_url "$SQLITE_EXPORTER_URL/metrics" "SQLite query exporter"
+  verify_sqlite_exporter_visibility \
+    "$HARNESS_SQLITE_DAEMON_DB_PATH" \
+    "/srv/sqlite/daemon/harness.db" \
+    "daemon SQLite database"
+  verify_sqlite_exporter_visibility \
+    "$HARNESS_SQLITE_MONITOR_DB_PATH" \
+    "/srv/sqlite/monitor/harness-cache.store" \
+    "monitor SQLite cache"
   local config_path
   config_path="$(write_shared_config false)"
   printf 'Grafana: %s\n' "$GRAFANA_URL"
@@ -135,6 +249,7 @@ start_stack() {
   printf 'Loki: %s\n' "$LOKI_URL"
   printf 'Pyroscope: %s\n' "$PYROSCOPE_URL"
   printf 'Alloy: %s\n' "$ALLOY_URL"
+  printf 'SQLite Exporter: %s\n' "$SQLITE_EXPORTER_URL"
   printf 'Shared config: %s\n' "$config_path"
 }
 
@@ -241,8 +356,15 @@ run_bridge_smoke() {
 }
 
 run_daemon_server_smoke() {
-  local daemon_home daemon_root manifest_path daemon_log daemon_pid endpoint token_path token
-  daemon_home="$(mktemp -d "${TMPDIR:-/tmp}/harness-observability-daemon.XXXXXX")"
+  local daemon_home daemon_root manifest_path daemon_log daemon_pid endpoint token_path token cleanup_home
+  daemon_home="$(normalize_env_value "${HARNESS_DAEMON_DATA_HOME:-}" || true)"
+  cleanup_home=false
+  if [ -z "$daemon_home" ]; then
+    daemon_home="$(mktemp -d "${TMPDIR:-/tmp}/harness-observability-daemon.XXXXXX")"
+    cleanup_home=true
+  else
+    mkdir -p "$daemon_home"
+  fi
   daemon_root="$daemon_home/harness/daemon"
   manifest_path="$daemon_root/manifest.json"
   daemon_log="$daemon_home/daemon.log"
@@ -255,7 +377,9 @@ run_daemon_server_smoke() {
       wait_for_process_exit "$daemon_pid" 15 || kill "$daemon_pid" >/dev/null 2>&1 || true
       wait_for_process_exit "$daemon_pid" 5 || kill -9 "$daemon_pid" >/dev/null 2>&1 || true
     fi
-    rm -rf "$daemon_home"
+    if [ "$cleanup_home" = true ]; then
+      rm -rf "$daemon_home"
+    fi
   }
 
   trap cleanup_daemon_server_smoke RETURN
@@ -413,6 +537,15 @@ wait_for_tempo_service() {
     "q={resource.service.name=\"${service_name}\"}"
 }
 
+wait_for_tempo_span() {
+  local service_name="$1"
+  local span_name="$2"
+  wait_for_signal \
+    "$TEMPO_URL/api/search" \
+    "Tempo span ${span_name} for ${service_name}" \
+    "q={resource.service.name=\"${service_name}\" && name=\"${span_name}\"}"
+}
+
 wait_for_loki_service() {
   local service_name="$1"
   local start_ns="$2"
@@ -512,20 +645,32 @@ verify_grafana_provisioning() {
   wait_for_grafana_dashboard "Harness Runtime Execution"
   wait_for_grafana_dashboard "Harness Daemon Transport"
   wait_for_grafana_dashboard "Harness Monitor Client"
+  wait_for_grafana_dashboard "Harness SQLite Forensics"
 }
 
 smoke_stack() {
   local now_seconds
   local loki_start
   local loki_end
+  local smoke_root
 
   require_tool jq
+  smoke_root="$ROOT/tmp/observability/smoke-data"
+  export HARNESS_DAEMON_DATA_HOME="$smoke_root/daemon-data"
+  export XDG_DATA_HOME="$smoke_root/monitor-data"
+  mkdir -p "$HARNESS_DAEMON_DATA_HOME" "$XDG_DATA_HOME"
   start_stack
   run_cli_smoke
   run_hook_smoke
   run_bridge_smoke
   run_daemon_server_smoke
   run_monitor_smoke
+  require_sqlite_smoke_target \
+    "$HARNESS_SQLITE_DAEMON_DB_PATH" \
+    "daemon SQLite database"
+  require_sqlite_smoke_target \
+    "$HARNESS_SQLITE_MONITOR_DB_PATH" \
+    "monitor SQLite cache"
 
   now_seconds="$(date +%s)"
   loki_start="$((now_seconds - 600))000000000"
@@ -547,12 +692,34 @@ smoke_stack() {
     "$PROMETHEUS_URL/api/v1/query" \
     "Prometheus monitor metrics" \
     "query=sum(harness_monitor_http_requests_total)"
+  wait_for_signal \
+    "$PROMETHEUS_URL/api/v1/query" \
+    "Prometheus daemon SQLite metrics" \
+    "query=sum(harness_daemon_db_operations_total)"
+  wait_for_signal \
+    "$PROMETHEUS_URL/api/v1/query" \
+    "Prometheus monitor SQLite metrics" \
+    "query=sum(harness_monitor_sqlite_operations_total)"
+  wait_for_signal \
+    "$PROMETHEUS_URL/api/v1/query" \
+    "Prometheus SQLite exporter daemon target" \
+    "query=sum(queries{job=\"sqlite-exporter\",database=\"daemon_db\",status=\"success\"})"
+  wait_for_signal \
+    "$PROMETHEUS_URL/api/v1/query" \
+    "Prometheus SQLite exporter monitor target" \
+    "query=sum(queries{job=\"sqlite-exporter\",database=\"monitor_cache\",status=\"success\"})"
+  wait_for_signal \
+    "$PROMETHEUS_URL/api/v1/query" \
+    "Prometheus SQLite table metrics" \
+    "query=sum(harness_sqlite_table_rows{database=~\"daemon_db|monitor_cache\"})"
 
   wait_for_tempo_service "harness-cli"
   wait_for_tempo_service "harness-hook"
   wait_for_tempo_service "harness-bridge"
   wait_for_tempo_service "harness-daemon"
   wait_for_tempo_service "harness-monitor"
+  wait_for_tempo_span "harness-daemon" "daemon.db.async.list_session_summaries"
+  wait_for_tempo_span "harness-monitor" "monitor.sqlite.record_counts"
 
   wait_for_loki_service "harness-cli" "$loki_start" "$loki_end"
   wait_for_loki_service "harness-hook" "$loki_start" "$loki_end"
