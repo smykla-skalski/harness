@@ -222,9 +222,22 @@ extension HarnessMonitorTelemetry {
           "os.version": .string(osVersionString),
           "host.arch": .string(hostArchitecture()),
           "user_agent.original": .string(userAgent),
+          "device.id": .string(kernelUUID()),
         ]
       )
     )
+  }
+
+  func kernelUUID() -> String {
+    var size: Int = 0
+    sysctlbyname("kern.uuid", nil, &size, nil, 0)
+    guard size > 0 else {
+      return "unknown"
+    }
+    var uuid = [CChar](repeating: 0, count: size)
+    sysctlbyname("kern.uuid", &uuid, &size, nil, 0)
+    let data = Data(uuid.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) })
+    return String(bytes: data, encoding: .utf8) ?? "unknown"
   }
 
   func hostArchitecture() -> String {

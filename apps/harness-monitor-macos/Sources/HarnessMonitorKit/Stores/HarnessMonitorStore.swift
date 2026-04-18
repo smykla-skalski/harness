@@ -228,6 +228,24 @@ public final class HarnessMonitorStore {
   }
 
   public func bootstrap() async {
+    let startedAt = ContinuousClock.now
+    let span = HarnessMonitorTelemetry.shared.startSpan(
+      name: "app.lifecycle.bootstrap",
+      kind: .internal,
+      attributes: [
+        "daemon.ownership": .string(daemonOwnership == .external ? "external" : "managed")
+      ]
+    )
+    defer {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+        event: "bootstrap",
+        launchMode: "live",
+        durationMs: durationMs
+      )
+      span.end()
+    }
+
     connectionState = .connecting
 
     isBootstrapping = true
