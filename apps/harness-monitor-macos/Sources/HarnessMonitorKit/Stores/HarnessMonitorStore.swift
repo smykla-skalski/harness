@@ -246,19 +246,21 @@ public final class HarnessMonitorStore {
       span.end()
     }
 
-    connectionState = .connecting
+    await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
+      connectionState = .connecting
 
-    isBootstrapping = true
-    defer {
-      isBootstrapping = false
-      replayQueuedReconnectAfterBootstrapIfNeeded()
-    }
+      isBootstrapping = true
+      defer {
+        isBootstrapping = false
+        replayQueuedReconnectAfterBootstrapIfNeeded()
+      }
 
-    switch daemonOwnership {
-    case .external:
-      await bootstrapExternalDaemon()
-    case .managed:
-      await bootstrapManagedDaemon()
+      switch daemonOwnership {
+      case .external:
+        await bootstrapExternalDaemon()
+      case .managed:
+        await bootstrapManagedDaemon()
+      }
     }
   }
 

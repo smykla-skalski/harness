@@ -3,12 +3,6 @@ import OpenTelemetryApi
 import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 
-private struct HarnessMonitorHeaderSetter: Setter {
-  func set(carrier: inout [String: String], key: String, value: String) {
-    carrier[key] = value
-  }
-}
-
 public final class HarnessMonitorTelemetry: @unchecked Sendable {
   public static let shared = HarnessMonitorTelemetry()
 
@@ -116,6 +110,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     var carrier: [String: String] = [:]
     let activeSpanContext =
       spanContext
+      ?? HarnessMonitorTelemetryTaskContext.parentSpanContext
       ?? OpenTelemetry.instance.contextProvider.activeSpan?.context
     if let activeSpanContext, activeSpanContext.isValid {
       OpenTelemetry.instance.propagators.textMapPropagator.inject(
@@ -145,6 +140,11 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       instrumentationName: HarnessMonitorTelemetryConstants.tracerScope
     )
     let spanBuilder = tracer.spanBuilder(spanName: name).setSpanKind(spanKind: kind)
+    if let parentSpanContext = HarnessMonitorTelemetryTaskContext.parentSpanContext,
+      parentSpanContext.isValid
+    {
+      spanBuilder.setParent(parentSpanContext)
+    }
     for (key, value) in attributes {
       spanBuilder.setAttribute(key: key, value: value)
     }
@@ -226,7 +226,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     let startedAt = ContinuousClock.now
 
     do {
-      let result = try work()
+      let result = try withActiveSpan(span, work)
       let durationMs = harnessMonitorDurationMilliseconds(
         startedAt.duration(to: ContinuousClock.now)
       )
@@ -290,7 +290,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     let startedAt = ContinuousClock.now
 
     do {
-      let result = try await work()
+      let result = try await withActiveSpan(span, work)
       let durationMs = harnessMonitorDurationMilliseconds(
         startedAt.duration(to: ContinuousClock.now)
       )

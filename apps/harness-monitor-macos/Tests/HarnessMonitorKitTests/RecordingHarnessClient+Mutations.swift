@@ -7,6 +7,7 @@ extension RecordingHarnessClient {
     sessionID: String,
     request: TaskCreateRequest
   ) async throws -> SessionDetail {
+    recordActiveTraceContext(operation: "createTask")
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .createTask(

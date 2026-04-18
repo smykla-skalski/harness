@@ -10,6 +10,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval as tokio_interval};
+use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 use tracing::{debug, info};
 
@@ -63,13 +64,15 @@ pub async fn ws_upgrade_handler(
         connection_span.record("trace_id", display(trace_id));
     }
     ws.on_upgrade(move |socket| async move {
-        let _guard = connection_span.enter();
-        handle_connection(socket, state).await;
+        handle_connection(socket, state)
+            .instrument(connection_span.clone())
+            .await;
     })
 }
 
 fn websocket_connection_span(request_id: &str) -> tracing::Span {
     tracing::info_span!(
+        parent: None,
         "harness.daemon.websocket.connection",
         otel.name = "GET /v1/ws",
         otel.kind = "server",

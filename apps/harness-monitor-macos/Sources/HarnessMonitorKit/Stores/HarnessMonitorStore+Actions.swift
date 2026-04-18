@@ -396,19 +396,20 @@ extension HarnessMonitorStore {
     }
 
     do {
-      let measuredMutation = try await Self.measureOperation {
-        try await mutation()
-      }
-      recordRequestSuccess()
-      guard selectedSessionID == sessionID else {
+      return try await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context)
+      {
+        let measuredMutation = try await Self.measureOperation { try await mutation() }
+        recordRequestSuccess()
+        guard selectedSessionID == sessionID else {
+          return true
+        }
+        selectedSession = measuredMutation.value
+        applySessionSummaryUpdate(measuredMutation.value.session)
+        synchronizeActionActor()
+        scheduleSessionPushFallback(using: client, sessionID: sessionID)
+        presentSuccessFeedback(actionName)
         return true
       }
-      selectedSession = measuredMutation.value
-      applySessionSummaryUpdate(measuredMutation.value.session)
-      synchronizeActionActor()
-      scheduleSessionPushFallback(using: client, sessionID: sessionID)
-      presentSuccessFeedback(actionName)
-      return true
     } catch {
       span.status = .error(description: error.localizedDescription)
       HarnessMonitorTelemetry.shared.recordError(error, on: span)

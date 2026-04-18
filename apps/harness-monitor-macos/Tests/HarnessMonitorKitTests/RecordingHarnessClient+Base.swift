@@ -109,6 +109,7 @@ extension RecordingHarnessClient {
 
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
     recordReadCall(.sessionDetail(id))
+    recordActiveTraceContext(operation: "sessionDetail")
     recordSessionDetailScope(id: id, scope: scope)
     try await sleepIfNeeded(configuredDetailDelay(for: id))
     if let error = configuredSessionDetailError(for: id) {
