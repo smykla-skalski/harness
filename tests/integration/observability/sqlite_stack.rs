@@ -250,3 +250,39 @@ fn grafana_ini_does_not_hardcode_admin_credentials() {
         "grafana.ini should not hardcode the admin password once compose provides GF_SECURITY_ADMIN_PASSWORD"
     );
 }
+
+#[test]
+fn grafana_default_home_dashboard_points_to_a_provisioned_dashboard() {
+    let config_path = repo_root().join("resources/observability/grafana/grafana.ini");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    let configured_dashboard = config
+        .lines()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            trimmed
+                .strip_prefix("default_home_dashboard_path =")
+                .map(str::trim)
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "grafana.ini should configure a default home dashboard path in {}",
+                config_path.display()
+            )
+        });
+    let dashboard_name = std::path::Path::new(configured_dashboard)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_else(|| panic!("invalid Grafana home dashboard path: {configured_dashboard}"));
+    let dashboard_path = repo_root()
+        .join("resources/observability/grafana/dashboards")
+        .join(dashboard_name);
+
+    assert!(
+        dashboard_path.is_file(),
+        "grafana home dashboard should point to a provisioned dashboard JSON, got {configured_dashboard}"
+    );
+    assert_eq!(
+        dashboard_name, "service-map.json",
+        "Grafana home dashboard should use the documented Harness Service Flow landing page"
+    );
+}
