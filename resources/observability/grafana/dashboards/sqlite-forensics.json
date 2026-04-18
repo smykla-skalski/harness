@@ -846,6 +846,102 @@
       ],
       "title": "Daemon Event Log",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite-monitor"
+      },
+      "description": "Recent cache refreshes and UI views from the monitor cache store.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 44
+      },
+      "id": 20,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "queryText": "SELECT ZSESSIONID AS session_id, ZSTATUSRAW AS status, datetime(ZLASTCACHEDAT + 978307200, 'unixepoch') AS last_cached_at, datetime(ZLASTVIEWEDAT + 978307200, 'unixepoch') AS last_viewed_at FROM ZCACHEDSESSION ORDER BY ZLASTCACHEDAT DESC LIMIT 20",
+          "queryType": "table",
+          "rawQueryText": "SELECT ZSESSIONID AS session_id, ZSTATUSRAW AS status, datetime(ZLASTCACHEDAT + 978307200, 'unixepoch') AS last_cached_at, datetime(ZLASTVIEWEDAT + 978307200, 'unixepoch') AS last_viewed_at FROM ZCACHEDSESSION ORDER BY ZLASTCACHEDAT DESC LIMIT 20",
+          "refId": "A",
+          "timeColumns": []
+        }
+      ],
+      "title": "Monitor Cache Freshness",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite-monitor"
+      },
+      "description": "Cached work items as seen by the monitor client.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 44
+      },
+      "id": 21,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "queryText": "SELECT ZTASKID AS task_id, ZTITLE AS title, ZSEVERITYRAW AS severity, ZSTATUSRAW AS status, ZASSIGNEDTO AS assigned_to, ZUPDATEDAT AS updated_at FROM ZCACHEDWORKITEM ORDER BY ZUPDATEDAT DESC LIMIT 20",
+          "queryType": "table",
+          "rawQueryText": "SELECT ZTASKID AS task_id, ZTITLE AS title, ZSEVERITYRAW AS severity, ZSTATUSRAW AS status, ZASSIGNEDTO AS assigned_to, ZUPDATEDAT AS updated_at FROM ZCACHEDWORKITEM ORDER BY ZUPDATEDAT DESC LIMIT 20",
+          "refId": "A",
+          "timeColumns": []
+        }
+      ],
+      "title": "Cached Work Items",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite-monitor"
+      },
+      "description": "Aggregated tool activity cached by runtime in the monitor store.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 44
+      },
+      "id": 22,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "queryText": "SELECT ZRUNTIME AS runtime, SUM(ZTOOLINVOCATIONCOUNT) AS tool_calls, SUM(ZTOOLERRORCOUNT) AS tool_errors, MAX(ZLATESTEVENTAT) AS latest_event FROM ZCACHEDAGENTACTIVITY GROUP BY ZRUNTIME ORDER BY tool_calls DESC",
+          "queryType": "table",
+          "rawQueryText": "SELECT ZRUNTIME AS runtime, SUM(ZTOOLINVOCATIONCOUNT) AS tool_calls, SUM(ZTOOLERRORCOUNT) AS tool_errors, MAX(ZLATESTEVENTAT) AS latest_event FROM ZCACHEDAGENTACTIVITY GROUP BY ZRUNTIME ORDER BY tool_calls DESC",
+          "refId": "A",
+          "timeColumns": []
+        }
+      ],
+      "title": "Cached Agent Activity",
+      "type": "table"
     }
   ],
   "refresh": "30s",
