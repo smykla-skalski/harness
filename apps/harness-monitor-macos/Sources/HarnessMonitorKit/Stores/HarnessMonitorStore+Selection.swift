@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OpenTelemetryApi
 
 extension HarnessMonitorStore {
   public var selectedSessionID: String? {
@@ -234,6 +235,23 @@ extension HarnessMonitorStore {
   }
 
   func performSessionSelection(sessionID: String) async {
+    let startedAt = ContinuousClock.now
+    let span = HarnessMonitorTelemetry.shared.startSpan(
+      name: "user.interaction.select_session",
+      kind: .internal,
+      attributes: ["session.id": .string(sessionID)]
+    )
+    defer {
+      span.end()
+      let elapsed = startedAt.duration(to: ContinuousClock.now)
+      let durationMs = harnessMonitorDurationMilliseconds(elapsed)
+      HarnessMonitorTelemetry.shared.recordUserInteraction(
+        interaction: "select_session",
+        sessionID: sessionID,
+        durationMs: durationMs
+      )
+    }
+
     await applyCachedSessionIfAvailable(sessionID: sessionID)
 
     guard !Task.isCancelled else { return }

@@ -1,7 +1,7 @@
 import OpenTelemetryApi
 
 extension HarnessMonitorTelemetry {
-  func recordAppLifecycleEvent(event: String, launchMode: String, durationMs: Double?) {
+  public func recordAppLifecycleEvent(event: String, launchMode: String, durationMs: Double?) {
     bootstrap()
     let instruments = stateLock.withLock { state.instruments }
     instruments?.recordAppLifecycleEvent(
