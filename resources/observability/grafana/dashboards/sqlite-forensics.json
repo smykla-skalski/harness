@@ -718,7 +718,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "max by (db_entity) (harness_monitor_sqlite_record_count)",
+          "expr": "max by (db_entity) (harness_monitor_sqlite_record_count) or label_replace(max by (entity) (harness_sqlite_table_rows{database=\"monitor_cache\"}), \"db_entity\", \"$1\", \"entity\", \"(.*)\")",
           "legendFormat": "recorded {{db_entity}}",
           "refId": "B"
         }
