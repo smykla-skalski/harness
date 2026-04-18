@@ -94,6 +94,8 @@ public final class HarnessMonitorStore {
   public let daemonOwnership: DaemonOwnership
   let fileViewer: any FileViewerActivating
   @ObservationIgnored public let voiceCapture: any VoiceCaptureProviding
+  @ObservationIgnored var resourceMetricsSampler: any HarnessMonitorResourceSampling =
+    HarnessMonitorResourceMetrics.shared
   public let modelContext: ModelContext?
   let cacheService: SessionCacheService?
   var client: (any HarnessMonitorClientProtocol)?
@@ -248,6 +250,8 @@ public final class HarnessMonitorStore {
 
     await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
       connectionState = .connecting
+      startResourceMetricsSampling()
+      recordActiveTaskGauge()
 
       isBootstrapping = true
       defer {

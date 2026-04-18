@@ -18,7 +18,14 @@ extension HarnessMonitorStore {
 
   public var connectionState: ConnectionState {
     get { connection.connectionState }
-    set { connection.connectionState = newValue }
+    set {
+      let oldValue = connection.connectionState
+      connection.connectionState = newValue
+      guard oldValue != newValue else {
+        return
+      }
+      recordWebSocketConnectionGauge()
+    }
   }
 
   public var daemonStatus: DaemonStatusReport? {
@@ -53,7 +60,14 @@ extension HarnessMonitorStore {
 
   public var activeTransport: TransportKind {
     get { connection.activeTransport }
-    set { connection.activeTransport = newValue }
+    set {
+      let oldValue = connection.activeTransport
+      connection.activeTransport = newValue
+      guard oldValue != newValue else {
+        return
+      }
+      recordWebSocketConnectionGauge()
+    }
   }
 
   public var connectionMetrics: ConnectionMetrics {

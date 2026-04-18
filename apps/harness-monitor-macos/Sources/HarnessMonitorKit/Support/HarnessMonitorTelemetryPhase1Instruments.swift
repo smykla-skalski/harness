@@ -10,6 +10,7 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
   private let cacheReadDuration: HarnessMonitorDoubleHistogramRecorder
   private let residentMemoryGauge: HarnessMonitorLongGaugeRecorder
   private let virtualMemoryGauge: HarnessMonitorLongGaugeRecorder
+  private let activityGauges: HarnessMonitorTelemetryActivityGauges
   private let apiErrorCounter: HarnessMonitorLongCounterRecorder
   private let decodingErrorCounter: HarnessMonitorLongCounterRecorder
   private let timeoutErrorCounter: HarnessMonitorLongCounterRecorder
@@ -53,6 +54,7 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
       .gaugeBuilder(name: "harness_monitor_memory_virtual_bytes")
       .ofLongs()
       .build()
+    let activityGauges = HarnessMonitorTelemetryActivityGauges(meter: meter)
     let apiErrorCounter =
       meter
       .counterBuilder(name: "harness_monitor_api_errors_total")
@@ -79,6 +81,7 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
     self.cacheReadDuration = HarnessMonitorDoubleHistogramRecorder(histogram: cacheReadDuration)
     self.residentMemoryGauge = HarnessMonitorLongGaugeRecorder(gauge: residentMemoryGauge)
     self.virtualMemoryGauge = HarnessMonitorLongGaugeRecorder(gauge: virtualMemoryGauge)
+    self.activityGauges = activityGauges
     self.apiErrorCounter = HarnessMonitorLongCounterRecorder(counter: apiErrorCounter)
     self.decodingErrorCounter = HarnessMonitorLongCounterRecorder(counter: decodingErrorCounter)
     self.timeoutErrorCounter = HarnessMonitorLongCounterRecorder(counter: timeoutErrorCounter)
@@ -137,6 +140,14 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
   ) {
     residentMemoryGauge.record(value: Int(clamping: residentMemoryBytes), attributes: [:])
     virtualMemoryGauge.record(value: Int(clamping: virtualMemoryBytes), attributes: [:])
+  }
+
+  func recordActiveTasks(_ count: Int) {
+    activityGauges.recordActiveTasks(count)
+  }
+
+  func recordWebSocketConnections(_ count: Int) {
+    activityGauges.recordWebSocketConnections(count)
   }
 
   func recordAPIError(
