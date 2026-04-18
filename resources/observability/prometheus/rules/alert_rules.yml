@@ -1,0 +1,42 @@
+groups:
+  - name: harness_critical_alerts
+    rules:
+      - alert: HarnessHookFailureRateHigh
+        expr: harness:hook_failure_rate:5m > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Hook failure rate exceeds 5%"
+
+      - alert: HarnessDaemonDown
+        expr: sum(rate(harness_daemon_http_requests_total[2m])) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Harness daemon appears to be down"
+
+      - alert: HarnessHighLatency
+        expr: harness:daemon_http_p99_ms:5m > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Daemon HTTP p99 latency exceeds 500ms"
+
+      - alert: HarnessSQLiteLockContention
+        expr: harness:daemon_db_busy_rate:5m > 1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SQLite lock contention detected"
+
+      - alert: HarnessDBPoolExhaustion
+        expr: harness:daemon_db_pool_utilization:ratio > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection pool near exhaustion"

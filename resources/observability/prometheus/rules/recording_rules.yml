@@ -1,0 +1,20 @@
+groups:
+  - name: harness_recording_rules
+    interval: 30s
+    rules:
+      - record: harness:hook_failure_rate:5m
+        expr: |
+          (sum(rate(harness_hook_outcomes_total{hook_outcome!="allow"}[5m])) /
+           clamp_min(sum(rate(harness_hook_outcomes_total[5m])), 0.001)) * 100
+
+      - record: harness:daemon_http_p99_ms:5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m])))
+
+      - record: harness:daemon_db_busy_rate:5m
+        expr: sum(rate(harness_daemon_db_busy_total[5m]))
+
+      - record: harness:daemon_db_pool_utilization:ratio
+        expr: |
+          (max(harness_daemon_db_pool_connections{pool_state="active"}) /
+           clamp_min(max(harness_daemon_db_pool_connections{pool_state="idle"}) +
+                     max(harness_daemon_db_pool_connections{pool_state="active"}), 1)) * 100
