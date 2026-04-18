@@ -137,30 +137,37 @@ sqlite_exporter_runtime_root() {
 }
 
 prepare_sqlite_exporter_env() {
-  local runtime_root missing_root daemon_db_path monitor_db_path daemon_mount_dir monitor_mount_dir
+  local runtime_root missing_root snapshot_root daemon_db_path monitor_db_path daemon_source_dir monitor_source_dir
   runtime_root="$(sqlite_exporter_runtime_root)"
   missing_root="$runtime_root/missing"
+  snapshot_root="$runtime_root/snapshots"
   daemon_db_path="$(resolve_daemon_db_path)"
   monitor_db_path="$(resolve_monitor_cache_path)"
 
-  mkdir -p "$missing_root/daemon" "$missing_root/monitor"
+  mkdir -p "$missing_root/daemon" "$missing_root/monitor" "$snapshot_root/daemon" "$snapshot_root/monitor"
 
   if [ -d "$(dirname "$daemon_db_path")" ]; then
-    daemon_mount_dir="$(dirname "$daemon_db_path")"
+    daemon_source_dir="$(dirname "$daemon_db_path")"
   else
-    daemon_mount_dir="$missing_root/daemon"
+    daemon_source_dir="$missing_root/daemon"
   fi
 
   if [ -d "$(dirname "$monitor_db_path")" ]; then
-    monitor_mount_dir="$(dirname "$monitor_db_path")"
+    monitor_source_dir="$(dirname "$monitor_db_path")"
   else
-    monitor_mount_dir="$missing_root/monitor"
+    monitor_source_dir="$missing_root/monitor"
   fi
 
-  export HARNESS_SQLITE_EXPORTER_DAEMON_DIR="$daemon_mount_dir"
-  export HARNESS_SQLITE_EXPORTER_MONITOR_DIR="$monitor_mount_dir"
+  export HARNESS_SQLITE_SOURCE_DAEMON_DIR="$daemon_source_dir"
+  export HARNESS_SQLITE_SOURCE_MONITOR_DIR="$monitor_source_dir"
+  export HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR="$snapshot_root/daemon"
+  export HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR="$snapshot_root/monitor"
   export HARNESS_SQLITE_DAEMON_DB_PATH="$daemon_db_path"
   export HARNESS_SQLITE_MONITOR_DB_PATH="$monitor_db_path"
+  export HARNESS_SQLITE_SOURCE_DAEMON_DB_PATH="$daemon_db_path"
+  export HARNESS_SQLITE_SOURCE_MONITOR_DB_PATH="$monitor_db_path"
+  export HARNESS_SQLITE_SNAPSHOT_DAEMON_DB_PATH="$snapshot_root/daemon/harness.db"
+  export HARNESS_SQLITE_SNAPSHOT_MONITOR_DB_PATH="$snapshot_root/monitor/harness-cache.store"
 }
 
 runtime_shared_config_path() {
@@ -433,6 +440,58 @@ verify_sqlite_exporter_visibility() {
   fi
 }
 
+remove_sqlite_snapshot_file() {
+  local path="$1"
+  rm -f "$path" "${path}-shm" "${path}-wal"
+}
+
+reset_sqlite_snapshots() {
+  remove_sqlite_snapshot_file "$HARNESS_SQLITE_SNAPSHOT_DAEMON_DB_PATH"
+  remove_sqlite_snapshot_file "$HARNESS_SQLITE_SNAPSHOT_MONITOR_DB_PATH"
+}
+
+wait_for_sqlite_snapshot() {
+  local source_path="$1"
+  local snapshot_path="$2"
+  local description="$3"
+  [ -f "$source_path" ] || return 0
+  wait_for_file "$snapshot_path" "$description"
+}
+
+wait_for_sqlite_snapshots() {
+  wait_for_sqlite_snapshot \
+    "$HARNESS_SQLITE_DAEMON_DB_PATH" \
+    "$HARNESS_SQLITE_SNAPSHOT_DAEMON_DB_PATH" \
+    "daemon SQLite snapshot"
+  wait_for_sqlite_snapshot \
+    "$HARNESS_SQLITE_MONITOR_DB_PATH" \
+    "$HARNESS_SQLITE_SNAPSHOT_MONITOR_DB_PATH" \
+    "monitor SQLite snapshot"
+}
+
+sqlite_mount_consumer_services() {
+  printf '%s\n' sqlite-snapshot
+  printf '%s\n' sqlite-exporter
+  printf '%s\n' grafana
+}
+
+recreate_sqlite_mount_consumers() {
+  local services=()
+  local service
+
+  prepare_sqlite_exporter_env
+  while IFS= read -r service; do
+    [ -n "$service" ] || continue
+    services+=("$service")
+  done < <(sqlite_mount_consumer_services)
+
+  reset_sqlite_snapshots
+  compose up -d --force-recreate "${services[@]}" >/dev/null
+  wait_for_sqlite_snapshots
+  wait_for_url "$SQLITE_EXPORTER_URL/metrics" "SQLite query exporter"
+  wait_for_url "$GRAFANA_URL/api/health" "Grafana"
+}
+
 require_sqlite_smoke_target() {
   local path="$1"
   local description="$2"
@@ -445,22 +504,25 @@ require_sqlite_smoke_target() {
 start_stack() {
   require_tool docker
   require_tool curl
+  prepare_sqlite_exporter_env
+  reset_sqlite_snapshots
   compose up -d
   wait_for_url "$PROMETHEUS_URL/-/ready" "Prometheus"
   wait_for_url "$TEMPO_URL/ready" "Tempo"
   wait_for_url "$LOKI_URL/ready" "Loki"
   wait_for_url "$PYROSCOPE_URL/ready" "Pyroscope"
+  wait_for_sqlite_snapshots
   wait_for_url "$GRAFANA_URL/api/health" "Grafana"
   wait_for_url "$ALLOY_URL/-/ready" "Alloy"
   wait_for_url "$SQLITE_EXPORTER_URL/metrics" "SQLite query exporter"
   verify_sqlite_exporter_visibility \
-    "$HARNESS_SQLITE_DAEMON_DB_PATH" \
+    "$HARNESS_SQLITE_SNAPSHOT_DAEMON_DB_PATH" \
     "/srv/sqlite/daemon/harness.db" \
-    "daemon SQLite database"
+    "daemon SQLite snapshot"
   verify_sqlite_exporter_visibility \
-    "$HARNESS_SQLITE_MONITOR_DB_PATH" \
+    "$HARNESS_SQLITE_SNAPSHOT_MONITOR_DB_PATH" \
     "/srv/sqlite/monitor/harness-cache.store" \
-    "monitor SQLite cache"
+    "monitor SQLite snapshot"
   local config_path
   local launcher_path
   config_path="$(write_shared_config false)"
@@ -958,8 +1020,7 @@ smoke_stack() {
       unset HARNESS_APP_GROUP_ID
     fi
 
-    compose up -d --force-recreate sqlite-exporter >/dev/null
-    wait_for_url "$SQLITE_EXPORTER_URL/metrics" "SQLite query exporter"
+    recreate_sqlite_mount_consumers
     write_shared_config false >/dev/null
 
     return "$status"
@@ -1100,6 +1161,9 @@ case "$command" in
   --run-local-harness-fixture)
     shift
     run_local_harness "$@"
+    ;;
+  --restore-smoke-stack-fixture)
+    recreate_sqlite_mount_consumers
     ;;
   *)
     cat <<'EOF' >&2

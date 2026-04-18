@@ -1,4 +1,4 @@
-use super::{load_dashboard, panel_by_title, panel_expr, panel_exprs};
+use super::support::{load_dashboard, panel_by_title, panel_expr, panel_exprs};
 
 #[test]
 fn monitor_dashboard_surfaces_resource_activity_gauges() {
@@ -32,16 +32,40 @@ fn monitor_dashboard_surfaces_phase1_observability_metrics() {
     let dashboard = load_dashboard("monitor-client.json");
 
     for (title, metric_fragment) in [
-        ("Lifecycle Events / 5m", "harness_monitor_app_lifecycle_total"),
-        ("Lifecycle Events / 5m", "harness_monitor_user_interactions_total"),
-        ("Bootstrap p95", "harness_monitor_bootstrap_duration_ms_bucket"),
-        ("Interaction p95", "harness_monitor_user_interaction_duration_ms_bucket"),
+        (
+            "Lifecycle Events / 5m",
+            "harness_monitor_app_lifecycle_total",
+        ),
+        (
+            "Lifecycle Events / 5m",
+            "harness_monitor_user_interactions_total",
+        ),
+        (
+            "Bootstrap p95",
+            "harness_monitor_bootstrap_duration_ms_bucket",
+        ),
+        (
+            "Interaction p95",
+            "harness_monitor_user_interaction_duration_ms_bucket",
+        ),
         ("Cache and API Pressure", "harness_monitor_api_errors_total"),
-        ("Cache and API Pressure", "harness_monitor_cache_read_duration_ms_bucket"),
+        (
+            "Cache and API Pressure",
+            "harness_monitor_cache_read_duration_ms_bucket",
+        ),
         ("API Errors / 5m", "harness_monitor_api_errors_total"),
-        ("Decoding Errors / 5m", "harness_monitor_decoding_errors_total"),
-        ("Timeout Errors / 5m", "harness_monitor_timeout_errors_total"),
-        ("User Interactions / 5m", "harness_monitor_user_interactions_total"),
+        (
+            "Decoding Errors / 5m",
+            "harness_monitor_decoding_errors_total",
+        ),
+        (
+            "Timeout Errors / 5m",
+            "harness_monitor_timeout_errors_total",
+        ),
+        (
+            "User Interactions / 5m",
+            "harness_monitor_user_interactions_total",
+        ),
         ("Cache Miss %", "harness_monitor_cache_misses_total"),
     ] {
         let exprs = panel_exprs(&dashboard, title);

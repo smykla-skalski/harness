@@ -64,6 +64,21 @@ services:
       retries: 3
       start_period: 10s
 
+  sqlite-snapshot:
+    image: python:3.14-alpine3.22
+    command:
+      - python3
+      - /app/sync.py
+      - --interval
+      - "2"
+    restart: unless-stopped
+    volumes:
+      - ./sqlite-snapshot/sync.py:/app/sync.py:ro
+      - "${HARNESS_SQLITE_SOURCE_DAEMON_DIR}:/srv/source/daemon:ro"
+      - "${HARNESS_SQLITE_SOURCE_MONITOR_DIR}:/srv/source/monitor:ro"
+      - "${HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR}:/srv/sqlite/daemon:rw"
+      - "${HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR}:/srv/sqlite/monitor:rw"
+
   sqlite-exporter:
     image: adonato/query-exporter:2.11.1
     command:
@@ -73,8 +88,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./query-exporter/config.yml:/config/config.yaml:ro
-      - "${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:ro"
-      - "${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:ro"
+      - "${HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR}:/srv/sqlite/daemon:ro"
+      - "${HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR}:/srv/sqlite/monitor:ro"
     ports:
       - "127.0.0.1:9560:9560"
     healthcheck:
@@ -83,6 +98,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    depends_on:
+      - sqlite-snapshot
 
   pyroscope:
     image: grafana/pyroscope:1.21.0@sha256:751794786ee566c6b6200272546ba0200221c6c5660a03ca3b3b3d64d6b3d557
@@ -108,8 +125,8 @@ services:
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - "${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:rw"
-      - "${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:rw"
+      - "${HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR}:/srv/sqlite/daemon:ro"
+      - "${HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR}:/srv/sqlite/monitor:ro"
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"
@@ -123,6 +140,7 @@ services:
       - tempo
       - loki
       - prometheus
+      - sqlite-snapshot
       - sqlite-exporter
       - pyroscope
 

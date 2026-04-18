@@ -1,8 +1,8 @@
 databases:
   daemon_db:
-    dsn: sqlite:////srv/sqlite/daemon/harness.db
+    dsn: sqlite:///file:/srv/sqlite/daemon/harness.db?mode=ro&uri=true
   monitor_cache:
-    dsn: sqlite:////srv/sqlite/monitor/harness-cache.store
+    dsn: sqlite:///file:/srv/sqlite/monitor/harness-cache.store?mode=ro&uri=true
 
 metrics:
   harness_sqlite_table_rows:
