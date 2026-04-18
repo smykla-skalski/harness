@@ -40,6 +40,18 @@ extension HarnessMonitorTelemetry {
     )
   }
 
+  func recordActiveTasks(_ count: Int) {
+    bootstrap()
+    let instruments = stateLock.withLock { state.instruments }
+    instruments?.recordActiveTasks(count)
+  }
+
+  func recordWebSocketConnections(_ count: Int) {
+    bootstrap()
+    let instruments = stateLock.withLock { state.instruments }
+    instruments?.recordWebSocketConnections(count)
+  }
+
   func recordAPIError(endpoint: String, method: String, errorType: String, statusCode: Int?) {
     bootstrap()
     let instruments = stateLock.withLock { state.instruments }

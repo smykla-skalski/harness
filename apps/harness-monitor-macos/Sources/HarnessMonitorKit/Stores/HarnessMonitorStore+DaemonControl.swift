@@ -353,6 +353,7 @@ extension HarnessMonitorStore {
     cancelPendingAppInactivitySuspend()
     stopAllStreams()
     stopManifestWatcher()
+    stopResourceMetricsSampling()
     isAppLifecycleSuspended = false
 
     guard let client else {

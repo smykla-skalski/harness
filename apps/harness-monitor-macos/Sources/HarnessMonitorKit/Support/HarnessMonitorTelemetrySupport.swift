@@ -219,6 +219,14 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
     )
   }
 
+  func recordActiveTasks(_ count: Int) {
+    phase1.recordActiveTasks(count)
+  }
+
+  func recordWebSocketConnections(_ count: Int) {
+    phase1.recordWebSocketConnections(count)
+  }
+
   func recordAPIError(
     endpoint: String,
     method: String,

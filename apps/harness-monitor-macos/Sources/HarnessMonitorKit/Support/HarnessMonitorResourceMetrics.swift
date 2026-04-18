@@ -1,6 +1,13 @@
 import Foundation
 
+protocol HarnessMonitorResourceSampling: Sendable {
+  func startSampling()
+  func stopSampling()
+}
+
 public final class HarnessMonitorResourceMetrics: @unchecked Sendable {
+  static let shared = HarnessMonitorResourceMetrics()
+
   private let sampleInterval: Duration
   private var sampleTask: Task<Void, Never>?
   private let lock = NSLock()
@@ -48,3 +55,5 @@ public final class HarnessMonitorResourceMetrics: @unchecked Sendable {
     )
   }
 }
+
+extension HarnessMonitorResourceMetrics: HarnessMonitorResourceSampling {}
