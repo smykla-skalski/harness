@@ -316,6 +316,7 @@ extension HarnessMonitorStore {
         await service.cacheSessionList(sessions, projects: projects)
       }
     }
+    recordActiveTaskGauge()
 
     if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
       primeSessionSelection(nil)
@@ -332,6 +333,7 @@ extension HarnessMonitorStore {
     scheduleCacheWrite { service in
       await service.cacheSessionSummary(summary, project: project)
     }
+    recordActiveTaskGauge()
   }
 
   func applySelectedSessionSnapshot(
