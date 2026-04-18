@@ -80,7 +80,7 @@ services:
       - "${HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR}:/srv/sqlite/monitor:rw"
 
   sqlite-exporter:
-    image: adonato/query-exporter:2.11.1
+    image: adonato/query-exporter:5.0.2
     command:
       - -p
       - "9560"
