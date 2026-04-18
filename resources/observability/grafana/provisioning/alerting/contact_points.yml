@@ -1,0 +1,10 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: harness-default
+    receivers:
+      - uid: harness-default-email
+        type: email
+        settings:
+          addresses: ${GF_ALERTING_EMAIL_ADDRESSES:-admin@localhost}
