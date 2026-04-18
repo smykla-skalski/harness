@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -281,24 +282,14 @@ if log_path:
         handle.write(os.environ.get("GRAFANA_SERVICE_ACCOUNT_TOKEN", "") + "\n")
 
 def read_message():
-    content_length = None
-    while True:
-        line = sys.stdin.buffer.readline()
-        if line == b"":
-            return None
-        if line in (b"\r\n", b"\n"):
-            break
-        header = line.decode("utf-8").strip()
-        if header.lower().startswith("content-length:"):
-            content_length = int(header.split(":", 1)[1].strip())
-    if content_length is None:
-        raise SystemExit("missing Content-Length header")
-    return json.loads(sys.stdin.buffer.read(content_length))
+    line = sys.stdin.buffer.readline()
+    if line == b"":
+        return None
+    return json.loads(line.decode("utf-8"))
 
 def write_message(payload):
     body = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-    sys.stdout.buffer.write(f"Content-Length: {len(body)}\r\n\r\n".encode("ascii"))
-    sys.stdout.buffer.write(body)
+    sys.stdout.buffer.write(body + b"\n")
     sys.stdout.buffer.flush()
 
 token = os.environ.get("GRAFANA_SERVICE_ACCOUNT_TOKEN", "")
@@ -343,12 +334,14 @@ fn write_mcp_message(stdin: &mut ChildStdin, payload: &Value) {
     stdin.flush().expect("flush mcp body");
 }
 
-fn read_mcp_message(stdout: &mut BufReader<ChildStdout>) -> Value {
+fn read_mcp_message(stdout: &mut BufReader<ChildStdout>) -> Option<Value> {
     let mut content_length = None;
     loop {
         let mut line = String::new();
         let bytes = stdout.read_line(&mut line).expect("read mcp header line");
-        assert!(bytes > 0, "unexpected EOF while reading mcp headers");
+        if bytes == 0 {
+            return None;
+        }
         if line == "\r\n" || line == "\n" {
             break;
         }
@@ -359,7 +352,48 @@ fn read_mcp_message(stdout: &mut BufReader<ChildStdout>) -> Value {
     let content_length = content_length.expect("missing Content-Length header");
     let mut body = vec![0; content_length];
     stdout.read_exact(&mut body).expect("read mcp body");
-    serde_json::from_slice(&body).expect("decode mcp body")
+    Some(serde_json::from_slice(&body).expect("decode mcp body"))
+}
+
+fn spawn_mcp_response_reader(stdout: ChildStdout) -> Receiver<Value> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut stdout = BufReader::new(stdout);
+        loop {
+            let Some(message) = read_mcp_message(&mut stdout) else {
+                return;
+            };
+            if sender.send(message).is_err() {
+                return;
+            }
+        }
+    });
+    receiver
+}
+
+fn write_json_line_message(stdin: &mut ChildStdin, payload: &Value) {
+    let body = serde_json::to_vec(payload).expect("serialize json line payload");
+    stdin.write_all(&body).expect("write json line body");
+    stdin.write_all(b"\n").expect("write json line newline");
+    stdin.flush().expect("flush json line payload");
+}
+
+fn spawn_json_line_response_reader(stdout: ChildStdout) -> Receiver<Value> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let stdout = BufReader::new(stdout);
+        for line in stdout.lines() {
+            let line = line.expect("read json line");
+            if line.trim().is_empty() {
+                continue;
+            }
+            let payload = serde_json::from_str::<Value>(&line).expect("decode json line");
+            if sender.send(payload).is_err() {
+                return;
+            }
+        }
+    });
+    receiver
 }
 
 fn wait_for<F>(description: &str, predicate: F)
@@ -662,7 +696,7 @@ fn observability_launcher_restarts_child_after_token_refresh() {
     );
     let mut stdin = launcher.stdin.take().expect("launcher stdin");
     let stdout = launcher.stdout.take().expect("launcher stdout");
-    let mut stdout = BufReader::new(stdout);
+    let responses = spawn_mcp_response_reader(stdout);
 
     write_mcp_message(
         &mut stdin,
@@ -677,7 +711,9 @@ fn observability_launcher_restarts_child_after_token_refresh() {
             }
         }),
     );
-    let initialize_response = read_mcp_message(&mut stdout);
+    let initialize_response = responses
+        .recv_timeout(Duration::from_secs(3))
+        .expect("expected initialize response from launcher");
     assert_eq!(initialize_response["id"], 1);
     assert_eq!(
         initialize_response["result"]["serverInfo"]["version"],
@@ -701,7 +737,9 @@ fn observability_launcher_restarts_child_after_token_refresh() {
             "params": {}
         }),
     );
-    let first_tools_response = read_mcp_message(&mut stdout);
+    let first_tools_response = responses
+        .recv_timeout(Duration::from_secs(3))
+        .expect("expected first tools/list response from launcher");
     assert_eq!(first_tools_response["id"], 2);
     assert_eq!(
         first_tools_response["result"]["tools"][0]["name"],
@@ -744,12 +782,139 @@ fn observability_launcher_restarts_child_after_token_refresh() {
             "params": {}
         }),
     );
-    let second_tools_response = read_mcp_message(&mut stdout);
+    let second_tools_response = responses
+        .recv_timeout(Duration::from_secs(3))
+        .expect("expected second tools/list response from launcher");
     assert_eq!(second_tools_response["id"], 3);
     assert_eq!(
         second_tools_response["result"]["tools"][0]["name"],
         "fresh-token-2"
     );
+
+    drop(stdin);
+    let status = launcher.wait().expect("wait for launcher exit");
+    assert!(
+        status.success(),
+        "launcher did not exit cleanly: {status:?}"
+    );
+}
+
+#[test]
+fn observability_launcher_accepts_line_delimited_client_transport() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_grafana = FakeGrafanaServer::start();
+
+    let home = tmp.path().join("home");
+    let xdg_config_home = tmp.path().join("xdg-config");
+    let xdg_data_home = tmp.path().join("xdg-data");
+    let fake_bin_dir = tmp.path().join("fake-bin");
+    let fake_uvx_path = fake_bin_dir.join("uvx");
+    let start_log_path = tmp.path().join("fake-uvx-starts.log");
+    write_fake_uvx_mcp_server(&fake_uvx_path);
+
+    let config_output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--write-shared-config-fixture")
+        .arg("false")
+        .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", &xdg_config_home)
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .env("HARNESS_GRAFANA_URL", &fake_grafana.base_url)
+        .output()
+        .expect("write shared config fixture");
+    assert!(
+        config_output.status.success(),
+        "shared config helper failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&config_output.stdout),
+        String::from_utf8_lossy(&config_output.stderr)
+    );
+
+    let launcher_output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--install-grafana-mcp-launcher-fixture")
+        .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", &xdg_config_home)
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .output()
+        .expect("install grafana launcher fixture");
+    assert!(
+        launcher_output.status.success(),
+        "launcher helper failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&launcher_output.stdout),
+        String::from_utf8_lossy(&launcher_output.stderr)
+    );
+
+    let launcher_path = PathBuf::from(
+        parse_output_lines(&launcher_output.stdout)
+            .into_iter()
+            .next()
+            .expect("launcher path output"),
+    );
+
+    let mut launcher = spawn_launcher(
+        &launcher_path,
+        &repo,
+        &home,
+        &xdg_config_home,
+        &xdg_data_home,
+        &fake_bin_dir,
+        &start_log_path,
+    );
+    let mut stdin = launcher.stdin.take().expect("launcher stdin");
+    let stdout = launcher.stdout.take().expect("launcher stdout");
+    let responses = spawn_json_line_response_reader(stdout);
+
+    write_json_line_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "codex-test", "version": "1.0"}
+            }
+        }),
+    );
+    let initialize_response = responses
+        .recv_timeout(Duration::from_secs(3))
+        .expect("expected initialize response from launcher");
+    assert_eq!(initialize_response["id"], 1);
+    assert_eq!(
+        initialize_response["result"]["serverInfo"]["version"],
+        "fresh-token-1"
+    );
+
+    write_json_line_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {}
+        }),
+    );
+    write_json_line_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    let tools_response = responses
+        .recv_timeout(Duration::from_secs(3))
+        .expect("expected tools/list response from launcher");
+    assert_eq!(tools_response["id"], 2);
+    assert_eq!(tools_response["result"]["tools"][0]["name"], "fresh-token-1");
 
     drop(stdin);
     let status = launcher.wait().expect("wait for launcher exit");
