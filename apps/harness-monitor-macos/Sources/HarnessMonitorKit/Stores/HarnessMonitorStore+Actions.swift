@@ -1,4 +1,5 @@
 import Foundation
+import OpenTelemetryApi
 
 extension HarnessMonitorStore {
   private var readOnlySessionAccessMessage: String {
@@ -369,6 +370,14 @@ extension HarnessMonitorStore {
     sessionID: String,
     mutation: @escaping @Sendable () async throws -> SessionDetail
   ) async -> Bool {
+    let startedAt = ContinuousClock.now
+    let interactionType = actionName.lowercased().replacingOccurrences(of: " ", with: "_")
+    let span = HarnessMonitorTelemetry.shared.startSpan(
+      name: "user.action.\(interactionType)",
+      kind: .internal,
+      attributes: ["user.action.name": .string(actionName), "session.id": .string(sessionID)]
+    )
+
     isSessionActionInFlight = true
     inFlightActionID = actionID
     defer {
@@ -376,6 +385,14 @@ extension HarnessMonitorStore {
       if inFlightActionID == actionID {
         inFlightActionID = nil
       }
+      span.end()
+      let elapsed = startedAt.duration(to: ContinuousClock.now)
+      let durationMs = harnessMonitorDurationMilliseconds(elapsed)
+      HarnessMonitorTelemetry.shared.recordUserInteraction(
+        interaction: interactionType,
+        sessionID: sessionID,
+        durationMs: durationMs
+      )
     }
 
     do {
@@ -393,6 +410,8 @@ extension HarnessMonitorStore {
       presentSuccessFeedback(actionName)
       return true
     } catch {
+      span.status = .error(description: error.localizedDescription)
+      HarnessMonitorTelemetry.shared.recordError(error, on: span)
       presentFailureFeedback(error.localizedDescription)
       return false
     }

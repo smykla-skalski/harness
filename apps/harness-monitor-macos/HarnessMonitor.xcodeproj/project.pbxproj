@@ -52,6 +52,7 @@
 		1ABE762092BFD43856A94B9D /* HarnessMonitorTelemetry+Registration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033E591095F3D017A2951973 /* HarnessMonitorTelemetry+Registration.swift */; };
 		1D5335303EB469DA60F61D9E /* HarnessMonitorVoicePreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A68CF71029A92AEA133D9AC2 /* HarnessMonitorVoicePreferencesTests.swift */; };
 		1D6D539AB2E19D72DC20DFF6 /* HarnessMonitorObservabilityConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98DEA6475E9925593CF654FF /* HarnessMonitorObservabilityConfig.swift */; };
+		1F4B89834800B10498832910 /* HarnessMonitorObservabilityPhase2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9BDB723B7BA016EC560E30 /* HarnessMonitorObservabilityPhase2Tests.swift */; };
 		1FDCA96EF83A9FE7324D1601 /* PreferencesConnectionSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4BC05B6F0BD221701999E8 /* PreferencesConnectionSection.swift */; };
 		20343B36FB4517B05276C764 /* HarnessMonitorStoreSelectionFlowTests+SecondaryHydration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB4C577CDC1BF03F640E753 /* HarnessMonitorStoreSelectionFlowTests+SecondaryHydration.swift */; };
 		21DE950CCCEF5C1D6D101CD2 /* HarnessMonitorStore+FilteringModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D917FB210A36BFFABA1A108F /* HarnessMonitorStore+FilteringModels.swift */; };
@@ -863,6 +864,7 @@
 		A8F99BBCB903D8D91414D04D /* ToolbarCenterpieceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarCenterpieceView.swift; sourceTree = "<group>"; };
 		A9EE9145AFAF9EC87A0D9DEA /* PreviewHarnessClientFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewHarnessClientFixtures.swift; sourceTree = "<group>"; };
 		AB298FFDBFE1D7E4ED01C1EA /* HarnessMonitorStoreLifecycleCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreLifecycleCoreTests.swift; sourceTree = "<group>"; };
+		AB9BDB723B7BA016EC560E30 /* HarnessMonitorObservabilityPhase2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorObservabilityPhase2Tests.swift; sourceTree = "<group>"; };
 		ABA319C6585B0E20EAF5D62B /* DaemonModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonModelsTests.swift; sourceTree = "<group>"; };
 		AC3DEB71D83421D39C08EB52 /* HarnessMonitorNotificationPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorNotificationPreset.swift; sourceTree = "<group>"; };
 		AC8F56F79F97655ADFBDAB6B /* HarnessMonitorSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorSchema.swift; sourceTree = "<group>"; };
@@ -1288,6 +1290,7 @@
 				58FB43EC559971767C15D1CF /* HarnessMonitorObservabilityConfigTests.swift */,
 				7DCED38AFC4A0C0E7DA6B463 /* HarnessMonitorObservabilityExportTests.swift */,
 				82B2B2201CE847483AF4914A /* HarnessMonitorObservabilityPhase1Tests.swift */,
+				AB9BDB723B7BA016EC560E30 /* HarnessMonitorObservabilityPhase2Tests.swift */,
 				B631DFDD9A19A6915FB4E6BE /* HarnessMonitorObservabilitySmokeTests.swift */,
 				17BD77350FBDC1B328C902A6 /* HarnessMonitorObservabilityTestSupport.swift */,
 				2266B4D3F9138644E0BEE018 /* HarnessMonitorPathsTests.swift */,
@@ -2133,6 +2136,7 @@
 				83D851591AA1A566473E6827 /* HarnessMonitorObservabilityConfigTests.swift in Sources */,
 				92EF6B4A4AE26C4A1372FBEE /* HarnessMonitorObservabilityExportTests.swift in Sources */,
 				4F4909AEDEEB9C1BA8A6422A /* HarnessMonitorObservabilityPhase1Tests.swift in Sources */,
+				1F4B89834800B10498832910 /* HarnessMonitorObservabilityPhase2Tests.swift in Sources */,
 				6EEAB654721BB5ED2E3068A1 /* HarnessMonitorObservabilitySmokeTests.swift in Sources */,
 				7769E133FD21CC617FC37C11 /* HarnessMonitorObservabilityTestSupport.swift in Sources */,
 				E11C2EA307936518FC198A79 /* HarnessMonitorPathsTests.swift in Sources */,
