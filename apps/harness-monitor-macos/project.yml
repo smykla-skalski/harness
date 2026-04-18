@@ -50,7 +50,7 @@ packages:
     exactVersion: 2.4.1
   GRPCSwift:
     url: https://github.com/grpc/grpc-swift
-    exactVersion: 1.27.0
+    exactVersion: 2.2.3
   Textual:
     url: https://github.com/gonzalezreal/textual
     exactVersion: 0.3.1
