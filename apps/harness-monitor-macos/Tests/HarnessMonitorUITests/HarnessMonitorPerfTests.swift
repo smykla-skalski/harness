@@ -131,14 +131,36 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testLaunchForPerfSeedsObservabilityConfigIntoIsolatedDataHome() throws {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+
+    XCTAssertTrue(
+      configureIsolatedDataHome(for: app, purpose: "perf-observability-config")
+    )
+
+    let isolatedRoot = try XCTUnwrap(app.launchEnvironment[Self.daemonDataHomeKey])
+    let configURL = URL(fileURLWithPath: isolatedRoot, isDirectory: true)
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("observability", isDirectory: true)
+      .appendingPathComponent("config.json")
+
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: configURL.path),
+      "Expected isolated perf runs to seed an observability config"
+    )
+    let configBody = try String(contentsOf: configURL, encoding: .utf8)
+    XCTAssertTrue(configBody.contains("\"enabled\": true"))
+    XCTAssertTrue(configBody.contains("\"grpc_endpoint\": \"http://127.0.0.1:4317\""))
+  }
+
   func testSelectSessionCockpitScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "select-session-cockpit")
     let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
-    let sessionInspectorCard = element(in: launched, identifier: Accessibility.sessionInspectorCard)
+    let sessionHeaderCard = element(in: launched, identifier: Accessibility.sessionHeaderCard)
 
     if boardRoot.waitForExistence(timeout: Self.actionTimeout) {
-      XCTAssertFalse(sessionInspectorCard.exists)
+      XCTAssertFalse(sessionHeaderCard.exists)
     }
 
     waitForScenarioCompletion(
@@ -146,7 +168,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       scenario: "select-session-cockpit"
     )
 
-    XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionHeaderCard.waitForExistence(timeout: Self.uiTimeout))
     assertAuditBuildState(in: launched, scenario: "select-session-cockpit")
 
     launched.terminate()
