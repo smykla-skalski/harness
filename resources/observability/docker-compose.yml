@@ -83,15 +83,18 @@ services:
 
   grafana:
     image: grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    user: "0"
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_DEFAULT_THEME: light
-      GF_PLUGINS_PREINSTALL_SYNC: grafana-llm-app@1.0.8@https://grafana.com/api/plugins/grafana-llm-app/versions/1.0.8/download
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-llm-app@1.0.8@https://grafana.com/api/plugins/grafana-llm-app/versions/1.0.8/download,frser-sqlite-datasource@4.0.2
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - "${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:rw"
+      - "${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:rw"
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"
