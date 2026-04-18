@@ -236,6 +236,41 @@ fn grafana_compose_installs_sqlite_plugin_and_mounts_live_databases() {
 }
 
 #[test]
+fn distroless_observability_backends_use_external_readiness_checks() {
+    let compose: ComposeFile = load_yaml_file("resources/observability/docker-compose.yml");
+
+    for service_name in ["alloy", "loki", "tempo", "pyroscope"] {
+        let service = compose
+            .services
+            .get(service_name)
+            .unwrap_or_else(|| panic!("missing {service_name} service"));
+        assert!(
+            service.healthcheck.is_none(),
+            "{service_name} should rely on host-side readiness checks instead of an in-container probe command that may not exist in the upstream image"
+        );
+    }
+}
+
+#[test]
+fn sqlite_exporter_healthcheck_uses_curl_probe() {
+    let compose: ComposeFile = load_yaml_file("resources/observability/docker-compose.yml");
+    let service = compose
+        .services
+        .get("sqlite-exporter")
+        .expect("missing sqlite-exporter service");
+    let test = service
+        .healthcheck
+        .as_ref()
+        .and_then(|healthcheck| healthcheck.test.as_ref())
+        .expect("sqlite-exporter should declare a healthcheck command");
+
+    assert!(
+        test.iter().any(|part| part.contains("curl")),
+        "sqlite-exporter should use curl for its in-container healthcheck, got: {test:?}"
+    );
+}
+
+#[test]
 fn grafana_provisions_sqlite_datasources_for_daemon_and_monitor_databases() {
     let provisioning: DatasourceProvisioning =
         load_yaml_file("resources/observability/grafana/provisioning/datasources/datasources.yml");
@@ -403,9 +438,17 @@ struct ComposeService {
     #[serde(default)]
     environment: Option<BTreeMap<String, String>>,
     #[serde(default)]
+    healthcheck: Option<ComposeHealthcheck>,
+    #[serde(default)]
     user: Option<String>,
     #[serde(default)]
     volumes: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ComposeHealthcheck {
+    #[serde(default)]
+    test: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
