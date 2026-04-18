@@ -18,6 +18,17 @@ fn write_fake_harness_binary(path: &Path, version: &str) {
         .expect("chmod fake harness");
 }
 
+fn write_fake_observability_harness_binary(path: &Path) {
+    std::fs::create_dir_all(path.parent().expect("binary parent")).expect("create binary dir");
+    std::fs::write(
+        path,
+        "#!/bin/sh\nset -eu\nprintf 'ARGS=%s\\n' \"$*\" >\"$FAKE_HARNESS_LOG\"\nprintf 'OTEL_EXPORTER_OTLP_ENDPOINT=[%s]\\n' \"${OTEL_EXPORTER_OTLP_ENDPOINT-}\" >>\"$FAKE_HARNESS_LOG\"\nprintf 'OTEL_EXPORTER_OTLP_HEADERS=[%s]\\n' \"${OTEL_EXPORTER_OTLP_HEADERS-}\" >>\"$FAKE_HARNESS_LOG\"\nprintf 'OTEL_EXPORTER_OTLP_PROTOCOL=[%s]\\n' \"${OTEL_EXPORTER_OTLP_PROTOCOL-}\" >>\"$FAKE_HARNESS_LOG\"\nprintf 'HARNESS_OTEL_EXPORT=[%s]\\n' \"${HARNESS_OTEL_EXPORT-}\" >>\"$FAKE_HARNESS_LOG\"\nprintf 'HARNESS_OTEL_GRAFANA_URL=[%s]\\n' \"${HARNESS_OTEL_GRAFANA_URL-}\" >>\"$FAKE_HARNESS_LOG\"\nprintf 'HARNESS_OTEL_PYROSCOPE_URL=[%s]\\n' \"${HARNESS_OTEL_PYROSCOPE_URL-}\" >>\"$FAKE_HARNESS_LOG\"\n",
+    )
+    .expect("write fake observability harness");
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .expect("chmod fake observability harness");
+}
+
 fn run_harness_version(path: &Path) -> String {
     let output = Command::new(path)
         .arg("--version")
@@ -241,6 +252,57 @@ fn observability_script_test_helper_writes_shared_config_to_both_runtime_roots()
             body.contains("\"grpc_endpoint\": \"http://127.0.0.1:4317\""),
             "expected gRPC endpoint in {path}: {body}"
         );
+    }
+}
+
+#[test]
+fn observability_script_runs_smoke_cli_via_local_binary_without_otel_env() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_binary = tmp.path().join("fake-bin/harness");
+    let log_path = tmp.path().join("fake-harness.log");
+    write_fake_observability_harness_binary(&fake_binary);
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--run-local-harness-fixture")
+        .arg("session")
+        .arg("list")
+        .arg("--json")
+        .current_dir(&repo)
+        .env("HOME", tmp.path().join("home"))
+        .env("FAKE_HARNESS_LOG", &log_path)
+        .env("HARNESS_OBSERVABILITY_HARNESS_BIN", &fake_binary)
+        .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://example.com:4317")
+        .env("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer test")
+        .env("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+        .env("HARNESS_OTEL_EXPORT", "1")
+        .env("HARNESS_OTEL_GRAFANA_URL", "http://grafana.invalid")
+        .env("HARNESS_OTEL_PYROSCOPE_URL", "http://pyroscope.invalid")
+        .output()
+        .expect("run local harness observability fixture");
+
+    assert!(
+        output.status.success(),
+        "fixture failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log = std::fs::read_to_string(&log_path).expect("read fake harness log");
+    assert!(
+        log.contains("ARGS=session list --json"),
+        "expected fixture to invoke the fake harness binary, got: {log}"
+    );
+    for key in [
+        "OTEL_EXPORTER_OTLP_ENDPOINT=[]",
+        "OTEL_EXPORTER_OTLP_HEADERS=[]",
+        "OTEL_EXPORTER_OTLP_PROTOCOL=[]",
+        "HARNESS_OTEL_EXPORT=[]",
+        "HARNESS_OTEL_GRAFANA_URL=[]",
+        "HARNESS_OTEL_PYROSCOPE_URL=[]",
+    ] {
+        assert!(log.contains(key), "expected cleared env {key}, got: {log}");
     }
 }
 
