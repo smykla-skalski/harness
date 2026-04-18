@@ -79,6 +79,43 @@ fn sqlite_exporter_query_health_panel_uses_exporter_counter_metric() {
 }
 
 #[test]
+fn sqlite_forensics_dashboard_includes_daemon_sqlite_tables() {
+    let dashboard = load_dashboard("sqlite-forensics.json");
+
+    assert_sqlite_table_panel(
+        &dashboard,
+        "Recent Daemon Sessions",
+        "sqlite-daemon",
+        &[
+            "FROM sessions",
+            "ORDER BY COALESCE(last_activity_at, updated_at) DESC",
+            "LIMIT 20",
+        ],
+    );
+    assert_sqlite_table_panel(
+        &dashboard,
+        "Daemon Open Tasks",
+        "sqlite-daemon",
+        &[
+            "FROM tasks",
+            "WHERE status != 'done'",
+            "CASE severity",
+            "LIMIT 20",
+        ],
+    );
+    assert_sqlite_table_panel(
+        &dashboard,
+        "Daemon Event Log",
+        "sqlite-daemon",
+        &[
+            "FROM daemon_events",
+            "ORDER BY recorded_at DESC",
+            "LIMIT 50",
+        ],
+    );
+}
+
+#[test]
 fn grafana_compose_installs_sqlite_plugin_and_mounts_live_databases() {
     let compose: ComposeFile = load_yaml_file("resources/observability/docker-compose.yml");
     let grafana = compose
@@ -173,16 +210,55 @@ fn dashboard_json_paths(root: &Path) -> Vec<PathBuf> {
 }
 
 fn panel_expr(dashboard: &Value, title: &str) -> String {
+    panel_by_title(dashboard, title)["targets"]
+        .as_array()
+        .and_then(|targets| targets.first())
+        .and_then(|target| target["expr"].as_str())
+        .unwrap_or_else(|| panic!("missing panel expression for {title}"))
+        .to_string()
+}
+
+fn assert_sqlite_table_panel(
+    dashboard: &Value,
+    title: &str,
+    datasource_uid: &str,
+    expected_fragments: &[&str],
+) {
+    let panel = panel_by_title(dashboard, title);
+    assert_eq!(panel["type"].as_str(), Some("table"));
+    assert_eq!(panel["datasource"]["uid"].as_str(), Some(datasource_uid));
+
+    let target = panel["targets"]
+        .as_array()
+        .and_then(|targets| targets.first())
+        .unwrap_or_else(|| panic!("missing target for {title}"));
+
+    assert_eq!(target["queryType"].as_str(), Some("table"));
+    assert_eq!(target["timeColumns"].as_array(), Some(&Vec::new()));
+
+    let raw_query = target["rawQueryText"]
+        .as_str()
+        .unwrap_or_else(|| panic!("missing sqlite query text for {title}"));
+    let query_text = target["queryText"]
+        .as_str()
+        .unwrap_or_else(|| panic!("missing sqlite rendered query text for {title}"));
+    assert_eq!(raw_query, query_text);
+
+    for fragment in expected_fragments {
+        assert!(
+            raw_query.contains(fragment),
+            "{title} query should contain {fragment:?}, got: {raw_query}"
+        );
+    }
+}
+
+fn panel_by_title<'a>(dashboard: &'a Value, title: &str) -> &'a Value {
     dashboard["panels"]
         .as_array()
         .unwrap()
         .iter()
         .find(|panel| panel["title"].as_str() == Some(title))
-        .and_then(|panel| panel["targets"].as_array())
-        .and_then(|targets| targets.first())
-        .and_then(|target| target["expr"].as_str())
-        .unwrap_or_else(|| panic!("missing panel expression for {title}"))
-        .to_string()
+        .unwrap_or_else(|| panic!("missing panel {title}"))
 }
 
 fn collect_trace_links(value: &Value) -> Vec<DashboardLink> {
