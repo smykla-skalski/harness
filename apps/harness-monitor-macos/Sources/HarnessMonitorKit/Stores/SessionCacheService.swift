@@ -53,6 +53,7 @@ public actor SessionCacheService {
   func loadSessionDetail(
     sessionID: String
   ) -> CachedSessionSnapshot? {
+    let startedAt = ContinuousClock.now
     let context = makeContext()
     var descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { $0.sessionId == sessionID }
@@ -60,10 +61,14 @@ public actor SessionCacheService {
     descriptor.fetchLimit = 1
 
     guard let cached = try? context.fetch(descriptor).first else {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_detail", hit: false, durationMs: durationMs
+      )
       return nil
     }
 
-    return CachedSessionSnapshot(
+    let result = CachedSessionSnapshot(
       detail: cached.toSessionDetail(),
       timeline: cached.timelineEntries
         .map { $0.toTimelineEntry() }
@@ -75,12 +80,18 @@ public actor SessionCacheService {
         },
       timelineWindow: cached.decodedTimelineWindow()
     )
+    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+    HarnessMonitorTelemetry.shared.recordCacheRead(
+      operation: "load_session_detail", hit: true, durationMs: durationMs
+    )
+    return result
   }
 
   func loadSessionList() -> (
     sessions: [SessionSummary],
     projects: [ProjectSummary]
   )? {
+    let startedAt = ContinuousClock.now
     let context = makeContext()
     let sessionDescriptor = FetchDescriptor<CachedSession>(
       sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
@@ -94,26 +105,42 @@ public actor SessionCacheService {
       let projects = try? context.fetch(projectDescriptor),
       !sessions.isEmpty
     else {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_list", hit: false, durationMs: durationMs
+      )
       return nil
     }
 
-    return (
+    let result = (
       sessions: sessions.map { $0.toSessionSummary() },
       projects: projects.map { $0.toProjectSummary() }
     )
+    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+    HarnessMonitorTelemetry.shared.recordCacheRead(
+      operation: "load_session_list", hit: true, durationMs: durationMs
+    )
+    return result
   }
 
   func recentlyViewedSessionIDs(limit: Int) -> [String] {
+    let startedAt = ContinuousClock.now
     let context = makeContext()
     var descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { $0.lastViewedAt != nil },
       sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
     )
     descriptor.fetchLimit = limit
-    return ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
+    let ids = ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
+    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+    HarnessMonitorTelemetry.shared.recordCacheRead(
+      operation: "recently_viewed_session_ids", hit: !ids.isEmpty, durationMs: durationMs
+    )
+    return ids
   }
 
   func sessionMetadata() -> SessionMetadata {
+    let startedAt = ContinuousClock.now
     let context = makeContext()
     let count = (try? context.fetchCount(FetchDescriptor<CachedSession>())) ?? 0
     var latestDescriptor = FetchDescriptor<CachedSession>(
@@ -121,19 +148,36 @@ public actor SessionCacheService {
     )
     latestDescriptor.fetchLimit = 1
     let latest = try? context.fetch(latestDescriptor).first
-
-    return SessionMetadata(count: count, lastCachedAt: latest?.lastCachedAt)
+    let result = SessionMetadata(count: count, lastCachedAt: latest?.lastCachedAt)
+    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+    HarnessMonitorTelemetry.shared.recordCacheRead(
+      operation: "session_metadata", hit: count > 0, durationMs: durationMs
+    )
+    return result
   }
 
   func hydrationQueue(for summaries: [SessionSummary]) -> [SessionSummary] {
-    guard !summaries.isEmpty else { return [] }
+    let startedAt = ContinuousClock.now
+    guard !summaries.isEmpty else {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "hydration_queue", hit: false, durationMs: durationMs
+      )
+      return []
+    }
 
     let context = makeContext()
     let summaryIds = summaries.map(\.sessionId)
     let descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { summaryIds.contains($0.sessionId) }
     )
-    guard let cached = try? context.fetch(descriptor) else { return summaries }
+    guard let cached = try? context.fetch(descriptor) else {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "hydration_queue", hit: false, durationMs: durationMs
+      )
+      return summaries
+    }
     let timelineDescriptor = FetchDescriptor<CachedTimelineEntry>(
       predicate: #Predicate { summaryIds.contains($0.sessionId) }
     )
@@ -146,17 +190,17 @@ public actor SessionCacheService {
       snapshotState[session.sessionId] = timelineSessionIDs.contains(session.sessionId)
     }
 
-    return summaries.filter { summary in
+    let result = summaries.filter { summary in
       guard let hasTimeline = snapshotState[summary.sessionId] else {
         return true
       }
-      // Background hydration is a startup fallback, not the authoritative live
-      // refresh path. Once a session already has a cached timeline, keep that
-      // snapshot and let the selected-session live load fetch exact detail on
-      // demand instead of rehydrating every recently viewed session in the
-      // background whenever only the summary timestamp changes.
       return !hasTimeline
     }
+    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+    HarnessMonitorTelemetry.shared.recordCacheRead(
+      operation: "hydration_queue", hit: !cached.isEmpty, durationMs: durationMs
+    )
+    return result
   }
 
 }
