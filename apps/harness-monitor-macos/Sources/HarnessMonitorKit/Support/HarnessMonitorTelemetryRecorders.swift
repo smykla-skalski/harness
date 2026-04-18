@@ -41,7 +41,14 @@ final class HarnessMonitorDoubleHistogramRecorder: @unchecked Sendable {
 
   func record(value: Double, attributes: [String: AttributeValue]) {
     lock.withLock {
-      histogram.record(value: value, attributes: attributes)
+      var enriched = attributes
+      if let spanContext = OpenTelemetry.instance.contextProvider.activeSpan?.context,
+        spanContext.isValid
+      {
+        enriched["exemplar.trace_id"] = .string(spanContext.traceId.hexString)
+        enriched["exemplar.span_id"] = .string(spanContext.spanId.hexString)
+      }
+      histogram.record(value: value, attributes: enriched)
     }
   }
 }
