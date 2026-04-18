@@ -140,7 +140,16 @@ extension HarnessMonitorAPIClient {
       durationMs: durationMs,
       failed: false
     )
-    return try decoder.decode(Response.self, from: data)
+    do {
+      return try decoder.decode(Response.self, from: data)
+    } catch {
+      HarnessMonitorTelemetry.shared.recordDecodingError(
+        entity: path, reason: String(describing: error)
+      )
+      span.status = .error(description: "decoding failed")
+      HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      throw error
+    }
   }
 
   private func recordTransportFailure(
@@ -152,6 +161,36 @@ extension HarnessMonitorAPIClient {
   ) {
     let method = request.httpMethod ?? "?"
     let path = request.url?.path ?? "?"
+
+    let errorType: String
+    if let urlError = error as? URLError {
+      switch urlError.code {
+      case .timedOut:
+        errorType = "timeout"
+        HarnessMonitorTelemetry.shared.recordTimeoutError(
+          operation: "http_request", durationMs: durationMs
+        )
+      case .networkConnectionLost:
+        errorType = "connection_lost"
+      case .notConnectedToInternet:
+        errorType = "offline"
+      case .cannotConnectToHost:
+        errorType = "connection_refused"
+      default:
+        errorType = "url_error_\(urlError.code.rawValue)"
+      }
+    } else if error is DecodingError {
+      errorType = "decoding"
+      HarnessMonitorTelemetry.shared.recordDecodingError(
+        entity: path, reason: String(describing: error)
+      )
+    } else {
+      errorType = "unknown"
+    }
+
+    HarnessMonitorTelemetry.shared.recordAPIError(
+      endpoint: path, method: method, errorType: errorType, statusCode: nil
+    )
     HarnessMonitorTelemetry.shared.recordError(error, on: span)
     span.status = .error(description: error.localizedDescription)
     HarnessMonitorTelemetry.shared.recordHTTPRequest(
@@ -169,6 +208,7 @@ extension HarnessMonitorAPIClient {
         "request.id": .string(requestID),
         "request.duration_ms": .double(durationMs),
         "error.message": .string(error.localizedDescription),
+        "error.type": .string(errorType),
       ]
     )
   }
