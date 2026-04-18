@@ -579,7 +579,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (database, query, status) (rate(queries{job=\"sqlite-exporter\"}[5m]))",
+          "expr": "sum by (database, query, status) (rate(queries_total{job=\"sqlite-exporter\"}[5m]))",
           "legendFormat": "{{database}} :: {{query}} :: {{status}}",
           "refId": "A"
         }
