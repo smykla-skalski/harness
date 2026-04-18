@@ -106,6 +106,25 @@ fn monitor_dashboard_surfaces_resource_activity_gauges() {
 }
 
 #[test]
+fn monitor_dashboard_surfaces_phase1_observability_metrics() {
+    let dashboard = load_dashboard("monitor-client.json");
+
+    for (title, metric_fragment) in [
+        ("Lifecycle / 5m", "harness_monitor_app_lifecycle_total"),
+        ("Bootstrap p95", "harness_monitor_bootstrap_duration_ms_bucket"),
+        ("Interactions / 5m", "harness_monitor_user_interactions_total"),
+        ("Cache Read p95", "harness_monitor_cache_read_duration_ms_bucket"),
+        ("API Errors / 5m", "harness_monitor_api_errors_total"),
+    ] {
+        let expr = panel_expr(&dashboard, title);
+        assert!(
+            expr.contains(metric_fragment),
+            "{title} should visualize {metric_fragment}, got: {expr}"
+        );
+    }
+}
+
+#[test]
 fn sqlite_forensics_dashboard_includes_daemon_sqlite_tables() {
     let dashboard = load_dashboard("sqlite-forensics.json");
 
