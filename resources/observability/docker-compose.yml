@@ -14,12 +14,6 @@ services:
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
       - "127.0.0.1:12345:12345"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:12345/-/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     depends_on:
       - tempo
       - loki
@@ -36,12 +30,6 @@ services:
       - tempo-data:/var/lib/tempo
     ports:
       - "127.0.0.1:3200:3200"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3200/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
 
   loki:
     image: grafana/loki:3.7.1@sha256:73e905b51a7f917f7a1075e4be68759df30226e03dcb3cd2213b989cc0dc8eb4
@@ -54,12 +42,6 @@ services:
       - loki-data:/var/lib/loki
     ports:
       - "127.0.0.1:3100:3100"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
 
   prometheus:
     image: prom/prometheus:v3.11.2@sha256:5550dc63da361dc30f6fe02ac0e4dfc736ededfef3c8d12a634db04a67824d78
@@ -96,7 +78,7 @@ services:
     ports:
       - "127.0.0.1:9560:9560"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9560/metrics"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:9560/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -111,12 +93,6 @@ services:
       - pyroscope-data:/var/lib/pyroscope
     ports:
       - "127.0.0.1:4040:4040"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4040/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
 
   grafana:
     image: grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
