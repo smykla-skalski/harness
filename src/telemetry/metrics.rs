@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 use std::sync::OnceLock;
 
 use axum::http::HeaderMap;
 use axum::http::header::HeaderName;
 use opentelemetry::KeyValue;
 use opentelemetry::global;
-use opentelemetry::metrics::{Counter, Histogram, Meter};
+use opentelemetry::metrics::{Counter, Gauge, Histogram, Meter};
 use opentelemetry::propagation::{Extractor, Injector};
 use opentelemetry::trace::TraceContextExt as _;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -17,6 +19,13 @@ static DAEMON_CLIENT_DURATION_HISTOGRAM: OnceLock<Histogram<u64>> = OnceLock::ne
 static DAEMON_CLIENT_REQUEST_COUNTER: OnceLock<Counter<u64>> = OnceLock::new();
 static DAEMON_HTTP_DURATION_HISTOGRAM: OnceLock<Histogram<u64>> = OnceLock::new();
 static DAEMON_HTTP_REQUEST_COUNTER: OnceLock<Counter<u64>> = OnceLock::new();
+static DAEMON_DB_DURATION_HISTOGRAM: OnceLock<Histogram<u64>> = OnceLock::new();
+static DAEMON_DB_OPERATION_COUNTER: OnceLock<Counter<u64>> = OnceLock::new();
+static DAEMON_DB_ERROR_COUNTER: OnceLock<Counter<u64>> = OnceLock::new();
+static DAEMON_DB_BUSY_COUNTER: OnceLock<Counter<u64>> = OnceLock::new();
+static DAEMON_DB_FILE_SIZE_GAUGE: OnceLock<Gauge<u64>> = OnceLock::new();
+static DAEMON_DB_POOL_CONNECTION_GAUGE: OnceLock<Gauge<u64>> = OnceLock::new();
+static DAEMON_DB_HEALTH_COUNT_GAUGE: OnceLock<Gauge<u64>> = OnceLock::new();
 
 #[must_use]
 pub fn current_trace_headers() -> BTreeMap<String, String> {
@@ -90,6 +99,76 @@ pub fn record_daemon_http_metrics(method: &str, path: &str, status: u16, duratio
     daemon_http_request_counter().add(1, &attributes);
 }
 
+pub fn record_daemon_db_operation_metrics(
+    operation: &str,
+    engine: &str,
+    access: &str,
+    duration_ms: u64,
+    is_error: bool,
+    is_busy: bool,
+    db_path: Option<&Path>,
+) {
+    let attributes = daemon_db_attributes(operation, engine, access, db_path);
+    daemon_db_duration_histogram().record(duration_ms, &attributes);
+    daemon_db_operation_counter().add(1, &attributes);
+    if is_error {
+        daemon_db_error_counter().add(1, &attributes);
+    }
+    if is_busy {
+        daemon_db_busy_counter().add(1, &attributes);
+    }
+    if let Some(size_bytes) = sqlite_file_size_bytes(db_path) {
+        daemon_db_file_size_gauge().record(
+            size_bytes,
+            &[
+                KeyValue::new("db.system", "sqlite"),
+                KeyValue::new("db.engine", engine.to_string()),
+                KeyValue::new("db.file", db_file_label(db_path)),
+            ],
+        );
+    }
+}
+
+pub fn record_daemon_db_pool_state(engine: &str, total_connections: u64, idle_connections: u64) {
+    let in_use_connections = total_connections.saturating_sub(idle_connections);
+    for (state, value) in [
+        ("total", total_connections),
+        ("idle", idle_connections),
+        ("in_use", in_use_connections),
+    ] {
+        daemon_db_pool_connection_gauge().record(
+            value,
+            &[
+                KeyValue::new("db.system", "sqlite"),
+                KeyValue::new("db.engine", engine.to_string()),
+                KeyValue::new("pool.state", state.to_string()),
+            ],
+        );
+    }
+}
+
+pub fn record_daemon_db_health_counts(
+    engine: &str,
+    project_count: usize,
+    worktree_count: usize,
+    session_count: usize,
+) {
+    for (entity, value) in [
+        ("projects", u64::try_from(project_count).unwrap_or(u64::MAX)),
+        ("worktrees", u64::try_from(worktree_count).unwrap_or(u64::MAX)),
+        ("sessions", u64::try_from(session_count).unwrap_or(u64::MAX)),
+    ] {
+        daemon_db_health_count_gauge().record(
+            value,
+            &[
+                KeyValue::new("db.system", "sqlite"),
+                KeyValue::new("db.engine", engine.to_string()),
+                KeyValue::new("db.entity", entity.to_string()),
+            ],
+        );
+    }
+}
+
 fn telemetry_meter() -> &'static Meter {
     TELEMETRY_METER.get_or_init(|| global::meter("harness"))
 }
@@ -143,6 +222,104 @@ fn daemon_http_request_counter() -> &'static Counter<u64> {
             .u64_counter("harness.daemon.http.requests")
             .build()
     })
+}
+
+fn daemon_db_duration_histogram() -> &'static Histogram<u64> {
+    DAEMON_DB_DURATION_HISTOGRAM.get_or_init(|| {
+        telemetry_meter()
+            .u64_histogram("harness.daemon.db.operation.duration")
+            .with_unit("ms")
+            .build()
+    })
+}
+
+fn daemon_db_operation_counter() -> &'static Counter<u64> {
+    DAEMON_DB_OPERATION_COUNTER.get_or_init(|| {
+        telemetry_meter()
+            .u64_counter("harness.daemon.db.operations")
+            .build()
+    })
+}
+
+fn daemon_db_error_counter() -> &'static Counter<u64> {
+    DAEMON_DB_ERROR_COUNTER.get_or_init(|| {
+        telemetry_meter()
+            .u64_counter("harness.daemon.db.errors")
+            .build()
+    })
+}
+
+fn daemon_db_busy_counter() -> &'static Counter<u64> {
+    DAEMON_DB_BUSY_COUNTER.get_or_init(|| {
+        telemetry_meter()
+            .u64_counter("harness.daemon.db.busy")
+            .build()
+    })
+}
+
+fn daemon_db_file_size_gauge() -> &'static Gauge<u64> {
+    DAEMON_DB_FILE_SIZE_GAUGE.get_or_init(|| {
+        telemetry_meter()
+            .u64_gauge("harness.daemon.db.file_size_bytes")
+            .build()
+    })
+}
+
+fn daemon_db_pool_connection_gauge() -> &'static Gauge<u64> {
+    DAEMON_DB_POOL_CONNECTION_GAUGE.get_or_init(|| {
+        telemetry_meter()
+            .u64_gauge("harness.daemon.db.pool.connections")
+            .build()
+    })
+}
+
+fn daemon_db_health_count_gauge() -> &'static Gauge<u64> {
+    DAEMON_DB_HEALTH_COUNT_GAUGE.get_or_init(|| {
+        telemetry_meter()
+            .u64_gauge("harness.daemon.db.health.count")
+            .build()
+    })
+}
+
+fn daemon_db_attributes(
+    operation: &str,
+    engine: &str,
+    access: &str,
+    db_path: Option<&Path>,
+) -> [KeyValue; 5] {
+    [
+        KeyValue::new("db.system", "sqlite"),
+        KeyValue::new("db.engine", engine.to_string()),
+        KeyValue::new("db.operation.name", operation.to_string()),
+        KeyValue::new("db.access", access.to_string()),
+        KeyValue::new("db.file", db_file_label(db_path)),
+    ]
+}
+
+fn db_file_label(db_path: Option<&Path>) -> String {
+    db_path
+        .and_then(Path::file_name)
+        .and_then(|file_name| file_name.to_str())
+        .map_or_else(|| "memory".to_string(), ToOwned::to_owned)
+}
+
+fn sqlite_file_size_bytes(db_path: Option<&Path>) -> Option<u64> {
+    let path = db_path?;
+    let mut total = 0_u64;
+    let base = path.as_os_str().to_owned();
+    for suffix in ["", "-wal", "-shm"] {
+        let candidate = if suffix.is_empty() {
+            path.to_path_buf()
+        } else {
+            let mut value = base.clone();
+            value.push(suffix);
+            value.into()
+        };
+        if let Ok(metadata) = fs::metadata(candidate) {
+            total = total.saturating_add(metadata.len());
+        }
+    }
+    Some(total)
 }
 
 #[derive(Default)]

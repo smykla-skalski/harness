@@ -47,8 +47,15 @@ extension SessionCacheService {
       try Task.checkCancellation()
       try await beforeSave()
       try Task.checkCancellation()
-      try saveChanges(context)
-      return true
+      return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
+        operation: operation.replacingOccurrences(of: " ", with: "_"),
+        access: "write",
+        database: "monitor-cache",
+        databasePath: databaseURL?.path
+      ) {
+        try saveChanges(context)
+        return true
+      }
     } catch is CancellationError {
       return false
     } catch {

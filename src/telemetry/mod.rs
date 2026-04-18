@@ -11,7 +11,8 @@ pub use config::{
 };
 pub use metrics::{
     apply_parent_context_from_headers, apply_parent_context_from_text_map, current_trace_headers,
-    current_trace_id, record_daemon_client_metrics, record_daemon_http_metrics,
+    current_trace_id, record_daemon_client_metrics, record_daemon_db_health_counts,
+    record_daemon_db_operation_metrics, record_daemon_db_pool_state, record_daemon_http_metrics,
     record_hook_metrics,
 };
 pub use profiler::DaemonProfiler;

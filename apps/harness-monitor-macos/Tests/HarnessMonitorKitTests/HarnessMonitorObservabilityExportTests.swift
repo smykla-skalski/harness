@@ -90,9 +90,17 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     HarnessMonitorTelemetry.shared.resetForTests()
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+    let modelContainer = try HarnessMonitorModelContainer.live(using: environment)
+    let cacheService = SessionCacheService(
+      modelContainer: modelContainer,
+      databaseURL: HarnessMonitorPaths.harnessRoot(using: environment)
+        .appendingPathComponent("harness-cache.store")
+    )
+    let cacheCounts = await cacheService.recordCounts()
     let entries = try await client.timeline(sessionID: "grpc-export", scope: .summary)
     HarnessMonitorTelemetry.shared.shutdown()
 
+    #expect(cacheCounts.sessions == 0)
     #expect(entries.count == 1)
     #expect(collector.traceCollector.hasReceivedSpans)
     #expect(collector.logCollector.hasReceivedLogs)
@@ -101,6 +109,8 @@ struct HarnessMonitorObservabilityGRPCExportTests {
     #expect(collector.logCollector.serviceNames.contains("harness-monitor"))
     #expect(collector.metricCollector.serviceNames.contains("harness-monitor"))
     #expect(collector.metricCollector.metricNames.contains("harness_monitor_http_requests_total"))
+    #expect(collector.metricCollector.metricNames.contains("harness_monitor_sqlite_operations_total"))
+    #expect(collector.metricCollector.metricNames.contains("harness_monitor_sqlite_file_size_bytes"))
   }
 
   @Test("gRPC export keeps websocket client and daemon server spans on one trace")
@@ -182,7 +192,7 @@ struct HarnessMonitorObservabilityGRPCExportTests {
   }
 }
 
-@Suite("Harness Monitor observability smoke")
+@Suite("Harness Monitor observability smoke", .serialized)
 struct HarnessMonitorObservabilitySmokeTests {
   @Test("Collector-configured shutdown flushes signals for the smoke lane")
   func collectorConfiguredShutdownFlushesSignalsForSmoke() async throws {
@@ -215,9 +225,17 @@ struct HarnessMonitorObservabilitySmokeTests {
 
     HarnessMonitorTelemetry.shared.resetForTests()
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+    let modelContainer = try HarnessMonitorModelContainer.live(using: environment)
+    let cacheService = SessionCacheService(
+      modelContainer: modelContainer,
+      databaseURL: HarnessMonitorPaths.harnessRoot(using: environment)
+        .appendingPathComponent("harness-cache.store")
+    )
+    let cacheCounts = await cacheService.recordCounts()
     let entries = try await client.timeline(sessionID: "observability-smoke", scope: .summary)
     HarnessMonitorTelemetry.shared.shutdown()
 
+    #expect(cacheCounts.sessions == 0)
     #expect(entries.count == 1)
   }
 
@@ -265,6 +283,9 @@ struct HarnessMonitorObservabilitySmokeTests {
     _ = try await transport.sessions()
     await transport.shutdown()
     HarnessMonitorTelemetry.shared.shutdown()
+    // Keep the test host alive long enough for the live collector/Tempo path
+    // to observe the flushed websocket client span before xctest tears down.
+    try await Task.sleep(for: .seconds(2))
   }
 }
 

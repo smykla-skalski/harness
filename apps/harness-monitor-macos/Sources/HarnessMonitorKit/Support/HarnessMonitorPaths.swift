@@ -107,6 +107,13 @@ public enum HarnessMonitorPaths {
     Self.harnessRoot(using: environment).appendingPathComponent("daemon", isDirectory: true)
   }
 
+  public static func cacheStoreURL(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.harnessRoot(using: environment)
+      .appendingPathComponent("harness-cache.store")
+  }
+
   public static func manifestURL(using environment: HarnessMonitorEnvironment = .current) -> URL {
     Self.daemonRoot(using: environment).appendingPathComponent("manifest.json")
   }

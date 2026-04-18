@@ -39,6 +39,21 @@ final class HarnessMonitorLongCounterRecorder: @unchecked Sendable {
   }
 }
 
+final class HarnessMonitorLongGaugeRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var gauge: any LongGauge
+
+  init(gauge: some LongGauge) {
+    self.gauge = gauge
+  }
+
+  func record(value: Int, attributes: [String: AttributeValue]) {
+    lock.withLock {
+      gauge.record(value: value, attributes: attributes)
+    }
+  }
+}
+
 final class HarnessMonitorDoubleHistogramRecorder: @unchecked Sendable {
   private let lock = NSLock()
   private var histogram: any DoubleHistogram
@@ -69,6 +84,11 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
   private let httpRequestDuration: HarnessMonitorDoubleHistogramRecorder
   private let websocketConnectCounter: HarnessMonitorLongCounterRecorder
   private let websocketRPCDuration: HarnessMonitorDoubleHistogramRecorder
+  private let sqliteOperationCounter: HarnessMonitorLongCounterRecorder
+  private let sqliteOperationDuration: HarnessMonitorDoubleHistogramRecorder
+  private let sqliteErrorCounter: HarnessMonitorLongCounterRecorder
+  private let sqliteFileSizeGauge: HarnessMonitorLongGaugeRecorder
+  private let sqliteRecordCountGauge: HarnessMonitorLongGaugeRecorder
 
   init(meterProvider: any MeterProvider) {
     let meter =
@@ -87,11 +107,40 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
       meter
       .histogramBuilder(name: "harness_monitor_websocket_rpc_duration_ms")
       .build()
+    let sqliteOperationCounter =
+      meter
+      .counterBuilder(name: "harness_monitor_sqlite_operations_total")
+      .build()
+    let sqliteOperationDuration =
+      meter
+      .histogramBuilder(name: "harness_monitor_sqlite_operation_duration_ms")
+      .build()
+    let sqliteErrorCounter =
+      meter
+      .counterBuilder(name: "harness_monitor_sqlite_errors_total")
+      .build()
+    let sqliteFileSizeGauge =
+      meter
+      .gaugeBuilder(name: "harness_monitor_sqlite_file_size_bytes")
+      .ofLongs()
+      .build()
+    let sqliteRecordCountGauge =
+      meter
+      .gaugeBuilder(name: "harness_monitor_sqlite_record_count")
+      .ofLongs()
+      .build()
 
     httpRequestCounter = HarnessMonitorLongCounterRecorder(counter: httpCounter)
     httpRequestDuration = HarnessMonitorDoubleHistogramRecorder(histogram: httpDuration)
     websocketConnectCounter = HarnessMonitorLongCounterRecorder(counter: websocketCounter)
     websocketRPCDuration = HarnessMonitorDoubleHistogramRecorder(histogram: websocketDuration)
+    self.sqliteOperationCounter = HarnessMonitorLongCounterRecorder(counter: sqliteOperationCounter)
+    self.sqliteOperationDuration = HarnessMonitorDoubleHistogramRecorder(
+      histogram: sqliteOperationDuration
+    )
+    self.sqliteErrorCounter = HarnessMonitorLongCounterRecorder(counter: sqliteErrorCounter)
+    self.sqliteFileSizeGauge = HarnessMonitorLongGaugeRecorder(gauge: sqliteFileSizeGauge)
+    self.sqliteRecordCountGauge = HarnessMonitorLongGaugeRecorder(gauge: sqliteRecordCountGauge)
   }
 
   func recordHTTPRequest(
@@ -132,6 +181,55 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
     )
   }
 
+  func recordSQLiteOperation(
+    operation: String,
+    access: String,
+    database: String,
+    durationMs: Double,
+    failed: Bool
+  ) {
+    let attributes = sqliteAttributes(
+      operation: operation,
+      access: access,
+      database: database
+    )
+    sqliteOperationCounter.add(value: 1, attributes: attributes)
+    sqliteOperationDuration.record(value: durationMs, attributes: attributes)
+    if failed {
+      sqliteErrorCounter.add(value: 1, attributes: attributes)
+    }
+  }
+
+  func recordSQLiteFileSize(
+    database: String,
+    path: String,
+    sizeBytes: Int64
+  ) {
+    sqliteFileSizeGauge.record(
+      value: Int(clamping: sizeBytes),
+      attributes: [
+        "db.system": .string("sqlite"),
+        "db.name": .string(database),
+        "db.file": .string((path as NSString).lastPathComponent),
+      ]
+    )
+  }
+
+  func recordSQLiteRecordCount(
+    database: String,
+    entity: String,
+    count: Int
+  ) {
+    sqliteRecordCountGauge.record(
+      value: count,
+      attributes: [
+        "db.system": .string("sqlite"),
+        "db.name": .string(database),
+        "db.entity": .string(entity),
+      ]
+    )
+  }
+
   private func baseRequestAttributes(
     method: String,
     path: String,
@@ -148,6 +246,19 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
       attributes["http.response.status_code"] = .int(statusCode)
     }
     return attributes
+  }
+
+  private func sqliteAttributes(
+    operation: String,
+    access: String,
+    database: String
+  ) -> [String: AttributeValue] {
+    [
+      "db.system": .string("sqlite"),
+      "db.operation.name": .string(operation),
+      "db.access": .string(access),
+      "db.name": .string(database),
+    ]
   }
 }
 

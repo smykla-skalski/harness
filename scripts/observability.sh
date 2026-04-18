@@ -290,9 +290,45 @@ run_daemon_server_smoke() {
   cleanup_daemon_server_smoke
 }
 
+enumerate_monitor_test_classes() {
+  local enum_json
+  enum_json="$ROOT/tmp/harness-monitor-test-enumeration.json"
+  mkdir -p "$(dirname "$enum_json")"
+  "$ROOT/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" \
+    -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
+    -scheme "HarnessMonitor" \
+    -configuration Debug \
+    -derivedDataPath "$ROOT/tmp/xcode-derived" \
+    -skipPackagePluginValidation \
+    test \
+    CODE_SIGNING_ALLOWED=NO \
+    -destination 'platform=macOS' \
+    -skip-testing:HarnessMonitorUITests \
+    -only-testing:HarnessMonitorKitTests \
+    -enumerate-tests \
+    -test-enumeration-format json \
+    -test-enumeration-style hierarchical \
+    -test-enumeration-output-path "$enum_json" \
+    >/dev/null
+  jq -r '.. | objects | select(.kind? == "class") | .name' "$enum_json"
+}
+
+monitor_smoke_skip_args() {
+  local class_name
+  while IFS= read -r class_name; do
+    [ -n "$class_name" ] || continue
+    [ "$class_name" = "HarnessMonitorObservabilitySmokeTests" ] && continue
+    printf '%s\0' "-skip-testing:HarnessMonitorKitTests/${class_name}"
+  done < <(enumerate_monitor_test_classes | sort -u)
+}
+
 run_monitor_smoke() {
   local log_path
+  local -a smoke_skip_args=()
   log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-otel-smoke.XXXXXX.log")"
+  while IFS= read -r -d '' skip_arg; do
+    smoke_skip_args+=("$skip_arg")
+  done < <(monitor_smoke_skip_args)
   write_shared_config true >/dev/null
   write_monitor_smoke_data_home_marker
   trap 'write_shared_config false >/dev/null || true; remove_monitor_smoke_data_home_marker; rm -f "$log_path"' RETURN
@@ -313,7 +349,8 @@ run_monitor_smoke() {
       CODE_SIGNING_ALLOWED=NO \
       -destination 'platform=macOS' \
       -skip-testing:HarnessMonitorUITests \
-      -only-testing:HarnessMonitorKitTests/HarnessMonitorObservabilitySmokeTests \
+      -only-testing:HarnessMonitorKitTests \
+      "${smoke_skip_args[@]}" \
       >"$log_path" 2>&1
   then
     cat "$log_path" >&2

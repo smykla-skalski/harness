@@ -12,10 +12,17 @@ public enum HarnessMonitorModelContainer {
       withIntermediateDirectories: true,
       attributes: nil
     )
-    let url = root.appendingPathComponent("harness-cache.store")
+    let url = HarnessMonitorPaths.cacheStoreURL(using: environment)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
 
-    return try makeContainer(schema: schema, config: config)
+    return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
+      operation: "open_cache_store",
+      access: "maintenance",
+      database: "monitor-cache",
+      databasePath: url.path
+    ) {
+      try makeContainer(schema: schema, config: config)
+    }
   }
 
   public static func preview() throws -> ModelContainer {

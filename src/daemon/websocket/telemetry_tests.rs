@@ -45,6 +45,7 @@ async fn websocket_dispatch_uses_trace_context_parent_and_rpc_name() {
     let spans = exporter.finished_spans();
     let parent_span = find_exported_span(&spans, "monitor.websocket.client");
     let rpc_span = find_exported_span(&spans, "session.detail");
+    let db_span = find_exported_span(&spans, "daemon.db.async.resolve_session");
 
     assert_eq!(rpc_span.span_kind, SpanKind::Server);
     assert!(rpc_span.parent_span_is_remote);
@@ -60,6 +61,20 @@ async fn websocket_dispatch_uses_trace_context_parent_and_rpc_name() {
     assert_eq!(
         span_string_attribute(rpc_span, "transport.kind").as_deref(),
         Some("websocket")
+    );
+    assert_eq!(db_span.span_kind, SpanKind::Client);
+    assert_eq!(db_span.parent_span_id, rpc_span.span_context.span_id());
+    assert_eq!(
+        db_span.span_context.trace_id(),
+        rpc_span.span_context.trace_id()
+    );
+    assert_eq!(
+        span_string_attribute(db_span, "db.operation.name").as_deref(),
+        Some("resolve_session")
+    );
+    assert_eq!(
+        span_string_attribute(db_span, "db.system").as_deref(),
+        Some("sqlite")
     );
 }
 

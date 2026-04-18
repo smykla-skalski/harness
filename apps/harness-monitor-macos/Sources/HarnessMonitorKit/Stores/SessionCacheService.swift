@@ -13,17 +13,20 @@ public actor SessionCacheService {
   }
 
   let modelContainer: ModelContainer
+  let databaseURL: URL?
   let beforeSave: () async throws -> Void
   let saveChanges: (ModelContext) throws -> Void
 
   public init(
     modelContainer: ModelContainer,
+    databaseURL: URL? = nil,
     beforeSave: @escaping @Sendable () async throws -> Void = {},
     saveChanges: @escaping @Sendable (ModelContext) throws -> Void = { context in
       try context.save()
     }
   ) {
     self.modelContainer = modelContainer
+    self.databaseURL = databaseURL
     self.beforeSave = beforeSave
     self.saveChanges = saveChanges
   }
