@@ -95,7 +95,7 @@ datasources:
     uid: tokio-console
     type: bsull-console-datasource
     access: proxy
+    url: http://host.docker.internal:6669
     editable: false
     jsonData:
-      url: "http://host.docker.internal:6669"
-      retainFor: "6s"
+      retainFor: 6
