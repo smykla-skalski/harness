@@ -9,6 +9,24 @@ datasources:
     isDefault: true
     editable: false
 
+  - name: SQLite Daemon
+    uid: sqlite-daemon
+    type: frser-sqlite-datasource
+    access: proxy
+    editable: false
+    jsonData:
+      path: /srv/sqlite/daemon/harness.db
+      pathOptions: mode=ro
+
+  - name: SQLite Monitor
+    uid: sqlite-monitor
+    type: frser-sqlite-datasource
+    access: proxy
+    editable: false
+    jsonData:
+      path: /srv/sqlite/monitor/harness-cache.store
+      pathOptions: mode=ro
+
   - name: Loki
     uid: loki
     type: loki

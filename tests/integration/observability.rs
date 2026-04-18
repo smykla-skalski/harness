@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::Deserialize;
 use serde_json::Value;
 
 #[derive(Debug)]
@@ -76,6 +78,69 @@ fn sqlite_exporter_query_health_panel_uses_exporter_counter_metric() {
     );
 }
 
+#[test]
+fn grafana_compose_installs_sqlite_plugin_and_mounts_live_databases() {
+    let compose: ComposeFile = load_yaml_file("resources/observability/docker-compose.yml");
+    let grafana = compose
+        .services
+        .get("grafana")
+        .expect("grafana service should exist");
+    let plugin_list = grafana
+        .environment
+        .as_ref()
+        .and_then(|env| env.get("GF_PLUGINS_PREINSTALL_SYNC"))
+        .expect("grafana should declare preinstalled plugins");
+    let volumes = grafana
+        .volumes
+        .as_ref()
+        .expect("grafana should declare volumes");
+
+    assert!(
+        plugin_list.contains("frser-sqlite-datasource"),
+        "grafana should install the sqlite datasource plugin, got: {plugin_list}"
+    );
+    assert_eq!(
+        grafana.user.as_deref(),
+        Some("0"),
+        "grafana should run as root so the sqlite plugin can query live WAL databases"
+    );
+    assert!(
+        volumes.contains(&"${HARNESS_SQLITE_EXPORTER_DAEMON_DIR}:/srv/sqlite/daemon:rw".to_string()),
+        "grafana should mount the daemon sqlite directory read-write"
+    );
+    assert!(
+        volumes.contains(&"${HARNESS_SQLITE_EXPORTER_MONITOR_DIR}:/srv/sqlite/monitor:rw".to_string()),
+        "grafana should mount the monitor sqlite directory read-write"
+    );
+}
+
+#[test]
+fn grafana_provisions_sqlite_datasources_for_daemon_and_monitor_databases() {
+    let provisioning: DatasourceProvisioning =
+        load_yaml_file("resources/observability/grafana/provisioning/datasources/datasources.yml");
+    let daemon = provisioning
+        .datasources
+        .iter()
+        .find(|datasource| datasource.uid == "sqlite-daemon")
+        .expect("missing sqlite-daemon datasource");
+    let monitor = provisioning
+        .datasources
+        .iter()
+        .find(|datasource| datasource.uid == "sqlite-monitor")
+        .expect("missing sqlite-monitor datasource");
+
+    assert_eq!(daemon.kind, "frser-sqlite-datasource");
+    assert_eq!(
+        daemon.json_data.path.as_deref(),
+        Some("/srv/sqlite/daemon/harness.db")
+    );
+    assert_eq!(monitor.kind, "frser-sqlite-datasource");
+    assert_eq!(
+        monitor.json_data.path.as_deref(),
+        Some("/srv/sqlite/monitor/harness-cache.store")
+    );
+}
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -86,6 +151,15 @@ fn load_dashboard(name: &str) -> Value {
         .join(name);
     let content = fs::read_to_string(&path).unwrap();
     serde_json::from_str(&content).unwrap()
+}
+
+fn load_yaml_file<T>(relative_path: &str) -> T
+where
+    T: for<'de> Deserialize<'de>,
+{
+    let path = repo_root().join(relative_path);
+    let content = fs::read_to_string(&path).unwrap();
+    serde_yml::from_str(&content).unwrap()
 }
 
 fn dashboard_json_paths(root: &Path) -> Vec<PathBuf> {
@@ -142,4 +216,39 @@ fn collect_trace_links_inner(value: &Value, links: &mut Vec<DashboardLink>) {
         }
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct ComposeFile {
+    services: BTreeMap<String, ComposeService>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ComposeService {
+    #[serde(default)]
+    environment: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    user: Option<String>,
+    #[serde(default)]
+    volumes: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DatasourceProvisioning {
+    datasources: Vec<ProvisionedDatasource>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProvisionedDatasource {
+    uid: String,
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(rename = "jsonData", default)]
+    json_data: SqliteDatasourceJsonData,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SqliteDatasourceJsonData {
+    #[serde(default)]
+    path: Option<String>,
 }
