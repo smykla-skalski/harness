@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -16,7 +19,6 @@ use tokio::task::JoinHandle;
 const GRAFANA_SERVICE_ACCOUNT_NAME: &str = "codex-grafana-mcp";
 const GRAFANA_SERVICE_ACCOUNT_ID: i64 = 7;
 const STALE_TOKEN: &str = "stale-token";
-const FRESH_TOKEN: &str = "fresh-token";
 const GRAFANA_ADMIN_USER: &str = "observability-admin";
 const GRAFANA_ADMIN_PASSWORD: &str = "observability-password";
 
@@ -32,6 +34,7 @@ struct FakeGrafanaState {
     requests: Vec<LoggedRequest>,
     service_account_exists: bool,
     issued_token_count: usize,
+    current_valid_token: Option<String>,
 }
 
 struct FakeGrafanaServer {
@@ -100,8 +103,14 @@ async fn search_dashboards(
     Query(_query): Query<HashMap<String, String>>,
 ) -> (StatusCode, Json<Value>) {
     record_request(&state, "GET", "/api/search", &headers);
-    match authorization_header(&headers).as_deref() {
-        Some(value) if value == format!("Bearer {FRESH_TOKEN}") => (
+    let expected_authorization = state
+        .lock()
+        .expect("lock fake grafana")
+        .current_valid_token
+        .as_ref()
+        .map(|token| format!("Bearer {token}"));
+    match (authorization_header(&headers), expected_authorization) {
+        (Some(actual), Some(expected)) if actual == expected => (
             StatusCode::OK,
             Json(json!([{ "title": "Harness System Overview" }])),
         ),
@@ -190,12 +199,14 @@ async fn create_service_account_token(
     let mut guard = state.lock().expect("lock fake grafana");
     guard.service_account_exists = true;
     guard.issued_token_count += 1;
+    let token = format!("fresh-token-{}", guard.issued_token_count);
+    guard.current_valid_token = Some(token.clone());
     (
         StatusCode::OK,
         Json(json!({
             "id": guard.issued_token_count,
             "name": format!("token-{}", guard.issued_token_count),
-            "key": FRESH_TOKEN
+            "key": token
         })),
     )
 }
@@ -241,7 +252,7 @@ fn parse_output_lines(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-fn write_fake_uvx(path: &PathBuf) {
+fn write_fake_uvx_env_printer(path: &PathBuf) {
     std::fs::create_dir_all(path.parent().expect("fake uvx parent")).expect("create fake uvx dir");
     std::fs::write(
         path,
@@ -253,8 +264,252 @@ fn write_fake_uvx(path: &PathBuf) {
         .expect("chmod fake uvx");
 }
 
+fn write_fake_uvx_mcp_server(path: &PathBuf) {
+    std::fs::create_dir_all(path.parent().expect("fake uvx parent")).expect("create fake uvx dir");
+    std::fs::write(
+        path,
+        r#"#!/usr/bin/env python3
+import json
+import os
+import pathlib
+import sys
+
+log_path = os.environ.get("FAKE_UVX_START_LOG")
+if log_path:
+    pathlib.Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "a", encoding="utf-8") as handle:
+        handle.write(os.environ.get("GRAFANA_SERVICE_ACCOUNT_TOKEN", "") + "\n")
+
+def read_message():
+    content_length = None
+    while True:
+        line = sys.stdin.buffer.readline()
+        if line == b"":
+            return None
+        if line in (b"\r\n", b"\n"):
+            break
+        header = line.decode("utf-8").strip()
+        if header.lower().startswith("content-length:"):
+            content_length = int(header.split(":", 1)[1].strip())
+    if content_length is None:
+        raise SystemExit("missing Content-Length header")
+    return json.loads(sys.stdin.buffer.read(content_length))
+
+def write_message(payload):
+    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    sys.stdout.buffer.write(f"Content-Length: {len(body)}\r\n\r\n".encode("ascii"))
+    sys.stdout.buffer.write(body)
+    sys.stdout.buffer.flush()
+
+token = os.environ.get("GRAFANA_SERVICE_ACCOUNT_TOKEN", "")
+
+while True:
+    message = read_message()
+    if message is None:
+        break
+    method = message.get("method")
+    if method == "initialize":
+        write_message(
+            {
+                "jsonrpc": "2.0",
+                "id": message["id"],
+                "result": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {},
+                    "serverInfo": {"name": "fake-grafana", "version": token},
+                },
+            }
+        )
+    elif method == "tools/list":
+        write_message(
+            {
+                "jsonrpc": "2.0",
+                "id": message["id"],
+                "result": {"tools": [{"name": token}]},
+            }
+        )
+"#,
+    )
+    .expect("write fake uvx mcp server");
+    #[allow(clippy::permissions_set_readonly_false)]
+    std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod fake uvx mcp server");
+}
+
+fn write_mcp_message(stdin: &mut ChildStdin, payload: &Value) {
+    let body = serde_json::to_vec(payload).expect("serialize mcp payload");
+    write!(stdin, "Content-Length: {}\r\n\r\n", body.len()).expect("write mcp header");
+    stdin.write_all(&body).expect("write mcp body");
+    stdin.flush().expect("flush mcp body");
+}
+
+fn read_mcp_message(stdout: &mut BufReader<ChildStdout>) -> Value {
+    let mut content_length = None;
+    loop {
+        let mut line = String::new();
+        let bytes = stdout.read_line(&mut line).expect("read mcp header line");
+        assert!(bytes > 0, "unexpected EOF while reading mcp headers");
+        if line == "\r\n" || line == "\n" {
+            break;
+        }
+        if let Some(value) = line.trim().strip_prefix("Content-Length:") {
+            content_length = Some(value.trim().parse::<usize>().expect("parse content length"));
+        }
+    }
+    let content_length = content_length.expect("missing Content-Length header");
+    let mut body = vec![0; content_length];
+    stdout.read_exact(&mut body).expect("read mcp body");
+    serde_json::from_slice(&body).expect("decode mcp body")
+}
+
+fn wait_for<F>(description: &str, predicate: F)
+where
+    F: Fn() -> bool,
+{
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        if predicate() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    panic!("timed out waiting for {description}");
+}
+
+fn read_log_tokens(path: &PathBuf) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn spawn_launcher(
+    launcher_path: &PathBuf,
+    repo: &PathBuf,
+    home: &PathBuf,
+    xdg_config_home: &PathBuf,
+    xdg_data_home: &PathBuf,
+    fake_bin_dir: &PathBuf,
+    start_log_path: &PathBuf,
+) -> Child {
+    let path_env = format!(
+        "{}:{}",
+        fake_bin_dir.display(),
+        std::env::var("PATH").expect("PATH")
+    );
+    Command::new(launcher_path)
+        .current_dir(repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", home)
+        .env("PATH", path_env)
+        .env("XDG_CONFIG_HOME", xdg_config_home)
+        .env("XDG_DATA_HOME", xdg_data_home)
+        .env("FAKE_UVX_START_LOG", start_log_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn grafana launcher")
+}
+
 #[test]
-fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation() {
+fn observability_refreshes_stale_grafana_token_after_stack_recreation() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_grafana = FakeGrafanaServer::start();
+
+    let home = tmp.path().join("home");
+    let xdg_config_home = tmp.path().join("xdg-config");
+    let xdg_data_home = tmp.path().join("xdg-data");
+
+    let config_output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--write-shared-config-fixture")
+        .arg("false")
+        .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", &xdg_config_home)
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .env("HARNESS_GRAFANA_URL", &fake_grafana.base_url)
+        .output()
+        .expect("write shared config fixture");
+    assert!(
+        config_output.status.success(),
+        "shared config helper failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&config_output.stdout),
+        String::from_utf8_lossy(&config_output.stderr)
+    );
+    let token_path = xdg_config_home
+        .join("harness/observability")
+        .join("grafana-mcp.token");
+    std::fs::create_dir_all(token_path.parent().expect("token parent")).expect("create token dir");
+    std::fs::write(&token_path, STALE_TOKEN).expect("write stale token");
+
+    let refresh_run = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--refresh-grafana-mcp-token-fixture")
+        .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", &xdg_config_home)
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .output()
+        .expect("run token refresh helper");
+    assert!(
+        refresh_run.status.success(),
+        "token refresh helper failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&refresh_run.stdout),
+        String::from_utf8_lossy(&refresh_run.stderr)
+    );
+    assert_eq!(
+        std::fs::read_to_string(&token_path).expect("read rotated token"),
+        "fresh-token-1"
+    );
+    assert_eq!(fake_grafana.issued_token_count(), 1);
+
+    let requests = fake_grafana.requests();
+    assert!(
+        requests.iter().any(|request| {
+            request.method == "GET"
+                && request.path == "/api/search"
+                && request.authorization.as_deref() == Some(&format!("Bearer {STALE_TOKEN}"))
+        }),
+        "expected stale token validation request, got: {requests:?}"
+    );
+    assert!(
+        requests.iter().any(|request| {
+            request.method == "GET"
+                && request.path == "/api/serviceaccounts/search"
+                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
+        }),
+        "expected basic-auth service account lookup, got: {requests:?}"
+    );
+    assert!(
+        requests.iter().any(|request| {
+            request.method == "POST"
+                && request.path == "/api/serviceaccounts"
+                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
+        }),
+        "expected service account creation, got: {requests:?}"
+    );
+    assert!(
+        requests.iter().any(|request| {
+            request.method == "POST"
+                && request.path
+                    == format!("/api/serviceaccounts/{GRAFANA_SERVICE_ACCOUNT_ID}/tokens")
+                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
+        }),
+        "expected token creation, got: {requests:?}"
+    );
+}
+
+#[test]
+fn observability_child_launcher_rotates_stale_grafana_token() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fake_grafana = FakeGrafanaServer::start();
@@ -264,7 +519,87 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
     let xdg_data_home = tmp.path().join("xdg-data");
     let fake_bin_dir = tmp.path().join("fake-bin");
     let fake_uvx_path = fake_bin_dir.join("uvx");
-    write_fake_uvx(&fake_uvx_path);
+    write_fake_uvx_env_printer(&fake_uvx_path);
+
+    let config_output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--write-shared-config-fixture")
+        .arg("false")
+        .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", &xdg_config_home)
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .env("HARNESS_GRAFANA_URL", &fake_grafana.base_url)
+        .output()
+        .expect("write shared config fixture");
+    assert!(
+        config_output.status.success(),
+        "shared config helper failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&config_output.stdout),
+        String::from_utf8_lossy(&config_output.stderr)
+    );
+
+    let token_path = xdg_config_home
+        .join("harness/observability")
+        .join("grafana-mcp.token");
+    std::fs::create_dir_all(token_path.parent().expect("token parent")).expect("create token dir");
+    std::fs::write(&token_path, STALE_TOKEN).expect("write stale token");
+
+    let path_env = format!(
+        "{}:{}",
+        fake_bin_dir.display(),
+        std::env::var("PATH").expect("PATH")
+    );
+    let child_run = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--launch-grafana-mcp-child")
+        .arg("--help")
+        .current_dir(&repo)
+        .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
+        .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
+        .env("HOME", &home)
+        .env("PATH", path_env)
+        .env("XDG_CONFIG_HOME", &xdg_config_home)
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .output()
+        .expect("run grafana child launcher");
+    assert!(
+        child_run.status.success(),
+        "grafana child launcher failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&child_run.stdout),
+        String::from_utf8_lossy(&child_run.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&child_run.stdout);
+    assert!(
+        stdout.contains(&format!("GRAFANA_URL={}", fake_grafana.base_url)),
+        "expected child launcher to export fake grafana url, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("GRAFANA_SERVICE_ACCOUNT_TOKEN=fresh-token-1"),
+        "expected child launcher to rotate the stale token, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("ARGS=mcp-grafana --help"),
+        "expected child launcher to invoke uvx mcp-grafana, got: {stdout}"
+    );
+}
+
+#[test]
+fn observability_launcher_restarts_child_after_token_refresh() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_grafana = FakeGrafanaServer::start();
+
+    let home = tmp.path().join("home");
+    let xdg_config_home = tmp.path().join("xdg-config");
+    let xdg_data_home = tmp.path().join("xdg-data");
+    let fake_bin_dir = tmp.path().join("fake-bin");
+    let fake_uvx_path = fake_bin_dir.join("uvx");
+    let start_log_path = tmp.path().join("fake-uvx-starts.log");
+    write_fake_uvx_mcp_server(&fake_uvx_path);
 
     let config_output = Command::new("/bin/bash")
         .arg(repo.join("scripts/observability.sh"))
@@ -316,80 +651,110 @@ fn observability_launcher_refreshes_stale_grafana_token_after_stack_recreation()
     std::fs::create_dir_all(token_path.parent().expect("token parent")).expect("create token dir");
     std::fs::write(&token_path, STALE_TOKEN).expect("write stale token");
 
-    let path_env = format!(
-        "{}:{}",
-        fake_bin_dir.display(),
-        std::env::var("PATH").expect("PATH")
+    let mut launcher = spawn_launcher(
+        &launcher_path,
+        &repo,
+        &home,
+        &xdg_config_home,
+        &xdg_data_home,
+        &fake_bin_dir,
+        &start_log_path,
     );
-    let launcher_run = Command::new(&launcher_path)
-        .arg("--help")
+    let mut stdin = launcher.stdin.take().expect("launcher stdin");
+    let stdout = launcher.stdout.take().expect("launcher stdout");
+    let mut stdout = BufReader::new(stdout);
+
+    write_mcp_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "grafana-test", "version": "1.0"}
+            }
+        }),
+    );
+    let initialize_response = read_mcp_message(&mut stdout);
+    assert_eq!(initialize_response["id"], 1);
+    assert_eq!(
+        initialize_response["result"]["serverInfo"]["version"],
+        "fresh-token-1"
+    );
+
+    write_mcp_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {}
+        }),
+    );
+    write_mcp_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    let first_tools_response = read_mcp_message(&mut stdout);
+    assert_eq!(first_tools_response["id"], 2);
+    assert_eq!(
+        first_tools_response["result"]["tools"][0]["name"],
+        "fresh-token-1"
+    );
+
+    std::fs::write(&token_path, STALE_TOKEN).expect("overwrite token with stale value");
+    let refresh_run = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--refresh-grafana-mcp-token-fixture")
         .current_dir(&repo)
         .env("GF_SECURITY_ADMIN_USER", GRAFANA_ADMIN_USER)
         .env("GF_SECURITY_ADMIN_PASSWORD", GRAFANA_ADMIN_PASSWORD)
         .env("HOME", &home)
-        .env("PATH", path_env)
         .env("XDG_CONFIG_HOME", &xdg_config_home)
         .env("XDG_DATA_HOME", &xdg_data_home)
         .output()
-        .expect("run launcher");
+        .expect("run token refresh helper");
     assert!(
-        launcher_run.status.success(),
-        "launcher failed: stdout={} stderr={}",
-        String::from_utf8_lossy(&launcher_run.stdout),
-        String::from_utf8_lossy(&launcher_run.stderr)
+        refresh_run.status.success(),
+        "token refresh helper failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&refresh_run.stdout),
+        String::from_utf8_lossy(&refresh_run.stderr)
     );
 
-    let stdout = String::from_utf8_lossy(&launcher_run.stdout);
-    assert!(
-        stdout.contains(&format!("GRAFANA_URL={}", fake_grafana.base_url)),
-        "expected launcher to export fake grafana url, got: {stdout}"
+    wait_for("second token issuance", || {
+        fake_grafana.issued_token_count() == 2
+    });
+    wait_for("launcher restart with refreshed token", || {
+        let tokens = read_log_tokens(&start_log_path);
+        tokens.len() >= 2 && tokens.last().is_some_and(|token| token == "fresh-token-2")
+    });
+
+    write_mcp_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/list",
+            "params": {}
+        }),
     );
-    assert!(
-        stdout.contains(&format!("GRAFANA_SERVICE_ACCOUNT_TOKEN={FRESH_TOKEN}")),
-        "expected launcher to rotate the stale token, got: {stdout}"
-    );
-    assert!(
-        stdout.contains("ARGS=mcp-grafana --help"),
-        "expected launcher to invoke uvx mcp-grafana, got: {stdout}"
-    );
+    let second_tools_response = read_mcp_message(&mut stdout);
+    assert_eq!(second_tools_response["id"], 3);
     assert_eq!(
-        std::fs::read_to_string(&token_path).expect("read rotated token"),
-        FRESH_TOKEN
+        second_tools_response["result"]["tools"][0]["name"],
+        "fresh-token-2"
     );
-    assert_eq!(fake_grafana.issued_token_count(), 1);
 
-    let requests = fake_grafana.requests();
+    drop(stdin);
+    let status = launcher.wait().expect("wait for launcher exit");
     assert!(
-        requests.iter().any(|request| {
-            request.method == "GET"
-                && request.path == "/api/search"
-                && request.authorization.as_deref() == Some(&format!("Bearer {STALE_TOKEN}"))
-        }),
-        "expected stale token validation request, got: {requests:?}"
-    );
-    assert!(
-        requests.iter().any(|request| {
-            request.method == "GET"
-                && request.path == "/api/serviceaccounts/search"
-                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
-        }),
-        "expected basic-auth service account lookup, got: {requests:?}"
-    );
-    assert!(
-        requests.iter().any(|request| {
-            request.method == "POST"
-                && request.path == "/api/serviceaccounts"
-                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
-        }),
-        "expected service account creation, got: {requests:?}"
-    );
-    assert!(
-        requests.iter().any(|request| {
-            request.method == "POST"
-                && request.path
-                    == format!("/api/serviceaccounts/{GRAFANA_SERVICE_ACCOUNT_ID}/tokens")
-                && request.authorization.as_deref() == Some(expected_basic_admin_auth().as_str())
-        }),
-        "expected token creation, got: {requests:?}"
+        status.success(),
+        "launcher did not exit cleanly: {status:?}"
     );
 }
