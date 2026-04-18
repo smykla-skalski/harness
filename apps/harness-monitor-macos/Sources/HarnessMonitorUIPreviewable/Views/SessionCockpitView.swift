@@ -39,56 +39,58 @@ struct SessionCockpitView: View {
   }
 
   var body: some View {
-    HarnessMonitorColumnScrollView(
-      verticalPadding: HarnessMonitorTheme.spacingXL,
-      constrainContentWidth: true
-    ) {
-      VStack(alignment: .leading, spacing: 16) {
-        SessionCockpitHeaderCard(
-          store: store,
-          detail: detail,
-          isSessionReadOnly: isSessionReadOnly,
-          observeSelectedSession: { Task { await store.observeSelectedSession() } },
-          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-          inspectObserver: store.inspectObserver
-        )
-        SessionMetricGrid(
-          metrics: detail.session.metrics
-        )
-        SessionActionDock(
-          detail: detail,
-          inspectTask: store.inspect(taskID:),
-          inspectAgent: store.inspect(agentID:),
-          inspectObserver: store.inspectObserver,
-          openAgentTui: { openWindow(id: HarnessMonitorWindowID.agentTui) },
-          isCodexFlowAvailable: store.isCodexFlowAvailable,
-          openCodexFlow: store.presentCodexFlowSheet
-        )
-        HarnessMonitorAdaptiveGridLayout(
-          minimumColumnWidth: 340,
-          maximumColumns: 2,
-          spacing: 16
-        ) {
-          taskSection
-          agentSection
-        }
-        SessionCockpitSignalsSection(
-          store: store,
-          signals: detail.signals,
-          isExtensionsLoading: isExtensionsLoading,
-          isSessionReadOnly: isSessionReadOnly
-        )
-        SessionCockpitTimelineSection(
-          sessionID: detail.session.sessionId,
-          timeline: timeline,
-          timelineWindow: timelineWindow,
-          isTimelineLoading: isTimelineLoading,
-          loadPage: { page, pageSize in
-            await store.loadSelectedTimelinePage(page: page, pageSize: pageSize)
+    ViewBodySignposter.measure("SessionCockpitView") {
+      HarnessMonitorColumnScrollView(
+        verticalPadding: HarnessMonitorTheme.spacingXL,
+        constrainContentWidth: true
+      ) {
+        VStack(alignment: .leading, spacing: 16) {
+          SessionCockpitHeaderCard(
+            store: store,
+            detail: detail,
+            isSessionReadOnly: isSessionReadOnly,
+            observeSelectedSession: { Task { await store.observeSelectedSession() } },
+            requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+            inspectObserver: store.inspectObserver
+          )
+          SessionMetricGrid(
+            metrics: detail.session.metrics
+          )
+          SessionActionDock(
+            detail: detail,
+            inspectTask: store.inspect(taskID:),
+            inspectAgent: store.inspect(agentID:),
+            inspectObserver: store.inspectObserver,
+            openAgentTui: { openWindow(id: HarnessMonitorWindowID.agentTui) },
+            isCodexFlowAvailable: store.isCodexFlowAvailable,
+            openCodexFlow: store.presentCodexFlowSheet
+          )
+          HarnessMonitorAdaptiveGridLayout(
+            minimumColumnWidth: 340,
+            maximumColumns: 2,
+            spacing: 16
+          ) {
+            taskSection
+            agentSection
           }
-        )
+          SessionCockpitSignalsSection(
+            store: store,
+            signals: detail.signals,
+            isExtensionsLoading: isExtensionsLoading,
+            isSessionReadOnly: isSessionReadOnly
+          )
+          SessionCockpitTimelineSection(
+            sessionID: detail.session.sessionId,
+            timeline: timeline,
+            timelineWindow: timelineWindow,
+            isTimelineLoading: isTimelineLoading,
+            loadPage: { page, pageSize in
+              await store.loadSelectedTimelinePage(page: page, pageSize: pageSize)
+            }
+          )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 

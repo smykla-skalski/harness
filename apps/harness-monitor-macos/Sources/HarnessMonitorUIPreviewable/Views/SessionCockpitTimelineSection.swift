@@ -92,85 +92,90 @@ struct SessionCockpitTimelineSection: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      Text("Timeline")
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
-      if presentation.totalCount == 0 && isTimelineLoading == false {
-        SessionCockpitEmptyStateRow(section: .timeline)
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-          SessionTimelinePageSummary(
-            rangeText: pageRangeText,
-            pageSize: $pageSize
-          )
-
-          placeholderAwareTimelineRows
-            .id(contentIdentity)
-
-          if showsPagination {
-            SessionTimelinePaginationFooter(
-              currentPage: visiblePage,
-              pageCount: pageCount,
-              pageStatusText: pageStatusText,
-              visiblePages: SessionTimelinePagination.visiblePages(
-                currentPage: visiblePage,
-                pageCount: pageCount
-              ),
-              goToPreviousPage: { changePage(to: visiblePage - 1) },
-              goToNextPage: { changePage(to: visiblePage + 1) },
-              goToPage: changePage(to:)
+    ViewBodySignposter.measure("SessionCockpitTimelineSection") {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        Text("Timeline")
+          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+        if presentation.totalCount == 0 && isTimelineLoading == false {
+          SessionCockpitEmptyStateRow(section: .timeline)
+        } else {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+            SessionTimelinePageSummary(
+              rangeText: pageRangeText,
+              pageSize: $pageSize
             )
-            .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
+
+            placeholderAwareTimelineRows
+              .id(contentIdentity)
+
+            if showsPagination {
+              SessionTimelinePaginationFooter(
+                currentPage: visiblePage,
+                pageCount: pageCount,
+                pageStatusText: pageStatusText,
+                visiblePages: SessionTimelinePagination.visiblePages(
+                  currentPage: visiblePage,
+                  pageCount: pageCount
+                ),
+                goToPreviousPage: { changePage(to: visiblePage - 1) },
+                goToNextPage: { changePage(to: visiblePage + 1) },
+                goToPage: changePage(to:)
+              )
+              .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
+            }
+          }
+          .padding(HarnessMonitorTheme.spacingLG)
+          .background {
+            RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+              .fill(.primary.opacity(0.035))
+              .overlay {
+                RoundedRectangle(
+                  cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
+                  style: .continuous
+                )
+                .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+              }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .onChange(of: sessionID) { _, _ in
+            retainedPage = nil
+            updateCurrentPageIfNeeded(0, animated: false)
+            requestVisiblePageIfNeeded(page: 0)
+          }
+          .onChange(of: pageSize) { oldPageSize, newPageSize in
+            retainedPage = nil
+            let rebasedPage = SessionTimelinePagination.rebasedPage(
+              currentPage,
+              itemCount: presentation.totalCount,
+              oldPageSize: oldPageSize.rawValue,
+              newPageSize: newPageSize.rawValue
+            )
+            updateCurrentPageIfNeeded(rebasedPage, animated: true)
+            requestVisiblePageIfNeeded(page: rebasedPage)
+          }
+          .onChange(of: timeline.count) { _, _ in
+            rememberVisiblePageIfNeeded()
+            requestVisiblePageIfNeeded(page: requestedPage)
+          }
+          .onChange(of: presentation.needsRefresh, initial: true) { _, needsRefresh in
+            // Safety net: if metadata reports entries but the list arrived empty
+            // (stale cache/window survived an entry wipe, daemon responded with
+            // an unchanged revision while we had nothing loaded, etc.) reload
+            // the page so the user never sees a frozen "Showing 0-0 of N" card.
+            guard needsRefresh else { return }
+            requestVisiblePageIfNeeded(page: requestedPage)
+          }
+          .onAppear {
+            rememberVisiblePageIfNeeded()
+          }
+          .onChange(of: requestedDisplay) { _, _ in
+            rememberVisiblePageIfNeeded()
           }
         }
-        .padding(HarnessMonitorTheme.spacingLG)
-        .background {
-          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-            .fill(.primary.opacity(0.035))
-            .overlay {
-              RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-                .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onChange(of: sessionID) { _, _ in
-          retainedPage = nil
-          updateCurrentPageIfNeeded(0, animated: false)
-          requestVisiblePageIfNeeded(page: 0)
-        }
-        .onChange(of: pageSize) { oldPageSize, newPageSize in
-          retainedPage = nil
-          let rebasedPage = SessionTimelinePagination.rebasedPage(
-            currentPage,
-            itemCount: presentation.totalCount,
-            oldPageSize: oldPageSize.rawValue,
-            newPageSize: newPageSize.rawValue
-          )
-          updateCurrentPageIfNeeded(rebasedPage, animated: true)
-          requestVisiblePageIfNeeded(page: rebasedPage)
-        }
-        .onChange(of: timeline.count) { _, _ in
-          rememberVisiblePageIfNeeded()
-          requestVisiblePageIfNeeded(page: requestedPage)
-        }
-        .onChange(of: presentation.needsRefresh, initial: true) { _, needsRefresh in
-          // Safety net: if metadata reports entries but the list arrived empty
-          // (stale cache/window survived an entry wipe, daemon responded with
-          // an unchanged revision while we had nothing loaded, etc.) reload
-          // the page so the user never sees a frozen "Showing 0-0 of N" card.
-          guard needsRefresh else { return }
-          requestVisiblePageIfNeeded(page: requestedPage)
-        }
-        .onAppear {
-          rememberVisiblePageIfNeeded()
-        }
-        .onChange(of: requestedDisplay) { _, _ in
-          rememberVisiblePageIfNeeded()
-        }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   @ViewBuilder private var placeholderAwareTimelineRows: some View {
@@ -402,7 +407,6 @@ private struct SessionCockpitTimelinePlaceholderRow: View {
   .padding()
   .frame(width: 960)
 }
-
 #Preview("Timeline") {
   SessionCockpitTimelineSection(
     sessionID: PreviewFixtures.summary.sessionId,
