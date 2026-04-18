@@ -1,4 +1,11 @@
 {
+  "layout": {
+    "kind": "auto-grid",
+    "spec": {
+      "maxColumns": 4,
+      "minColumnWidth": 300
+    }
+  },
   "annotations": {
     "list": [
       {
