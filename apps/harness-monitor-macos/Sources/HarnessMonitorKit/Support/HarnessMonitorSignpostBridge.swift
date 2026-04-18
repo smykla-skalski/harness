@@ -37,4 +37,14 @@ public final class HarnessMonitorSignpostBridge: @unchecked Sendable {
     }
     span?.end()
   }
+
+  @MainActor
+  public func withInterval<T>(
+    name: StaticString,
+    _ operation: @MainActor () async throws -> T
+  ) async rethrows -> T {
+    let (state, _) = beginInterval(name: name)
+    defer { endInterval(name: name, state: state) }
+    return try await operation()
+  }
 }
