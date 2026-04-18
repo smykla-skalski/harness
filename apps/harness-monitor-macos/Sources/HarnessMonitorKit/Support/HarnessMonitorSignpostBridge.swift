@@ -41,9 +41,15 @@ public final class HarnessMonitorSignpostBridge: @unchecked Sendable {
   @MainActor
   public func withInterval<T>(
     name: StaticString,
+    flushOnCompletion: Bool = false,
     _ operation: @MainActor () async throws -> T
   ) async rethrows -> T {
     let (state, _) = beginInterval(name: name)
+    defer {
+      if flushOnCompletion {
+        HarnessMonitorTelemetry.shared.forceFlush()
+      }
+    }
     defer { endInterval(name: name, state: state) }
     return try await operation()
   }

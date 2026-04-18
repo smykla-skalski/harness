@@ -391,6 +391,8 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     }
   }
 
+  func forceFlush() { stateLock.withLock { state.exportControl }?.forceFlush() }
+
   func setHTTPExporterSessionForTests(_ session: URLSession?) {
     stateLock.withLock {
       state.httpExporterSessionOverride = session

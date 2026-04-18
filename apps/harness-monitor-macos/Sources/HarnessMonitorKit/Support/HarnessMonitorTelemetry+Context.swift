@@ -15,13 +15,16 @@ extension HarnessMonitorTelemetry {
     _ span: SpanBase,
     _ operation: () throws -> T
   ) rethrows -> T {
-    try OpenTelemetry.instance.contextProvider.withActiveSpan(span, operation)
+    try OpenTelemetryApi.OpenTelemetry.instance.contextProvider.withActiveSpan(span, operation)
   }
 
   func withActiveSpan<T>(
     _ span: SpanBase,
     _ operation: () async throws -> T
   ) async rethrows -> T {
-    try await OpenTelemetry.instance.contextProvider.withActiveSpan(span, operation)
+    try await OpenTelemetryApi.OpenTelemetry.instance.contextProvider.withActiveSpan(
+      span,
+      operation
+    )
   }
 }

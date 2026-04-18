@@ -32,7 +32,10 @@ enum HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async {
-    await signpostBridge.withInterval(name: scenario.signpostName) {
+    await signpostBridge.withInterval(
+      name: scenario.signpostName,
+      flushOnCompletion: true
+    ) {
       switch scenario {
       case .launchDashboard:
         await store.bootstrapIfNeeded()
