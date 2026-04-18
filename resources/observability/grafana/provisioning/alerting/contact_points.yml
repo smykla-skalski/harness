@@ -7,4 +7,4 @@ contactPoints:
       - uid: harness-default-email
         type: email
         settings:
-          addresses: admin@localhost
+          addresses: $GF_ALERTING_EMAIL_ADDRESSES
