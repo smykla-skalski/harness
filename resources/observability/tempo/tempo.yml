@@ -13,6 +13,11 @@ distributor:
         http:
           endpoint: 0.0.0.0:4318
 
+ingester:
+  trace_idle_period: 30s
+  trace_live_period: 2m
+  flush_check_period: 5s
+
 metrics_generator:
   registry:
     external_labels:
@@ -22,6 +27,9 @@ metrics_generator:
     local_blocks:
       filter_server_spans: false
       flush_to_storage: true
+      trace_idle_period: 30s
+      trace_live_period: 2m
+      flush_check_period: 5s
   storage:
     path: /var/lib/tempo/generator/wal
     remote_write:

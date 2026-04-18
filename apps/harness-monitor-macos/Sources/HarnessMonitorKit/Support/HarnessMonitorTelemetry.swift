@@ -1,12 +1,17 @@
 import Foundation
 import OpenTelemetryApi
+import OpenTelemetryConcurrency
 import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
+
+typealias OpenTelemetry = OpenTelemetryApi.OpenTelemetry
+private typealias ConcurrencyOpenTelemetry = OpenTelemetryConcurrency.OpenTelemetry
 
 public final class HarnessMonitorTelemetry: @unchecked Sendable {
   public static let shared = HarnessMonitorTelemetry()
 
   struct DeferredExportActivation {
+    let id = UUID()
     let resource: Resource
     let config: HarnessMonitorObservabilityConfig
     let probeHost: String
@@ -56,6 +61,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       config = nil
     }
 
+    ConcurrencyOpenTelemetry.registerDefaultConcurrencyContextManager()
     OpenTelemetry.registerPropagators(
       textPropagators: [W3CTraceContextPropagator()],
       baggagePropagator: W3CBaggagePropagator()
@@ -66,7 +72,11 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       )
     }
 
-    let activationPlan = registrationPlan(resource: resource, config: config)
+    let activationPlan = registrationPlan(
+      resource: resource,
+      config: config,
+      environment: environment
+    )
 
     let instruments = HarnessMonitorTelemetryInstruments(
       meterProvider: activationPlan.registration.meterProvider
@@ -362,15 +372,23 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
   }
 
   public func shutdown() {
-    let exportControl = stateLock.withLock { () -> HarnessMonitorTelemetryExportControl? in
-      let exportControl = state.exportControl
+    let shutdownPlan = stateLock.withLock { () -> (HarnessMonitorTelemetryExportControl?, Bool) in
+      (state.exportControl, state.deferredExportActivation != nil)
+    }
+    let exportControl = shutdownPlan.0
+    if shutdownPlan.1 {
+      // Preserve buffered telemetry on disk when the collector never became ready.
+      exportControl?.forceFlush()
+      exportControl?.closeTransport()
+    } else {
+      exportControl?.forceFlush()
+      exportControl?.shutdown()
+    }
+    stateLock.withLock {
       state.exportControl = nil
       state.deferredExportActivation = nil
       state.deferredExportActivationInFlight = false
-      return exportControl
     }
-    exportControl?.forceFlush()
-    exportControl?.shutdown()
   }
 
   func setHTTPExporterSessionForTests(_ session: URLSession?) {
@@ -394,25 +412,5 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
       textPropagators: [W3CTraceContextPropagator()],
       baggagePropagator: W3CBaggagePropagator()
     )
-  }
-
-  func makeHTTPExporterClient() -> any HTTPClient {
-    let session = stateLock.withLock { state.httpExporterSessionOverride }
-    guard let session else {
-      return BaseHTTPClient()
-    }
-    return BaseHTTPClient(session: session)
-  }
-
-  private func swiftDataStoreSize(atPath path: String) -> Int64 {
-    let paths = [path, path + "-wal", path + "-shm"]
-    var total: Int64 = 0
-    for candidate in paths {
-      let attrs = try? FileManager.default.attributesOfItem(atPath: candidate)
-      if let size = attrs?[.size] as? Int64 {
-        total += size
-      }
-    }
-    return total
   }
 }

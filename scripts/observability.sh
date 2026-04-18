@@ -759,7 +759,7 @@ wait_for_tempo_service() {
   wait_for_signal \
     "$TEMPO_URL/api/search" \
     "Tempo traces for ${service_name}" \
-    "query={resource.service.name=\"${service_name}\"}"
+    "q={resource.service.name=\"${service_name}\"}"
 }
 
 wait_for_tempo_span() {
@@ -768,7 +768,22 @@ wait_for_tempo_span() {
   wait_for_signal \
     "$TEMPO_URL/api/search" \
     "Tempo span ${span_name} for ${service_name}" \
-    "query={resource.service.name=\"${service_name}\" && name=\"${span_name}\"}"
+    "q={resource.service.name=\"${service_name}\" && name=\"${span_name}\"}"
+}
+
+wait_for_service_graph_edge() {
+  local client_name="$1"
+  local server_name="$2"
+  local connection_type="${3:-}"
+  local query="query=sum(traces_service_graph_request_total{client=\"${client_name}\",server=\"${server_name}\""
+  if [ -n "$connection_type" ]; then
+    query+=",connection_type=\"${connection_type}\""
+  fi
+  query+="})"
+  wait_for_signal \
+    "$PROMETHEUS_URL/api/v1/query" \
+    "Prometheus service graph ${client_name} -> ${server_name}" \
+    "$query"
 }
 
 wait_for_loki_service() {
@@ -1004,6 +1019,9 @@ smoke_stack() {
     "$PROMETHEUS_URL/api/v1/query" \
     "Prometheus SQLite table metrics" \
     "query=sum(harness_sqlite_table_rows{database=~\"daemon_db|monitor_cache\"})"
+  wait_for_service_graph_edge "harness-monitor" "harness-daemon"
+  wait_for_service_graph_edge "harness-daemon" "sqlite" "database"
+  wait_for_service_graph_edge "harness-monitor" "monitor-cache" "database"
 
   wait_for_tempo_service "harness-cli"
   wait_for_tempo_service "harness-hook"
