@@ -107,3 +107,39 @@ run = "./scripts/observability.sh reset"
 [tasks."observability:smoke"]
 description = "Start the local observability stack, emit smoke telemetry, and verify traces, metrics, and logs arrive"
 run = "./scripts/observability.sh smoke"
+
+[tasks."host-metrics:install"]
+description = "Install and start macOS host metrics services (Alloy + darwin-exporter)"
+run = "./scripts/host-metrics.sh install"
+
+[tasks."host-metrics:uninstall"]
+description = "Stop and remove macOS host metrics services"
+run = "./scripts/host-metrics.sh uninstall"
+
+[tasks."host-metrics:start"]
+description = "Start macOS host metrics services"
+run = "./scripts/host-metrics.sh start"
+
+[tasks."host-metrics:stop"]
+description = "Stop macOS host metrics services"
+run = "./scripts/host-metrics.sh stop"
+
+[tasks."host-metrics:restart"]
+description = "Restart macOS host metrics services"
+run = "./scripts/host-metrics.sh restart"
+
+[tasks."host-metrics:status"]
+description = "Show macOS host metrics service status and Prometheus targets"
+run = "./scripts/host-metrics.sh status"
+
+[tasks."host-metrics:metrics"]
+description = "Query current macOS host metrics from Prometheus"
+run = "./scripts/host-metrics.sh metrics"
+
+[tasks."host-metrics:logs"]
+description = "Show recent logs from macOS host metrics services"
+run = "./scripts/host-metrics.sh logs"
+
+[tasks."host-metrics:build-darwin-exporter"]
+description = "Build darwin-exporter from vendor submodule"
+run = "./scripts/host-metrics.sh build-darwin-exporter"

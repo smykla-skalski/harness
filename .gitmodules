@@ -1,0 +1,3 @@
+[submodule "vendor/darwin-exporter"]
+	path = vendor/darwin-exporter
+	url = https://github.com/timansky/darwin-exporter.git
