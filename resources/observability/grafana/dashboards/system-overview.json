@@ -45,6 +45,17 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
+      "title": "SQLite Forensics",
+      "type": "link",
+      "url": "/d/harness-sqlite-forensics"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
       "title": "Service Map",
       "type": "link",
       "url": "/d/harness-service-map"

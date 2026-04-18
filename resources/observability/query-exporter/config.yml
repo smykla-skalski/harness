@@ -1,0 +1,130 @@
+databases:
+  daemon_db:
+    dsn: sqlite:////srv/sqlite/daemon/harness.db
+  monitor_cache:
+    dsn: sqlite:////srv/sqlite/monitor/harness-cache.store
+
+metrics:
+  harness_sqlite_table_rows:
+    type: gauge
+    description: Row counts for selected SQLite tables in the harness observability targets.
+    labels: [entity]
+  harness_sqlite_status_rows:
+    type: gauge
+    description: Status counts for selected SQLite entities in the harness observability targets.
+    labels: [entity, status]
+
+queries:
+  daemon_table_rows:
+    interval: 15
+    databases: [daemon_db]
+    metrics: [harness_sqlite_table_rows]
+    sql: |
+      SELECT 'projects' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM projects
+      UNION ALL
+      SELECT 'sessions' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM sessions
+      UNION ALL
+      SELECT 'agents' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM agents
+      UNION ALL
+      SELECT 'tasks' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM tasks
+      UNION ALL
+      SELECT 'signal_index' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM signal_index
+      UNION ALL
+      SELECT 'session_log' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM session_log
+      UNION ALL
+      SELECT 'task_checkpoints' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM task_checkpoints
+      UNION ALL
+      SELECT 'daemon_events' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM daemon_events
+      UNION ALL
+      SELECT 'conversation_events' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM conversation_events
+      UNION ALL
+      SELECT 'session_timeline_entries' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM session_timeline_entries
+      UNION ALL
+      SELECT 'agent_activity_cache' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM agent_activity_cache
+      UNION ALL
+      SELECT 'change_tracking' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM change_tracking
+      UNION ALL
+      SELECT 'diagnostics_cache' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM diagnostics_cache
+      UNION ALL
+      SELECT 'codex_runs' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM codex_runs
+      UNION ALL
+      SELECT 'agent_tuis' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM agent_tuis
+
+  daemon_status_rows:
+    interval: 15
+    databases: [daemon_db]
+    metrics: [harness_sqlite_status_rows]
+    sql: |
+      SELECT 'sessions' AS entity, COALESCE(status, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM sessions
+      GROUP BY status
+      UNION ALL
+      SELECT 'agents' AS entity, COALESCE(status, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM agents
+      GROUP BY status
+      UNION ALL
+      SELECT 'tasks' AS entity, COALESCE(status, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM tasks
+      GROUP BY status
+      UNION ALL
+      SELECT 'signal_index' AS entity, COALESCE(status, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM signal_index
+      GROUP BY status
+      UNION ALL
+      SELECT 'codex_runs' AS entity, COALESCE(status, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM codex_runs
+      GROUP BY status
+      UNION ALL
+      SELECT 'agent_tuis' AS entity, COALESCE(status, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM agent_tuis
+      GROUP BY status
+
+  monitor_table_rows:
+    interval: 15
+    databases: [monitor_cache]
+    metrics: [harness_sqlite_table_rows]
+    sql: |
+      SELECT 'cached_projects' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDPROJECT
+      UNION ALL
+      SELECT 'cached_sessions' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDSESSION
+      UNION ALL
+      SELECT 'cached_agents' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDAGENT
+      UNION ALL
+      SELECT 'cached_work_items' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDWORKITEM
+      UNION ALL
+      SELECT 'cached_signal_records' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDSIGNALRECORD
+      UNION ALL
+      SELECT 'cached_timeline_entries' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDTIMELINEENTRY
+      UNION ALL
+      SELECT 'cached_agent_activity' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDAGENTACTIVITY
+      UNION ALL
+      SELECT 'cached_observer' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDOBSERVER
+      UNION ALL
+      SELECT 'project_filter_preferences' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZPROJECTFILTERPREFERENCE
+      UNION ALL
+      SELECT 'recent_searches' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZRECENTSEARCH
+      UNION ALL
+      SELECT 'session_bookmarks' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZSESSIONBOOKMARK
+      UNION ALL
+      SELECT 'user_notes' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZUSERNOTE
+
+  monitor_status_rows:
+    interval: 15
+    databases: [monitor_cache]
+    metrics: [harness_sqlite_status_rows]
+    sql: |
+      SELECT 'cached_sessions' AS entity, COALESCE(ZSTATUSRAW, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM ZCACHEDSESSION
+      GROUP BY ZSTATUSRAW
+      UNION ALL
+      SELECT 'cached_agents' AS entity, COALESCE(ZSTATUSRAW, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM ZCACHEDAGENT
+      GROUP BY ZSTATUSRAW
+      UNION ALL
+      SELECT 'cached_work_items' AS entity, COALESCE(ZSTATUSRAW, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM ZCACHEDWORKITEM
+      GROUP BY ZSTATUSRAW
+      UNION ALL
+      SELECT 'cached_signal_records' AS entity, COALESCE(ZSTATUSRAW, 'unknown') AS status, COUNT(*) AS harness_sqlite_status_rows
+      FROM ZCACHEDSIGNALRECORD
+      GROUP BY ZSTATUSRAW
