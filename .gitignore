@@ -4,6 +4,7 @@
 
 # Local scratch
 /tmp/
+/output/
 .envrc
 
 # macOS
