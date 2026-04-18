@@ -41,6 +41,14 @@ resolve_data_root() {
   printf '%s\n' "${HOME}/.local/share"
 }
 
+resolve_config_root() {
+  if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+    printf '%s\n' "$XDG_CONFIG_HOME"
+    return
+  fi
+  printf '%s\n' "${HOME}/.config"
+}
+
 normalize_env_value() {
   local value="${1:-}"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -126,6 +134,14 @@ runtime_shared_config_path() {
   printf '%s/harness/observability/config.json\n' "$(resolve_data_root)"
 }
 
+grafana_mcp_token_path() {
+  printf '%s/harness/observability/grafana-mcp.token\n' "$(resolve_config_root)"
+}
+
+grafana_mcp_launcher_path() {
+  printf '%s\n' "${HARNESS_GRAFANA_MCP_LAUNCHER_PATH:-$HOME/.local/bin/codex-grafana-mcp}"
+}
+
 monitor_shared_config_path() {
   printf '%s/harness/observability/config.json\n' "$(resolve_monitor_data_root)"
 }
@@ -178,6 +194,146 @@ remove_shared_config() {
     [ -n "$config_path" ] || continue
     rm -f "$config_path"
   done < <(shared_config_paths)
+}
+
+python_json_eval() {
+  local input_json="$1"
+  local expression="$2"
+
+  python3 - "$input_json" "$expression" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+expression = sys.argv[2]
+
+if expression == "grafana_url":
+    value = payload.get("grafana_url")
+    if not value:
+        raise SystemExit("grafana_url missing from observability config")
+    print(value)
+elif expression == "service_account_id":
+    for item in payload.get("serviceAccounts", []):
+        if item.get("name") == "codex-grafana-mcp":
+            print(item["id"])
+            break
+elif expression == "created_service_account_id":
+    value = payload.get("id")
+    if value is None:
+        raise SystemExit("missing service account id in Grafana response")
+    print(value)
+elif expression == "token_key":
+    value = payload.get("key")
+    if not value:
+        raise SystemExit("missing token key in Grafana response")
+    print(value)
+else:
+    raise SystemExit(f"unsupported json expression: {expression}")
+PY
+}
+
+read_grafana_url_from_shared_config() {
+  local config_path
+  config_path="$(runtime_shared_config_path)"
+  if [ ! -f "$config_path" ]; then
+    printf 'missing observability config: %s\n' "$config_path" >&2
+    printf 'start the local stack with scripts/observability.sh start first\n' >&2
+    exit 1
+  fi
+  python_json_eval "$(tr -d '\n' <"$config_path")" "grafana_url"
+}
+
+grafana_mcp_api_call() {
+  local grafana_url="$1"
+  local method="$2"
+  local path="$3"
+  shift 3
+
+  curl -fsS \
+    -u "${HARNESS_GRAFANA_ADMIN_USER:-admin}:${HARNESS_GRAFANA_ADMIN_PASSWORD:-admin}" \
+    -H 'Content-Type: application/json' \
+    -X "$method" \
+    "$grafana_url$path" \
+    "$@"
+}
+
+grafana_mcp_token_is_valid() {
+  local grafana_url="$1"
+  local token="$2"
+
+  curl -fsS \
+    -H "Authorization: Bearer $token" \
+    "$grafana_url/api/search?type=dash-db&limit=1" \
+    >/dev/null 2>&1
+}
+
+ensure_grafana_mcp_token() {
+  local grafana_url="$1"
+  local path cached_token response service_account_id token_name token
+
+  path="$(grafana_mcp_token_path)"
+  if [ -f "$path" ]; then
+    cached_token="$(tr -d '\r\n' <"$path")"
+    if [ -n "$cached_token" ] && grafana_mcp_token_is_valid "$grafana_url" "$cached_token"; then
+      printf '%s' "$cached_token"
+      return
+    fi
+  fi
+
+  mkdir -p "$(dirname "$path")"
+  response="$(grafana_mcp_api_call "$grafana_url" GET "/api/serviceaccounts/search?query=codex-grafana-mcp")"
+  service_account_id="$(python_json_eval "$(tr -d '\n' <<<"$response")" "service_account_id" || true)"
+
+  if [ -z "$service_account_id" ]; then
+    response="$(
+      grafana_mcp_api_call \
+        "$grafana_url" \
+        POST \
+        "/api/serviceaccounts" \
+        --data '{"name":"codex-grafana-mcp","role":"Editor","isDisabled":false}'
+    )"
+    service_account_id="$(python_json_eval "$(tr -d '\n' <<<"$response")" "created_service_account_id")"
+  fi
+
+  token_name="codex-$(hostname -s)-$(date +%Y%m%d%H%M%S)"
+  response="$(
+    grafana_mcp_api_call \
+      "$grafana_url" \
+      POST \
+      "/api/serviceaccounts/${service_account_id}/tokens" \
+      --data "{\"name\":\"${token_name}\"}"
+  )"
+  token="$(python_json_eval "$(tr -d '\n' <<<"$response")" "token_key")"
+
+  umask 077
+  printf '%s' "$token" >"$path"
+  printf '%s' "$token"
+}
+
+install_grafana_mcp_launcher() {
+  local launcher_path
+  launcher_path="$(grafana_mcp_launcher_path)"
+  mkdir -p "$(dirname "$launcher_path")"
+  cat >"$launcher_path" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec "$ROOT/scripts/observability.sh" --launch-grafana-mcp "\$@"
+EOF
+  chmod 755 "$launcher_path"
+  printf '%s\n' "$launcher_path"
+}
+
+launch_grafana_mcp() {
+  local grafana_url
+
+  require_tool curl
+  require_tool python3
+  require_tool uvx
+  grafana_url="$(read_grafana_url_from_shared_config)"
+  export GRAFANA_URL="$grafana_url"
+  export GRAFANA_SERVICE_ACCOUNT_TOKEN
+  GRAFANA_SERVICE_ACCOUNT_TOKEN="$(ensure_grafana_mcp_token "$grafana_url")"
+  exec uvx mcp-grafana "$@"
 }
 
 write_monitor_smoke_data_home_marker() {
@@ -264,7 +420,9 @@ start_stack() {
     "/srv/sqlite/monitor/harness-cache.store" \
     "monitor SQLite cache"
   local config_path
+  local launcher_path
   config_path="$(write_shared_config false)"
+  launcher_path="$(install_grafana_mcp_launcher)"
   printf 'Grafana: %s\n' "$GRAFANA_URL"
   printf 'Prometheus: %s\n' "$PROMETHEUS_URL"
   printf 'Tempo: %s\n' "$TEMPO_URL"
@@ -273,6 +431,7 @@ start_stack() {
   printf 'Alloy: %s\n' "$ALLOY_URL"
   printf 'SQLite Exporter: %s\n' "$SQLITE_EXPORTER_URL"
   printf 'Shared config: %s\n' "$config_path"
+  printf 'Grafana MCP Launcher: %s\n' "$launcher_path"
 }
 
 stop_stack() {
@@ -861,6 +1020,13 @@ case "$command" in
     ;;
   --write-shared-config-fixture)
     write_shared_config_fixture "${2:-false}"
+    ;;
+  --install-grafana-mcp-launcher-fixture)
+    install_grafana_mcp_launcher
+    ;;
+  --launch-grafana-mcp)
+    shift
+    launch_grafana_mcp "$@"
     ;;
   *)
     cat <<'EOF' >&2
