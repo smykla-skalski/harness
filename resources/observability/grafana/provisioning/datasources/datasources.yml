@@ -81,3 +81,12 @@ datasources:
     access: proxy
     url: http://pyroscope:4040
     editable: false
+
+  - name: Tokio Console
+    uid: tokio-console
+    type: bsull-console-datasource
+    access: proxy
+    editable: false
+    jsonData:
+      url: "http://host.docker.internal:6669"
+      retainFor: "6s"

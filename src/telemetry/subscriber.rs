@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::Display;
 use std::io;
+#[cfg(feature = "tokio-console")]
+use std::net::SocketAddr;
 
 use opentelemetry::KeyValue;
 use opentelemetry::global;
@@ -19,6 +21,8 @@ use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::fmt;
 use tracing_subscriber::fmt::time::ChronoUtc;
 use tracing_subscriber::prelude::*;
+#[cfg(feature = "tokio-console")]
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::reload;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -124,13 +128,43 @@ pub fn init_tracing_subscriber() -> Result<TelemetryGuard, CliError> {
     }
 }
 
+#[cfg(feature = "tokio-console")]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn build_console_layer<S>() -> Option<Box<dyn tracing_subscriber::Layer<S> + Send + Sync + 'static>>
+where
+    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
+{
+    if env::var("HARNESS_TOKIO_CONSOLE").ok().as_deref() != Some("1") {
+        return None;
+    }
+    let addr: SocketAddr = env::var("HARNESS_TOKIO_CONSOLE_ADDR")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| ([127, 0, 0, 1], 6669).into());
+    tracing::info!(%addr, "tokio-console server starting");
+    Some(Box::new(
+        console_subscriber::ConsoleLayer::builder()
+            .server_addr(addr)
+            .spawn(),
+    ))
+}
+
 fn init_subscriber_without_telemetry(
     filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
     use_json_format: bool,
 ) -> Result<(), CliError> {
+    #[cfg(feature = "tokio-console")]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = build_console_layer();
+    #[cfg(not(feature = "tokio-console"))]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+
     if use_json_format {
         tracing_subscriber::registry()
             .with(filter_layer)
+            .with(console_layer)
             .with(
                 fmt::layer()
                     .json()
@@ -141,6 +175,7 @@ fn init_subscriber_without_telemetry(
     } else {
         tracing_subscriber::registry()
             .with(filter_layer)
+            .with(console_layer)
             .with(
                 fmt::layer()
                     .with_writer(io::stderr)
@@ -166,6 +201,11 @@ fn init_subscriber_with_telemetry(
     global::set_tracer_provider(tracer_provider.clone());
     global::set_meter_provider(meter_provider.clone());
 
+    #[cfg(feature = "tokio-console")]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = build_console_layer();
+    #[cfg(not(feature = "tokio-console"))]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+
     if use_json_format {
         let otel_trace_layer =
             tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -174,6 +214,7 @@ fn init_subscriber_with_telemetry(
                 .with_filter(filter_fn(|metadata| metadata.target().starts_with("harness")));
         tracing_subscriber::registry()
             .with(filter_layer)
+            .with(console_layer)
             .with(
                 fmt::layer()
                     .json()
@@ -191,6 +232,7 @@ fn init_subscriber_with_telemetry(
                 .with_filter(filter_fn(|metadata| metadata.target().starts_with("harness")));
         tracing_subscriber::registry()
             .with(filter_layer)
+            .with(console_layer)
             .with(
                 fmt::layer()
                     .with_writer(io::stderr)
