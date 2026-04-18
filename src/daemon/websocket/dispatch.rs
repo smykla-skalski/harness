@@ -1,19 +1,3 @@
-use std::sync::{Arc, Mutex};
-
-use axum::extract::ws::Message;
-use tokio::time::Instant;
-use tracing::field::{Empty, display};
-
-use crate::daemon::http::DaemonHttpState;
-use crate::daemon::protocol::{
-    AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, WsRequest, WsResponse,
-};
-use crate::daemon::service;
-use crate::telemetry::{apply_parent_context_from_text_map, current_trace_id};
-
 use super::connection::ConnectionState;
 use super::frames::{
     error_response, ok_response, serialize_error_response_frames, serialize_response_frames,
@@ -26,6 +10,19 @@ use super::queries::{
     dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
     handle_stream_subscribe, handle_stream_unsubscribe,
 };
+use crate::daemon::http::DaemonHttpState;
+use crate::daemon::protocol::{
+    AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
+    SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, WsRequest, WsResponse,
+};
+use crate::daemon::service;
+use crate::telemetry::{apply_parent_context_from_text_map, current_trace_id};
+use axum::extract::ws::Message;
+use std::sync::{Arc, Mutex};
+use tokio::time::Instant;
+use tracing::field::{Empty, display};
 
 pub(crate) async fn handle_message(
     text: &str,
