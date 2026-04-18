@@ -34,7 +34,7 @@
       "keepTime": false,
       "tags": [],
       "targetBlank": false,
-      "title": "Traces Drilldown",
+      "title": "Traces Breakdown",
       "type": "link",
       "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
     }
@@ -318,7 +318,7 @@
         {
           "keepTime": false,
           "targetBlank": false,
-          "title": "Open Traces Drilldown",
+          "title": "Open Traces Breakdown",
           "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
         }
       ],
