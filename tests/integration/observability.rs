@@ -79,6 +79,27 @@ fn sqlite_exporter_query_health_panel_uses_exporter_counter_metric() {
 }
 
 #[test]
+fn monitor_dashboard_surfaces_resource_activity_gauges() {
+    let dashboard = load_dashboard("monitor-client.json");
+
+    for (title, metric) in [
+        ("Active Tasks", "sum(harness_monitor_active_tasks)"),
+        ("WS Connections", "sum(harness_monitor_websocket_connections)"),
+        (
+            "Resident Memory",
+            "sum(harness_monitor_memory_resident_bytes)",
+        ),
+        ("Virtual Memory", "sum(harness_monitor_memory_virtual_bytes)"),
+    ] {
+        let expr = panel_expr(&dashboard, title);
+        assert!(
+            expr.contains(metric),
+            "{title} should visualize {metric}, got: {expr}"
+        );
+    }
+}
+
+#[test]
 fn sqlite_forensics_dashboard_includes_daemon_sqlite_tables() {
     let dashboard = load_dashboard("sqlite-forensics.json");
 
