@@ -61,8 +61,31 @@ fn traces_dashboard_links_use_supported_local_views() {
     );
 }
 
+#[test]
+fn sqlite_exporter_query_health_panel_uses_exporter_counter_metric() {
+    let dashboard = load_dashboard("sqlite-forensics.json");
+    let expr = panel_expr(&dashboard, "SQLite Exporter Query Health");
+
+    assert!(
+        expr.contains("queries_total"),
+        "SQLite Exporter Query Health should use the sqlite-exporter counter metric, got: {expr}"
+    );
+    assert!(
+        !expr.contains("rate(queries{"),
+        "SQLite Exporter Query Health should not query the nonexistent `queries` metric: {expr}"
+    );
+}
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn load_dashboard(name: &str) -> Value {
+    let path = repo_root()
+        .join("resources/observability/grafana/dashboards")
+        .join(name);
+    let content = fs::read_to_string(&path).unwrap();
+    serde_json::from_str(&content).unwrap()
 }
 
 fn dashboard_json_paths(root: &Path) -> Vec<PathBuf> {
@@ -73,6 +96,19 @@ fn dashboard_json_paths(root: &Path) -> Vec<PathBuf> {
         .collect::<Vec<_>>();
     paths.sort();
     paths
+}
+
+fn panel_expr(dashboard: &Value, title: &str) -> String {
+    dashboard["panels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|panel| panel["title"].as_str() == Some(title))
+        .and_then(|panel| panel["targets"].as_array())
+        .and_then(|targets| targets.first())
+        .and_then(|target| target["expr"].as_str())
+        .unwrap_or_else(|| panic!("missing panel expression for {title}"))
+        .to_string()
 }
 
 fn collect_trace_links(value: &Value) -> Vec<DashboardLink> {
