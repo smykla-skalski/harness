@@ -69,6 +69,16 @@ struct HarnessMonitorObservabilityPhase5Tests {
     #expect(signpostSpan != nil)
   }
 
+  @Test("Signpost bridge ends the owned OTEL span when the interval finishes")
+  func signpostBridgeEndsOwnedSpanOnIntervalEnd() {
+    let bridge = HarnessMonitorSignpostBridge()
+    let (state, span) = bridge.beginInterval(name: "bridge_owned_interval")
+    #expect(span.isRecording)
+
+    bridge.endInterval(name: "bridge_owned_interval", state: state)
+    #expect(!span.isRecording)
+  }
+
   // MARK: - View Signposter Tests
 
   @Test("View signposter measures view body")

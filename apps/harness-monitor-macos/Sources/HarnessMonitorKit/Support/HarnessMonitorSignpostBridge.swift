@@ -32,8 +32,9 @@ public final class HarnessMonitorSignpostBridge: @unchecked Sendable {
   public func endInterval(name: StaticString, state: OSSignpostIntervalState) {
     signposter.endInterval(name, state)
     let key = ObjectIdentifier(state as AnyObject)
-    lock.withLock {
-      _ = activeIntervals.removeValue(forKey: key)
+    let span = lock.withLock {
+      activeIntervals.removeValue(forKey: key)
     }
+    span?.end()
   }
 }
