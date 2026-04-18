@@ -549,35 +549,81 @@ response_contains_signal() {
   printf '%s' "$response" | grep -Eq '"result":[[:space:]]*\[[[:space:]]*\{'
 }
 
-run_cli_smoke() {
+OBSERVABILITY_LOCAL_HARNESS_BINARY=""
+
+resolve_local_cargo_target_dir() {
+  local target_dir
+  target_dir="$(normalize_env_value "${CARGO_TARGET_DIR:-}" || true)"
+  if [ -n "$target_dir" ]; then
+    printf '%s\n' "$target_dir"
+    return
+  fi
+
+  target_dir="$(
+    "$ROOT/scripts/cargo-local.sh" --print-env \
+      | awk -F= '/^CARGO_TARGET_DIR=/{print $2}'
+  )"
+  if [ -z "$target_dir" ]; then
+    printf 'failed to resolve CARGO_TARGET_DIR via scripts/cargo-local.sh --print-env\n' >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$target_dir"
+}
+
+resolve_local_harness_binary() {
+  local binary_path target_dir
+  if [ -n "${OBSERVABILITY_LOCAL_HARNESS_BINARY:-}" ]; then
+    printf '%s\n' "$OBSERVABILITY_LOCAL_HARNESS_BINARY"
+    return
+  fi
+
+  binary_path="$(normalize_env_value "${HARNESS_OBSERVABILITY_HARNESS_BIN:-}" || true)"
+  if [ -n "$binary_path" ]; then
+    if [ ! -x "$binary_path" ]; then
+      printf 'configured harness smoke binary is not executable: %s\n' "$binary_path" >&2
+      exit 1
+    fi
+    OBSERVABILITY_LOCAL_HARNESS_BINARY="$binary_path"
+    printf '%s\n' "$OBSERVABILITY_LOCAL_HARNESS_BINARY"
+    return
+  fi
+
+  target_dir="$(resolve_local_cargo_target_dir)"
+  "$ROOT/scripts/cargo-local.sh" build --quiet --bin harness >/dev/null
+  binary_path="$target_dir/debug/harness"
+  if [ ! -x "$binary_path" ]; then
+    printf 'failed to resolve built local harness binary at %s\n' "$binary_path" >&2
+    exit 1
+  fi
+  OBSERVABILITY_LOCAL_HARNESS_BINARY="$binary_path"
+  printf '%s\n' "$OBSERVABILITY_LOCAL_HARNESS_BINARY"
+}
+
+# Use the built binary directly so long-lived smoke commands do not hold cargo-run locks.
+run_local_harness() {
+  local binary_path
+  binary_path="$(resolve_local_harness_binary)"
   OTEL_EXPORTER_OTLP_ENDPOINT= \
   OTEL_EXPORTER_OTLP_HEADERS= \
   OTEL_EXPORTER_OTLP_PROTOCOL= \
   HARNESS_OTEL_EXPORT= \
   HARNESS_OTEL_GRAFANA_URL= \
   HARNESS_OTEL_PYROSCOPE_URL= \
-  "$ROOT/scripts/cargo-local.sh" run --quiet -- session list --json >/dev/null
+  "$binary_path" "$@"
+}
+
+run_cli_smoke() {
+  run_local_harness session list --json >/dev/null
 }
 
 run_hook_smoke() {
   printf '%s' '{"hook_event_name":"PreToolUse","session_id":"observability-smoke-session","tool_name":"Read","tool_input":{"file_path":"Cargo.toml"}}' \
-    | OTEL_EXPORTER_OTLP_ENDPOINT= \
-      OTEL_EXPORTER_OTLP_HEADERS= \
-      OTEL_EXPORTER_OTLP_PROTOCOL= \
-      HARNESS_OTEL_EXPORT= \
-      HARNESS_OTEL_GRAFANA_URL= \
-      HARNESS_OTEL_PYROSCOPE_URL= \
-      "$ROOT/scripts/cargo-local.sh" run --quiet -- hook --agent codex suite:run tool-guard >/dev/null
+    | run_local_harness hook --agent codex suite:run tool-guard >/dev/null
 }
 
 run_bridge_smoke() {
-  OTEL_EXPORTER_OTLP_ENDPOINT= \
-  OTEL_EXPORTER_OTLP_HEADERS= \
-  OTEL_EXPORTER_OTLP_PROTOCOL= \
-  HARNESS_OTEL_EXPORT= \
-  HARNESS_OTEL_GRAFANA_URL= \
-  HARNESS_OTEL_PYROSCOPE_URL= \
-  "$ROOT/scripts/cargo-local.sh" run --quiet -- bridge status >/dev/null || true
+  run_local_harness bridge status >/dev/null || true
 }
 
 run_daemon_server_smoke() {
@@ -598,7 +644,7 @@ run_daemon_server_smoke() {
   cleanup_daemon_server_smoke() {
     if [ -n "$daemon_pid" ] && kill -0 "$daemon_pid" >/dev/null 2>&1; then
       HARNESS_DAEMON_DATA_HOME="$daemon_home" \
-      "$ROOT/scripts/cargo-local.sh" run --quiet -- daemon stop --json >/dev/null 2>&1 || true
+      run_local_harness daemon stop --json >/dev/null 2>&1 || true
       wait_for_process_exit "$daemon_pid" 15 || kill "$daemon_pid" >/dev/null 2>&1 || true
       wait_for_process_exit "$daemon_pid" 5 || kill -9 "$daemon_pid" >/dev/null 2>&1 || true
     fi
@@ -610,13 +656,7 @@ run_daemon_server_smoke() {
   trap cleanup_daemon_server_smoke RETURN
 
   HARNESS_DAEMON_DATA_HOME="$daemon_home" \
-  OTEL_EXPORTER_OTLP_ENDPOINT= \
-  OTEL_EXPORTER_OTLP_HEADERS= \
-  OTEL_EXPORTER_OTLP_PROTOCOL= \
-  HARNESS_OTEL_EXPORT= \
-  HARNESS_OTEL_GRAFANA_URL= \
-  HARNESS_OTEL_PYROSCOPE_URL= \
-  "$ROOT/scripts/cargo-local.sh" run --quiet -- daemon serve --host 127.0.0.1 --port 0 \
+  run_local_harness daemon serve --host 127.0.0.1 --port 0 \
     >"$daemon_log" 2>&1 &
   daemon_pid="$!"
 
@@ -628,7 +668,7 @@ run_daemon_server_smoke() {
     "$endpoint/v1/health" >/dev/null
 
   HARNESS_DAEMON_DATA_HOME="$daemon_home" \
-  "$ROOT/scripts/cargo-local.sh" run --quiet -- daemon stop --json >/dev/null
+  run_local_harness daemon stop --json >/dev/null
   wait_for_process_exit "$daemon_pid" 15 || {
     printf 'daemon did not exit cleanly; log follows\n' >&2
     cat "$daemon_log" >&2
@@ -639,45 +679,9 @@ run_daemon_server_smoke() {
   cleanup_daemon_server_smoke
 }
 
-enumerate_monitor_test_classes() {
-  local enum_json
-  enum_json="$ROOT/tmp/harness-monitor-test-enumeration.json"
-  mkdir -p "$(dirname "$enum_json")"
-  "$ROOT/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" \
-    -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
-    -scheme "HarnessMonitor" \
-    -configuration Debug \
-    -derivedDataPath "$ROOT/tmp/xcode-derived" \
-    -skipPackagePluginValidation \
-    test \
-    CODE_SIGNING_ALLOWED=NO \
-    -destination 'platform=macOS' \
-    -skip-testing:HarnessMonitorUITests \
-    -only-testing:HarnessMonitorKitTests \
-    -enumerate-tests \
-    -test-enumeration-format json \
-    -test-enumeration-style hierarchical \
-    -test-enumeration-output-path "$enum_json" \
-    >/dev/null
-  jq -r '.. | objects | select(.kind? == "class") | .name' "$enum_json"
-}
-
-monitor_smoke_skip_args() {
-  local class_name
-  while IFS= read -r class_name; do
-    [ -n "$class_name" ] || continue
-    [ "$class_name" = "HarnessMonitorObservabilitySmokeTests" ] && continue
-    printf '%s\0' "-skip-testing:HarnessMonitorKitTests/${class_name}"
-  done < <(enumerate_monitor_test_classes | sort -u)
-}
-
 run_monitor_smoke() {
   local log_path
-  local -a smoke_skip_args=()
   log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-otel-smoke.XXXXXX.log")"
-  while IFS= read -r -d '' skip_arg; do
-    smoke_skip_args+=("$skip_arg")
-  done < <(monitor_smoke_skip_args)
   write_shared_config true >/dev/null
   write_monitor_smoke_data_home_marker
   trap 'write_shared_config false >/dev/null || true; remove_monitor_smoke_data_home_marker; rm -f "$log_path"' RETURN
@@ -698,8 +702,7 @@ run_monitor_smoke() {
       CODE_SIGNING_ALLOWED=NO \
       -destination 'platform=macOS' \
       -skip-testing:HarnessMonitorUITests \
-      -only-testing:HarnessMonitorKitTests \
-      "${smoke_skip_args[@]}" \
+      -only-testing:HarnessMonitorKitTests/HarnessMonitorObservabilitySmokeTests \
       >"$log_path" 2>&1
   then
     cat "$log_path" >&2
@@ -1093,6 +1096,10 @@ case "$command" in
     ;;
   --refresh-grafana-mcp-token-fixture)
     refresh_grafana_mcp_token
+    ;;
+  --run-local-harness-fixture)
+    shift
+    run_local_harness "$@"
     ;;
   *)
     cat <<'EOF' >&2

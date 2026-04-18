@@ -27,3 +27,11 @@
   - `harness-runtime-execution`
   - `harness-sqlite-forensics`
   - `harness-service-map`
+- The follow-up smoke fix moved the CLI, hook, bridge, and temporary daemon smoke steps off `cargo run` and onto a built local `harness` binary to avoid target-dir lock retention from long-lived `cargo run ... daemon serve`.
+- A regression test now proves the observability smoke wrapper executes the local binary path and clears the OTEL env overlay:
+  - `cargo test --test integration smoke_cli_via_local_binary -- --nocapture`
+- The monitor smoke lane was narrowed to `-only-testing:HarnessMonitorKitTests/HarnessMonitorObservabilitySmokeTests` after confirming that Xcode's `-enumerate-tests` output omits the separate Swift Testing observability suites, which made the old generated skip list over-broad and non-deterministic.
+- Canonical end-to-end validation now passes with:
+  - `./scripts/observability.sh smoke`
+- Version sync was rechecked after the patch release bump to `25.4.1` with:
+  - `./scripts/version.sh check`
