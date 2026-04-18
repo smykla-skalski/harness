@@ -1,2 +1,3 @@
 [build]
 rustc-wrapper = "scripts/rustc-cache-wrapper.sh"
+rustflags = ["--cfg", "tokio_unstable"]
