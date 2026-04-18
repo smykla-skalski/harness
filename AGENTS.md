@@ -152,6 +152,17 @@ Tracing macros inflate `clippy::cognitive_complexity` scores artificially (tokio
 
 Never add `#[expect(clippy::cognitive_complexity)]` as a first move. Always simplify first.
 
+## Grafana dashboards
+
+All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ responsive auto-grid layout. When creating or modifying dashboards:
+
+- Include the `layout` block at the dashboard root with `kind: "auto-grid"`, `maxColumns: 4`, `minColumnWidth: 300`
+- Use `gridPos.w: 6` (quarter width) for stat panels - 4 across on large screens, stacks on narrow
+- Use `gridPos.w: 12` (half width) for time series and logs - 2 across on large screens, stacks on narrow
+- Use `gridPos.w: 24` (full width) sparingly for wide panels like log viewers
+- Avoid `gridPos.w: 3` or `w: 4` - too dense for mobile/tablet viewports
+- Panel order in the JSON determines auto-grid placement when widths allow reflow
+
 ## Gotchas
 
 - `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` and routes write/question policy through the same combined pre-tool hook (see `rules.rs:26`)
