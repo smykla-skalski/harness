@@ -58,6 +58,8 @@ func temporaryDirectory() throws -> URL {
 struct LiveDaemonFixture {
   let process: Process
   let connection: HarnessMonitorConnection
+  private static let manifestTimeout: TimeInterval = 60
+  private static let healthTimeout: TimeInterval = 30
 
   static func start(
     xdgDataHome: URL,
@@ -97,19 +99,29 @@ struct LiveDaemonFixture {
     }
     process.environment = mergedEnvironment(overrides: processEnvironmentOverrides)
     try process.run()
-
-    let manifest = try waitForDaemonManifest(at: manifestURL)
-    let token = try String(contentsOfFile: manifest.tokenPath, encoding: .utf8)
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    let connection = HarnessMonitorConnection(
-      endpoint: manifest.endpoint,
-      token: token
-    )
-    try await waitForDaemonHealth(connection: connection)
-    return Self(
-      process: process,
-      connection: connection
-    )
+    do {
+      let manifest = try waitForDaemonManifest(
+        at: manifestURL,
+        timeout: Self.manifestTimeout
+      )
+      let token = try String(contentsOfFile: manifest.tokenPath, encoding: .utf8)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let connection = HarnessMonitorConnection(
+        endpoint: manifest.endpoint,
+        token: token
+      )
+      try await waitForDaemonHealth(
+        connection: connection,
+        timeout: Self.healthTimeout
+      )
+      return Self(
+        process: process,
+        connection: connection
+      )
+    } catch {
+      terminateDaemonProcess(process)
+      throw error
+    }
   }
 
   func stop() async {
@@ -140,8 +152,11 @@ private struct LiveDaemonManifest: Decodable {
   let tokenPath: String
 }
 
-private func waitForDaemonManifest(at url: URL) throws -> LiveDaemonManifest {
-  let deadline = Date().addingTimeInterval(15)
+private func waitForDaemonManifest(
+  at url: URL,
+  timeout: TimeInterval
+) throws -> LiveDaemonManifest {
+  let deadline = Date().addingTimeInterval(timeout)
   let decoder = JSONDecoder()
   decoder.keyDecodingStrategy = .convertFromSnakeCase
 
@@ -203,7 +218,10 @@ private func httpBaseEndpoint(from endpoint: URL?) -> URL? {
   return endpoint
 }
 
-private func waitForDaemonHealth(connection: HarnessMonitorConnection) async throws {
+private func waitForDaemonHealth(
+  connection: HarnessMonitorConnection,
+  timeout: TimeInterval
+) async throws {
   let client = HarnessMonitorAPIClient(connection: connection)
   defer {
     Task {
@@ -211,7 +229,7 @@ private func waitForDaemonHealth(connection: HarnessMonitorConnection) async thr
     }
   }
 
-  let deadline = Date().addingTimeInterval(15)
+  let deadline = Date().addingTimeInterval(timeout)
   while Date() < deadline {
     do {
       _ = try await client.health()
@@ -222,6 +240,22 @@ private func waitForDaemonHealth(connection: HarnessMonitorConnection) async thr
   }
 
   throw URLError(.timedOut)
+}
+
+private func terminateDaemonProcess(_ process: Process) {
+  guard process.isRunning else {
+    return
+  }
+
+  process.terminate()
+  let deadline = Date().addingTimeInterval(5)
+  while process.isRunning && Date() < deadline {
+    Thread.sleep(forTimeInterval: 0.1)
+  }
+
+  if process.isRunning {
+    kill(process.processIdentifier, SIGKILL)
+  }
 }
 
 func repoRoot(filePath: StaticString = #filePath) -> URL {
@@ -269,4 +303,53 @@ private func smokeDataHomeURL(filePath: StaticString = #filePath) throws -> URL?
     return nil
   }
   return URL(fileURLWithPath: rawDataHome, isDirectory: true)
+}
+
+func waitForAllSignalExports(
+  collector: GRPCCollectorServer,
+  environment: HarnessMonitorEnvironment,
+  timeout: Duration = .seconds(5)
+) async throws {
+  do {
+    try await waitForTraceExport(timeout: timeout) {
+      collector.traceCollector.hasReceivedSpans
+        && collector.logCollector.hasReceivedLogs
+        && collector.metricCollector.hasReceivedMetrics
+    }
+  } catch {
+    print(deferredExportDebugSummary(collector: collector, environment: environment))
+    throw error
+  }
+}
+
+private func deferredExportDebugSummary(
+  collector: GRPCCollectorServer,
+  environment: HarnessMonitorEnvironment
+) -> String {
+  let bufferRoot =
+    HarnessMonitorPaths.harnessRoot(using: environment)
+    .appendingPathComponent("observability", isDirectory: true)
+    .appendingPathComponent("otlp-buffer", isDirectory: true)
+  let traceFiles = bufferedExportFileNames(signal: "traces", bufferRoot: bufferRoot)
+  let logFiles = bufferedExportFileNames(signal: "logs", bufferRoot: bufferRoot)
+  let metricFiles = bufferedExportFileNames(signal: "metrics", bufferRoot: bufferRoot)
+
+  return [
+    "deferred export debug:",
+    "traces=\(collector.traceCollector.exportedSpans.count)",
+    "logs=\(collector.logCollector.receivedLogs.count)",
+    "metrics=\(collector.metricCollector.receivedMetrics.count)",
+    "traceFiles=\(traceFiles)",
+    "logFiles=\(logFiles)",
+    "metricFiles=\(metricFiles)",
+  ].joined(separator: " ")
+}
+
+private func bufferedExportFileNames(signal: String, bufferRoot: URL) -> [String] {
+  let signalRoot = bufferRoot.appendingPathComponent(signal, isDirectory: true)
+  let entries = try? FileManager.default.contentsOfDirectory(
+    at: signalRoot,
+    includingPropertiesForKeys: nil
+  )
+  return (entries ?? []).map(\.lastPathComponent)
 }

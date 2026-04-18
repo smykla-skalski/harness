@@ -164,6 +164,7 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     let transport = WebSocketTransport(connection: daemon.connection)
     try await transport.connect()
+    _ = try await transport.health()
     _ = try await transport.sessions()
     await transport.shutdown()
     HarnessMonitorTelemetry.shared.shutdown()
@@ -242,6 +243,7 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     let transport = WebSocketTransport(connection: daemon.connection)
     try await transport.connect()
+    _ = try await transport.health()
     _ = await makeBootstrappedStore(client: transport)
     await transport.shutdown()
     HarnessMonitorTelemetry.shared.shutdown()
@@ -296,8 +298,8 @@ struct HarnessMonitorObservabilityGRPCExportTests {
     #expect(dbSpan.parentSpanID == daemonSpan.spanID)
   }
 
-  @Test("gRPC export waits for a loopback collector before activating")
-  func grpcExportWaitsForLoopbackCollectorBeforeActivating() async throws {
+  @Test("gRPC export preserves pre-collector root spans until the loopback collector is reachable")
+  func grpcExportPreservesPreCollectorRootSpansUntilLoopbackCollectorIsReachable() async throws {
     let reservedPort = try ReservedLoopbackPort()
     let endpoint = URL(string: "http://127.0.0.1:\(reservedPort.port)")!
     let temporaryHome = try temporaryDirectory()
@@ -322,10 +324,25 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     HarnessMonitorTelemetry.shared.resetForTests()
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+    let startupSpan = HarnessMonitorTelemetry.shared.startSpan(
+      name: "app.lifecycle.deferred_bootstrap",
+      kind: .internal
+    )
+    startupSpan.end()
+    HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+      event: "bootstrap",
+      launchMode: "live",
+      durationMs: 25
+    )
 
     #expect(
       HarnessMonitorTelemetry.shared.stateLock.withLock {
-        HarnessMonitorTelemetry.shared.state.exportControl == nil
+        HarnessMonitorTelemetry.shared.state.deferredExportActivation != nil
+      }
+    )
+    #expect(
+      HarnessMonitorTelemetry.shared.stateLock.withLock {
+        HarnessMonitorTelemetry.shared.state.exportControl != nil
       }
     )
 
@@ -337,9 +354,10 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     let activationDeadline = ContinuousClock().now + .seconds(3)
     while ContinuousClock().now < activationDeadline {
+      HarnessMonitorTelemetry.shared.bootstrap(using: environment)
       _ = try await client.timeline(sessionID: "grpc-deferred-export", scope: .summary)
       let exportActivated = HarnessMonitorTelemetry.shared.stateLock.withLock {
-        HarnessMonitorTelemetry.shared.state.exportControl != nil
+        HarnessMonitorTelemetry.shared.state.deferredExportActivation == nil
       }
       if exportActivated {
         break
@@ -349,13 +367,24 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     #expect(
       HarnessMonitorTelemetry.shared.stateLock.withLock {
-        HarnessMonitorTelemetry.shared.state.exportControl != nil
+        HarnessMonitorTelemetry.shared.state.deferredExportActivation == nil
       }
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
+    try await waitForAllSignalExports(
+      collector: collector,
+      environment: environment
+    )
+
     #expect(collector.traceCollector.hasReceivedSpans)
     #expect(collector.logCollector.hasReceivedLogs)
     #expect(collector.metricCollector.hasReceivedMetrics)
+    #expect(
+      collector.traceCollector.exportedSpans.contains {
+        $0.serviceName == "harness-monitor"
+          && $0.name == "app.lifecycle.deferred_bootstrap"
+      }
+    )
   }
 }

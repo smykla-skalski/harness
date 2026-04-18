@@ -10,10 +10,15 @@ import OpenTelemetrySdk
 extension HarnessMonitorTelemetry {
   func registerProviders(
     resource: Resource,
-    config: HarnessMonitorObservabilityConfig?
+    config: HarnessMonitorObservabilityConfig?,
+    environment: HarnessMonitorEnvironment = .current
   ) -> HarnessMonitorTelemetryRegistration {
     if let config {
-      return registerExportingProviders(resource: resource, config: config)
+      return registerExportingProviders(
+        resource: resource,
+        config: config,
+        environment: environment
+      )
     }
 
     OpenTelemetry.registerTracerProvider(
@@ -34,7 +39,9 @@ extension HarnessMonitorTelemetry {
 
   func registerExportingProviders(
     resource: Resource,
-    config: HarnessMonitorObservabilityConfig
+    config: HarnessMonitorObservabilityConfig,
+    environment: HarnessMonitorEnvironment = .current,
+    deferredExportActivation: DeferredExportActivation? = nil
   ) -> HarnessMonitorTelemetryRegistration {
     let otlpHeaders = config.headers.map { ($0.key, $0.value) }
     let otlpConfig = OtlpConfiguration(
@@ -69,11 +76,18 @@ extension HarnessMonitorTelemetry {
         config: otlpConfig,
         envVarHeaders: nil
       )
-      return registerProviders(
-        resource: resource,
+      let exporters = bufferedExportersIfNeeded(
         traceExporter: traceExporter,
         logExporter: logExporter,
         metricExporter: metricExporter,
+        environment: environment,
+        activation: deferredExportActivation
+      )
+      return registerProviders(
+        resource: resource,
+        traceExporter: exporters.traceExporter,
+        logExporter: exporters.logExporter,
+        metricExporter: exporters.metricExporter,
         exportControl: makeExportControl(
           channels: [traceChannel, logChannel, metricChannel],
           group: group
@@ -115,9 +129,9 @@ extension HarnessMonitorTelemetry {
 
   func registerProviders(
     resource: Resource,
-    traceExporter: some SpanExporter,
-    logExporter: some LogRecordExporter,
-    metricExporter: some MetricExporter,
+    traceExporter: any SpanExporter,
+    logExporter: any LogRecordExporter,
+    metricExporter: any MetricExporter,
     exportControl: HarnessMonitorTelemetryExportControl?
   ) -> HarnessMonitorTelemetryRegistration {
     let spanProcessor = BatchSpanProcessor(
@@ -164,6 +178,13 @@ extension HarnessMonitorTelemetry {
           explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
         )
         _ = meterProvider.forceFlush()
+        _ = traceExporter.flush(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = logExporter.forceFlush(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = metricExporter.flush()
         exportControl?.forceFlush()
       },
       shutdown: {
@@ -172,12 +193,22 @@ extension HarnessMonitorTelemetry {
           explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
         )
         _ = meterProvider.forceFlush()
+        _ = traceExporter.flush(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = logExporter.forceFlush(
+          explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
+        )
+        _ = metricExporter.flush()
         tracerProvider.shutdown()
         _ = logProcessor.shutdown(
           explicitTimeout: HarnessMonitorTelemetryConstants.exportTimeoutSeconds
         )
         _ = meterProvider.shutdown()
         exportControl?.shutdown()
+      },
+      closeTransport: {
+        exportControl?.closeTransport()
       }
     )
     return HarnessMonitorTelemetryRegistration(
@@ -307,6 +338,12 @@ extension HarnessMonitorTelemetry {
     HarnessMonitorTelemetryExportControl(
       forceFlush: {},
       shutdown: {
+        for channel in channels {
+          _ = try? channel.close().wait()
+        }
+        try? group.syncShutdownGracefully()
+      },
+      closeTransport: {
         for channel in channels {
           _ = try? channel.close().wait()
         }
