@@ -343,6 +343,15 @@ ensure_grafana_mcp_token() {
   printf '%s' "$token"
 }
 
+refresh_grafana_mcp_token() {
+  local grafana_url
+
+  require_tool curl
+  require_tool python3
+  grafana_url="$(read_grafana_url_from_shared_config)"
+  ensure_grafana_mcp_token "$grafana_url" >/dev/null
+}
+
 install_grafana_mcp_launcher() {
   local launcher_path
   launcher_path="$(grafana_mcp_launcher_path)"
@@ -350,13 +359,13 @@ install_grafana_mcp_launcher() {
   cat >"$launcher_path" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-exec "$ROOT/scripts/observability.sh" --launch-grafana-mcp "\$@"
+exec python3 "$ROOT/scripts/grafana_mcp_supervisor.py" "\$@"
 EOF
   chmod 755 "$launcher_path"
   printf '%s\n' "$launcher_path"
 }
 
-launch_grafana_mcp() {
+launch_grafana_mcp_child() {
   local grafana_url
 
   require_tool curl
@@ -456,6 +465,7 @@ start_stack() {
   local launcher_path
   config_path="$(write_shared_config false)"
   launcher_path="$(install_grafana_mcp_launcher)"
+  refresh_grafana_mcp_token
   printf 'Grafana: %s\n' "$GRAFANA_URL"
   printf 'Prometheus: %s\n' "$PROMETHEUS_URL"
   printf 'Tempo: %s\n' "$TEMPO_URL"
@@ -1057,9 +1067,12 @@ case "$command" in
   --install-grafana-mcp-launcher-fixture)
     install_grafana_mcp_launcher
     ;;
-  --launch-grafana-mcp)
+  --launch-grafana-mcp-child)
     shift
-    launch_grafana_mcp "$@"
+    launch_grafana_mcp_child "$@"
+    ;;
+  --refresh-grafana-mcp-token-fixture)
+    refresh_grafana_mcp_token
     ;;
   *)
     cat <<'EOF' >&2
