@@ -198,6 +198,104 @@ struct HarnessMonitorObservabilityGRPCExportTests {
     #expect(daemonSpan.parentSpanID == monitorSpan.spanID)
   }
 
+  @Test("gRPC export keeps bootstrap, transport, daemon server, and daemon db spans on one trace")
+  func grpcExportKeepsBootstrapTransportDaemonServerAndDbSpansOnOneTrace() async throws {
+    let collector = try GRPCCollectorServer()
+    defer {
+      collector.shutdown()
+      HarnessMonitorTelemetry.shared.resetForTests()
+    }
+
+    let temporaryHome = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: temporaryHome) }
+
+    let xdgDataHome = temporaryHome.appendingPathComponent("xdg-data", isDirectory: true)
+    let daemonDataHome = temporaryHome.appendingPathComponent("daemon-data", isDirectory: true)
+    try FileManager.default.createDirectory(at: xdgDataHome, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: daemonDataHome, withIntermediateDirectories: true)
+
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        "XDG_DATA_HOME": xdgDataHome.path,
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonDataHome.path,
+        "OTEL_EXPORTER_OTLP_ENDPOINT": collector.endpoint.absoluteString,
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+      ],
+      homeDirectory: temporaryHome
+    )
+    let daemon = try await LiveDaemonFixture.start(
+      xdgDataHome: xdgDataHome,
+      daemonDataHome: daemonDataHome,
+      environmentOverrides: [
+        "OTEL_EXPORTER_OTLP_ENDPOINT": collector.endpoint.absoluteString,
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+      ]
+    )
+    defer {
+      Task {
+        await daemon.stop()
+      }
+    }
+
+    HarnessMonitorTelemetry.shared.resetForTests()
+    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+
+    let transport = WebSocketTransport(connection: daemon.connection)
+    try await transport.connect()
+    _ = await makeBootstrappedStore(client: transport)
+    await transport.shutdown()
+    HarnessMonitorTelemetry.shared.shutdown()
+    await daemon.stop()
+
+    try await waitForTraceExport(timeout: .seconds(5)) {
+      let spans = collector.traceCollector.exportedSpans
+      let hasBootstrapSpan = spans.contains {
+        $0.serviceName == "harness-monitor" && $0.name == "app.lifecycle.bootstrap"
+      }
+      let hasMonitorClientSpan = spans.contains {
+        $0.serviceName == "harness-monitor" && $0.name == "daemon.websocket.rpc"
+      }
+      let hasDaemonSessionsSpan = spans.contains {
+        $0.serviceName == "harness-daemon" && $0.name == "sessions"
+      }
+      let hasDaemonDbSpan = spans.contains {
+        $0.serviceName == "harness-daemon" && $0.name == "daemon.db.async.list_session_summaries"
+      }
+      return hasBootstrapSpan && hasMonitorClientSpan && hasDaemonSessionsSpan && hasDaemonDbSpan
+    }
+
+    let spans = collector.traceCollector.exportedSpans
+    let bootstrapSpan = try #require(
+      spans.last {
+        $0.serviceName == "harness-monitor" && $0.name == "app.lifecycle.bootstrap"
+      }
+    )
+    let monitorClientSpans = spans.filter {
+      $0.serviceName == "harness-monitor"
+        && $0.name == "daemon.websocket.rpc"
+        && $0.traceID == bootstrapSpan.traceID
+        && $0.parentSpanID == bootstrapSpan.spanID
+    }
+    let daemonSpan = try #require(
+      spans.last {
+        $0.serviceName == "harness-daemon"
+          && $0.name == "sessions"
+          && $0.traceID == bootstrapSpan.traceID
+      }
+    )
+    let dbSpan = try #require(
+      spans.last {
+        $0.serviceName == "harness-daemon"
+          && $0.name == "daemon.db.async.list_session_summaries"
+          && $0.traceID == bootstrapSpan.traceID
+      }
+    )
+
+    #expect(monitorClientSpans.isEmpty == false)
+    #expect(monitorClientSpans.contains { $0.spanID == daemonSpan.parentSpanID })
+    #expect(dbSpan.parentSpanID == daemonSpan.spanID)
+  }
+
   @Test("gRPC export waits for a loopback collector before activating")
   func grpcExportWaitsForLoopbackCollectorBeforeActivating() async throws {
     let reservedPort = try ReservedLoopbackPort()

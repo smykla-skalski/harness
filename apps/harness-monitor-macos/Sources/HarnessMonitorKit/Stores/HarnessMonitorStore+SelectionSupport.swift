@@ -65,6 +65,21 @@ extension HarnessMonitorStore {
     return availableActionActors.first?.agentId
   }
 
+  func synchronizeSessionBaggage(for sessionID: String?) {
+    guard let sessionID else {
+      HarnessMonitorTelemetry.shared.clearSessionBaggage()
+      return
+    }
+
+    let projectID =
+      sessionIndex.sessionSummary(for: sessionID)?.projectId
+      ?? selectedSession.flatMap { session in
+        session.session.sessionId == sessionID ? session.session.projectId : nil
+      }
+      ?? sessions.first(where: { $0.sessionId == sessionID })?.projectId
+    HarnessMonitorTelemetry.shared.setSessionBaggage(sessionID: sessionID, projectID: projectID)
+  }
+
   func beginSessionLoad() -> UInt64 {
     sessionLoadSequence &+= 1
     withUISyncBatch {
