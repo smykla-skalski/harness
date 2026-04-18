@@ -41,6 +41,10 @@ datasources:
           matcherRegex: trace_id=\"?([0-9a-f]{32})\"?
           name: TraceID
           url: ${__value.raw}
+        - datasourceUid: tempo
+          matcherRegex: span_id=\"?([0-9a-f]{16})\"?
+          name: SpanID
+          url: ${__value.raw}
     secureJsonData:
       httpHeaderValue1: "1"
 
@@ -74,6 +78,11 @@ datasources:
             query: sum(rate(harness_hook_outcomes_total[5m]))
           - name: Daemon HTTP rate
             query: sum(rate(harness_daemon_http_requests_total[5m]))
+      tracesToProfiles:
+        datasourceUid: pyroscope
+        profileTypeId: process_cpu:cpu:nanoseconds:cpu:nanoseconds
+        customQuery: true
+        query: '{service_name="${__span.tags.service.name}"}'
 
   - name: Pyroscope
     uid: pyroscope
