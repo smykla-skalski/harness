@@ -16,6 +16,8 @@
 		<string>harness=info</string>
 		<key>HARNESS_SANDBOXED</key>
 		<string>1</string>
+		<key>HARNESS_TOKIO_CONSOLE</key>
+		<string>1</string>
 	</dict>
 	<key>KeepAlive</key>
 	<true/>
