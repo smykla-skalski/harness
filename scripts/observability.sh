@@ -657,8 +657,26 @@ wait_for_grafana_resource() {
   done
 }
 
+wait_for_grafana_plugin() {
+  local plugin_id="$1"
+  local description="$2"
+  local attempt=0
+  while true; do
+    if grafana_api "$GRAFANA_URL/api/plugins/$plugin_id/settings" >/dev/null 2>&1; then
+      return
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+      printf 'timed out waiting for Grafana plugin %s (%s)\n' "$plugin_id" "$description" >&2
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
 verify_grafana_provisioning() {
   grafana_api "$GRAFANA_URL/api/health" >/dev/null
+  wait_for_grafana_plugin grafana-llm-app "Grafana LLM app"
   wait_for_grafana_datasource prometheus "Prometheus"
   wait_for_grafana_datasource loki "Loki"
   wait_for_grafana_datasource tempo "Tempo"
@@ -676,8 +694,57 @@ smoke_stack() {
   local loki_start
   local loki_end
   local smoke_root
+  local saved_harness_daemon_data_home="${HARNESS_DAEMON_DATA_HOME-}"
+  local saved_xdg_data_home="${XDG_DATA_HOME-}"
+  local saved_harness_app_group_id="${HARNESS_APP_GROUP_ID-}"
+  local had_harness_daemon_data_home=false
+  local had_xdg_data_home=false
+  local had_harness_app_group_id=false
+
+  if [ "${HARNESS_DAEMON_DATA_HOME+x}" = x ]; then
+    had_harness_daemon_data_home=true
+  fi
+  if [ "${XDG_DATA_HOME+x}" = x ]; then
+    had_xdg_data_home=true
+  fi
+  if [ "${HARNESS_APP_GROUP_ID+x}" = x ]; then
+    had_harness_app_group_id=true
+  fi
+
+  restore_smoke_stack() {
+    local status="$?"
+
+    trap - RETURN
+    remove_shared_config
+    remove_monitor_smoke_data_home_marker
+
+    if [ "$had_harness_daemon_data_home" = true ]; then
+      export HARNESS_DAEMON_DATA_HOME="$saved_harness_daemon_data_home"
+    else
+      unset HARNESS_DAEMON_DATA_HOME
+    fi
+
+    if [ "$had_xdg_data_home" = true ]; then
+      export XDG_DATA_HOME="$saved_xdg_data_home"
+    else
+      unset XDG_DATA_HOME
+    fi
+
+    if [ "$had_harness_app_group_id" = true ]; then
+      export HARNESS_APP_GROUP_ID="$saved_harness_app_group_id"
+    else
+      unset HARNESS_APP_GROUP_ID
+    fi
+
+    compose up -d --force-recreate sqlite-exporter >/dev/null
+    wait_for_url "$SQLITE_EXPORTER_URL/metrics" "SQLite query exporter"
+    write_shared_config false >/dev/null
+
+    return "$status"
+  }
 
   require_tool jq
+  trap restore_smoke_stack RETURN
   smoke_root="$ROOT/tmp/observability/smoke-data"
   export HARNESS_DAEMON_DATA_HOME="$smoke_root/daemon-data"
   export XDG_DATA_HOME="$smoke_root/monitor-data"
