@@ -22,5 +22,6 @@ mod integration {
     mod compact;
     mod hooks;
     mod preflight;
+    mod grafana_connector;
     mod universal;
 }
