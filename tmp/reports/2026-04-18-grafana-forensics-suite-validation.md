@@ -1,0 +1,29 @@
+# Grafana Forensics Suite Validation
+
+- Dashboard JSON syntax validated with `jq empty resources/observability/grafana/dashboards/*.json`.
+- Dashboard widths normalized with no remaining `gridPos.w` values of `3`, `4`, or `8`.
+- Repo version sync validated with `./scripts/version.sh check`.
+- Local observability stack was reset with `./scripts/observability.sh reset` and then started with `./scripts/observability.sh start`.
+- During live validation, Grafana file provisioning initially rejected the dashboards as `v2 format`; the dashboards were converted back to the provisionable classic JSON shape while keeping the new suite structure, queries, and panel layout.
+- Grafana search confirmed the presence of:
+  - `harness-daemon-transport`
+  - `harness-host-machine`
+  - `harness-investigation-cockpit`
+  - `harness-monitor-client`
+  - `harness-runtime-execution`
+  - `harness-service-map`
+  - `harness-sqlite-forensics`
+- Dashboard UID checks confirmed:
+  - `harness-investigation-cockpit` => `Harness Investigation Cockpit`
+  - `harness-host-machine` => `Harness Host Machine`
+- Prometheus target proof confirmed:
+  - `integrations/unix=1`
+  - `darwin-exporter=1`
+- Grafana star initialization confirmed the expected order:
+  - `harness-investigation-cockpit`
+  - `harness-host-machine`
+  - `harness-daemon-transport`
+  - `harness-monitor-client`
+  - `harness-runtime-execution`
+  - `harness-sqlite-forensics`
+  - `harness-service-map`

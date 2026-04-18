@@ -899,11 +899,13 @@ verify_grafana_provisioning() {
   wait_for_grafana_datasource tempo "Tempo"
   wait_for_grafana_datasource pyroscope "Pyroscope"
   wait_for_grafana_resource "/api/datasources/uid/loki/resources/drilldown-limits" "Loki drilldown limits"
-  wait_for_grafana_dashboard "Harness System Overview"
-  wait_for_grafana_dashboard "Harness Runtime Execution"
+  wait_for_grafana_dashboard "Harness Investigation Cockpit"
+  wait_for_grafana_dashboard "Harness Host Machine"
+  wait_for_grafana_dashboard "Harness Runtime & Hooks"
   wait_for_grafana_dashboard "Harness Daemon Transport"
   wait_for_grafana_dashboard "Harness Monitor Client"
-  wait_for_grafana_dashboard "Harness SQLite Forensics"
+  wait_for_grafana_dashboard "Harness Storage & SQLite"
+  wait_for_grafana_dashboard "Harness Service Flow"
 }
 
 smoke_stack() {

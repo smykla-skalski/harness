@@ -1,11 +1,4 @@
 {
-  "layout": {
-    "kind": "auto-grid",
-    "spec": {
-      "maxColumns": 4,
-      "minColumnWidth": 300
-    }
-  },
   "annotations": {
     "list": [
       {
@@ -26,59 +19,92 @@
   "graphTooltip": 1,
   "links": [
     {
+      "title": "Investigation Cockpit",
+      "type": "link",
+      "url": "/d/harness-investigation-cockpit",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Metrics Drilldown",
-      "type": "link",
-      "url": "/a/grafana-metricsdrilldown-app/drilldown"
+      "tags": []
     },
     {
+      "title": "Host Machine",
+      "type": "link",
+      "url": "/d/harness-host-machine",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
+      "tags": []
+    },
+    {
+      "title": "Monitor Client",
+      "type": "link",
+      "url": "/d/harness-monitor-client",
       "keepTime": true,
-      "tags": [],
+      "includeVars": true,
       "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
+      "title": "Storage & SQLite",
+      "type": "link",
+      "url": "/d/harness-sqlite-forensics",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
+      "title": "Service Flow",
+      "type": "link",
+      "url": "/d/harness-service-map",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
       "title": "Logs Drilldown",
       "type": "link",
-      "url": "/a/grafana-lokiexplore-app/explore"
-    },
-    {
+      "url": "/a/grafana-lokiexplore-app/explore",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": false,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
+      "tags": []
+    },
+    {
       "title": "Traces Breakdown",
       "type": "link",
-      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "SQLite Forensics",
-      "type": "link",
-      "url": "/d/harness-sqlite-forensics"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
+      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown",
+      "keepTime": false,
       "includeVars": false,
-      "keepTime": true,
-      "tags": [],
       "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
       "title": "Profiles Drilldown",
       "type": "link",
-      "url": "/a/grafana-pyroscope-app/explore"
+      "url": "/a/grafana-pyroscope-app/explore",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
     }
   ],
   "panels": [
@@ -591,63 +617,101 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Lifecycle events emitted by live Harness Monitor clients in the last five minutes.",
+      "description": "Lifecycle event rate and user interaction rate over the current investigation window.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "unit": "short"
+          "unit": "ops"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
+        "h": 8,
+        "w": 12,
         "x": 0,
         "y": 8
       },
       "id": 13,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
         },
-        "textMode": "value"
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(sum(increase(harness_monitor_app_lifecycle_total[5m])) or on() vector(0))",
+          "expr": "sum by (lifecycle_event) (rate(harness_monitor_app_lifecycle_total[5m]))",
+          "legendFormat": "{{lifecycle_event}}",
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(harness_monitor_user_interactions_total[5m]))",
+          "legendFormat": "user interactions",
+          "refId": "B"
         }
       ],
-      "title": "Lifecycle / 5m",
-      "type": "stat"
+      "title": "Lifecycle Events / 5m",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "API errors, cache miss ratio, and cache read p95 over the current investigation window.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(harness_monitor_api_errors_total[5m]))",
+          "legendFormat": "api errors",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "(sum(rate(harness_monitor_cache_misses_total[5m])) / clamp_min(sum(rate(harness_monitor_cache_hits_total[5m])) + sum(rate(harness_monitor_cache_misses_total[5m])), 0.000001)) * 100",
+          "legendFormat": "cache miss %",
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_monitor_cache_read_duration_ms_bucket[5m])))",
+          "legendFormat": "cache read p95",
+          "refId": "C"
+        }
+      ],
+      "title": "Cache and API Pressure",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -683,11 +747,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 8
+        "w": 6,
+        "x": 0,
+        "y": 16
       },
-      "id": 14,
+      "id": 15,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -710,195 +774,6 @@
         }
       ],
       "title": "Bootstrap p95",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "User interactions recorded by live Harness Monitor clients in the last five minutes.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 8
-      },
-      "id": 15,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "(sum(increase(harness_monitor_user_interactions_total[5m])) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Interactions / 5m",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cache read p95 latency from the monitor cache histogram family.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 150
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 8
-      },
-      "id": 16,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_cache_read_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_cache_read_duration_ms_count[5m])) > 0)) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Cache Read p95",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "API transport errors recorded by Harness Monitor clients in the last five minutes.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 8
-      },
-      "id": 17,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "(sum(increase(harness_monitor_api_errors_total[5m])) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "API Errors / 5m",
       "type": "stat"
     },
     {
@@ -935,11 +810,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 8
+        "w": 6,
+        "x": 6,
+        "y": 16
       },
-      "id": 18,
+      "id": 16,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -969,6 +844,132 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "API transport errors recorded by Harness Monitor clients in the last five minutes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 16
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "(sum(increase(harness_monitor_api_errors_total[5m])) or on() vector(0))",
+          "refId": "A"
+        }
+      ],
+      "title": "API Errors / 5m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "User interactions recorded by live Harness Monitor clients in the last five minutes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "(sum(increase(harness_monitor_user_interactions_total[5m])) or on() vector(0))",
+          "refId": "A"
+        }
+      ],
+      "title": "User Interactions / 5m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "HTTP throughput by path and status code.",
       "fieldConfig": {
         "defaults": {
@@ -983,7 +984,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 20
       },
       "id": 5,
       "links": [
@@ -1030,7 +1031,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 20
       },
       "id": 6,
       "options": {
@@ -1069,7 +1070,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 28
       },
       "id": 7,
       "options": {
@@ -1105,7 +1106,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 28
       },
       "id": 8,
       "links": [
@@ -1136,7 +1137,7 @@
       "type": "logs"
     }
   ],
-  "refresh": "30s",
+  "refresh": "10s",
   "schemaVersion": 39,
   "style": "dark",
   "tags": [
@@ -1186,7 +1187,7 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-3h",
     "to": "now"
   },
   "title": "Harness Monitor Client",
