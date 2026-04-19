@@ -34,6 +34,38 @@ impl DaemonClient {
         process_response(response, "GET", path, &request_id, &start)
     }
 
+    /// GET that treats HTTP 404 as a distinct "endpoint absent" signal
+    /// (returned as `Ok(None)`), used when the client wants to detect a
+    /// missing new endpoint on an older daemon without conflating it with
+    /// other failures.
+    pub(super) fn get_optional<Res: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &[(&str, &str)],
+    ) -> Result<Option<Res>, CliError> {
+        let request_id = Uuid::new_v4().to_string();
+        let start = Instant::now();
+        let url = format!("{}{path}", self.endpoint);
+        let span = client_request_span("GET", path, &request_id, &self.endpoint);
+        let _guard = span.enter();
+        record_trace_id(&span);
+        let propagation_headers = current_trace_headers();
+        let response = RUNTIME.block_on(async {
+            let mut request = self
+                .http
+                .get(&url)
+                .bearer_auth(&self.token)
+                .header("x-request-id", &request_id)
+                .query(query)
+                .timeout(MUTATION_TIMEOUT);
+            for (header, value) in &propagation_headers {
+                request = request.header(header, value);
+            }
+            request.send().await
+        });
+        process_optional_response(response, "GET", path, &request_id, &start)
+    }
+
     pub(super) fn post<Req: serde::Serialize, Res: DeserializeOwned>(
         &self,
         path: &str,
@@ -61,6 +93,55 @@ impl DaemonClient {
         });
         process_response(response, "POST", path, &request_id, &start)
     }
+}
+
+fn process_optional_response<Res: DeserializeOwned>(
+    response: Result<reqwest::Response, reqwest::Error>,
+    method: &str,
+    path: &str,
+    request_id: &str,
+    start: &Instant,
+) -> Result<Option<Res>, CliError> {
+    let span = tracing::Span::current();
+    let response = response.map_err(|error| {
+        log_client_request(method, path, 0, start, request_id, true);
+        CliErrorKind::workflow_io(format!("daemon HTTP request failed: {error}"))
+    })?;
+
+    let status = response.status().as_u16();
+    if status == 404 {
+        log_client_request(method, path, status, start, request_id, false);
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+        span.record("http_status_code", display(status));
+        span.record("http.response.status_code", display(status));
+        span.record("duration_ms", display(duration_ms));
+        span.record("error", display(false));
+        span.record("request.failed", display(false));
+        return Ok(None);
+    }
+
+    let body_text = RUNTIME
+        .block_on(response.text())
+        .map_err(|error| CliErrorKind::workflow_io(format!("daemon HTTP read body: {error}")))?;
+
+    let failed = !(200..300).contains(&status);
+    log_client_request(method, path, status, start, request_id, failed);
+    let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+    span.record("http_status_code", display(status));
+    span.record("http.response.status_code", display(status));
+    span.record("duration_ms", display(duration_ms));
+    span.record("error", display(failed));
+    span.record("request.failed", display(failed));
+
+    if failed {
+        return Err(parse_error_response(&body_text, status));
+    }
+
+    serde_json::from_str(&body_text)
+        .map(Some)
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon HTTP parse response: {error}")).into()
+        })
 }
 
 fn process_response<Res: DeserializeOwned>(

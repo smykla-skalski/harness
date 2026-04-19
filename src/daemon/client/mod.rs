@@ -9,6 +9,8 @@ mod discovery_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 
+pub use api::RuntimeSessionLookup;
+
 use std::time::Duration;
 
 /// HTTP client for daemon-first session mutations.

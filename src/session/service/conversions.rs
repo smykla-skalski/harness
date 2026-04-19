@@ -2,6 +2,7 @@ use super::{
     BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, DaemonClient, ResolvedRuntimeSessionAgent,
     SessionState, SessionStatus, protocol, runtime_session_matches_agent,
 };
+use crate::daemon::client::RuntimeSessionLookup;
 use crate::session::types::SessionPolicy;
 
 pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
@@ -63,6 +64,23 @@ pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> Se
 }
 
 pub(crate) fn resolve_runtime_session_via_daemon(
+    client: &DaemonClient,
+    runtime_name: &str,
+    runtime_session_id: &str,
+) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
+    match client.resolve_runtime_session(runtime_name, runtime_session_id)? {
+        RuntimeSessionLookup::Resolved(agent) => Ok(Some(agent)),
+        RuntimeSessionLookup::NotFound => Ok(None),
+        RuntimeSessionLookup::EndpointUnavailable => {
+            resolve_runtime_session_via_legacy_fanout(client, runtime_name, runtime_session_id)
+        }
+    }
+}
+
+/// Legacy resolver used only when the daemon predates
+/// `/v1/runtime-sessions/resolve`. Kept intact for seamless upgrades -
+/// delete once the minimum supported daemon version ships the new endpoint.
+fn resolve_runtime_session_via_legacy_fanout(
     client: &DaemonClient,
     runtime_name: &str,
     runtime_session_id: &str,
