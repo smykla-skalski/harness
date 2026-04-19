@@ -656,7 +656,7 @@
         "multi": true,
         "name": "level",
         "options": [],
-        "query": "debug,info,warn,error",
+        "query": "DEBUG,INFO,WARN,ERROR",
         "type": "custom"
       }
     ]
