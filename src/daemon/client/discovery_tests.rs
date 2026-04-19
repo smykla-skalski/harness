@@ -24,30 +24,28 @@ fn try_build_client_requires_authenticated_api_readiness() {
         for request_index in 0..3 {
             let (mut stream, _) = listener.accept().expect("accept");
             let request = read_http_request(&mut stream);
-            if request.starts_with("GET /v1/health ") {
-                let request_lower = request.to_ascii_lowercase();
-                assert!(
-                    request_lower.contains("authorization: bearer test-token"),
-                    "missing bearer auth: {request}"
-                );
-                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
-                continue;
-            }
-            assert!(request.starts_with("GET /v1/sessions "));
             let request_lower = request.to_ascii_lowercase();
             assert!(
                 request_lower.contains("authorization: bearer test-token"),
                 "missing bearer auth: {request}"
             );
-            let body = if request_index == 1 {
-                "{\"error\":\"warming up\"}"
-            } else {
-                "[]"
-            };
+            if request.starts_with("GET /v1/health ") {
+                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
+                continue;
+            }
+            assert!(
+                request.starts_with("GET /v1/ready "),
+                "unexpected probe request: {request}"
+            );
             let status = if request_index == 1 {
                 "503 Service Unavailable"
             } else {
                 "200 OK"
+            };
+            let body = if request_index == 1 {
+                "{\"error\":\"warming up\"}"
+            } else {
+                "{\"ready\":true,\"daemon_epoch\":\"test\"}"
             };
             write_http_response(&mut stream, status, "application/json", body);
         }
@@ -137,20 +135,18 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
         for request_index in 0..3 {
             let (mut stream, _) = listener.accept().expect("accept");
             let request = read_http_request(&mut stream);
-            if request.starts_with("GET /v1/health ") {
-                let request_lower = request.to_ascii_lowercase();
-                assert!(
-                    request_lower.contains("authorization: bearer test-token"),
-                    "missing bearer auth: {request}"
-                );
-                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
-                continue;
-            }
-            assert!(request.starts_with("GET /v1/sessions "));
             let request_lower = request.to_ascii_lowercase();
             assert!(
                 request_lower.contains("authorization: bearer test-token"),
                 "missing bearer auth: {request}"
+            );
+            if request.starts_with("GET /v1/health ") {
+                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
+                continue;
+            }
+            assert!(
+                request.starts_with("GET /v1/ready "),
+                "unexpected probe request: {request}"
             );
             let status = if request_index == 1 {
                 "503 Service Unavailable"
@@ -160,7 +156,7 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
             let body = if request_index == 1 {
                 "{\"error\":\"warming up\"}"
             } else {
-                "[]"
+                "{\"ready\":true,\"daemon_epoch\":\"test\"}"
             };
             write_http_response(&mut stream, status, "application/json", body);
         }
