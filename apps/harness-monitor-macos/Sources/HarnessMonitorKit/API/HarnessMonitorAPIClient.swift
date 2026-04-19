@@ -404,10 +404,6 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/voice-sessions/\(voiceSessionID)/finish", body: request)
   }
 
-  public func personas() async throws -> [AgentPersona] {
-    try await get("/v1/personas")
-  }
-
   public func logLevel() async throws -> LogLevelResponse {
     try await get("/v1/daemon/log-level")
   }
