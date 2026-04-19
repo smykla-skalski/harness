@@ -1,4 +1,5 @@
 import ApplicationServices
+import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
 
@@ -169,7 +170,7 @@ func postClick(at point: CGPoint, button: MouseButton, clickState: Int64) throws
 }
 
 func handleType(_ args: [String]) throws {
-  var delayMillis: UInt32 = 0
+  var delayMillis: UInt32 = 10
   var text: String?
   var i = 0
   while i < args.count {
@@ -196,21 +197,62 @@ func handleType(_ args: [String]) throws {
 
   try requireTrustedAccessibility()
 
-  let utf16 = Array(typeText.utf16)
-  if delayMillis == 0 {
-    try postUnicodeString(utf16)
-  } else {
-    for scalar in typeText.unicodeScalars {
-      let chunk = Array(String(scalar).utf16)
-      try postUnicodeString(chunk)
-      if delayMillis > 0 {
-        usleep(useconds_t(delayMillis) * 1_000)
-      }
+  let layout = try KeyboardLayout.current()
+  for character in typeText {
+    if let mapping = layout.mapping(for: character) {
+      try postKey(keycode: mapping.keycode, shift: mapping.shift, option: mapping.option)
+    } else {
+      // Fallback: no keycode on this layout produces the character. Drive the
+      // Unicode-override path which works for most apps (not all).
+      try postUnicodeOverride(Array(String(character).utf16))
+    }
+    if delayMillis > 0 {
+      usleep(useconds_t(delayMillis) * 1_000)
     }
   }
 }
 
-func postUnicodeString(_ utf16: [UInt16]) throws {
+func postKey(keycode: CGKeyCode, shift: Bool, option: Bool) throws {
+  let shiftKey: CGKeyCode = 0x38
+  let optionKey: CGKeyCode = 0x3A
+
+  var flags: CGEventFlags = []
+  if shift { flags.insert(.maskShift) }
+  if option { flags.insert(.maskAlternate) }
+
+  if shift {
+    try postModifier(keycode: shiftKey, keyDown: true, flags: flags)
+  }
+  if option {
+    try postModifier(keycode: optionKey, keyDown: true, flags: flags)
+  }
+
+  guard let down = CGEvent(keyboardEventSource: nil, virtualKey: keycode, keyDown: true),
+        let up = CGEvent(keyboardEventSource: nil, virtualKey: keycode, keyDown: false) else {
+    throw InputToolError.eventCreationFailed("keyboard")
+  }
+  down.flags = flags
+  up.flags = flags
+  down.post(tap: .cgSessionEventTap)
+  up.post(tap: .cgSessionEventTap)
+
+  if option {
+    try postModifier(keycode: optionKey, keyDown: false, flags: [])
+  }
+  if shift {
+    try postModifier(keycode: shiftKey, keyDown: false, flags: [])
+  }
+}
+
+func postModifier(keycode: CGKeyCode, keyDown: Bool, flags: CGEventFlags) throws {
+  guard let event = CGEvent(keyboardEventSource: nil, virtualKey: keycode, keyDown: keyDown) else {
+    throw InputToolError.eventCreationFailed("modifier")
+  }
+  event.flags = flags
+  event.post(tap: .cgSessionEventTap)
+}
+
+func postUnicodeOverride(_ utf16: [UInt16]) throws {
   guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
         let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
     throw InputToolError.eventCreationFailed("keyboard")
@@ -220,8 +262,84 @@ func postUnicodeString(_ utf16: [UInt16]) throws {
     down.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: base)
     up.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: base)
   }
-  down.post(tap: .cghidEventTap)
-  up.post(tap: .cghidEventTap)
+  down.post(tap: .cgSessionEventTap)
+  up.post(tap: .cgSessionEventTap)
+}
+
+// Builds a character -> (keycode, shift, option) table by reverse-engineering
+// the current keyboard layout via UCKeyTranslate. This is how cliclick,
+// Hammerspoon, and similar tools make synthesized typing reliable across
+// QWERTY, Dvorak, AZERTY, etc.
+struct KeyboardLayout {
+  struct Mapping {
+    let keycode: CGKeyCode
+    let shift: Bool
+    let option: Bool
+  }
+
+  private let table: [Character: Mapping]
+
+  func mapping(for character: Character) -> Mapping? {
+    table[character]
+  }
+
+  static func current() throws -> KeyboardLayout {
+    guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else {
+      throw InputToolError.eventCreationFailed("keyboard layout")
+    }
+    guard let layoutDataPointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+      throw InputToolError.eventCreationFailed("keyboard layout data")
+    }
+    let layoutData = Unmanaged<CFData>.fromOpaque(layoutDataPointer).takeUnretainedValue() as Data
+    var table: [Character: Mapping] = [:]
+    layoutData.withUnsafeBytes { rawBuffer in
+      guard let pointer = rawBuffer.bindMemory(to: UCKeyboardLayout.self).baseAddress else {
+        return
+      }
+      // Skip common non-typing keycodes: return (36), tab (48), space handled separately
+      for keycode in 0..<128 {
+        let permutations: [(shift: Bool, option: Bool, modifiers: UInt32)] = [
+          (false, false, 0),
+          (true, false, UInt32(shiftKey >> 8) & 0xFF),
+          (false, true, UInt32(optionKey >> 8) & 0xFF),
+          (true, true, UInt32((shiftKey | optionKey) >> 8) & 0xFF)
+        ]
+        for perm in permutations {
+          var deadKeyState: UInt32 = 0
+          var actualLength = 0
+          var chars = [UniChar](repeating: 0, count: 4)
+          let status = UCKeyTranslate(
+            pointer,
+            UInt16(keycode),
+            UInt16(kUCKeyActionDisplay),
+            perm.modifiers,
+            UInt32(LMGetKbdType()),
+            UInt32(kUCKeyTranslateNoDeadKeysMask),
+            &deadKeyState,
+            chars.count,
+            &actualLength,
+            &chars
+          )
+          if status == noErr, actualLength > 0 {
+            let string = String(utf16CodeUnits: chars, count: actualLength)
+            if let character = string.first, table[character] == nil {
+              table[character] = Mapping(
+                keycode: CGKeyCode(keycode),
+                shift: perm.shift,
+                option: perm.option
+              )
+            }
+          }
+        }
+      }
+    }
+    // Space is almost always 49 and isn't hit by the character loop above in
+    // some layouts. Anchor it explicitly.
+    if table[" "] == nil {
+      table[" "] = Mapping(keycode: 49, shift: false, option: false)
+    }
+    return KeyboardLayout(table: table)
+  }
 }
 
 func handlePosition() throws {
