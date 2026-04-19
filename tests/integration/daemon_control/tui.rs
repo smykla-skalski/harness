@@ -381,8 +381,7 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
         "recover leader failed: {}",
         output_text(&recover_output)
     );
-    let started: AgentTuiSnapshot =
-        serde_json::from_slice(&recover_output.stdout).expect("parse recover start");
+    let started = parse_terminal_agent_output(&recover_output.stdout);
     assert_eq!(started.status, AgentTuiStatus::Running);
     assert_eq!(started.session_id, session.session_id);
 

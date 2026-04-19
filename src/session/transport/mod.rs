@@ -3,16 +3,13 @@ use clap::Subcommand;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
-mod attach;
 mod managed_agents;
 mod recover;
 mod session_commands;
 mod signal;
 mod support;
 mod task;
-mod tui;
 
-pub use attach::TuiAttachArgs;
 pub use managed_agents::{
     CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentStartArgs, CodexAgentSteerArgs,
     ManagedAgentAttachArgs, ManagedAgentListArgs, ManagedAgentShowArgs, ManagedTerminalInputArgs,
@@ -27,9 +24,6 @@ pub use session_commands::{
 };
 pub use signal::{SignalListArgs, SignalSendArgs};
 pub use task::{TaskAssignArgs, TaskCheckpointArgs, TaskCreateArgs, TaskListArgs, TaskUpdateArgs};
-pub use tui::{
-    TuiInputArgs, TuiKeyArg, TuiListArgs, TuiResizeArgs, TuiShowArgs, TuiStartArgs, TuiStopArgs,
-};
 
 /// Multi-agent session orchestration commands.
 #[derive(Debug, Clone, Subcommand)]
@@ -63,11 +57,6 @@ pub enum SessionCommand {
     Agents {
         #[command(subcommand)]
         command: SessionAgentsCommand,
-    },
-    /// Managed interactive agent TUI processes.
-    Tui {
-        #[command(subcommand)]
-        command: SessionTuiCommand,
     },
     /// Observe all agents in a session.
     Observe(SessionObserveArgs),
@@ -109,26 +98,6 @@ pub enum SessionSignalCommand {
     List(SignalListArgs),
 }
 
-/// Session TUI subcommands.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum SessionTuiCommand {
-    /// Start an agent runtime in a managed PTY.
-    Start(TuiStartArgs),
-    /// Attach to an active managed TUI process.
-    Attach(TuiAttachArgs),
-    /// List managed TUIs for a session.
-    List(TuiListArgs),
-    /// Show the latest snapshot for one managed TUI.
-    Show(TuiShowArgs),
-    /// Send keyboard-like input to an active managed TUI.
-    Input(TuiInputArgs),
-    /// Resize an active managed TUI.
-    Resize(TuiResizeArgs),
-    /// Stop an active managed TUI.
-    Stop(TuiStopArgs),
-}
-
 impl Execute for SessionCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
@@ -142,7 +111,6 @@ impl Execute for SessionCommand {
             Self::Task { command } => command.execute(context),
             Self::Signal { command } => command.execute(context),
             Self::Agents { command } => command.execute(context),
-            Self::Tui { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
             Self::Sync(args) => args.execute(context),
             Self::Leave(args) => args.execute(context),
@@ -170,20 +138,6 @@ impl Execute for SessionSignalCommand {
         match self {
             Self::Send(args) => args.execute(context),
             Self::List(args) => args.execute(context),
-        }
-    }
-}
-
-impl Execute for SessionTuiCommand {
-    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
-        match self {
-            Self::Start(args) => args.execute(context),
-            Self::Attach(args) => args.execute(context),
-            Self::List(args) => args.execute(context),
-            Self::Show(args) => args.execute(context),
-            Self::Input(args) => args.execute(context),
-            Self::Resize(args) => args.execute(context),
-            Self::Stop(args) => args.execute(context),
         }
     }
 }

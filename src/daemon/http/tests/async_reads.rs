@@ -10,8 +10,6 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::state::DaemonManifest;
 
-mod agent_tuis;
-mod codex;
 mod managed_agents;
 mod sessions;
 
