@@ -30,6 +30,7 @@ final class HarnessMonitorAgentsE2ETests: HarnessMonitorUITestCase {
       controlIdentifier: Accessibility.agentTuiRuntimePicker,
       title: "Codex"
     )
+    selectFastModelForTerminal(in: app, runtime: "codex")
     replaceText(
       in: app,
       identifier: Accessibility.agentTuiPromptField,
@@ -83,6 +84,7 @@ final class HarnessMonitorAgentsE2ETests: HarnessMonitorUITestCase {
       controlIdentifier: Accessibility.agentTuiCreateModePicker,
       title: "Codex"
     )
+    selectFastModelForCodex(in: app)
     replaceText(
       in: app,
       identifier: Accessibility.agentsCodexPromptField,

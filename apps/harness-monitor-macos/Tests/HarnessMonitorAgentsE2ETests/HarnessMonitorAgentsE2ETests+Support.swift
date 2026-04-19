@@ -8,6 +8,36 @@ extension HarnessMonitorAgentsE2ETests {
   static let liveStartupTimeout: TimeInterval = 20
   static let codexCompletionTimeout: TimeInterval = 120
 
+  /// Display name of the cheapest/fastest model exposed by each runtime's
+  /// catalog. E2E runs use these to keep token spend and turnaround low.
+  /// Keep in sync with `src/agents/runtime/models.rs::cheapest_fastest`.
+  static let e2eFastModelDisplayName: [String: String] = [
+    "codex": "o4-mini",
+    "claude": "Haiku 4.5",
+    "gemini": "Gemini 2.5 Flash",
+    "copilot": "GPT-4o mini",
+    "vibe": "Mistral Small",
+    "opencode": "Claude Haiku 4.5",
+  ]
+
+  func selectFastModelForTerminal(in app: XCUIApplication, runtime: String) {
+    guard let displayName = Self.e2eFastModelDisplayName[runtime] else { return }
+    selectSegment(
+      in: app,
+      controlIdentifier: Accessibility.agentsModelPicker,
+      title: displayName
+    )
+  }
+
+  func selectFastModelForCodex(in app: XCUIApplication) {
+    guard let displayName = Self.e2eFastModelDisplayName["codex"] else { return }
+    selectSegment(
+      in: app,
+      controlIdentifier: Accessibility.agentsCodexModelPicker,
+      title: displayName
+    )
+  }
+
   func setUpLiveHarness(purpose: String) throws -> HarnessMonitorAgentsE2ELiveHarness {
     try HarnessMonitorAgentsE2ELiveHarness.setUp(for: self, purpose: purpose)
   }
