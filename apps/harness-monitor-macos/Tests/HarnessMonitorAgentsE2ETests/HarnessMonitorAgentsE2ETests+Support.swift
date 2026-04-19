@@ -12,11 +12,11 @@ extension HarnessMonitorAgentsE2ETests {
   /// catalog. E2E runs use these to keep token spend and turnaround low.
   /// Keep in sync with `src/agents/runtime/models.rs::cheapest_fastest`.
   static let e2eFastModelDisplayName: [String: String] = [
-    "codex": "o4-mini",
+    "codex": "GPT-5.1 Codex mini",
     "claude": "Haiku 4.5",
-    "gemini": "Gemini 2.5 Flash",
-    "copilot": "GPT-4o mini",
-    "vibe": "Mistral Small",
+    "gemini": "Gemini 2.5 Flash-Lite",
+    "copilot": "GPT-5.4 mini",
+    "vibe": "Mistral Small 4",
     "opencode": "Claude Haiku 4.5",
   ]
 
