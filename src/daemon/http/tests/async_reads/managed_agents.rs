@@ -29,6 +29,7 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
             pending_approvals: Vec::new(),
             created_at: "2026-04-14T14:00:00Z".into(),
             updated_at: "2026-04-14T14:01:00Z".into(),
+            model: None,
         })
         .await
         .expect("seed codex run");
@@ -104,6 +105,7 @@ async fn get_managed_agent_wraps_codex_run_when_sync_db_is_unavailable() {
             pending_approvals: Vec::new(),
             created_at: "2026-04-14T16:00:00Z".into(),
             updated_at: "2026-04-14T16:01:00Z".into(),
+            model: None,
         })
         .await
         .expect("seed codex run");
