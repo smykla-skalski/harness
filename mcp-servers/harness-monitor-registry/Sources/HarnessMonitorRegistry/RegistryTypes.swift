@@ -2,7 +2,8 @@ import CoreGraphics
 import Foundation
 
 public let registryProtocolVersion: Int = 1
-public let registrySocketFilename: String = "harness-monitor-mcp.sock"
+/// Keep short - Unix domain sockets have a 104-byte path limit on macOS.
+public let registrySocketFilename: String = "mcp.sock"
 public let registryAppGroupIdentifier: String = "Q498EB36N4.io.harnessmonitor"
 
 public enum RegistryElementKind: String, Sendable, Codable, CaseIterable {
