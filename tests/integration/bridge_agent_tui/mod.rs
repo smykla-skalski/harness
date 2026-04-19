@@ -482,6 +482,8 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
                 rows: 30,
                 cols: 120,
                 model: None,
+                effort: None,
+                allow_custom_model: false,
             },
         )
         .expect("start TUI");
