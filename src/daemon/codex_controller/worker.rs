@@ -101,6 +101,9 @@ impl CodexRunWorker {
         if let Some(model) = &self.snapshot.model {
             params["model"] = json!(model);
         }
+        if let Some(effort) = &self.snapshot.effort {
+            params["reasoning"] = json!({ "effort": effort });
+        }
 
         let result = rpc.request(method, params).await?;
         let thread_id = result

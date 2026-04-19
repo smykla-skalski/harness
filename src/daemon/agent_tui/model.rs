@@ -9,6 +9,7 @@ use crate::agents::runtime::{InitialPromptDelivery, runtime_for_name};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
 
+use super::effort::apply_effort_to_profile;
 use super::process::AgentTuiProcess;
 use super::screen::TerminalScreenSnapshot;
 use super::{DEFAULT_COLS, DEFAULT_ROWS};
@@ -253,6 +254,11 @@ pub struct AgentTuiStartRequest {
     /// `None` means use the runtime default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// Optional reasoning/thinking effort level. Must be a member of the
+    /// selected model's `effort_values`; ignored silently when the model does
+    /// not support effort. `None` skips effort selection entirely.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
 }
 
 impl AgentTuiStartRequest {
@@ -268,8 +274,12 @@ impl AgentTuiStartRequest {
         } else {
             AgentTuiLaunchProfile::from_argv(&default_profile.runtime, self.argv.clone())?
         };
-        if let Some(model) = self.model.as_deref().filter(|value| !value.is_empty()) {
+        let model = self.model.as_deref().filter(|value| !value.is_empty());
+        if let Some(model) = model {
             apply_model_to_profile(&mut profile, model)?;
+        }
+        if let Some(effort) = self.effort.as_deref().filter(|value| !value.is_empty()) {
+            apply_effort_to_profile(&mut profile, model, effort)?;
         }
         Ok(profile)
     }
@@ -417,6 +427,7 @@ mod model_selection_tests {
             cols: DEFAULT_COLS,
             persona: None,
             model: None,
+            effort: None,
         }
     }
 

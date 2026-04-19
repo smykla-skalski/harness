@@ -15,6 +15,7 @@ fn start_run_rejects_empty_prompt_before_db_lookup() {
         mode: CodexRunMode::Report,
         resume_thread_id: None,
         model: None,
+        effort: None,
     };
 
     let error = controller
@@ -36,6 +37,7 @@ fn start_run_rejects_unknown_model_for_codex() {
         mode: CodexRunMode::Report,
         resume_thread_id: None,
         model: Some("not-a-codex-model".to_string()),
+        effort: None,
     };
 
     let error = controller
@@ -50,4 +52,47 @@ fn start_run_rejects_unknown_model_for_codex() {
         message.contains("gpt-5-codex"),
         "error should list valid codex models: {message}"
     );
+}
+
+#[test]
+fn start_run_rejects_effort_on_non_reasoning_model() {
+    let (sender, _) = broadcast::channel(8);
+    let controller = CodexControllerHandle::new(sender, Arc::new(OnceLock::new()), false);
+    let request = CodexRunRequest {
+        actor: None,
+        prompt: "investigate".to_string(),
+        mode: CodexRunMode::Report,
+        resume_thread_id: None,
+        model: Some("gpt-5.4-mini".to_string()),
+        effort: Some("medium".to_string()),
+    };
+
+    let error = controller
+        .start_run("sess-1", &request)
+        .expect_err("non-reasoning model should reject effort");
+    let message = error.to_string();
+    assert!(
+        message.contains("does not support"),
+        "unexpected error: {message}"
+    );
+}
+
+#[test]
+fn start_run_rejects_unknown_effort_value() {
+    let (sender, _) = broadcast::channel(8);
+    let controller = CodexControllerHandle::new(sender, Arc::new(OnceLock::new()), false);
+    let request = CodexRunRequest {
+        actor: None,
+        prompt: "investigate".to_string(),
+        mode: CodexRunMode::Report,
+        resume_thread_id: None,
+        model: Some("gpt-5-codex".to_string()),
+        effort: Some("extreme".to_string()),
+    };
+
+    let error = controller
+        .start_run("sess-1", &request)
+        .expect_err("unknown effort should be rejected");
+    let message = error.to_string();
+    assert!(message.contains("extreme"), "unexpected error: {message}");
 }
