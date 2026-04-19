@@ -11,10 +11,10 @@ The server ships as a Node.js stdio MCP server. It talks to the running Harness 
 | `list_windows` | Returns `CGWindowID`, title, role, and frame for each Harness Monitor window. | IPC to app |
 | `list_elements` | Returns registered interactive elements. Filter by `windowID` or `kind`. | IPC to app |
 | `get_element` | Full metadata for an element by `.accessibilityIdentifier`. | IPC to app |
-| `move_mouse` | Move cursor to screen `(x, y)`. No click. | `cliclick` |
-| `click` | Click at `(x, y)` with optional `button` and `doubleClick`. | `cliclick` |
-| `click_element` | Resolve an identifier to its frame and click the center. | IPC + `cliclick` |
-| `type_text` | Type text into the focused window. Unicode-safe. | `cliclick` (fallback `osascript`) |
+| `move_mouse` | Move cursor to screen `(x, y)`. No click. | `harness-monitor-input` (Swift/CGEvent) |
+| `click` | Click at `(x, y)` with optional `button` and `doubleClick`. | `harness-monitor-input` |
+| `click_element` | Resolve an identifier to its frame and click the center. | IPC + `harness-monitor-input` |
+| `type_text` | Type text into the focused window. Unicode-safe. | `harness-monitor-input` |
 | `screenshot_window` | Capture a window (`windowID`) or display. Returns PNG. | `/usr/sbin/screencapture` |
 
 All coordinates are in global screen space, origin at top-left (matching `CGEvent`). Elements publish frames via `GeometryReader` + `CoordinateSpace.global`.
@@ -23,9 +23,11 @@ All coordinates are in global screen space, origin at top-left (matching `CGEven
 
 - macOS 26+ (the app itself targets macOS 26 and uses `MACOSX_DEPLOYMENT_TARGET = 26.0`)
 - Node.js 20+
-- `cliclick` - `brew install cliclick` (required for mouse and preferred for keyboard)
+- The bundled `harness-monitor-input` helper. Build it once with `swift build -c release --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input`
 - Accessibility permission granted to whichever process runs this MCP server (Claude Code, iTerm, etc.) - System Settings -> Privacy & Security -> Accessibility
 - Screen Recording permission if you use `screenshot_window` with a `windowID`
+
+`cliclick` (`brew install cliclick`) is accepted as a fallback when the bundled helper is not built.
 
 ## Build
 
@@ -86,7 +88,7 @@ See `src/protocol.ts` for the full request/response contract.
 
 ## Permissions and entitlements
 
-The MCP server process needs the Accessibility permission so `cliclick` and `osascript` can synthesize mouse and keyboard events. Window-scoped screenshots also need Screen Recording.
+The MCP server process needs the Accessibility permission so the `harness-monitor-input` helper (or `cliclick`) can synthesize mouse and keyboard events via `CGEvent`. Window-scoped screenshots also need Screen Recording.
 
 The Harness Monitor app side needs its socket listener allowed to bind inside the app-group container - no extra entitlement beyond the existing app-group membership. The listener uses BSD sockets (`socket` / `bind` / `listen` / `accept`).
 

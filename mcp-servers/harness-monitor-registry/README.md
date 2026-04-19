@@ -6,10 +6,12 @@ Swift package that exposes Harness Monitor's accessibility elements to the `harn
 
 - `AccessibilityRegistry` - Swift actor holding a dictionary of `RegistryElement` and `RegistryWindow` values. Thread-safe by construction.
 - `RegistryRequestDispatcher` - transport-agnostic handler that turns a `RegistryRequest` into a `RegistryResponse`. Unit tested without sockets.
-- `RegistryListener` - POSIX-socket-based NDJSON server. Network.framework's `NWListener` does not expose a filesystem-socket listen path reliably, so accept() runs on a dedicated `DispatchQueue` and each connection is wrapped in `DispatchIO`.
+- `RegistryListener` - POSIX-socket-based NDJSON server. `NWListener` does not expose a filesystem-socket listen path reliably, so accept() runs on a dedicated `DispatchQueue` and each connection is driven by a `DispatchSource.makeReadSource` + non-blocking `recv()` loop.
 - `NDJSONLineBuffer` - byte-oriented framing for the wire.
 - `RegistryWireCodec` - JSON codec for the envelope format the Node server expects.
 - `.trackAccessibility(...)` - SwiftUI view modifier that captures a view's frame via `GeometryReader` + `CoordinateSpace.global` and registers it with a registry. Frame updates flow through a `PreferenceKey`, so moves during layout are picked up automatically.
+- `harness-monitor-input` executable - CGEvent-backed input-synthesis CLI that replaces the external `cliclick` dependency. Subcommands: `move`, `click`, `type`, `position`, `check`.
+- `harness-monitor-registry-host` executable - manual-test harness that seeds the registry with fixture windows and elements and runs the listener at a given socket path.
 
 ## Why a separate package
 

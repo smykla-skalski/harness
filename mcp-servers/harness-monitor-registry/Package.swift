@@ -14,6 +14,10 @@ let package = Package(
     .executable(
       name: "harness-monitor-registry-host",
       targets: ["HarnessMonitorRegistryHost"]
+    ),
+    .executable(
+      name: "harness-monitor-input",
+      targets: ["HarnessMonitorInputTool"]
     )
   ],
   targets: [
@@ -28,6 +32,13 @@ let package = Package(
     .executableTarget(
       name: "HarnessMonitorRegistryHost",
       dependencies: ["HarnessMonitorRegistry"],
+      swiftSettings: [
+        .enableUpcomingFeature("StrictConcurrency"),
+        .unsafeFlags(["-strict-concurrency=complete"])
+      ]
+    ),
+    .executableTarget(
+      name: "HarnessMonitorInputTool",
       swiftSettings: [
         .enableUpcomingFeature("StrictConcurrency"),
         .unsafeFlags(["-strict-concurrency=complete"])
