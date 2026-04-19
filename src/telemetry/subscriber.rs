@@ -432,7 +432,7 @@ fn telemetry_resource(service: RuntimeService) -> Resource {
         .with_attributes([
             KeyValue::new("service.namespace", "harness"),
             KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
-            KeyValue::new("deployment.environment.name", "local"),
+            KeyValue::new("deployment.env", "local"),
         ])
         .build()
 }
