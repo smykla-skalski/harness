@@ -3,6 +3,8 @@ import SwiftUI
 
 struct ToolbarDaemonStatusDot: View {
   let connectionState: HarnessMonitorStore.ConnectionState
+  @ScaledMetric(relativeTo: .caption)
+  private var dotSize: CGFloat = 10
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
@@ -11,7 +13,7 @@ struct ToolbarDaemonStatusDot: View {
   var body: some View {
     Circle()
       .fill(statusColor.opacity(fillOpacity))
-      .frame(width: 10, height: 10)
+      .frame(width: dotSize, height: dotSize)
       .background {
         Circle()
           .strokeBorder(statusColor.opacity(strokeOpacity), lineWidth: 1)
