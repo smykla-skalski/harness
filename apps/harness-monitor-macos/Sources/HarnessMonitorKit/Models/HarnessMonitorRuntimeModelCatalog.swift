@@ -17,16 +17,55 @@ public enum RuntimeModelTier: String, Codable, Equatable, Sendable, CaseIterable
   }
 }
 
+/// Reasoning / thinking parameter family published alongside each runtime
+/// model. Mirrors `agents::runtime::models::EffortKind` on the daemon side.
+public enum EffortKind: String, Codable, Equatable, Sendable, CaseIterable {
+  case none
+  case thinkingBudget = "thinking_budget"
+  case reasoningEffort = "reasoning_effort"
+
+  public var supportsEffort: Bool { self != .none }
+}
+
 /// One model offered by a runtime.
 public struct RuntimeModel: Codable, Equatable, Identifiable, Sendable {
   public let id: String
   public let displayName: String
   public let tier: RuntimeModelTier
+  public let effortKind: EffortKind
+  public let effortValues: [String]
 
-  public init(id: String, displayName: String, tier: RuntimeModelTier) {
+  public var supportsEffort: Bool { effortKind.supportsEffort }
+
+  public init(
+    id: String,
+    displayName: String,
+    tier: RuntimeModelTier,
+    effortKind: EffortKind = .none,
+    effortValues: [String] = []
+  ) {
     self.id = id
     self.displayName = displayName
     self.tier = tier
+    self.effortKind = effortKind
+    self.effortValues = effortValues
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    displayName = try container.decode(String.self, forKey: .displayName)
+    tier = try container.decode(RuntimeModelTier.self, forKey: .tier)
+    effortKind = try container.decodeIfPresent(EffortKind.self, forKey: .effortKind) ?? .none
+    effortValues = try container.decodeIfPresent([String].self, forKey: .effortValues) ?? []
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case displayName
+    case tier
+    case effortKind
+    case effortValues
   }
 }
 

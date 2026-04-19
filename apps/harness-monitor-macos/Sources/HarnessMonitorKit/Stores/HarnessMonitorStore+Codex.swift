@@ -50,14 +50,18 @@ extension HarnessMonitorStore {
     mode: CodexRunMode,
     actor: String = "harness-app",
     resumeThreadId: String? = nil,
-    model: String? = nil
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false
   ) async -> Bool {
     await startCodexRunSnapshot(
       prompt: prompt,
       mode: mode,
       actor: actor,
       resumeThreadId: resumeThreadId,
-      model: model
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel
     ) != nil
   }
 
@@ -67,7 +71,9 @@ extension HarnessMonitorStore {
     mode: CodexRunMode,
     actor: String = "harness-app",
     resumeThreadId: String? = nil,
-    model: String? = nil
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false
   ) async -> CodexRunSnapshot? {
     guard guardSessionActionsAvailable() else { return nil }
     guard let client, let sessionID = selectedSessionID else { return nil }
@@ -87,7 +93,9 @@ extension HarnessMonitorStore {
       prompt: trimmedPrompt,
       mode: mode,
       resumeThreadId: resumeThreadId,
-      model: model
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel
     )
 
     do {
