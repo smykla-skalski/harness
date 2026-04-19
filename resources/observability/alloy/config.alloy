@@ -9,7 +9,7 @@ otelcol.receiver.otlp "harness" {
 
   output {
     logs = [
-      otelcol.processor.batch.logs.input,
+      otelcol.processor.transform.logs.input,
     ]
     metrics = [
       otelcol.processor.batch.metrics.input,
@@ -21,8 +21,21 @@ otelcol.receiver.otlp "harness" {
   }
 }
 
-// Note: With native OTLP endpoint, Loki's otlp_config (in loki.yml) controls
-// which attributes become labels vs structured metadata. No Alloy hints needed.
+// Copy severity_text to resource attribute "level" for Loki label indexing
+otelcol.processor.transform "logs" {
+  error_mode = "ignore"
+
+  log_statements {
+    context = "log"
+    statements = [
+      `set(resource.attributes["level"], severity_text)`,
+    ]
+  }
+
+  output {
+    logs = [otelcol.processor.batch.logs.input]
+  }
+}
 
 otelcol.processor.batch "logs" {
   output {
