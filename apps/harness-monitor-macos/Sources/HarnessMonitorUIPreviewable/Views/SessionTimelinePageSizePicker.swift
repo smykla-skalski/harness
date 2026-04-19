@@ -21,6 +21,7 @@ struct SessionTimelinePageSizePicker: View {
       .frame(width: 68)
       .harnessNativeFormControl()
       .accessibilityLabel("Events per page")
+      .accessibilityHint("Changes the number of timeline events displayed per page")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePageSizePicker)
     }
   }

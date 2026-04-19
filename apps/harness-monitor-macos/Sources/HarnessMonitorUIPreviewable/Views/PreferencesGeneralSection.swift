@@ -31,6 +31,7 @@ public struct PreferencesAppearanceSection: View {
           }
         }
         .harnessNativeFormControl()
+        .accessibilityHint("Changes the color scheme for all windows")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesThemeModePicker)
 
         Picker("Text size", selection: $textSizeIndex) {
@@ -39,6 +40,7 @@ public struct PreferencesAppearanceSection: View {
           }
         }
         .harnessNativeFormControl()
+        .accessibilityHint("Scales text throughout the application")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTextSizePicker)
 
         Picker("Backdrop", selection: $backdropModeRawValue) {
@@ -47,10 +49,12 @@ public struct PreferencesAppearanceSection: View {
           }
         }
         .harnessNativeFormControl()
+        .accessibilityHint("Controls where the background image renders")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
 
         Toggle("Corner animation", isOn: $cornerAnimationEnabled)
           .harnessNativeFormControl()
+          .accessibilityHint("Shows a dancing llama during activity")
           .accessibilityIdentifier("harness.preferences.appearance.cornerAnimation")
       } header: {
         Text("Appearance")

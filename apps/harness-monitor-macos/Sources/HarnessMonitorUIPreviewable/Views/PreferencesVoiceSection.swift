@@ -160,10 +160,13 @@ private struct PreferencesVoiceProcessingSection: View {
   var body: some View {
     Section {
       Toggle("Local daemon", isOn: $localDaemonSinkEnabled)
+        .accessibilityHint("Routes audio to the local harness daemon")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesVoiceLocalDaemonToggle)
       Toggle("Agent bridge", isOn: $agentBridgeSinkEnabled)
+        .accessibilityHint("Routes audio through the agent bridge connection")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesVoiceAgentBridgeToggle)
       Toggle("Remote processor", isOn: $remoteProcessorSinkEnabled)
+        .accessibilityHint("Routes audio to a remote processing service")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesVoiceRemoteProcessorToggle)
 
       LabeledContent("Effective sinks") {
