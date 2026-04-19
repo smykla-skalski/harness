@@ -15,6 +15,28 @@ fi
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 SCHEMES_DIR="$ROOT/HarnessMonitor.xcodeproj/xcshareddata/xcschemes"
+LOCAL_REGISTRY_PACKAGE_RELATIVE_PATH="../../mcp-servers/harness-monitor-registry"
+LOCAL_REGISTRY_PRODUCT_NAME="HarnessMonitorRegistry"
+
+repair_local_package_product_link() {
+  local pbxproj_path="$1"
+  HARNESS_MONITOR_LOCAL_PACKAGE_RELATIVE_PATH="$LOCAL_REGISTRY_PACKAGE_RELATIVE_PATH" \
+  HARNESS_MONITOR_LOCAL_PACKAGE_PRODUCT_NAME="$LOCAL_REGISTRY_PRODUCT_NAME" \
+    /usr/bin/perl -0pi -e '
+      my $package_path = $ENV{HARNESS_MONITOR_LOCAL_PACKAGE_RELATIVE_PATH};
+      my $product_name = $ENV{HARNESS_MONITOR_LOCAL_PACKAGE_PRODUCT_NAME};
+      my $package_comment = "/* XCLocalSwiftPackageReference \"$package_path\" */";
+      my ($package_id) = $_ =~ /([A-F0-9]+) \Q$package_comment\E = \{\n\t\t\tisa = XCLocalSwiftPackageReference;/s
+        or die "missing local package reference for $package_path\n";
+      my $package_line = "\t\t\tpackage = $package_id $package_comment;\n";
+      my $product_block = qr/\t\t[A-F0-9]+ \/\* \Q$product_name\E \*\/ = \{\n\t\t\tisa = XCSwiftPackageProductDependency;\n/s;
+
+      if ($_ !~ /$product_block\Q$package_line\E\t\t\tproductName = \Q$product_name\E;\n/s) {
+        s/($product_block)(\t\t\tproductName = \Q$product_name\E;\n)/$1$package_line$2/s
+          or die "missing package product dependency for $product_name\n";
+      }
+    ' "$pbxproj_path"
+}
 
 # XcodeGen does not expose LastUpgradeCheck or product bundle file-reference names.
 # Apply these as post-generation patches so they survive regeneration.
@@ -31,6 +53,10 @@ sed -i '' \
   -e 's|/\* HarnessMonitorUITestHost\.app \*/|/* Harness Monitor UI Testing.app */|g' \
   -e 's|path = HarnessMonitorUITestHost\.app;|path = "Harness Monitor UI Testing.app";|g' \
   "$PBXPROJ"
+
+# XcodeGen omits the back-reference from the local package product to its
+# XCLocalSwiftPackageReference. Repair it so Xcode resolves the local package.
+repair_local_package_product_link "$PBXPROJ"
 
 # Scheme files carry the same LastUpgradeVersion attribute.
 for scheme in "$SCHEMES_DIR"/*.xcscheme; do
