@@ -26,6 +26,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
     var deferredExportActivation: DeferredExportActivation?
     var deferredExportActivationInFlight = false
     var httpExporterSessionOverride: URLSession?
+    var currentBaggage: Baggage?
   }
 
   let stateLock = NSLock()
@@ -129,7 +130,8 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
         setter: HarnessMonitorHeaderSetter()
       )
     }
-    if let baggage = OpenTelemetry.instance.contextProvider.activeBaggage {
+    let storedBaggage = stateLock.withLock { state.currentBaggage }
+    if let baggage = storedBaggage {
       OpenTelemetry.instance.propagators.textMapBaggagePropagator.inject(
         baggage: baggage,
         carrier: &carrier,

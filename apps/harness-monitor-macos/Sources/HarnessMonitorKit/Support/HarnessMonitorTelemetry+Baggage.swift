@@ -15,12 +15,11 @@ extension HarnessMonitorTelemetry {
     {
       builder.put(key: projectKey, value: projectValue, metadata: nil)
     }
-    OpenTelemetry.instance.contextProvider.setActiveBaggage(builder.build())
+    stateLock.withLock { state.currentBaggage = builder.build() }
   }
 
   func clearSessionBaggage() {
     bootstrap()
-    let emptyBaggage = OpenTelemetry.instance.baggageManager.baggageBuilder().build()
-    OpenTelemetry.instance.contextProvider.setActiveBaggage(emptyBaggage)
+    stateLock.withLock { state.currentBaggage = nil }
   }
 }
