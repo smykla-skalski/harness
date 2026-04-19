@@ -12,7 +12,7 @@ settings:
     CLANG_CXX_LANGUAGE_STANDARD: gnu++20
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
     CODE_SIGNING_ALLOWED: YES
-    CURRENT_PROJECT_VERSION: 26.0.0
+    CURRENT_PROJECT_VERSION: 26.1.0
     DEAD_CODE_STRIPPING: YES
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
@@ -30,7 +30,7 @@ settings:
     HARNESS_MONITOR_BUILD_GIT_COMMIT: local-dev
     HARNESS_MONITOR_BUILD_GIT_DIRTY: false
     HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT: local-dev
-    MARKETING_VERSION: 26.0.0
+    MARKETING_VERSION: 26.1.0
   configs:
     Preview:
       COMPILER_INDEX_STORE_ENABLE: NO
@@ -535,6 +535,7 @@ targets:
     platform: macOS
     deploymentTarget: "26.0"
     sources:
+      - Tests/HarnessMonitorUITestSupport
       - Tests/HarnessMonitorUITests
     dependencies:
       - target: HarnessMonitorUITestHost
@@ -566,6 +567,44 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
         PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.ui-tests
+        TEST_TARGET_NAME: HarnessMonitorUITestHost
+  HarnessMonitorAgentsE2ETests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Tests/HarnessMonitorUITestSupport
+      - Tests/HarnessMonitorAgentsE2ETests
+    dependencies:
+      - target: HarnessMonitorUITestHost
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "${XCODE_RUNNING_FOR_PREVIEWS:-}" = "1" ] || [[ "${BUILD_DIR:-}" == *"/Previews/"* ]]; then
+            exit 0
+          fi
+
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+
+          for runner in "$BUILT_PRODUCTS_DIR"/*-Runner.app; do
+            if [ -e "$runner" ]; then
+              strip_attrs "$runner"
+            fi
+          done
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.agents-e2e-tests
         TEST_TARGET_NAME: HarnessMonitorUITestHost
 schemes:
   HarnessMonitor:
@@ -611,6 +650,16 @@ schemes:
         - variable: HARNESS_BOOTSTRAP_TIMEOUT_SECONDS
           value: "60"
           isEnabled: true
+  HarnessMonitorAgentsE2E:
+    build:
+      targets:
+        HarnessMonitor: all
+        HarnessMonitorKit: all
+        HarnessMonitorUIPreviewable: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: HarnessMonitorAgentsE2ETests
   HarnessMonitorUIPreviewable:
     build:
       config: Preview
