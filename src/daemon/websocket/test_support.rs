@@ -237,6 +237,7 @@ fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapshot {
         created_at: "2026-04-13T19:00:00Z".into(),
         updated_at: updated_at.into(),
         model: None,
+        effort: None,
     }
 }
 
