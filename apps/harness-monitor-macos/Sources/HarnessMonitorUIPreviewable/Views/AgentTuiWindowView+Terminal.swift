@@ -18,6 +18,7 @@ extension AgentTuiWindowView {
           .scaledFont(.caption)
           .controlSize(.mini)
           .keyboardShortcut("l", modifiers: [.command])
+          .accessibilityHint("Wraps long terminal lines to fit the viewport")
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiWrapToggle)
       }
     }
@@ -85,13 +86,22 @@ extension AgentTuiWindowView {
       Text("Input")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Picker("Input mode", selection: $viewModel.inputMode) {
+      HarnessMonitorSegmentedPicker(
+        title: "Input mode",
+        selection: $viewModel.inputMode,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputModePicker
+      ) {
         ForEach(AgentTuiInputMode.allCases) { mode in
-          Text(mode.title).tag(mode)
+          Text(mode.title)
+            .tag(mode)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.agentTuiInputModePicker,
+                option: mode.title
+              )
+            )
         }
       }
-      .pickerStyle(.segmented)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiInputModePicker)
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         multilineEditor(
           placeholder: "Text to send to the TUI",
@@ -233,6 +243,7 @@ extension AgentTuiWindowView {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
         .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
     }
+    .accessibilityFrameMarker(accessibilityIdentifier)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(accessibilityIdentifier)
   }

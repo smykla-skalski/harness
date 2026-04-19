@@ -232,6 +232,8 @@ public struct PreferencesNotificationsSection: View {
       LabeledContent("Relevance") {
         Slider(value: $notifications.draft.relevanceScore, in: 0...1)
           .frame(maxWidth: 220)
+          .accessibilityValue("\(Int(notifications.draft.relevanceScore * 100)) percent")
+          .accessibilityHint("Adjusts the notification priority threshold")
       }
     } header: {
       Text("Native Options")
