@@ -18,6 +18,7 @@ use crate::daemon::http::{self, DaemonHttpState};
 use crate::daemon::protocol::StreamEvent;
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
+use super::config::build_config_push_frame;
 use super::dispatch::handle_message;
 use super::relay::relay_broadcast;
 
@@ -97,6 +98,16 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
 
     let (priority_tx, mut priority_rx) = mpsc::channel::<Message>(64);
     let (bulk_tx, mut bulk_rx) = mpsc::channel::<Message>(256);
+
+    // Push the configuration frame before subscribing to broadcasts so it is
+    // guaranteed to be the first frame delivered to the client.
+    if let Some(frame) = build_config_push_frame()
+        && priority_tx.send(frame).await.is_err()
+    {
+        tracing::debug!("websocket closed before configuration frame could be sent");
+        return;
+    }
+
     let broadcast_rx = state.sender.subscribe();
 
     let connection_relay = Arc::clone(&connection);
