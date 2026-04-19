@@ -14,7 +14,7 @@ public actor RegistryListener {
   private let queue: DispatchQueue
   private var socketFD: Int32 = -1
   private var acceptSource: DispatchSourceRead?
-  private var connections: [Int32: DispatchIO] = [:]
+  private var connections: [Int32: Connection] = [:]
   private var running = false
 
   public init(
@@ -86,8 +86,9 @@ public actor RegistryListener {
       Darwin.close(socketFD)
       socketFD = -1
     }
-    for (fd, io) in connections {
-      io.close()
+    for (fd, connection) in connections {
+      connection.readSource.cancel()
+      connection.writeQueue.cancel()
       Darwin.close(fd)
     }
     connections.removeAll()
@@ -106,31 +107,48 @@ public actor RegistryListener {
   }
 
   private func attachConnection(fd: Int32) {
-    let io = DispatchIO(
-      type: .stream,
-      fileDescriptor: fd,
-      queue: queue,
-      cleanupHandler: { _ in Darwin.close(fd) }
-    )
-    io.setLimit(lowWater: 1)
-    connections[fd] = io
-    pump(fd: fd, io: io)
+    _ = Darwin.fcntl(fd, F_SETFL, Darwin.fcntl(fd, F_GETFL, 0) | O_NONBLOCK)
+    let readSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
+    let writeQueue = DispatchSource.makeUserDataAddSource(queue: queue)
+    writeQueue.resume()
+    let buffer = BufferBox()
+    let closed = ClosedFlag()
+    readSource.setEventHandler { [weak self] in
+      self?.handleReadable(fd: fd, buffer: buffer, closed: closed)
+    }
+    readSource.setCancelHandler {
+      Darwin.close(fd)
+    }
+    connections[fd] = Connection(readSource: readSource, writeQueue: writeQueue)
+    readSource.resume()
   }
 
-  private func pump(fd: Int32, io: DispatchIO) {
-    var buffer = NDJSONLineBuffer()
-    io.read(offset: 0, length: .max, queue: queue) { [weak self] isDone, data, _ in
-      guard let self else { return }
-      if let data, data.isEmpty == false {
-        let rawData = Data(copying: data)
-        let lines = buffer.append(rawData)
+  private nonisolated func handleReadable(fd: Int32, buffer: BufferBox, closed: ClosedFlag) {
+    if closed.isClosed { return }
+    var scratch = [UInt8](repeating: 0, count: 16 * 1024)
+    while true {
+      let bytesRead = scratch.withUnsafeMutableBufferPointer { pointer in
+        Darwin.recv(fd, pointer.baseAddress, pointer.count, 0)
+      }
+      if bytesRead > 0 {
+        let chunk = Data(scratch.prefix(bytesRead))
+        let lines = buffer.append(chunk)
         for line in lines {
           Task { await self.handleLine(line, fd: fd) }
         }
+        continue
       }
-      if isDone {
+      if bytesRead == 0 {
+        closed.mark()
         Task { await self.closeConnection(fd: fd) }
+        return
       }
+      if errno == EAGAIN || errno == EWOULDBLOCK {
+        return
+      }
+      closed.mark()
+      Task { await self.closeConnection(fd: fd) }
+      return
     }
   }
 
@@ -148,11 +166,11 @@ public actor RegistryListener {
     do {
       var payload = try RegistryWireCodec.encodeResponse(response)
       payload.append(0x0A)
-      guard let io = connections[fd] else { return }
-      let chunk = payload.withUnsafeBytes { bytes -> DispatchData in
-        DispatchData(bytes: bytes)
+      guard connections[fd] != nil else { return }
+      _ = payload.withUnsafeBytes { bytes -> Int in
+        guard let base = bytes.baseAddress else { return 0 }
+        return Darwin.send(fd, base, bytes.count, 0)
       }
-      io.write(offset: 0, data: chunk, queue: queue) { _, _, _ in }
     } catch {
       logger.error(
         "harness-monitor MCP failed to encode response: \(error.localizedDescription, privacy: .public)"
@@ -161,8 +179,42 @@ public actor RegistryListener {
   }
 
   private func closeConnection(fd: Int32) {
-    guard let io = connections.removeValue(forKey: fd) else { return }
-    io.close()
+    guard let connection = connections.removeValue(forKey: fd) else { return }
+    connection.writeQueue.cancel()
+    connection.readSource.cancel()
+  }
+}
+
+private struct Connection {
+  let readSource: DispatchSourceRead
+  let writeQueue: DispatchSourceUserDataAdd
+}
+
+private final class BufferBox: @unchecked Sendable {
+  private var buffer = NDJSONLineBuffer()
+  private let lock = NSLock()
+
+  func append(_ data: Data) -> [Data] {
+    lock.lock()
+    defer { lock.unlock() }
+    return buffer.append(data)
+  }
+}
+
+private final class ClosedFlag: @unchecked Sendable {
+  private var closed = false
+  private let lock = NSLock()
+
+  var isClosed: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return closed
+  }
+
+  func mark() {
+    lock.lock()
+    defer { lock.unlock() }
+    closed = true
   }
 }
 
@@ -183,16 +235,6 @@ public enum RegistryListenerError: Error, CustomStringConvertible {
     case .pathTooLong(let path):
       return "unix socket path too long: \(path)"
     }
-  }
-}
-
-private extension Data {
-  init(copying dispatchData: DispatchData) {
-    var copy = Data(count: dispatchData.count)
-    copy.withUnsafeMutableBytes { destination in
-      _ = dispatchData.copyBytes(to: destination)
-    }
-    self = copy
   }
 }
 
