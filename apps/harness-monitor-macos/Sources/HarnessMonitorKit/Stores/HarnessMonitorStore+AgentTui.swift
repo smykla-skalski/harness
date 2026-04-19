@@ -41,6 +41,8 @@ extension HarnessMonitorStore {
     projectDir: String? = nil,
     persona: String? = nil,
     model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false,
     argv: [String] = [],
     rows: Int,
     cols: Int
@@ -75,6 +77,8 @@ extension HarnessMonitorStore {
           projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,
           persona: persona,
           model: model,
+          effort: effort,
+          allowCustomModel: allowCustomModel,
           argv: normalizedArgv,
           rows: rows,
           cols: cols
@@ -116,7 +120,7 @@ extension HarnessMonitorStore {
     let actionName: String? =
       switch feedback {
       case .visible:
-      "Agents resized"
+        "Agents resized"
       case .silent:
         nil
       }

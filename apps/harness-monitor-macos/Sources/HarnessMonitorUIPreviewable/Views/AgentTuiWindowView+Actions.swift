@@ -100,6 +100,20 @@ extension AgentTuiWindowView {
       case .terminal:
         let startSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
         viewModel.expectedSize = startSize
+        let catalog = viewModel.availableRuntimeModels.first {
+          $0.runtime == viewModel.runtime.rawValue
+        }
+        let pickerValue =
+          viewModel.selectedTerminalModelByRuntime[viewModel.runtime]
+          ?? catalog?.default
+          ?? ""
+        let customValue = viewModel.customTerminalModelByRuntime[viewModel.runtime] ?? ""
+        let resolved = AgentTuiWindowView.effectiveModelId(
+          pickerValue: pickerValue,
+          customValue: customValue,
+          catalogDefault: catalog?.default ?? ""
+        )
+        let effort = viewModel.selectedTerminalEffortByRuntime[viewModel.runtime]
         let success = await store.startAgentTui(
           runtime: viewModel.runtime,
           role: viewModel.selectedRole,
@@ -107,7 +121,9 @@ extension AgentTuiWindowView {
           prompt: viewModel.prompt,
           projectDir: trimmedProjectDir,
           persona: viewModel.selectedPersona,
-          model: viewModel.selectedTerminalModelByRuntime[viewModel.runtime],
+          model: resolved.id,
+          effort: effort,
+          allowCustomModel: resolved.allowCustom,
           argv: parsedArgvOverride,
           rows: startSize.rows,
           cols: startSize.cols
@@ -124,10 +140,20 @@ extension AgentTuiWindowView {
           focusedField = .input
         }
       case .codex:
+        let catalog = viewModel.availableRuntimeModels.first { $0.runtime == "codex" }
+        let pickerValue = viewModel.selectedCodexModel ?? catalog?.default ?? ""
+        let customValue = viewModel.customCodexModel ?? ""
+        let resolved = AgentTuiWindowView.effectiveModelId(
+          pickerValue: pickerValue,
+          customValue: customValue,
+          catalogDefault: catalog?.default ?? ""
+        )
         let startedRun = await store.startCodexRunSnapshot(
           prompt: viewModel.codexPrompt,
           mode: viewModel.codexMode,
-          model: viewModel.selectedCodexModel
+          model: resolved.id,
+          effort: viewModel.selectedCodexEffort,
+          allowCustomModel: resolved.allowCustom
         )
         if let startedRun {
           viewModel.codexPrompt = ""
