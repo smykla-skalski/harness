@@ -24,37 +24,40 @@ pub(super) fn apply_effort_to_profile(
     profile: &mut AgentTuiLaunchProfile,
     model: Option<&str>,
     effort: &str,
+    allow_custom: bool,
 ) -> Result<(), CliError> {
-    let catalog = models::catalog_for(&profile.runtime).ok_or_else(|| {
-        CliErrorKind::workflow_parse(format!("unknown runtime '{}'", profile.runtime))
-    })?;
-    let model_id = model.unwrap_or(catalog.default.as_str());
-    let model_entry = catalog
-        .models
-        .iter()
-        .find(|entry| entry.id == model_id)
-        .ok_or_else(|| {
-            CliErrorKind::workflow_parse(format!(
-                "model '{model_id}' is not valid for runtime '{}'",
-                profile.runtime
-            ))
+    if !allow_custom {
+        let catalog = models::catalog_for(&profile.runtime).ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!("unknown runtime '{}'", profile.runtime))
         })?;
-    if !model_entry.supports_effort() {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "model '{model_id}' does not support an effort level"
-        ))
-        .into());
-    }
-    if !model_entry
-        .effort_values
-        .iter()
-        .any(|value| value == effort)
-    {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "effort '{effort}' is not valid for model '{model_id}': valid values are {}",
-            model_entry.effort_values.join(", ")
-        ))
-        .into());
+        let model_id = model.unwrap_or(catalog.default.as_str());
+        let model_entry = catalog
+            .models
+            .iter()
+            .find(|entry| entry.id == model_id)
+            .ok_or_else(|| {
+                CliErrorKind::workflow_parse(format!(
+                    "model '{model_id}' is not valid for runtime '{}'",
+                    profile.runtime
+                ))
+            })?;
+        if !model_entry.supports_effort() {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "model '{model_id}' does not support an effort level"
+            ))
+            .into());
+        }
+        if !model_entry
+            .effort_values
+            .iter()
+            .any(|value| value == effort)
+        {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "effort '{effort}' is not valid for model '{model_id}': valid values are {}",
+                model_entry.effort_values.join(", ")
+            ))
+            .into());
+        }
     }
 
     let Some(runtime_adapter) = runtime_for_name(&profile.runtime) else {
@@ -101,6 +104,7 @@ mod tests {
             persona: None,
             model: None,
             effort: None,
+            allow_custom_model: false,
         }
     }
 
@@ -191,6 +195,58 @@ mod tests {
                 "codex".to_string(),
                 "--model".to_string(),
                 "gpt-5-codex".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn custom_model_accepts_arbitrary_effort_level_for_codex() {
+        let mut request = base_request("codex");
+        request.model = Some("gpt-6-private".into());
+        request.effort = Some("maximum".into());
+        request.allow_custom_model = true;
+        let profile = request.launch_profile().expect("profile");
+        assert_eq!(
+            profile.argv,
+            vec![
+                "codex".to_string(),
+                "--model".to_string(),
+                "gpt-6-private".to_string(),
+                "--reasoning-effort".to_string(),
+                "maximum".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn custom_model_effort_still_dropped_when_runtime_has_no_flag() {
+        let mut request = base_request("claude");
+        request.model = Some("claude-sonnet-5-0-private".into());
+        request.effort = Some("insane".into());
+        request.allow_custom_model = true;
+        let profile = request.launch_profile().expect("profile");
+        assert_eq!(
+            profile.argv,
+            vec![
+                "claude".to_string(),
+                "--model".to_string(),
+                "claude-sonnet-5-0-private".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn allow_custom_model_bypasses_catalog_validation() {
+        let mut request = base_request("claude");
+        request.model = Some("claude-sonnet-5-0-private".into());
+        request.allow_custom_model = true;
+        let profile = request.launch_profile().expect("profile");
+        assert_eq!(
+            profile.argv,
+            vec![
+                "claude".to_string(),
+                "--model".to_string(),
+                "claude-sonnet-5-0-private".to_string(),
             ]
         );
     }
