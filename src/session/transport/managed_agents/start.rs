@@ -197,3 +197,82 @@ impl Execute for CodexAgentStartArgs {
         Ok(0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    /// Local harness for parsing just the managed-agents subcommand args from
+    /// a raw argv vec so the tests do not depend on the full CLI graph.
+    #[derive(clap::Parser, Debug)]
+    #[command(name = "terminal")]
+    struct TerminalParse {
+        #[command(flatten)]
+        args: TerminalAgentStartArgs,
+    }
+
+    #[derive(clap::Parser, Debug)]
+    #[command(name = "codex")]
+    struct CodexParse {
+        #[command(flatten)]
+        args: CodexAgentStartArgs,
+    }
+
+    #[test]
+    fn terminal_cli_parses_effort_and_model_at_lowest_tier() {
+        // E2E intent: cheapest/fastest codex model + lowest effort level so
+        // live runs stay under budget.
+        let parsed = TerminalParse::try_parse_from([
+            "terminal",
+            "sess-1",
+            "--runtime",
+            "codex",
+            "--model",
+            "gpt-5.1-codex-mini",
+            "--effort",
+            "minimal",
+        ])
+        .expect("parse");
+        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.1-codex-mini"));
+        assert_eq!(parsed.args.effort.as_deref(), Some("minimal"));
+        assert!(!parsed.args.allow_custom_model);
+    }
+
+    #[test]
+    fn terminal_cli_accepts_allow_custom_model_flag() {
+        let parsed = TerminalParse::try_parse_from([
+            "terminal",
+            "sess-1",
+            "--runtime",
+            "claude",
+            "--model",
+            "claude-sonnet-5-0-private",
+            "--allow-custom-model",
+        ])
+        .expect("parse");
+        assert!(parsed.args.allow_custom_model);
+        assert_eq!(
+            parsed.args.model.as_deref(),
+            Some("claude-sonnet-5-0-private")
+        );
+    }
+
+    #[test]
+    fn codex_cli_parses_effort_and_model_at_lowest_tier() {
+        let parsed = CodexParse::try_parse_from([
+            "codex",
+            "sess-1",
+            "--prompt",
+            "explore the suite",
+            "--model",
+            "gpt-5.1-codex-mini",
+            "--effort",
+            "minimal",
+        ])
+        .expect("parse");
+        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.1-codex-mini"));
+        assert_eq!(parsed.args.effort.as_deref(), Some("minimal"));
+        assert!(!parsed.args.allow_custom_model);
+    }
+}
