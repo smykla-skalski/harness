@@ -240,7 +240,10 @@ public struct AgentTuiWindowView: View {
         return
       }
       if viewModel.selection.terminalID == selectedTuiID {
-        syncTerminalSize()
+        if viewModel.expectedSize == nil {
+          viewModel.expectedSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+        }
+        enforceExpectedSize()
       }
     }
     .onChange(of: store.selectedCodexRun?.runId) { _, _ in
@@ -263,7 +266,8 @@ public struct AgentTuiWindowView: View {
       case .terminal(let sessionID):
         guard oldValue.terminalID != sessionID else { return }
         store.selectAgentTui(tuiID: sessionID)
-        syncTerminalSize()
+        viewModel.expectedSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+        enforceExpectedSize()
       case .codex(let runID):
         guard oldValue.codexRunID != runID else { return }
         store.selectCodexRun(runID: runID)
