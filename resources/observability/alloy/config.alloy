@@ -9,7 +9,7 @@ otelcol.receiver.otlp "harness" {
 
   output {
     logs = [
-      otelcol.processor.attributes.logs_labels.input,
+      otelcol.processor.batch.logs.input,
     ]
     metrics = [
       otelcol.processor.batch.metrics.input,
@@ -21,30 +21,13 @@ otelcol.receiver.otlp "harness" {
   }
 }
 
-otelcol.processor.attributes "logs_labels" {
-  action {
-    key    = "loki.resource.labels"
-    action = "insert"
-    value  = "service.name, service.namespace, service.version, deployment.environment.name"
-  }
-
-  action {
-    key    = "loki.attribute.labels"
-    action = "insert"
-    value  = "request_id, http_method, http_route, hook_name, hook_event, outcome"
-  }
-
-  output {
-    logs = [
-      otelcol.processor.batch.logs.input,
-    ]
-  }
-}
+// Note: With native OTLP endpoint, Loki's otlp_config (in loki.yml) controls
+// which attributes become labels vs structured metadata. No Alloy hints needed.
 
 otelcol.processor.batch "logs" {
   output {
     logs = [
-      otelcol.exporter.loki.harness.input,
+      otelcol.exporter.otlphttp.loki.input,
     ]
   }
 }
@@ -120,12 +103,14 @@ otelcol.exporter.otlp "tempo" {
   }
 }
 
-otelcol.exporter.loki "harness" {
-  forward_to = [loki.write.harness.receiver]
-}
-
-loki.write "harness" {
-  endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
+// Use Loki's native OTLP endpoint (Loki 3.0+)
+// Label promotion controlled by otlp_config in loki.yml, not Alloy hints
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+    tls {
+      insecure             = true
+      insecure_skip_verify = true
+    }
   }
 }
