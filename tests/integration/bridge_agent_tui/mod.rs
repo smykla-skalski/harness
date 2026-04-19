@@ -369,6 +369,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                         cols: 120,
                         persona: None,
                         model: None,
+                        effort: None,
                     },
                 )
                 .expect("start sandboxed tui via bridge");

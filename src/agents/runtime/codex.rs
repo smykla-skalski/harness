@@ -21,6 +21,10 @@ impl AgentRuntime for CodexRuntime {
         "codex"
     }
 
+    fn effort_flag(&self) -> Option<&'static str> {
+        Some("--reasoning-effort")
+    }
+
     fn discover_native_log(
         &self,
         session_id: &str,

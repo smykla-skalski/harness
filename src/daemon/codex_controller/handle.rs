@@ -27,6 +27,7 @@ use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::effort::validate_codex_effort;
 use super::worker::CodexRunWorker;
 
 #[derive(Clone)]
@@ -189,7 +190,8 @@ impl CodexControllerHandle {
             return Err(CliErrorKind::workflow_parse("codex prompt cannot be empty").into());
         }
 
-        if let Some(model) = request.model.as_deref().filter(|value| !value.is_empty()) {
+        let requested_model = request.model.as_deref().filter(|value| !value.is_empty());
+        if let Some(model) = requested_model {
             validate_model("codex", model).map_err(|valid| {
                 let detail = if valid.is_empty() {
                     "no codex model catalog available".to_string()
@@ -200,6 +202,10 @@ impl CodexControllerHandle {
                     "model '{model}' is not valid for runtime 'codex': {detail}"
                 )))
             })?;
+        }
+
+        if let Some(effort) = request.effort.as_deref().filter(|value| !value.is_empty()) {
+            validate_codex_effort(requested_model, effort)?;
         }
 
         self.preflight_websocket_probe(session_id)?;
@@ -225,6 +231,7 @@ impl CodexControllerHandle {
             created_at: now.clone(),
             updated_at: now,
             model: request.model.clone(),
+            effort: request.effort.clone(),
         };
         self.save_and_broadcast(&snapshot)?;
         tracing::info!(

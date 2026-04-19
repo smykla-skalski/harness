@@ -5,6 +5,7 @@
 
 use std::time::Duration;
 
+mod effort;
 mod input;
 mod manager;
 mod manager_control;

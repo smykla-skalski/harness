@@ -172,6 +172,18 @@ pub trait AgentRuntime: Send + Sync {
         Some("--model")
     }
 
+    /// CLI flag this runtime accepts to override the reasoning/thinking
+    /// effort level for a session.
+    ///
+    /// Returns `Some("--reasoning-effort")` for runtimes whose CLI exposes
+    /// effort directly (codex). Runtimes that configure effort via API body,
+    /// config file, or not at all return `None`, and the effort selection is
+    /// accepted but dropped with a warning at spawn time so the rest of the
+    /// flow still validates the request shape.
+    fn effort_flag(&self) -> Option<&'static str> {
+        None
+    }
+
     /// Serializable capability snapshot for UI and daemon clients.
     fn capabilities(&self) -> RuntimeCapabilities {
         let hook_points: Vec<HookIntegrationDescriptor> = self

@@ -115,6 +115,11 @@ pub struct TerminalAgentStartArgs {
     /// the runtime default when omitted.
     #[arg(long)]
     pub model: Option<String>,
+    /// Reasoning/thinking effort level. Must be a level supported by the
+    /// selected model; runtimes whose CLI does not accept the flag ignore it
+    /// with a warning.
+    #[arg(long)]
+    pub effort: Option<String>,
 }
 
 impl Execute for TerminalAgentStartArgs {
@@ -135,6 +140,7 @@ impl Execute for TerminalAgentStartArgs {
             cols: self.cols,
             persona: self.persona.clone(),
             model: self.model.clone(),
+            effort: self.effort.clone(),
         };
         let snapshot = daemon_client()?.start_terminal_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
@@ -159,6 +165,11 @@ pub struct CodexAgentStartArgs {
     /// codex runtime default when omitted.
     #[arg(long)]
     pub model: Option<String>,
+    /// Reasoning effort level forwarded to the codex app-server. Must match a
+    /// value supported by the selected model; ignored when the model does not
+    /// support reasoning.
+    #[arg(long)]
+    pub effort: Option<String>,
 }
 
 impl Execute for CodexAgentStartArgs {
@@ -169,6 +180,7 @@ impl Execute for CodexAgentStartArgs {
             mode: self.mode,
             resume_thread_id: self.resume_thread_id.clone(),
             model: self.model.clone(),
+            effort: self.effort.clone(),
         };
         let snapshot = daemon_client()?.start_codex_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
