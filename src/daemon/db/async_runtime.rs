@@ -262,6 +262,8 @@ impl AsyncCodexRunRow {
                 .map_err(|error| db_error(format!("parse async codex approvals: {error}")))?,
             created_at: self.created_at,
             updated_at: self.updated_at,
+            // Model is intentionally not persisted; only used at thread/start.
+            model: None,
         })
     }
 }

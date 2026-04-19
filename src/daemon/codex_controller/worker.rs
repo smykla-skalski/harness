@@ -98,6 +98,9 @@ impl CodexRunWorker {
         if let Some(thread_id) = &self.snapshot.thread_id {
             params["threadId"] = json!(thread_id);
         }
+        if let Some(model) = &self.snapshot.model {
+            params["model"] = json!(model);
+        }
 
         let result = rpc.request(method, params).await?;
         let thread_id = result

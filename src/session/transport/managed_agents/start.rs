@@ -111,6 +111,10 @@ pub struct TerminalAgentStartArgs {
     /// Persona identifier to attach to the agent registration.
     #[arg(long)]
     pub persona: Option<String>,
+    /// Model identifier validated against the runtime's catalog. Defaults to
+    /// the runtime default when omitted.
+    #[arg(long)]
+    pub model: Option<String>,
 }
 
 impl Execute for TerminalAgentStartArgs {
@@ -130,6 +134,7 @@ impl Execute for TerminalAgentStartArgs {
             rows: self.rows,
             cols: self.cols,
             persona: self.persona.clone(),
+            model: self.model.clone(),
         };
         let snapshot = daemon_client()?.start_terminal_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
@@ -150,6 +155,10 @@ pub struct CodexAgentStartArgs {
     /// Resume an existing Codex thread instead of starting a new one.
     #[arg(long)]
     pub resume_thread_id: Option<String>,
+    /// Model identifier validated against the codex catalog. Defaults to the
+    /// codex runtime default when omitted.
+    #[arg(long)]
+    pub model: Option<String>,
 }
 
 impl Execute for CodexAgentStartArgs {
@@ -159,6 +168,7 @@ impl Execute for CodexAgentStartArgs {
             prompt: self.prompt.clone(),
             mode: self.mode,
             resume_thread_id: self.resume_thread_id.clone(),
+            model: self.model.clone(),
         };
         let snapshot = daemon_client()?.start_codex_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;

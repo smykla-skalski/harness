@@ -13,6 +13,7 @@ use tokio::sync::{broadcast, mpsc};
 use tokio::task::block_in_place;
 use uuid::Uuid;
 
+use crate::agents::runtime::models::validate_model;
 use crate::daemon::bridge;
 use crate::daemon::codex_transport::{self, CodexTransportKind};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
@@ -188,6 +189,19 @@ impl CodexControllerHandle {
             return Err(CliErrorKind::workflow_parse("codex prompt cannot be empty").into());
         }
 
+        if let Some(model) = request.model.as_deref().filter(|value| !value.is_empty()) {
+            validate_model("codex", model).map_err(|valid| {
+                let detail = if valid.is_empty() {
+                    "no codex model catalog available".to_string()
+                } else {
+                    format!("valid models: {}", valid.join(", "))
+                };
+                CliError::from(CliErrorKind::workflow_parse(format!(
+                    "model '{model}' is not valid for runtime 'codex': {detail}"
+                )))
+            })?;
+        }
+
         self.preflight_websocket_probe(session_id)?;
 
         let project_dir = self.project_dir_for_session(session_id)?;
@@ -210,6 +224,7 @@ impl CodexControllerHandle {
             pending_approvals: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
+            model: request.model.clone(),
         };
         self.save_and_broadcast(&snapshot)?;
         tracing::info!(

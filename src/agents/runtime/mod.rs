@@ -162,6 +162,16 @@ pub trait AgentRuntime: Send + Sync {
         InitialPromptDelivery::PtySend
     }
 
+    /// CLI flag this runtime accepts to override the model for a session.
+    ///
+    /// Returns `Some("--model")` for runtimes that take a `--model <id>` pair
+    /// (claude/codex/gemini/copilot/opencode/vibe). Runtimes that cannot be
+    /// configured this way return `None` and the model selection is dropped
+    /// with a warning at spawn time.
+    fn model_flag(&self) -> Option<&'static str> {
+        Some("--model")
+    }
+
     /// Serializable capability snapshot for UI and daemon clients.
     fn capabilities(&self) -> RuntimeCapabilities {
         let hook_points: Vec<HookIntegrationDescriptor> = self

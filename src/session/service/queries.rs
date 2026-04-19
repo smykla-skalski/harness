@@ -73,6 +73,7 @@ pub fn build_recovery_tui_request(
         rows: 30,
         cols: 120,
         persona: None,
+        model: None,
     })
 }
 

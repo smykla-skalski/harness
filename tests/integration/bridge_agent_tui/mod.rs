@@ -368,6 +368,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                         rows: 30,
                         cols: 120,
                         persona: None,
+                        model: None,
                     },
                 )
                 .expect("start sandboxed tui via bridge");
@@ -478,6 +479,7 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
                 argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                 rows: 30,
                 cols: 120,
+                model: None,
             },
         )
         .expect("start TUI");

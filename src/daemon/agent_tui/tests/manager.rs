@@ -69,7 +69,8 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
                     ],
                     rows: 5,
                     cols: 40,
-                },
+                    model: None,
+},
             )
             .expect("start manager TUI");
 
@@ -162,7 +163,8 @@ fn manager_start_does_not_pre_register() {
                     argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                     rows: 5,
                     cols: 40,
-                },
+                    model: None,
+},
             )
             .expect("start");
 
@@ -236,7 +238,8 @@ fn manager_auto_join_prompt_in_transcript() {
                     argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                     rows: 5,
                     cols: 80,
-                },
+                    model: None,
+},
             )
             .expect("start");
 
@@ -321,7 +324,8 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
                     ],
                     rows: 5,
                     cols: 80,
-                },
+                    model: None,
+},
             )
             .expect("start");
 
