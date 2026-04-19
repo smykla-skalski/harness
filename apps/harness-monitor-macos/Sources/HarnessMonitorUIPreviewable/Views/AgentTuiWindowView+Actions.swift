@@ -102,6 +102,7 @@ extension AgentTuiWindowView {
         viewModel.expectedSize = startSize
         let success = await store.startAgentTui(
           runtime: viewModel.runtime,
+          role: viewModel.selectedRole,
           name: viewModel.name,
           prompt: viewModel.prompt,
           projectDir: trimmedProjectDir,
@@ -117,6 +118,7 @@ extension AgentTuiWindowView {
           viewModel.argvOverride = ""
           viewModel.inputText = ""
           viewModel.selectedPersona = nil
+          viewModel.selectedRole = .worker
           viewModel.selection = .terminal(startedTuiID)
           focusedField = .input
         }
