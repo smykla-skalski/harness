@@ -263,6 +263,88 @@ public struct AgentTuiListResponse: Codable, Equatable, Sendable {
   public let tuis: [AgentTuiSnapshot]
 }
 
+public struct ManagedAgentListResponse: Codable, Equatable, Sendable {
+  public let agents: [ManagedAgentSnapshot]
+}
+
+public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
+  case terminal(AgentTuiSnapshot)
+  case codex(CodexRunSnapshot)
+
+  public var id: String { agentId }
+
+  public var agentId: String {
+    switch self {
+    case .terminal(let snapshot):
+      snapshot.tuiId
+    case .codex(let snapshot):
+      snapshot.runId
+    }
+  }
+
+  public var sessionId: String {
+    switch self {
+    case .terminal(let snapshot):
+      snapshot.sessionId
+    case .codex(let snapshot):
+      snapshot.sessionId
+    }
+  }
+
+  public var updatedAt: String {
+    switch self {
+    case .terminal(let snapshot):
+      snapshot.updatedAt
+    case .codex(let snapshot):
+      snapshot.updatedAt
+    }
+  }
+
+  public var terminal: AgentTuiSnapshot? {
+    guard case .terminal(let snapshot) = self else { return nil }
+    return snapshot
+  }
+
+  public var codex: CodexRunSnapshot? {
+    guard case .codex(let snapshot) = self else { return nil }
+    return snapshot
+  }
+}
+
+extension ManagedAgentSnapshot: Codable {
+  private enum CodingKeys: String, CodingKey {
+    case kind
+    case snapshot
+  }
+
+  private enum Kind: String, Codable {
+    case terminal
+    case codex
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    switch try container.decode(Kind.self, forKey: .kind) {
+    case .terminal:
+      self = .terminal(try container.decode(AgentTuiSnapshot.self, forKey: .snapshot))
+    case .codex:
+      self = .codex(try container.decode(CodexRunSnapshot.self, forKey: .snapshot))
+    }
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .terminal(let snapshot):
+      try container.encode(Kind.terminal, forKey: .kind)
+      try container.encode(snapshot, forKey: .snapshot)
+    case .codex(let snapshot):
+      try container.encode(Kind.codex, forKey: .kind)
+      try container.encode(snapshot, forKey: .snapshot)
+    }
+  }
+}
+
 public struct AgentTuiSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let tuiId: String
   public let sessionId: String
@@ -307,6 +389,24 @@ extension AgentTuiListResponse {
         }
         return left.tuiId < right.tuiId
       })
+  }
+}
+
+extension ManagedAgentListResponse {
+  public var terminals: [AgentTuiSnapshot] {
+    agents.compactMap(\.terminal)
+  }
+
+  public var codexRuns: [CodexRunSnapshot] {
+    agents.compactMap(\.codex)
+  }
+
+  public var terminalListResponse: AgentTuiListResponse {
+    AgentTuiListResponse(tuis: terminals)
+  }
+
+  public var codexRunListResponse: CodexRunListResponse {
+    CodexRunListResponse(runs: codexRuns)
   }
 }
 

@@ -30,7 +30,7 @@ impl BridgeServer {
         }
         if self.active_tuis()?.contains_key(&spec.tui_id) {
             return Err(CliErrorKind::workflow_io(format!(
-                "agent TUI '{}' is already active in host bridge",
+                "terminal agent '{}' is already active in host bridge",
                 spec.tui_id
             ))
             .into());
@@ -111,7 +111,7 @@ impl BridgeServer {
     pub(super) fn stop_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let active = self.active_tuis()?.remove(tui_id).ok_or_else(|| {
             CliErrorKind::session_not_active(format!(
-                "agent TUI '{tui_id}' is not active in host bridge"
+                "terminal agent '{tui_id}' is not active in host bridge"
             ))
         })?;
         active.process.kill()?;
@@ -129,7 +129,7 @@ impl BridgeServer {
     pub(super) fn active_tui(&self, tui_id: &str) -> Result<BridgeActiveTui, CliError> {
         self.active_tuis()?.get(tui_id).cloned().ok_or_else(|| {
             CliErrorKind::session_not_active(format!(
-                "agent TUI '{tui_id}' is not active in host bridge"
+                "terminal agent '{tui_id}' is not active in host bridge"
             ))
             .into()
         })

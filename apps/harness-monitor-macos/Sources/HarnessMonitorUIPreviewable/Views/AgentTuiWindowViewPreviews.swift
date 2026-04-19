@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-#Preview("Agent TUI - Create") {
+#Preview("Agents - Create") {
   agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: [],
@@ -10,7 +10,7 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Create With Recovery") {
+#Preview("Agents - Create With Recovery") {
   agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: [],
@@ -19,7 +19,7 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Running Session") {
+#Preview("Agents - Running Session") {
   agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.runningSingle,
@@ -28,7 +28,7 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Stopped Session") {
+#Preview("Agents - Stopped Session") {
   agentTuiWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.stoppedSingle,
@@ -37,7 +37,7 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Multiple Sessions") {
+#Preview("Agents - Multiple Sessions") {
   agentTuiWindowPreview(
     width: 980,
     store: AgentTuiPreviewSupport.makeStore(
@@ -47,7 +47,7 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Many Sessions") {
+#Preview("Agents - Many Sessions") {
   agentTuiWindowPreview(
     width: 980,
     store: AgentTuiPreviewSupport.makeStore(
@@ -57,7 +57,7 @@ import SwiftUI
   )
 }
 
-#Preview("Agent TUI - Mixed Sessions") {
+#Preview("Agents - Mixed Sessions") {
   agentTuiWindowPreview(
     width: 980,
     store: AgentTuiPreviewSupport.makeStore(

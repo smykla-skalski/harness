@@ -45,7 +45,7 @@ Sources: `cargo run --quiet -- observe scan --help`; `cargo run --quiet -- obser
 | `transfer-leader` | Hand leader role to another agent |
 | `task` | Work-item management family |
 | `signal` | File-backed signal management family |
-| `tui` | Managed interactive agent TUI family |
+| `agents` | Unified managed terminal and Codex thread family |
 | `observe` | Observe all agents in one session |
 | `sync` | Run one-shot liveness reconciliation |
 | `leave` | Let one agent leave voluntarily |
@@ -53,9 +53,9 @@ Sources: `cargo run --quiet -- observe scan --help`; `cargo run --quiet -- obser
 | `status` | Show current session status |
 | `list` | List sessions |
 
-Nested families currently expose: `session task {create, assign, list, update, checkpoint}`, `session signal {send, list}`, and `session tui {start, attach, list, show, input, resize, stop}`.
+Nested families currently expose: `session task {create, assign, list, update, checkpoint}`, `session signal {send, list}`, and `session agents {start, attach, list, show, input, resize, stop, steer, interrupt, approve}`.
 
-Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session task --help`; `cargo run --quiet -- session signal --help`; `cargo run --quiet -- session tui --help`; `src/session/transport/mod.rs:25-170`.
+Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session task --help`; `cargo run --quiet -- session signal --help`; `cargo run --quiet -- session agents --help`; `src/session/transport/mod.rs:25-170`.
 
 ## `session start` reference
 

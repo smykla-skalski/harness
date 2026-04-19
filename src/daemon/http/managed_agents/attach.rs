@@ -41,10 +41,10 @@ pub(super) async fn get_terminal_agent_attach(
     }
 
     if state.agent_tui_manager.state.sandboxed {
-        let stream_result =
-            block_in_place(|| BridgeClient::for_capability(BridgeCapability::AgentTui).and_then(
-                |client| client.agent_tui_attach(&agent_id),
-            ));
+        let stream_result = block_in_place(|| {
+            BridgeClient::for_capability(BridgeCapability::AgentTui)
+                .and_then(|client| client.agent_tui_attach(&agent_id))
+        });
 
         let stream = match stream_result {
             Ok(stream) => stream,

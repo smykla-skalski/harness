@@ -147,45 +147,131 @@ extension WebSocketTransport {
   }
 
   public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
-    let value = try await send(
-      method: "session.agent_tuis",
-      params: .object(["session_id": .string(sessionID)])
-    )
-    let tuis: [AgentTuiSnapshot] = try decode(value)
-    return AgentTuiListResponse(tuis: tuis)
+    let agents = try await managedAgents(sessionID: sessionID)
+    return AgentTuiListResponse(tuis: agents.agents.compactMap { $0.terminal })
   }
 
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    let snapshot = try await managedAgent(agentID: tuiID)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
+  }
+
+  public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
     let value = try await send(
-      method: "agent_tui.detail",
-      params: .object(["tui_id": .string(tuiID)])
+      method: "session.managed_agents",
+      params: .object(["session_id": .string(sessionID)])
     )
     return try decode(value)
+  }
+
+  public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    let value = try await send(
+      method: "managed_agent.detail",
+      params: .object(["agent_id": .string(agentID)])
+    )
+    return try decode(value)
+  }
+
+  public func startManagedTerminalAgent(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.startManagedTerminalAgent(sessionID: sessionID, request: request)
+  }
+
+  public func startManagedCodexAgent(
+    sessionID: String,
+    request: CodexRunRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.startManagedCodexAgent(sessionID: sessionID, request: request)
+  }
+
+  public func sendManagedAgentInput(
+    agentID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.sendManagedAgentInput(agentID: agentID, request: request)
+  }
+
+  public func resizeManagedAgent(
+    agentID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.resizeManagedAgent(agentID: agentID, request: request)
+  }
+
+  public func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.stopManagedAgent(agentID: agentID)
+  }
+
+  public func steerManagedCodexAgent(
+    agentID: String,
+    request: CodexSteerRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.steerManagedCodexAgent(agentID: agentID, request: request)
+  }
+
+  public func interruptManagedCodexAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.interruptManagedCodexAgent(agentID: agentID)
+  }
+
+  public func resolveManagedCodexApproval(
+    agentID: String,
+    approvalID: String,
+    request: CodexApprovalDecisionRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await httpFallbackClient.resolveManagedCodexApproval(
+      agentID: agentID,
+      approvalID: approvalID,
+      request: request
+    )
   }
 
   public func startAgentTui(
     sessionID: String,
     request: AgentTuiStartRequest
   ) async throws -> AgentTuiSnapshot {
-    try await httpFallbackClient.startAgentTui(sessionID: sessionID, request: request)
+    let snapshot = try await startManagedTerminalAgent(sessionID: sessionID, request: request)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(
+        code: 500,
+        message: "Managed agent start did not return a terminal snapshot."
+      )
+    }
+    return tui
   }
 
   public func sendAgentTuiInput(
     tuiID: String,
     request: AgentTuiInputRequest
   ) async throws -> AgentTuiSnapshot {
-    try await httpFallbackClient.sendAgentTuiInput(tuiID: tuiID, request: request)
+    let snapshot = try await sendManagedAgentInput(agentID: tuiID, request: request)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func resizeAgentTui(
     tuiID: String,
     request: AgentTuiResizeRequest
   ) async throws -> AgentTuiSnapshot {
-    try await httpFallbackClient.resizeAgentTui(tuiID: tuiID, request: request)
+    let snapshot = try await resizeManagedAgent(agentID: tuiID, request: request)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
-    try await httpFallbackClient.stopAgentTui(tuiID: tuiID)
+    let snapshot = try await stopManagedAgent(agentID: tuiID)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func personas() async throws -> [AgentPersona] {

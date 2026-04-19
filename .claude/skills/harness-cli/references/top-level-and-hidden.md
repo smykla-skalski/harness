@@ -12,7 +12,7 @@
 | `observe` | Observe and classify harness-managed agent session logs |
 | `session` | Multi-agent session orchestration |
 | `daemon` | Local daemon for the Harness app |
-| `bridge` | Supervise host capabilities for sandboxed Codex and agent TUI flows |
+| `bridge` | Supervise host capabilities for sandboxed Codex and terminal agent flows |
 
 Sources: `cargo run --quiet -- --help`; `src/app/cli.rs:96-158`.
 

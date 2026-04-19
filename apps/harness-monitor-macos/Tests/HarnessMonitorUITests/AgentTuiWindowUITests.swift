@@ -83,7 +83,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
           && backButton.isEnabled
           && !forwardButton.isEnabled
       },
-      "Selecting the create tab should move the active Agent TUI window into its create pane"
+      "Selecting the create tab should move the active Agents window into its create pane"
     )
 
     invokeHarnessMonitorMenuItem(in: app, title: "Back")
@@ -95,7 +95,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
           && forwardButton.isEnabled
       },
       """
-      Harness Monitor > Back should navigate back inside the active Agent TUI window history while
+      Harness Monitor > Back should navigate back inside the active Agents window history while
       preserving the original create pane behind the restored session.
       state=\(state.label)
       routing=\(commandRoutingState.label)
@@ -112,7 +112,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
           && backButton.isEnabled
           && !forwardButton.isEnabled
       },
-      "Harness Monitor > Forward should navigate forward inside the active Agent TUI window history"
+      "Harness Monitor > Forward should navigate forward inside the active Agents window history"
     )
   }
 
@@ -151,7 +151,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThan(
       toolbar.buttons.count,
       0,
-      "Agent TUI window should expose toolbar controls in native window chrome"
+      "Agents window should expose toolbar controls in native window chrome"
     )
 
     let leadingToolbarButton = toolbar.buttons.element(boundBy: 0)
@@ -163,17 +163,17 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(
       toolbarLeadingInset,
       176,
-      "Agent TUI sidebar toggle should stay near the leading window chrome"
+      "Agents sidebar toggle should stay near the leading window chrome"
     )
     XCTAssertGreaterThan(
       rowTopInset,
       44,
-      "Agent TUI sidebar content should start below the native toolbar controls"
+      "Agents sidebar content should start below the native toolbar controls"
     )
     XCTAssertLessThan(
       rowTopInset,
       120,
-      "Agent TUI sidebar content should stay visually close to the toolbar"
+      "Agents sidebar content should stay visually close to the toolbar"
     )
   }
 
@@ -226,7 +226,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))
 
     guard let initialSize = agentTuiSize(from: state.label) else {
-      XCTFail("Expected the agent TUI state marker to expose the live size")
+      XCTFail("Expected the Agents state marker to expose the live size")
       return
     }
     let initialHeight = viewport.frame.height

@@ -4,9 +4,9 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-@Suite("Harness Monitor agent TUI flow")
+@Suite("Harness Monitor agents flow")
 struct HarnessMonitorStoreAgentTuiTests {
-  @Test("Start agent TUI sends request and selects returned snapshot")
+  @Test("Start Agents sends request and selects returned snapshot")
   func startAgentTuiSendsRequestAndSelectsReturnedSnapshot() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
@@ -38,10 +38,10 @@ struct HarnessMonitorStoreAgentTuiTests {
     )
     #expect(store.selectedAgentTui?.runtime == "copilot")
     #expect(store.selectedAgentTui?.size == AgentTuiSize(rows: 30, cols: 110))
-    #expect(store.currentSuccessFeedbackMessage == "Agent TUI started")
+    #expect(store.currentSuccessFeedbackMessage == "Agents started")
   }
 
-  @Test("Starting another agent TUI promotes and selects the new snapshot")
+  @Test("Starting another Agents promotes and selects the new snapshot")
   func startAgentTuiPromotesNewSnapshotOverExistingSelection() async {
     let client = RecordingHarnessClient()
     let existing = client.agentTuiFixture(
@@ -68,7 +68,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTuis.contains { $0.tuiId == existing.tuiId })
   }
 
-  @Test("Start agent TUI with vibe runtime sends vibe as the runtime string")
+  @Test("Start Agents with vibe runtime sends vibe as the runtime string")
   func startAgentTuiWithVibeRuntimeSendsVibeRuntimeString() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
@@ -101,7 +101,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.runtime == "vibe")
   }
 
-  @Test("Start agent TUI sends argv and project directory overrides")
+  @Test("Start Agents sends argv and project directory overrides")
   func startAgentTuiSendsArgvAndProjectDirectoryOverrides() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
@@ -137,7 +137,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.projectDir == "/tmp/alt-worktree")
   }
 
-  @Test("Agent TUI input updates the selected screen snapshot")
+  @Test("Agents input updates the selected screen snapshot")
   func agentTuiInputUpdatesSelectedScreenSnapshot() async {
     let client = RecordingHarnessClient()
     let tui = client.agentTuiFixture()
@@ -152,7 +152,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.screen.text.contains("status") == true)
   }
 
-  @Test("Agent TUI input chases a fresher snapshot after a stale action response")
+  @Test("Agents input chases a fresher snapshot after a stale action response")
   func agentTuiInputRefreshesAfterStaleActionResponse() async {
     let client = RecordingHarnessClient()
     let running = client.agentTuiFixture(screenText: "copilot> ready")
@@ -229,7 +229,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTuis.first?.size.rows == 48)
   }
 
-  @Test("Silent Agent TUI resize skips success feedback")
+  @Test("Silent Agents resize skips success feedback")
   func silentResizeAgentTuiSkipsSuccessFeedback() async {
     let client = RecordingHarnessClient()
     let running = client.agentTuiFixture(rows: 32, cols: 120)
@@ -253,7 +253,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
-  @Test("Agent TUI stream update refreshes selected TUI")
+  @Test("Agents stream update refreshes selected TUI")
   func agentTuiStreamUpdateRefreshesSelectedTui() async {
     let client = RecordingHarnessClient()
     let running = client.agentTuiFixture(screenText: "copilot> ready")
@@ -278,7 +278,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.screen.text == "copilot> done")
   }
 
-  @Test("Stopping agent TUI keeps the stopped snapshot selected")
+  @Test("Stopping Agents keeps the stopped snapshot selected")
   func stopAgentTuiKeepsStoppedSnapshotSelected() async {
     let client = RecordingHarnessClient()
     let running = client.agentTuiFixture(screenText: "copilot> ready")
@@ -295,7 +295,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTuis.contains { $0.tuiId == running.tuiId && $0.status == .stopped })
   }
 
-  @Test("Agent TUI actions stay read-only while daemon is offline")
+  @Test("Agents actions stay read-only while daemon is offline")
   func agentTuiActionsStayReadOnlyWhileDaemonIsOffline() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
@@ -314,7 +314,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.currentFailureFeedbackMessage?.contains("read-only mode") == true)
   }
 
-  @Test("Start agent TUI sets unavailable flag when sandboxed daemon returns 501")
+  @Test("Start Agents sets unavailable flag when sandboxed daemon returns 501")
   func startAgentTuiSetsUnavailableFlagOnSandboxed501() async {
     let client = RecordingHarnessClient()
     client.configureAgentTuiStartError(
@@ -336,7 +336,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.currentFailureFeedbackMessage?.contains("bridge unavailable") == true)
   }
 
-  @Test("Start agent TUI keeps host bridge ready when daemon is not sandboxed")
+  @Test("Start Agents keeps host bridge ready when daemon is not sandboxed")
   func startAgentTuiDoesNotSetUnavailableFlagOnUnsandboxed501() async {
     let client = RecordingHarnessClient()
     client.configureAgentTuiStartError(
@@ -357,7 +357,7 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.currentFailureFeedbackMessage?.contains("bridge unavailable") == true)
   }
 
-  @Test("Successful agent TUI start clears unavailable flag")
+  @Test("Successful Agents start clears unavailable flag")
   func successfulAgentTuiStartClearsUnavailableFlag() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)

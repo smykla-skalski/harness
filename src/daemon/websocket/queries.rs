@@ -1,9 +1,13 @@
+use std::cmp::Reverse;
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, require_async_db};
-use crate::daemon::protocol::{StreamEvent, TimelineWindowRequest, WsRequest, WsResponse};
+use crate::daemon::protocol::{
+    ManagedAgentListResponse, ManagedAgentSnapshot, StreamEvent, TimelineWindowRequest, WsRequest,
+    WsResponse,
+};
 use crate::daemon::service;
 
 use super::connection::ConnectionState;
@@ -51,8 +55,8 @@ async fn dispatch_session_read_query(
     match request.method.as_str() {
         "session.detail" => Some(dispatch_session_detail_query(request, state).await),
         "session.timeline" => Some(dispatch_session_timeline_query(request, state).await),
-        "session.agent_tuis" => Some(dispatch_session_agent_tuis_query(request, state)),
-        "agent_tui.detail" => Some(dispatch_agent_tui_detail_query(request, state)),
+        "session.managed_agents" => Some(dispatch_session_managed_agents_query(request, state)),
+        "managed_agent.detail" => Some(dispatch_managed_agent_detail_query(request, state)),
         _ => None,
     }
 }
@@ -140,26 +144,56 @@ fn timeline_window_request_from_ws(request: &WsRequest) -> TimelineWindowRequest
     }
 }
 
-fn dispatch_session_agent_tuis_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+fn dispatch_session_managed_agents_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
 
+    let mut agents: Vec<_> = match state.agent_tui_manager.list(&session_id) {
+        Ok(response) => response
+            .tuis
+            .into_iter()
+            .map(ManagedAgentSnapshot::Terminal)
+            .collect(),
+        Err(error) => {
+            return dispatch_query_result::<ManagedAgentListResponse>(&request.id, Err(error));
+        }
+    };
+    let codex_agents = match state.codex_controller.list_runs(&session_id) {
+        Ok(response) => response.runs.into_iter().map(ManagedAgentSnapshot::Codex),
+        Err(error) => {
+            return dispatch_query_result::<ManagedAgentListResponse>(&request.id, Err(error));
+        }
+    };
+    agents.extend(codex_agents);
+    agents.sort_by_key(|agent| {
+        (
+            Reverse(agent.updated_at().to_string()),
+            agent.session_id().to_string(),
+            agent.agent_id().to_string(),
+        )
+    });
+    dispatch_query_result(&request.id, Ok(ManagedAgentListResponse { agents }))
+}
+
+fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
+    };
+
+    if let Ok(snapshot) = state.agent_tui_manager.get(&agent_id) {
+        return dispatch_query_result(&request.id, Ok(ManagedAgentSnapshot::Terminal(snapshot)));
+    }
     dispatch_query_result(
         &request.id,
         state
-            .agent_tui_manager
-            .list(&session_id)
-            .map(|response| response.tuis),
+            .codex_controller
+            .run(&agent_id)
+            .map(ManagedAgentSnapshot::Codex),
     )
-}
-
-fn dispatch_agent_tui_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let Some(tui_id) = extract_string_param(&request.params, "tui_id") else {
-        return error_response(&request.id, "MISSING_PARAM", "missing tui_id");
-    };
-
-    dispatch_query_result(&request.id, state.agent_tui_manager.get(&tui_id))
 }
 
 async fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
@@ -274,8 +308,8 @@ mod tests {
     use serde_json::Value;
 
     use super::super::test_support::{
-        seed_sample_agent_tui, seed_sample_timeline, test_http_state_with_async_db_timeline,
-        test_http_state_with_db,
+        seed_sample_agent_tui, seed_sample_codex_run, seed_sample_timeline,
+        test_http_state_with_async_db_timeline, test_http_state_with_db,
     };
     use super::*;
     use crate::daemon::protocol::WsRequest;
@@ -307,12 +341,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dispatch_read_query_session_agent_tuis_returns_snapshot_array() {
+    async fn dispatch_read_query_session_managed_agents_returns_merged_response() {
         let state = test_http_state_with_db();
-        seed_sample_agent_tui(&state, "tui-1", "2026-04-13T19:10:00Z");
+        seed_sample_agent_tui(&state, "tui-3", "2026-04-13T19:12:00Z");
+        seed_sample_codex_run(&state, "run-1", "2026-04-13T19:13:00Z");
         let request = WsRequest {
-            id: "req-agent-tuis".into(),
-            method: "session.agent_tuis".into(),
+            id: "req-managed-agents".into(),
+            method: "session.managed_agents".into(),
             params: serde_json::json!({ "session_id": "sess-test-1" }),
             trace_context: None,
         };
@@ -320,31 +355,38 @@ mod tests {
         let response = dispatch_read_query(&request, &state).await;
 
         assert!(response.error.is_none());
-        let result = response.result.expect("agent tui list response");
-        let Value::Array(entries) = result else {
-            panic!("expected websocket agent tui list result to be an array");
+        let result = response.result.expect("managed agent list response");
+        let Value::Array(entries) = result["agents"].clone() else {
+            panic!("expected managed agent list response to contain an agents array");
         };
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0]["tui_id"].as_str(), Some("tui-1"));
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0]["kind"].as_str(), Some("codex"));
+        assert_eq!(entries[0]["snapshot"]["run_id"].as_str(), Some("run-1"));
+        assert_eq!(entries[1]["kind"].as_str(), Some("terminal"));
+        assert_eq!(entries[1]["snapshot"]["tui_id"].as_str(), Some("tui-3"));
     }
 
     #[tokio::test]
-    async fn dispatch_read_query_agent_tui_detail_returns_snapshot() {
+    async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
         let state = test_http_state_with_db();
-        seed_sample_agent_tui(&state, "tui-2", "2026-04-13T19:11:00Z");
+        seed_sample_codex_run(&state, "run-2", "2026-04-13T19:14:00Z");
         let request = WsRequest {
-            id: "req-agent-tui".into(),
-            method: "agent_tui.detail".into(),
-            params: serde_json::json!({ "tui_id": "tui-2" }),
+            id: "req-managed-agent".into(),
+            method: "managed_agent.detail".into(),
+            params: serde_json::json!({ "agent_id": "run-2" }),
             trace_context: None,
         };
 
         let response = dispatch_read_query(&request, &state).await;
 
         assert!(response.error.is_none());
-        let result = response.result.expect("agent tui response");
-        assert_eq!(result["tui_id"].as_str(), Some("tui-2"));
-        assert_eq!(result["session_id"].as_str(), Some("sess-test-1"));
+        let result = response.result.expect("managed agent response");
+        assert_eq!(result["kind"].as_str(), Some("codex"));
+        assert_eq!(result["snapshot"]["run_id"].as_str(), Some("run-2"));
+        assert_eq!(
+            result["snapshot"]["session_id"].as_str(),
+            Some("sess-test-1")
+        );
     }
 
     #[tokio::test]

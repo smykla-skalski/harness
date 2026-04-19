@@ -5,6 +5,8 @@ struct AgentTuiSidebar: View {
   @Binding var selection: AgentTuiSheetSelection
   let agentTuis: [AgentTuiSnapshot]
   let sessionTitlesByID: [String: String]
+  let codexRuns: [CodexRunSnapshot]
+  let codexTitlesByID: [String: String]
   let refresh: () -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -28,40 +30,74 @@ struct AgentTuiSidebar: View {
     agentTuis.filter { !$0.status.isActive }
   }
 
+  private var activeCodexRuns: [CodexRunSnapshot] {
+    codexRuns.filter { $0.status.isActive }
+  }
+
+  private var inactiveCodexRuns: [CodexRunSnapshot] {
+    codexRuns.filter { !$0.status.isActive }
+  }
+
   var body: some View {
     List(selection: selectionBinding) {
-      Label("Create", systemImage: "plus.rectangle")
+      Label("New", systemImage: "plus.rectangle")
         .scaledFont(.body)
         .padding(.vertical, rowPadding)
         .tag(AgentTuiSheetSelection.create)
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
 
       if !activeTuis.isEmpty {
-        Section("Active") {
+        Section("Interactive") {
           ForEach(activeTuis) { tui in
             AgentTuiSidebarRow(
               snapshot: tui,
               title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
             )
             .padding(.vertical, rowPadding)
-
-            .tag(AgentTuiSheetSelection.session(tui.tuiId))
+            .tag(AgentTuiSheetSelection.terminal(tui.tuiId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
           }
         }
       }
 
       if !inactiveTuis.isEmpty {
-        Section("Inactive") {
+        Section("Past Terminals") {
           ForEach(inactiveTuis) { tui in
             AgentTuiSidebarRow(
               snapshot: tui,
               title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
             )
             .padding(.vertical, rowPadding)
-
-            .tag(AgentTuiSheetSelection.session(tui.tuiId))
+            .tag(AgentTuiSheetSelection.terminal(tui.tuiId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
+          }
+        }
+      }
+
+      if !activeCodexRuns.isEmpty {
+        Section("Codex Threads") {
+          ForEach(activeCodexRuns) { run in
+            CodexRunSidebarRow(
+              snapshot: run,
+              title: codexTitlesByID[run.runId] ?? "Codex run"
+            )
+            .padding(.vertical, rowPadding)
+            .tag(AgentTuiSheetSelection.codex(run.runId))
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(run.runId))
+          }
+        }
+      }
+
+      if !inactiveCodexRuns.isEmpty {
+        Section("Past Codex Threads") {
+          ForEach(inactiveCodexRuns) { run in
+            CodexRunSidebarRow(
+              snapshot: run,
+              title: codexTitlesByID[run.runId] ?? "Codex run"
+            )
+            .padding(.vertical, rowPadding)
+            .tag(AgentTuiSheetSelection.codex(run.runId))
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(run.runId))
           }
         }
       }

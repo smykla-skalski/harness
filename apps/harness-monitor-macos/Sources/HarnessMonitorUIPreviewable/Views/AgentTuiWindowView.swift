@@ -32,7 +32,8 @@ public struct AgentTuiWindowView: View {
     let initialDisplayState = AgentTuiDisplayState(store: store)
     let initialSelection = Self.initialSelection(
       displayState: initialDisplayState,
-      selectedTuiID: store.selectedAgentTui?.tuiId
+      selectedTerminalID: store.selectedAgentTui?.tuiId,
+      selectedCodexRunID: store.selectedCodexRun?.runId
     )
     _stateViewModel = State(
       wrappedValue: ViewModel(displayState: initialDisplayState, selection: initialSelection)
@@ -61,14 +62,29 @@ public struct AgentTuiWindowView: View {
   }
 
   var selectedSessionTui: AgentTuiSnapshot? {
-    guard let selectedTuiID = viewModel.selection.sessionID else {
+    guard let selectedTuiID = viewModel.selection.terminalID else {
       return nil
     }
     return viewModel.displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
   }
 
+  var selectedCodexRun: CodexRunSnapshot? {
+    guard let selectedRunID = viewModel.selection.codexRunID else {
+      return nil
+    }
+    return viewModel.displayState.sortedCodexRuns.first { $0.runId == selectedRunID }
+  }
+
   var trimmedInput: String {
     viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  var trimmedCodexPrompt: String {
+    viewModel.codexPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  var trimmedCodexContext: String {
+    viewModel.codexContext.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   var trimmedProjectDir: String? {
@@ -83,8 +99,12 @@ public struct AgentTuiWindowView: View {
       .filter { !$0.isEmpty }
   }
 
-  var canStart: Bool {
+  var canStartTerminal: Bool {
     !viewModel.isSubmitting && viewModel.rows > 0 && viewModel.cols > 0
+  }
+
+  var canStartCodex: Bool {
+    !viewModel.isSubmitting && !trimmedCodexPrompt.isEmpty
   }
 
   var canSend: Bool {
@@ -106,8 +126,11 @@ public struct AgentTuiWindowView: View {
     selectedSessionTui?.status.isActive == true && !viewModel.isSubmitting
   }
 
-  var orderedSessionIDs: [String] {
-    viewModel.displayState.sortedAgentTuis.map(\.tuiId)
+  var canSteerCodex: Bool {
+    guard let selectedCodexRun else {
+      return false
+    }
+    return selectedCodexRun.status.isActive && !trimmedCodexContext.isEmpty && !viewModel.isSubmitting
   }
 
   var usesLiveViewportSplitLayout: Bool {
@@ -118,7 +141,7 @@ public struct AgentTuiWindowView: View {
     switch viewModel.selection {
     case .create:
       return "selection=create"
-    case .session(let sessionID):
+    case .terminal(let sessionID):
       let status = selectedSessionTui?.status.rawValue ?? "missing"
       let sizeLabel =
         if let selectedSessionTui {
@@ -127,7 +150,11 @@ public struct AgentTuiWindowView: View {
           "size=missing"
         }
       return
-        "selection=session:\(sessionID),status=\(status),wrap=\(viewModel.wrapLines),\(sizeLabel)"
+        "selection=terminal:\(sessionID),status=\(status),wrap=\(viewModel.wrapLines),\(sizeLabel)"
+    case .codex(let runID):
+      let status = selectedCodexRun?.status.rawValue ?? "missing"
+      let approvalCount = selectedCodexRun?.pendingApprovals.count ?? 0
+      return "selection=codex:\(runID),status=\(status),approvals=\(approvalCount)"
     }
   }
 
@@ -135,8 +162,10 @@ public struct AgentTuiWindowView: View {
     switch viewModel.selection {
     case .create:
       "create"
-    case .session(let sessionID):
-      "session:\(sessionID)"
+    case .terminal(let sessionID):
+      "terminal:\(sessionID)"
+    case .codex(let runID):
+      "codex:\(runID)"
     }
   }
 
@@ -147,6 +176,8 @@ public struct AgentTuiWindowView: View {
         selection: $viewModel.selection,
         agentTuis: viewModel.displayState.sortedAgentTuis,
         sessionTitlesByID: viewModel.displayState.sessionTitlesByID,
+        codexRuns: viewModel.displayState.sortedCodexRuns,
+        codexTitlesByID: viewModel.displayState.codexTitlesByID,
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
@@ -174,9 +205,11 @@ public struct AgentTuiWindowView: View {
       navigationBridge.update(viewModel.windowNavigation)
       await Task.yield()
       async let tuiRefresh = store.refreshSelectedAgentTuis()
+      async let codexRefresh = store.refreshSelectedCodexRuns()
       async let personas = store.fetchPersonas()
       let loadedPersonas = await personas
       _ = await tuiRefresh
+      _ = await codexRefresh
       if viewModel.availablePersonas != loadedPersonas {
         viewModel.availablePersonas = loadedPersonas
       }
@@ -187,6 +220,10 @@ public struct AgentTuiWindowView: View {
       refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
+    .onChange(of: store.selectedCodexRuns) { _, _ in
+      refreshDisplayState()
+      reconcileSheetState(afterRefresh: false)
+    }
     .onChange(of: selectedAgentNames) { _, _ in
       refreshDisplayState()
     }
@@ -194,13 +231,20 @@ public struct AgentTuiWindowView: View {
       refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
+    .onChange(of: store.codexUnavailable) { _, _ in
+      refreshDisplayState()
+      reconcileSheetState(afterRefresh: false)
+    }
     .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
       guard let selectedTuiID else {
         return
       }
-      if viewModel.selection.sessionID == selectedTuiID {
+      if viewModel.selection.terminalID == selectedTuiID {
         syncTerminalSize()
       }
+    }
+    .onChange(of: store.selectedCodexRun?.runId) { _, _ in
+      refreshDisplayState()
     }
     .onChange(of: viewModel.selection) { oldValue, newValue in
       if oldValue != newValue {
@@ -213,10 +257,17 @@ public struct AgentTuiWindowView: View {
         viewModel.navigationForwardStack.removeAll()
         updateNavigationState()
       }
-      guard case .session(let sessionID) = newValue else { return }
-      guard oldValue.sessionID != sessionID else { return }
-      store.selectAgentTui(tuiID: sessionID)
-      syncTerminalSize()
+      switch newValue {
+      case .create:
+        break
+      case .terminal(let sessionID):
+        guard oldValue.terminalID != sessionID else { return }
+        store.selectAgentTui(tuiID: sessionID)
+        syncTerminalSize()
+      case .codex(let runID):
+        guard oldValue.codexRunID != runID else { return }
+        store.selectCodexRun(runID: runID)
+      }
     }
     .onDisappear {
       cancelPendingViewportResize()

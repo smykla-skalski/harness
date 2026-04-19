@@ -6,9 +6,7 @@ struct SessionActionDock: View {
   let inspectTask: (String) -> Void
   let inspectAgent: (String) -> Void
   let inspectObserver: () -> Void
-  let openAgentTui: () -> Void
-  let isCodexFlowAvailable: Bool
-  let openCodexFlow: () -> Void
+  let openAgents: () -> Void
 
   private var firstTaskID: String? {
     detail.tasks.first?.taskId
@@ -47,6 +45,7 @@ struct SessionActionDock: View {
           subtitle: "Create, reassign, checkpoint",
           symbol: "checklist",
           action: focusFirstTask,
+          helpText: "Jump to the first task to inspect.",
           accessibilityID: nil
         )
         flowButton(
@@ -54,6 +53,7 @@ struct SessionActionDock: View {
           subtitle: "Change roles and leadership",
           symbol: "person.2",
           action: focusFirstAgent,
+          helpText: "Jump to the first agent to inspect.",
           accessibilityID: nil
         )
         flowButton(
@@ -61,69 +61,19 @@ struct SessionActionDock: View {
           subtitle: "Surface and triage issues",
           symbol: "eye",
           action: focusObserver,
+          helpText: "Open the session observer.",
           accessibilityID: nil
         )
         flowButton(
-          title: "Agent TUI",
-          subtitle: "Drive Copilot or Codex",
+          title: "Agents",
+          subtitle: "Drive unified agent workflows",
           symbol: "terminal",
-          action: openAgentTui,
-          accessibilityID: HarnessMonitorAccessibility.agentTuiButton
+          action: openAgents,
+          helpText: "Open the unified Agents workspace to launch and manage sessions.",
+          accessibilityID: HarnessMonitorAccessibility.agentsActionButton
         )
-        codexFlowButton
       }
     }
-  }
-
-  @ViewBuilder private var codexFlowButton: some View {
-    if isCodexFlowAvailable {
-      flowButton(
-        title: "Codex Flow",
-        subtitle: "Ask for a report or patch",
-        symbol: "sparkles",
-        action: openCodexFlow,
-        accessibilityID: HarnessMonitorAccessibility.codexFlowButton
-      )
-      .help("Ask Codex for a report or patch.")
-    } else {
-      codexFlowPlaceholder
-    }
-  }
-
-  private var codexFlowPlaceholder: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      Label("Codex Flow", systemImage: "sparkles")
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        .hidden()
-      Text("Ask for a report or patch")
-        .scaledFont(.caption)
-        .hidden()
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(HarnessMonitorTheme.cardPadding)
-    .overlay {
-      Image(systemName: "hammer.circle.fill")
-        .font(.system(size: 30, weight: .semibold, design: .rounded))
-        .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.35))
-        .accessibilityIdentifier(HarnessMonitorAccessibility.codexFlowPlaceholderIcon)
-    }
-    .background {
-      RoundedRectangle(
-        cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-        style: .continuous
-      )
-      .fill(HarnessMonitorTheme.ink.opacity(0.03))
-    }
-    .contentShape(
-      RoundedRectangle(
-        cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-        style: .continuous
-      )
-    )
-    .optionalAccessibilityIdentifier(HarnessMonitorAccessibility.codexFlowButton)
-    .help("Codex Flow")
-    .accessibilityLabel("Codex Flow")
-    .accessibilityValue("Unavailable")
   }
 
   private func flowButton(
@@ -131,6 +81,7 @@ struct SessionActionDock: View {
     subtitle: String,
     symbol: String,
     action: @escaping () -> Void,
+    helpText: String,
     accessibilityID: String?
   ) -> some View {
     Button(action: action) {
@@ -145,6 +96,7 @@ struct SessionActionDock: View {
       .padding(HarnessMonitorTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
+    .help(helpText)
     .optionalAccessibilityIdentifier(accessibilityID)
   }
 
@@ -184,9 +136,7 @@ extension View {
     inspectTask: { _ in },
     inspectAgent: { _ in },
     inspectObserver: {},
-    openAgentTui: {},
-    isCodexFlowAvailable: false,
-    openCodexFlow: {}
+    openAgents: {}
   )
   .padding()
   .frame(width: 960)

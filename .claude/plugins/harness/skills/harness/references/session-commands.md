@@ -64,18 +64,22 @@ harness session observe <session-id> [--poll-interval <seconds>] --actor <agent-
 
 Cross-agent observation within session. Combines with `--poll-interval` for continuous monitoring.
 
-## TUI
+## Agents
 
-Managed interactive agent TUI processes.
+Unified managed terminal and Codex thread operations.
 
 ```
-harness session tui start <session-id> --runtime <runtime> [--agent-id <id>]
-harness session tui attach <session-id> <tui-id>
-harness session tui list <session-id>
-harness session tui show <session-id> <tui-id>
-harness session tui input <session-id> <tui-id> --text "..."
-harness session tui resize <session-id> <tui-id> --cols <n> --rows <n>
-harness session tui stop <session-id> <tui-id>
+harness session agents start terminal <session-id> --runtime <runtime> [--agent-id <id>]
+harness session agents start codex <session-id> --mode <mode> --prompt "..."
+harness session agents attach <session-id> <agent-id>
+harness session agents list <session-id>
+harness session agents show <session-id> <agent-id>
+harness session agents input <session-id> <agent-id> --text "..."
+harness session agents resize <session-id> <agent-id> --cols <n> --rows <n>
+harness session agents stop <session-id> <agent-id>
+harness session agents steer <session-id> <agent-id> --prompt "..."
+harness session agents interrupt <session-id> <agent-id>
+harness session agents approve <session-id> <agent-id> <approval-id> --decision <accept|reject>
 ```
 
 ## Runtimes

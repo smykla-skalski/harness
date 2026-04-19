@@ -19,7 +19,7 @@ struct AgentTuiRuntimeTests {
     #expect(AgentTuiRuntime.allCases.contains(.vibe))
   }
 
-  @Test("Canonical agent TUI ordering keeps leader first regardless of updatedAt drift")
+  @Test("Canonical Agents ordering keeps leader first regardless of updatedAt drift")
   func canonicalOrderingPrioritizesLeaderOverWorkerRefresh() {
     let leader = AgentTuiSnapshot(
       tuiId: "leader-tui",

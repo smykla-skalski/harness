@@ -114,13 +114,13 @@ impl DaemonDb {
         Ok(snapshots)
     }
 
-    /// Persist a managed agent TUI snapshot.
+    /// Persist a managed terminal agent snapshot.
     ///
     /// # Errors
     /// Returns [`CliError`] on serialization or SQL failures.
     pub fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
         let argv_json = serde_json::to_string(&snapshot.argv)
-            .map_err(|error| db_error(format!("serialize agent TUI argv: {error}")))?;
+            .map_err(|error| db_error(format!("serialize terminal agent argv: {error}")))?;
         self.conn
             .execute(
                 "INSERT INTO agent_tuis (
@@ -166,11 +166,11 @@ impl DaemonDb {
                     snapshot.updated_at,
                 ],
             )
-            .map_err(|error| db_error(format!("save agent TUI: {error}")))?;
+            .map_err(|error| db_error(format!("save terminal agent: {error}")))?;
         Ok(())
     }
 
-    /// Load one managed agent TUI snapshot.
+    /// Load one managed terminal agent snapshot.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
@@ -187,7 +187,7 @@ impl DaemonDb {
         match result {
             Ok(snapshot) => Ok(Some(snapshot)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(error) => Err(db_error(format!("load agent TUI: {error}"))),
+            Err(error) => Err(db_error(format!("load terminal agent: {error}"))),
         }
     }
 
@@ -216,12 +216,12 @@ impl DaemonDb {
             Ok(state) => Ok(Some(state)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(error) => Err(db_error(format!(
-                "load agent TUI live-refresh state: {error}"
+                "load terminal agent live-refresh state: {error}"
             ))),
         }
     }
 
-    /// List managed agent TUI snapshots for a session, newest first.
+    /// List managed terminal agent snapshots for a session, newest first.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
@@ -236,14 +236,16 @@ impl DaemonDb {
                  WHERE session_id = ?1
                  ORDER BY updated_at DESC",
             )
-            .map_err(|error| db_error(format!("prepare agent TUI list: {error}")))?;
+            .map_err(|error| db_error(format!("prepare terminal agent list: {error}")))?;
         let rows = statement
             .query_map([session_id], agent_tui_from_row)
-            .map_err(|error| db_error(format!("query agent TUI list: {error}")))?;
+            .map_err(|error| db_error(format!("query terminal agent list: {error}")))?;
 
         let mut snapshots = Vec::new();
         for row in rows {
-            snapshots.push(row.map_err(|error| db_error(format!("read agent TUI row: {error}")))?);
+            snapshots.push(
+                row.map_err(|error| db_error(format!("read terminal agent row: {error}")))?,
+            );
         }
         Ok(snapshots)
     }
@@ -290,7 +292,7 @@ fn agent_tui_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTuiSnaps
         runtime: row.get(3)?,
         status: AgentTuiStatus::from_str(&status_raw).map_err(parse_error_to_sql)?,
         argv: serde_json::from_str(&argv_json)
-            .map_err(|error| parse_error_to_sql(format!("parse agent TUI argv: {error}")))?,
+            .map_err(|error| parse_error_to_sql(format!("parse terminal agent argv: {error}")))?,
         project_dir: row.get(6)?,
         size: AgentTuiSize { rows, cols },
         screen: TerminalScreenSnapshot {

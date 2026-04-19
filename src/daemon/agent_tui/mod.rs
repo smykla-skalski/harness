@@ -1,6 +1,6 @@
 #![expect(
     clippy::module_name_repetitions,
-    reason = "agent TUI protocol types use an explicit domain prefix"
+    reason = "terminal-agent protocol types use an explicit domain prefix"
 )]
 
 use std::time::Duration;

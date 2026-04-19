@@ -62,12 +62,10 @@ extension HarnessMonitorStore {
   }
 
   public enum PresentedSheet: Identifiable, Equatable {
-    case codexFlow
     case sendSignal(agentID: String)
 
     public var id: String {
       switch self {
-      case .codexFlow: "codexFlow"
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       }
     }

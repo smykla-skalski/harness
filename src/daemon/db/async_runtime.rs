@@ -139,13 +139,13 @@ impl AsyncDaemonDb {
             .collect()
     }
 
-    /// Save or update an agent TUI snapshot through the canonical async DB.
+    /// Save or update a terminal agent snapshot through the canonical async DB.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failures.
     pub(crate) async fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
         let argv_json = serde_json::to_string(&snapshot.argv)
-            .map_err(|error| db_error(format!("serialize async agent TUI argv: {error}")))?;
+            .map_err(|error| db_error(format!("serialize async terminal agent argv: {error}")))?;
         query(UPSERT_AGENT_TUI_SQL)
             .bind(&snapshot.tui_id)
             .bind(&snapshot.session_id)
@@ -167,11 +167,11 @@ impl AsyncDaemonDb {
             .bind(&snapshot.updated_at)
             .execute(self.pool())
             .await
-            .map_err(|error| db_error(format!("save async agent TUI: {error}")))?;
+            .map_err(|error| db_error(format!("save async terminal agent: {error}")))?;
         Ok(())
     }
 
-    /// Load one managed agent TUI snapshot from the canonical async DB.
+    /// Load one managed terminal agent snapshot from the canonical async DB.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
@@ -183,7 +183,7 @@ impl AsyncDaemonDb {
             .bind(tui_id)
             .fetch_optional(self.pool())
             .await
-            .map_err(|error| db_error(format!("load async agent TUI: {error}")))?
+            .map_err(|error| db_error(format!("load async terminal agent: {error}")))?
             .map(AsyncAgentTuiRow::into_snapshot)
             .transpose()
     }
@@ -200,12 +200,12 @@ impl AsyncDaemonDb {
             .bind(tui_id)
             .fetch_optional(self.pool())
             .await
-            .map_err(|error| db_error(format!("load async agent TUI live-refresh state: {error}")))?
+            .map_err(|error| db_error(format!("load async terminal agent live-refresh state: {error}")))?
             .map(AsyncAgentTuiLiveRefreshStateRow::into_state)
             .transpose()
     }
 
-    /// List managed agent TUI snapshots for a session, newest first, from the canonical async DB.
+    /// List managed terminal agent snapshots for a session, newest first, from the canonical async DB.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
@@ -217,7 +217,7 @@ impl AsyncDaemonDb {
             .bind(session_id)
             .fetch_all(self.pool())
             .await
-            .map_err(|error| db_error(format!("list async agent TUI snapshots: {error}")))?;
+            .map_err(|error| db_error(format!("list async terminal agent snapshots: {error}")))?;
         rows.into_iter()
             .map(AsyncAgentTuiRow::into_snapshot)
             .collect()
@@ -298,7 +298,7 @@ impl AsyncAgentTuiRow {
             .exit_code
             .map(|value| {
                 u32::try_from(value).map_err(|error| {
-                    db_error(format!("parse async agent TUI exit_code {value}: {error}"))
+                    db_error(format!("parse async terminal agent exit_code {value}: {error}"))
                 })
             })
             .transpose()?;
@@ -308,9 +308,9 @@ impl AsyncAgentTuiRow {
             agent_id: self.agent_id,
             runtime: self.runtime,
             status: AgentTuiStatus::from_str(&self.status)
-                .map_err(|error| parse_async_runtime_error("agent TUI status", &error))?,
+                .map_err(|error| parse_async_runtime_error("terminal agent status", &error))?,
             argv: serde_json::from_str(&self.argv_json)
-                .map_err(|error| db_error(format!("parse async agent TUI argv: {error}")))?,
+                .map_err(|error| db_error(format!("parse async terminal agent argv: {error}")))?,
             project_dir: self.project_dir,
             size: AgentTuiSize { rows, cols },
             screen: TerminalScreenSnapshot {
@@ -340,7 +340,7 @@ impl AsyncAgentTuiLiveRefreshStateRow {
     fn into_state(self) -> Result<AgentTuiLiveRefreshState, CliError> {
         Ok(AgentTuiLiveRefreshState {
             status: AgentTuiStatus::from_str(&self.status).map_err(|error| {
-                parse_async_runtime_error("agent TUI live-refresh status", &error)
+                parse_async_runtime_error("terminal agent live-refresh status", &error)
             })?,
             updated_at: self.updated_at,
         })

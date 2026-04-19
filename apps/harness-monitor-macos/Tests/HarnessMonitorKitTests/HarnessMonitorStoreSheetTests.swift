@@ -21,17 +21,6 @@ struct HarnessMonitorStoreSheetTests {
     #expect(store.presentedSheet == .sendSignal(agentID: "leader-claude"))
   }
 
-  @Test("presentCodexFlowSheet stays disabled while the feature is WIP")
-  func presentCodexFlowSheetStaysDisabledWhileWIP() async {
-    let store = await makeBootstrappedStore()
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    store.presentCodexFlowSheet()
-
-    #expect(store.presentedSheet == nil)
-    #expect(store.isCodexFlowAvailable == false)
-  }
-
   @Test("dismissSheet clears the sheet")
   func dismissSheetClearsSheet() async {
     let store = await makeBootstrappedStore()
@@ -77,22 +66,18 @@ struct HarnessMonitorStoreSheetTests {
 
   @Test("PresentedSheet id is stable and unique per case")
   func presentedSheetIdIsStable() {
-    let codexSheet = HarnessMonitorStore.PresentedSheet.codexFlow
     let sheet1 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")
     let sheet2 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-b")
 
-    #expect(codexSheet.id == "codexFlow")
     #expect(sheet1.id == "sendSignal:agent-a")
     #expect(sheet2.id == "sendSignal:agent-b")
-    #expect(codexSheet.id != sheet1.id)
     #expect(sheet1.id != sheet2.id)
   }
 
-  @Test("PresentedSheet has no agentTui case")
-  func presentedSheetHasNoAgentTuiCase() {
-    let sheet = HarnessMonitorStore.PresentedSheet.codexFlow
+  @Test("PresentedSheet only includes sendSignal")
+  func presentedSheetOnlyIncludesSendSignal() {
+    let sheet = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")
     switch sheet {
-    case .codexFlow: break
     case .sendSignal: break
     }
   }

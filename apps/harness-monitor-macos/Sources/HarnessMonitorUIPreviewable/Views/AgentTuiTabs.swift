@@ -1,11 +1,35 @@
 enum AgentTuiSheetSelection: Hashable {
   case create
-  case session(String)
+  case terminal(String)
+  case codex(String)
 
-  var sessionID: String? {
-    guard case .session(let sessionID) = self else {
+  var terminalID: String? {
+    guard case .terminal(let terminalID) = self else {
       return nil
     }
-    return sessionID
+    return terminalID
+  }
+
+  var codexRunID: String? {
+    guard case .codex(let runID) = self else {
+      return nil
+    }
+    return runID
+  }
+}
+
+enum AgentTuiCreateMode: String, CaseIterable, Identifiable {
+  case terminal
+  case codex
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .terminal:
+      "Terminal"
+    case .codex:
+      "Codex"
+    }
   }
 }

@@ -275,7 +275,7 @@ extension HarnessMonitorStore {
     let capabilityName =
       switch capability {
       case "agent-tui":
-        "Agent TUI"
+        "Agents"
       case "codex":
         "Codex"
       default:

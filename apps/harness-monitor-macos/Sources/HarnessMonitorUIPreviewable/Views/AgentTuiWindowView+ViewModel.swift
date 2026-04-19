@@ -19,16 +19,26 @@ extension AgentTuiWindowView {
   struct AgentTuiDisplayState: Equatable {
     let sortedAgentTuis: [AgentTuiSnapshot]
     let sessionTitlesByID: [String: String]
+    let sortedCodexRuns: [CodexRunSnapshot]
+    let codexTitlesByID: [String: String]
     let agentTuiUnavailable: Bool
+    let codexUnavailable: Bool
 
     var hasAgentTuis: Bool {
       !sortedAgentTuis.isEmpty
     }
 
+    var hasCodexRuns: Bool {
+      !sortedCodexRuns.isEmpty
+    }
+
     init() {
       sortedAgentTuis = []
       sessionTitlesByID = [:]
+      sortedCodexRuns = []
+      codexTitlesByID = [:]
       agentTuiUnavailable = false
+      codexUnavailable = false
     }
 
     @MainActor
@@ -41,6 +51,24 @@ extension AgentTuiWindowView {
           return left.runtime < right.runtime
         }
         return left.tuiId < right.tuiId
+      }
+      let sortedCodexRuns = store.selectedCodexRuns.sorted { left, right in
+        if left.status.isActive != right.status.isActive {
+          return left.status.isActive && !right.status.isActive
+        }
+        if left.mode != right.mode {
+          return left.mode.rawValue < right.mode.rawValue
+        }
+        if left.createdAt != right.createdAt {
+          return left.createdAt > right.createdAt
+        }
+        return left.runId < right.runId
+      }
+
+      var codexTitlesByID: [String: String] = [:]
+      codexTitlesByID.reserveCapacity(sortedCodexRuns.count)
+      for run in sortedCodexRuns {
+        codexTitlesByID[run.runId] = Self.codexTitle(for: run)
       }
 
       let agentNames = Dictionary(
@@ -55,7 +83,23 @@ extension AgentTuiWindowView {
 
       self.sortedAgentTuis = sortedAgentTuis
       self.sessionTitlesByID = sessionTitlesByID
+      self.sortedCodexRuns = sortedCodexRuns
+      self.codexTitlesByID = codexTitlesByID
       self.agentTuiUnavailable = store.agentTuiUnavailable
+      self.codexUnavailable = store.codexUnavailable
+    }
+
+    static func codexTitle(for run: CodexRunSnapshot) -> String {
+      let promptSummary = run.prompt
+        .split(whereSeparator: \.isNewline)
+        .first
+        .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        .flatMap { normalized in
+          normalized.isEmpty ? nil : normalized
+        }
+        ?? "Codex run"
+      let clippedPrompt = String(promptSummary.prefix(45))
+      return "Codex · \(run.mode.title) · \(clippedPrompt)"
     }
   }
 
@@ -171,6 +215,11 @@ extension AgentTuiWindowView {
     var selectedPersona: String?
     var availablePersonas: [AgentPersona] = []
     var expandedPersonaInfo: String?
+    var createMode: AgentTuiCreateMode = .terminal
+    var codexPrompt = ""
+    var codexMode: CodexRunMode = .report
+    var codexContext = ""
+    var resolvingCodexApprovalID: String?
     var navigationBackStack: [AgentTuiSheetSelection] = []
     var navigationForwardStack: [AgentTuiSheetSelection] = []
     var suppressHistoryRecording = false

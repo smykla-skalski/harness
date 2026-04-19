@@ -61,9 +61,7 @@ struct SessionCockpitView: View {
             inspectTask: store.inspect(taskID:),
             inspectAgent: store.inspect(agentID:),
             inspectObserver: store.inspectObserver,
-            openAgentTui: { openWindow(id: HarnessMonitorWindowID.agentTui) },
-            isCodexFlowAvailable: store.isCodexFlowAvailable,
-            openCodexFlow: store.presentCodexFlowSheet
+            openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
           HarnessMonitorAdaptiveGridLayout(
             minimumColumnWidth: 340,

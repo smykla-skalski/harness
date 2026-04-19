@@ -100,9 +100,9 @@ Use the default `HarnessMonitor` scheme. This exercises the shipping path: the d
 
 Run this scheme before cutting a TestFlight / notarized build - it's the only way to validate the release code path end-to-end.
 
-Codex Runs use WebSocket transport when sandboxed. The daemon connects to an externally-managed `codex app-server` on loopback. Users start the bridge with `harness codex-bridge start` in a terminal or install it as a login item with `harness codex-bridge install-launch-agent`. The bridge writes `codex-endpoint.json` to the daemon data root; the daemon watches it and updates the manifest live so the Swift UI reflects bridge status without restart.
+Codex threads inside Agents use WebSocket transport when sandboxed. The daemon connects to an externally-managed `codex app-server` on loopback. Users start the bridge with `harness codex-bridge start` in a terminal or install it as a login item with `harness codex-bridge install-launch-agent`. The bridge writes `codex-endpoint.json` to the daemon data root; the daemon watches it and updates the manifest live so the Swift UI reflects bridge status without restart.
 
-When no codex bridge is running in managed mode, `POST /v1/sessions/{id}/codex-runs` returns 503 with `{"error": "codex-unavailable"}`. The Swift store sets `codexUnavailable = true` and the Codex Flow sheet shows a recovery banner with a copy-to-clipboard command. The flag clears on reconnect.
+When no codex bridge is running in managed mode, `POST /v1/sessions/{id}/managed-agents/codex` returns 503 with `{"error": "codex-unavailable"}`. The Swift store sets `codexUnavailable = true` and the unified Agents window shows a recovery banner with a copy-to-clipboard command. The flag clears on reconnect.
 
 Minimum codex version for WebSocket transport: `rust-v0.102.0+`.
 
