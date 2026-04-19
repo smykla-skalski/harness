@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 
 @testable import HarnessMonitorKit
@@ -228,6 +229,43 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
     )
 
     #expect(stabilized == AgentTuiSize(rows: 52, cols: 126))
+  }
+
+  @MainActor
+  @Test("Zero-size viewports do not auto-resize to the row/col minimum")
+  func zeroSizeViewportsDoNotAutoResizeToMinimum() {
+    let collapsed = AgentTuiWindowView.TerminalViewportSizing.terminalSize(
+      for: CGSize(width: 0, height: 0),
+      fontScale: 1
+    )
+
+    #expect(collapsed == nil)
+  }
+
+  @MainActor
+  @Test("Tiny transient viewports bail out instead of snapping to 9x20")
+  func tinyTransientViewportsBailOut() {
+    let tiny = AgentTuiWindowView.TerminalViewportSizing.terminalSize(
+      for: CGSize(width: 40, height: 30),
+      fontScale: 1
+    )
+
+    #expect(tiny == nil)
+  }
+
+  @MainActor
+  @Test("A usable viewport still produces a measured terminal size")
+  func usableViewportProducesMeasuredSize() {
+    let measured = AgentTuiWindowView.TerminalViewportSizing.terminalSize(
+      for: CGSize(width: 900, height: 600),
+      fontScale: 1
+    )
+
+    #expect(measured != nil)
+    if let measured {
+      #expect(measured.rows >= 20)
+      #expect(measured.cols >= 60)
+    }
   }
 }
 

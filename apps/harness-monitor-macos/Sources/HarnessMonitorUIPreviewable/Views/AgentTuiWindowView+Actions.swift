@@ -237,8 +237,11 @@ extension AgentTuiWindowView {
 
   func resizeTui(_ tui: AgentTuiSnapshot) {
     viewModel.isSubmitting = true
+    cancelPendingViewportResize()
+    let target = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+    viewModel.expectedSize = target
     Task {
-      _ = await store.resizeAgentTui(tuiID: tui.tuiId, rows: viewModel.rows, cols: viewModel.cols)
+      _ = await store.resizeAgentTui(tuiID: tui.tuiId, rows: target.rows, cols: target.cols)
       viewModel.isSubmitting = false
     }
   }

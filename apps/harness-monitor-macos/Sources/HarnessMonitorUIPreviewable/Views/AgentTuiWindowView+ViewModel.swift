@@ -139,14 +139,13 @@ extension AgentTuiWindowView {
     @MainActor
     static func terminalSize(for viewportSize: CGSize, fontScale: CGFloat) -> AgentTuiSize? {
       let cellSize = measuredCellSize(for: fontScale)
-      let usableWidth = max(
-        viewportSize.width - contentInsets.width,
-        minimumMeasuredContentWidth
-      )
-      let usableHeight = max(
-        viewportSize.height - contentInsets.height,
-        minimumMeasuredContentHeight
-      )
+      let usableWidth = viewportSize.width - contentInsets.width
+      let usableHeight = viewportSize.height - contentInsets.height
+      guard usableWidth >= minimumMeasuredContentWidth,
+        usableHeight >= minimumMeasuredContentHeight
+      else {
+        return nil
+      }
       let rawRows = Int(floor(usableHeight / cellSize.height))
       let rawCols = Int(floor(usableWidth / cellSize.width))
       guard rawRows > 0, rawCols > 0 else {
