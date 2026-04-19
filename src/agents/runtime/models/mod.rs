@@ -10,11 +10,24 @@
 //! Model namespaces do not overlap across runtimes; the daemon ships one
 //! catalog per runtime keyed by runtime name and the UI filters by the
 //! selected runtime.
+//!
+//! Source-of-truth references consulted when maintaining these catalogs:
+//! - Claude: <https://platform.claude.com/docs/en/docs/about-claude/models/overview>
+//! - `OpenAI` (Codex): <https://developers.openai.com/api/docs/models/all>
+//! - Gemini: <https://ai.google.dev/gemini-api/docs/models>
+//! - Mistral (Vibe): <https://docs.mistral.ai/getting-started/models/models_overview/>
+//! - GitHub Copilot: <https://docs.github.com/en/copilot/reference/ai-models/supported-models>
+
+mod catalogs;
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
+
+use self::catalogs::{
+    claude_catalog, codex_catalog, copilot_catalog, gemini_catalog, opencode_catalog, vibe_catalog,
+};
 
 /// Coarse cost/speed tier used by the UI for ordering and by E2E tests for
 /// picking the cheapest/fastest model.
@@ -64,150 +77,6 @@ static REGISTRY: LazyLock<BTreeMap<&'static str, RuntimeModelCatalog>> = LazyLoc
     map
 });
 
-fn claude_catalog() -> RuntimeModelCatalog {
-    RuntimeModelCatalog {
-        runtime: "claude".into(),
-        models: vec![
-            RuntimeModel {
-                id: "claude-haiku-4-5".into(),
-                display_name: "Haiku 4.5".into(),
-                tier: RuntimeModelTier::Fast,
-            },
-            RuntimeModel {
-                id: "claude-sonnet-4-6".into(),
-                display_name: "Sonnet 4.6".into(),
-                tier: RuntimeModelTier::Balanced,
-            },
-            RuntimeModel {
-                id: "claude-opus-4-7".into(),
-                display_name: "Opus 4.7".into(),
-                tier: RuntimeModelTier::Max,
-            },
-        ],
-        default: "claude-sonnet-4-6".into(),
-        cheapest_fastest: "claude-haiku-4-5".into(),
-    }
-}
-
-fn codex_catalog() -> RuntimeModelCatalog {
-    RuntimeModelCatalog {
-        runtime: "codex".into(),
-        models: vec![
-            RuntimeModel {
-                id: "o4-mini".into(),
-                display_name: "o4-mini".into(),
-                tier: RuntimeModelTier::Fast,
-            },
-            RuntimeModel {
-                id: "gpt-5-codex".into(),
-                display_name: "GPT-5 Codex".into(),
-                tier: RuntimeModelTier::Balanced,
-            },
-            RuntimeModel {
-                id: "gpt-5-codex-max".into(),
-                display_name: "GPT-5 Codex Max".into(),
-                tier: RuntimeModelTier::Max,
-            },
-        ],
-        default: "gpt-5-codex".into(),
-        cheapest_fastest: "o4-mini".into(),
-    }
-}
-
-fn gemini_catalog() -> RuntimeModelCatalog {
-    RuntimeModelCatalog {
-        runtime: "gemini".into(),
-        models: vec![
-            RuntimeModel {
-                id: "gemini-2.5-flash".into(),
-                display_name: "Gemini 2.5 Flash".into(),
-                tier: RuntimeModelTier::Fast,
-            },
-            RuntimeModel {
-                id: "gemini-2.5-pro".into(),
-                display_name: "Gemini 2.5 Pro".into(),
-                tier: RuntimeModelTier::Balanced,
-            },
-        ],
-        default: "gemini-2.5-pro".into(),
-        cheapest_fastest: "gemini-2.5-flash".into(),
-    }
-}
-
-fn copilot_catalog() -> RuntimeModelCatalog {
-    // Copilot proxies multiple providers; we expose the GitHub-published model
-    // identifiers and let the user choose.
-    RuntimeModelCatalog {
-        runtime: "copilot".into(),
-        models: vec![
-            RuntimeModel {
-                id: "gpt-4o-mini".into(),
-                display_name: "GPT-4o mini".into(),
-                tier: RuntimeModelTier::Fast,
-            },
-            RuntimeModel {
-                id: "gpt-4o".into(),
-                display_name: "GPT-4o".into(),
-                tier: RuntimeModelTier::Balanced,
-            },
-            RuntimeModel {
-                id: "claude-sonnet-4.5".into(),
-                display_name: "Claude Sonnet 4.5".into(),
-                tier: RuntimeModelTier::Max,
-            },
-        ],
-        default: "gpt-4o".into(),
-        cheapest_fastest: "gpt-4o-mini".into(),
-    }
-}
-
-fn vibe_catalog() -> RuntimeModelCatalog {
-    // Vibe wraps Mistral; their CLI accepts the provider's model ids.
-    RuntimeModelCatalog {
-        runtime: "vibe".into(),
-        models: vec![
-            RuntimeModel {
-                id: "mistral-small-latest".into(),
-                display_name: "Mistral Small".into(),
-                tier: RuntimeModelTier::Fast,
-            },
-            RuntimeModel {
-                id: "mistral-large-latest".into(),
-                display_name: "Mistral Large".into(),
-                tier: RuntimeModelTier::Balanced,
-            },
-        ],
-        default: "mistral-large-latest".into(),
-        cheapest_fastest: "mistral-small-latest".into(),
-    }
-}
-
-fn opencode_catalog() -> RuntimeModelCatalog {
-    // OpenCode is provider-agnostic; we ship a small curated set spanning
-    // popular providers so users can pick a familiar model.
-    RuntimeModelCatalog {
-        runtime: "opencode".into(),
-        models: vec![
-            RuntimeModel {
-                id: "anthropic/claude-haiku-4-5".into(),
-                display_name: "Claude Haiku 4.5".into(),
-                tier: RuntimeModelTier::Fast,
-            },
-            RuntimeModel {
-                id: "anthropic/claude-sonnet-4-6".into(),
-                display_name: "Claude Sonnet 4.6".into(),
-                tier: RuntimeModelTier::Balanced,
-            },
-            RuntimeModel {
-                id: "openai/gpt-5-codex".into(),
-                display_name: "GPT-5 Codex".into(),
-                tier: RuntimeModelTier::Max,
-            },
-        ],
-        default: "anthropic/claude-sonnet-4-6".into(),
-        cheapest_fastest: "anthropic/claude-haiku-4-5".into(),
-    }
-}
 
 /// Look up the model catalog for a runtime.
 #[must_use]
