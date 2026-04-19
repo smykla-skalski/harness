@@ -140,10 +140,9 @@ impl RegistryClient {
         connection: &mut Connection,
         request: &RegistryRequest,
     ) -> Result<RegistryResponse, RegistryError> {
-        let payload = serde_json::to_vec(request)
-            .map_err(|error| RegistryError::Protocol {
-                detail: format!("encode request: {error}"),
-            })?;
+        let payload = serde_json::to_vec(request).map_err(|error| RegistryError::Protocol {
+            detail: format!("encode request: {error}"),
+        })?;
         write_line(&mut connection.writer, &payload).await?;
         read_response(&mut connection.reader, self.request_timeout).await
     }
@@ -155,10 +154,7 @@ impl Default for RegistryClient {
     }
 }
 
-async fn write_line(
-    writer: &mut OwnedWriteHalf,
-    payload: &[u8],
-) -> Result<(), RegistryError> {
+async fn write_line(writer: &mut OwnedWriteHalf, payload: &[u8]) -> Result<(), RegistryError> {
     writer
         .write_all(payload)
         .await
@@ -194,10 +190,11 @@ async fn read_response(
             detail: "server closed connection".into(),
         });
     }
-    serde_json::from_str(line.trim_end_matches(['\n', '\r']))
-        .map_err(|error| RegistryError::Protocol {
+    serde_json::from_str(line.trim_end_matches(['\n', '\r'])).map_err(|error| {
+        RegistryError::Protocol {
             detail: format!("decode response: {error}"),
-        })
+        }
+    })
 }
 
 fn decode_outcome<T: DeserializeOwned>(

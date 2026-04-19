@@ -87,8 +87,7 @@ mod tests {
         let Message::Text(text) = frame else {
             panic!("config frame should be a text message");
         };
-        let push: WsPushEvent =
-            serde_json::from_str(&text).expect("deserialize config push event");
+        let push: WsPushEvent = serde_json::from_str(&text).expect("deserialize config push event");
         assert_eq!(push.event, WS_CONFIG_EVENT);
         assert_eq!(push.seq, 0);
         assert!(push.session_id.is_none());

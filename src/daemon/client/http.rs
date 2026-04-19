@@ -137,11 +137,9 @@ fn process_optional_response<Res: DeserializeOwned>(
         return Err(parse_error_response(&body_text, status));
     }
 
-    serde_json::from_str(&body_text)
-        .map(Some)
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("daemon HTTP parse response: {error}")).into()
-        })
+    serde_json::from_str(&body_text).map(Some).map_err(|error| {
+        CliErrorKind::workflow_io(format!("daemon HTTP parse response: {error}")).into()
+    })
 }
 
 fn process_response<Res: DeserializeOwned>(

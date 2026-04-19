@@ -9,9 +9,7 @@ use tokio::net::UnixListener;
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::{Tool, ToolRegistry};
 
-use super::{
-    ClickElementTool, GetElementTool, ListElementsTool, ListWindowsTool, register_all,
-};
+use super::{ClickElementTool, GetElementTool, ListElementsTool, ListWindowsTool, register_all};
 
 fn socket_path(dir: &TempDir) -> PathBuf {
     dir.path().join("registry.sock")

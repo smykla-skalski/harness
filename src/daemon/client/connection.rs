@@ -142,7 +142,10 @@ pub(super) fn wait_for_authenticated_api(client: &DaemonClient, timeout: Duratio
     }
 }
 
-fn authenticated_api_ready(client: &DaemonClient, probe_path: AuthReadinessProbePath) -> ProbeOutcome {
+fn authenticated_api_ready(
+    client: &DaemonClient,
+    probe_path: AuthReadinessProbePath,
+) -> ProbeOutcome {
     let url = format!("{}{}", client.endpoint, probe_path.as_str());
     RUNTIME.block_on(async {
         let response = client

@@ -36,7 +36,11 @@ pub fn move_mouse_args(backend: &Backend, x: f64, y: f64) -> Option<(OsString, V
     match backend {
         Backend::HarnessInput(path) => Some((
             os_string_from_path(path),
-            vec![OsString::from("move"), OsString::from(px), OsString::from(py)],
+            vec![
+                OsString::from("move"),
+                OsString::from(px),
+                OsString::from(py),
+            ],
         )),
         Backend::Cliclick => Some((
             OsString::from("cliclick"),
@@ -71,12 +75,20 @@ pub fn click_args(
             }
             args
         })),
-        Backend::Cliclick => Some((OsString::from("cliclick"), cliclick_click_args(&px, &py, button, double_click))),
+        Backend::Cliclick => Some((
+            OsString::from("cliclick"),
+            cliclick_click_args(&px, &py, button, double_click),
+        )),
         Backend::None => None,
     }
 }
 
-fn cliclick_click_args(px: &str, py: &str, button: MouseButton, double_click: bool) -> Vec<OsString> {
+fn cliclick_click_args(
+    px: &str,
+    py: &str,
+    button: MouseButton,
+    double_click: bool,
+) -> Vec<OsString> {
     if double_click {
         return vec![OsString::from(format!("dc:{px},{py}"))];
     }
@@ -227,7 +239,9 @@ fn round_to_string(value: f64) -> String {
     // and consumes as screen pixels. Clamping to i32 is more than enough
     // for any real display geometry; truncation outside that range would
     // itself be nonsensical, so we saturate.
-    let clamped = value.round().clamp(f64::from(i32::MIN), f64::from(i32::MAX));
+    let clamped = value
+        .round()
+        .clamp(f64::from(i32::MIN), f64::from(i32::MAX));
     #[expect(
         clippy::cast_possible_truncation,
         reason = "value is clamped to i32::MIN..=i32::MAX immediately above"

@@ -71,7 +71,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
                     rows: 30,
                     cols: 120,
                     model: None,
-},
+                },
             )
             .expect("start manager TUI");
 

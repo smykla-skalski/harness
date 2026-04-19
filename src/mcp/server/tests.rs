@@ -2,17 +2,14 @@ use async_trait::async_trait;
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, duplex};
 
-use crate::mcp::protocol::{
-    ErrorCode, ErrorObject, Notification, Request, RequestId, Response,
-};
+use crate::mcp::protocol::{ErrorCode, ErrorObject, Notification, Request, RequestId, Response};
 use crate::mcp::server::{IncomingMessage, RequestHandler, serve};
 
 #[test]
 fn incoming_message_routes_requests_by_id_presence() {
-    let req = IncomingMessage::parse(
-        r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"#,
-    )
-    .expect("parse request");
+    let req =
+        IncomingMessage::parse(r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"#)
+            .expect("parse request");
     match req {
         IncomingMessage::Request(r) => assert_eq!(r.method, "tools/list"),
         IncomingMessage::Notification(_) => panic!("expected request"),
@@ -174,7 +171,10 @@ async fn serve_handles_notifications_without_response() {
     client.read_to_string(&mut buf).await.unwrap();
     handle.await.unwrap().unwrap();
 
-    assert!(buf.is_empty(), "notifications emit no response, got {buf:?}");
+    assert!(
+        buf.is_empty(),
+        "notifications emit no response, got {buf:?}"
+    );
     let note = rx.recv().await.expect("notification delivered");
     assert_eq!(note.method, "notifications/initialized");
 }

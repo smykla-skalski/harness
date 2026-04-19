@@ -111,10 +111,7 @@ async fn tools_list_returns_registered_metadata_in_order() {
     assert_eq!(tools.len(), 2);
     assert_eq!(tools[0].get("name").unwrap(), "fake");
     assert_eq!(tools[1].get("name").unwrap(), "broken");
-    assert_eq!(
-        tools[0].pointer("/inputSchema/required/0").unwrap(),
-        "x",
-    );
+    assert_eq!(tools[0].pointer("/inputSchema/required/0").unwrap(), "x",);
 }
 
 #[tokio::test]

@@ -83,9 +83,7 @@ impl AgentTuiManagerHandle {
             .get(tui_id)
             .and_then(|active| active.process.clone())
             .ok_or_else(|| {
-                CliErrorKind::session_not_active(format!(
-                    "terminal agent '{tui_id}' is not active"
-                ))
+                CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
                     .into()
             })
     }
@@ -108,7 +106,7 @@ impl AgentTuiManagerHandle {
                 CliErrorKind::session_not_active(format!(
                     "terminal agent '{tui_id_owned}' not found"
                 ))
-                    .into()
+                .into()
             })
         }) {
             return result;

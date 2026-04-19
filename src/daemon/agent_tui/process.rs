@@ -80,9 +80,9 @@ impl AgentTuiProcess {
     /// Returns a workflow I/O error on PTY allocation, command spawn, or stream setup failure.
     pub fn spawn(spec: &AgentTuiSpawnSpec) -> Result<Self, CliError> {
         let pty_system = native_pty_system();
-        let pair = pty_system
-            .openpty(spec.size.into())
-            .map_err(|error| CliErrorKind::workflow_io(format!("open terminal agent PTY: {error}")))?;
+        let pair = pty_system.openpty(spec.size.into()).map_err(|error| {
+            CliErrorKind::workflow_io(format!("open terminal agent PTY: {error}"))
+        })?;
         let cmd = command_builder(spec);
         let child = pair.slave.spawn_command(cmd).map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn terminal agent process: {error}"))
@@ -154,7 +154,9 @@ impl AgentTuiProcess {
         let size = size.validate()?;
         lock(&self.master, "terminal agent PTY master")?
             .resize(size.into())
-            .map_err(|error| CliErrorKind::workflow_io(format!("resize terminal agent PTY: {error}")))?;
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("resize terminal agent PTY: {error}"))
+            })?;
         lock(&self.screen, "terminal agent screen parser")?.resize(size);
         Ok(())
     }
