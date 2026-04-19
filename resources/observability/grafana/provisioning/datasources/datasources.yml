@@ -38,13 +38,13 @@ datasources:
       maxLines: 5000
       derivedFields:
         - datasourceUid: tempo
-          matcherRegex: trace_id=\"?([0-9a-f]{32})\"?
+          matcherRegex: '"traceid":"([0-9a-f]{32})"'
           name: TraceID
-          url: ${__value.raw}
+          url: $${__value.raw}
         - datasourceUid: tempo
-          matcherRegex: span_id=\"?([0-9a-f]{16})\"?
+          matcherRegex: '"spanid":"([0-9a-f]{16})"'
           name: SpanID
-          url: ${__value.raw}
+          url: $${__value.raw}
     secureJsonData:
       httpHeaderValue1: "1"
 
@@ -68,7 +68,7 @@ datasources:
         filterBySpanID: true
         spanStartTimeShift: -10m
         spanEndTimeShift: 10m
-        query: '{service_name=~".+"} |= ""'
+        query: '{service_name=~".+"} |~ "$${__trace.traceId}"'
       tracesToMetrics:
         datasourceUid: prometheus
         spanStartTimeShift: -10m
@@ -82,7 +82,7 @@ datasources:
         datasourceUid: pyroscope
         profileTypeId: process_cpu:cpu:nanoseconds:cpu:nanoseconds
         customQuery: true
-        query: '{service_name="${__span.tags.service.name}"}'
+        query: '{service_name="$${__span.tags.service.name}"}'
 
   - name: Pyroscope
     uid: pyroscope
