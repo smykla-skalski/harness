@@ -42,6 +42,21 @@ pub enum RuntimeModelTier {
     Max,
 }
 
+/// Reasoning/thinking parameter family exposed by a model. The UI uses this
+/// to decide which CLI parameter name to show next to the effort picker and
+/// whether to show it at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EffortKind {
+    /// No reasoning/thinking parameter accepted - the effort picker is hidden.
+    None,
+    /// Anthropic- and Google-style thinking budget (token-count based, but
+    /// the UI exposes coarse levels mapped to budgets internally).
+    ThinkingBudget,
+    /// `OpenAI`-style `reasoning_effort` parameter with named levels.
+    ReasoningEffort,
+}
+
 /// One model offered by a runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeModel {
@@ -51,6 +66,25 @@ pub struct RuntimeModel {
     pub display_name: String,
     /// Cost/speed tier metadata.
     pub tier: RuntimeModelTier,
+    /// Family of reasoning parameter the model accepts.
+    #[serde(default = "effort_kind_none")]
+    pub effort_kind: EffortKind,
+    /// Allowed effort level names (empty when `effort_kind` is `None`).
+    /// Ordered low → high so the UI can default to the first entry.
+    #[serde(default)]
+    pub effort_values: Vec<String>,
+}
+
+fn effort_kind_none() -> EffortKind {
+    EffortKind::None
+}
+
+impl RuntimeModel {
+    /// Whether this model accepts a reasoning/thinking parameter at all.
+    #[must_use]
+    pub fn supports_effort(&self) -> bool {
+        !matches!(self.effort_kind, EffortKind::None)
+    }
 }
 
 /// All models a single runtime can spawn with.
@@ -76,7 +110,6 @@ static REGISTRY: LazyLock<BTreeMap<&'static str, RuntimeModelCatalog>> = LazyLoc
     map.insert("opencode", opencode_catalog());
     map
 });
-
 
 /// Look up the model catalog for a runtime.
 #[must_use]
@@ -104,7 +137,11 @@ pub fn validate_model(runtime: &str, model: &str) -> Result<(), Vec<String>> {
     if catalog.models.iter().any(|entry| entry.id == model) {
         Ok(())
     } else {
-        Err(catalog.models.iter().map(|entry| entry.id.clone()).collect())
+        Err(catalog
+            .models
+            .iter()
+            .map(|entry| entry.id.clone())
+            .collect())
     }
 }
 
@@ -219,5 +256,58 @@ mod tests {
         assert!(json.contains("\"tier\":\"fast\""));
         assert!(json.contains("\"tier\":\"balanced\""));
         assert!(json.contains("\"tier\":\"max\""));
+    }
+
+    #[test]
+    fn claude_sonnet_supports_thinking_budget() {
+        let catalog = catalog_for("claude").unwrap();
+        let sonnet = catalog
+            .models
+            .iter()
+            .find(|m| m.id == "claude-sonnet-4-6")
+            .expect("sonnet 4.6 present");
+        assert_eq!(sonnet.effort_kind, EffortKind::ThinkingBudget);
+        assert!(sonnet.supports_effort());
+        assert!(!sonnet.effort_values.is_empty());
+    }
+
+    #[test]
+    fn codex_thinking_model_uses_reasoning_effort() {
+        let catalog = catalog_for("codex").unwrap();
+        let thinking = catalog
+            .models
+            .iter()
+            .find(|m| m.id == "gpt-5-codex")
+            .expect("gpt-5-codex present");
+        assert_eq!(thinking.effort_kind, EffortKind::ReasoningEffort);
+        assert!(thinking.effort_values.iter().any(|v| v == "minimal"));
+    }
+
+    #[test]
+    fn gemini_flash_lite_has_no_effort() {
+        let catalog = catalog_for("gemini").unwrap();
+        let lite = catalog
+            .models
+            .iter()
+            .find(|m| m.id == "gemini-2.5-flash-lite")
+            .expect("2.5 flash-lite present");
+        assert_eq!(lite.effort_kind, EffortKind::None);
+        assert!(!lite.supports_effort());
+        assert!(lite.effort_values.is_empty());
+    }
+
+    #[test]
+    fn effort_values_deserialize_default_when_absent() {
+        let json = r#"{"id":"x","display_name":"X","tier":"fast"}"#;
+        let model: RuntimeModel = serde_json::from_str(json).expect("parse");
+        assert_eq!(model.effort_kind, EffortKind::None);
+        assert!(model.effort_values.is_empty());
+    }
+
+    #[test]
+    fn effort_kind_serializes_snake_case() {
+        let catalog = catalog_for("claude").unwrap();
+        let json = serde_json::to_string(catalog).expect("serialize");
+        assert!(json.contains("\"effort_kind\":\"thinking_budget\""));
     }
 }
