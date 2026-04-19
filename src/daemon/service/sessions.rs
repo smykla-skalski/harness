@@ -6,6 +6,7 @@ use super::{
     reconcile_expired_pending_signals_for_async_db, reconcile_expired_pending_signals_for_db,
     session_not_found, snapshot, timeline,
 };
+use crate::session::service::ResolvedRuntimeSessionAgent;
 
 mod liveness;
 
@@ -91,7 +92,7 @@ pub(crate) async fn resolve_runtime_session_agent_async(
     runtime_name: &str,
     runtime_session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
-) -> Result<Option<crate::session::service::ResolvedRuntimeSessionAgent>, CliError> {
+) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
     let async_db = async_db.ok_or_else(|| {
         CliError::new(CliErrorKind::usage_error(
             "async daemon database pool is required for runtime session resolution",
@@ -104,12 +105,10 @@ pub(crate) async fn resolve_runtime_session_agent_async(
         0 => Ok(None),
         1 => {
             let (orchestration_session_id, agent_id) = matches.remove(0);
-            Ok(Some(
-                crate::session::service::ResolvedRuntimeSessionAgent {
-                    orchestration_session_id,
-                    agent_id,
-                },
-            ))
+            Ok(Some(ResolvedRuntimeSessionAgent {
+                orchestration_session_id,
+                agent_id,
+            }))
         }
         _ => Err(CliErrorKind::session_ambiguous(format!(
             "runtime session '{runtime_session_id}' for runtime '{runtime_name}' \
