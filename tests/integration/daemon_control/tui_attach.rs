@@ -32,8 +32,9 @@ fn local_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "start",
+            "terminal",
             session.session_id.as_str(),
             "--runtime",
             "codex",
@@ -52,8 +53,7 @@ fn local_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
         "tui start failed: {}",
         output_text(&start_output)
     );
-    let started: AgentTuiSnapshot =
-        serde_json::from_slice(&start_output.stdout).expect("parse tui start");
+    let started = parse_terminal_agent_output(&start_output.stdout);
     assert_eq!(started.status, AgentTuiStatus::Running);
 
     let live_snapshot = wait_for_tui_screen_text(&home, &xdg, &started.tui_id, "already-there");
@@ -77,7 +77,7 @@ fn local_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
     let stop_output = run_harness(
         &home,
         &xdg,
-        &["session", "tui", "stop", started.tui_id.as_str()],
+        &["session", "agents", "stop", started.tui_id.as_str()],
     );
     assert!(
         stop_output.status.success(),
@@ -121,8 +121,9 @@ fn sandboxed_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "start",
+            "terminal",
             session.session_id.as_str(),
             "--runtime",
             "codex",
@@ -141,8 +142,7 @@ fn sandboxed_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
         "tui start failed: {}",
         output_text(&start_output)
     );
-    let started: AgentTuiSnapshot =
-        serde_json::from_slice(&start_output.stdout).expect("parse tui start");
+    let started = parse_terminal_agent_output(&start_output.stdout);
     assert_eq!(started.status, AgentTuiStatus::Running);
 
     let live_snapshot = wait_for_tui_screen_text(&home, &xdg, &started.tui_id, "already-there");
@@ -166,7 +166,7 @@ fn sandboxed_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
     let stop_output = run_harness(
         &home,
         &xdg,
-        &["session", "tui", "stop", started.tui_id.as_str()],
+        &["session", "agents", "stop", started.tui_id.as_str()],
     );
     assert!(
         stop_output.status.success(),
@@ -195,10 +195,9 @@ fn wait_for_tui_screen_text(
 ) -> AgentTuiSnapshot {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let output = run_harness(home, xdg, &["session", "tui", "show", tui_id]);
+        let output = run_harness(home, xdg, &["session", "agents", "show", tui_id]);
         if output.status.success() {
-            let snapshot: AgentTuiSnapshot =
-                serde_json::from_slice(&output.stdout).expect("parse tui show");
+            let snapshot = parse_terminal_agent_output(&output.stdout);
             if snapshot.screen.text.contains(needle) {
                 return snapshot;
             }
@@ -232,7 +231,7 @@ impl AttachedTuiSession {
             .expect("open attach PTY");
         let mut command = CommandBuilder::new(harness_binary());
         command.arg("session");
-        command.arg("tui");
+        command.arg("agents");
         command.arg("attach");
         command.arg(tui_id);
         command.env("HARNESS_HOST_HOME", home);

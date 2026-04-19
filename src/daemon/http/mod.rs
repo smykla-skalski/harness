@@ -30,6 +30,7 @@ mod agents;
 mod auth;
 mod codex;
 mod core;
+mod managed_agents;
 mod response;
 mod runtime_session;
 mod sessions;
@@ -182,6 +183,7 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(tasks::task_routes())
         .merge(agents::agent_routes())
         .merge(agents::agent_tui_routes())
+        .merge(managed_agents::managed_agent_routes())
         .merge(signals::signal_routes())
         .merge(codex::codex_routes())
         .merge(voice::voice_routes())

@@ -31,8 +31,9 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "start",
+            "terminal",
             session.session_id.as_str(),
             "--runtime",
             "codex",
@@ -51,8 +52,7 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
         "tui start failed: {}",
         output_text(&start_output)
     );
-    let started: AgentTuiSnapshot =
-        serde_json::from_slice(&start_output.stdout).expect("parse tui start");
+    let started = parse_terminal_agent_output(&start_output.stdout);
     assert_eq!(started.status, AgentTuiStatus::Running);
     assert_eq!(started.session_id, session.session_id);
 
@@ -61,7 +61,7 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "input",
             started.tui_id.as_str(),
             "--text",
@@ -79,7 +79,7 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "input",
             started.tui_id.as_str(),
             "--key",
@@ -91,22 +91,20 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
         "tui enter failed: {}",
         output_text(&enter_output)
     );
-    let echoed: AgentTuiSnapshot =
-        serde_json::from_slice(&enter_output.stdout).expect("parse tui input");
+    let echoed = parse_terminal_agent_output(&enter_output.stdout);
     assert!(echoed.screen.text.contains("bridge ok"));
 
     let stop_output = run_harness(
         &home,
         &xdg,
-        &["session", "tui", "stop", started.tui_id.as_str()],
+        &["session", "agents", "stop", started.tui_id.as_str()],
     );
     assert!(
         stop_output.status.success(),
         "tui stop failed: {}",
         output_text(&stop_output)
     );
-    let stopped: AgentTuiSnapshot =
-        serde_json::from_slice(&stop_output.stdout).expect("parse tui stop");
+    let stopped = parse_terminal_agent_output(&stop_output.stdout);
     assert_eq!(stopped.status, AgentTuiStatus::Stopped);
 
     let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
@@ -194,8 +192,9 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "start",
+            "terminal",
             "app-group-cli-tui",
             "--runtime",
             "codex",
@@ -214,8 +213,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         "cli tui start failed: {}",
         output_text(&start_output)
     );
-    let started: AgentTuiSnapshot =
-        serde_json::from_slice(&start_output.stdout).expect("parse tui start");
+    let started = parse_terminal_agent_output(&start_output.stdout);
     assert_eq!(started.status, AgentTuiStatus::Running);
 
     let text_output = run_harness(
@@ -223,7 +221,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "input",
             started.tui_id.as_str(),
             "--text",
@@ -241,7 +239,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         &xdg,
         &[
             "session",
-            "tui",
+            "agents",
             "input",
             started.tui_id.as_str(),
             "--key",
@@ -253,22 +251,20 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         "cli tui enter failed: {}",
         output_text(&enter_output)
     );
-    let echoed: AgentTuiSnapshot =
-        serde_json::from_slice(&enter_output.stdout).expect("parse tui input");
+    let echoed = parse_terminal_agent_output(&enter_output.stdout);
     assert!(echoed.screen.text.contains("bridge ok"));
 
     let stop_output = run_harness(
         &home,
         &xdg,
-        &["session", "tui", "stop", started.tui_id.as_str()],
+        &["session", "agents", "stop", started.tui_id.as_str()],
     );
     assert!(
         stop_output.status.success(),
         "cli tui stop failed: {}",
         output_text(&stop_output)
     );
-    let stopped: AgentTuiSnapshot =
-        serde_json::from_slice(&stop_output.stdout).expect("parse tui stop");
+    let stopped = parse_terminal_agent_output(&stop_output.stdout);
     assert_eq!(stopped.status, AgentTuiStatus::Stopped);
 
     let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
@@ -394,7 +390,7 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
     let (ready_status, ready_body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/agent-tuis/{}/ready", started.tui_id),
+        &format!("/v1/managed-agents/{}/ready", started.tui_id),
         json!({}),
     );
     assert_eq!(ready_status, 200, "unexpected ready body: {ready_body}");
@@ -407,7 +403,7 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
     let stop_output = run_harness(
         &home,
         &xdg,
-        &["session", "tui", "stop", started.tui_id.as_str()],
+        &["session", "agents", "stop", started.tui_id.as_str()],
     );
     assert!(
         stop_output.status.success(),
@@ -453,10 +449,9 @@ exec cat
 fn wait_for_tui_prompt(home: &Path, xdg: &Path, tui_id: &str) -> AgentTuiSnapshot {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
-        let output = run_harness(home, xdg, &["session", "tui", "show", tui_id]);
+        let output = run_harness(home, xdg, &["session", "agents", "show", tui_id]);
         if output.status.success() {
-            let snapshot: AgentTuiSnapshot =
-                serde_json::from_slice(&output.stdout).expect("parse tui show");
+            let snapshot = parse_terminal_agent_output(&output.stdout);
             if snapshot.screen.text.contains("--role leader")
                 && snapshot.screen.text.contains("policy-preset:swarm-default")
             {

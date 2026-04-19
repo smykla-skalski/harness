@@ -38,7 +38,7 @@ pub struct TuiStartArgs {
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
     /// Override argv, one argument per --arg.
-    #[arg(long = "arg")]
+    #[arg(long = "arg", allow_hyphen_values = true)]
     pub argv: Vec<String>,
     /// Initial PTY rows.
     #[arg(long, default_value_t = 30)]
