@@ -118,16 +118,62 @@ try {
       name: "click",
       arguments: { x: 200, y: 200 },
     });
-    record("click executed without error", true);
+    record("click tool returned without error", true);
 
-    // Verify type_text path runs without error. We type a trivial sequence
-    // that will go to the focused window; caller's responsibility to focus a
-    // scratch buffer before --allow-input.
+    // Open TextEdit with a new blank document and give it keyboard focus.
+    await execFileAsync("/usr/bin/open", ["-a", "TextEdit"]);
+    await execFileAsync("/usr/bin/osascript", [
+      "-e",
+      'tell application "TextEdit" to activate',
+      "-e",
+      'tell application "TextEdit" to make new document',
+    ]);
+    await new Promise((resolveTimer) => setTimeout(resolveTimer, 800));
+
+    const boundsText = await execFileAsync("/usr/bin/osascript", [
+      "-e",
+      'tell application "System Events" to tell process "TextEdit" to get {position, size} of window 1',
+    ]);
+    const boundsParts = boundsText.stdout.trim().split(",").map((s) => Number(s.trim()));
+    if (boundsParts.length !== 4 || !boundsParts.every((n) => Number.isFinite(n))) {
+      record("TextEdit window bounds discovered", false, `bounds=${boundsText.stdout.trim()}`);
+      throw new Error("cannot continue without TextEdit window bounds");
+    }
+    const [winX, winY, winW, winH] = boundsParts as [number, number, number, number];
+    const clickX = winX + winW / 2;
+    const clickY = winY + winH / 2;
+    record(
+      "TextEdit window bounds discovered",
+      true,
+      `pos=(${winX},${winY}) size=(${winW}x${winH}) click=(${clickX},${clickY})`,
+    );
+    await client.callTool({
+      name: "click",
+      arguments: { x: clickX, y: clickY },
+    });
+    await new Promise((resolveTimer) => setTimeout(resolveTimer, 350));
+
+    const probeString = `probe-${Date.now()}`;
     await client.callTool({
       name: "type_text",
-      arguments: { text: "" },
+      arguments: { text: probeString },
     });
-    record("type_text empty string is a no-op", true);
+    await new Promise((resolveTimer) => setTimeout(resolveTimer, 400));
+    const readback = await execFileAsync("/usr/bin/osascript", [
+      "-e",
+      'tell application "TextEdit" to get text of document 1',
+    ]);
+    const typed = readback.stdout.trim();
+    record(
+      "type_text lands in the focused TextEdit document",
+      typed.includes(probeString),
+      `typed="${typed.replace(/\n/g, "\\n")}" expected~="${probeString}"`,
+    );
+
+    await execFileAsync("/usr/bin/osascript", [
+      "-e",
+      'tell application "TextEdit" to close document 1 saving no',
+    ]).catch(() => {});
   } else if (allowInput && helperPath === null) {
     record("skip live input (helper binary not built)", false, "run the swift build first");
   } else {
