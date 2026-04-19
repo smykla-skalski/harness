@@ -31,6 +31,7 @@ schema_config:
 limits_config:
   allow_structured_metadata: true
   volume_enabled: true
+  discover_log_levels: false
 
   # OTLP attribute mapping - controls which attributes become labels vs structured metadata
   otlp_config:
@@ -42,7 +43,7 @@ limits_config:
             - service.name
             - service.namespace
             - service.version
-            - deployment.environment.name
+            - deployment.env
         # Drop high-cardinality resource attributes from index
         - action: drop
           attributes:
@@ -61,8 +62,12 @@ limits_config:
           - outcome
           - http_status_code
           - error
-      # High-cardinality attributes stay as structured metadata (default behavior)
-      # request_id, trace_id, session.id, project.id, duration_ms, error_message, tui_id, agent_id
+      # Drop unwanted OTLP severity fields and Loki auto-detection
+      - action: drop
+        attributes:
+          - detected_level
+          - severity_text
+          - severity_number
 
 query_range:
   results_cache:
