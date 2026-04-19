@@ -184,3 +184,30 @@ run = "harness mcp serve"
 [tasks."mcp:smoke"]
 description = "Drive harness mcp serve through initialize + tools/list (pass a tool name as arg to also tools/call it)"
 run = "./scripts/mcp-smoke.sh"
+
+[tasks."mcp:doctor"]
+description = "Diagnose the local MCP setup: CLI, helper, Monitor.app, socket, protocol round-trip, .mcp.json"
+run = "./scripts/mcp-doctor.sh"
+
+[tasks."mcp:register-claude"]
+description = "Idempotently register harness-monitor in repo-root .mcp.json (accepts add|remove|show as first arg)"
+run = "./scripts/mcp-register-claude.sh"
+
+[tasks."mcp:wait-socket"]
+description = "Poll the registry socket until it is bound (accepts optional timeout in seconds, default 30)"
+run = "./scripts/mcp-wait-socket.sh"
+
+[tasks."mcp:launch:dev"]
+description = "Launch Monitor.app (Debug) with HARNESS_MONITOR_MCP_FORCE_ENABLE=1 so the host starts automatically"
+depends = ["mcp:build:monitor"]
+run = "./scripts/mcp-launch-dev.sh"
+
+[tasks."mcp:dev"]
+description = "One-shot dev chain: install CLI, build helper + app, launch with force-enable, wait for socket, smoke test, register in .mcp.json"
+depends = ["install", "mcp:build:input-helper", "mcp:build:monitor"]
+run = [
+  "./scripts/mcp-launch-dev.sh",
+  "./scripts/mcp-wait-socket.sh 45",
+  "./scripts/mcp-register-claude.sh add",
+  "./scripts/mcp-smoke.sh list_windows",
+]
