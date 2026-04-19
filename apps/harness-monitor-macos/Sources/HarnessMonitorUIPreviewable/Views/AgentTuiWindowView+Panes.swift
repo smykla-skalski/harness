@@ -156,7 +156,10 @@ extension AgentTuiWindowView {
               }
             }
             if !formModel.availablePersonas.isEmpty {
-              inlinePersonaGrid
+              inlinePersonaPicker
+            }
+            if let catalog = terminalRuntimeCatalog(formModel) {
+              terminalModelPicker(formModel, catalog: catalog)
             }
             TextField("Optional display name", text: $formModel.name)
               .harnessNativeFormControl()
@@ -238,6 +241,9 @@ extension AgentTuiWindowView {
                   )
               }
             }
+            if let catalog = codexCatalog(formModel) {
+              codexModelPicker(formModel, catalog: catalog)
+            }
           }
 
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -265,72 +271,83 @@ extension AgentTuiWindowView {
     }
   }
 
-  static let personaColumns = [
-    GridItem(.adaptive(minimum: 140), spacing: HarnessMonitorTheme.spacingMD)
-  ]
-
-  var inlinePersonaGrid: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Persona")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      LazyVGrid(columns: Self.personaColumns, spacing: HarnessMonitorTheme.spacingMD) {
-        ForEach(viewModel.availablePersonas, id: \.identifier) { persona in
-          personaCardButton(persona)
-        }
+  var inlinePersonaPicker: some View {
+    HarnessMonitorSegmentedPicker(
+      title: "Persona",
+      selection: Binding(
+        get: { viewModel.selectedPersona ?? "" },
+        set: { viewModel.selectedPersona = $0.isEmpty ? nil : $0 }
+      ),
+      accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPersonaPicker
+    ) {
+      Text("None")
+        .tag("")
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.segmentedOption(
+            HarnessMonitorAccessibility.agentTuiPersonaPicker,
+            option: "None"
+          )
+        )
+      ForEach(viewModel.availablePersonas, id: \.identifier) { persona in
+        Text(persona.name)
+          .tag(persona.identifier)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.agentTuiPersonaCard(persona.identifier)
+          )
       }
     }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaPicker)
   }
 
-  func personaCardButton(_ persona: AgentPersona) -> some View {
-    let isSelected = viewModel.selectedPersona == persona.identifier
-    return Button {
-      viewModel.selectedPersona = isSelected ? nil : persona.identifier
-    } label: {
-      VStack(spacing: HarnessMonitorTheme.spacingSM) {
-        PersonaSymbolView(symbol: persona.symbol, size: 40)
-          .foregroundStyle(isSelected ? HarnessMonitorTheme.accent : .secondary)
-        Text(persona.name)
-          .scaledFont(.callout.weight(.medium))
-          .lineLimit(2)
-          .multilineTextAlignment(.center)
-      }
-      .frame(minWidth: 120, minHeight: 100)
-      .frame(maxWidth: .infinity)
-      .overlay(alignment: .topTrailing) {
-        if isSelected {
-          Image(systemName: "checkmark.circle.fill")
-            .foregroundStyle(HarnessMonitorTheme.accent)
-            .font(.system(size: 14))
-            .padding(HarnessMonitorTheme.spacingXS)
-        }
-      }
-    }
-    .harnessInteractiveCardButtonStyle(tint: isSelected ? HarnessMonitorTheme.accent : nil)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaCard(persona.identifier))
-    .accessibilityLabel(persona.name)
-    .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .popover(
-      isPresented: Binding(
-        get: { viewModel.expandedPersonaInfo == persona.identifier },
-        set: { if !$0 { viewModel.expandedPersonaInfo = nil } }
-      )
+  func terminalRuntimeCatalog(_ formModel: ViewModel) -> RuntimeModelCatalog? {
+    formModel.availableRuntimeModels.first { $0.runtime == formModel.runtime.rawValue }
+  }
+
+  func codexCatalog(_ formModel: ViewModel) -> RuntimeModelCatalog? {
+    formModel.availableRuntimeModels.first { $0.runtime == "codex" }
+  }
+
+  func terminalModelPicker(_ formModel: ViewModel, catalog: RuntimeModelCatalog) -> some View {
+    let binding = Binding<String>(
+      get: { formModel.selectedTerminalModelByRuntime[formModel.runtime] ?? catalog.default },
+      set: { formModel.selectedTerminalModelByRuntime[formModel.runtime] = $0 }
+    )
+    return HarnessMonitorSegmentedPicker(
+      title: "Model",
+      selection: binding,
+      accessibilityIdentifier: HarnessMonitorAccessibility.agentsModelPicker
     ) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        Text(persona.name)
-          .scaledFont(.headline)
-        Text(persona.description)
-          .scaledFont(.body)
-          .foregroundStyle(.secondary)
+      ForEach(catalog.models) { model in
+        Text(model.displayName)
+          .tag(model.id)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.agentsModelPicker,
+              option: model.displayName
+            )
+          )
       }
-      .padding()
-      .frame(maxWidth: 280)
     }
-    .contextMenu {
-      Button("Learn more") {
-        viewModel.expandedPersonaInfo = persona.identifier
+  }
+
+  func codexModelPicker(_ formModel: ViewModel, catalog: RuntimeModelCatalog) -> some View {
+    let binding = Binding<String>(
+      get: { formModel.selectedCodexModel ?? catalog.default },
+      set: { formModel.selectedCodexModel = $0 }
+    )
+    return HarnessMonitorSegmentedPicker(
+      title: "Model",
+      selection: binding,
+      accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexModelPicker
+    ) {
+      ForEach(catalog.models) { model in
+        Text(model.displayName)
+          .tag(model.id)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.agentsCodexModelPicker,
+              option: model.displayName
+            )
+          )
       }
     }
   }
