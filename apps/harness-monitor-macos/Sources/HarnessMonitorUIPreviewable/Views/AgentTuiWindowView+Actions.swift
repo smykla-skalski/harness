@@ -88,7 +88,7 @@ extension AgentTuiWindowView {
         }
       }
       reconcileSheetState(afterRefresh: false)
-      syncTerminalSize()
+      enforceExpectedSize()
       viewModel.isSubmitting = false
     }
   }
@@ -98,6 +98,8 @@ extension AgentTuiWindowView {
     Task {
       switch viewModel.createMode {
       case .terminal:
+        let startSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+        viewModel.expectedSize = startSize
         let success = await store.startAgentTui(
           runtime: viewModel.runtime,
           name: viewModel.name,
@@ -105,8 +107,8 @@ extension AgentTuiWindowView {
           projectDir: trimmedProjectDir,
           persona: viewModel.selectedPersona,
           argv: parsedArgvOverride,
-          rows: viewModel.rows,
-          cols: viewModel.cols
+          rows: startSize.rows,
+          cols: startSize.cols
         )
         if success, let startedTuiID = store.selectedAgentTui?.tuiId {
           viewModel.name = ""
@@ -253,6 +255,7 @@ extension AgentTuiWindowView {
     }
 
     viewModel.pendingViewportResizeTarget = terminalSize
+    viewModel.expectedSize = terminalSize
     viewModel.viewportResizeTask?.cancel()
     let tuiID = tui.tuiId
     viewModel.viewportResizeTask = Task { @MainActor in
@@ -281,7 +284,7 @@ extension AgentTuiWindowView {
       }
       viewModel.pendingViewportResizeTarget = nil
       if !resized {
-        syncTerminalSize()
+        enforceExpectedSize()
       }
     }
   }
@@ -292,18 +295,21 @@ extension AgentTuiWindowView {
     viewModel.pendingViewportResizeTarget = nil
   }
 
-  func syncTerminalSize() {
-    guard let selectedSessionTui else {
+  func enforceExpectedSize() {
+    guard let expected = viewModel.expectedSize,
+      let serverSize = selectedSessionTui?.size,
+      expected != serverSize,
+      selectedSessionTui?.status.isActive == true
+    else {
       return
     }
-    if viewModel.pendingViewportResizeTarget == selectedSessionTui.size {
-      viewModel.pendingViewportResizeTarget = nil
-    }
-    if viewModel.rows != selectedSessionTui.size.rows {
-      viewModel.rows = selectedSessionTui.size.rows
-    }
-    if viewModel.cols != selectedSessionTui.size.cols {
-      viewModel.cols = selectedSessionTui.size.cols
+    Task {
+      _ = await store.resizeAgentTui(
+        tuiID: selectedSessionTui!.tuiId,
+        rows: expected.rows,
+        cols: expected.cols,
+        feedback: .silent
+      )
     }
   }
 
@@ -327,7 +333,7 @@ extension AgentTuiWindowView {
         applyProgrammaticSelection(preferredSelection)
         return
       }
-      syncTerminalSize()
+      enforceExpectedSize()
     case .codex(let selectedRunID):
       guard store.selectedCodexRuns.contains(where: { $0.runId == selectedRunID }) else {
         applyProgrammaticSelection(preferredSelection)
@@ -339,14 +345,14 @@ extension AgentTuiWindowView {
   func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
     guard viewModel.selection != nextSelection else {
       if nextSelection.terminalID != nil {
-        syncTerminalSize()
+        enforceExpectedSize()
       }
       return
     }
     viewModel.suppressHistoryRecording = true
     viewModel.selection = nextSelection
     if nextSelection.terminalID != nil {
-      syncTerminalSize()
+      enforceExpectedSize()
     }
   }
 
