@@ -15,8 +15,6 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::daemon::websocket::ws_upgrade_handler;
-use crate::errors::CliError;
-use crate::session::persona;
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
@@ -34,7 +32,6 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
             "/v1/daemon/log-level",
             get(get_log_level).put(put_log_level),
         )
-        .route("/v1/personas", get(get_personas))
         .route("/v1/projects", get(get_projects))
         .route(
             "/v1/runtime-sessions/resolve",
@@ -126,21 +123,6 @@ pub(super) async fn get_diagnostics(
         Err(error) => Err(error),
     };
     timed_json("GET", "/v1/diagnostics", &request_id, start, result)
-}
-
-async fn get_personas(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    timed_json(
-        "GET",
-        "/v1/personas",
-        &request_id,
-        start,
-        Ok::<_, CliError>(persona::all()),
-    )
 }
 
 async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
