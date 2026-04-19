@@ -151,9 +151,68 @@ fn monitor_project_generation_syncs_versions_after_xcodegen() {
     let sync_index = script
         .rfind("\"$REPO_ROOT/scripts/version.sh\" sync-monitor")
         .expect("generate-project.sh should sync monitor versions");
+    let repair_index = script
+        .find("repair_local_package_product_link \"$PBXPROJ\"")
+        .expect(
+            "generate-project.sh should repair the local HarnessMonitorRegistry package link after xcodegen",
+        );
 
     assert!(
         sync_index > xcodegen_index,
         "generate-project.sh should sync monitor versions after xcodegen so regenerated project.pbxproj build versions do not drift"
+    );
+    assert!(
+        repair_index > xcodegen_index,
+        "generate-project.sh should repair the local HarnessMonitorRegistry package link after xcodegen regenerates project.pbxproj"
+    );
+    assert!(
+        sync_index > repair_index,
+        "generate-project.sh should repair the local HarnessMonitorRegistry package link before syncing version metadata"
+    );
+}
+
+#[test]
+fn monitor_project_keeps_registry_product_bound_to_local_package_reference() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let project_pbxproj = read_repo_file(
+        root,
+        "apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj",
+    );
+    let local_package_comment =
+        "/* XCLocalSwiftPackageReference \"../../mcp-servers/harness-monitor-registry\" */";
+    let local_package_ref = project_pbxproj
+        .lines()
+        .find_map(|line| {
+            if line.contains(local_package_comment) {
+                line.split_whitespace().next().map(str::to_owned)
+            } else {
+                None
+            }
+        })
+        .expect("project.pbxproj should declare the local HarnessMonitorRegistry package");
+    let package_product_section = project_pbxproj
+        .split("/* Begin XCSwiftPackageProductDependency section */")
+        .nth(1)
+        .and_then(|section| {
+            section
+                .split("/* End XCSwiftPackageProductDependency section */")
+                .next()
+        })
+        .expect("project.pbxproj should contain the Swift package product dependency section");
+    let registry_product_block = package_product_section
+        .split("\t\t};")
+        .find(|block| {
+            block.contains("isa = XCSwiftPackageProductDependency;")
+                && block.contains("productName = HarnessMonitorRegistry;")
+        })
+        .expect(
+            "project.pbxproj should declare the HarnessMonitorRegistry package product dependency",
+        );
+
+    assert!(
+        registry_product_block.contains(&format!(
+            "package = {local_package_ref} {local_package_comment};"
+        )),
+        "HarnessMonitorRegistry package product should stay bound to the local package reference so Xcode can resolve it"
     );
 }
