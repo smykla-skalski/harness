@@ -38,6 +38,15 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
                     write_http_response(&mut stream, "200 OK", "text/plain", "ok");
                     continue;
                 }
+                if request.starts_with("GET /v1/ready ") {
+                    write_http_response(
+                        &mut stream,
+                        "200 OK",
+                        "application/json",
+                        "{\"ready\":true,\"daemon_epoch\":\"test\"}",
+                    );
+                    continue;
+                }
                 if request.starts_with("GET /v1/sessions ") {
                     write_http_response(&mut stream, "200 OK", "application/json", "[]");
                     continue;

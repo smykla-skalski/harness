@@ -40,6 +40,113 @@ fn try_connect_returns_none_when_no_daemon() {
 }
 
 #[test]
+fn resolve_runtime_session_returns_resolved_match() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured_query = Arc::new(Mutex::new(String::new()));
+
+    let server = {
+        let captured_query = Arc::clone(&captured_query);
+        thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let request = read_http_request(&mut stream);
+            *captured_query.lock().expect("query capture") = request_path(&request);
+            write_http_response(
+                &mut stream,
+                "200 OK",
+                "application/json",
+                "{\"resolved\":{\"orchestration_session_id\":\"sess-1\",\"agent_id\":\"codex-abc\"}}",
+            );
+        })
+    };
+
+    let client = DaemonClient {
+        endpoint,
+        token: "test-token".into(),
+        http: reqwest::Client::new(),
+    };
+    let outcome = client
+        .resolve_runtime_session("codex", "runtime-worker-42")
+        .expect("resolve runtime session");
+
+    match outcome {
+        crate::daemon::client::RuntimeSessionLookup::Resolved(agent) => {
+            assert_eq!(agent.orchestration_session_id, "sess-1");
+            assert_eq!(agent.agent_id, "codex-abc");
+        }
+        other => panic!("expected Resolved, got {other:?}"),
+    }
+    let query = captured_query.lock().expect("query").clone();
+    assert!(
+        query.starts_with("/v1/runtime-sessions/resolve?"),
+        "unexpected resolver query: {query}"
+    );
+    assert!(query.contains("runtime_name=codex"));
+    assert!(query.contains("runtime_session_id=runtime-worker-42"));
+    server.join().expect("server");
+}
+
+#[test]
+fn resolve_runtime_session_returns_not_found_when_resolved_is_null() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let _request = read_http_request(&mut stream);
+        write_http_response(
+            &mut stream,
+            "200 OK",
+            "application/json",
+            "{\"resolved\":null}",
+        );
+    });
+
+    let client = DaemonClient {
+        endpoint,
+        token: "test-token".into(),
+        http: reqwest::Client::new(),
+    };
+    let outcome = client
+        .resolve_runtime_session("codex", "unknown")
+        .expect("resolve runtime session");
+    assert!(matches!(
+        outcome,
+        crate::daemon::client::RuntimeSessionLookup::NotFound
+    ));
+    server.join().expect("server");
+}
+
+#[test]
+fn resolve_runtime_session_signals_endpoint_unavailable_on_404() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let _request = read_http_request(&mut stream);
+        write_http_response(
+            &mut stream,
+            "404 Not Found",
+            "application/json",
+            "{\"error\":\"not found\"}",
+        );
+    });
+
+    let client = DaemonClient {
+        endpoint,
+        token: "test-token".into(),
+        http: reqwest::Client::new(),
+    };
+    let outcome = client
+        .resolve_runtime_session("codex", "sess-worker-a")
+        .expect("resolve runtime session");
+    assert!(matches!(
+        outcome,
+        crate::daemon::client::RuntimeSessionLookup::EndpointUnavailable
+    ));
+    server.join().expect("server");
+}
+
+#[test]
 fn parse_error_response_extracts_message() {
     let body = r#"{"error":{"code":"KSRCLI092","message":"agent conflict"}}"#;
     let error = parse_error_response(body, 400);

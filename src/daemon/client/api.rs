@@ -3,15 +3,29 @@ use crate::daemon::protocol::{
     AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
     CodexSteerRequest, LeaderTransferRequest, ManagedAgentListResponse, ManagedAgentSnapshot,
-    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionJoinRequest, SessionLeaveRequest,
-    SessionMutationResponse, SessionStartRequest, SessionSummary, SessionTitleRequest,
-    SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
+    RoleChangeRequest, RuntimeSessionResolutionResponse, SessionDetail, SessionEndRequest,
+    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
+    SessionSummary, SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskUpdateRequest,
 };
 use crate::errors::CliError;
+use crate::session::service::ResolvedRuntimeSessionAgent;
 use crate::session::types::{AgentPersona, SessionState};
 
 use super::DaemonClient;
+
+/// Outcome of asking the daemon to resolve a runtime-session ID.
+///
+/// The client treats "endpoint missing" as a distinct state so callers can
+/// fall back to the legacy fan-out over `list_sessions + get_session_detail`
+/// when a new CLI talks to an older daemon that pre-dates `/v1/runtime-sessions/resolve`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeSessionLookup {
+    Resolved(ResolvedRuntimeSessionAgent),
+    NotFound,
+    EndpointUnavailable,
+}
 
 #[expect(
     clippy::missing_errors_doc,
@@ -24,6 +38,38 @@ impl DaemonClient {
     /// Returns [`CliError`] on network or deserialization failures.
     pub fn personas(&self) -> Result<Vec<AgentPersona>, CliError> {
         self.get("/v1/personas")
+    }
+
+    /// Resolve a runtime-session ID against the dedicated resolver endpoint.
+    ///
+    /// Returns [`RuntimeSessionLookup::EndpointUnavailable`] when the remote
+    /// daemon does not recognise `/v1/runtime-sessions/resolve` (HTTP 404),
+    /// letting the caller fall back to the legacy `list_sessions` +
+    /// `get_session_detail` fan-out. All other transport failures surface
+    /// as [`CliError`].
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on network failures, non-404 HTTP errors, or
+    /// when the daemon surfaces ambiguity as `session_ambiguous`.
+    pub fn resolve_runtime_session(
+        &self,
+        runtime_name: &str,
+        runtime_session_id: &str,
+    ) -> Result<RuntimeSessionLookup, CliError> {
+        let response: Option<RuntimeSessionResolutionResponse> = self.get_optional(
+            "/v1/runtime-sessions/resolve",
+            &[
+                ("runtime_name", runtime_name),
+                ("runtime_session_id", runtime_session_id),
+            ],
+        )?;
+        Ok(match response {
+            None => RuntimeSessionLookup::EndpointUnavailable,
+            Some(payload) => match payload.resolved {
+                Some(resolved) => RuntimeSessionLookup::Resolved(resolved),
+                None => RuntimeSessionLookup::NotFound,
+            },
+        })
     }
 
     pub fn start_session(&self, request: &SessionStartRequest) -> Result<SessionState, CliError> {
