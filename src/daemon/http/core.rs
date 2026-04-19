@@ -7,7 +7,9 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 
 use crate::daemon::bridge::reconfigure_bridge;
-use crate::daemon::protocol::{HostBridgeReconfigureRequest, SetLogLevelRequest};
+use crate::daemon::protocol::{
+    HostBridgeReconfigureRequest, ReadinessResponse, SetLogLevelRequest,
+};
 use crate::daemon::service;
 use crate::daemon::websocket::ws_upgrade_handler;
 use crate::errors::CliError;
@@ -21,6 +23,7 @@ use super::{DaemonHttpState, require_async_db};
 pub(super) fn core_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route("/v1/health", get(get_health))
+        .route("/v1/ready", get(get_ready))
         .route("/v1/diagnostics", get(get_diagnostics))
         .route("/v1/daemon/stop", post(post_stop_daemon))
         .route("/v1/bridge/reconfigure", post(post_bridge_reconfigure))
@@ -48,6 +51,22 @@ pub(super) async fn get_health(
         Err(error) => Err(error),
     };
     timed_json("GET", "/v1/health", &request_id, start, result)
+}
+
+pub(super) async fn get_ready(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = require_async_db(&state, "ready").map(|_| ReadinessResponse {
+        ready: true,
+        daemon_epoch: state.daemon_epoch.clone(),
+    });
+    timed_json("GET", "/v1/ready", &request_id, start, result)
 }
 
 pub(super) async fn get_diagnostics(

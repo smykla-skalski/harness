@@ -26,7 +26,7 @@ use crate::session::types::{
 use super::DaemonHttpState;
 use super::agents::{post_remove_agent, post_role_change, post_transfer_leader};
 use super::auth::authorize_control_request;
-use super::core::{get_diagnostics, get_health};
+use super::core::{get_diagnostics, get_health, get_ready};
 use super::response::{map_json, request_activity_log_level};
 use super::runtime_session::post_runtime_session;
 use super::sessions::{
@@ -263,6 +263,30 @@ async fn get_health_responds_when_db_lock_is_held() {
     let response = get_health(auth_headers(), State(state)).await;
 
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn get_ready_requires_auth() {
+    let response = get_ready(HeaderMap::new(), State(test_http_state_with_db())).await;
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_ready_returns_ok_without_querying_database() {
+    let state = test_http_state_with_db();
+    let expected_epoch = state.daemon_epoch.clone();
+    // Hold the sync DB lock for the whole call: if the handler ran any DB
+    // work it would deadlock; this proves the probe is DB-free.
+    let db = state.db.get().expect("db slot").clone();
+    let _db_guard = db.lock().expect("db lock");
+
+    let response = get_ready(auth_headers(), State(state)).await;
+
+    let (status, body) = response_json(response).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ready"].as_bool(), Some(true));
+    assert_eq!(body["daemon_epoch"].as_str(), Some(expected_epoch.as_str()));
 }
 
 #[tokio::test]
