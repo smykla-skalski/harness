@@ -27,6 +27,11 @@ extension HarnessMonitorStore {
     return (try? await client.personas()) ?? []
   }
 
+  public func fetchRuntimeModelCatalogs() async -> [RuntimeModelCatalog] {
+    guard let client else { return [] }
+    return (try? await client.runtimeModelCatalogs()) ?? []
+  }
+
   @discardableResult
   public func startAgentTui(
     runtime: AgentTuiRuntime,
@@ -35,6 +40,7 @@ extension HarnessMonitorStore {
     prompt: String?,
     projectDir: String? = nil,
     persona: String? = nil,
+    model: String? = nil,
     argv: [String] = [],
     rows: Int,
     cols: Int
@@ -68,6 +74,7 @@ extension HarnessMonitorStore {
           prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
           projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,
           persona: persona,
+          model: model,
           argv: normalizedArgv,
           rows: rows,
           cols: cols

@@ -275,7 +275,20 @@ extension WebSocketTransport {
   }
 
   public func personas() async throws -> [AgentPersona] {
-    try await httpFallbackClient.personas()
+    try await configuration().personas
+  }
+
+  public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
+    try await configuration().runtimeModels
+  }
+
+  public func configuration() async throws -> MonitorConfiguration {
+    if let cached = cachedConfiguration {
+      return cached
+    }
+    return try await withCheckedThrowingContinuation { continuation in
+      configurationWaiters.append(continuation)
+    }
   }
 
   public func logLevel() async throws -> LogLevelResponse {

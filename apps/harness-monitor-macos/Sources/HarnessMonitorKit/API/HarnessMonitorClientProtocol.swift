@@ -176,6 +176,8 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     request: VoiceSessionFinishRequest
   ) async throws -> VoiceSessionMutationResponse
   func personas() async throws -> [AgentPersona]
+  func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog]
+  func configuration() async throws -> MonitorConfiguration
   func logLevel() async throws -> LogLevelResponse
   func setLogLevel(_ level: String) async throws -> LogLevelResponse
 }
@@ -250,6 +252,14 @@ extension HarnessMonitorClientProtocol {
 
   public func personas() async throws -> [AgentPersona] {
     []
+  }
+
+  public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
+    []
+  }
+
+  public func configuration() async throws -> MonitorConfiguration {
+    MonitorConfiguration(personas: [], runtimeModels: [])
   }
 
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {

@@ -381,6 +381,10 @@ extension WebSocketTransport {
     sessionId: String?,
     payload: JSONValue
   ) {
+    if event == "config" {
+      handleConfigurationPush(payload: payload)
+      return
+    }
     let streamEvent = StreamEvent(
       event: event,
       recordedAt: recordedAt,
@@ -397,6 +401,23 @@ extension WebSocketTransport {
       let err = error.localizedDescription
       HarnessMonitorLogger.websocket.warning(
         "Dropping malformed push frame \(event, privacy: .public): \(err, privacy: .public)"
+      )
+    }
+  }
+
+  private func handleConfigurationPush(payload: JSONValue) {
+    do {
+      let configuration: MonitorConfiguration = try decode(payload)
+      cachedConfiguration = configuration
+      let waiters = configurationWaiters
+      configurationWaiters.removeAll()
+      for waiter in waiters {
+        waiter.resume(returning: configuration)
+      }
+    } catch {
+      let err = error.localizedDescription
+      HarnessMonitorLogger.websocket.warning(
+        "Dropping malformed config push frame: \(err, privacy: .public)"
       )
     }
   }
