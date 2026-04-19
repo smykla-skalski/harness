@@ -30,7 +30,7 @@ fn sandboxed_codex_run_returns_501_when_bridge_excludes_codex() {
     let (http_status, body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/sessions/{}/codex-runs", session.session_id),
+        &format!("/v1/sessions/{}/managed-agents/codex", session.session_id),
         json!({
             "prompt": "verify excluded codex capability",
             "mode": "report",
@@ -96,15 +96,14 @@ fn sandboxed_codex_run_succeeds_immediately_after_bridge_start_with_codex() {
     let (http_status, body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/sessions/{}/codex-runs", session.session_id),
+        &format!("/v1/sessions/{}/managed-agents/codex", session.session_id),
         json!({
             "prompt": "verify queued codex run after readiness-gated bridge start",
             "mode": "report",
         }),
     );
     assert_eq!(http_status, 200, "unexpected body: {body}");
-    let snapshot: CodexRunSnapshot =
-        serde_json::from_value(body).expect("parse codex run snapshot");
+    let snapshot = parse_codex_agent_value(body);
     assert_eq!(snapshot.session_id, session.session_id);
     assert_eq!(snapshot.status, CodexRunStatus::Queued);
     assert_eq!(
@@ -173,7 +172,10 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
     let (http_status, body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        &format!(
+            "/v1/sessions/{}/managed-agents/terminal",
+            session.session_id
+        ),
         json!({
             "runtime": "codex",
             "name": "Excluded TUI",
@@ -260,7 +262,10 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
     let (http_status, body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        &format!(
+            "/v1/sessions/{}/managed-agents/terminal",
+            session.session_id
+        ),
         json!({
             "runtime": "codex",
             "name": "Reconfigured TUI",
@@ -271,8 +276,7 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
         }),
     );
     assert_eq!(http_status, 200, "unexpected body: {body}");
-    let snapshot: AgentTuiSnapshot =
-        serde_json::from_value(body).expect("parse agent tui snapshot");
+    let snapshot = parse_terminal_agent_value(body);
     assert_eq!(snapshot.status, AgentTuiStatus::Running);
 
     let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
@@ -317,7 +321,10 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     let (start_status, start_body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        &format!(
+            "/v1/sessions/{}/managed-agents/terminal",
+            session.session_id
+        ),
         json!({
             "runtime": "codex",
             "name": "Disable force TUI",
@@ -366,7 +373,10 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     let (restart_status, restart_body) = post_json(
         &endpoint,
         &token,
-        &format!("/v1/sessions/{}/agent-tuis", session.session_id),
+        &format!(
+            "/v1/sessions/{}/managed-agents/terminal",
+            session.session_id
+        ),
         json!({
             "runtime": "codex",
             "name": "Excluded again",

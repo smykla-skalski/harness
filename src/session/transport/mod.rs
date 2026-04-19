@@ -4,6 +4,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
 mod attach;
+mod managed_agents;
 mod recover;
 mod session_commands;
 mod signal;
@@ -12,6 +13,12 @@ mod task;
 mod tui;
 
 pub use attach::TuiAttachArgs;
+pub use managed_agents::{
+    CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentStartArgs, CodexAgentSteerArgs,
+    ManagedAgentAttachArgs, ManagedAgentListArgs, ManagedAgentShowArgs, ManagedTerminalInputArgs,
+    ManagedTerminalResizeArgs, ManagedTerminalStopArgs, SessionAgentStartCommand,
+    SessionAgentsCommand, TerminalAgentStartArgs,
+};
 pub use recover::SessionRecoverLeaderArgs;
 pub use session_commands::{
     SessionAssignArgs, SessionEndArgs, SessionJoinArgs, SessionLeaveArgs, SessionListArgs,
@@ -51,6 +58,11 @@ pub enum SessionCommand {
     Signal {
         #[command(subcommand)]
         command: SessionSignalCommand,
+    },
+    /// Unified managed terminal and Codex thread operations.
+    Agents {
+        #[command(subcommand)]
+        command: SessionAgentsCommand,
     },
     /// Managed interactive agent TUI processes.
     Tui {
@@ -129,6 +141,7 @@ impl Execute for SessionCommand {
             Self::RecoverLeader(args) => args.execute(context),
             Self::Task { command } => command.execute(context),
             Self::Signal { command } => command.execute(context),
+            Self::Agents { command } => command.execute(context),
             Self::Tui { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
             Self::Sync(args) => args.execute(context),
