@@ -4,11 +4,13 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::protocol::{
     AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
-    AgentRuntimeSessionRegistrationResponse, LeaderTransferRequest, RoleChangeRequest,
-    SessionDetail, SessionEndRequest, SessionJoinRequest, SessionLeaveRequest,
-    SessionMutationResponse, SessionStartRequest, SessionSummary, SessionTitleRequest,
-    SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
+    AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
+    CodexSteerRequest, LeaderTransferRequest, ManagedAgentListResponse, ManagedAgentSnapshot,
+    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionJoinRequest,
+    SessionLeaveRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
+    SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskUpdateRequest,
 };
 use crate::errors::CliError;
 use crate::session::types::{AgentPersona, SessionState};
@@ -243,5 +245,87 @@ impl DaemonClient {
 
     pub fn get_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         self.get(&format!("/v1/agent-tuis/{tui_id}"))
+    }
+
+    pub fn list_managed_agents(
+        &self,
+        session_id: &str,
+    ) -> Result<ManagedAgentListResponse, CliError> {
+        self.get(&format!("/v1/sessions/{session_id}/managed-agents"))
+    }
+
+    pub fn get_managed_agent(&self, agent_id: &str) -> Result<ManagedAgentSnapshot, CliError> {
+        self.get(&format!("/v1/managed-agents/{agent_id}"))
+    }
+
+    pub fn start_terminal_managed_agent(
+        &self,
+        session_id: &str,
+        request: &AgentTuiStartRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/managed-agents/terminal"),
+            request,
+        )
+    }
+
+    pub fn start_codex_managed_agent(
+        &self,
+        session_id: &str,
+        request: &CodexRunRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/managed-agents/codex"),
+            request,
+        )
+    }
+
+    pub fn send_managed_terminal_input(
+        &self,
+        agent_id: &str,
+        request: &AgentTuiInputRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(&format!("/v1/managed-agents/{agent_id}/input"), request)
+    }
+
+    pub fn resize_managed_terminal(
+        &self,
+        agent_id: &str,
+        request: &AgentTuiResizeRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(&format!("/v1/managed-agents/{agent_id}/resize"), request)
+    }
+
+    pub fn stop_managed_terminal(&self, agent_id: &str) -> Result<ManagedAgentSnapshot, CliError> {
+        let body = serde_json::json!({});
+        self.post(&format!("/v1/managed-agents/{agent_id}/stop"), &body)
+    }
+
+    pub fn steer_codex_managed_agent(
+        &self,
+        agent_id: &str,
+        request: &CodexSteerRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(&format!("/v1/managed-agents/{agent_id}/steer"), request)
+    }
+
+    pub fn interrupt_codex_managed_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        let body = serde_json::json!({});
+        self.post(&format!("/v1/managed-agents/{agent_id}/interrupt"), &body)
+    }
+
+    pub fn resolve_codex_managed_agent_approval(
+        &self,
+        agent_id: &str,
+        approval_id: &str,
+        request: &CodexApprovalDecisionRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(
+            &format!("/v1/managed-agents/{agent_id}/approvals/{approval_id}"),
+            request,
+        )
     }
 }
