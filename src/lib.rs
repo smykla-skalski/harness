@@ -17,6 +17,7 @@ pub mod hooks;
 pub mod infra;
 pub mod kernel;
 pub(crate) mod manifests;
+pub mod mcp;
 pub mod observe;
 pub(crate) mod platform;
 pub mod run;
