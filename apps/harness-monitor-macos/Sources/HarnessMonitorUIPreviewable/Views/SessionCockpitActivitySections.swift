@@ -303,6 +303,8 @@ private struct SignalCancelActionButton: View {
   let signal: SessionSignalRecord
   let useWhiteTint: Bool
   @Binding var isHovering: Bool
+  @ScaledMetric(relativeTo: .title3)
+  private var actionIconSize: CGFloat = 28
 
   var body: some View {
     Button {
@@ -318,7 +320,7 @@ private struct SignalCancelActionButton: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .foregroundStyle(useWhiteTint ? Color.white : HarnessMonitorTheme.danger)
         .opacity(isHovering ? 1 : (useWhiteTint ? 0.9 : 0.7))
-        .frame(width: 28, height: 28)
+        .frame(width: actionIconSize, height: actionIconSize)
         .contentShape(Rectangle())
         .scaleEffect(isHovering ? 1.22 : 1)
         .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isHovering)
@@ -335,6 +337,8 @@ private struct SignalResendActionButton: View {
   let signal: SessionSignalRecord
   let useWhiteTint: Bool
   @Binding var isHovering: Bool
+  @ScaledMetric(relativeTo: .title3)
+  private var actionIconSize: CGFloat = 28
 
   var body: some View {
     Button {
@@ -345,7 +349,7 @@ private struct SignalResendActionButton: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .foregroundStyle(useWhiteTint ? Color.white : HarnessMonitorTheme.accent)
         .opacity(isHovering ? 1 : (useWhiteTint ? 0.9 : 0.7))
-        .frame(width: 28, height: 28)
+        .frame(width: actionIconSize, height: actionIconSize)
         .contentShape(Rectangle())
         .scaleEffect(isHovering ? 1.22 : 1)
         .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isHovering)

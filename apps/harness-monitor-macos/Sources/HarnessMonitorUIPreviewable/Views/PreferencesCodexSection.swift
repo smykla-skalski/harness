@@ -5,6 +5,8 @@ public struct PreferencesHostBridgeSection: View {
   public let store: HarnessMonitorStore
   @State private var pendingForcedDisableCapability: String?
   @State private var pendingForcedDisableMessage = ""
+  @ScaledMetric(relativeTo: .caption)
+  private var statusCircleSize: CGFloat = 8
 
   public init(store: HarnessMonitorStore) {
     self.store = store
@@ -30,7 +32,7 @@ public struct PreferencesHostBridgeSection: View {
           HStack(spacing: HarnessMonitorTheme.spacingXS) {
             Circle()
               .fill(hostBridge.running ? .green : .secondary)
-              .frame(width: 8, height: 8)
+              .frame(width: statusCircleSize, height: statusCircleSize)
             Text(hostBridge.running ? "Running" : "Not running")
               .scaledFont(.body)
           }
@@ -104,7 +106,7 @@ public struct PreferencesHostBridgeSection: View {
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
           Circle()
             .fill(capabilityColor(state))
-            .frame(width: 8, height: 8)
+            .frame(width: statusCircleSize, height: statusCircleSize)
           Text(capabilityStatusLabel(state))
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)

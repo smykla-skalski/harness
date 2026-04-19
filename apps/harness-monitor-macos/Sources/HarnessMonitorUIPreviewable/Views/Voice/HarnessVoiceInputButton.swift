@@ -29,6 +29,8 @@ struct HarnessVoiceInputButton: View {
   var pendingTranscriptSegmentLimit =
     HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
   @State private var _model = ViewModel()
+  @ScaledMetric(relativeTo: .headline)
+  private var progressSize: CGFloat = 16
 
   var model: ViewModel { _model }
 
@@ -110,7 +112,7 @@ struct HarnessVoiceInputButton: View {
         Spacer()
         ProgressView()
           .controlSize(.small)
-          .frame(width: 16, height: 16)
+          .frame(width: progressSize, height: progressSize)
           .opacity(model.isRecording ? 1 : 0)
       }
       .frame(height: 22)
