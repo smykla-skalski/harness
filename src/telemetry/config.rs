@@ -301,7 +301,10 @@ mod tests {
         temp_env::with_vars(
             [
                 ("XDG_DATA_HOME", Some(xdg_data_str)),
-                ("OTEL_EXPORTER_OTLP_ENDPOINT", Some("http://collector.example:55681")),
+                (
+                    "OTEL_EXPORTER_OTLP_ENDPOINT",
+                    Some("http://collector.example:55681"),
+                ),
                 ("OTEL_EXPORTER_OTLP_PROTOCOL", Some("http/protobuf")),
                 (
                     "OTEL_EXPORTER_OTLP_HEADERS",
@@ -320,7 +323,10 @@ mod tests {
                 assert_eq!(resolved.source, TelemetryConfigSource::Environment);
                 assert_eq!(resolved.protocol, ExportProtocol::HttpProtobuf);
                 assert_eq!(resolved.endpoint, "http://collector.example:55681");
-                assert_eq!(resolved.pyroscope_url, Some("http://127.0.0.1:4404".to_string()));
+                assert_eq!(
+                    resolved.pyroscope_url,
+                    Some("http://127.0.0.1:4404".to_string())
+                );
                 assert_eq!(
                     resolved.headers,
                     BTreeMap::from([

@@ -16,9 +16,7 @@ use tracing::{debug, info};
 
 use crate::daemon::http::{self, DaemonHttpState};
 use crate::daemon::protocol::StreamEvent;
-use crate::telemetry::{
-    apply_parent_context_from_headers, current_trace_id, with_active_baggage,
-};
+use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
 use super::dispatch::handle_message;
 use super::relay::relay_broadcast;
@@ -268,11 +266,9 @@ pub(crate) async fn handle_incoming_message(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> IncomingMessageAction {
     match message {
-        Message::Text(text) => {
-            IncomingMessageAction::RespondBatch(
-                Box::pin(handle_message(&text, state, connection)).await,
-            )
-        }
+        Message::Text(text) => IncomingMessageAction::RespondBatch(
+            Box::pin(handle_message(&text, state, connection)).await,
+        ),
         Message::Ping(payload) => IncomingMessageAction::RespondBatch(vec![Message::Pong(payload)]),
         Message::Close(_) => IncomingMessageAction::CloseConnection,
         Message::Binary(_) | Message::Pong(_) => IncomingMessageAction::ContinueLoop,

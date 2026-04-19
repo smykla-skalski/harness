@@ -1,6 +1,6 @@
+use pyroscope::PyroscopeError;
 use pyroscope::backend::{BackendConfig, pprof::PprofConfig, pprof_backend};
 use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgentRunning};
-use pyroscope::PyroscopeError;
 use tracing::{info, warn};
 
 use super::config::{ResolvedTelemetryConfig, RuntimeService};
@@ -33,8 +33,9 @@ impl DaemonProfiler {
 
     #[must_use]
     pub fn start(service: RuntimeService, export: &ResolvedTelemetryConfig) -> Self {
-        daemon_profiler_settings(service, export)
-            .map_or_else(Self::disabled, |settings| Self::start_with_settings(service, &settings))
+        daemon_profiler_settings(service, export).map_or_else(Self::disabled, |settings| {
+            Self::start_with_settings(service, &settings)
+        })
     }
 
     pub fn shutdown(&mut self) {
@@ -107,9 +108,7 @@ fn daemon_profiler_settings(
     })
 }
 
-fn build_running_agent(
-    settings: &DaemonProfilerSettings,
-) -> Result<RunningAgent, PyroscopeError> {
+fn build_running_agent(settings: &DaemonProfilerSettings) -> Result<RunningAgent, PyroscopeError> {
     let tags = settings
         .tags
         .iter()
@@ -129,8 +128,8 @@ fn build_running_agent(
         "2.0.0",
         backend,
     )
-        .tags(tags)
-        .build()?;
+    .tags(tags)
+    .build()?;
     agent.start()
 }
 
@@ -170,12 +169,18 @@ mod tests {
 
     #[test]
     fn daemon_profiler_settings_skip_non_daemon_services() {
-        assert_eq!(daemon_profiler_settings(RuntimeService::Cli, &export(Some("http://127.0.0.1:4040"))), None);
+        assert_eq!(
+            daemon_profiler_settings(RuntimeService::Cli, &export(Some("http://127.0.0.1:4040"))),
+            None
+        );
     }
 
     #[test]
     fn daemon_profiler_settings_require_pyroscope_url() {
-        assert_eq!(daemon_profiler_settings(RuntimeService::Daemon, &export(None)), None);
+        assert_eq!(
+            daemon_profiler_settings(RuntimeService::Daemon, &export(None)),
+            None
+        );
     }
 
     #[test]

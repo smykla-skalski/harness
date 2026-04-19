@@ -17,8 +17,9 @@ use super::registry::Hook;
 use super::{HookCommand, HookOutcome, HookType};
 use observation::{
     HookRunMetadata, acknowledged_signal_lines, find_pending_signals_with_trace,
-    finish_hook_observation, prepare_hook_execution, project_dir_for_signal_context, read_hook_payload,
-    record_hook_event_failure, record_trace_id, resolve_signal_session_with_trace,
+    finish_hook_observation, prepare_hook_execution, project_dir_for_signal_context,
+    read_hook_payload, record_hook_event_failure, record_trace_id,
+    resolve_signal_session_with_trace,
 };
 
 mod observation;
