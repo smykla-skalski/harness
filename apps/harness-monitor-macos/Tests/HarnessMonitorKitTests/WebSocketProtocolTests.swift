@@ -209,7 +209,7 @@ struct WebSocketProtocolTests {
     #expect(seq == 42)
   }
 
-  @Test("Agent TUI list reads require a live WebSocket connection")
+  @Test("Agents list reads require a live WebSocket connection")
   func agentTuiListReadsRequireWebSocketConnection() async {
     let transport = makeTransport(endpoint: URL(string: "http://127.0.0.1:1")!)
 
@@ -218,7 +218,7 @@ struct WebSocketProtocolTests {
     }
   }
 
-  @Test("Agent TUI detail reads require a live WebSocket connection")
+  @Test("Agents detail reads require a live WebSocket connection")
   func agentTuiDetailReadsRequireWebSocketConnection() async {
     let transport = makeTransport(endpoint: URL(string: "http://127.0.0.1:1")!)
 

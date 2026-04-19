@@ -208,7 +208,7 @@ struct AdaptiveGridLayoutMeasurementKeyTests {
   }
 }
 
-@Suite("Agent TUI viewport auto-resize stabilization")
+@Suite("Agents viewport auto-resize stabilization")
 struct AgentTuiViewportAutoResizeStabilizationTests {
   @Test("Minor viewport jitter preserves the current terminal size")
   func minorViewportJitterPreservesCurrentTerminalSize() {

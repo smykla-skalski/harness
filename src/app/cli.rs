@@ -153,7 +153,7 @@ pub enum Command {
         command: DaemonCommand,
     },
 
-    /// Supervise host capabilities for sandboxed Codex and agent TUI flows.
+    /// Supervise host capabilities for sandboxed Codex and terminal agent flows.
     Bridge {
         #[command(subcommand)]
         command: BridgeCommand,

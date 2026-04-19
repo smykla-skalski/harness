@@ -213,7 +213,7 @@ For multi-agent orchestration, there is also the session orchestration path:
 4. An observer runs `harness session observe <session-id> --poll-interval 3` to classify issues across all agent logs and auto-create work items.
 5. The leader ends the session with `harness session end` when all tasks are done.
 
-Signal delivery between agents uses file-based signaling through `agents/signals/`. Signals are still picked up during `PreToolUse` hook callbacks and injected as `additional_context`, but daemon-managed agent TUIs are now nudged after the file write so idle sessions can re-enter the hook cycle without manual input.
+Signal delivery between agents uses file-based signaling through `agents/signals/`. Signals are still picked up during `PreToolUse` hook callbacks and injected as `additional_context`, but daemon-managed terminal agents are now nudged after the file write so idle sessions can re-enter the hook cycle without manual input.
 
 That keeps host wrappers thin. They translate local hook payloads, but harness owns the real workflow state.
 

@@ -180,8 +180,8 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
             | "sessions"
             | "session.detail"
             | "session.timeline"
-            | "session.agent_tuis"
-            | "agent_tui.detail"
+            | "session.managed_agents"
+            | "managed_agent.detail"
     ) {
         Some(dispatch_read_query(request, state).await)
     } else {

@@ -1,6 +1,4 @@
-use crate::daemon::agent_tui::{
-    AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest,
-};
+use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,

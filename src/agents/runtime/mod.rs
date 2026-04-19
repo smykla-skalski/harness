@@ -63,7 +63,7 @@ pub struct HookIntegrationDescriptor {
     pub supports_context_injection: bool,
 }
 
-/// How the daemon delivers the initial join prompt to an agent TUI process.
+/// How the daemon delivers the initial join prompt to a terminal agent process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InitialPromptDelivery {
     /// Append the prompt as a positional CLI argument (claude, codex, vibe).

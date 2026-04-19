@@ -55,7 +55,7 @@ extension HarnessMonitorStore {
 
     return await mutateAgentTui(
       using: client,
-      actionName: "Agent TUI started",
+      actionName: "Agents started",
       selectUpdatedSnapshot: true
     ) {
       try await client.startAgentTui(
@@ -107,7 +107,7 @@ extension HarnessMonitorStore {
     let actionName: String? =
       switch feedback {
       case .visible:
-        "Agent TUI resized"
+      "Agents resized"
       case .silent:
         nil
       }
@@ -125,7 +125,7 @@ extension HarnessMonitorStore {
     guard guardSessionActionsAvailable() else { return false }
     guard let client else { return false }
 
-    return await mutateAgentTui(using: client, actionName: "Agent TUI stopped") {
+    return await mutateAgentTui(using: client, actionName: "Agents stopped") {
       try await client.stopAgentTui(tuiID: tuiID)
     }
   }
@@ -223,7 +223,7 @@ extension HarnessMonitorStore {
       }
       let err = error.localizedDescription
       HarnessMonitorLogger.store.warning(
-        "websocket reconnect agent TUI refresh failed: \(err, privacy: .public)"
+        "websocket reconnect terminal agent refresh failed: \(err, privacy: .public)"
       )
     }
   }
@@ -365,7 +365,7 @@ extension HarnessMonitorStore {
       let tuiId = baseline.tuiId
       let err = error.localizedDescription
       HarnessMonitorLogger.store.warning(
-        "agent TUI post-action refresh failed for \(tuiId, privacy: .public): \(err, privacy: .public)"
+        "terminal agent post-action refresh failed for \(tuiId, privacy: .public): \(err, privacy: .public)"
       )
       return true
     }

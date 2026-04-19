@@ -68,7 +68,7 @@ public struct PreferencesHostBridgeSection: View {
     }
     .preferencesDetailFormStyle()
     .confirmationDialog(
-      "Disable agent-tui capability?",
+      "Disable Agents capability?",
       isPresented: forceDisableConfirmationPresented,
       titleVisibility: .visible
     ) {
@@ -89,7 +89,7 @@ public struct PreferencesHostBridgeSection: View {
     } message: {
       Text(pendingForcedDisableMessage)
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesCodexSection)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesAgentsSection)
   }
 
   @ViewBuilder
@@ -184,9 +184,9 @@ public struct PreferencesHostBridgeSection: View {
   private func capabilityTitle(_ name: String) -> String {
     switch name {
     case "agent-tui":
-      "Agent TUI"
+      "Agents"
     case "codex":
-      "Codex"
+      "Agents"
     default:
       name.replacingOccurrences(of: "-", with: " ").capitalized
     }
@@ -229,13 +229,13 @@ private struct HostBridgeCommandsView: View {
         title: "Start bridge",
         description: "Run once in a terminal to enable host-side capabilities",
         command: startCommand,
-        accessibilityID: HarnessMonitorAccessibility.preferencesCodexCopyStartButton
+        accessibilityID: HarnessMonitorAccessibility.preferencesAgentsCopyStartButton
       )
       commandRow(
         title: "Auto-start at login",
         description: "Install as a login item for persistent auto-start",
         command: installCommand,
-        accessibilityID: HarnessMonitorAccessibility.preferencesCodexCopyInstallButton
+        accessibilityID: HarnessMonitorAccessibility.preferencesAgentsCopyInstallButton
       )
     }
   }

@@ -19,6 +19,10 @@ extension AgentTuiWindowView {
     Self.runtimeTitle(for: tui)
   }
 
+  func resolvedTitle(for run: CodexRunSnapshot) -> String {
+    viewModel.displayState.codexTitlesByID[run.runId] ?? Self.codexTitle(for: run)
+  }
+
   static func runtimeTitle(for tui: AgentTuiSnapshot) -> String {
     if let runtime = AgentTuiRuntime(rawValue: tui.runtime) {
       return runtime.title
@@ -31,16 +35,28 @@ extension AgentTuiWindowView {
     return tui.runtime.capitalized
   }
 
+  static func codexTitle(for run: CodexRunSnapshot) -> String {
+    AgentTuiDisplayState.codexTitle(for: run)
+  }
+
   static func initialSelection(
     displayState: AgentTuiDisplayState,
-    selectedTuiID: String?
+    selectedTerminalID: String?,
+    selectedCodexRunID: String?
   ) -> AgentTuiSheetSelection {
     let orderedSessionIDs = displayState.sortedAgentTuis.map(\.tuiId)
-    if let selectedTuiID, orderedSessionIDs.contains(selectedTuiID) {
-      return .session(selectedTuiID)
+    let orderedRunIDs = displayState.sortedCodexRuns.map(\.runId)
+    if let selectedTerminalID, orderedSessionIDs.contains(selectedTerminalID) {
+      return .terminal(selectedTerminalID)
+    }
+    if let selectedCodexRunID, orderedRunIDs.contains(selectedCodexRunID) {
+      return .codex(selectedCodexRunID)
     }
     if let fallbackTuiID = orderedSessionIDs.first {
-      return .session(fallbackTuiID)
+      return .terminal(fallbackTuiID)
+    }
+    if let fallbackRunID = orderedRunIDs.first {
+      return .codex(fallbackRunID)
     }
     return .create
   }
@@ -52,12 +68,24 @@ extension AgentTuiWindowView {
   func refresh() {
     viewModel.isSubmitting = true
     Task {
-      if viewModel.selection.sessionID != nil,
-        store.selectedAgentTui?.tuiId == viewModel.selection.sessionID
-      {
-        _ = await store.refreshSelectedAgentTui()
-      } else {
-        _ = await store.refreshSelectedAgentTuis()
+      switch viewModel.selection {
+      case .create:
+        async let tuiRefresh = store.refreshSelectedAgentTuis()
+        async let codexRefresh = store.refreshSelectedCodexRuns()
+        _ = await tuiRefresh
+        _ = await codexRefresh
+      case .terminal(let tuiID):
+        if store.selectedAgentTui?.tuiId == tuiID {
+          _ = await store.refreshSelectedAgentTui()
+        } else {
+          _ = await store.refreshSelectedAgentTuis()
+        }
+      case .codex(let runID):
+        if store.selectedCodexRun?.runId == runID {
+          _ = await store.refreshSelectedCodexRun()
+        } else {
+          _ = await store.refreshSelectedCodexRuns()
+        }
       }
       reconcileSheetState(afterRefresh: false)
       syncTerminalSize()
@@ -68,27 +96,75 @@ extension AgentTuiWindowView {
   func startTui() {
     viewModel.isSubmitting = true
     Task {
-      let success = await store.startAgentTui(
-        runtime: viewModel.runtime,
-        name: viewModel.name,
-        prompt: viewModel.prompt,
-        projectDir: trimmedProjectDir,
-        persona: viewModel.selectedPersona,
-        argv: parsedArgvOverride,
-        rows: viewModel.rows,
-        cols: viewModel.cols
-      )
-      if success, let startedTuiID = store.selectedAgentTui?.tuiId {
-        viewModel.name = ""
-        viewModel.prompt = ""
-        viewModel.projectDir = ""
-        viewModel.argvOverride = ""
-        viewModel.inputText = ""
-        viewModel.selectedPersona = nil
-        viewModel.selection = .session(startedTuiID)
-        focusedField = .input
+      switch viewModel.createMode {
+      case .terminal:
+        let success = await store.startAgentTui(
+          runtime: viewModel.runtime,
+          name: viewModel.name,
+          prompt: viewModel.prompt,
+          projectDir: trimmedProjectDir,
+          persona: viewModel.selectedPersona,
+          argv: parsedArgvOverride,
+          rows: viewModel.rows,
+          cols: viewModel.cols
+        )
+        if success, let startedTuiID = store.selectedAgentTui?.tuiId {
+          viewModel.name = ""
+          viewModel.prompt = ""
+          viewModel.projectDir = ""
+          viewModel.argvOverride = ""
+          viewModel.inputText = ""
+          viewModel.selectedPersona = nil
+          viewModel.selection = .terminal(startedTuiID)
+          focusedField = .input
+        }
+      case .codex:
+        let success = await store.startCodexRun(
+          prompt: viewModel.codexPrompt,
+          mode: viewModel.codexMode
+        )
+        if success, let startedRunID = store.selectedCodexRun?.runId {
+          viewModel.codexPrompt = ""
+          viewModel.codexContext = ""
+          viewModel.selection = .codex(startedRunID)
+        }
       }
       viewModel.isSubmitting = false
+    }
+  }
+
+  func steerCodexRun(_ run: CodexRunSnapshot) {
+    viewModel.isSubmitting = true
+    Task {
+      let success = await store.steerCodexRun(runID: run.runId, prompt: viewModel.codexContext)
+      if success {
+        viewModel.codexContext = ""
+      }
+      viewModel.isSubmitting = false
+    }
+  }
+
+  func interruptCodexRun(_ run: CodexRunSnapshot) {
+    viewModel.isSubmitting = true
+    Task {
+      _ = await store.interruptCodexRun(runID: run.runId)
+      viewModel.isSubmitting = false
+    }
+  }
+
+  func resolveCodexApproval(
+    _ approval: CodexApprovalRequest,
+    run: CodexRunSnapshot,
+    decision: CodexApprovalDecision
+  ) {
+    viewModel.resolvingCodexApprovalID = approval.approvalId
+    Task {
+      _ = await store.resolveCodexApproval(
+        runID: run.runId,
+        approvalID: approval.approvalId,
+        decision: decision
+      )
+      viewModel.resolvingCodexApprovalID = nil
     }
   }
 
@@ -148,7 +224,7 @@ extension AgentTuiWindowView {
   }
 
   func updateViewportGeometry(_ viewportSize: CGSize, for tui: AgentTuiSnapshot) {
-    guard viewModel.selection.sessionID == tui.tuiId, tui.status.isActive else {
+    guard viewModel.selection.terminalID == tui.tuiId, tui.status.isActive else {
       return
     }
     guard
@@ -185,7 +261,7 @@ extension AgentTuiWindowView {
         return
       }
       guard
-        viewModel.selection.sessionID == tuiID,
+        viewModel.selection.terminalID == tuiID,
         selectedSessionTui?.status.isActive == true
       else {
         if viewModel.pendingViewportResizeTarget == terminalSize {
@@ -234,7 +310,8 @@ extension AgentTuiWindowView {
   func reconcileSheetState(afterRefresh: Bool) {
     let preferredSelection = Self.initialSelection(
       displayState: viewModel.displayState,
-      selectedTuiID: store.selectedAgentTui?.tuiId
+      selectedTerminalID: store.selectedAgentTui?.tuiId,
+      selectedCodexRunID: store.selectedCodexRun?.runId
     )
 
     if afterRefresh {
@@ -242,28 +319,33 @@ extension AgentTuiWindowView {
       return
     }
 
-    guard let selectedTuiID = viewModel.selection.sessionID else {
-      return
+    switch viewModel.selection {
+    case .create:
+      break
+    case .terminal(let selectedTuiID):
+      guard store.selectedAgentTuis.contains(where: { $0.tuiId == selectedTuiID }) else {
+        applyProgrammaticSelection(preferredSelection)
+        return
+      }
+      syncTerminalSize()
+    case .codex(let selectedRunID):
+      guard store.selectedCodexRuns.contains(where: { $0.runId == selectedRunID }) else {
+        applyProgrammaticSelection(preferredSelection)
+        return
+      }
     }
-
-    guard store.selectedAgentTuis.contains(where: { $0.tuiId == selectedTuiID }) else {
-      applyProgrammaticSelection(preferredSelection)
-      return
-    }
-
-    syncTerminalSize()
   }
 
   func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
     guard viewModel.selection != nextSelection else {
-      if nextSelection.sessionID != nil {
+      if nextSelection.terminalID != nil {
         syncTerminalSize()
       }
       return
     }
     viewModel.suppressHistoryRecording = true
     viewModel.selection = nextSelection
-    if nextSelection.sessionID != nil {
+    if nextSelection.terminalID != nil {
       syncTerminalSize()
     }
   }

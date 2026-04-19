@@ -60,7 +60,7 @@ pub(crate) struct AgentTuiAttachState {
     pub(crate) broadcast_rx: broadcast::Receiver<Vec<u8>>,
 }
 
-/// Live process handle for an agent TUI running inside a PTY.
+/// Live process handle for a terminal agent running inside a PTY.
 pub struct AgentTuiProcess {
     master: Shared<Box<dyn MasterPty + Send>>,
     child: Shared<Box<dyn Child + Send + Sync>>,
@@ -82,18 +82,18 @@ impl AgentTuiProcess {
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(spec.size.into())
-            .map_err(|error| CliErrorKind::workflow_io(format!("open agent TUI PTY: {error}")))?;
+            .map_err(|error| CliErrorKind::workflow_io(format!("open terminal agent PTY: {error}")))?;
         let cmd = command_builder(spec);
         let child = pair.slave.spawn_command(cmd).map_err(|error| {
-            CliErrorKind::workflow_io(format!("spawn agent TUI process: {error}"))
+            CliErrorKind::workflow_io(format!("spawn terminal agent process: {error}"))
         })?;
         drop(pair.slave);
 
         let reader = pair.master.try_clone_reader().map_err(|error| {
-            CliErrorKind::workflow_io(format!("clone agent TUI PTY reader: {error}"))
+            CliErrorKind::workflow_io(format!("clone terminal agent PTY reader: {error}"))
         })?;
         let writer = pair.master.take_writer().map_err(|error| {
-            CliErrorKind::workflow_io(format!("take agent TUI PTY writer: {error}"))
+            CliErrorKind::workflow_io(format!("take terminal agent PTY writer: {error}"))
         })?;
 
         let (broadcast_tx, broadcast_rx) = broadcast::channel(1024);
@@ -137,12 +137,12 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow I/O error when the PTY writer fails.
     pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), CliError> {
-        let mut writer = lock(&self.writer, "agent TUI writer")?;
+        let mut writer = lock(&self.writer, "terminal agent writer")?;
         writer
             .write_all(bytes)
             .and_then(|()| writer.flush())
             .map_err(|error| {
-                CliErrorKind::workflow_io(format!("write agent TUI input: {error}")).into()
+                CliErrorKind::workflow_io(format!("write terminal agent input: {error}")).into()
             })
     }
 
@@ -152,10 +152,10 @@ impl AgentTuiProcess {
     /// Returns a workflow parse or I/O error when resize fails.
     pub fn resize(&self, size: AgentTuiSize) -> Result<(), CliError> {
         let size = size.validate()?;
-        lock(&self.master, "agent TUI PTY master")?
+        lock(&self.master, "terminal agent PTY master")?
             .resize(size.into())
-            .map_err(|error| CliErrorKind::workflow_io(format!("resize agent TUI PTY: {error}")))?;
-        lock(&self.screen, "agent TUI screen parser")?.resize(size);
+            .map_err(|error| CliErrorKind::workflow_io(format!("resize terminal agent PTY: {error}")))?;
+        lock(&self.screen, "terminal agent screen parser")?.resize(size);
         Ok(())
     }
 
@@ -164,7 +164,7 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow I/O error when internal state is poisoned.
     pub fn screen(&self) -> Result<TerminalScreenSnapshot, CliError> {
-        Ok(lock(&self.screen, "agent TUI screen parser")?.snapshot())
+        Ok(lock(&self.screen, "terminal agent screen parser")?.snapshot())
     }
 
     /// Return a copy of the raw terminal transcript captured so far.
@@ -172,12 +172,12 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow I/O error when internal state is poisoned.
     pub fn transcript(&self) -> Result<Vec<u8>, CliError> {
-        Ok(lock(&self.transcript, "agent TUI transcript")?.clone())
+        Ok(lock(&self.transcript, "terminal agent transcript")?.clone())
     }
 
     pub(crate) fn attach_state(&self) -> Result<AgentTuiAttachState, CliError> {
         let broadcast_rx = self.broadcast_rx.resubscribe();
-        let initial_bytes = lock(&self.screen, "agent TUI screen parser")?.state_formatted();
+        let initial_bytes = lock(&self.screen, "terminal agent screen parser")?.state_formatted();
         Ok(AgentTuiAttachState {
             initial_bytes,
             broadcast_rx,
@@ -189,10 +189,10 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow I/O error when internal state is poisoned or the file write fails.
     pub fn persist_transcript(&self, path: &Path) -> Result<(), CliError> {
-        let transcript = lock(&self.transcript, "agent TUI transcript")?;
+        let transcript = lock(&self.transcript, "terminal agent transcript")?;
         let mut persisted_len = lock(
             &self.persisted_transcript_len,
-            "agent TUI persisted transcript length",
+            "terminal agent persisted transcript length",
         )?;
         persist_transcript(path, transcript.as_slice(), &mut persisted_len)
     }
@@ -202,10 +202,10 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow I/O error when process polling fails.
     pub fn try_wait(&self) -> Result<Option<ExitStatus>, CliError> {
-        lock(&self.child, "agent TUI child")?
+        lock(&self.child, "terminal agent child")?
             .try_wait()
             .map_err(|error| {
-                CliErrorKind::workflow_io(format!("poll agent TUI process: {error}")).into()
+                CliErrorKind::workflow_io(format!("poll terminal agent process: {error}")).into()
             })
     }
 
@@ -231,10 +231,10 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow I/O error when process termination fails.
     pub fn kill(&self) -> Result<(), CliError> {
-        lock(&self.child, "agent TUI child")?
+        lock(&self.child, "terminal agent child")?
             .kill()
             .map_err(|error| {
-                CliErrorKind::workflow_io(format!("kill agent TUI process: {error}")).into()
+                CliErrorKind::workflow_io(format!("kill terminal agent process: {error}")).into()
             })
     }
 

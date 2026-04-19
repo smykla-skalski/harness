@@ -15,6 +15,7 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::index::DiscoveredProject;
+use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
 use crate::session::types::{
     AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState, SessionStatus,
@@ -59,6 +60,14 @@ pub(super) fn seed_sample_timeline(state: &DaemonHttpState) {
         &[sample_tool_result_event()],
     )
     .expect("sync conversation events");
+}
+
+pub(super) fn seed_sample_codex_run(state: &DaemonHttpState, run_id: &str, updated_at: &str) {
+    let db = state.db.get().expect("db slot").clone();
+    let db = db.lock().expect("db lock");
+    persist_sample_session(&db);
+    db.save_codex_run(&sample_codex_run(run_id, updated_at))
+        .expect("save codex run");
 }
 
 pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState {
@@ -206,6 +215,25 @@ fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapshot {
         exit_code: None,
         signal: None,
         error: None,
+        created_at: "2026-04-13T19:00:00Z".into(),
+        updated_at: updated_at.into(),
+    }
+}
+
+fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapshot {
+    CodexRunSnapshot {
+        run_id: run_id.into(),
+        session_id: "sess-test-1".into(),
+        project_dir: "/tmp/harness".into(),
+        thread_id: Some(format!("thread-{run_id}")),
+        turn_id: Some(format!("turn-{run_id}")),
+        mode: CodexRunMode::Report,
+        status: CodexRunStatus::Running,
+        prompt: format!("Investigate {run_id}"),
+        latest_summary: Some("Working through managed agents".into()),
+        final_message: None,
+        error: None,
+        pending_approvals: Vec::new(),
         created_at: "2026-04-13T19:00:00Z".into(),
         updated_at: updated_at.into(),
     }

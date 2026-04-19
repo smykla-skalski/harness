@@ -10,8 +10,6 @@ private struct HarnessMonitorSheetMetrics {
     switch sheet {
     case .sendSignal:
       Self(minWidth: 420, idealWidth: 500, minHeight: 300)
-    case .codexFlow:
-      Self(minWidth: 520, idealWidth: 620, minHeight: 520)
     }
   }
 }
@@ -31,8 +29,6 @@ struct HarnessMonitorSheetRouter: View {
 
   @ViewBuilder private var sheetContent: some View {
     switch sheet {
-    case .codexFlow:
-      CodexFlowSheetView(store: store)
     case .sendSignal(let agentID):
       SendSignalSheetView(store: store, agentID: agentID)
     }

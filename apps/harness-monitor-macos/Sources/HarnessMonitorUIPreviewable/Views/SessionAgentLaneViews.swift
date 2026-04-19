@@ -199,7 +199,7 @@ struct SessionAgentSummaryCard: View {
               .font(.system(size: 20))
               .foregroundStyle(tuiMarkerColor)
               .padding(HarnessMonitorTheme.spacingSM)
-              .accessibilityLabel("Agent TUI \(tuiStatus?.title ?? "")")
+              .accessibilityLabel("Agents \(tuiStatus?.title ?? "")")
               .accessibilityIdentifier(
                 HarnessMonitorAccessibility.sessionAgentTuiMarker(agent.agentId)
               )

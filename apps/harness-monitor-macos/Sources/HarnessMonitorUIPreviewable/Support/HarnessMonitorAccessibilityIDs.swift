@@ -159,7 +159,36 @@ public enum HarnessMonitorAccessibility {
     "harness.session.timeline.pagination.status"
   public static let connectionCard = "harness.preferences.connection-card"
   public static let cornerOverlay = "harness.corner-overlay"
-  public static let agentTuiButton = "harness.session.agent-tui"
+  public static let agentsActionButton = "harness.session.agents"
+  public static let agentTuiButton = agentsActionButton
+  public static let agentsSheet = agentTuiSheet
+  public static let agentsState = agentTuiState
+  public static let agentsCommandRoutingState = agentTuiCommandRoutingState
+  public static let agentsCreateTab = agentTuiCreateTab
+  public static let agentsRuntimePicker = agentTuiRuntimePicker
+  public static let agentsNameField = agentTuiNameField
+  public static let agentsPromptField = agentTuiPromptField
+  public static let agentsProjectDirField = agentTuiProjectDirField
+  public static let agentsArgvField = agentTuiArgvField
+  public static let agentsLaunchPane = agentTuiLaunchPane
+  public static let agentsSessionPane = agentTuiSessionPane
+  public static let agentsViewport = agentTuiViewport
+  public static let agentsInputField = agentTuiInputField
+  public static let agentsInputModePicker = agentTuiInputModePicker
+  public static let agentsRefreshButton = agentTuiRefreshButton
+  public static let agentsStartButton = agentTuiStartButton
+  public static let agentsSendButton = agentTuiSendButton
+  public static let agentsResizeButton = agentTuiResizeButton
+  public static let agentsStopButton = agentTuiStopButton
+  public static let agentsRevealTranscriptButton = agentTuiRevealTranscriptButton
+  public static let agentsRecoveryBanner = agentTuiRecoveryBanner
+  public static let agentsEnableBridgeButton = agentTuiEnableBridgeButton
+  public static let agentsCopyCommandButton = agentTuiCopyCommandButton
+  public static let agentsBackToCreateButton = agentTuiBackToCreateButton
+  public static let agentsWrapToggle = agentTuiWrapToggle
+  public static let agentsNavigateBackButton = agentTuiNavigateBackButton
+  public static let agentsNavigateForwardButton = agentTuiNavigateForwardButton
+  public static let agentsPersonaPicker = agentTuiPersonaPicker
   public static let agentTuiSheet = "harness.sheet.agent-tui"
   public static let agentTuiState = "harness.sheet.agent-tui.state"
   public static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"
@@ -191,18 +220,12 @@ public enum HarnessMonitorAccessibility {
   public static func agentTuiPersonaCard(_ identifier: String) -> String {
     "harness.sheet.agent-tui.persona.\(identifier)"
   }
-  public static let codexFlowButton = "harness.session.codex-flow"
-  public static let codexFlowPlaceholderIcon = "harness.session.codex-flow.placeholder-icon"
-  public static let codexFlowSheet = "harness.sheet.codex-flow"
-  public static let codexFlowPromptField = "harness.sheet.codex-flow.prompt"
-  public static let codexFlowPromptVoiceButton = "harness.sheet.codex-flow.prompt.voice"
-  public static let codexFlowContextField = "harness.sheet.codex-flow.context"
-  public static let codexFlowContextVoiceButton = "harness.sheet.codex-flow.context.voice"
-  public static let codexFlowModePicker = "harness.sheet.codex-flow.mode"
-  public static let codexFlowCancelButton = "harness.sheet.codex-flow.cancel"
-  public static let codexFlowSubmitButton = "harness.sheet.codex-flow.submit"
-  public static let codexFlowSteerButton = "harness.sheet.codex-flow.steer"
-  public static let codexFlowInterruptButton = "harness.sheet.codex-flow.interrupt"
+  public static let agentsCodexPromptField = "harness.window.agents.codex.prompt"
+  public static let agentsCodexContextField = "harness.window.agents.codex.context"
+  public static let agentsCodexModePicker = "harness.window.agents.codex.mode"
+  public static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
+  public static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
+  public static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
   public static let sendSignalSheet = "harness.sheet.send-signal"
   public static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   public static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
@@ -211,11 +234,14 @@ public enum HarnessMonitorAccessibility {
   public static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
   public static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
   public static let preferencesCodexSection = "harness.preferences.codex"
+  public static let preferencesAgentsSection = preferencesCodexSection
   public static let preferencesCodexCopyStartButton = "harness.preferences.codex.copy-start"
   public static let preferencesCodexCopyInstallButton = "harness.preferences.codex.copy-install"
-  public static let codexFlowRecoveryBanner = "harness.sheet.codex-flow.recovery-banner"
-  public static let codexFlowEnableBridgeButton = "harness.sheet.codex-flow.enable-bridge"
-  public static let codexFlowCopyCommandButton = "harness.sheet.codex-flow.copy-command"
+  public static let preferencesAgentsCopyStartButton = preferencesCodexCopyStartButton
+  public static let preferencesAgentsCopyInstallButton = preferencesCodexCopyInstallButton
+  public static let agentsCodexRecoveryBanner = "harness.window.agents.codex.recovery-banner"
+  public static let agentsCodexEnableBridgeButton = "harness.window.agents.codex.enable-bridge"
+  public static let agentsCodexCopyCommandButton = "harness.window.agents.codex.copy-command"
   public static let preferencesDatabaseStatistics = "harness.preferences.database.statistics"
   public static let preferencesDatabaseStatisticsPicker =
     "harness.preferences.database.statistics-picker"
@@ -313,7 +339,7 @@ public enum HarnessMonitorAccessibility {
   }
 
   public static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
-    "harness.sheet.codex-flow.approval.\(slug(approvalID)).\(slug(decision))"
+    "harness.window.agents.codex.approval.\(slug(approvalID)).\(slug(decision))"
   }
 
   public static func agentTuiTab(_ tuiID: String) -> String {

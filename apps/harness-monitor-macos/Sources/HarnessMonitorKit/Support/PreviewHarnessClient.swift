@@ -280,7 +280,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     guard let tui = await state.agentTui(tuiID: tuiID) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
     return tui
   }
@@ -299,7 +299,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   ) async throws -> AgentTuiSnapshot {
     try await performActionDelay()
     guard let updatedTui = await state.sendAgentTuiInput(tuiID: tuiID, request: request) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
     return updatedTui
   }
@@ -310,7 +310,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   ) async throws -> AgentTuiSnapshot {
     try await performActionDelay()
     guard let updatedTui = await state.resizeAgentTui(tuiID: tuiID, request: request) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
     return updatedTui
   }
@@ -318,7 +318,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     try await performActionDelay()
     guard let updatedTui = await state.stopAgentTui(tuiID: tuiID) else {
-      throw HarnessMonitorAPIError.server(code: 404, message: "Agent TUI unavailable.")
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
     return updatedTui
   }
