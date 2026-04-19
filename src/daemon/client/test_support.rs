@@ -63,19 +63,6 @@ pub(crate) fn fake_running_xdg_daemon(
         for _ in 0..2 {
             let (mut stream, _) = listener.accept().expect("accept");
             let request = read_http_request(&mut stream);
-            if request.starts_with("GET /v1/health ") {
-                let request_lower = request.to_ascii_lowercase();
-                assert!(
-                    request_lower.contains(&format!(
-                        "authorization: bearer {}",
-                        token_value.to_ascii_lowercase()
-                    )),
-                    "missing bearer auth: {request}"
-                );
-                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
-                continue;
-            }
-            assert!(request.starts_with("GET /v1/sessions "));
             let request_lower = request.to_ascii_lowercase();
             assert!(
                 request_lower.contains(&format!(
@@ -83,6 +70,23 @@ pub(crate) fn fake_running_xdg_daemon(
                     token_value.to_ascii_lowercase()
                 )),
                 "missing bearer auth: {request}"
+            );
+            if request.starts_with("GET /v1/health ") {
+                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
+                continue;
+            }
+            if request.starts_with("GET /v1/ready ") {
+                write_http_response(
+                    &mut stream,
+                    "200 OK",
+                    "application/json",
+                    "{\"ready\":true,\"daemon_epoch\":\"test\"}",
+                );
+                continue;
+            }
+            assert!(
+                request.starts_with("GET /v1/sessions "),
+                "unexpected probe request: {request}"
             );
             write_http_response(&mut stream, "200 OK", "application/json", "[]");
         }

@@ -53,15 +53,17 @@ fn parse_error_response_handles_plain_text() {
 }
 
 #[test]
-fn wait_for_authenticated_api_retries_until_sessions_endpoint_succeeds() {
+fn wait_for_authenticated_api_retries_ready_probe_until_it_succeeds() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
     let saw_auth = Arc::new(AtomicBool::new(false));
-    let session_calls = Arc::new(AtomicUsize::new(0));
+    let probe_calls = Arc::new(AtomicUsize::new(0));
+    let paths = Arc::new(Mutex::new(Vec::<String>::new()));
 
     let server = {
         let saw_auth = Arc::clone(&saw_auth);
-        let session_calls = Arc::clone(&session_calls);
+        let probe_calls = Arc::clone(&probe_calls);
+        let paths = Arc::clone(&paths);
         thread::spawn(move || {
             for _ in 0..2 {
                 let (mut stream, _) = listener.accept().expect("accept");
@@ -72,7 +74,11 @@ fn wait_for_authenticated_api_retries_until_sessions_endpoint_succeeds() {
                 {
                     saw_auth.store(true, Ordering::SeqCst);
                 }
-                let call_index = session_calls.fetch_add(1, Ordering::SeqCst);
+                paths
+                    .lock()
+                    .expect("paths lock")
+                    .push(request_path(&request));
+                let call_index = probe_calls.fetch_add(1, Ordering::SeqCst);
                 if call_index == 0 {
                     write_http_response(
                         &mut stream,
@@ -81,7 +87,12 @@ fn wait_for_authenticated_api_retries_until_sessions_endpoint_succeeds() {
                         "{\"error\":\"warming up\"}",
                     );
                 } else {
-                    write_http_response(&mut stream, "200 OK", "application/json", "[]");
+                    write_http_response(
+                        &mut stream,
+                        "200 OK",
+                        "application/json",
+                        "{\"ready\":true,\"daemon_epoch\":\"test\"}",
+                    );
                 }
             }
         })
@@ -97,23 +108,68 @@ fn wait_for_authenticated_api_retries_until_sessions_endpoint_succeeds() {
         Duration::from_millis(250)
     ));
     assert!(saw_auth.load(Ordering::SeqCst));
-    assert_eq!(session_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(probe_calls.load(Ordering::SeqCst), 2);
+    let observed = paths.lock().expect("paths lock").clone();
+    assert_eq!(observed, vec!["/v1/ready", "/v1/ready"]);
     server.join().expect("server");
 }
 
 #[test]
-fn wait_for_authenticated_api_returns_false_when_sessions_endpoint_never_recovers() {
+fn wait_for_authenticated_api_falls_back_to_sessions_when_ready_endpoint_is_missing() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
-    let session_calls = Arc::new(AtomicUsize::new(0));
+    let paths = Arc::new(Mutex::new(Vec::<String>::new()));
 
     let server = {
-        let session_calls = Arc::clone(&session_calls);
+        let paths = Arc::clone(&paths);
+        thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().expect("accept");
+                let request = read_http_request(&mut stream);
+                let path = request_path(&request);
+                paths.lock().expect("paths lock").push(path.clone());
+                if path == "/v1/ready" {
+                    write_http_response(
+                        &mut stream,
+                        "404 Not Found",
+                        "application/json",
+                        "{\"error\":\"not found\"}",
+                    );
+                } else {
+                    assert_eq!(path, "/v1/sessions", "unexpected fallback path: {path}");
+                    write_http_response(&mut stream, "200 OK", "application/json", "[]");
+                }
+            }
+        })
+    };
+
+    let client = DaemonClient {
+        endpoint,
+        token: "test-token".to_string(),
+        http: reqwest::Client::new(),
+    };
+    assert!(wait_for_authenticated_api(
+        &client,
+        Duration::from_millis(250)
+    ));
+    let observed = paths.lock().expect("paths lock").clone();
+    assert_eq!(observed, vec!["/v1/ready", "/v1/sessions"]);
+    server.join().expect("server");
+}
+
+#[test]
+fn wait_for_authenticated_api_returns_false_when_probe_never_recovers() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let probe_calls = Arc::new(AtomicUsize::new(0));
+
+    let server = {
+        let probe_calls = Arc::clone(&probe_calls);
         thread::spawn(move || {
             for _ in 0..3 {
                 let (mut stream, _) = listener.accept().expect("accept");
                 let _request = read_http_request(&mut stream);
-                session_calls.fetch_add(1, Ordering::SeqCst);
+                probe_calls.fetch_add(1, Ordering::SeqCst);
                 write_http_response(
                     &mut stream,
                     "503 Service Unavailable",
@@ -133,8 +189,15 @@ fn wait_for_authenticated_api_returns_false_when_sessions_endpoint_never_recover
         &client,
         Duration::from_millis(250)
     ));
-    assert!(session_calls.load(Ordering::SeqCst) >= 2);
+    assert!(probe_calls.load(Ordering::SeqCst) >= 2);
     server.join().expect("server");
+}
+
+fn request_path(request: &str) -> String {
+    let first_line = request.lines().next().unwrap_or_default();
+    let mut parts = first_line.split_whitespace();
+    let _method = parts.next();
+    parts.next().unwrap_or_default().to_string()
 }
 
 #[test]
