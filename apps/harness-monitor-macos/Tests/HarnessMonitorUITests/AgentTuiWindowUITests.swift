@@ -267,6 +267,18 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testTerminalModelPickerVisibleInCreatePane() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+
+    let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
+    XCTAssertTrue(
+      waitForElement(picker, timeout: Self.uiTimeout),
+      "Terminal model picker should be visible in create pane"
+    )
+  }
+
   func testStartingWithDefaultPersonaStartsTui() throws {
     let app = launchInCockpitPreview()
 

@@ -340,6 +340,29 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     ]
   }
 
+  public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
+    [
+      RuntimeModelCatalog(
+        runtime: "codex",
+        models: [
+          RuntimeModel(id: "o4-mini", displayName: "o4-mini", tier: .fast),
+          RuntimeModel(id: "gpt-5-codex", displayName: "GPT-5 Codex", tier: .balanced),
+        ],
+        default: "gpt-5-codex",
+        cheapestFastest: "o4-mini"
+      ),
+      RuntimeModelCatalog(
+        runtime: "claude",
+        models: [
+          RuntimeModel(id: "claude-haiku-4-5", displayName: "Haiku 4.5", tier: .fast),
+          RuntimeModel(id: "claude-sonnet-4-6", displayName: "Sonnet 4.6", tier: .balanced),
+        ],
+        default: "claude-sonnet-4-6",
+        cheapestFastest: "claude-haiku-4-5"
+      ),
+    ]
+  }
+
   public func logLevel() async throws -> LogLevelResponse {
     LogLevelResponse(
       level: HarnessMonitorLogger.defaultDaemonLogLevel,
