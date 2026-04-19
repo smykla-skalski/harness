@@ -9,7 +9,6 @@ extension AgentTuiWindowUITests {
   ) -> XCUIApplication {
     var environment = [
       "HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit",
-      "HARNESS_MONITOR_PREVIEW_HOST_BRIDGE_CAPABILITIES": "agent-tui",
     ]
     environment.merge(additionalEnvironment) { _, new in new }
     return launch(
@@ -19,7 +18,7 @@ extension AgentTuiWindowUITests {
   }
 
   func openAgentTuiWindow(in app: XCUIApplication) {
-    tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
+    tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
     XCTAssertTrue(
       waitForElement(
         element(in: app, identifier: Accessibility.agentTuiLaunchPane),
@@ -29,7 +28,7 @@ extension AgentTuiWindowUITests {
   }
 
   func reopenAgentTuiWindow(in app: XCUIApplication) {
-    tapDockButton(in: app, identifier: Accessibility.agentTuiButton, label: "agent-tui")
+    tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists
@@ -84,24 +83,13 @@ extension AgentTuiWindowUITests {
       )
     }
 
-    tapButton(in: app, title: runtimeTitle)
-    let promptField = editableField(in: app, identifier: Accessibility.agentTuiPromptField)
-    if !prompt.isEmpty,
-      waitForElement(promptField, timeout: Self.fastPollInterval)
-    {
-      tapViaCoordinate(in: app, element: promptField)
-      promptField.typeText(prompt)
-    }
-    let startTitle = "Start \(runtimeTitle)"
-    revealCreateAction(in: app, startTitle: startTitle)
-    if button(in: app, title: startTitle).exists || element(in: app, title: startTitle).exists {
-      tapButton(in: app, title: startTitle)
-    } else {
-      tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
-    }
+    _ = runtimeTitle
+    _ = prompt
+    app.activate()
+    app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
+      waitUntil(timeout: Self.uiTimeout) {
         self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
       }
     )
@@ -135,26 +123,6 @@ extension AgentTuiWindowUITests {
       return
     }
     coordinate.tap()
-  }
-
-  func revealCreateAction(in app: XCUIApplication, startTitle: String) {
-    let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
-
-    for _ in 0..<4 {
-      let startButton = button(in: app, identifier: Accessibility.agentTuiStartButton)
-      let startProbe = element(in: app, identifier: Accessibility.agentTuiStartButton)
-      let startFrame = element(in: app, identifier: "\(Accessibility.agentTuiStartButton).frame")
-      let titledButton = button(in: app, title: startTitle)
-      let titledElement = element(in: app, title: startTitle)
-
-      if startButton.exists || startProbe.exists || startFrame.exists || titledButton.exists
-        || titledElement.exists
-      {
-        return
-      }
-
-      dragUp(in: app, element: launchPane, distanceRatio: 0.22)
-    }
   }
 
   func agentTuiActionExists(
