@@ -167,14 +167,14 @@ extension HarnessMonitorStore {
       ?? preferredCodexRun(from: selectedCodexRuns)
   }
 
-  func applyCodexRun(_ run: CodexRunSnapshot) {
+  func applyCodexRun(_ run: CodexRunSnapshot, selectingRun: Bool = false) {
     guard run.sessionId == selectedSessionID else {
       return
     }
 
     let runs = upsertingCodexRun(run, into: selectedCodexRuns)
     selectedCodexRuns = runs
-    if selectedCodexRun?.runId == run.runId || selectedCodexRun == nil {
+    if selectingRun || selectedCodexRun?.runId == run.runId || selectedCodexRun == nil {
       selectedCodexRun = run
     }
   }
@@ -311,7 +311,7 @@ extension HarnessMonitorStore {
   private func applyCodexRunStartSuccess(_ run: CodexRunSnapshot) {
     recordRequestSuccess()
     clearHostBridgeIssue(for: "codex")
-    applyCodexRun(run)
+    applyCodexRun(run, selectingRun: true)
     presentSuccessFeedback("Codex run started")
   }
 
