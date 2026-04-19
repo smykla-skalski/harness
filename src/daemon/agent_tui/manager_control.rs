@@ -216,7 +216,7 @@ impl AgentTuiManagerHandle {
         Ok(stopped)
     }
 
-    /// Signal that an agent TUI is ready to accept input.
+    /// Signal that a terminal agent is ready to accept input.
     ///
     /// Called by the `SessionStart` hook callback. Sets the readiness condvar
     /// so the deferred join thread can proceed. Idempotent - calling twice is
@@ -232,7 +232,7 @@ impl AgentTuiManagerHandle {
     pub fn signal_ready(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let process = self.active_process(tui_id)?;
         signal_readiness_ready(&process.readiness_signal());
-        tracing::info!(tui_id = %tui_id, "agent TUI readiness signaled via callback");
+        tracing::info!(tui_id = %tui_id, "terminal agent readiness signaled via callback");
         self.get(tui_id)
     }
 }

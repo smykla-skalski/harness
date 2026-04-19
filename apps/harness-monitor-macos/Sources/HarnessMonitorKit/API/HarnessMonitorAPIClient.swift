@@ -201,30 +201,106 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/sessions/\(sessionID)/observe", body: request)
   }
 
+  public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
+    try await get("/v1/sessions/\(sessionID)/managed-agents")
+  }
+
+  public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    try await get("/v1/managed-agents/\(agentID)")
+  }
+
+  public func startManagedTerminalAgent(
+    sessionID: String,
+    request: AgentTuiStartRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/sessions/\(sessionID)/managed-agents/terminal", body: request)
+  }
+
+  public func startManagedCodexAgent(
+    sessionID: String,
+    request: CodexRunRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/sessions/\(sessionID)/managed-agents/codex", body: request)
+  }
+
+  public func sendManagedAgentInput(
+    agentID: String,
+    request: AgentTuiInputRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/managed-agents/\(agentID)/input", body: request)
+  }
+
+  public func resizeManagedAgent(
+    agentID: String,
+    request: AgentTuiResizeRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/managed-agents/\(agentID)/resize", body: request)
+  }
+
+  public func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/managed-agents/\(agentID)/stop", body: EmptyBody())
+  }
+
+  public func steerManagedCodexAgent(
+    agentID: String,
+    request: CodexSteerRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/managed-agents/\(agentID)/steer", body: request)
+  }
+
+  public func interruptManagedCodexAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/managed-agents/\(agentID)/interrupt", body: EmptyBody())
+  }
+
+  public func resolveManagedCodexApproval(
+    agentID: String,
+    approvalID: String,
+    request: CodexApprovalDecisionRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await post("/v1/managed-agents/\(agentID)/approvals/\(approvalID)", body: request)
+  }
+
   public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
-    try await get("/v1/sessions/\(sessionID)/codex-runs")
+    let agents = try await managedAgents(sessionID: sessionID)
+    return CodexRunListResponse(runs: agents.agents.compactMap { $0.codex })
   }
 
   public func codexRun(runID: String) async throws -> CodexRunSnapshot {
-    try await get("/v1/codex-runs/\(runID)")
+    let snapshot = try await managedAgent(agentID: runID)
+    guard let codex = snapshot.codex else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+    }
+    return codex
   }
 
   public func startCodexRun(
     sessionID: String,
     request: CodexRunRequest
   ) async throws -> CodexRunSnapshot {
-    try await post("/v1/sessions/\(sessionID)/codex-runs", body: request)
+    let snapshot = try await startManagedCodexAgent(sessionID: sessionID, request: request)
+    guard let codex = snapshot.codex else {
+      throw HarnessMonitorAPIError.server(code: 500, message: "Managed Codex agent did not return a Codex snapshot.")
+    }
+    return codex
   }
 
   public func steerCodexRun(
     runID: String,
     request: CodexSteerRequest
   ) async throws -> CodexRunSnapshot {
-    try await post("/v1/codex-runs/\(runID)/steer", body: request)
+    let snapshot = try await steerManagedCodexAgent(agentID: runID, request: request)
+    guard let codex = snapshot.codex else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+    }
+    return codex
   }
 
   public func interruptCodexRun(runID: String) async throws -> CodexRunSnapshot {
-    try await post("/v1/codex-runs/\(runID)/interrupt", body: EmptyBody())
+    let snapshot = try await interruptManagedCodexAgent(agentID: runID)
+    guard let codex = snapshot.codex else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+    }
+    return codex
   }
 
   public func resolveCodexApproval(
@@ -232,40 +308,72 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     approvalID: String,
     request: CodexApprovalDecisionRequest
   ) async throws -> CodexRunSnapshot {
-    try await post("/v1/codex-runs/\(runID)/approvals/\(approvalID)", body: request)
+    let snapshot = try await resolveManagedCodexApproval(
+      agentID: runID,
+      approvalID: approvalID,
+      request: request
+    )
+    guard let codex = snapshot.codex else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+    }
+    return codex
   }
 
   public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
-    try await get("/v1/sessions/\(sessionID)/agent-tuis")
+    let agents = try await managedAgents(sessionID: sessionID)
+    return AgentTuiListResponse(tuis: agents.agents.compactMap { $0.terminal })
   }
 
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
-    try await get("/v1/agent-tuis/\(tuiID)")
+    let snapshot = try await managedAgent(agentID: tuiID)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func startAgentTui(
     sessionID: String,
     request: AgentTuiStartRequest
   ) async throws -> AgentTuiSnapshot {
-    try await post("/v1/sessions/\(sessionID)/agent-tuis", body: request)
+    let snapshot = try await startManagedTerminalAgent(sessionID: sessionID, request: request)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(
+        code: 500,
+        message: "Managed agent start did not return a terminal snapshot."
+      )
+    }
+    return tui
   }
 
   public func sendAgentTuiInput(
     tuiID: String,
     request: AgentTuiInputRequest
   ) async throws -> AgentTuiSnapshot {
-    try await post("/v1/agent-tuis/\(tuiID)/input", body: request)
+    let snapshot = try await sendManagedAgentInput(agentID: tuiID, request: request)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func resizeAgentTui(
     tuiID: String,
     request: AgentTuiResizeRequest
   ) async throws -> AgentTuiSnapshot {
-    try await post("/v1/agent-tuis/\(tuiID)/resize", body: request)
+    let snapshot = try await resizeManagedAgent(agentID: tuiID, request: request)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
-    try await post("/v1/agent-tuis/\(tuiID)/stop", body: EmptyBody())
+    let snapshot = try await stopManagedAgent(agentID: tuiID)
+    guard let tui = snapshot.terminal else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
+    }
+    return tui
   }
 
   public func startVoiceSession(

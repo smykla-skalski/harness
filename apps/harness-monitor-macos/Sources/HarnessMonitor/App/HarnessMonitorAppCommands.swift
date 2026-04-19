@@ -41,7 +41,7 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var canNavigateBack: Bool {
     switch activeWindowNavigationScope {
-    case .agentTui:
+    case .agents:
       agentTuiNavigationBridge.state.canGoBack
     case .main:
       displayState.canNavigateBack
@@ -50,7 +50,7 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var canNavigateForward: Bool {
     switch activeWindowNavigationScope {
-    case .agentTui:
+    case .agents:
       agentTuiNavigationBridge.state.canGoForward
     case .main:
       displayState.canNavigateForward
@@ -164,7 +164,7 @@ struct HarnessMonitorAppCommands: Commands {
     let scope = activeWindowNavigationScope
     Task {
       switch scope {
-      case .agentTui:
+      case .agents:
         await agentTuiNavigationBridge.navigateBack()
       case .main:
         await store.navigateBack()
@@ -176,7 +176,7 @@ struct HarnessMonitorAppCommands: Commands {
     let scope = activeWindowNavigationScope
     Task {
       switch scope {
-      case .agentTui:
+      case .agents:
         await agentTuiNavigationBridge.navigateForward()
       case .main:
         await store.navigateForward()

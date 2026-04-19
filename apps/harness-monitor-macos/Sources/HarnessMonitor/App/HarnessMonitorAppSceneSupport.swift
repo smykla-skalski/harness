@@ -257,8 +257,8 @@ struct AgentTuiWindowRootView: View {
   private var commandRoutingStateText: String {
     let scopeLabel =
       switch windowCommandRouting.activeScope {
-      case .agentTui:
-        "agentTui"
+      case .agents:
+        "agents"
       case .main:
         "main"
       case nil:
@@ -283,7 +283,7 @@ struct AgentTuiWindowRootView: View {
       )
       .modifier(
         WindowCommandScopeTrackingModifier(
-          scope: .agentTui,
+          scope: .agents,
           routingState: windowCommandRouting
         )
       )
@@ -299,7 +299,7 @@ struct AgentTuiWindowRootView: View {
       .overlay {
         if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
           AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.agentTuiCommandRoutingState,
+            identifier: HarnessMonitorAccessibility.agentsCommandRoutingState,
             text: commandRoutingStateText
           )
         }

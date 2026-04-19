@@ -165,7 +165,7 @@ impl BridgeClient {
         parse_bridge_payload(payload)
     }
 
-    /// Start one bridge-managed agent TUI session.
+    /// Start one bridge-managed terminal agent session.
     ///
     /// # Errors
     /// Returns [`CliError`] when the bridge rejects the request or the payload
@@ -174,7 +174,7 @@ impl BridgeClient {
         self.typed_capability_request(BridgeCapability::AgentTui, "start", spec)
     }
 
-    /// Load the latest snapshot for one bridge-managed agent TUI.
+    /// Load the latest snapshot for one bridge-managed terminal agent.
     ///
     /// # Errors
     /// Returns [`CliError`] when the bridge rejects the request or the payload
@@ -189,7 +189,7 @@ impl BridgeClient {
         )
     }
 
-    /// Send keyboard-like input to one bridge-managed agent TUI.
+    /// Send keyboard-like input to one bridge-managed terminal agent.
     ///
     /// # Errors
     /// Returns [`CliError`] when the bridge rejects the request or the payload
@@ -209,7 +209,7 @@ impl BridgeClient {
         )
     }
 
-    /// Resize one bridge-managed agent TUI.
+    /// Resize one bridge-managed terminal agent.
     ///
     /// # Errors
     /// Returns [`CliError`] when the bridge rejects the request or the payload
@@ -229,7 +229,7 @@ impl BridgeClient {
         )
     }
 
-    /// Stop one bridge-managed agent TUI.
+    /// Stop one bridge-managed terminal agent.
     ///
     /// # Errors
     /// Returns [`CliError`] when the bridge rejects the request or the payload
@@ -244,7 +244,7 @@ impl BridgeClient {
         )
     }
 
-    /// Attach to one bridge-managed agent TUI.
+    /// Attach to one bridge-managed terminal agent.
     /// Returns the raw socket for streaming output.
     ///
     /// # Errors

@@ -31,7 +31,7 @@ fn launch_profile_rejects_unknown_runtime() {
     assert!(
         error
             .to_string()
-            .contains("unsupported agent TUI runtime 'unknown'")
+            .contains("unsupported terminal agent runtime 'unknown'")
     );
 }
 
@@ -40,7 +40,7 @@ fn launch_profile_override_rejects_empty_argv() {
     let error =
         AgentTuiLaunchProfile::from_argv("codex", Vec::new()).expect_err("argv should fail");
 
-    assert!(error.to_string().contains("agent TUI argv cannot be empty"));
+    assert!(error.to_string().contains("terminal agent argv cannot be empty"));
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn launch_profile_override_rejects_empty_program() {
     assert!(
         error
             .to_string()
-            .contains("agent TUI argv[0] cannot be empty")
+            .contains("terminal agent argv[0] cannot be empty")
     );
 }
 
@@ -120,7 +120,7 @@ fn size_rejects_zero_dimensions() {
     assert!(
         error
             .to_string()
-            .contains("agent TUI rows and cols must be greater than zero")
+            .contains("terminal agent rows and cols must be greater than zero")
     );
 }
 

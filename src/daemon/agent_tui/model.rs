@@ -12,7 +12,7 @@ use super::process::AgentTuiProcess;
 use super::screen::TerminalScreenSnapshot;
 use super::{DEFAULT_COLS, DEFAULT_ROWS};
 
-/// Terminal dimensions used when spawning or resizing an agent TUI.
+/// Terminal dimensions used when spawning or resizing a terminal agent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiSize {
     pub rows: u16,
@@ -36,7 +36,7 @@ impl AgentTuiSize {
     pub fn validate(self) -> Result<Self, CliError> {
         if self.rows == 0 || self.cols == 0 {
             return Err(CliErrorKind::workflow_parse(
-                "agent TUI rows and cols must be greater than zero",
+                "terminal agent rows and cols must be greater than zero",
             )
             .into());
         }
@@ -78,7 +78,7 @@ impl AgentTuiLaunchProfile {
             "vibe" => "vibe",
             _ => {
                 return Err(CliErrorKind::workflow_parse(format!(
-                    "unsupported agent TUI runtime '{runtime}'"
+                    "unsupported terminal agent runtime '{runtime}'"
                 ))
                 .into());
             }
@@ -96,13 +96,17 @@ impl AgentTuiLaunchProfile {
     pub fn from_argv(runtime: &str, argv: Vec<String>) -> Result<Self, CliError> {
         let runtime = runtime.trim();
         if runtime.is_empty() {
-            return Err(CliErrorKind::workflow_parse("agent TUI runtime cannot be empty").into());
+            return Err(
+                CliErrorKind::workflow_parse("terminal agent runtime cannot be empty").into()
+            );
         }
         let Some(program) = argv.first().map(|value| value.trim()) else {
-            return Err(CliErrorKind::workflow_parse("agent TUI argv cannot be empty").into());
+            return Err(CliErrorKind::workflow_parse("terminal agent argv cannot be empty").into());
         };
         if program.is_empty() {
-            return Err(CliErrorKind::workflow_parse("agent TUI argv[0] cannot be empty").into());
+            return Err(
+                CliErrorKind::workflow_parse("terminal agent argv[0] cannot be empty").into()
+            );
         }
         Ok(Self {
             runtime: runtime.to_string(),
@@ -111,7 +115,7 @@ impl AgentTuiLaunchProfile {
     }
 }
 
-/// Fully resolved process spawn request for a managed agent TUI.
+/// Fully resolved process spawn request for a managed terminal agent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentTuiSpawnSpec {
     pub profile: AgentTuiLaunchProfile,
@@ -158,7 +162,7 @@ impl AgentTuiSpawnSpec {
 
 /// PTY backend boundary used by the TUI manager.
 pub trait AgentTuiBackend {
-    /// Spawn an interactive agent TUI inside a PTY.
+    /// Spawn an interactive terminal agent inside a PTY.
     ///
     /// # Errors
     /// Returns a workflow I/O error if PTY allocation or process spawning fails.
@@ -175,7 +179,7 @@ impl AgentTuiBackend for PortablePtyAgentTuiBackend {
     }
 }
 
-/// Lifecycle status for a managed agent TUI process.
+/// Lifecycle status for a managed terminal agent process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentTuiStatus {
@@ -205,16 +209,16 @@ impl AgentTuiStatus {
             "exited" => Ok(Self::Exited),
             "failed" => Ok(Self::Failed),
             "stopped" => Ok(Self::Stopped),
-            _ => Err(format!("unknown agent TUI status '{value}'")),
+            _ => Err(format!("unknown terminal agent status '{value}'")),
         }
     }
 }
 
 pub(super) const fn session_disconnect_reason(status: AgentTuiStatus) -> Option<&'static str> {
     match status {
-        AgentTuiStatus::Exited => Some("managed agent TUI exited"),
-        AgentTuiStatus::Failed => Some("managed agent TUI failed"),
-        AgentTuiStatus::Stopped => Some("managed agent TUI stopped"),
+        AgentTuiStatus::Exited => Some("managed terminal agent exited"),
+        AgentTuiStatus::Failed => Some("managed terminal agent failed"),
+        AgentTuiStatus::Stopped => Some("managed terminal agent stopped"),
         AgentTuiStatus::Starting | AgentTuiStatus::Running => None,
     }
 }
@@ -272,13 +276,13 @@ impl AgentTuiStartRequest {
     }
 }
 
-/// Request body for sending keyboard-like input into an active agent TUI.
+/// Request body for sending keyboard-like input into an active terminal agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiInputRequest {
     pub input: super::input::AgentTuiInput,
 }
 
-/// Request body for resizing an active agent TUI PTY.
+/// Request body for resizing an active terminal agent PTY.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiResizeRequest {
     pub rows: u16,
@@ -299,7 +303,7 @@ impl AgentTuiResizeRequest {
     }
 }
 
-/// List response for managed agent TUI snapshots.
+/// List response for managed terminal agent snapshots.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiListResponse {
     pub tuis: Vec<AgentTuiSnapshot>,

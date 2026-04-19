@@ -52,3 +52,59 @@ struct AgentTuiSidebarRow: View {
     )
   }
 }
+
+struct CodexRunSidebarRow: View {
+  let snapshot: CodexRunSnapshot
+  let title: String
+
+  private var statusColor: Color {
+    switch snapshot.status {
+    case .running:
+      .green
+    case .waitingApproval:
+      .orange
+    case .queued:
+      .yellow
+    case .completed:
+      .secondary
+    case .failed, .cancelled:
+      .red
+    }
+  }
+
+  private var symbolName: String {
+    switch snapshot.status {
+    case .waitingApproval:
+      "hand.raised.fill"
+    case .completed:
+      "checkmark.circle.fill"
+    case .failed, .cancelled:
+      "xmark.octagon.fill"
+    case .queued, .running:
+      "sparkles"
+    }
+  }
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+      Image(systemName: symbolName)
+        .imageScale(.large)
+        .foregroundStyle(statusColor)
+        .accessibilityHidden(true)
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .scaledFont(.body)
+          .lineLimit(1)
+          .truncationMode(.tail)
+        Text(snapshot.status.title)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(title), Codex, \(snapshot.status.title)")
+  }
+}

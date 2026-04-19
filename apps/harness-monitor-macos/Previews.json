@@ -16,7 +16,7 @@
     },
     {
       "id": "AgentTuiWindowView",
-      "description": "Agent TUI window with terminal + sidebar",
+      "description": "Agents window with terminal + sidebar",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/AgentTuiWindowViewPreviews.swift",
       "index": 0
     },

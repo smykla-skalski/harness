@@ -270,7 +270,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
     #expect(store.selectedAgentTuis.isEmpty)
     #expect(store.selectedAgentTui == nil)
-    #expect(store.currentSuccessFeedbackMessage == "Disabled Agent TUI host bridge")
+    #expect(store.currentSuccessFeedbackMessage == "Disabled Agents host bridge")
   }
 
 }

@@ -62,7 +62,7 @@ pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Res
     let path_env = var("PATH").unwrap_or_default();
     wrapper::main_with_home(project_dir, &path_env, &host_home_dir())?;
     let agent = hook_agent_for_runtime_name(runtime).ok_or_else(|| {
-        CliErrorKind::workflow_parse(format!("unsupported agent TUI runtime '{runtime}'"))
+        CliErrorKind::workflow_parse(format!("unsupported terminal agent runtime '{runtime}'"))
     })?;
     let _ = wrapper::write_agent_bootstrap(project_dir, agent)?;
     Ok(())
@@ -77,7 +77,7 @@ pub(crate) fn wait_for_readiness(process: &AgentTuiProcess, runtime: &str, tui_i
         tracing::warn!(
             runtime = %runtime,
             tui_id = %tui_id,
-            "agent TUI readiness timeout, sending join message anyway"
+            "terminal agent readiness timeout, sending join message anyway"
         );
     }
 }
@@ -169,7 +169,7 @@ pub(crate) fn build_auto_join_prompt(
 }
 
 /// Return per-runtime argv entries that make the harness session plugin
-/// discoverable when the agent TUI starts.
+/// discoverable when the terminal agent starts.
 pub(crate) fn skill_directory_flags(runtime: &str, project_dir: &Path) -> Vec<String> {
     match runtime {
         "claude" => {
@@ -251,7 +251,7 @@ fn resolve_agent_tui_program(runtime: &str, program: &str) -> Option<PathBuf> {
 
 fn agent_tui_spawn_path(runtime: &str) -> Option<OsString> {
     let dirs = agent_tui_search_dirs(runtime);
-    (!dirs.is_empty()).then(|| join_paths(dirs).expect("agent TUI PATH entries serialize"))
+    (!dirs.is_empty()).then(|| join_paths(dirs).expect("terminal agent PATH entries serialize"))
 }
 
 fn agent_tui_search_dirs(runtime: &str) -> Vec<PathBuf> {

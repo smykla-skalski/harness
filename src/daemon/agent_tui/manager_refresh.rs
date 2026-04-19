@@ -36,7 +36,7 @@ impl AgentTuiManagerHandle {
     pub(super) fn active(
         &self,
     ) -> Result<MutexGuard<'_, BTreeMap<String, ActiveAgentTui>>, CliError> {
-        lock(&self.state.active, "agent TUI active process map")
+        lock(&self.state.active, "terminal agent active process map")
     }
 
     pub(super) fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
@@ -57,7 +57,7 @@ impl AgentTuiManagerHandle {
                         .build()
                         .map_err(|error| {
                             CliError::from(CliErrorKind::workflow_io(format!(
-                                "build async agent TUI bridge runtime: {error}"
+                                "build async terminal agent bridge runtime: {error}"
                             )))
                         })?
                         .block_on(future)
@@ -65,7 +65,7 @@ impl AgentTuiManagerHandle {
                 .join()
                 .map_err(|_| {
                     CliError::from(CliErrorKind::workflow_io(
-                        "join async agent TUI bridge thread",
+                        "join async terminal agent bridge thread",
                     ))
                 })
                 .and_then(identity),
@@ -83,7 +83,9 @@ impl AgentTuiManagerHandle {
             .get(tui_id)
             .and_then(|active| active.process.clone())
             .ok_or_else(|| {
-                CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' is not active"))
+                CliErrorKind::session_not_active(format!(
+                    "terminal agent '{tui_id}' is not active"
+                ))
                     .into()
             })
     }
@@ -103,7 +105,9 @@ impl AgentTuiManagerHandle {
         let tui_id_owned = tui_id.to_string();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
             async_db.agent_tui(&tui_id_owned).await?.ok_or_else(|| {
-                CliErrorKind::session_not_active(format!("agent TUI '{tui_id_owned}' not found"))
+                CliErrorKind::session_not_active(format!(
+                    "terminal agent '{tui_id_owned}' not found"
+                ))
                     .into()
             })
         }) {
@@ -111,7 +115,7 @@ impl AgentTuiManagerHandle {
         }
         let db = self.db()?;
         lock_db(&db)?.agent_tui(tui_id)?.ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("agent TUI '{tui_id}' not found")).into()
+            CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' not found")).into()
         })
     }
 
@@ -298,7 +302,7 @@ impl AgentTuiManagerHandle {
         reason = "tracing macro expansion in a leaf logging helper"
     )]
     fn warn_live_refresh_failure(tui_id: &str, error: &CliError) {
-        tracing::warn!(tui_id = %tui_id, %error, "agent TUI live refresh failed");
+        tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
     }
 
     pub(super) fn save_and_broadcast(
@@ -318,7 +322,7 @@ impl AgentTuiManagerHandle {
         }
         let session_id = snapshot.session_id.clone();
         let payload = serde_json::to_value(&snapshot).map_err(|error| {
-            CliErrorKind::workflow_serialize(format!("serialize agent TUI event: {error}"))
+            CliErrorKind::workflow_serialize(format!("serialize terminal agent event: {error}"))
         })?;
         let event = StreamEvent {
             event: event_name.to_string(),

@@ -120,13 +120,13 @@ pub(super) fn persist_transcript(
 ) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
         fs_err::create_dir_all(parent).map_err(|error| {
-            CliErrorKind::workflow_io(format!("create agent TUI transcript dir: {error}"))
+            CliErrorKind::workflow_io(format!("create terminal agent transcript dir: {error}"))
         })?;
     }
 
     if transcript.len() < *persisted_len {
         fs_err::write(path, transcript).map_err(|error| {
-            CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}"))
+            CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
         })?;
         *persisted_len = transcript.len();
         return Ok(());
@@ -135,7 +135,7 @@ pub(super) fn persist_transcript(
     if transcript.len() == *persisted_len {
         if *persisted_len == 0 && !path.exists() {
             fs_err::write(path, transcript).map_err(|error| {
-                CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}"))
+                CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
             })?;
         }
         return Ok(());
@@ -143,7 +143,7 @@ pub(super) fn persist_transcript(
 
     if *persisted_len == 0 || !path.exists() {
         fs_err::write(path, transcript).map_err(|error| {
-            CliErrorKind::workflow_io(format!("write agent TUI transcript: {error}"))
+            CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
         })?;
     } else {
         let mut file = fs_err::OpenOptions::new()
@@ -151,11 +151,11 @@ pub(super) fn persist_transcript(
             .create(true)
             .open(path)
             .map_err(|error| {
-                CliErrorKind::workflow_io(format!("open agent TUI transcript: {error}"))
+                CliErrorKind::workflow_io(format!("open terminal agent transcript: {error}"))
             })?;
         file.write_all(&transcript[*persisted_len..])
             .map_err(|error| {
-                CliErrorKind::workflow_io(format!("append agent TUI transcript: {error}"))
+                CliErrorKind::workflow_io(format!("append terminal agent transcript: {error}"))
             })?;
     }
 
