@@ -51,7 +51,10 @@ pub(super) fn read_hook_payload(
 ) -> Result<Vec<u8>, i32> {
     let _read_span = tracing::debug_span!("harness.hook.read_input").entered();
     super::read_hook_input_bytes(metadata.hook).map_err(|error| {
-        let message = format!("`{}` received invalid hook payload: {error}", metadata.hook_name);
+        let message = format!(
+            "`{}` received invalid hook payload: {error}",
+            metadata.hook_name
+        );
         finish_hook_observation(
             metadata.span,
             metadata.hook_name,
@@ -59,7 +62,13 @@ pub(super) fn read_hook_payload(
             "invalid-input",
             metadata.started_at,
         );
-        super::render_runtime_error(metadata.agent, metadata.hook_impl, event, "KSH001", &message)
+        super::render_runtime_error(
+            metadata.agent,
+            metadata.hook_impl,
+            event,
+            "KSH001",
+            &message,
+        )
     })
 }
 
@@ -75,7 +84,10 @@ fn normalize_hook_payload(
             Ok(prepare_normalized_context(context, metadata.skill, event))
         }
         Err(error) => {
-            let message = format!("`{}` received invalid hook payload: {error}", metadata.hook_name);
+            let message = format!(
+                "`{}` received invalid hook payload: {error}",
+                metadata.hook_name
+            );
             finish_hook_observation(
                 metadata.span,
                 metadata.hook_name,
@@ -115,7 +127,9 @@ pub(super) fn execute_hook_with_observability(
         Ok(result) => result,
         Err(error) => {
             let detail = super::format_hook_error_detail(hook_impl, &error);
-            NormalizedHookResult::from_hook_result(hook_runtime_result(hook_impl, "KSH002", &detail))
+            NormalizedHookResult::from_hook_result(hook_runtime_result(
+                hook_impl, "KSH002", &detail,
+            ))
         }
     }
 }
@@ -161,7 +175,10 @@ pub(super) fn record_hook_event_failure(
         &execution.normalized_for_record,
         &execution.result,
     ) {
-        let message = format!("`{}` failed to record agent event: {error}", metadata.hook_name);
+        let message = format!(
+            "`{}` failed to record agent event: {error}",
+            metadata.hook_name
+        );
         finish_hook_observation(
             metadata.span,
             metadata.hook_name,
@@ -187,7 +204,11 @@ pub(super) fn record_trace_id(span: &tracing::Span) {
 }
 
 pub(super) fn project_dir_for_signal_context(context: &NormalizedHookContext) -> &Path {
-    context.session.cwd.as_deref().unwrap_or_else(|| Path::new("."))
+    context
+        .session
+        .cwd
+        .as_deref()
+        .unwrap_or_else(|| Path::new("."))
 }
 
 pub(super) fn resolve_signal_session_with_trace(
@@ -216,7 +237,12 @@ pub(super) fn find_pending_signals_with_trace(
         runtime_session_id = runtime_session_id
     )
     .entered();
-    super::find_pending_signals(agent_runtime, project_dir, runtime_session_id, resolved_session)
+    super::find_pending_signals(
+        agent_runtime,
+        project_dir,
+        runtime_session_id,
+        resolved_session,
+    )
 }
 
 pub(super) fn acknowledged_signal_lines(

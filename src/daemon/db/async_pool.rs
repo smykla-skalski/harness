@@ -188,67 +188,73 @@ impl AsyncDaemonDb {
     ) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError> {
         use daemon_protocol::{ProjectSummary, WorktreeSummary};
 
-        trace_async_db_operation("list_project_summaries", "read", Some(&self.path), || async {
-            record_daemon_db_pool_state(
-                "async",
-                u64::from(self.pool.size()),
-                u64::try_from(self.pool.num_idle()).unwrap_or(u64::MAX),
-            );
-            let rows = query_as::<_, AsyncProjectSummaryRow>(PROJECT_SUMMARIES_SQL)
-                .fetch_all(self.pool())
-                .await
-                .map_err(|error| db_error(format!("query async project summaries: {error}")))?;
+        trace_async_db_operation(
+            "list_project_summaries",
+            "read",
+            Some(&self.path),
+            || async {
+                record_daemon_db_pool_state(
+                    "async",
+                    u64::from(self.pool.size()),
+                    u64::try_from(self.pool.num_idle()).unwrap_or(u64::MAX),
+                );
+                let rows = query_as::<_, AsyncProjectSummaryRow>(PROJECT_SUMMARIES_SQL)
+                    .fetch_all(self.pool())
+                    .await
+                    .map_err(|error| db_error(format!("query async project summaries: {error}")))?;
 
-            let mut grouped: BTreeMap<String, ProjectSummary> = BTreeMap::new();
-            for row in rows {
-                let project = row.project();
-                let active_session_count = usize_from_i64(row.active_session_count);
-                let total_session_count = usize_from_i64(row.total_session_count);
-                let project_id = project.summary_project_id();
-                let entry = grouped
-                    .entry(project_id.clone())
-                    .or_insert_with(|| ProjectSummary {
-                        project_id,
-                        name: project.summary_project_name(),
-                        project_dir: project.summary_project_dir(),
-                        context_root: project.summary_context_root(),
-                        active_session_count: 0,
-                        total_session_count: 0,
-                        worktrees: Vec::new(),
-                    });
+                let mut grouped: BTreeMap<String, ProjectSummary> = BTreeMap::new();
+                for row in rows {
+                    let project = row.project();
+                    let active_session_count = usize_from_i64(row.active_session_count);
+                    let total_session_count = usize_from_i64(row.total_session_count);
+                    let project_id = project.summary_project_id();
+                    let entry =
+                        grouped
+                            .entry(project_id.clone())
+                            .or_insert_with(|| ProjectSummary {
+                                project_id,
+                                name: project.summary_project_name(),
+                                project_dir: project.summary_project_dir(),
+                                context_root: project.summary_context_root(),
+                                active_session_count: 0,
+                                total_session_count: 0,
+                                worktrees: Vec::new(),
+                            });
 
-                if project.is_worktree && total_session_count > 0 {
-                    entry.worktrees.push(WorktreeSummary {
-                        checkout_id: project.checkout_id.clone(),
-                        name: project
-                            .worktree_name
-                            .clone()
-                            .unwrap_or_else(|| project.checkout_name.clone()),
-                        checkout_root: project
-                            .project_dir
-                            .as_ref()
-                            .map_or_else(String::new, |path| path.display().to_string()),
-                        context_root: project.context_root.display().to_string(),
-                        active_session_count,
-                        total_session_count,
-                    });
+                    if project.is_worktree && total_session_count > 0 {
+                        entry.worktrees.push(WorktreeSummary {
+                            checkout_id: project.checkout_id.clone(),
+                            name: project
+                                .worktree_name
+                                .clone()
+                                .unwrap_or_else(|| project.checkout_name.clone()),
+                            checkout_root: project
+                                .project_dir
+                                .as_ref()
+                                .map_or_else(String::new, |path| path.display().to_string()),
+                            context_root: project.context_root.display().to_string(),
+                            active_session_count,
+                            total_session_count,
+                        });
+                    }
+
+                    entry.active_session_count += active_session_count;
+                    entry.total_session_count += total_session_count;
                 }
 
-                entry.active_session_count += active_session_count;
-                entry.total_session_count += total_session_count;
-            }
-
-            let mut summaries: Vec<_> = grouped
-                .into_values()
-                .filter(|summary| summary.total_session_count > 0)
-                .collect();
-            for summary in &mut summaries {
-                summary
-                    .worktrees
-                    .sort_by(|left, right| left.name.cmp(&right.name));
-            }
-            Ok(summaries)
-        })
+                let mut summaries: Vec<_> = grouped
+                    .into_values()
+                    .filter(|summary| summary.total_session_count > 0)
+                    .collect();
+                for summary in &mut summaries {
+                    summary
+                        .worktrees
+                        .sort_by(|left, right| left.name.cmp(&right.name));
+                }
+                Ok(summaries)
+            },
+        )
         .await
     }
 
@@ -259,23 +265,28 @@ impl AsyncDaemonDb {
     pub(crate) async fn list_session_summaries(
         &self,
     ) -> Result<Vec<daemon_protocol::SessionSummary>, CliError> {
-        trace_async_db_operation("list_session_summaries", "read", Some(&self.path), || async {
-            record_daemon_db_pool_state(
-                "async",
-                u64::from(self.pool.size()),
-                u64::try_from(self.pool.num_idle()).unwrap_or(u64::MAX),
-            );
-            let rows = query_as::<_, AsyncSessionSummaryRow>(SESSION_SUMMARIES_SQL)
-                .fetch_all(self.pool())
-                .await
-                .map_err(|error| db_error(format!("query async session summaries: {error}")))?;
+        trace_async_db_operation(
+            "list_session_summaries",
+            "read",
+            Some(&self.path),
+            || async {
+                record_daemon_db_pool_state(
+                    "async",
+                    u64::from(self.pool.size()),
+                    u64::try_from(self.pool.num_idle()).unwrap_or(u64::MAX),
+                );
+                let rows = query_as::<_, AsyncSessionSummaryRow>(SESSION_SUMMARIES_SQL)
+                    .fetch_all(self.pool())
+                    .await
+                    .map_err(|error| db_error(format!("query async session summaries: {error}")))?;
 
-            let mut summaries = Vec::new();
-            for row in rows {
-                summaries.push(row.into_summary(self).await?);
-            }
-            Ok(summaries)
-        })
+                let mut summaries = Vec::new();
+                for row in rows {
+                    summaries.push(row.into_summary(self).await?);
+                }
+                Ok(summaries)
+            },
+        )
         .await
     }
 
@@ -297,7 +308,9 @@ impl AsyncDaemonDb {
                 .bind(session_id)
                 .fetch_optional(self.pool())
                 .await
-                .map_err(|error| db_error(format!("resolve async session {session_id}: {error}")))?;
+                .map_err(|error| {
+                    db_error(format!("resolve async session {session_id}: {error}"))
+                })?;
             match row {
                 Some(row) => row.into_resolved_session(self).await.map(Some),
                 None => Ok(None),

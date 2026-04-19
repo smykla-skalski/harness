@@ -20,8 +20,8 @@ mod integration {
     mod cluster;
     mod commands;
     mod compact;
+    mod grafana_connector;
     mod hooks;
     mod preflight;
-    mod grafana_connector;
     mod universal;
 }

@@ -19,7 +19,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::telemetry::{
-    apply_parent_context_from_text_map, current_trace_id, with_active_baggage, TelemetryBaggage,
+    TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
 };
 use axum::extract::ws::Message;
 use std::sync::{Arc, Mutex};
@@ -77,10 +77,12 @@ pub(crate) async fn dispatch(
         "request.failed" = Empty,
         trace_id = Empty
     );
-    let baggage = request.trace_context.as_ref().map_or_else(
-        TelemetryBaggage::default,
-        |trace_context| apply_parent_context_from_text_map(&span, trace_context),
-    );
+    let baggage = request
+        .trace_context
+        .as_ref()
+        .map_or_else(TelemetryBaggage::default, |trace_context| {
+            apply_parent_context_from_text_map(&span, trace_context)
+        });
     if let Some(trace_id) = span.in_scope(current_trace_id) {
         span.record("trace_id", display(trace_id));
     }
