@@ -46,6 +46,11 @@ pub struct CodexRunRequest {
     /// ignored when the selected model does not support reasoning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    /// When `true`, the `model` field is accepted as-is without catalog
+    /// validation and any effort value is forwarded without checking the
+    /// model's `effort_values`.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub allow_custom_model: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
