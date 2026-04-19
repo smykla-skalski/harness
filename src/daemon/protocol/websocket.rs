@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+use crate::agents::runtime::models::RuntimeModelCatalog;
+use crate::session::types::AgentPersona;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WsRequest {
     pub id: String,
@@ -50,6 +53,19 @@ pub struct WsChunkFrame {
     pub chunk_count: usize,
     pub chunk_base64: String,
 }
+
+/// Initial configuration payload pushed as the first WebSocket frame after
+/// upgrade. The Swift client must receive and process this before any other
+/// traffic so personas and per-runtime model catalogs are available before the
+/// user can start an agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WsConfigPayload {
+    pub personas: Vec<AgentPersona>,
+    pub runtime_models: Vec<RuntimeModelCatalog>,
+}
+
+/// Event name used for the initial configuration push.
+pub const WS_CONFIG_EVENT: &str = "config";
 
 #[cfg(test)]
 mod tests {
