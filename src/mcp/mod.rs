@@ -11,6 +11,8 @@
 #[cfg(target_os = "macos")]
 pub mod automation;
 pub mod dispatch;
+#[cfg(target_os = "macos")]
+pub mod tools;
 pub mod handshake;
 pub mod protocol;
 #[cfg(unix)]
