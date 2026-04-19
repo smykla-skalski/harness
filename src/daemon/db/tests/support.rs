@@ -186,6 +186,7 @@ pub(super) fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapsh
         pending_approvals: Vec::new(),
         created_at: "2026-04-09T09:00:00Z".into(),
         updated_at: updated_at.into(),
+        model: None,
     }
 }
 

@@ -37,6 +37,10 @@ pub struct CodexRunRequest {
     pub mode: CodexRunMode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resume_thread_id: Option<String>,
+    /// Optional model identifier validated against the codex catalog. `None`
+    /// means use the runtime default selected by the codex app-server.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +89,11 @@ pub struct CodexRunSnapshot {
     pub pending_approvals: Vec<CodexApprovalRequest>,
     pub created_at: String,
     pub updated_at: String,
+    /// Optional model identifier passed to the codex app-server at thread
+    /// start. Not persisted yet; reloads from the database always populate
+    /// this with `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

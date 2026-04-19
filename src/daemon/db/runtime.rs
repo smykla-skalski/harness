@@ -271,6 +271,9 @@ fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnaps
             .map_err(|error| parse_error_to_sql(format!("parse codex approvals: {error}")))?,
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
+        // The model is intentionally not persisted yet; it only matters at
+        // thread/start, never on resume from the database.
+        model: None,
     })
 }
 

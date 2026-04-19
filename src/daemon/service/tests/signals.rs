@@ -116,7 +116,8 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                     rows: 5,
                     cols: 40,
                     persona: None,
-                },
+                    model: None,
+},
             )
             .expect("start agent tui");
         // Simulate the SessionStart hook callback.
@@ -239,7 +240,8 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                     rows: 5,
                     cols: 40,
                     persona: None,
-                },
+                    model: None,
+},
             )
             .expect("start agent tui");
         manager

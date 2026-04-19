@@ -155,7 +155,8 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
                         argv: vec![],
                         rows: 24,
                         cols: 80,
-                    },
+                        model: None,
+},
                 )
                 .expect_err("start should fail without bridge");
 
