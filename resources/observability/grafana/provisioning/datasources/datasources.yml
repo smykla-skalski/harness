@@ -36,6 +36,7 @@ datasources:
     jsonData:
       httpHeaderName1: X-Scope-OrgID
       maxLines: 5000
+      detectedLevelField: severity
       derivedFields:
         - datasourceUid: tempo
           matcherRegex: '"traceid":"([0-9a-f]{32})"'
