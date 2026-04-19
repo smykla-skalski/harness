@@ -279,6 +279,45 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testEffortPickerVisibleForReasoningCapableDefaultModel() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+
+    let effortPicker = element(in: app, identifier: Accessibility.agentsEffortPicker)
+    XCTAssertTrue(
+      waitForElement(effortPicker, timeout: Self.uiTimeout),
+      "Effort picker should be visible when the default terminal model supports reasoning"
+    )
+  }
+
+  func testCustomModelOptionRevealsTextField() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+
+    let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
+    XCTAssertTrue(waitForElement(picker, timeout: Self.uiTimeout))
+
+    let customOption = app.buttons[
+      HarnessMonitorUITestAccessibility.segmentedOption(
+        Accessibility.agentsModelPicker,
+        option: "Custom"
+      )
+    ]
+    XCTAssertTrue(
+      waitForElement(customOption, timeout: Self.uiTimeout),
+      "Custom... option should appear inside the model picker"
+    )
+    customOption.click()
+
+    let customField = element(in: app, identifier: Accessibility.agentsCustomModelField)
+    XCTAssertTrue(
+      waitForElement(customField, timeout: Self.uiTimeout),
+      "Custom model text field should appear after selecting Custom..."
+    )
+  }
+
   func testStartingWithDefaultPersonaStartsTui() throws {
     let app = launchInCockpitPreview()
 
