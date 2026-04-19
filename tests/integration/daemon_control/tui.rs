@@ -12,7 +12,7 @@ fn sandboxed_agent_tui_start_succeeds_with_host_bridge() {
 
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _initial_status = wait_for_daemon_ready(&home, &xdg);
-    let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
+    let mut bridge = spawn_bridge_with_mock_codex(&home, &xdg, tmp.path(), "agent-tui", &[]);
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
 
@@ -167,7 +167,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         "daemon status should discover the running app-group daemon"
     );
 
-    let mut bridge = spawn_bridge(&home, &xdg, &["--capability", "agent-tui"]);
+    let mut bridge = spawn_bridge_with_mock_codex(&home, &xdg, tmp.path(), "agent-tui", &[]);
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
 
     let project_arg = project.to_str().expect("utf8 project");

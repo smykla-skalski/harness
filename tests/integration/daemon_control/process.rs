@@ -69,6 +69,28 @@ pub(super) fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> Mana
     }
 }
 
+pub(super) fn spawn_bridge_with_mock_codex(
+    home: &Path,
+    xdg: &Path,
+    base: &Path,
+    capability: &str,
+    extra_args: &[&str],
+) -> ManagedChild {
+    let mock_codex = create_mock_codex(base);
+    let codex_port_text = unused_local_port().to_string();
+    let codex_path = mock_codex.to_str().expect("utf8 codex path");
+    let mut args = vec![
+        "--capability",
+        capability,
+        "--codex-port",
+        codex_port_text.as_str(),
+        "--codex-path",
+        codex_path,
+    ];
+    args.extend(extra_args.iter().copied());
+    spawn_bridge(home, xdg, &args)
+}
+
 pub(super) fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
     Command::new(harness_binary())
         .args(args)

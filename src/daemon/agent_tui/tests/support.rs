@@ -6,6 +6,7 @@ use crate::daemon::agent_tui::{
     AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiSize, AgentTuiSnapshot,
     AgentTuiSpawnSpec, AgentTuiStatus, PortablePtyAgentTuiBackend, TerminalScreenSnapshot,
 };
+use crate::daemon::protocol::StreamEvent;
 
 pub(super) const WAIT_TIMEOUT: Duration = super::super::DEFAULT_WAIT_TIMEOUT;
 
@@ -115,6 +116,31 @@ pub(super) fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool)
         std::thread::sleep(Duration::from_millis(20));
     }
     assert!(condition(), "condition should become true before timeout");
+}
+
+pub(super) fn recv_broadcast_events(
+    receiver: &mut tokio::sync::broadcast::Receiver<StreamEvent>,
+    count: usize,
+    timeout: Duration,
+) -> Vec<StreamEvent> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("create broadcast receive runtime");
+    let deadline = std::time::Instant::now() + timeout;
+    let mut events = Vec::new();
+    while events.len() < count {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match runtime.block_on(async { tokio::time::timeout(remaining, receiver.recv()).await }) {
+            Ok(Ok(event)) => events.push(event),
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {}
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) | Err(_) => break,
+        }
+    }
+    events
 }
 
 pub(super) fn with_agent_tui_home<T>(base: &Path, action: impl FnOnce() -> T) -> T {

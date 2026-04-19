@@ -259,7 +259,6 @@ pub(crate) fn write_fake_uvx_env_printer(path: &PathBuf) {
         "#!/bin/sh\nprintf 'GRAFANA_URL=%s\\n' \"${GRAFANA_URL:-}\"\nprintf 'GRAFANA_SERVICE_ACCOUNT_TOKEN=%s\\n' \"${GRAFANA_SERVICE_ACCOUNT_TOKEN:-}\"\nprintf 'ARGS=%s\\n' \"$*\"\n",
     )
     .expect("write fake uvx");
-    #[allow(clippy::permissions_set_readonly_false)]
     std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o755))
         .expect("chmod fake uvx");
 }
@@ -321,7 +320,6 @@ while True:
 "#,
     )
     .expect("write fake uvx mcp server");
-    #[allow(clippy::permissions_set_readonly_false)]
     std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o755))
         .expect("chmod fake uvx mcp server");
 }

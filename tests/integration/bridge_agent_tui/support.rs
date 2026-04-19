@@ -1,3 +1,4 @@
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::thread;
@@ -62,6 +63,86 @@ pub(super) fn ensure_host_home(data_home: &Path) -> PathBuf {
     let host_home = data_home.join("host-home");
     std::fs::create_dir_all(&host_home).expect("create host home");
     host_home
+}
+
+pub(super) fn create_mock_codex(base: &Path) -> PathBuf {
+    let script = base.join("mock-codex");
+    std::fs::write(
+        &script,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo 'mock-codex 0.0.1'
+  exit 0
+fi
+
+exec python3 - "$@" <<'PY'
+import socket
+import sys
+
+args = sys.argv[1:]
+if len(args) < 3 or args[0] != "app-server" or args[1] != "--listen":
+    print(f"unexpected args: {args}", file=sys.stderr)
+    sys.exit(2)
+
+listen = args[2]
+if not listen.startswith("ws://"):
+    print(f"unexpected listen address: {listen}", file=sys.stderr)
+    sys.exit(3)
+
+address = listen[len("ws://"):]
+host, port = address.rsplit(":", 1)
+port = int(port)
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server.bind((host, port))
+server.listen()
+
+while True:
+    conn, _ = server.accept()
+    request = b""
+    while b"\r\n\r\n" not in request:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        request += chunk
+
+    if request.startswith(b"GET /readyz ") or request.startswith(b"GET /healthz "):
+        body = b"ok\n"
+        response = (
+            b"HTTP/1.1 200 OK\r\n"
+            + f"Content-Length: {len(body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + body
+        )
+    else:
+        body = b"missing\n"
+        response = (
+            b"HTTP/1.1 404 Not Found\r\n"
+            + f"Content-Length: {len(body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + body
+        )
+    conn.sendall(response)
+    conn.close()
+PY
+"#,
+    )
+    .expect("write mock codex");
+    std::fs::set_permissions(
+        &script,
+        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
+    )
+    .expect("chmod mock codex");
+    script
+}
+
+pub(super) fn unused_local_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("bind local port")
+        .local_addr()
+        .expect("read local addr")
+        .port()
 }
 
 pub(super) fn harness_binary() -> PathBuf {
