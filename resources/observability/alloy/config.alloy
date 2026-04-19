@@ -9,7 +9,7 @@ otelcol.receiver.otlp "harness" {
 
   output {
     logs = [
-      otelcol.processor.transform.logs.input,
+      otelcol.processor.batch.logs.input,
     ]
     metrics = [
       otelcol.processor.batch.metrics.input,
@@ -18,22 +18,6 @@ otelcol.receiver.otlp "harness" {
       otelcol.processor.batch.traces.input,
       otelcol.connector.spanmetrics.harness.input,
     ]
-  }
-}
-
-// Copy severity_text to resource attribute "level" for Loki label indexing
-otelcol.processor.transform "logs" {
-  error_mode = "ignore"
-
-  log_statements {
-    context = "log"
-    statements = [
-      `set(resource.attributes["level"], severity_text)`,
-    ]
-  }
-
-  output {
-    logs = [otelcol.processor.batch.logs.input]
   }
 }
 
