@@ -76,8 +76,11 @@ extension HarnessMonitorStore {
     allowCustomModel: Bool = false
   ) async -> CodexRunSnapshot? {
     guard guardSessionActionsAvailable() else { return nil }
-    guard let client, let sessionID = selectedSessionID else { return nil }
-    guard let actor = actionActor(for: actor) else { return nil }
+    guard let client, let sessionID = selectedSessionID else {
+      presentFailureFeedback("Select a session before starting a Codex thread.")
+      return nil
+    }
+    let resolvedActor = actionActor(for: actor)
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
@@ -89,7 +92,7 @@ extension HarnessMonitorStore {
     defer { isSessionActionInFlight = false }
 
     let request = CodexRunRequest(
-      actor: actor,
+      actor: resolvedActor,
       prompt: trimmedPrompt,
       mode: mode,
       resumeThreadId: resumeThreadId,
