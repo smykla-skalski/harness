@@ -175,6 +175,8 @@ struct ToolbarCenterpieceView: View {
   let availableDetailWidth: CGFloat
   var statusMessages: [ToolbarStatusMessage] = []
   var connectionState: HarnessMonitorStore.ConnectionState = .idle
+  @ScaledMetric(relativeTo: .body)
+  private var daemonStatusDotSize: CGFloat = 20
   private static let toolbarHeight: CGFloat = 32
   private static let statusLeadingInset: CGFloat = 12
   private static let daemonTrailingInset: CGFloat = 10
@@ -229,6 +231,6 @@ struct ToolbarCenterpieceView: View {
 
   private var daemonStatusDot: some View {
     ToolbarDaemonStatusDot(connectionState: connectionState)
-      .frame(width: 20, height: 20)
+      .frame(width: daemonStatusDotSize, height: daemonStatusDotSize)
   }
 }

@@ -8,6 +8,8 @@ struct CopyableCommandBox: View {
   let accessibilityIdentifier: String
 
   @State private var wasCopied = false
+  @ScaledMetric(relativeTo: .body)
+  private var copyIconSize: CGFloat = 16
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
@@ -22,7 +24,7 @@ struct CopyableCommandBox: View {
         Image(systemName: wasCopied ? "checkmark" : "doc.on.clipboard")
           .imageScale(.medium)
           .contentTransition(.symbolEffect(.replace))
-          .frame(width: 16, height: 16)
+          .frame(width: copyIconSize, height: copyIconSize)
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
           .background(

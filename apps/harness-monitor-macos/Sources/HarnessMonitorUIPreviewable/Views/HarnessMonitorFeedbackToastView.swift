@@ -37,6 +37,8 @@ public struct HarnessMonitorFeedbackToastView: View {
 private struct HarnessMonitorFeedbackToastRow: View {
   let feedback: ActionFeedback
   let toast: ToastSlice
+  @ScaledMetric(relativeTo: .callout)
+  private var dismissButtonSize: CGFloat = 28
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
@@ -52,7 +54,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
         Image(systemName: "xmark")
           .scaledFont(.system(.footnote, design: .rounded, weight: .bold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .frame(width: 28, height: 28)
+          .frame(width: dismissButtonSize, height: dismissButtonSize)
           .contentShape(.circle)
           .harnessToastDismissGlass()
       }
