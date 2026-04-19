@@ -204,6 +204,7 @@ enum HarnessMonitorUITestAccessibility {
   static let voiceInputFailureMessage = "harness.voice-input.failure.message"
   static let voiceInputFailureInstructions = "harness.voice-input.failure.instructions"
   static let leaderAgentSignalTrigger = "harness.session.agent.leader-claude.signal-trigger"
+  static let agentsButton = "harness.session.agents"
   static let agentTuiButton = "harness.session.agent-tui"
   static let agentTuiSheet = "harness.sheet.agent-tui"
   static let agentTuiState = "harness.sheet.agent-tui.state"
