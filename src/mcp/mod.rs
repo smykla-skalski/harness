@@ -11,6 +11,8 @@
 pub mod dispatch;
 pub mod handshake;
 pub mod protocol;
+#[cfg(unix)]
+pub mod registry;
 pub mod server;
 pub mod tool;
 
