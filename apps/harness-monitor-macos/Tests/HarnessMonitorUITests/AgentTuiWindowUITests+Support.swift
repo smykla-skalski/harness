@@ -8,7 +8,7 @@ extension AgentTuiWindowUITests {
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {
     var environment = [
-      "HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit",
+      "HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"
     ]
     environment.merge(additionalEnvironment) { _, new in new }
     return launch(

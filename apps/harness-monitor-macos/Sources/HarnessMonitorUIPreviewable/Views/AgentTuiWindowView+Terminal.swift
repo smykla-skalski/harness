@@ -384,9 +384,15 @@ extension AgentTuiWindowView {
       "The shared host bridge is running without Codex enabled. Enable it now or run this in a terminal:"
     case .unavailable:
       if hostBridge.running && codexBridgeCapabilityPresent {
-        "The shared host bridge is running, but the Codex capability is unavailable. Re-enable it or run this in a terminal:"
+        """
+        The shared host bridge is running, but the Codex capability is unavailable.
+        Re-enable it or run this in a terminal:
+        """
       } else {
-        "Harness Monitor runs sandboxed and needs the host bridge to start or steer Codex threads. Run this in a terminal:"
+        """
+        Harness Monitor runs sandboxed and needs the host bridge to start or steer
+        Codex threads. Run this in a terminal:
+        """
       }
     case .ready:
       ""

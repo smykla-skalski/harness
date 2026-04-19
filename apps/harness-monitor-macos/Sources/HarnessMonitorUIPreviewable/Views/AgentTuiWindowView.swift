@@ -130,7 +130,10 @@ public struct AgentTuiWindowView: View {
     guard let selectedCodexRun else {
       return false
     }
-    return selectedCodexRun.status.isActive && !trimmedCodexContext.isEmpty && !viewModel.isSubmitting
+    return
+      selectedCodexRun.status.isActive
+      && !trimmedCodexContext.isEmpty
+      && !viewModel.isSubmitting
   }
 
   var usesLiveViewportSplitLayout: Bool {

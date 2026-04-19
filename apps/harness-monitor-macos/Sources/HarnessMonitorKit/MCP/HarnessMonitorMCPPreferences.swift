@@ -31,13 +31,13 @@ public enum HarnessMonitorMCPPreferencesDefaults {
   /// var. Returns `false` in release builds even if the variable is set.
   public static var forceEnableFromEnvironment: Bool {
     #if DEBUG
-    guard let value = ProcessInfo.processInfo.environment[forceEnableEnvVar] else {
-      return false
-    }
-    let normalized = value.lowercased()
-    return normalized == "1" || normalized == "true" || normalized == "yes"
+      guard let value = ProcessInfo.processInfo.environment[forceEnableEnvVar] else {
+        return false
+      }
+      let normalized = value.lowercased()
+      return normalized == "1" || normalized == "true" || normalized == "yes"
     #else
-    return false
+      return false
     #endif
   }
 }

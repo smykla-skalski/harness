@@ -2,6 +2,14 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionActionDock: View {
+  private struct FlowButtonDetails {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let helpText: String
+    let accessibilityID: String?
+  }
+
   let detail: SessionDetail
   let inspectTask: (String) -> Void
   let inspectAgent: (String) -> Void
@@ -41,54 +49,58 @@ struct SessionActionDock: View {
         spacing: HarnessMonitorTheme.sectionSpacing
       ) {
         flowButton(
-          title: "Task Flow",
-          subtitle: "Create, reassign, checkpoint",
-          symbol: "checklist",
+          FlowButtonDetails(
+            title: "Task Flow",
+            subtitle: "Create, reassign, checkpoint",
+            symbol: "checklist",
+            helpText: "Jump to the first task to inspect.",
+            accessibilityID: nil
+          ),
           action: focusFirstTask,
-          helpText: "Jump to the first task to inspect.",
-          accessibilityID: nil
         )
         flowButton(
-          title: "People Flow",
-          subtitle: "Change roles and leadership",
-          symbol: "person.2",
+          FlowButtonDetails(
+            title: "People Flow",
+            subtitle: "Change roles and leadership",
+            symbol: "person.2",
+            helpText: "Jump to the first agent to inspect.",
+            accessibilityID: nil
+          ),
           action: focusFirstAgent,
-          helpText: "Jump to the first agent to inspect.",
-          accessibilityID: nil
         )
         flowButton(
-          title: "Observe Flow",
-          subtitle: "Surface and triage issues",
-          symbol: "eye",
+          FlowButtonDetails(
+            title: "Observe Flow",
+            subtitle: "Surface and triage issues",
+            symbol: "eye",
+            helpText: "Open the session observer.",
+            accessibilityID: nil
+          ),
           action: focusObserver,
-          helpText: "Open the session observer.",
-          accessibilityID: nil
         )
         flowButton(
-          title: "Agents",
-          subtitle: "Drive unified agent workflows",
-          symbol: "terminal",
+          FlowButtonDetails(
+            title: "Agents",
+            subtitle: "Drive unified agent workflows",
+            symbol: "terminal",
+            helpText: "Open the unified Agents workspace to launch and manage sessions.",
+            accessibilityID: HarnessMonitorAccessibility.agentsActionButton
+          ),
           action: openAgents,
-          helpText: "Open the unified Agents workspace to launch and manage sessions.",
-          accessibilityID: HarnessMonitorAccessibility.agentsActionButton
         )
       }
     }
   }
 
   private func flowButton(
-    title: String,
-    subtitle: String,
-    symbol: String,
-    action: @escaping () -> Void,
-    helpText: String,
-    accessibilityID: String?
+    _ details: FlowButtonDetails,
+    action: @escaping () -> Void
   ) -> some View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        Label(title, systemImage: symbol)
+        Label(details.title, systemImage: details.symbol)
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        Text(subtitle)
+        Text(details.subtitle)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
@@ -96,8 +108,8 @@ struct SessionActionDock: View {
       .padding(HarnessMonitorTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
-    .help(helpText)
-    .optionalAccessibilityIdentifier(accessibilityID)
+    .help(details.helpText)
+    .optionalAccessibilityIdentifier(details.accessibilityID)
   }
 
   private func focusFirstTask() {
