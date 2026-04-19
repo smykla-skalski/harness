@@ -41,6 +41,13 @@ struct LatencyBadge: View {
     quality.themeColor
   }
 
+  private var accessibilityLabel: String {
+    if let latencyMs {
+      return "Network latency \(latencyMs) milliseconds, \(quality.accessibilityDescription)"
+    }
+    return "Network latency unavailable"
+  }
+
   var body: some View {
     Text(latencyMs.map { "\($0)ms" } ?? "n/a")
       .scaledFont(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
@@ -50,6 +57,8 @@ struct LatencyBadge: View {
       .harnessPillPadding()
       .harnessControlPill(tint: tint)
       .harnessUITestValue("chrome=glass-static")
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(accessibilityLabel)
   }
 }
 
@@ -259,6 +268,9 @@ struct ReconnectionProgressView: View {
         .clipShape(Capsule())
     }
     .animation(.spring(duration: 0.3), value: attempt)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Reconnecting to daemon")
+    .accessibilityValue("Attempt \(attempt) of \(maxAttempts)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.reconnectionProgress)
   }
 }
