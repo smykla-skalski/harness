@@ -4,6 +4,7 @@ mod copilot;
 pub mod event;
 mod gemini;
 pub mod liveness;
+pub mod models;
 mod opencode;
 pub mod signal;
 mod vibe;
