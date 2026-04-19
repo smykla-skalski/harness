@@ -74,6 +74,7 @@ extension AgentTuiWindowView {
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiLaunchPane)
   }
 
@@ -87,6 +88,7 @@ extension AgentTuiWindowView {
       .harnessActionButtonStyle(variant: .bordered, tint: nil)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiBackToCreateButton)
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
@@ -100,32 +102,59 @@ extension AgentTuiWindowView {
       Text("New agent")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Picker("Mode", selection: $formModel.createMode) {
+      HarnessMonitorSegmentedPicker(
+        title: "Mode",
+        selection: $formModel.createMode,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiCreateModePicker
+      ) {
         ForEach(AgentTuiCreateMode.allCases) { mode in
-          Text(mode.title).tag(mode)
+          Text(mode.title)
+            .tag(mode)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.agentTuiCreateModePicker,
+                option: mode.title
+              )
+            )
         }
       }
-      .pickerStyle(.segmented)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateModePicker)
 
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         switch formModel.createMode {
         case .terminal:
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-            Picker("Runtime", selection: $formModel.runtime) {
+            HarnessMonitorSegmentedPicker(
+              title: "Runtime",
+              selection: $formModel.runtime,
+              accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiRuntimePicker
+            ) {
               ForEach(AgentTuiRuntime.allCases) { runtime in
-                Text(runtime.title).tag(runtime)
+                Text(runtime.title)
+                  .tag(runtime)
+                  .accessibilityIdentifier(
+                    HarnessMonitorAccessibility.segmentedOption(
+                      HarnessMonitorAccessibility.agentTuiRuntimePicker,
+                      option: runtime.title
+                    )
+                  )
               }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
-            Picker("Role", selection: $formModel.selectedRole) {
+            HarnessMonitorSegmentedPicker(
+              title: "Role",
+              selection: $formModel.selectedRole,
+              accessibilityIdentifier: HarnessMonitorAccessibility.agentsRolePicker
+            ) {
               ForEach(SessionRole.allCases, id: \.self) { role in
-                Text(role.title).tag(role)
+                Text(role.title)
+                  .tag(role)
+                  .accessibilityIdentifier(
+                    HarnessMonitorAccessibility.segmentedOption(
+                      HarnessMonitorAccessibility.agentsRolePicker,
+                      option: role.title
+                    )
+                  )
               }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.agentsRolePicker)
             if !formModel.availablePersonas.isEmpty {
               inlinePersonaGrid
             }
@@ -168,7 +197,6 @@ extension AgentTuiWindowView {
               in: TerminalViewportSizing.colRange,
               step: 10
             )
-            Spacer(minLength: 0)
             HarnessMonitorActionButton(
               title: "Start \(formModel.runtime.title)",
               variant: .prominent,
@@ -179,10 +207,6 @@ extension AgentTuiWindowView {
             }
             .keyboardShortcut(.defaultAction)
             .disabled(!canStartTerminal)
-            .accessibilityTestProbe(
-              HarnessMonitorAccessibility.agentTuiStartButton,
-              label: "Start \(formModel.runtime.title)"
-            )
           }
           .frame(width: 240, alignment: .topLeading)
 
@@ -198,13 +222,22 @@ extension AgentTuiWindowView {
               minHeight: 120,
               accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexPromptField
             )
-            Picker("Mode", selection: $formModel.codexMode) {
+            HarnessMonitorSegmentedPicker(
+              title: "Mode",
+              selection: $formModel.codexMode,
+              accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexModePicker
+            ) {
               ForEach(CodexRunMode.allCases) { mode in
-                Text(mode.title).tag(mode)
+                Text(mode.title)
+                  .tag(mode)
+                  .accessibilityIdentifier(
+                    HarnessMonitorAccessibility.segmentedOption(
+                      HarnessMonitorAccessibility.agentsCodexModePicker,
+                      option: mode.title
+                    )
+                  )
               }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexModePicker)
           }
 
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -215,7 +248,6 @@ extension AgentTuiWindowView {
               .scaledFont(.footnote)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
             HarnessMonitorActionButton(
               title: "Start Codex",
               variant: .prominent,
@@ -226,10 +258,6 @@ extension AgentTuiWindowView {
             }
             .keyboardShortcut(.defaultAction)
             .disabled(!canStartCodex)
-            .accessibilityTestProbe(
-              HarnessMonitorAccessibility.agentsCodexSubmitButton,
-              label: "Start Codex"
-            )
           }
           .frame(width: 260, alignment: .topLeading)
         }
@@ -323,6 +351,7 @@ extension AgentTuiWindowView {
     .frame(
       maxWidth: .infinity, maxHeight: tui.status.isActive ? .infinity : nil, alignment: .topLeading
     )
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
@@ -331,12 +360,24 @@ extension AgentTuiWindowView {
       codexHeader(run)
       if let finalMessage = run.finalMessage, !finalMessage.isEmpty {
         codexTextSection(title: "Final", text: finalMessage)
+          .accessibilityTestProbe(
+            HarnessMonitorAccessibility.agentsCodexFinalMessage,
+            label: finalMessage
+          )
       } else if let latestSummary = run.latestSummary, !latestSummary.isEmpty {
         codexTextSection(title: "Latest", text: latestSummary)
+          .accessibilityTestProbe(
+            HarnessMonitorAccessibility.agentsCodexLatestSummary,
+            label: latestSummary
+          )
       }
       if let error = run.error, !error.isEmpty {
         codexTextSection(title: "Error", text: error)
           .foregroundStyle(HarnessMonitorTheme.danger)
+          .accessibilityTestProbe(
+            HarnessMonitorAccessibility.agentsCodexErrorMessage,
+            label: error
+          )
       }
       if !run.pendingApprovals.isEmpty {
         codexApprovalsSection(run)
@@ -346,6 +387,7 @@ extension AgentTuiWindowView {
       }
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionPane)
   }
 
@@ -478,6 +520,8 @@ extension AgentTuiWindowView {
       .harnessActionButtonStyle(variant: .bordered, tint: nil)
       .disabled(!canSteerCodex)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexSteerButton)
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsCodexSteerButton).frame")
+      .accessibilityTestProbe(HarnessMonitorAccessibility.agentsCodexSteerButton, label: "Send Context")
     }
   }
 

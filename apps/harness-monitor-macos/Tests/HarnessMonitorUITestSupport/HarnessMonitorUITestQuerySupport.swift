@@ -264,22 +264,8 @@ extension HarnessMonitorUITestCase {
       }
     }
 
-    let textField = app.textFields.matching(identifier: identifier).firstMatch
-    if textField.exists {
-      return textField
-    }
-
-    let textView = app.textViews.matching(identifier: identifier).firstMatch
-    if textView.exists {
-      return textView
-    }
-
     let genericMatch = element(in: app, identifier: identifier)
-    if genericMatch.exists {
-      return genericMatch
-    }
-
-    return app.descendants(matching: .textField).matching(identifier: identifier).firstMatch
+    return genericMatch
   }
 
   func toolbarButton(in app: XCUIApplication, index: Int) -> XCUIElement {

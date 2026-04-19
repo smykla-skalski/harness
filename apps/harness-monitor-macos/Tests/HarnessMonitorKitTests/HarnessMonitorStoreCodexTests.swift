@@ -36,6 +36,23 @@ struct HarnessMonitorStoreCodexTests {
     #expect(store.currentSuccessFeedbackMessage == "Codex run started")
   }
 
+  @Test("Start Codex run returns the started snapshot")
+  func startCodexRunReturnsStartedSnapshot() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let startedRun = await store.startCodexRunSnapshot(
+      prompt: "Investigate the failing suite.",
+      mode: .workspaceWrite,
+      actor: "leader-claude"
+    )
+
+    #expect(startedRun?.runId == store.selectedCodexRun?.runId)
+    #expect(startedRun?.prompt == "Investigate the failing suite.")
+    #expect(startedRun?.mode == .workspaceWrite)
+  }
+
   @Test("Starting another Codex run reselects the newly started run")
   func startingAnotherCodexRunReselectsNewRun() async {
     let client = RecordingHarnessClient()

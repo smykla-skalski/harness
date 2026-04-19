@@ -6,7 +6,7 @@ extension HarnessMonitorStore {
 
   private enum CodexStartRecoveryOutcome {
     case notAttempted
-    case succeeded
+    case succeeded(CodexRunSnapshot)
     case failed
   }
 
@@ -51,14 +51,29 @@ extension HarnessMonitorStore {
     actor: String = "harness-app",
     resumeThreadId: String? = nil
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client, let sessionID = selectedSessionID else { return false }
-    guard let actor = actionActor(for: actor) else { return false }
+    await startCodexRunSnapshot(
+      prompt: prompt,
+      mode: mode,
+      actor: actor,
+      resumeThreadId: resumeThreadId
+    ) != nil
+  }
+
+  @discardableResult
+  public func startCodexRunSnapshot(
+    prompt: String,
+    mode: CodexRunMode,
+    actor: String = "harness-app",
+    resumeThreadId: String? = nil
+  ) async -> CodexRunSnapshot? {
+    guard guardSessionActionsAvailable() else { return nil }
+    guard let client, let sessionID = selectedSessionID else { return nil }
+    guard let actor = actionActor(for: actor) else { return nil }
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
       presentFailureFeedback("Codex prompt cannot be empty.")
-      return false
+      return nil
     }
 
     isSessionActionInFlight = true
@@ -78,7 +93,7 @@ extension HarnessMonitorStore {
         request: request
       )
       applyCodexRunStartSuccess(measuredRun.value)
-      return true
+      return measuredRun.value
     } catch let apiError as HarnessMonitorAPIError {
       switch await recoverCodexStartAfterTransientBridgeFailure(
         using: client,
@@ -86,10 +101,10 @@ extension HarnessMonitorStore {
         request: request,
         error: apiError
       ) {
-      case .succeeded:
-        return true
+      case .succeeded(let run):
+        return run
       case .failed:
-        return false
+        return nil
       case .notAttempted:
         break
       }
@@ -97,10 +112,10 @@ extension HarnessMonitorStore {
         markHostBridgeIssue(for: "codex", statusCode: code)
       }
       presentFailureFeedback(apiError.localizedDescription)
-      return false
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
-      return false
+      return nil
     }
   }
 
@@ -344,7 +359,7 @@ extension HarnessMonitorStore {
         request: request
       )
       applyCodexRunStartSuccess(measuredRun.value)
-      return .succeeded
+      return .succeeded(measuredRun.value)
     } catch let retryError as HarnessMonitorAPIError {
       if case .server(let retryCode, _) = retryError, retryCode == 501 || retryCode == 503 {
         markHostBridgeIssue(for: "codex", statusCode: retryCode)

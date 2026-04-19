@@ -128,58 +128,11 @@ extension HarnessMonitorUITestCase {
       try FileManager.default.removeItem(at: targetURL)
     }
 
-    if let sourceURL = sharedObservabilityConfigSourceURL() {
-      try FileManager.default.copyItem(at: sourceURL, to: targetURL)
-      return
-    }
-
     try defaultObservabilityConfigBody().write(
       to: targetURL,
       atomically: true,
       encoding: .utf8
     )
-  }
-
-  private func sharedObservabilityConfigSourceURL() -> URL? {
-    let homeDirectories = candidateHomeDirectories()
-    let candidateURLs = homeDirectories.flatMap { homeDirectory in
-      [
-        homeDirectory
-          .appendingPathComponent("Library", isDirectory: true)
-          .appendingPathComponent("Application Support", isDirectory: true)
-          .appendingPathComponent("harness", isDirectory: true)
-          .appendingPathComponent("observability", isDirectory: true)
-          .appendingPathComponent("config.json"),
-        homeDirectory
-          .appendingPathComponent("Library", isDirectory: true)
-          .appendingPathComponent("Group Containers", isDirectory: true)
-          .appendingPathComponent("Q498EB36N4.io.harnessmonitor", isDirectory: true)
-          .appendingPathComponent("harness", isDirectory: true)
-          .appendingPathComponent("observability", isDirectory: true)
-          .appendingPathComponent("config.json"),
-      ]
-    }
-
-    return candidateURLs.first { candidateURL in
-      FileManager.default.fileExists(atPath: candidateURL.path)
-    }
-  }
-
-  private func candidateHomeDirectories() -> [URL] {
-    var directories: [URL] = []
-    let candidates = [
-      FileManager.default.homeDirectoryForCurrentUser,
-      URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true),
-      ProcessInfo.processInfo.environment["HOME"].map {
-        URL(fileURLWithPath: $0, isDirectory: true)
-      },
-    ]
-
-    for candidate in candidates.compactMap({ $0 }) where directories.contains(candidate) == false {
-      directories.append(candidate)
-    }
-
-    return directories
   }
 
   private func defaultObservabilityConfigBody() -> String {

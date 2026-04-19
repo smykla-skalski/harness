@@ -230,6 +230,9 @@ public enum HarnessMonitorAccessibility {
   public static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
   public static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
   public static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
+  public static let agentsCodexFinalMessage = "harness.window.agents.codex.final"
+  public static let agentsCodexLatestSummary = "harness.window.agents.codex.latest"
+  public static let agentsCodexErrorMessage = "harness.window.agents.codex.error"
   public static let sendSignalSheet = "harness.sheet.send-signal"
   public static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   public static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
@@ -372,6 +375,10 @@ public enum HarnessMonitorAccessibility {
 
   public static func preferencesBackgroundTile(_ key: String) -> String {
     "harness.preferences.background.\(slug(key))"
+  }
+
+  public static func segmentedOption(_ controlID: String, option: String) -> String {
+    "\(controlID).option.\(slug(option))"
   }
 
   private static func slug(_ value: String) -> String {

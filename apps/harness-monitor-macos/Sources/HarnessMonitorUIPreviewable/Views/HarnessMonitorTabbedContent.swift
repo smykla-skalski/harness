@@ -79,3 +79,43 @@ struct HarnessMonitorTabbedContent<
     }
   }
 }
+
+struct HarnessMonitorSegmentedPicker<
+  SelectionValue: Hashable,
+  Content: View
+>: View {
+  let title: String
+  @Binding var selection: SelectionValue
+  let accessibilityIdentifier: String
+  let fillsWidth: Bool
+  @ViewBuilder let content: () -> Content
+
+  init(
+    title: String,
+    selection: Binding<SelectionValue>,
+    accessibilityIdentifier: String,
+    fillsWidth: Bool = false,
+    @ViewBuilder content: @escaping () -> Content
+  ) {
+    self.title = title
+    _selection = selection
+    self.accessibilityIdentifier = accessibilityIdentifier
+    self.fillsWidth = fillsWidth
+    self.content = content
+  }
+
+  var body: some View {
+    HStack(spacing: 0) {
+      Picker(title, selection: $selection) {
+        content()
+      }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .harnessNativeFormControl()
+      .frame(maxWidth: fillsWidth ? .infinity : nil)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(accessibilityIdentifier)
+  }
+}

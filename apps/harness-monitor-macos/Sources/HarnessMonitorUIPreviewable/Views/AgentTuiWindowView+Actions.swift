@@ -123,14 +123,14 @@ extension AgentTuiWindowView {
           focusedField = .input
         }
       case .codex:
-        let success = await store.startCodexRun(
+        let startedRun = await store.startCodexRunSnapshot(
           prompt: viewModel.codexPrompt,
           mode: viewModel.codexMode
         )
-        if success, let startedRunID = store.selectedCodexRun?.runId {
+        if let startedRun {
           viewModel.codexPrompt = ""
           viewModel.codexContext = ""
-          viewModel.selection = .codex(startedRunID)
+          viewModel.selection = .codex(startedRun.runId)
         }
       }
       viewModel.isSubmitting = false

@@ -142,14 +142,12 @@ struct HarnessMonitorAppConfiguration {
 
     var values = environment.values
     values[uiTestsEnvironmentKey] = "1"
-    // Never let an external-daemon developer env leak into UI tests; UI tests
-    // always run against managed/preview controllers, not a real terminal
-    // daemon.
-    values[DaemonOwnership.environmentKey] = "0"
 
     if isUITestHost, isBlank(values[HarnessMonitorLaunchMode.environmentKey]) {
       values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue
     }
+
+    normalizeUITestDaemonOwnership(&values)
 
     if isBlank(values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]) {
       values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey] = defaultUITestDataHomePath(
@@ -182,6 +180,28 @@ struct HarnessMonitorAppConfiguration {
 
   private static func isBlank(_ rawValue: String?) -> Bool {
     rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+  }
+
+  private static func normalizeUITestDaemonOwnership(_ values: inout [String: String]) {
+    guard uiTestsMayUseExternalDaemon(values) else {
+      // Normal UI tests must stay preview-safe even if the developer shell
+      // happens to export an external-daemon override.
+      values[DaemonOwnership.environmentKey] = "0"
+      return
+    }
+
+    values[DaemonOwnership.environmentKey] = "1"
+  }
+
+  private static func uiTestsMayUseExternalDaemon(_ values: [String: String]) -> Bool {
+    guard HarnessMonitorLaunchMode(environment: values) == .live else {
+      return false
+    }
+
+    let rawValue = values[DaemonOwnership.environmentKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    return rawValue == "1" || rawValue == "true" || rawValue == "yes" || rawValue == "on"
   }
 
   @MainActor
