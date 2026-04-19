@@ -2,7 +2,7 @@ use std::thread;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use tracing::field::{display, Empty};
+use tracing::field::{Empty, display};
 
 use crate::agents::transport::AgentsCommand;
 use crate::app::command_context::{AppContext, Execute};

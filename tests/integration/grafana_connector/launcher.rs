@@ -7,10 +7,9 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use super::support::{
-    FakeGrafanaServer, GRAFANA_ADMIN_PASSWORD, GRAFANA_ADMIN_USER, STALE_TOKEN,
-    parse_output_lines, read_log_tokens, spawn_json_line_response_reader, spawn_launcher,
-    spawn_mcp_response_reader, wait_for, write_fake_uvx_mcp_server, write_json_line_message,
-    write_mcp_message,
+    FakeGrafanaServer, GRAFANA_ADMIN_PASSWORD, GRAFANA_ADMIN_USER, STALE_TOKEN, parse_output_lines,
+    read_log_tokens, spawn_json_line_response_reader, spawn_launcher, spawn_mcp_response_reader,
+    wait_for, write_fake_uvx_mcp_server, write_json_line_message, write_mcp_message,
 };
 
 #[test]
@@ -306,7 +305,10 @@ fn observability_launcher_accepts_line_delimited_client_transport() {
         .recv_timeout(Duration::from_secs(3))
         .expect("expected tools/list response from launcher");
     assert_eq!(tools_response["id"], 2);
-    assert_eq!(tools_response["result"]["tools"][0]["name"], "fresh-token-1");
+    assert_eq!(
+        tools_response["result"]["tools"][0]["name"],
+        "fresh-token-1"
+    );
 
     drop(stdin);
     let status = launcher.wait().expect("wait for launcher exit");

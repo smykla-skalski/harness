@@ -4,17 +4,17 @@ use std::future::Future;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use opentelemetry::Context;
-use opentelemetry::baggage::BaggageExt as _;
 use axum::http::HeaderMap;
 use axum::http::header::HeaderName;
+use opentelemetry::Context;
 use opentelemetry::KeyValue;
+use opentelemetry::baggage::BaggageExt as _;
 use opentelemetry::global;
 use opentelemetry::metrics::{Counter, Gauge, Histogram, Meter};
 use opentelemetry::propagation::{Extractor, Injector, TextMapCompositePropagator};
 use opentelemetry::trace::TraceContextExt as _;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 static TELEMETRY_METER: OnceLock<Meter> = OnceLock::new();
 static HOOK_DURATION_HISTOGRAM: OnceLock<Histogram<u64>> = OnceLock::new();
@@ -226,7 +226,10 @@ pub fn record_daemon_db_health_counts(
 ) {
     for (entity, value) in [
         ("projects", u64::try_from(project_count).unwrap_or(u64::MAX)),
-        ("worktrees", u64::try_from(worktree_count).unwrap_or(u64::MAX)),
+        (
+            "worktrees",
+            u64::try_from(worktree_count).unwrap_or(u64::MAX),
+        ),
         ("sessions", u64::try_from(session_count).unwrap_or(u64::MAX)),
     ] {
         daemon_db_health_count_gauge().record(

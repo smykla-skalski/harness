@@ -145,7 +145,10 @@ fn sync_session_canonicalizes_active_sessions_without_leader() {
         .expect("session present");
     assert_eq!(loaded.status, SessionStatus::LeaderlessDegraded);
     assert!(loaded.leader_id.is_none());
-    assert_eq!(loaded.schema_version, crate::session::types::CURRENT_VERSION);
+    assert_eq!(
+        loaded.schema_version,
+        crate::session::types::CURRENT_VERSION
+    );
 
     let summaries = db.list_session_summaries_full().expect("session summaries");
     assert_eq!(summaries.len(), 1);
@@ -240,7 +243,10 @@ fn list_session_summaries_repair_legacy_active_rows_and_state_payloads() {
     assert_eq!(stored_status, "leaderless_degraded");
     assert_eq!(repaired_state.status, SessionStatus::LeaderlessDegraded);
     assert!(repaired_state.leader_id.is_none());
-    assert_eq!(repaired_state.schema_version, crate::session::types::CURRENT_VERSION);
+    assert_eq!(
+        repaired_state.schema_version,
+        crate::session::types::CURRENT_VERSION
+    );
 }
 
 #[test]

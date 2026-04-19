@@ -82,8 +82,10 @@ impl DaemonDb {
         let version = self.schema_version()?;
         let needs_ledger_backfill =
             matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7");
-        let needs_session_repair =
-            matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8");
+        let needs_session_repair = matches!(
+            version.as_str(),
+            "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8"
+        );
         let should_reclaim_space = match version.as_str() {
             "1" => {
                 self.conn

@@ -53,9 +53,7 @@ fn session_row_needs_resync(
 ) -> Result<bool, CliError> {
     let canonical_status = session_status_db_label(state.status)?;
     let canonical_is_active = i64::from(state.status == SessionStatus::Active);
-    Ok(
-        stored_status != canonical_status
-            || stored_leader_id != state.leader_id.as_deref()
-            || stored_is_active != canonical_is_active,
-    )
+    Ok(stored_status != canonical_status
+        || stored_leader_id != state.leader_id.as_deref()
+        || stored_is_active != canonical_is_active)
 }

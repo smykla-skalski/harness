@@ -21,7 +21,9 @@ where
     let _guard = span.enter();
     let started_at = Instant::now();
     let result = work();
-    finish_db_operation(operation, "sync", access, db_path, started_at, &span, &result);
+    finish_db_operation(
+        operation, "sync", access, db_path, started_at, &span, &result,
+    );
     result
 }
 
@@ -38,7 +40,9 @@ where
     let span = db_operation_span(operation, "async", access, db_path);
     let started_at = Instant::now();
     let result = work().instrument(span.clone()).await;
-    finish_db_operation(operation, "async", access, db_path, started_at, &span, &result);
+    finish_db_operation(
+        operation, "async", access, db_path, started_at, &span, &result,
+    );
     result
 }
 
@@ -81,10 +85,7 @@ fn finish_db_operation<T>(
 ) {
     let duration_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = result.is_err();
-    let is_busy = result
-        .as_ref()
-        .err()
-        .is_some_and(error_is_busy);
+    let is_busy = result.as_ref().err().is_some_and(error_is_busy);
 
     span.record("duration_ms", display(duration_ms));
     span.record("error", display(is_error));

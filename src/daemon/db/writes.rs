@@ -128,8 +128,16 @@ impl DaemonDb {
             )
             .map_err(|error| db_error(format!("upsert session: {error}")))?;
 
-        replace_agents(&transaction, &canonical_state.session_id, &canonical_state.agents)?;
-        replace_tasks(&transaction, &canonical_state.session_id, &canonical_state.tasks)?;
+        replace_agents(
+            &transaction,
+            &canonical_state.session_id,
+            &canonical_state.agents,
+        )?;
+        replace_tasks(
+            &transaction,
+            &canonical_state.session_id,
+            &canonical_state.tasks,
+        )?;
         transaction
             .execute(
                 "INSERT INTO session_timeline_state (

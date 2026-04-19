@@ -7,8 +7,8 @@ use opentelemetry::Value as OTelValue;
 use opentelemetry::trace::{SpanKind, TracerProvider as _};
 use opentelemetry_sdk::error::OTelSdkResult;
 use opentelemetry_sdk::trace::{SdkTracerProvider, SpanData, SpanExporter};
-use tokio::sync::Notify;
 use tokio::net::TcpListener;
+use tokio::sync::Notify;
 use tracing_subscriber::prelude::*;
 
 #[tokio::test(flavor = "current_thread")]

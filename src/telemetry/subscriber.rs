@@ -157,7 +157,8 @@ fn init_subscriber_without_telemetry(
     use_json_format: bool,
 ) -> Result<(), CliError> {
     #[cfg(feature = "tokio-console")]
-    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = build_console_layer();
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
+        build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
 
@@ -165,13 +166,11 @@ fn init_subscriber_without_telemetry(
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(console_layer)
-            .with(
-                fmt::layer()
-                    .json()
-                    .with_writer(io::stderr),
-            )
+            .with(fmt::layer().json().with_writer(io::stderr))
             .try_init()
-            .map_err(|error| CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into())
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into()
+            })
     } else {
         tracing_subscriber::registry()
             .with(filter_layer)
@@ -183,7 +182,9 @@ fn init_subscriber_without_telemetry(
                     .with_timer(ChronoUtc::rfc_3339()),
             )
             .try_init()
-            .map_err(|error| CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into())
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into()
+            })
     }
 }
 
@@ -202,34 +203,35 @@ fn init_subscriber_with_telemetry(
     global::set_meter_provider(meter_provider.clone());
 
     #[cfg(feature = "tokio-console")]
-    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = build_console_layer();
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
+        build_console_layer();
     #[cfg(not(feature = "tokio-console"))]
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
 
     if use_json_format {
-        let otel_trace_layer =
-            tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
+        let otel_trace_layer = tracing_opentelemetry::layer()
+            .with_tracer(tracer_provider.tracer(service.service_name()));
         let otel_log_layer =
-            OpenTelemetryTracingBridge::new(&logger_provider)
-                .with_filter(filter_fn(|metadata| metadata.target().starts_with("harness")));
+            OpenTelemetryTracingBridge::new(&logger_provider).with_filter(filter_fn(|metadata| {
+                metadata.target().starts_with("harness")
+            }));
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(console_layer)
-            .with(
-                fmt::layer()
-                    .json()
-                    .with_writer(io::stderr),
-            )
+            .with(fmt::layer().json().with_writer(io::stderr))
             .with(otel_trace_layer)
             .with(otel_log_layer)
             .try_init()
-            .map_err(|error| CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")))?;
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
+            })?;
     } else {
-        let otel_trace_layer =
-            tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
+        let otel_trace_layer = tracing_opentelemetry::layer()
+            .with_tracer(tracer_provider.tracer(service.service_name()));
         let otel_log_layer =
-            OpenTelemetryTracingBridge::new(&logger_provider)
-                .with_filter(filter_fn(|metadata| metadata.target().starts_with("harness")));
+            OpenTelemetryTracingBridge::new(&logger_provider).with_filter(filter_fn(|metadata| {
+                metadata.target().starts_with("harness")
+            }));
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(console_layer)
@@ -242,7 +244,9 @@ fn init_subscriber_with_telemetry(
             .with(otel_trace_layer)
             .with(otel_log_layer)
             .try_init()
-            .map_err(|error| CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")))?;
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
+            })?;
     }
 
     let daemon_profiler = DaemonProfiler::start(service, &export);
@@ -261,7 +265,15 @@ fn init_subscriber_with_telemetry(
 fn build_export_providers(
     export: &ResolvedTelemetryConfig,
     resource: Resource,
-) -> Result<(TokioRuntime, SdkTracerProvider, SdkMeterProvider, SdkLoggerProvider), CliError> {
+) -> Result<
+    (
+        TokioRuntime,
+        SdkTracerProvider,
+        SdkMeterProvider,
+        SdkLoggerProvider,
+    ),
+    CliError,
+> {
     let async_runtime = TokioRuntimeBuilder::new_multi_thread()
         .enable_all()
         .thread_name("harness-telemetry")
@@ -278,7 +290,12 @@ fn build_export_providers(
         logger_provider = build_logger_provider(export, resource)?;
     }
 
-    Ok((async_runtime, tracer_provider, meter_provider, logger_provider))
+    Ok((
+        async_runtime,
+        tracer_provider,
+        meter_provider,
+        logger_provider,
+    ))
 }
 
 fn build_tracer_provider(
@@ -303,7 +320,13 @@ fn build_tracer_provider(
                 .with_protocol(Protocol::HttpBinary)
                 .with_endpoint(signal_http_endpoint(&export.endpoint, "/v1/traces"));
             if !export.headers.is_empty() {
-                builder = builder.with_headers(export.headers.clone().into_iter().collect::<HashMap<_, _>>());
+                builder = builder.with_headers(
+                    export
+                        .headers
+                        .clone()
+                        .into_iter()
+                        .collect::<HashMap<_, _>>(),
+                );
             }
             builder
                 .build()
@@ -341,7 +364,13 @@ fn build_meter_provider(
                 .with_protocol(Protocol::HttpBinary)
                 .with_endpoint(signal_http_endpoint(&export.endpoint, "/v1/metrics"));
             if !export.headers.is_empty() {
-                builder = builder.with_headers(export.headers.clone().into_iter().collect::<HashMap<_, _>>());
+                builder = builder.with_headers(
+                    export
+                        .headers
+                        .clone()
+                        .into_iter()
+                        .collect::<HashMap<_, _>>(),
+                );
             }
             builder
                 .build()
@@ -377,7 +406,13 @@ fn build_logger_provider(
                 .with_protocol(Protocol::HttpBinary)
                 .with_endpoint(signal_http_endpoint(&export.endpoint, "/v1/logs"));
             if !export.headers.is_empty() {
-                builder = builder.with_headers(export.headers.clone().into_iter().collect::<HashMap<_, _>>());
+                builder = builder.with_headers(
+                    export
+                        .headers
+                        .clone()
+                        .into_iter()
+                        .collect::<HashMap<_, _>>(),
+                );
             }
             builder
                 .build()
@@ -424,10 +459,7 @@ fn tonic_metadata(headers: &BTreeMap<String, String>) -> Result<MetadataMap, Cli
     Ok(metadata)
 }
 
-fn telemetry_setup_error(
-    operation: &str,
-    error: impl Display,
-) -> CliError {
+fn telemetry_setup_error(operation: &str, error: impl Display) -> CliError {
     CliErrorKind::workflow_io(format!("{operation}: {error}")).into()
 }
 

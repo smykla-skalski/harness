@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use crate::daemon::index as daemon_index;
-use crate::session::storage as session_storage;
 use crate::session::service::canonicalize_active_session_without_leader;
+use crate::session::storage as session_storage;
 use crate::workspace::utc_now;
 
 use super::{
