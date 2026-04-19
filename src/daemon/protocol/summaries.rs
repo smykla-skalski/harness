@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
+use crate::session::service::ResolvedRuntimeSessionAgent;
 use crate::session::types::{
     AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionSignalRecord, SessionStatus,
     WorkItem,
@@ -47,7 +48,7 @@ pub struct ReadinessResponse {
 /// populating this response with multiple entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeSessionResolutionResponse {
-    pub resolved: Option<crate::session::service::ResolvedRuntimeSessionAgent>,
+    pub resolved: Option<ResolvedRuntimeSessionAgent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

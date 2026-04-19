@@ -37,6 +37,7 @@ pub(crate) use super::{
     snapshot as daemon_snapshot, state, state as daemon_state, timeline as daemon_timeline,
 };
 
+mod async_agents;
 mod async_bootstrap;
 mod async_change_tracking;
 mod async_conversation;
