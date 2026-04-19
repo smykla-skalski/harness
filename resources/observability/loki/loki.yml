@@ -32,6 +32,38 @@ limits_config:
   allow_structured_metadata: true
   volume_enabled: true
 
+  # OTLP attribute mapping - controls which attributes become labels vs structured metadata
+  otlp_config:
+    # Resource attributes: service identity fields become stream labels (low cardinality)
+    resource_attributes:
+      attributes_config:
+        - action: index_label
+          attributes:
+            - service.name
+            - service.namespace
+            - service.version
+            - deployment.environment.name
+        # Drop high-cardinality resource attributes from index
+        - action: drop
+          attributes:
+            - telemetry.sdk.name
+            - telemetry.sdk.language
+            - telemetry.sdk.version
+
+    # Log attributes: low-cardinality operation fields become labels
+    log_attributes:
+      - action: index_label
+        attributes:
+          - http_method
+          - http_route
+          - hook_name
+          - hook_event
+          - outcome
+          - http_status_code
+          - error
+      # High-cardinality attributes stay as structured metadata (default behavior)
+      # request_id, trace_id, session.id, project.id, duration_ms, error_message, tui_id, agent_id
+
 query_range:
   results_cache:
     cache:
