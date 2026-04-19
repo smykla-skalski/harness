@@ -250,10 +250,12 @@ extension AgentTuiWindowView {
             Text("Codex thread")
               .scaledFont(.caption.bold())
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            Text("Use report for investigation, workspace write for direct patches, and approval for gated edits.")
-              .scaledFont(.footnote)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .fixedSize(horizontal: false, vertical: true)
+            Text(
+              "Use report for investigation, workspace write for direct patches, and approval for gated edits."
+            )
+            .scaledFont(.footnote)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
             HarnessMonitorActionButton(
               title: "Start Codex",
               variant: .prominent,
@@ -311,20 +313,82 @@ extension AgentTuiWindowView {
       get: { formModel.selectedTerminalModelByRuntime[formModel.runtime] ?? catalog.default },
       set: { formModel.selectedTerminalModelByRuntime[formModel.runtime] = $0 }
     )
-    return HarnessMonitorSegmentedPicker(
-      title: "Model",
-      selection: binding,
-      accessibilityIdentifier: HarnessMonitorAccessibility.agentsModelPicker
-    ) {
-      ForEach(catalog.models) { model in
-        Text(model.displayName)
-          .tag(model.id)
+    let customBinding = Binding<String>(
+      get: { formModel.customTerminalModelByRuntime[formModel.runtime] ?? "" },
+      set: { formModel.customTerminalModelByRuntime[formModel.runtime] = $0 }
+    )
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HarnessMonitorSegmentedPicker(
+        title: "Model",
+        selection: binding,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentsModelPicker
+      ) {
+        ForEach(catalog.models) { model in
+          Text(model.displayName)
+            .tag(model.id)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.agentsModelPicker,
+                option: model.displayName
+              )
+            )
+        }
+        Text("Custom...")
+          .tag(RuntimeCustomModel.tag)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.segmentedOption(
               HarnessMonitorAccessibility.agentsModelPicker,
-              option: model.displayName
+              option: "Custom"
             )
           )
+      }
+      if binding.wrappedValue == RuntimeCustomModel.tag {
+        TextField("Provider-specific model id", text: customBinding)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCustomModelField)
+      }
+      terminalEffortPicker(formModel, catalog: catalog, selectedModelBinding: binding)
+    }
+  }
+
+  func terminalEffortPicker(
+    _ formModel: ViewModel,
+    catalog: RuntimeModelCatalog,
+    selectedModelBinding: Binding<String>
+  ) -> some View {
+    let values = AgentTuiWindowView.effortValues(
+      catalog: catalog,
+      selectedModelId: selectedModelBinding.wrappedValue
+    )
+    let selection = Binding<String>(
+      get: {
+        guard let current = formModel.selectedTerminalEffortByRuntime[formModel.runtime],
+          values.contains(current)
+        else { return values.first ?? "" }
+        return current
+      },
+      set: { formModel.selectedTerminalEffortByRuntime[formModel.runtime] = $0 }
+    )
+    return Group {
+      if values.isEmpty {
+        EmptyView()
+      } else {
+        HarnessMonitorSegmentedPicker(
+          title: "Effort",
+          selection: selection,
+          accessibilityIdentifier: HarnessMonitorAccessibility.agentsEffortPicker
+        ) {
+          ForEach(values, id: \.self) { level in
+            Text(level.capitalized)
+              .tag(level)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentsEffortPicker,
+                  option: level
+                )
+              )
+          }
+        }
       }
     }
   }
@@ -334,20 +398,82 @@ extension AgentTuiWindowView {
       get: { formModel.selectedCodexModel ?? catalog.default },
       set: { formModel.selectedCodexModel = $0 }
     )
-    return HarnessMonitorSegmentedPicker(
-      title: "Model",
-      selection: binding,
-      accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexModelPicker
-    ) {
-      ForEach(catalog.models) { model in
-        Text(model.displayName)
-          .tag(model.id)
+    let customBinding = Binding<String>(
+      get: { formModel.customCodexModel ?? "" },
+      set: { formModel.customCodexModel = $0 }
+    )
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HarnessMonitorSegmentedPicker(
+        title: "Model",
+        selection: binding,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexModelPicker
+      ) {
+        ForEach(catalog.models) { model in
+          Text(model.displayName)
+            .tag(model.id)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.agentsCodexModelPicker,
+                option: model.displayName
+              )
+            )
+        }
+        Text("Custom...")
+          .tag(RuntimeCustomModel.tag)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.segmentedOption(
               HarnessMonitorAccessibility.agentsCodexModelPicker,
-              option: model.displayName
+              option: "Custom"
             )
           )
+      }
+      if binding.wrappedValue == RuntimeCustomModel.tag {
+        TextField("Provider-specific model id", text: customBinding)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexCustomModelField)
+      }
+      codexEffortPicker(formModel, catalog: catalog, selectedModelBinding: binding)
+    }
+  }
+
+  func codexEffortPicker(
+    _ formModel: ViewModel,
+    catalog: RuntimeModelCatalog,
+    selectedModelBinding: Binding<String>
+  ) -> some View {
+    let values = AgentTuiWindowView.effortValues(
+      catalog: catalog,
+      selectedModelId: selectedModelBinding.wrappedValue
+    )
+    let selection = Binding<String>(
+      get: {
+        guard let current = formModel.selectedCodexEffort,
+          values.contains(current)
+        else { return values.first ?? "" }
+        return current
+      },
+      set: { formModel.selectedCodexEffort = $0 }
+    )
+    return Group {
+      if values.isEmpty {
+        EmptyView()
+      } else {
+        HarnessMonitorSegmentedPicker(
+          title: "Effort",
+          selection: selection,
+          accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexEffortPicker
+        ) {
+          ForEach(values, id: \.self) { level in
+            Text(level.capitalized)
+              .tag(level)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentsCodexEffortPicker,
+                  option: level
+                )
+              )
+          }
+        }
       }
     }
   }
@@ -538,7 +664,8 @@ extension AgentTuiWindowView {
       .disabled(!canSteerCodex)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexSteerButton)
       .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsCodexSteerButton).frame")
-      .accessibilityTestProbe(HarnessMonitorAccessibility.agentsCodexSteerButton, label: "Send Context")
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.agentsCodexSteerButton, label: "Send Context")
     }
   }
 

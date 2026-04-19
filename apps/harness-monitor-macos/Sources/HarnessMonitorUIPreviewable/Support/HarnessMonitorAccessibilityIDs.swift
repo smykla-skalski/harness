@@ -228,7 +228,11 @@ public enum HarnessMonitorAccessibility {
     "harness.window.agents.persona.\(identifier)"
   }
   public static let agentsModelPicker = "harness.window.agents.model"
+  public static let agentsCustomModelField = "harness.window.agents.model.custom"
+  public static let agentsEffortPicker = "harness.window.agents.effort"
   public static let agentsCodexModelPicker = "harness.window.agents.codex.model"
+  public static let agentsCodexCustomModelField = "harness.window.agents.codex.model.custom"
+  public static let agentsCodexEffortPicker = "harness.window.agents.codex.effort"
   public static let agentsCodexPromptField = "harness.window.agents.codex.prompt"
   public static let agentsCodexContextField = "harness.window.agents.codex.context"
   public static let agentsCodexModePicker = "harness.window.agents.codex.mode"

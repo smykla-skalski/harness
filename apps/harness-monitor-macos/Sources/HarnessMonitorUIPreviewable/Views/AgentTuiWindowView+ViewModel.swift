@@ -90,7 +90,8 @@ extension AgentTuiWindowView {
     }
 
     static func codexTitle(for run: CodexRunSnapshot) -> String {
-      let promptSummary = run.prompt
+      let promptSummary =
+        run.prompt
         .split(whereSeparator: \.isNewline)
         .first
         .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -218,6 +219,13 @@ extension AgentTuiWindowView {
     var availableRuntimeModels: [RuntimeModelCatalog] = []
     var selectedTerminalModelByRuntime: [AgentTuiRuntime: String] = [:]
     var selectedCodexModel: String?
+    var selectedTerminalEffortByRuntime: [AgentTuiRuntime: String] = [:]
+    var selectedCodexEffort: String?
+    /// Per-runtime custom model id entered in the "Custom..." text field.
+    /// `nil` when the picker is on a catalog model; a non-empty string when
+    /// the user typed a custom id and toggled the escape hatch.
+    var customTerminalModelByRuntime: [AgentTuiRuntime: String] = [:]
+    var customCodexModel: String?
     var createMode: AgentTuiCreateMode = .terminal
     var codexPrompt = ""
     var codexMode: CodexRunMode = .report
