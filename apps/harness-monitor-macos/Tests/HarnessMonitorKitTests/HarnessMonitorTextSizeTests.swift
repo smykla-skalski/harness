@@ -273,3 +273,48 @@ struct SessionTaskCardLayoutTests {
     return host.fittingSize
   }
 }
+
+@MainActor
+@Suite("Agents window mounting")
+struct AgentsWindowMountTests {
+  @Test("Agents window mounts from the cockpit preview store without crashing")
+  func agentsWindowMountsFromCockpitPreviewStore() async {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+    let navigationBridge = AgentTuiWindowNavigationBridge()
+    let host = NSHostingView(
+      rootView: AgentTuiWindowView(
+        store: store,
+        navigationBridge: navigationBridge
+      )
+    )
+    let window = NSWindow(
+      contentRect: CGRect(x: 0, y: 0, width: 1_240, height: 820),
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = CGRect(x: 0, y: 0, width: 1_240, height: 820)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    await Task.yield()
+    await Task.yield()
+    try? await Task.sleep(for: .milliseconds(50))
+
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(host.window === window)
+    #expect(window.contentView === host)
+    #expect(window.toolbar != nil)
+    #expect(host.fittingSize.width > 0)
+    #expect(host.fittingSize.height > 0)
+  }
+}

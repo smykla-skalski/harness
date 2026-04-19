@@ -188,12 +188,12 @@ public struct AgentTuiWindowView: View {
       .toolbarBaselineFrame(.sidebar)
     } detail: {
       detailColumnContent
-        .toolbar {
-          agentTuiNavigationToolbarItems
-          sessionToolbarItems
-        }
     }
     .navigationSplitViewStyle(.balanced)
+    .toolbar {
+      agentTuiNavigationToolbarItems
+      sessionToolbarItems
+    }
     .toolbarBaselineOverlay()
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
