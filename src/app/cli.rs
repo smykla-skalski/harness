@@ -14,6 +14,7 @@ use crate::daemon::bridge::BridgeCommand;
 use crate::daemon::transport::DaemonCommand;
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
+use crate::mcp::McpCommand;
 use crate::observe::ObserveArgs;
 use crate::run::{
     ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, DoctorArgs, EnvoyArgs,
@@ -158,6 +159,12 @@ pub enum Command {
         #[command(subcommand)]
         command: BridgeCommand,
     },
+
+    /// Model Context Protocol server for driving the Harness Monitor app.
+    Mcp {
+        #[command(subcommand)]
+        command: McpCommand,
+    },
 }
 
 /// Dispatch a parsed command to its owning subsystem.
@@ -179,6 +186,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::Session { command } => command.execute(&ctx),
         Command::Daemon { command } => command.execute(&ctx),
         Command::Bridge { command } => command.execute(&ctx),
+        Command::Mcp { command } => command.execute(&ctx),
     }
 }
 
@@ -196,6 +204,7 @@ fn command_name(command: &Command) -> &'static str {
         Command::Session { .. } => "session",
         Command::Daemon { .. } => "daemon",
         Command::Bridge { .. } => "bridge",
+        Command::Mcp { .. } => "mcp",
     }
 }
 

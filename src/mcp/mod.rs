@@ -19,6 +19,9 @@ pub mod protocol;
 pub mod registry;
 pub mod server;
 pub mod tool;
+pub mod transport;
+
+pub use transport::{McpCommand, McpServeArgs};
 
 #[cfg(test)]
 mod tests;
