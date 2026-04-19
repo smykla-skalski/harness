@@ -36,6 +36,36 @@ struct HarnessMonitorStoreCodexTests {
     #expect(store.currentSuccessFeedbackMessage == "Codex run started")
   }
 
+  @Test("Starting another Codex run reselects the newly started run")
+  func startingAnotherCodexRunReselectsNewRun() async {
+    let client = RecordingHarnessClient()
+    let existingRun = client.codexRunFixture(
+      runID: "codex-run-existing",
+      mode: .report,
+      status: .completed,
+      prompt: "Existing run"
+    )
+    client.configureCodexRuns([existingRun], for: PreviewFixtures.summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.selectedCodexRuns = [existingRun]
+    store.selectedCodexRun = existingRun
+    #expect(store.selectedCodexRun?.runId == existingRun.runId)
+
+    let started = await store.startCodexRun(
+      prompt: "Start a fresh run.",
+      mode: .approval,
+      actor: "leader-claude"
+    )
+
+    #expect(started)
+    #expect(store.selectedCodexRuns.map(\.runId) == ["codex-run-2", "codex-run-existing"])
+    #expect(store.selectedCodexRun?.runId == "codex-run-2")
+    #expect(store.selectedCodexRun?.prompt == "Start a fresh run.")
+    #expect(store.selectedCodexRun?.mode == .approval)
+  }
+
   @Test("Codex approval resolution clears pending approval")
   func codexApprovalResolutionClearsPendingApproval() async {
     let client = RecordingHarnessClient()
