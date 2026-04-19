@@ -120,6 +120,11 @@ pub struct TerminalAgentStartArgs {
     /// with a warning.
     #[arg(long)]
     pub effort: Option<String>,
+    /// Accept `--model` as-is without validating against the runtime's model
+    /// catalog. Used for provider previews or self-hosted identifiers that
+    /// Harness does not pre-register.
+    #[arg(long)]
+    pub allow_custom_model: bool,
 }
 
 impl Execute for TerminalAgentStartArgs {
@@ -141,6 +146,7 @@ impl Execute for TerminalAgentStartArgs {
             persona: self.persona.clone(),
             model: self.model.clone(),
             effort: self.effort.clone(),
+            allow_custom_model: self.allow_custom_model,
         };
         let snapshot = daemon_client()?.start_terminal_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
@@ -170,6 +176,9 @@ pub struct CodexAgentStartArgs {
     /// support reasoning.
     #[arg(long)]
     pub effort: Option<String>,
+    /// Accept `--model` as-is without validating against the codex catalog.
+    #[arg(long)]
+    pub allow_custom_model: bool,
 }
 
 impl Execute for CodexAgentStartArgs {
@@ -181,6 +190,7 @@ impl Execute for CodexAgentStartArgs {
             resume_thread_id: self.resume_thread_id.clone(),
             model: self.model.clone(),
             effort: self.effort.clone(),
+            allow_custom_model: self.allow_custom_model,
         };
         let snapshot = daemon_client()?.start_codex_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;

@@ -16,6 +16,7 @@ fn start_run_rejects_empty_prompt_before_db_lookup() {
         resume_thread_id: None,
         model: None,
         effort: None,
+        allow_custom_model: false,
     };
 
     let error = controller
@@ -38,6 +39,7 @@ fn start_run_rejects_unknown_model_for_codex() {
         resume_thread_id: None,
         model: Some("not-a-codex-model".to_string()),
         effort: None,
+        allow_custom_model: false,
     };
 
     let error = controller
@@ -65,6 +67,7 @@ fn start_run_rejects_effort_on_non_reasoning_model() {
         resume_thread_id: None,
         model: Some("gpt-5.4-mini".to_string()),
         effort: Some("medium".to_string()),
+        allow_custom_model: false,
     };
 
     let error = controller
@@ -88,6 +91,7 @@ fn start_run_rejects_unknown_effort_value() {
         resume_thread_id: None,
         model: Some("gpt-5-codex".to_string()),
         effort: Some("extreme".to_string()),
+        allow_custom_model: false,
     };
 
     let error = controller
@@ -95,4 +99,34 @@ fn start_run_rejects_unknown_effort_value() {
         .expect_err("unknown effort should be rejected");
     let message = error.to_string();
     assert!(message.contains("extreme"), "unexpected error: {message}");
+}
+
+#[test]
+fn start_run_accepts_custom_model_and_effort_when_opt_in() {
+    let (sender, _) = broadcast::channel(8);
+    let controller = CodexControllerHandle::new(sender, Arc::new(OnceLock::new()), false);
+    let request = CodexRunRequest {
+        actor: None,
+        prompt: "explore".to_string(),
+        mode: CodexRunMode::Report,
+        resume_thread_id: None,
+        model: Some("gpt-6-private".to_string()),
+        effort: Some("maximum".to_string()),
+        allow_custom_model: true,
+    };
+
+    // Validation passes; the call will later fail at the websocket preflight
+    // because no daemon is running, not at catalog validation.
+    let error = controller
+        .start_run("sess-1", &request)
+        .expect_err("preflight fails without daemon");
+    let message = error.to_string();
+    assert!(
+        !message.contains("gpt-6-private"),
+        "custom model should not show in validation error: {message}"
+    );
+    assert!(
+        !message.contains("maximum"),
+        "custom effort should not show in validation error: {message}"
+    );
 }

@@ -191,7 +191,9 @@ impl CodexControllerHandle {
         }
 
         let requested_model = request.model.as_deref().filter(|value| !value.is_empty());
-        if let Some(model) = requested_model {
+        if let Some(model) = requested_model
+            && !request.allow_custom_model
+        {
             validate_model("codex", model).map_err(|valid| {
                 let detail = if valid.is_empty() {
                     "no codex model catalog available".to_string()
@@ -204,7 +206,9 @@ impl CodexControllerHandle {
             })?;
         }
 
-        if let Some(effort) = request.effort.as_deref().filter(|value| !value.is_empty()) {
+        if let Some(effort) = request.effort.as_deref().filter(|value| !value.is_empty())
+            && !request.allow_custom_model
+        {
             validate_codex_effort(requested_model, effort)?;
         }
 

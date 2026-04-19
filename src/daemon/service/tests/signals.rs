@@ -118,6 +118,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                     persona: None,
                     model: None,
                     effort: None,
+                    allow_custom_model: false,
                 },
             )
             .expect("start agent tui");
@@ -243,6 +244,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                     persona: None,
                     model: None,
                     effort: None,
+                    allow_custom_model: false,
                 },
             )
             .expect("start agent tui");

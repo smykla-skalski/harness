@@ -259,6 +259,12 @@ pub struct AgentTuiStartRequest {
     /// not support effort. `None` skips effort selection entirely.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    /// When `true`, the `model` field is accepted as-is without catalog
+    /// validation and any effort value is forwarded without checking the
+    /// model's `effort_values`. Surfaces the "Custom..." picker option in the
+    /// UI for models Harness does not pre-register.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub allow_custom_model: bool,
 }
 
 impl AgentTuiStartRequest {
@@ -276,10 +282,10 @@ impl AgentTuiStartRequest {
         };
         let model = self.model.as_deref().filter(|value| !value.is_empty());
         if let Some(model) = model {
-            apply_model_to_profile(&mut profile, model)?;
+            apply_model_to_profile(&mut profile, model, self.allow_custom_model)?;
         }
         if let Some(effort) = self.effort.as_deref().filter(|value| !value.is_empty()) {
-            apply_effort_to_profile(&mut profile, model, effort)?;
+            apply_effort_to_profile(&mut profile, model, effort, self.allow_custom_model)?;
         }
         Ok(profile)
     }
@@ -306,18 +312,21 @@ impl AgentTuiStartRequest {
 fn apply_model_to_profile(
     profile: &mut AgentTuiLaunchProfile,
     model: &str,
+    allow_custom: bool,
 ) -> Result<(), CliError> {
-    models::validate_model(&profile.runtime, model).map_err(|valid_ids| {
-        let detail = if valid_ids.is_empty() {
-            format!("unknown runtime '{}'", profile.runtime)
-        } else {
-            format!("valid models: {}", valid_ids.join(", "))
-        };
-        CliErrorKind::workflow_parse(format!(
-            "model '{model}' is not valid for runtime '{}': {detail}",
-            profile.runtime
-        ))
-    })?;
+    if !allow_custom {
+        models::validate_model(&profile.runtime, model).map_err(|valid_ids| {
+            let detail = if valid_ids.is_empty() {
+                format!("unknown runtime '{}'", profile.runtime)
+            } else {
+                format!("valid models: {}", valid_ids.join(", "))
+            };
+            CliErrorKind::workflow_parse(format!(
+                "model '{model}' is not valid for runtime '{}': {detail}",
+                profile.runtime
+            ))
+        })?;
+    }
 
     let Some(runtime_adapter) = runtime_for_name(&profile.runtime) else {
         return Err(CliErrorKind::workflow_parse(format!(
@@ -428,6 +437,7 @@ mod model_selection_tests {
             persona: None,
             model: None,
             effort: None,
+            allow_custom_model: false,
         }
     }
 

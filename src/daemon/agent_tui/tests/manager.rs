@@ -71,6 +71,7 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
                     cols: 40,
                     model: None,
                     effort: None,
+                    allow_custom_model: false,
                 },
             )
             .expect("start manager TUI");
@@ -166,6 +167,7 @@ fn manager_start_does_not_pre_register() {
                     cols: 40,
                     model: None,
                     effort: None,
+                    allow_custom_model: false,
                 },
             )
             .expect("start");
@@ -242,6 +244,7 @@ fn manager_auto_join_prompt_in_transcript() {
                     cols: 80,
                     model: None,
                     effort: None,
+                    allow_custom_model: false,
                 },
             )
             .expect("start");
@@ -329,6 +332,7 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
                     cols: 80,
                     model: None,
                     effort: None,
+                    allow_custom_model: false,
                 },
             )
             .expect("start");

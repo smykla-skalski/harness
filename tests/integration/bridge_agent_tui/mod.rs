@@ -370,6 +370,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                         persona: None,
                         model: None,
                         effort: None,
+                        allow_custom_model: false,
                     },
                 )
                 .expect("start sandboxed tui via bridge");

@@ -157,6 +157,7 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
                         cols: 80,
                         model: None,
                         effort: None,
+                        allow_custom_model: false,
                     },
                 )
                 .expect_err("start should fail without bridge");

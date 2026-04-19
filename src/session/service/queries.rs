@@ -75,6 +75,7 @@ pub fn build_recovery_tui_request(
         persona: None,
         model: None,
         effort: None,
+        allow_custom_model: false,
     })
 }
 
