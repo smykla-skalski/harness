@@ -207,11 +207,16 @@ public struct AgentTuiWindowView: View {
       async let tuiRefresh = store.refreshSelectedAgentTuis()
       async let codexRefresh = store.refreshSelectedCodexRuns()
       async let personas = store.fetchPersonas()
+      async let runtimeModels = store.fetchRuntimeModelCatalogs()
       let loadedPersonas = await personas
+      let loadedRuntimeModels = await runtimeModels
       _ = await tuiRefresh
       _ = await codexRefresh
       if viewModel.availablePersonas != loadedPersonas {
         viewModel.availablePersonas = loadedPersonas
+      }
+      if viewModel.availableRuntimeModels != loadedRuntimeModels {
+        viewModel.availableRuntimeModels = loadedRuntimeModels
       }
       refreshDisplayState()
       reconcileSheetState(afterRefresh: true)

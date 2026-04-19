@@ -107,6 +107,7 @@ extension AgentTuiWindowView {
           prompt: viewModel.prompt,
           projectDir: trimmedProjectDir,
           persona: viewModel.selectedPersona,
+          model: viewModel.selectedTerminalModelByRuntime[viewModel.runtime],
           argv: parsedArgvOverride,
           rows: startSize.rows,
           cols: startSize.cols
@@ -125,7 +126,8 @@ extension AgentTuiWindowView {
       case .codex:
         let startedRun = await store.startCodexRunSnapshot(
           prompt: viewModel.codexPrompt,
-          mode: viewModel.codexMode
+          mode: viewModel.codexMode,
+          model: viewModel.selectedCodexModel
         )
         if let startedRun {
           viewModel.codexPrompt = ""

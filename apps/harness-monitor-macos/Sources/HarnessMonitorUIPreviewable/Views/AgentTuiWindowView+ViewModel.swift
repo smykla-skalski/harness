@@ -215,7 +215,9 @@ extension AgentTuiWindowView {
     var wrapLines = false
     var selectedPersona: String?
     var availablePersonas: [AgentPersona] = []
-    var expandedPersonaInfo: String?
+    var availableRuntimeModels: [RuntimeModelCatalog] = []
+    var selectedTerminalModelByRuntime: [AgentTuiRuntime: String] = [:]
+    var selectedCodexModel: String?
     var createMode: AgentTuiCreateMode = .terminal
     var codexPrompt = ""
     var codexMode: CodexRunMode = .report
