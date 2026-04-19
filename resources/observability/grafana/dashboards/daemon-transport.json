@@ -581,7 +581,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "{service_name=\"harness-daemon\", level=~\"${level:regex}\"} | json | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ .body }}{{ if .attributes_mode }} | mode={{ .attributes_mode }}{{ end }}{{ if .attributes_run_id }} | run={{ .attributes_run_id }}{{ end }}{{ if .attributes_session_id }} | session={{ .attributes_session_id }}{{ end }}\"",
+          "expr": "{service_name=\"harness-daemon\", level=~\"${level:regex}\"} | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ __line__ }}\"",
           "queryType": "range",
           "refId": "A"
         }
