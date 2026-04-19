@@ -298,16 +298,12 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
 
     let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
     XCTAssertTrue(waitForElement(picker, timeout: Self.uiTimeout))
+    picker.click()
 
-    let customOption = app.buttons[
-      HarnessMonitorUITestAccessibility.segmentedOption(
-        Accessibility.agentsModelPicker,
-        option: "Custom"
-      )
-    ]
+    let customOption = app.menuItems["Custom..."].firstMatch
     XCTAssertTrue(
       waitForElement(customOption, timeout: Self.uiTimeout),
-      "Custom... option should appear inside the model picker"
+      "Custom... menu item should appear after opening the model picker"
     )
     customOption.click()
 
