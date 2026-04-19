@@ -28,6 +28,27 @@ impl AgentRuntime for ClaudeRuntime {
         "claude"
     }
 
+    fn effort_env(&self, level: &str) -> Vec<(String, String)> {
+        // Claude's extended thinking is an API-level setting (`thinking.budget_tokens`),
+        // not a CLI flag. Emit both the level and a resolved token budget so
+        // downstream wrapper scripts can translate into Claude Code settings
+        // JSON without re-parsing the rung names.
+        let tokens = match level {
+            "off" => 0,
+            "low" => 4_096,
+            "medium" => 16_384,
+            "high" => 32_768,
+            _ => return Vec::new(),
+        };
+        vec![
+            ("HARNESS_CLAUDE_THINKING_LEVEL".into(), level.into()),
+            (
+                "HARNESS_CLAUDE_THINKING_BUDGET_TOKENS".into(),
+                tokens.to_string(),
+            ),
+        ]
+    }
+
     fn discover_native_log(
         &self,
         session_id: &str,
