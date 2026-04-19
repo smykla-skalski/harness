@@ -15,6 +15,7 @@ mod integration {
     mod daemon_sandbox_mode;
     pub mod helpers;
     mod install_workflow;
+    mod mcp;
     mod observability;
 
     mod cluster;
