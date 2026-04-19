@@ -20,6 +20,26 @@ public enum HarnessMonitorMCPPreferencesDefaults {
   /// Filename of the NDJSON accessibility socket inside the app-group
   /// container.
   public static let socketFilename = "harness-monitor-mcp.sock"
+
+  /// Environment variable that forces the registry host on regardless of
+  /// the `@AppStorage` toggle. DEBUG builds only - release builds ignore
+  /// the variable so production users cannot be tricked into opening the
+  /// socket without explicit consent.
+  public static let forceEnableEnvVar = "HARNESS_MONITOR_MCP_FORCE_ENABLE"
+
+  /// Whether the registry host should be forced on via the dev-mode env
+  /// var. Returns `false` in release builds even if the variable is set.
+  public static var forceEnableFromEnvironment: Bool {
+    #if DEBUG
+    guard let value = ProcessInfo.processInfo.environment[forceEnableEnvVar] else {
+      return false
+    }
+    let normalized = value.lowercased()
+    return normalized == "1" || normalized == "true" || normalized == "yes"
+    #else
+    return false
+    #endif
+  }
 }
 
 /// Resolve the absolute path of the accessibility registry socket. Mirrors
