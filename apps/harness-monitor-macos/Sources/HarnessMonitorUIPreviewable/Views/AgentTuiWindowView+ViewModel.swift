@@ -226,6 +226,7 @@ extension AgentTuiWindowView {
     var windowNavigation = WindowNavigationState()
     var pendingViewportResizeTarget: AgentTuiSize?
     var viewportResizeTask: Task<Void, Never>?
+    var expectedSize: AgentTuiSize?
 
     init(
       displayState: AgentTuiDisplayState = AgentTuiDisplayState(),
