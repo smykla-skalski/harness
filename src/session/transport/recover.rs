@@ -35,7 +35,7 @@ impl Execute for SessionRecoverLeaderArgs {
             agent_to_str(self.runtime),
             &project,
         )?;
-        let snapshot = daemon_client()?.start_agent_tui(&self.session_id, &request)?;
+        let snapshot = daemon_client()?.start_terminal_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
         Ok(0)
     }

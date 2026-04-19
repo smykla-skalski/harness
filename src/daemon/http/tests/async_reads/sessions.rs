@@ -4,9 +4,7 @@ use serde_json::Value;
 
 use super::*;
 use crate::daemon::http::core::{get_diagnostics, get_projects};
-use crate::daemon::http::sessions::{
-    SessionScopeQuery, get_session, get_sessions, get_timeline,
-};
+use crate::daemon::http::sessions::{SessionScopeQuery, get_session, get_sessions, get_timeline};
 
 #[tokio::test]
 async fn get_projects_uses_async_db_when_sync_db_is_unavailable() {
