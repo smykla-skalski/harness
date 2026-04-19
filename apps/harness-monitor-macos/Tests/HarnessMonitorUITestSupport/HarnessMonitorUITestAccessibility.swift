@@ -233,10 +233,12 @@ enum HarnessMonitorUITestAccessibility {
   static let agentTuiWrapToggle = "harness.sheet.agent-tui.wrap-toggle"
   static let agentTuiNavigateBackButton = "harness.sheet.agent-tui.navigate-back"
   static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
-  static let agentTuiPersonaPicker = "harness.sheet.agent-tui.persona-picker"
+  static let agentTuiPersonaPicker = "harness.window.agents.persona"
   static func agentTuiPersonaCard(_ identifier: String) -> String {
-    "harness.sheet.agent-tui.persona.\(identifier)"
+    "harness.window.agents.persona.\(identifier)"
   }
+  static let agentsModelPicker = "harness.window.agents.model"
+  static let agentsCodexModelPicker = "harness.window.agents.codex.model"
   static let agentsCodexPromptField = "harness.window.agents.codex.prompt"
   static let agentsCodexContextField = "harness.window.agents.codex.context"
   static let agentsCodexModePicker = "harness.window.agents.codex.mode"
