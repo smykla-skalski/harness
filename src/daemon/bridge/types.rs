@@ -159,6 +159,12 @@ pub struct AgentTuiStartSpec {
     pub transcript_path: PathBuf,
     pub size: AgentTuiSize,
     pub prompt: Option<String>,
+    /// Reasoning / thinking effort level forwarded to the runtime. Runtimes
+    /// that accept it via CLI flag have already had it folded into `profile.argv`
+    /// at request resolution; this field is consumed at spawn time for
+    /// runtimes whose effort is conveyed through environment variables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
 }
 
 #[derive(Debug, Clone, Args)]

@@ -68,6 +68,7 @@ impl AgentTuiManagerHandle {
             &project.project_dir,
             size,
             Some(auto_join.clone()),
+            request.effort.as_deref(),
         )?;
 
         let result = self.activate_tui(process, &snapshot_context);
@@ -181,6 +182,7 @@ impl AgentTuiManagerHandle {
             transcript_path,
             size,
             prompt: Some(auto_join),
+            effort: request.effort.clone(),
         })?;
         self.register_started_snapshot(&snapshot, ActiveAgentTui::new(None))?;
         Ok(snapshot)

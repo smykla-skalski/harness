@@ -84,6 +84,8 @@ pub(super) fn apply_effort_to_profile(
 
 #[cfg(test)]
 mod tests {
+    use crate::agents::runtime::runtime_for_name;
+
     use super::super::DEFAULT_COLS;
     use super::super::DEFAULT_ROWS;
     use super::super::model::AgentTuiStartRequest;
@@ -249,5 +251,49 @@ mod tests {
                 "claude-sonnet-5-0-private".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn claude_effort_env_maps_levels_to_budget_tokens() {
+        let claude = runtime_for_name("claude").expect("claude runtime");
+        let env: std::collections::BTreeMap<_, _> =
+            claude.effort_env("medium").into_iter().collect();
+        assert_eq!(
+            env.get("HARNESS_CLAUDE_THINKING_LEVEL").map(String::as_str),
+            Some("medium")
+        );
+        assert_eq!(
+            env.get("HARNESS_CLAUDE_THINKING_BUDGET_TOKENS")
+                .map(String::as_str),
+            Some("16384")
+        );
+    }
+
+    #[test]
+    fn claude_effort_env_off_resolves_to_zero_budget() {
+        let claude = runtime_for_name("claude").expect("claude runtime");
+        let env: std::collections::BTreeMap<_, _> = claude.effort_env("off").into_iter().collect();
+        assert_eq!(
+            env.get("HARNESS_CLAUDE_THINKING_BUDGET_TOKENS")
+                .map(String::as_str),
+            Some("0")
+        );
+    }
+
+    #[test]
+    fn gemini_effort_env_maps_levels_to_budget_tokens() {
+        let gemini = runtime_for_name("gemini").expect("gemini runtime");
+        let env: std::collections::BTreeMap<_, _> = gemini.effort_env("high").into_iter().collect();
+        assert_eq!(
+            env.get("HARNESS_GEMINI_THINKING_BUDGET_TOKENS")
+                .map(String::as_str),
+            Some("24576")
+        );
+    }
+
+    #[test]
+    fn codex_effort_env_is_empty_because_flag_based() {
+        let codex = runtime_for_name("codex").expect("codex runtime");
+        assert!(codex.effort_env("medium").is_empty());
     }
 }

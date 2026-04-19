@@ -21,6 +21,27 @@ impl AgentRuntime for GeminiRuntime {
         "gemini"
     }
 
+    fn effort_env(&self, level: &str) -> Vec<(String, String)> {
+        // Gemini exposes thinking via `thinking_config.thinking_budget` in
+        // the API; the `gemini` CLI does not yet take a flag, so mirror
+        // Claude's pattern and publish harness-prefixed env vars for wrapper
+        // scripts. Budget caps: 0 disables, 2.5-Flash tops out ~8192, Pro ~24576.
+        let tokens = match level {
+            "off" => 0,
+            "low" => 4_096,
+            "medium" => 16_384,
+            "high" => 24_576,
+            _ => return Vec::new(),
+        };
+        vec![
+            ("HARNESS_GEMINI_THINKING_LEVEL".into(), level.into()),
+            (
+                "HARNESS_GEMINI_THINKING_BUDGET_TOKENS".into(),
+                tokens.to_string(),
+            ),
+        ]
+    }
+
     fn discover_native_log(
         &self,
         session_id: &str,

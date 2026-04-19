@@ -364,7 +364,7 @@ extension AgentTuiWindowView {
       get: {
         guard let current = formModel.selectedTerminalEffortByRuntime[formModel.runtime],
           values.contains(current)
-        else { return values.first ?? "" }
+        else { return AgentTuiWindowView.defaultEffortLevel(from: values) }
         return current
       },
       set: { formModel.selectedTerminalEffortByRuntime[formModel.runtime] = $0 }
@@ -449,7 +449,7 @@ extension AgentTuiWindowView {
       get: {
         guard let current = formModel.selectedCodexEffort,
           values.contains(current)
-        else { return values.first ?? "" }
+        else { return AgentTuiWindowView.defaultEffortLevel(from: values) }
         return current
       },
       set: { formModel.selectedCodexEffort = $0 }
