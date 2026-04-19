@@ -10,6 +10,10 @@ let package = Package(
     .library(
       name: "HarnessMonitorRegistry",
       targets: ["HarnessMonitorRegistry"]
+    ),
+    .executable(
+      name: "harness-monitor-registry-host",
+      targets: ["HarnessMonitorRegistryHost"]
     )
   ],
   targets: [
@@ -18,6 +22,14 @@ let package = Package(
       swiftSettings: [
         .enableUpcomingFeature("StrictConcurrency"),
         .enableExperimentalFeature("StrictConcurrency"),
+        .unsafeFlags(["-strict-concurrency=complete"])
+      ]
+    ),
+    .executableTarget(
+      name: "HarnessMonitorRegistryHost",
+      dependencies: ["HarnessMonitorRegistry"],
+      swiftSettings: [
+        .enableUpcomingFeature("StrictConcurrency"),
         .unsafeFlags(["-strict-concurrency=complete"])
       ]
     ),
