@@ -124,6 +124,7 @@ fn spawn_agent_tui_process_bootstraps_runtime_assets_before_launch() {
                 &project,
                 AgentTuiSize { rows: 5, cols: 40 },
                 None,
+                None,
             )
             .expect("spawn process");
 

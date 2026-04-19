@@ -241,6 +241,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
                     transcript_path: tmp.path().join("transcript.log"),
                     size: AgentTuiSize { rows: 24, cols: 80 },
                     prompt: None,
+                    effort: None,
                 })
                 .expect("start agent tui");
             assert_eq!(snapshot.tui_id, "agent-tui-1");

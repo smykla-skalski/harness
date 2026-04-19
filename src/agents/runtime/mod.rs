@@ -177,11 +177,21 @@ pub trait AgentRuntime: Send + Sync {
     ///
     /// Returns `Some("--reasoning-effort")` for runtimes whose CLI exposes
     /// effort directly (codex). Runtimes that configure effort via API body,
-    /// config file, or not at all return `None`, and the effort selection is
-    /// accepted but dropped with a warning at spawn time so the rest of the
-    /// flow still validates the request shape.
+    /// config file, environment variable, or not at all return `None`.
     fn effort_flag(&self) -> Option<&'static str> {
         None
+    }
+
+    /// Environment variables this runtime consumes to receive the effort
+    /// level when no CLI flag is available. Called once per spawn with the
+    /// resolved effort level; the returned pairs are merged into the child
+    /// process environment.
+    ///
+    /// Harness-owned variable names (prefixed `HARNESS_`) so downstream
+    /// wrapper scripts can translate them to the provider-specific mechanism
+    /// (Claude Code settings JSON, Gemini `thinking_config`, etc.).
+    fn effort_env(&self, _level: &str) -> Vec<(String, String)> {
+        Vec::new()
     }
 
     /// Serializable capability snapshot for UI and daemon clients.

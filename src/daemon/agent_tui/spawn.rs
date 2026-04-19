@@ -30,12 +30,20 @@ pub(crate) fn spawn_agent_tui_process(
     project_dir: &Path,
     size: AgentTuiSize,
     auto_join_prompt: Option<String>,
+    effort: Option<&str>,
 ) -> Result<AgentTuiProcess, CliError> {
     ensure_runtime_bootstrap(&profile.runtime, project_dir)?;
     let mut env = BTreeMap::new();
     env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
     let runtime = runtime_for_name(&profile.runtime);
+    if let Some(effort) = effort.filter(|value| !value.is_empty())
+        && let Some(runtime) = runtime
+    {
+        for (key, value) in runtime.effort_env(effort) {
+            env.insert(key, value);
+        }
+    }
     let readiness_pattern = runtime.and_then(AgentRuntime::readiness_pattern);
     let prompt_delivery = runtime.map_or(
         InitialPromptDelivery::PtySend,

@@ -47,4 +47,17 @@ extension AgentTuiWindowView {
     }
     return (pickerValue, false)
   }
+
+  /// Pick the default effort level for a set of offered values. Prefers
+  /// `medium` when the runtime exposes it; otherwise falls back to the
+  /// middle index, rounding down. Returns an empty string when no values
+  /// are offered so callers can detect "no effort".
+  static func defaultEffortLevel(from values: [String]) -> String {
+    guard !values.isEmpty else { return "" }
+    if let medium = values.first(where: { $0 == "medium" }) {
+      return medium
+    }
+    let middleIndex = values.count / 2
+    return values[middleIndex]
+  }
 }
