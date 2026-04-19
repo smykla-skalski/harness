@@ -4,8 +4,8 @@ use crate::daemon::protocol::{CodexApprovalDecision, CodexApprovalRequest, Codex
 
 pub(super) fn thread_sandbox(mode: CodexRunMode) -> &'static str {
     match mode {
-        CodexRunMode::Report => "read-only",
-        CodexRunMode::WorkspaceWrite | CodexRunMode::Approval => "workspace-write",
+        CodexRunMode::Report | CodexRunMode::Approval => "read-only",
+        CodexRunMode::WorkspaceWrite => "workspace-write",
     }
 }
 
@@ -18,12 +18,12 @@ pub(super) fn approval_policy(mode: CodexRunMode) -> &'static str {
 
 pub(super) fn turn_sandbox_policy(mode: CodexRunMode, project_dir: &str) -> Value {
     match mode {
-        CodexRunMode::Report => json!({
+        CodexRunMode::Report | CodexRunMode::Approval => json!({
             "type": "readOnly",
             "networkAccess": false,
             "access": { "type": "fullAccess" }
         }),
-        CodexRunMode::WorkspaceWrite | CodexRunMode::Approval => json!({
+        CodexRunMode::WorkspaceWrite => json!({
             "type": "workspaceWrite",
             "networkAccess": false,
             "writableRoots": [project_dir],
@@ -209,5 +209,31 @@ fn app_server_approval_decision(decision: CodexApprovalDecision) -> &'static str
         CodexApprovalDecision::AcceptForSession => "acceptForSession",
         CodexApprovalDecision::Decline => "decline",
         CodexApprovalDecision::Cancel => "cancel",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{approval_policy, thread_sandbox, turn_sandbox_policy};
+    use crate::daemon::protocol::CodexRunMode;
+
+    #[test]
+    fn approval_mode_uses_read_only_thread_sandbox() {
+        assert_eq!(thread_sandbox(CodexRunMode::Approval), "read-only");
+    }
+
+    #[test]
+    fn approval_mode_keeps_on_request_policy_and_read_only_turn_sandbox() {
+        assert_eq!(approval_policy(CodexRunMode::Approval), "on-request");
+        assert_eq!(
+            turn_sandbox_policy(CodexRunMode::Approval, "/tmp/project"),
+            json!({
+                "type": "readOnly",
+                "networkAccess": false,
+                "access": { "type": "fullAccess" }
+            })
+        );
     }
 }
