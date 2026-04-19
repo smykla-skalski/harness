@@ -147,3 +147,40 @@ run = "./scripts/host-metrics.sh logs"
 [tasks."host-metrics:build-darwin-exporter"]
 description = "Build darwin-exporter from vendor submodule"
 run = "./scripts/host-metrics.sh build-darwin-exporter"
+
+[tasks."mcp:test"]
+description = "Run harness MCP server unit and integration tests"
+run = [
+  "cargo test --lib mcp::",
+  "cargo test --test integration mcp:: -- --test-threads=1",
+]
+
+[tasks."mcp:build:input-helper"]
+description = "Build the harness-monitor-input Swift helper (CGEvent backend)"
+run = "swift build -c release --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input"
+
+[tasks."mcp:build:monitor"]
+description = "Build the Harness Monitor macOS app (Debug) with the MCP registry host wired in"
+run = "xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation build"
+
+[tasks."mcp:launch:monitor"]
+description = "Open the Debug build of Harness Monitor.app"
+depends = ["mcp:build:monitor"]
+run = "./scripts/mcp-launch-monitor.sh"
+
+[tasks."mcp:install"]
+description = "Full local MCP install: Rust CLI, Swift input helper, and Monitor.app Debug build"
+depends = ["install", "mcp:build:input-helper", "mcp:build:monitor"]
+run = "printf '\\nMCP install complete. Next steps:\\n  1. mise run mcp:launch:monitor\\n  2. Cmd+, -> MCP -> enable the toggle\\n  3. mise run mcp:smoke\\n'"
+
+[tasks."mcp:socket-path"]
+description = "Print the resolved accessibility socket path"
+run = "./scripts/mcp-socket-path.sh"
+
+[tasks."mcp:serve"]
+description = "Run harness mcp serve on stdio (for manual debugging with MCP Inspector etc.)"
+run = "harness mcp serve"
+
+[tasks."mcp:smoke"]
+description = "Drive harness mcp serve through initialize + tools/list (pass a tool name as arg to also tools/call it)"
+run = "./scripts/mcp-smoke.sh"
