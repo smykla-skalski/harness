@@ -18,8 +18,9 @@ public enum HarnessMonitorMCPPreferencesDefaults {
   public static let appGroupIdentifier = "Q498EB36N4.io.harnessmonitor"
 
   /// Filename of the NDJSON accessibility socket inside the app-group
-  /// container.
-  public static let socketFilename = "harness-monitor-mcp.sock"
+  /// container. Keep short - Unix domain sockets have a 104-byte path
+  /// limit on macOS, and the Group Containers path is already long.
+  public static let socketFilename = "mcp.sock"
 
   /// Environment variable that forces the registry host on regardless of
   /// the `@AppStorage` toggle. DEBUG builds only - release builds ignore
