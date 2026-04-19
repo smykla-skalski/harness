@@ -12,11 +12,15 @@ struct HarnessMonitorMCPServiceGate: ViewModifier {
   private var registryHostEnabled = HarnessMonitorMCPPreferencesDefaults
     .registryHostEnabledDefault
 
+  private var effectiveEnabled: Bool {
+    registryHostEnabled || HarnessMonitorMCPPreferencesDefaults.forceEnableFromEnvironment
+  }
+
   func body(content: Content) -> some View {
     content
-      .task(id: registryHostEnabled) {
+      .task(id: effectiveEnabled) {
         await HarnessMonitorMCPAccessibilityService.shared
-          .setEnabled(registryHostEnabled)
+          .setEnabled(effectiveEnabled)
       }
   }
 }

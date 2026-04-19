@@ -14,6 +14,10 @@ public struct PreferencesMCPSection: View {
 
   public init() {}
 
+  private var forceEnabled: Bool {
+    HarnessMonitorMCPPreferencesDefaults.forceEnableFromEnvironment
+  }
+
   public var body: some View {
     Form {
       Section {
@@ -21,6 +25,12 @@ public struct PreferencesMCPSection: View {
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.preferencesMCPRegistryHostToggle
           )
+          .disabled(forceEnabled)
+        if forceEnabled {
+          Text(forceEnabledMessage)
+            .scaledFont(.caption)
+            .foregroundStyle(.orange)
+        }
         Text(socketDescription)
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
@@ -38,6 +48,12 @@ public struct PreferencesMCPSection: View {
       }
     }
     .preferencesDetailFormStyle()
+  }
+
+  private var forceEnabledMessage: String {
+    let envVar = HarnessMonitorMCPPreferencesDefaults.forceEnableEnvVar
+    return "\(envVar) is set in this DEBUG build; the host is forced on "
+      + "regardless of the toggle."
   }
 
   private var socketDescription: String {
