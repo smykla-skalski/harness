@@ -13,5 +13,5 @@ mod tool_result;
 mod tests;
 
 pub use error::{ErrorCode, ErrorObject};
-pub use message::{Notification, Request, RequestId, Response};
+pub use message::{JsonRpcVersion, Notification, Request, RequestId, Response};
 pub use tool_result::{ContentBlock, ToolResult};
