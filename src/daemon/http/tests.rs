@@ -26,7 +26,10 @@ use crate::session::types::{
 use super::DaemonHttpState;
 use super::agents::{post_remove_agent, post_role_change, post_transfer_leader};
 use super::auth::authorize_control_request;
-use super::core::{get_diagnostics, get_health, get_ready};
+use super::core::{
+    RuntimeSessionResolutionQuery, get_diagnostics, get_health, get_ready,
+    get_runtime_session_resolution,
+};
 use super::response::{map_json, request_activity_log_level};
 use super::runtime_session::post_runtime_session;
 use super::sessions::{
@@ -270,6 +273,38 @@ async fn get_ready_requires_auth() {
     let response = get_ready(HeaderMap::new(), State(test_http_state_with_db())).await;
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_runtime_session_resolution_requires_auth() {
+    let response = get_runtime_session_resolution(
+        HeaderMap::new(),
+        State(test_http_state_with_db()),
+        Query(RuntimeSessionResolutionQuery {
+            runtime_name: "codex".into(),
+            runtime_session_id: "anything".into(),
+        }),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_runtime_session_resolution_returns_null_resolved_when_nothing_matches() {
+    let response = get_runtime_session_resolution(
+        auth_headers(),
+        State(test_http_state_with_db()),
+        Query(RuntimeSessionResolutionQuery {
+            runtime_name: "codex".into(),
+            runtime_session_id: "missing-runtime-session".into(),
+        }),
+    )
+    .await;
+
+    let (status, body) = response_json(response).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["resolved"].is_null());
 }
 
 #[tokio::test]

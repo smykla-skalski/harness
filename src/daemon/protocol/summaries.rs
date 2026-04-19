@@ -39,6 +39,17 @@ pub struct ReadinessResponse {
     pub daemon_epoch: String,
 }
 
+/// Wire-level outcome of a runtime-session lookup.
+///
+/// Returned by `GET /v1/runtime-sessions/resolve`. `resolved` is `None` when
+/// no live agent matches; `Some` carries the single unambiguous match. The
+/// daemon surfaces ambiguity as a `session_ambiguous` error instead of
+/// populating this response with multiple entries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeSessionResolutionResponse {
+    pub resolved: Option<crate::session::service::ResolvedRuntimeSessionAgent>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogLevelResponse {
     pub level: String,

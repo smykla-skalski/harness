@@ -32,6 +32,15 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
                     write_http_response(&mut stream, "200 OK", "text/plain", "ok");
                     continue;
                 }
+                if request.starts_with("GET /v1/ready ") {
+                    write_http_response(
+                        &mut stream,
+                        "200 OK",
+                        "application/json",
+                        "{\"ready\":true,\"daemon_epoch\":\"test\"}",
+                    );
+                    continue;
+                }
                 if request.starts_with("GET /v1/sessions ") {
                     write_http_response(&mut stream, "200 OK", "application/json", "[]");
                     continue;

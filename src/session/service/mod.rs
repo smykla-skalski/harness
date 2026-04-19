@@ -51,7 +51,7 @@ pub struct TaskSpec<'a> {
     pub observe_issue_id: Option<&'a str>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ResolvedRuntimeSessionAgent {
     pub orchestration_session_id: String,
     pub agent_id: String,
