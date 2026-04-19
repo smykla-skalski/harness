@@ -9,3 +9,4 @@
 //! integration and automation tools are only compiled on macOS.
 
 pub mod protocol;
+pub mod server;
