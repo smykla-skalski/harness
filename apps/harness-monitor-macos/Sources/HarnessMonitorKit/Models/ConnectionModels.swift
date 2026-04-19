@@ -57,6 +57,21 @@ public enum ConnectionQuality: String, Equatable, Sendable {
       "Disconnected"
     }
   }
+
+  public var accessibilityDescription: String {
+    switch self {
+    case .excellent:
+      "excellent quality"
+    case .good:
+      "good quality"
+    case .degraded:
+      "degraded quality"
+    case .poor:
+      "poor quality"
+    case .disconnected:
+      "disconnected"
+    }
+  }
 }
 
 public struct ConnectionMetrics: Equatable, Sendable {
