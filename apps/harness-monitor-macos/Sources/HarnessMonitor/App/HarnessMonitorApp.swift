@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorRegistry
 import HarnessMonitorUIPreviewable
 import SwiftData
 import SwiftUI
@@ -46,6 +47,7 @@ struct HarnessMonitorApp: App {
   var body: some Scene {
     WindowGroup("Harness Monitor") {
       mainWindowContent
+        .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
@@ -79,6 +81,7 @@ struct HarnessMonitorApp: App {
         themeMode: $themeMode,
         selectedSection: $preferencesSelectedSection
       )
+      .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
@@ -91,6 +94,7 @@ struct HarnessMonitorApp: App {
         windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode
       )
+      .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 980, height: 620)
