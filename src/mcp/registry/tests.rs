@@ -8,7 +8,7 @@ use tokio::net::UnixListener;
 use tokio::sync::oneshot;
 
 use super::client::{RegistryClient, RegistryError};
-use super::path::{SOCKET_OVERRIDE_ENV, default_socket_path};
+use super::path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, SOCKET_OVERRIDE_ENV, default_socket_path};
 use super::types::{ListWindowsResult, RegistryRequest};
 
 fn socket_path(dir: &TempDir) -> PathBuf {
@@ -218,6 +218,29 @@ fn default_socket_path_falls_back_to_group_container() {
             let text = path.to_string_lossy();
             assert!(text.starts_with("/Users/fake/Library/Group Containers/"));
             assert!(text.ends_with("/mcp.sock"));
+        },
+    );
+}
+
+#[test]
+fn default_socket_path_uses_short_filename_for_realistic_group_container_paths() {
+    let home = "/Users/bart.smykla@konghq.com";
+    temp_env::with_vars(
+        [(SOCKET_OVERRIDE_ENV, None::<&str>), ("HOME", Some(home))],
+        || {
+            let path = default_socket_path();
+            let text = path.to_string_lossy();
+            assert!(text.ends_with("/mcp.sock"));
+            assert_eq!(SOCKET_FILENAME, "mcp.sock");
+            assert_eq!(
+                text,
+                format!("{home}/Library/Group Containers/{DEFAULT_APP_GROUP}/{SOCKET_FILENAME}"),
+            );
+            assert!(text.len() < 104);
+
+            let legacy =
+                format!("{home}/Library/Group Containers/{DEFAULT_APP_GROUP}/harness-monitor-mcp.sock");
+            assert!(legacy.len() >= 104);
         },
     );
 }

@@ -5,7 +5,8 @@ use std::path::PathBuf;
 pub const DEFAULT_APP_GROUP: &str = "Q498EB36N4.io.harnessmonitor";
 
 /// Filename of the Unix socket inside the app-group container.
-pub const SOCKET_FILENAME: &str = "harness-monitor-mcp.sock";
+/// Keep short - Unix domain sockets have a 104-byte path limit on macOS.
+pub const SOCKET_FILENAME: &str = "mcp.sock";
 
 /// Environment variable that overrides the default socket path. Useful for
 /// running the Harness Monitor app unsandboxed during development.

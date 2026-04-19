@@ -10,5 +10,5 @@ if [[ -n "${HARNESS_MONITOR_MCP_SOCKET:-}" ]]; then
 fi
 
 app_group="Q498EB36N4.io.harnessmonitor"
-socket="$HOME/Library/Group Containers/$app_group/harness-monitor-mcp.sock"
+socket="$HOME/Library/Group Containers/$app_group/mcp.sock"
 printf '%s\n' "$socket"

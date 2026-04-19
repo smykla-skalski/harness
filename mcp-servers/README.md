@@ -28,7 +28,7 @@ Claude Code / MCP client
                                        v
                            $HOME/Library/Group Containers/
                            Q498EB36N4.io.harnessmonitor/
-                           harness-monitor-mcp.sock
+                           mcp.sock
                                        ^
                                        |
 +---------------------------------------+
@@ -62,7 +62,7 @@ Point `--socket` at a custom path for unsandboxed dev:
   "mcpServers": {
     "harness-monitor": {
       "command": "harness",
-      "args": ["mcp", "serve", "--socket", "/tmp/harness-monitor-mcp.sock"]
+      "args": ["mcp", "serve", "--socket", "/tmp/mcp.sock"]
     }
   }
 }
@@ -71,7 +71,7 @@ Point `--socket` at a custom path for unsandboxed dev:
 Override the socket via environment instead:
 
 ```
-HARNESS_MONITOR_MCP_SOCKET=/tmp/harness-monitor-mcp.sock harness mcp serve
+HARNESS_MONITOR_MCP_SOCKET=/tmp/mcp.sock harness mcp serve
 ```
 
 Override the input helper binary:

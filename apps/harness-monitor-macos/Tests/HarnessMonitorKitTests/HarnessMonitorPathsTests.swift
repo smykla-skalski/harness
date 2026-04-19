@@ -115,4 +115,30 @@ struct HarnessMonitorPathsTests {
         == "Contents/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
     )
   }
+
+  @Test("MCP socket filename stays within realistic Unix socket path limits")
+  func mcpSocketFilenameStaysWithinUnixSocketPathLimits() {
+    let homeDirectory = URL(fileURLWithPath: "/Users/bart.smykla@konghq.com", isDirectory: true)
+    let appGroupDirectory =
+      homeDirectory
+      .appendingPathComponent("Library", isDirectory: true)
+      .appendingPathComponent("Group Containers", isDirectory: true)
+      .appendingPathComponent(
+        HarnessMonitorMCPPreferencesDefaults.appGroupIdentifier,
+        isDirectory: true
+      )
+    let socketPath =
+      appGroupDirectory
+      .appendingPathComponent(
+        HarnessMonitorMCPPreferencesDefaults.socketFilename,
+        isDirectory: false
+      )
+    let legacySocketPath =
+      appGroupDirectory
+      .appendingPathComponent("harness-monitor-mcp.sock", isDirectory: false)
+
+    #expect(HarnessMonitorMCPPreferencesDefaults.socketFilename == "mcp.sock")
+    #expect(socketPath.path.count < 104)
+    #expect(legacySocketPath.path.count >= 104)
+  }
 }
