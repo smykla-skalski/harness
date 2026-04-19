@@ -165,17 +165,17 @@ impl<'de> Deserialize<'de> for ErrMarker {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListWindowsResult {
     pub windows: Vec<RegistryWindow>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListElementsResult {
     pub elements: Vec<RegistryElement>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetElementResult {
     pub element: RegistryElement,
 }
