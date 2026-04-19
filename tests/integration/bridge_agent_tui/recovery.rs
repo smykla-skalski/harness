@@ -8,6 +8,7 @@ use harness::daemon::db::DaemonDb;
 use harness::session::service;
 use tokio::sync::broadcast;
 
+use super::support::{create_mock_codex, unused_local_port};
 use super::*;
 
 #[test]
@@ -20,11 +21,22 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     let mock_bin = tmp.path().join("bin");
     std::fs::create_dir_all(&mock_bin).expect("create mock bin");
     write_mock_codex_tui(&mock_bin);
+    let mock_codex = create_mock_codex(tmp.path());
+    let codex_port_text = unused_local_port().to_string();
     let path_env = prefixed_path_env(&mock_bin);
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+            .args([
+                "bridge",
+                "start",
+                "--capability",
+                "agent-tui",
+                "--codex-port",
+                &codex_port_text,
+                "--codex-path",
+                mock_codex.to_str().expect("utf8 codex path"),
+            ])
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)

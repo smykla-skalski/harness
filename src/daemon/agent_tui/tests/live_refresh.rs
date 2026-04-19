@@ -10,7 +10,9 @@ use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
-use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
+use super::support::{
+    WAIT_TIMEOUT, recv_broadcast_events, sample_snapshot, wait_until, with_agent_tui_home,
+};
 
 #[test]
 fn manager_publishes_terminal_output_without_manual_refresh() {
@@ -372,19 +374,12 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
         crate::session::types::AgentStatus::Disconnected
     );
 
-    let mut saw_sessions_updated = false;
-    let mut saw_session_updated = false;
-    wait_until(WAIT_TIMEOUT, || {
-        while let Ok(event) = receiver.try_recv() {
-            match event.event.as_str() {
-                "sessions_updated" => saw_sessions_updated = true,
-                "session_updated" if event.session_id.as_deref() == Some("sess-tui-exit") => {
-                    saw_session_updated = true;
-                }
-                _ => {}
-            }
-        }
-        saw_sessions_updated && saw_session_updated
+    let follow_up_events = recv_broadcast_events(&mut receiver, 3, WAIT_TIMEOUT);
+    let saw_sessions_updated = follow_up_events
+        .iter()
+        .any(|event| event.event == "sessions_updated");
+    let saw_session_updated = follow_up_events.iter().any(|event| {
+        event.event == "session_updated" && event.session_id.as_deref() == Some("sess-tui-exit")
     });
     assert!(saw_sessions_updated, "expected global session refresh");
     assert!(saw_session_updated, "expected scoped session refresh");
