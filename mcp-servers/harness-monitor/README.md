@@ -86,12 +86,9 @@ See `src/protocol.ts` for the full request/response contract.
 
 ## Permissions and entitlements
 
-The MCP server process needs:
+The MCP server process needs the Accessibility permission so `cliclick` and `osascript` can synthesize mouse and keyboard events. Window-scoped screenshots also need Screen Recording.
 
-- **Accessibility** - for `cliclick` and `osascript` to synthesize mouse/keyboard events
-- **Screen Recording** - for window screenshots with a `windowID`
-
-The Harness Monitor app side needs its socket listener allowed to bind inside the app-group container - no extra entitlement beyond the existing app-group membership. The listener uses `Network.framework` with a `.unix(path:)` endpoint.
+The Harness Monitor app side needs its socket listener allowed to bind inside the app-group container - no extra entitlement beyond the existing app-group membership. The listener uses BSD sockets (`socket` / `bind` / `listen` / `accept`).
 
 ## Development
 
