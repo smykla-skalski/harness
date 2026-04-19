@@ -28,20 +28,23 @@ public struct HarnessMonitorActionButton: View {
   }
 
   public var body: some View {
-    Button {
-      action()
-    } label: {
-      ProminentAwareLabel {
-        Text(title)
-          .lineLimit(1)
-          .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
-          .frame(maxWidth: fillsWidth ? .infinity : nil)
+    ZStack {
+      Button {
+        action()
+      } label: {
+        ProminentAwareLabel {
+          Text(title)
+            .lineLimit(1)
+            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+            .frame(maxWidth: fillsWidth ? .infinity : nil)
+        }
       }
+      .frame(maxWidth: fillsWidth ? .infinity : nil)
+      .harnessActionButtonStyle(variant: variant, tint: tint)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .accessibilityIdentifier(accessibilityIdentifier)
     }
-    .frame(maxWidth: fillsWidth ? .infinity : nil)
-    .harnessActionButtonStyle(variant: variant, tint: tint)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityTestProbe(accessibilityIdentifier, label: title)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
   }
 }
@@ -93,19 +96,25 @@ public struct HarnessMonitorAsyncActionButton: View {
   }
 
   public var body: some View {
-    Button {
-      if isLoading {
-        cancelAction()
-      } else {
-        performAction()
+    ZStack {
+      Button {
+        if isLoading {
+          cancelAction()
+        } else {
+          performAction()
+        }
+      } label: {
+        label
       }
-    } label: {
-      label
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil)
     .harnessActionButtonStyle(variant: effectiveVariant, tint: effectiveTint)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityTestProbe(
+      accessibilityIdentifier,
+      label: isLoading ? "Cancel" : title
+    )
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
     .onDisappear {
       runningTask?.cancel()

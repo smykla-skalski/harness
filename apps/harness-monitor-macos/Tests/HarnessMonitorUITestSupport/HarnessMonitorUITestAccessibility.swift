@@ -210,6 +210,7 @@ enum HarnessMonitorUITestAccessibility {
   static let agentTuiState = "harness.sheet.agent-tui.state"
   static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"
   static let agentTuiCreateTab = "harness.sheet.agent-tui.tab.create"
+  static let agentTuiCreateModePicker = "harness.sheet.agent-tui.create-mode"
   static let agentTuiRuntimePicker = "harness.sheet.agent-tui.runtime"
   static let agentTuiNameField = "harness.sheet.agent-tui.name"
   static let agentTuiPromptField = "harness.sheet.agent-tui.prompt"
@@ -242,6 +243,9 @@ enum HarnessMonitorUITestAccessibility {
   static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
   static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
   static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
+  static let agentsCodexFinalMessage = "harness.window.agents.codex.final"
+  static let agentsCodexLatestSummary = "harness.window.agents.codex.latest"
+  static let agentsCodexErrorMessage = "harness.window.agents.codex.error"
   static let agentsCodexRecoveryBanner = "harness.window.agents.codex.recovery-banner"
   static let agentsCodexEnableBridgeButton = "harness.window.agents.codex.enable-bridge"
   static let agentsCodexCopyCommandButton = "harness.window.agents.codex.copy-command"
@@ -289,8 +293,16 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.agent.\(slug(agentID)).task-drop-feedback"
   }
 
+  static func sessionRow(_ sessionID: String) -> String {
+    "harness.sidebar.session.\(slug(sessionID))"
+  }
+
   static func agentTuiTab(_ tuiID: String) -> String {
     "harness.sheet.agent-tui.tab.\(slug(tuiID))"
+  }
+
+  static func segmentedOption(_ controlID: String, option: String) -> String {
+    "\(controlID).option.\(slug(option))"
   }
 
   private static func slug(_ value: String) -> String {
