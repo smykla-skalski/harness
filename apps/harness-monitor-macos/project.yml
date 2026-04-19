@@ -54,6 +54,8 @@ packages:
   Textual:
     url: https://github.com/gonzalezreal/textual
     exactVersion: 0.3.1
+  HarnessMonitorRegistry:
+    path: ../../mcp-servers/harness-monitor-registry
 targets:
   HarnessMonitorKit:
     type: framework
@@ -87,6 +89,8 @@ targets:
         product: OpenTelemetryProtocolExporterHTTP
       - package: GRPCSwift
         product: GRPC
+      - package: HarnessMonitorRegistry
+        product: HarnessMonitorRegistry
     settings:
       base:
         CODE_SIGN_STYLE: Automatic

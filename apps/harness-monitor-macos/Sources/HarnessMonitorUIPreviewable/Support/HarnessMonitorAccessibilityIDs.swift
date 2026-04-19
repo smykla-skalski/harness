@@ -96,6 +96,9 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesTextSizePicker = "harness.preferences.text-size"
   public static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   public static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
+  public static let preferencesMCPSection = "harness.preferences.mcp"
+  public static let preferencesMCPRegistryHostToggle =
+    "harness.preferences.mcp.registry-host"
   public static let preferencesVoiceSection = "harness.preferences.voice"
   public static let preferencesVoiceLocaleField = "harness.preferences.voice.locale-field"
   public static let preferencesVoiceLocalePicker = "harness.preferences.voice.locale-picker"
