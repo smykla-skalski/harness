@@ -33,12 +33,11 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
 }
 
 final class WindowTrackingNSView: NSView {
-  private let registry: AccessibilityRegistry
+  private let syncController: WindowRegistrySyncController
   private var observations: [NSObjectProtocol] = []
-  private var trackedWindowNumber: Int?
 
   init(registry: AccessibilityRegistry) {
-    self.registry = registry
+    syncController = WindowRegistrySyncController(registry: registry)
     super.init(frame: .zero)
   }
 
@@ -53,8 +52,8 @@ final class WindowTrackingNSView: NSView {
   }
 
   private func startTracking(_ window: NSWindow) {
-    trackedWindowNumber = window.windowNumber
-    sync(window)
+    let generation = syncController.beginTracking(windowID: window.windowNumber)
+    sync(window, generation: generation)
     let names: [NSNotification.Name] = [
       NSWindow.didMoveNotification,
       NSWindow.didResizeNotification,
@@ -71,7 +70,7 @@ final class WindowTrackingNSView: NSView {
       ) { [weak self, weak window] _ in
         MainActor.assumeIsolated {
           guard let self, let window else { return }
-          self.sync(window)
+          self.sync(window, generation: generation)
         }
       }
       observations.append(obs)
@@ -81,13 +80,10 @@ final class WindowTrackingNSView: NSView {
   private func stopTracking() {
     observations.forEach { NotificationCenter.default.removeObserver($0) }
     observations.removeAll()
-    if let id = trackedWindowNumber {
-      Task { [registry] in await registry.unregisterWindow(id: id) }
-      trackedWindowNumber = nil
-    }
+    syncController.stopTracking()
   }
 
-  private func sync(_ window: NSWindow) {
+  private func sync(_ window: NSWindow, generation: UInt64) {
     let entry = RegistryWindow(
       id: window.windowNumber,
       title: window.title,
@@ -95,7 +91,7 @@ final class WindowTrackingNSView: NSView {
       isKey: window.isKeyWindow,
       isMain: window.isMainWindow
     )
-    Task { [registry] in await registry.registerWindow(entry) }
+    syncController.sync(entry, generation: generation)
   }
 }
 #endif

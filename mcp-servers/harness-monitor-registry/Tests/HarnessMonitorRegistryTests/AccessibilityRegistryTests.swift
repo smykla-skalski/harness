@@ -66,4 +66,26 @@ struct AccessibilityRegistryTests {
     let fetched = await registry.element(identifier: "dead")
     #expect(fetched == nil)
   }
+
+  @MainActor
+  @Test("stale window updates are ignored after tracking stops")
+  func staleWindowUpdatesAreIgnoredAfterTrackingStops() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowRegistrySyncController(registry: registry)
+    let entry = RegistryWindow(
+      id: 101,
+      title: "Tracked",
+      frame: RegistryRect(x: 40, y: 50, width: 320, height: 240)
+    )
+    let generation = controller.beginTracking(windowID: entry.id)
+
+    controller.sync(entry, generation: generation)
+    controller.stopTracking()
+    controller.sync(entry, generation: generation)
+
+    await controller.waitForIdle()
+
+    let windows = await registry.allWindows()
+    #expect(windows.isEmpty)
+  }
 }
