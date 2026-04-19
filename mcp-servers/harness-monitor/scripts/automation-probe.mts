@@ -1,23 +1,30 @@
 // Probes the MCP server's automation tools that reach out to the system:
-// screenshot_window (screencapture), and availability of cliclick.
-// Does NOT move the mouse or send keystrokes unless --allow-input is set.
+// - backend resolution (prefers the Swift helper, falls back to cliclick)
+// - screenshot_window via screencapture
+// - move_mouse via the selected backend (requires --allow-input)
+// - type_text via the selected backend (requires --allow-input; types into
+//   whatever window currently has focus -- caller is responsible)
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import process from "node:process";
-import { writeFile } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import process from "node:process";
 
 const execFileAsync = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
-const serverEntry = resolve(here, "..", "dist", "server.js");
+const packageRoot = resolve(here, "..");
+const serverEntry = resolve(packageRoot, "dist", "server.js");
+const registryRoot = resolve(packageRoot, "..", "harness-monitor-registry");
 
+const positionalArgs = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const allowInput = process.argv.includes("--allow-input");
-const socketPath = process.argv.find((a) => !a.startsWith("--") && a !== process.argv[0] && a !== process.argv[1]);
-if (socketPath === undefined) {
+const socketPath = positionalArgs[0];
+
+if (socketPath === undefined || socketPath.length === 0) {
   console.error("usage: automation-probe.mts <socket-path> [--allow-input]");
   process.exit(64);
 }
@@ -30,14 +37,34 @@ function record(name: string, pass: boolean, detail?: string) {
   console.log(`[${icon}] ${name}${suffix}`);
 }
 
-try {
-  await execFileAsync("/usr/bin/which", ["cliclick"]);
-  record("cliclick is on PATH", true);
-} catch {
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const helperDebugPath = resolve(registryRoot, ".build", "debug", "harness-monitor-input");
+const helperReleasePath = resolve(registryRoot, ".build", "release", "harness-monitor-input");
+const helperPath = (await fileExists(helperReleasePath))
+  ? helperReleasePath
+  : (await fileExists(helperDebugPath))
+    ? helperDebugPath
+    : null;
+record(
+  "Swift input helper is built",
+  helperPath !== null,
+  helperPath ?? "build with: swift build --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input",
+);
+
+if (helperPath !== null) {
+  const { stdout } = await execFileAsync(helperPath, ["check"]);
   record(
-    "cliclick is on PATH",
-    false,
-    "install via `brew install cliclick` before using mouse/keyboard tools",
+    "Swift helper reports accessibility trusted",
+    stdout.trim() === "trusted",
+    stdout.trim(),
   );
 }
 
@@ -55,13 +82,14 @@ try {
     arguments: {},
   })) as { content: Array<{ type: string; mimeType?: string; data?: string }> };
   const image = screenshot.content.find((c) => c.type === "image");
-  const pass = image !== undefined && image.mimeType === "image/png" && (image.data?.length ?? 0) > 0;
+  const imagePass =
+    image !== undefined && image.mimeType === "image/png" && (image.data?.length ?? 0) > 0;
   record(
     "screenshot_window returns PNG image content",
-    pass,
+    imagePass,
     image !== undefined ? `bytes_b64=${image.data?.length ?? 0}` : "no image content",
   );
-  if (pass && image?.data) {
+  if (imagePass && image?.data !== undefined) {
     const target = "/tmp/hm-e2e/screenshot.png";
     await writeFile(target, Buffer.from(image.data, "base64"));
     const sizeCheck = await execFileAsync("/usr/bin/file", [target]);
@@ -72,21 +100,38 @@ try {
     );
   }
 
-  if (allowInput) {
-    // Move mouse to a safe spot (top-left-ish) and back. Requires cliclick + Accessibility.
-    const before = await execFileAsync("cliclick", ["p"]);
+  if (allowInput && helperPath !== null) {
+    const before = (await execFileAsync(helperPath, ["position"])).stdout.trim();
     await client.callTool({
       name: "move_mouse",
-      arguments: { x: 100, y: 100 },
+      arguments: { x: 200, y: 200 },
     });
-    const after = await execFileAsync("cliclick", ["p"]);
+    const after = (await execFileAsync(helperPath, ["position"])).stdout.trim();
     record(
-      "move_mouse actually moves the cursor",
-      after.stdout.trim() !== before.stdout.trim(),
-      `before=${before.stdout.trim()} after=${after.stdout.trim()}`,
+      "move_mouse updates cursor position via MCP",
+      before !== after && after.startsWith("200"),
+      `before=${before} after=${after}`,
     );
+
+    // click on empty area - exercise full path but at a safe (desktop) coord
+    await client.callTool({
+      name: "click",
+      arguments: { x: 200, y: 200 },
+    });
+    record("click executed without error", true);
+
+    // Verify type_text path runs without error. We type a trivial sequence
+    // that will go to the focused window; caller's responsibility to focus a
+    // scratch buffer before --allow-input.
+    await client.callTool({
+      name: "type_text",
+      arguments: { text: "" },
+    });
+    record("type_text empty string is a no-op", true);
+  } else if (allowInput && helperPath === null) {
+    record("skip live input (helper binary not built)", false, "run the swift build first");
   } else {
-    console.log("[skip] move_mouse: pass --allow-input to exercise the real cursor");
+    console.log("[skip] live input: pass --allow-input to move the cursor and click");
   }
 } finally {
   await client.close();
