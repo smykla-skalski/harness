@@ -133,6 +133,23 @@ struct SessionTimelinePaginationFooter: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePaginationNext)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Page navigation")
+    .accessibilityValue("Page \(currentPage + 1) of \(pageCount)")
+    .accessibilityAdjustableAction { direction in
+      switch direction {
+      case .increment:
+        if currentPage < pageCount - 1 {
+          goToNextPage()
+        }
+      case .decrement:
+        if currentPage > 0 {
+          goToPreviousPage()
+        }
+      @unknown default:
+        break
+      }
+    }
   }
 }
 
