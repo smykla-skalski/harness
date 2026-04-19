@@ -22,6 +22,8 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
   var isShutDown = false
+  var cachedConfiguration: MonitorConfiguration?
+  var configurationWaiters: [CheckedContinuation<MonitorConfiguration, Error>] = []
 
   static let reconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
@@ -111,6 +113,11 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     partialFrames.removeAll()
     pending.failAll(error: WebSocketTransportError.connectionClosed)
     terminateAllStreams()
+    let waiters = configurationWaiters
+    configurationWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume(throwing: WebSocketTransportError.connectionClosed)
+    }
   }
 
   public func shutdown() async {

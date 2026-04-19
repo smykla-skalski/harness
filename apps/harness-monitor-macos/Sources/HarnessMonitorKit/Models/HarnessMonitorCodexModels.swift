@@ -66,17 +66,20 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
   public let prompt: String
   public let mode: CodexRunMode
   public let resumeThreadId: String?
+  public let model: String?
 
   public init(
     actor: String?,
     prompt: String,
     mode: CodexRunMode,
-    resumeThreadId: String? = nil
+    resumeThreadId: String? = nil,
+    model: String? = nil
   ) {
     self.actor = actor
     self.prompt = prompt
     self.mode = mode
     self.resumeThreadId = resumeThreadId
+    self.model = model
   }
 }
 
@@ -439,6 +442,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
   public let prompt: String?
   public let projectDir: String?
   public let persona: String?
+  public let model: String?
   public let argv: [String]
   public let rows: Int
   public let cols: Int
@@ -451,6 +455,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     prompt: String? = nil,
     projectDir: String? = nil,
     persona: String? = nil,
+    model: String? = nil,
     argv: [String] = [],
     rows: Int = 32,
     cols: Int = 120
@@ -462,6 +467,7 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     self.prompt = prompt
     self.projectDir = projectDir
     self.persona = persona
+    self.model = model
     self.argv = argv
     self.rows = rows
     self.cols = cols
