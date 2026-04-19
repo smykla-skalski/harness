@@ -76,6 +76,49 @@ pub(crate) async fn list_sessions_async(
     async_db.list_session_summaries().await
 }
 
+/// Resolve a runtime-session ID to the orchestration session and agent
+/// that own it, using a single indexed query against the canonical async DB.
+///
+/// The indexed lookup replaces the previous fan-out over
+/// `list_sessions` + `session_detail` that every hook invocation performed
+/// to translate a runtime session ID into a signal delivery target.
+///
+/// # Errors
+/// Returns [`CliError::session_ambiguous`] when more than one live agent
+/// claims the same `(runtime, runtime_session_id)` pair, and propagates SQL
+/// failures.
+pub(crate) async fn resolve_runtime_session_agent_async(
+    runtime_name: &str,
+    runtime_session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<Option<crate::session::service::ResolvedRuntimeSessionAgent>, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for runtime session resolution",
+        ))
+    })?;
+    let mut matches = async_db
+        .resolve_runtime_session_agents(runtime_name, runtime_session_id)
+        .await?;
+    match matches.len() {
+        0 => Ok(None),
+        1 => {
+            let (orchestration_session_id, agent_id) = matches.remove(0);
+            Ok(Some(
+                crate::session::service::ResolvedRuntimeSessionAgent {
+                    orchestration_session_id,
+                    agent_id,
+                },
+            ))
+        }
+        _ => Err(CliErrorKind::session_ambiguous(format!(
+            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' \
+             maps to multiple orchestration sessions"
+        ))
+        .into()),
+    }
+}
+
 /// Load a single session detail snapshot.
 ///
 /// # Errors

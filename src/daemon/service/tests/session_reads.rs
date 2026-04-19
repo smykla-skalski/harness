@@ -133,6 +133,68 @@ fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
 }
 
 #[test]
+fn resolve_runtime_session_agent_async_returns_match_for_live_worker() {
+    with_temp_project(|project| {
+        let fixture = setup_session_with_worker_logs(
+            project,
+            "daemon async runtime session resolve",
+            "daemon-async-runtime-session-resolve",
+        );
+        let orchestration_session_id = fixture.state.session_id.clone();
+        let status = session_service::session_status(&orchestration_session_id, project)
+            .expect("session status");
+        let worker = status
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("worker agent");
+        let worker_runtime_session = worker
+            .agent_session_id
+            .clone()
+            .expect("worker runtime session id");
+        let worker_agent_id = worker.agent_id.clone();
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let async_db = setup_async_db_with_session(project, &orchestration_session_id).await;
+
+            let resolved = resolve_runtime_session_agent_async(
+                "codex",
+                &worker_runtime_session,
+                Some(async_db.as_ref()),
+            )
+            .await
+            .expect("resolve runtime session")
+            .expect("live worker should resolve");
+
+            assert_eq!(resolved.orchestration_session_id, orchestration_session_id);
+            assert_eq!(resolved.agent_id, worker_agent_id);
+
+            let missing = resolve_runtime_session_agent_async(
+                "codex",
+                "does-not-exist",
+                Some(async_db.as_ref()),
+            )
+            .await
+            .expect("resolve missing runtime session");
+            assert!(missing.is_none(), "unknown runtime session must return None");
+
+            let wrong_runtime = resolve_runtime_session_agent_async(
+                "claude",
+                &worker_runtime_session,
+                Some(async_db.as_ref()),
+            )
+            .await
+            .expect("resolve cross-runtime");
+            assert!(
+                wrong_runtime.is_none(),
+                "runtime mismatch must not leak codex agent to claude lookup"
+            );
+        });
+    });
+}
+
+#[test]
 fn session_detail_async_promotes_live_worker_and_hides_dead_leader() {
     with_temp_project(|project| {
         let fixture = setup_session_with_worker_logs(
