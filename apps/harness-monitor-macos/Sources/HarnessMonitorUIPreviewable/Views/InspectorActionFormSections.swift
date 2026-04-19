@@ -213,6 +213,8 @@ struct InspectorTaskActionsSection: View {
       LabeledContent("Progress") {
         Slider(value: $checkpointProgress, in: 0...100, step: 5)
           .harnessNativeFormControl()
+          .accessibilityValue("\(Int(checkpointProgress)) percent complete")
+          .accessibilityHint("Sets the completion percentage for this checkpoint")
       }
       HStack {
         Text("\(Int(checkpointProgress))%")
