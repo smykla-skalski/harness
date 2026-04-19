@@ -89,15 +89,50 @@ fn log_health_result(endpoint: &str, health_ms: u64, ok: bool) {
     }
 }
 
+/// Which endpoint the authenticated-readiness probe should hit.
+///
+/// The probe prefers `/v1/ready` (dedicated, DB-free, added after the hook
+/// traffic leak was diagnosed). Daemons predating that endpoint respond with
+/// `404`, so the probe pins itself to `/v1/sessions` for the remainder of the
+/// warmup to keep rolling upgrades seamless.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AuthReadinessProbePath {
+    Ready,
+    SessionsFallback,
+}
+
+impl AuthReadinessProbePath {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Ready => "/v1/ready",
+            Self::SessionsFallback => "/v1/sessions",
+        }
+    }
+}
+
+enum ProbeOutcome {
+    Ready,
+    NotReady,
+    /// `404` on `/v1/ready`: the remote daemon is old; switch to the legacy
+    /// sessions-based probe without consuming a sleep interval.
+    ReadyEndpointMissing,
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "deadline-based warmup loop keeps daemon connection readiness explicit"
 )]
 pub(super) fn wait_for_authenticated_api(client: &DaemonClient, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
+    let mut probe_path = AuthReadinessProbePath::Ready;
     loop {
-        if authenticated_api_ready(client) {
-            return true;
+        match authenticated_api_ready(client, probe_path) {
+            ProbeOutcome::Ready => return true,
+            ProbeOutcome::NotReady => {}
+            ProbeOutcome::ReadyEndpointMissing => {
+                probe_path = AuthReadinessProbePath::SessionsFallback;
+                continue;
+            }
         }
         if Instant::now() >= deadline {
             tracing::debug!(endpoint = client.endpoint, "daemon session API not ready");
@@ -107,17 +142,26 @@ pub(super) fn wait_for_authenticated_api(client: &DaemonClient, timeout: Duratio
     }
 }
 
-fn authenticated_api_ready(client: &DaemonClient) -> bool {
-    let url = format!("{}/v1/sessions", client.endpoint);
+fn authenticated_api_ready(client: &DaemonClient, probe_path: AuthReadinessProbePath) -> ProbeOutcome {
+    let url = format!("{}{}", client.endpoint, probe_path.as_str());
     RUNTIME.block_on(async {
-        client
+        let response = client
             .http
             .get(&url)
             .bearer_auth(&client.token)
             .timeout(HEALTH_TIMEOUT)
             .send()
-            .await
-            .is_ok_and(|response| response.status().is_success())
+            .await;
+        match response {
+            Ok(response) if response.status().is_success() => ProbeOutcome::Ready,
+            Ok(response)
+                if probe_path == AuthReadinessProbePath::Ready
+                    && response.status().as_u16() == 404 =>
+            {
+                ProbeOutcome::ReadyEndpointMissing
+            }
+            _ => ProbeOutcome::NotReady,
+        }
     })
 }
 
