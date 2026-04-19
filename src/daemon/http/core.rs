@@ -6,9 +6,12 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
+use axum::extract::Query;
+
 use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::protocol::{
-    HostBridgeReconfigureRequest, ReadinessResponse, SetLogLevelRequest,
+    HostBridgeReconfigureRequest, ReadinessResponse, RuntimeSessionResolutionResponse,
+    SetLogLevelRequest,
 };
 use crate::daemon::service;
 use crate::daemon::websocket::ws_upgrade_handler;
@@ -33,8 +36,19 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
         )
         .route("/v1/personas", get(get_personas))
         .route("/v1/projects", get(get_projects))
+        .route(
+            "/v1/runtime-sessions/resolve",
+            get(get_runtime_session_resolution),
+        )
         .route("/v1/ws", get(ws_upgrade_handler))
         .route("/v1/stream", get(stream_global))
+}
+
+/// Query parameters for `GET /v1/runtime-sessions/resolve`.
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct RuntimeSessionResolutionQuery {
+    pub runtime_name: String,
+    pub runtime_session_id: String,
 }
 
 pub(super) async fn get_health(
@@ -67,6 +81,35 @@ pub(super) async fn get_ready(
         daemon_epoch: state.daemon_epoch.clone(),
     });
     timed_json("GET", "/v1/ready", &request_id, start, result)
+}
+
+pub(super) async fn get_runtime_session_resolution(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Query(query): Query<RuntimeSessionResolutionQuery>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = match require_async_db(&state, "runtime session resolution") {
+        Ok(async_db) => service::resolve_runtime_session_agent_async(
+            &query.runtime_name,
+            &query.runtime_session_id,
+            Some(async_db),
+        )
+        .await
+        .map(|resolved| RuntimeSessionResolutionResponse { resolved }),
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "GET",
+        "/v1/runtime-sessions/resolve",
+        &request_id,
+        start,
+        result,
+    )
 }
 
 pub(super) async fn get_diagnostics(

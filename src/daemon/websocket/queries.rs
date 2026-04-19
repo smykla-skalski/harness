@@ -44,6 +44,9 @@ async fn dispatch_daemon_read_query(
         "daemon.log_level" => Some(dispatch_query(&request.id, service::get_log_level)),
         "projects" => Some(dispatch_projects_query(&request.id, state).await),
         "sessions" => Some(dispatch_sessions_query(&request.id, state).await),
+        "runtime_session.resolve" => {
+            Some(dispatch_runtime_session_resolve_query(request, state).await)
+        }
         _ => None,
     }
 }
@@ -75,6 +78,32 @@ async fn dispatch_sessions_query(request_id: &str, state: &DaemonHttpState) -> W
         Err(error) => Err(error),
     };
     dispatch_query_result(request_id, result)
+}
+
+async fn dispatch_runtime_session_resolve_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    use crate::daemon::protocol::RuntimeSessionResolutionResponse;
+
+    let Some(runtime_name) = extract_string_param(&request.params, "runtime_name") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing runtime_name");
+    };
+    let Some(runtime_session_id) = extract_string_param(&request.params, "runtime_session_id")
+    else {
+        return error_response(&request.id, "MISSING_PARAM", "missing runtime_session_id");
+    };
+    let result = match require_async_db(state, "runtime session resolution") {
+        Ok(async_db) => service::resolve_runtime_session_agent_async(
+            &runtime_name,
+            &runtime_session_id,
+            Some(async_db),
+        )
+        .await
+        .map(|resolved| RuntimeSessionResolutionResponse { resolved }),
+        Err(error) => Err(error),
+    };
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_session_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -313,6 +342,44 @@ mod tests {
     };
     use super::*;
     use crate::daemon::protocol::WsRequest;
+
+    #[tokio::test]
+    async fn dispatch_read_query_runtime_session_resolve_requires_runtime_name() {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-resolve-missing".into(),
+            method: "runtime_session.resolve".into(),
+            params: serde_json::json!({ "runtime_session_id": "sess-worker" }),
+            trace_context: None,
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert_eq!(response.id, "req-resolve-missing");
+        let error = response.error.expect("missing param error");
+        assert_eq!(error.code, "MISSING_PARAM");
+    }
+
+    #[tokio::test]
+    async fn dispatch_read_query_runtime_session_resolve_returns_null_for_unknown_session() {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-resolve-null".into(),
+            method: "runtime_session.resolve".into(),
+            params: serde_json::json!({
+                "runtime_name": "codex",
+                "runtime_session_id": "missing-runtime-session",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert_eq!(response.id, "req-resolve-null");
+        assert!(response.error.is_none());
+        let result = response.result.expect("resolve response");
+        assert!(result.get("resolved").is_some_and(Value::is_null));
+    }
 
     #[tokio::test]
     async fn dispatch_read_query_health_succeeds_when_db_lock_is_held() {
