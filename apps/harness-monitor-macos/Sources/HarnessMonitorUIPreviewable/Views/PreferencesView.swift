@@ -52,6 +52,8 @@ public struct PreferencesView: View {
           )
         case .codex:
           PreferencesHostBridgeSection(store: store)
+        case .mcp:
+          PreferencesMCPSection()
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:
