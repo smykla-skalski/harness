@@ -35,6 +35,8 @@ fi
   --strict \
   "$ROOT/Sources" \
   "$ROOT/Tests/HarnessMonitorKitTests" \
+  "$ROOT/Tests/HarnessMonitorUITestSupport" \
+  "$ROOT/Tests/HarnessMonitorAgentsE2ETests" \
   "$ROOT/Tests/HarnessMonitorUITests"
 
 mkdir -p "$SWIFTLINT_CACHE_PATH"
@@ -48,6 +50,8 @@ mkdir -p "$SWIFTLINT_CACHE_PATH"
   --quiet \
   "$ROOT/Sources" \
   "$ROOT/Tests/HarnessMonitorKitTests" \
+  "$ROOT/Tests/HarnessMonitorUITestSupport" \
+  "$ROOT/Tests/HarnessMonitorAgentsE2ETests" \
   "$ROOT/Tests/HarnessMonitorUITests"
 
 "$XCODEBUILD_RUNNER" \
