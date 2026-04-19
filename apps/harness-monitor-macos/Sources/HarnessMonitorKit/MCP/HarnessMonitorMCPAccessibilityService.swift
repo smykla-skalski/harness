@@ -58,8 +58,10 @@ public final class HarnessMonitorMCPAccessibilityService {
     do {
       try await listener.start(at: socket.path)
     } catch {
+      let socketPath = socket.path
+      let description = error.localizedDescription
       logger.error(
-        "harness-monitor MCP: start failed at \(socket.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        "MCP start failed at \(socketPath, privacy: .public): \(description, privacy: .public)"
       )
       return
     }

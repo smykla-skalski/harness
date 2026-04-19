@@ -76,4 +76,30 @@ extension WebSocketTransport {
     let merged = try JSONSerialization.data(withJSONObject: object)
     return try Self.mergeDecoder.decode(JSONValue.self, from: merged)
   }
+
+  func handleConfigurationPush(payload: JSONValue) {
+    do {
+      let configuration: MonitorConfiguration = try decode(payload)
+      cachedConfiguration = configuration
+      let waiters = configurationWaiters
+      configurationWaiters.removeAll()
+      for waiter in waiters {
+        waiter.resume(returning: configuration)
+      }
+    } catch {
+      let err = error.localizedDescription
+      HarnessMonitorLogger.websocket.warning(
+        "Dropping malformed config push frame: \(err, privacy: .public)"
+      )
+    }
+  }
+
+  func finishStreams(with error: any Error) {
+    globalStreamContinuation?.finish(throwing: error)
+    globalStreamContinuation = nil
+    for (_, continuation) in sessionStreamContinuations {
+      continuation.finish(throwing: error)
+    }
+    sessionStreamContinuations.removeAll()
+  }
 }

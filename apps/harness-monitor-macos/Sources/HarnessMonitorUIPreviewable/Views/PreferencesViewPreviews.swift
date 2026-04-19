@@ -19,6 +19,23 @@ import SwiftUI
   )
 }
 
+#Preview("Preferences Appearance Section") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .dark
+
+  PreferencesAppearanceSection(themeMode: $themeMode)
+    .frame(width: 720)
+}
+
+#Preview("Preferences General Section") {
+  let store = PreferencesPreviewSupport.makeStore()
+
+  PreferencesGeneralSection(
+    store: store,
+    overview: PreferencesGeneralOverviewState(store: store)
+  )
+  .frame(width: 720)
+}
+
 #Preview("Preferences Window - Connection") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 
