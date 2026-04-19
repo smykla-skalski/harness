@@ -27,6 +27,18 @@ pub struct DaemonControlResponse {
     pub status: String,
 }
 
+/// Lightweight readiness probe response.
+///
+/// Returned by `GET /v1/ready`. Confirms the daemon is serving HTTP, the
+/// caller is authenticated, and the backing storage slot is wired up - but
+/// intentionally avoids any database query so short-lived CLI invocations can
+/// verify readiness cheaply.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadinessResponse {
+    pub ready: bool,
+    pub daemon_epoch: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogLevelResponse {
     pub level: String,
