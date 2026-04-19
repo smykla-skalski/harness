@@ -7,6 +7,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case voice
   case connection
   case codex
+  case mcp
   case database
   case diagnostics
 
@@ -20,6 +21,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     case .voice: "Voice"
     case .connection: "Connection"
     case .codex: "Codex"
+    case .mcp: "MCP"
     case .database: "Database"
     case .diagnostics: "Diagnostics"
     }
@@ -33,6 +35,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     case .voice: "mic"
     case .connection: "bolt.horizontal.circle"
     case .codex: "terminal"
+    case .mcp: "bolt.shield"
     case .database: "cylinder.split.1x2"
     case .diagnostics: "stethoscope"
     }
