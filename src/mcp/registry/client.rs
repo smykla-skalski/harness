@@ -108,8 +108,15 @@ impl RegistryClient {
     ) -> Result<T, RegistryError> {
         let mut guard = self.connection.lock().await;
         let connection = self.ensure_connected(&mut guard).await?;
-        let response = self.exchange(connection, request).await?;
-        decode_outcome(response, request.id())
+        match self.exchange(connection, request).await {
+            Ok(response) => decode_outcome(response, request.id()),
+            Err(error @ (RegistryError::Closed { .. } | RegistryError::Timeout { .. })) => {
+                // Drop the broken connection so the next call reconnects.
+                *guard = None;
+                Err(error)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     async fn ensure_connected<'a>(

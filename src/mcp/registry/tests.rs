@@ -158,6 +158,47 @@ async fn request_detects_id_mismatch_as_protocol_error() {
     assert!(matches!(err, RegistryError::Protocol { .. }));
 }
 
+#[tokio::test]
+async fn reconnects_after_server_closes_connection() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+
+    // First server: accepts one connection then immediately closes it.
+    let listener = UnixListener::bind(&path).expect("bind");
+    tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.expect("accept");
+        drop(stream); // close immediately
+    });
+
+    let client = RegistryClient::with_socket_path(path.clone())
+        .with_timeouts(Duration::from_millis(500), Duration::from_millis(500));
+    let id = client.next_request_id();
+    let err = client
+        .request::<ListWindowsResult>(&RegistryRequest::ListWindows { id })
+        .await
+        .expect_err("closed");
+    assert!(matches!(err, RegistryError::Closed { .. }));
+
+    // Remove the socket file so the second listener can bind the same path.
+    let _ = std::fs::remove_file(&path);
+
+    // Second server at the same path: responds normally.
+    let received = spawn_fake_server(path, |line| {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        let id = parsed.get("id").and_then(Value::as_u64).unwrap();
+        json!({"id": id, "ok": true, "result": {"windows": []}}).to_string()
+    })
+    .await;
+
+    let id = client.next_request_id();
+    let result: ListWindowsResult = client
+        .request(&RegistryRequest::ListWindows { id })
+        .await
+        .expect("reconnect succeeded");
+    assert!(result.windows.is_empty());
+    received.await.unwrap();
+}
+
 #[test]
 fn default_socket_path_respects_override_env() {
     temp_env::with_var(SOCKET_OVERRIDE_ENV, Some("/tmp/custom.sock"), || {
@@ -176,7 +217,7 @@ fn default_socket_path_falls_back_to_group_container() {
             let path = default_socket_path();
             let text = path.to_string_lossy();
             assert!(text.starts_with("/Users/fake/Library/Group Containers/"));
-            assert!(text.ends_with("/harness-monitor-mcp.sock"));
+            assert!(text.ends_with("/mcp.sock"));
         },
     );
 }
