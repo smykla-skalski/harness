@@ -30,6 +30,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func startAgentTui(
     runtime: AgentTuiRuntime,
+    role: SessionRole = .worker,
     name: String?,
     prompt: String?,
     projectDir: String? = nil,
@@ -62,6 +63,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         request: AgentTuiStartRequest(
           runtime: runtime.rawValue,
+          role: role,
           name: trimmedName?.isEmpty == false ? trimmedName : nil,
           prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
           projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,

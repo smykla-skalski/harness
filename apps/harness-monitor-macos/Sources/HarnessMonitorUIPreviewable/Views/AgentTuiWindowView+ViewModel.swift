@@ -201,6 +201,7 @@ extension AgentTuiWindowView {
   final class ViewModel {
     var displayState = AgentTuiDisplayState()
     var runtime: AgentTuiRuntime = .copilot
+    var selectedRole: SessionRole = .worker
     var name = ""
     var prompt = ""
     var projectDir = ""

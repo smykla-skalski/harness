@@ -106,6 +106,7 @@ extension AgentTuiWindowView {
         }
       }
       .pickerStyle(.segmented)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateModePicker)
 
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         switch formModel.createMode {
@@ -118,6 +119,13 @@ extension AgentTuiWindowView {
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
+            Picker("Role", selection: $formModel.selectedRole) {
+              ForEach(SessionRole.allCases, id: \.self) { role in
+                Text(role.title).tag(role)
+              }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentsRolePicker)
             if !formModel.availablePersonas.isEmpty {
               inlinePersonaGrid
             }
