@@ -4,9 +4,7 @@ use async_trait::async_trait;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 use tracing::warn;
 
-use crate::mcp::protocol::{
-    ErrorCode, ErrorObject, Notification, Request, RequestId, Response,
-};
+use crate::mcp::protocol::{ErrorCode, ErrorObject, Notification, Request, RequestId, Response};
 use crate::mcp::server::incoming::IncomingMessage;
 
 /// Contract for an MCP request/notification handler.
@@ -59,11 +57,7 @@ where
     }
 }
 
-async fn dispatch_request<H, W>(
-    handler: &H,
-    writer: &mut W,
-    request: Request,
-) -> io::Result<()>
+async fn dispatch_request<H, W>(handler: &H, writer: &mut W, request: Request) -> io::Result<()>
 where
     H: RequestHandler,
     W: AsyncWrite + Unpin + Send,

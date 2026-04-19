@@ -83,10 +83,7 @@ fn type_text_none_falls_back_to_osascript_keystroke() {
 fn screencapture_args_default_is_silent_png_no_target() {
     let path = PathBuf::from("/tmp/out.png");
     let args = screencapture_args(&ScreenshotOptions::default(), &path);
-    assert_eq!(
-        as_strings(&args),
-        vec!["-x", "-t", "png", "/tmp/out.png"],
-    );
+    assert_eq!(as_strings(&args), vec!["-x", "-t", "png", "/tmp/out.png"],);
 }
 
 #[test]

@@ -200,7 +200,11 @@ impl AsyncDaemonDb {
             .bind(tui_id)
             .fetch_optional(self.pool())
             .await
-            .map_err(|error| db_error(format!("load async terminal agent live-refresh state: {error}")))?
+            .map_err(|error| {
+                db_error(format!(
+                    "load async terminal agent live-refresh state: {error}"
+                ))
+            })?
             .map(AsyncAgentTuiLiveRefreshStateRow::into_state)
             .transpose()
     }
@@ -300,7 +304,9 @@ impl AsyncAgentTuiRow {
             .exit_code
             .map(|value| {
                 u32::try_from(value).map_err(|error| {
-                    db_error(format!("parse async terminal agent exit_code {value}: {error}"))
+                    db_error(format!(
+                        "parse async terminal agent exit_code {value}: {error}"
+                    ))
                 })
             })
             .transpose()?;

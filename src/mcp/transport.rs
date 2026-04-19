@@ -114,14 +114,9 @@ mod transport_tests {
 
     #[test]
     fn cli_parses_harness_mcp_serve_with_socket_override() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "mcp",
-            "serve",
-            "--socket",
-            "/tmp/override.sock",
-        ])
-        .expect("parse");
+        let cli =
+            Cli::try_parse_from(["harness", "mcp", "serve", "--socket", "/tmp/override.sock"])
+                .expect("parse");
         let McpCommand::Serve(args) = match cli.command {
             Command::Mcp { command } => command,
             other => panic!("expected Mcp command, got {other:?}"),
