@@ -11,7 +11,7 @@ use crate::daemon::protocol::{
 };
 use crate::errors::CliError;
 use crate::session::service::ResolvedRuntimeSessionAgent;
-use crate::session::types::{AgentPersona, SessionState};
+use crate::session::types::SessionState;
 
 use super::DaemonClient;
 
@@ -32,14 +32,6 @@ pub enum RuntimeSessionLookup {
     reason = "all methods forward to daemon HTTP and return CliError on failure"
 )]
 impl DaemonClient {
-    /// Fetch the list of available agent personas from the daemon.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on network or deserialization failures.
-    pub fn personas(&self) -> Result<Vec<AgentPersona>, CliError> {
-        self.get("/v1/personas")
-    }
-
     /// Resolve a runtime-session ID against the dedicated resolver endpoint.
     ///
     /// Returns [`RuntimeSessionLookup::EndpointUnavailable`] when the remote
