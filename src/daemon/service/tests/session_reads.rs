@@ -177,7 +177,10 @@ fn resolve_runtime_session_agent_async_returns_match_for_live_worker() {
             )
             .await
             .expect("resolve missing runtime session");
-            assert!(missing.is_none(), "unknown runtime session must return None");
+            assert!(
+                missing.is_none(),
+                "unknown runtime session must return None"
+            );
 
             let wrong_runtime = resolve_runtime_session_agent_async(
                 "claude",

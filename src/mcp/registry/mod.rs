@@ -14,6 +14,6 @@ mod tests;
 pub use client::{RegistryClient, RegistryError};
 pub use path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, default_socket_path};
 pub use types::{
-    ElementKind, GetElementResult, ListElementsResult, ListWindowsResult, Rect,
-    RegistryElement, RegistryRequest, RegistryResponse, RegistryWindow,
+    ElementKind, GetElementResult, ListElementsResult, ListWindowsResult, Rect, RegistryElement,
+    RegistryRequest, RegistryResponse, RegistryWindow,
 };

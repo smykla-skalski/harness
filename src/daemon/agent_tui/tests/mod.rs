@@ -75,7 +75,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
                     rows: 5,
                     cols: 40,
                     model: None,
-},
+                },
             )
             .expect("start manager TUI");
 

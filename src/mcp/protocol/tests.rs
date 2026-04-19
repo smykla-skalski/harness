@@ -47,10 +47,7 @@ fn notification_has_no_id() {
 fn response_success_serializes_with_result() {
     let resp = Response::success(RequestId::Number(3), json!({"ok": true}));
     let wire = serde_json::to_value(&resp).expect("serialize");
-    assert_eq!(
-        wire,
-        json!({"jsonrpc":"2.0","id":3,"result":{"ok":true}}),
-    );
+    assert_eq!(wire, json!({"jsonrpc":"2.0","id":3,"result":{"ok":true}}),);
 }
 
 #[test]

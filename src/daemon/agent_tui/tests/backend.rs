@@ -40,7 +40,11 @@ fn launch_profile_override_rejects_empty_argv() {
     let error =
         AgentTuiLaunchProfile::from_argv("codex", Vec::new()).expect_err("argv should fail");
 
-    assert!(error.to_string().contains("terminal agent argv cannot be empty"));
+    assert!(
+        error
+            .to_string()
+            .contains("terminal agent argv cannot be empty")
+    );
 }
 
 #[test]

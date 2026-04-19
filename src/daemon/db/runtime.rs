@@ -243,9 +243,8 @@ impl DaemonDb {
 
         let mut snapshots = Vec::new();
         for row in rows {
-            snapshots.push(
-                row.map_err(|error| db_error(format!("read terminal agent row: {error}")))?,
-            );
+            snapshots
+                .push(row.map_err(|error| db_error(format!("read terminal agent row: {error}")))?);
         }
         Ok(snapshots)
     }

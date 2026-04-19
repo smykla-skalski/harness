@@ -98,7 +98,7 @@ impl AgentTuiLaunchProfile {
         let runtime = runtime.trim();
         if runtime.is_empty() {
             return Err(
-                CliErrorKind::workflow_parse("terminal agent runtime cannot be empty").into()
+                CliErrorKind::workflow_parse("terminal agent runtime cannot be empty").into(),
             );
         }
         let Some(program) = argv.first().map(|value| value.trim()) else {
@@ -106,7 +106,7 @@ impl AgentTuiLaunchProfile {
         };
         if program.is_empty() {
             return Err(
-                CliErrorKind::workflow_parse("terminal agent argv[0] cannot be empty").into()
+                CliErrorKind::workflow_parse("terminal agent argv[0] cannot be empty").into(),
             );
         }
         Ok(Self {

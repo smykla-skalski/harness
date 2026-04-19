@@ -20,8 +20,11 @@ pub struct ScreenshotOptions {
 /// output path. `-x` silences the shutter sound; `-t png` sets PNG output.
 #[must_use]
 pub fn screencapture_args(options: &ScreenshotOptions, output: &Path) -> Vec<OsString> {
-    let mut args: Vec<OsString> =
-        vec![OsString::from("-x"), OsString::from("-t"), OsString::from("png")];
+    let mut args: Vec<OsString> = vec![
+        OsString::from("-x"),
+        OsString::from("-t"),
+        OsString::from("png"),
+    ];
     if let Some(window) = options.window_id {
         args.push(OsString::from("-l"));
         args.push(OsString::from(window.to_string()));
