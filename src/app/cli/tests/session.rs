@@ -321,8 +321,7 @@ fn parse_session_agents_start_terminal() {
             crate::session::transport::SessionCommand::Agents {
                 command:
                     crate::session::transport::SessionAgentsCommand::Start {
-                        command:
-                            crate::session::transport::SessionAgentStartCommand::Terminal(args),
+                        command: crate::session::transport::SessionAgentStartCommand::Terminal(args),
                     },
             },
     } = cli.command
@@ -336,7 +335,10 @@ fn parse_session_agents_start_terminal() {
         args.fallback_role,
         Some(crate::session::types::SessionRole::Reviewer)
     );
-    assert_eq!(args.capabilities, vec!["debug".to_string(), "tests".to_string()]);
+    assert_eq!(
+        args.capabilities,
+        vec!["debug".to_string(), "tests".to_string()]
+    );
     assert_eq!(args.name.as_deref(), Some("Terminal Worker"));
     assert_eq!(args.prompt.as_deref(), Some("Inspect the failure"));
     assert_eq!(args.project_dir.as_deref(), Some("/tmp/project"));
@@ -375,8 +377,7 @@ fn parse_session_agents_start_codex() {
             crate::session::transport::SessionCommand::Agents {
                 command:
                     crate::session::transport::SessionAgentsCommand::Start {
-                        command:
-                            crate::session::transport::SessionAgentStartCommand::Codex(args),
+                        command: crate::session::transport::SessionAgentStartCommand::Codex(args),
                     },
             },
     } = cli.command
@@ -471,4 +472,9 @@ fn parse_session_list() {
         panic!("expected Session List");
     };
     assert!(args.json);
+}
+
+#[test]
+fn parse_session_tui_is_removed() {
+    assert!(Cli::try_parse_from(["harness", "session", "tui", "list", "sess-1"]).is_err());
 }

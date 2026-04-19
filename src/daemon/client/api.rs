@@ -1,16 +1,14 @@
 use crate::daemon::agent_tui::{
-    AgentTuiInputRequest, AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSnapshot,
-    AgentTuiStartRequest,
+    AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest,
 };
 use crate::daemon::protocol::{
     AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
     CodexSteerRequest, LeaderTransferRequest, ManagedAgentListResponse, ManagedAgentSnapshot,
-    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionJoinRequest,
-    SessionLeaveRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
-    SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskUpdateRequest,
+    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionJoinRequest, SessionLeaveRequest,
+    SessionMutationResponse, SessionStartRequest, SessionSummary, SessionTitleRequest,
+    SignalAckRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskUpdateRequest,
 };
 use crate::errors::CliError;
 use crate::session::types::{AgentPersona, SessionState};
@@ -197,54 +195,12 @@ impl DaemonClient {
         self.post(&format!("/v1/sessions/{session_id}/signal-cancel"), request)
     }
 
-    pub fn start_agent_tui(
-        &self,
-        session_id: &str,
-        request: &AgentTuiStartRequest,
-    ) -> Result<AgentTuiSnapshot, CliError> {
-        self.post(&format!("/v1/sessions/{session_id}/agent-tuis"), request)
-    }
-
-    pub fn send_agent_tui_input(
-        &self,
-        tui_id: &str,
-        request: &AgentTuiInputRequest,
-    ) -> Result<AgentTuiSnapshot, CliError> {
-        self.post(&format!("/v1/agent-tuis/{tui_id}/input"), request)
-    }
-
-    pub fn resize_agent_tui(
-        &self,
-        tui_id: &str,
-        request: &AgentTuiResizeRequest,
-    ) -> Result<AgentTuiSnapshot, CliError> {
-        self.post(&format!("/v1/agent-tuis/{tui_id}/resize"), request)
-    }
-
-    pub fn stop_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
-        let body = serde_json::json!({});
-        self.post(&format!("/v1/agent-tuis/{tui_id}/stop"), &body)
-    }
-
-    pub fn signal_tui_ready(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
-        let body = serde_json::json!({});
-        self.post(&format!("/v1/agent-tuis/{tui_id}/ready"), &body)
-    }
-
     pub fn get_session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
         self.get(&format!("/v1/sessions/{session_id}"))
     }
 
     pub fn list_sessions(&self) -> Result<Vec<SessionSummary>, CliError> {
         self.get("/v1/sessions")
-    }
-
-    pub fn list_agent_tuis(&self, session_id: &str) -> Result<AgentTuiListResponse, CliError> {
-        self.get(&format!("/v1/sessions/{session_id}/agent-tuis"))
-    }
-
-    pub fn get_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
-        self.get(&format!("/v1/agent-tuis/{tui_id}"))
     }
 
     pub fn list_managed_agents(
@@ -299,6 +255,13 @@ impl DaemonClient {
     pub fn stop_managed_terminal(&self, agent_id: &str) -> Result<ManagedAgentSnapshot, CliError> {
         let body = serde_json::json!({});
         self.post(&format!("/v1/managed-agents/{agent_id}/stop"), &body)
+    }
+
+    pub fn signal_managed_terminal_ready(&self, agent_id: &str) -> Result<(), CliError> {
+        let body = serde_json::json!({});
+        let _: ManagedAgentSnapshot =
+            self.post(&format!("/v1/managed-agents/{agent_id}/ready"), &body)?;
+        Ok(())
     }
 
     pub fn steer_codex_managed_agent(

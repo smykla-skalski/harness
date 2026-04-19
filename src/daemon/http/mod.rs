@@ -28,7 +28,6 @@ use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with
 
 mod agents;
 mod auth;
-mod codex;
 mod core;
 mod managed_agents;
 mod response;
@@ -182,10 +181,8 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(sessions::session_routes())
         .merge(tasks::task_routes())
         .merge(agents::agent_routes())
-        .merge(agents::agent_tui_routes())
         .merge(managed_agents::managed_agent_routes())
         .merge(signals::signal_routes())
-        .merge(codex::codex_routes())
         .merge(voice::voice_routes())
         .layer(middleware::from_fn(trace_http_request))
 }

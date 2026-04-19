@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::time::Instant;
 
-use axum::extract::{Path, State, ws::WebSocketUpgrade};
+use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -15,9 +15,10 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 
 use super::DaemonHttpState;
-use super::agents::get_agent_tui_attach;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
+
+mod attach;
 
 pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -52,7 +53,7 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         )
         .route(
             "/v1/managed-agents/{agent_id}/attach",
-            get(get_terminal_agent_attach),
+            get(attach::get_terminal_agent_attach),
         )
         .route(
             "/v1/managed-agents/{agent_id}/steer",
@@ -245,27 +246,6 @@ async fn post_terminal_agent_ready(
     )
 }
 
-async fn get_terminal_agent_attach(
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    ws: WebSocketUpgrade,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let is_terminal = ensure_terminal_agent(&state, &agent_id).is_ok();
-    if !is_terminal {
-        let start = Instant::now();
-        let request_id = extract_request_id(&headers);
-        return timed_json(
-            "GET",
-            "/v1/managed-agents/{id}/attach",
-            &request_id,
-            start,
-            ensure_terminal_agent(&state, &agent_id).map(|()| ()),
-        );
-    }
-    get_agent_tui_attach(Path(agent_id), headers, ws, State(state)).await
-}
-
 async fn post_codex_agent_steer(
     Path(agent_id): Path<String>,
     headers: HeaderMap,
@@ -390,10 +370,7 @@ fn ensure_terminal_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), 
         ))
         .into());
     }
-    Err(CliErrorKind::session_not_active(format!(
-        "managed agent '{agent_id}' not found"
-    ))
-    .into())
+    Err(CliErrorKind::session_not_active(format!("managed agent '{agent_id}' not found")).into())
 }
 
 fn ensure_codex_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), CliError> {
@@ -406,8 +383,5 @@ fn ensure_codex_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), Cli
         ))
         .into());
     }
-    Err(CliErrorKind::session_not_active(format!(
-        "managed agent '{agent_id}' not found"
-    ))
-    .into())
+    Err(CliErrorKind::session_not_active(format!("managed agent '{agent_id}' not found")).into())
 }
