@@ -5,5 +5,5 @@
 
 pub mod bookmarks;
 
-// pub mod resolver;   // added in Task 6 (macOS-only)
+pub mod resolver; // macOS-only; resolver.rs is gated by #![cfg(target_os = "macos")]
 // pub mod migration;  // added in Task 8
