@@ -47,6 +47,25 @@ final class BookmarkStoreTests: XCTestCase {
     }
   }
 
+  func testAddRefusesToWipeFutureSchemaFile() async throws {
+    let dir = try makeTempDir()
+    let sandboxDir = dir.appendingPathComponent("sandbox", isDirectory: true)
+    try FileManager.default.createDirectory(at: sandboxDir, withIntermediateDirectories: true)
+    let url = sandboxDir.appendingPathComponent("bookmarks.json")
+    let originalBytes = Data(#"{"schemaVersion": 99, "bookmarks": []}"#.utf8)
+    try originalBytes.write(to: url)
+
+    let store = BookmarkStore(containerURL: dir)
+    let tmp = FileManager.default.temporaryDirectory
+    do {
+      _ = try await store.add(url: tmp, kind: .projectRoot)
+      XCTFail("expected throw; add must never silently wipe a future-schema file")
+    } catch BookmarkStoreError.unsupportedSchemaVersion {
+      // expected
+    }
+    XCTAssertEqual(try Data(contentsOf: url), originalBytes)
+  }
+
   func testResolveReturnsScopedURL() async throws {
     let dir = try makeTempDir()
     let store = BookmarkStore(containerURL: dir)
