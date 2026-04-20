@@ -17,7 +17,15 @@ pub fn data_root() -> PathBuf {
         return PathBuf::from(value);
     }
     #[cfg(target_os = "macos")]
-    if normalized_env_value("HARNESS_APP_GROUP_ID").is_some() {
+    if let Some(group_id) = normalized_env_value("HARNESS_APP_GROUP_ID") {
+        let group_root = host_home_dir()
+            .join("Library")
+            .join("Group Containers")
+            .join(&group_id);
+        if group_root.exists() {
+            return group_root;
+        }
+        // Legacy fallback: pre-migration Application Support path.
         return host_home_dir().join("Library").join("Application Support");
     }
     user_dirs::data_dir().unwrap_or_else(|_| dirs_home().join(".local").join("share"))

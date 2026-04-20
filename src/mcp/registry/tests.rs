@@ -238,8 +238,9 @@ fn default_socket_path_uses_short_filename_for_realistic_group_container_paths()
             );
             assert!(text.len() < 104);
 
-            let legacy =
-                format!("{home}/Library/Group Containers/{DEFAULT_APP_GROUP}/harness-monitor-mcp.sock");
+            let legacy = format!(
+                "{home}/Library/Group Containers/{DEFAULT_APP_GROUP}/harness-monitor-mcp.sock"
+            );
             assert!(legacy.len() >= 104);
         },
     );
