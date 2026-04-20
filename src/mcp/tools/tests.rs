@@ -8,11 +8,12 @@ use tokio::net::UnixListener;
 
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::{Tool, ToolRegistry};
+use crate::workspace::socket_paths::session_socket;
 
 use super::{ClickElementTool, GetElementTool, ListElementsTool, ListWindowsTool, register_all};
 
 fn socket_path(dir: &TempDir) -> PathBuf {
-    dir.path().join("registry.sock")
+    session_socket(dir.path(), "testid00", "registry")
 }
 
 fn spawn_single_response(

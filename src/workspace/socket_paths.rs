@@ -1,4 +1,29 @@
 //! Short, flat unix-socket path namespace keyed by session id.
+//!
+//! # Migration scope (Task 11 audit)
+//!
+//! Every non-test `UnixListener::bind` / `UnixStream::connect` call in this
+//! codebase receives a path that is already computed elsewhere:
+//!
+//! - `src/daemon/bridge/runtime.rs` — path comes from `ResolvedBridgeConfig::socket_path`,
+//!   which is built in `bridge_state::bridge_socket_path_for_root`. The bridge is a
+//!   single daemon-global socket with no session concept; its own path-budget logic
+//!   (fallback to group container or `/tmp` hash) is intentional and unaffected.
+//! - `src/daemon/bridge/client.rs` — path is loaded from persisted `BridgeState::socket_path`.
+//! - `src/mcp/registry/client.rs` — path comes from `path::default_socket_path()`,
+//!   which returns `<group>/mcp.sock` (the Monitor accessibility socket). No session
+//!   concept; that socket is a shared singleton.
+//!
+//! No production call site constructs a socket path inline. The migration applied
+//! in Task 11 is therefore limited to two test fixture helpers:
+//!
+//! - `src/mcp/registry/tests.rs` — `socket_path()` now calls `session_socket(dir.path(), "testid00", "registry")`
+//! - `src/mcp/tools/tests.rs`    — same helper updated
+//!
+//! The bridge test files (`tests/cleanup_and_config.rs`, `tests/legacy_server.rs`) bind
+//! to hardcoded names under the daemon root deliberately — they test legacy cleanup
+//! behavior that depends on specific filenames and are not socket-path construction
+//! tests; those are left unchanged.
 
 use std::path::{Path, PathBuf};
 
