@@ -1,6 +1,7 @@
 use super::*;
 
 use std::net::TcpListener;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -122,10 +123,22 @@ fn start_session_direct_creates_worktree() {
 
         assert_eq!(state.session_id.len(), 8, "session id is 8 chars");
         assert_eq!(state.branch_ref, format!("harness/{}", state.session_id));
-        assert!(state.worktree_path.exists(), "worktree workspace dir should exist");
-        assert!(state.worktree_path.join("README.md").exists(), "checked-out README.md must exist");
-        assert!(state.shared_path.exists(), "shared (memory) dir should exist");
-        assert!(state.origin_path.exists(), "origin path should resolve to a real dir");
+        assert!(
+            state.worktree_path.exists(),
+            "worktree workspace dir should exist"
+        );
+        assert!(
+            state.worktree_path.join("README.md").exists(),
+            "checked-out README.md must exist"
+        );
+        assert!(
+            state.shared_path.exists(),
+            "shared (memory) dir should exist"
+        );
+        assert!(
+            state.origin_path.exists(),
+            "origin path should resolve to a real dir"
+        );
         assert_eq!(
             state.project_name,
             project.file_name().expect("file_name").to_string_lossy()
@@ -158,5 +171,61 @@ fn start_session_direct_rejects_unknown_policy_preset() {
                 .contains("unknown session policy preset 'swarm-future'"),
             "unexpected error: {error}"
         );
+    });
+}
+
+#[test]
+fn session_start_honors_custom_base_ref() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
+            let project = tmp.path().join("project");
+            init_git_with_branches(&project, "experimental");
+            let db = setup_db_with_project(&project);
+
+            let experimental_head = {
+                let out = Command::new("git")
+                    .current_dir(&project)
+                    .args(["log", "experimental", "-1", "--format=%H"])
+                    .output()
+                    .expect("git log experimental");
+                String::from_utf8(out.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+
+            let state = start_session_direct(
+                &crate::daemon::protocol::SessionStartRequest {
+                    title: "base_ref test".into(),
+                    context: "honors custom base ref".into(),
+                    runtime: "claude".into(),
+                    session_id: None,
+                    project_dir: project.to_string_lossy().into_owned(),
+                    policy_preset: None,
+                    base_ref: Some("experimental".into()),
+                },
+                Some(&db),
+            )
+            .expect("start session with custom base_ref");
+
+            let worktree_head = {
+                let out = Command::new("git")
+                    .current_dir(&project)
+                    .args(["log", &state.branch_ref, "-1", "--format=%H"])
+                    .output()
+                    .expect("git log worktree branch");
+                String::from_utf8(out.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+
+            assert_eq!(
+                worktree_head, experimental_head,
+                "worktree HEAD must match experimental tip; branch_ref={}",
+                state.branch_ref
+            );
+        });
     });
 }

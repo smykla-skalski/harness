@@ -40,6 +40,65 @@ pub fn init_git_repo_with_seed(path: &Path) {
     assert!(commit.success(), "git commit failed at {}", path.display());
 }
 
+/// Initialize a git repository at `path` with a seed commit on the default
+/// branch and one extra branch `branch_name` that carries one additional
+/// commit.
+///
+/// The extra commit writes `branch.txt` so the branch diverges from the
+/// default at a distinct SHA. Leaves HEAD on the default branch. Panics on
+/// any git failure.
+pub fn init_git_repo_with_branches(path: &Path, branch_name: &str) {
+    init_git_repo_with_seed(path);
+    // Capture the current (default) branch name so we can restore it after
+    // creating the extra branch. HOME may point at a temp dir during tests, so
+    // init.defaultBranch from the real global config is not available.
+    let default_branch = {
+        let out = Command::new("git")
+            .current_dir(path)
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .output()
+            .expect("git rev-parse HEAD");
+        String::from_utf8(out.stdout)
+            .expect("utf8 branch name")
+            .trim()
+            .to_owned()
+    };
+    let checkout = Command::new("git")
+        .current_dir(path)
+        .args(["checkout", "-q", "-b", branch_name])
+        .status()
+        .expect("git checkout -b");
+    assert!(checkout.success(), "git checkout -b failed");
+    std::fs::write(path.join("branch.txt"), branch_name.as_bytes()).expect("write branch.txt");
+    let add = Command::new("git")
+        .current_dir(path)
+        .args(["add", "branch.txt"])
+        .status()
+        .expect("git add branch.txt");
+    assert!(add.success(), "git add branch.txt failed");
+    let commit = Command::new("git")
+        .current_dir(path)
+        .args([
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "user.name=test",
+            "commit",
+            "-q",
+            "-m",
+            branch_name,
+        ])
+        .status()
+        .expect("git commit branch");
+    assert!(commit.success(), "git commit branch failed");
+    let back = Command::new("git")
+        .current_dir(path)
+        .args(["checkout", "-q", &default_branch])
+        .status()
+        .expect("git checkout default branch");
+    assert!(back.success(), "git checkout default branch failed");
+}
+
 /// Run a closure inside an isolated Harness filesystem scope.
 ///
 /// Tests often set `XDG_DATA_HOME` to a temp dir but still accidentally see a
