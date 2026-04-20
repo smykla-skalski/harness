@@ -3,8 +3,10 @@
 //!
 //! Returns a guard whose `path()` is valid to read while the guard lives.
 //! On macOS the guard holds the bookmark's security-scope grant; the daemon
-//! must finish all filesystem work (notably `git worktree add`) before the
-//! guard drops, otherwise CFURL revokes access mid-operation.
+//! must finish any work that touches the origin path (notably
+//! `git worktree add`) before the guard drops, otherwise CFURL revokes
+//! access mid-operation. Filesystem work under the sessions root does not
+//! need the scope active.
 
 use std::fs;
 use std::path::{Path, PathBuf};
