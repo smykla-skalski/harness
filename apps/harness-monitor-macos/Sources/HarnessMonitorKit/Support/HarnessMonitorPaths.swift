@@ -100,7 +100,29 @@ public enum HarnessMonitorPaths {
   }
 
   public static func harnessRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
-    Self.dataRoot(using: environment).appendingPathComponent("harness", isDirectory: true)
+    if let configuredRoot = configuredDataHomeRoot(using: environment) {
+      return configuredRoot.appendingPathComponent("harness", isDirectory: true)
+    }
+
+    if let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines),
+      !value.isEmpty
+    {
+      return appGroupContainerURL(identifier: value, using: environment)
+        .appendingPathComponent("harness", isDirectory: true)
+    }
+
+    if let containerURL = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
+    ) {
+      return containerURL.appendingPathComponent("harness", isDirectory: true)
+    }
+
+    // Dev / preview fallback (non-sandboxed): fall back to ~/Library/Application Support/harness
+    return environment.homeDirectory
+      .appendingPathComponent("Library", isDirectory: true)
+      .appendingPathComponent("Application Support", isDirectory: true)
+      .appendingPathComponent("harness", isDirectory: true)
   }
 
   public static func daemonRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
