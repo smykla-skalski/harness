@@ -69,6 +69,9 @@ struct HarnessMonitorAppConfiguration {
       )
       applyUITestDefaults(environment: resolvedEnvironment, overrides: uiTestOverrides)
       seedTestToasts(environment: resolvedEnvironment, store: store)
+      #if DEBUG
+        seedPreseedBookmark(environment: resolvedEnvironment, store: store)
+      #endif
     }
 
     return Self(
@@ -405,4 +408,5 @@ struct HarnessMonitorAppConfiguration {
     let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmedValue.isEmpty ? fallback : trimmedValue
   }
+
 }
