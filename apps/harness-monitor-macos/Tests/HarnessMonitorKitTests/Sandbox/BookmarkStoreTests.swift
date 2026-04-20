@@ -80,6 +80,72 @@ final class BookmarkStoreTests: XCTestCase {
     XCTAssertFalse(resolved.isStale)
   }
 
+  #if DEBUG
+    func testInsertForTestingReplacesExistingRecordWithSameId() async throws {
+      let dir = try makeTempDir()
+      let store = BookmarkStore(containerURL: dir)
+      let first = BookmarkStore.Record(
+        id: "B-x",
+        kind: .projectRoot,
+        displayName: "first",
+        lastResolvedPath: "/tmp/first",
+        bookmarkData: Data([0x01])
+      )
+      let second = BookmarkStore.Record(
+        id: "B-x",
+        kind: .projectRoot,
+        displayName: "second",
+        lastResolvedPath: "/tmp/second",
+        bookmarkData: Data([0x02])
+      )
+      try await store.insertForTesting(first)
+      try await store.insertForTesting(second)
+      let all = await store.all()
+      XCTAssertEqual(all.count, 1)
+      XCTAssertEqual(all.first?.displayName, "second")
+    }
+
+    func testLoadDeduplicatesById() async throws {
+      let dir = try makeTempDir()
+      let sandboxDir = dir.appendingPathComponent("sandbox", isDirectory: true)
+      try FileManager.default.createDirectory(at: sandboxDir, withIntermediateDirectories: true)
+      let url = sandboxDir.appendingPathComponent("bookmarks.json")
+      // Write two records with the same id directly to bypass the store API.
+      let json = """
+        {
+          "schemaVersion": 1,
+          "bookmarks": [
+            {
+              "id": "B-preseed",
+              "kind": "project-root",
+              "displayName": "dup1",
+              "lastResolvedPath": "/tmp/a",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            },
+            {
+              "id": "B-preseed",
+              "kind": "project-root",
+              "displayName": "dup2",
+              "lastResolvedPath": "/tmp/b",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            }
+          ]
+        }
+        """
+      try Data(json.utf8).write(to: url)
+      let store = BookmarkStore(containerURL: dir)
+      let loaded = try await store.loadAndValidate()
+      XCTAssertEqual(loaded.bookmarks.count, 1)
+      XCTAssertEqual(loaded.bookmarks.first?.displayName, "dup1")
+    }
+  #endif
+
   private func makeTempDir() throws -> URL {
     let dir = FileManager.default.temporaryDirectory
       .appendingPathComponent("BookmarkStoreTests-\(UUID())", isDirectory: true)

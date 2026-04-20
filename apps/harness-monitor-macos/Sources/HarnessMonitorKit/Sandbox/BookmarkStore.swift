@@ -43,12 +43,22 @@ public actor BookmarkStore {
     } catch {
       throw BookmarkStoreError.ioError(String(describing: error))
     }
-    let decoded = try Self.decoder.decode(PersistedStore.self, from: data)
+    var decoded = try Self.decoder.decode(PersistedStore.self, from: data)
     if decoded.schemaVersion != PersistedStore.currentSchemaVersion {
       throw BookmarkStoreError.unsupportedSchemaVersion(
         found: decoded.schemaVersion,
         expected: PersistedStore.currentSchemaVersion
       )
+    }
+    // Dedupe on load: keep first occurrence of each id. Rewrite if we changed anything.
+    let originalCount = decoded.bookmarks.count
+    var seen = Set<String>()
+    decoded.bookmarks = decoded.bookmarks.filter { seen.insert($0.id).inserted }
+    if decoded.bookmarks.count != originalCount {
+      Self.logger.warning(
+        "deduplicated \(originalCount - decoded.bookmarks.count) stale bookmark record(s) on load"
+      )
+      try? save(decoded)
     }
     cached = decoded
     return decoded
@@ -173,8 +183,13 @@ public actor BookmarkStore {
     ///
     /// Only available in DEBUG builds. Intended exclusively for UI-test preseed
     /// scenarios where the real `.fileImporter` flow must be bypassed.
+    ///
+    /// If a record with the same id already exists it is replaced, so repeated
+    /// calls with the same preseed id do not accumulate duplicates.
     public func insertForTesting(_ record: Record) throws {
       var store = try loadForMutation()
+      // Dedupe by id: if a record with this id already exists, remove it before insert.
+      store.bookmarks.removeAll { $0.id == record.id }
       store.bookmarks.insert(record, at: 0)
       if store.bookmarks.count > Self.mruCap {
         store.bookmarks.removeLast(store.bookmarks.count - Self.mruCap)
