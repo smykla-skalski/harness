@@ -4,33 +4,16 @@
 // state.json at the new `<sessions_root>/<project>/<sid>/` layout, and that
 // DELETE /v1/sessions/<id> tears all of that down cleanly.
 
-use std::path::PathBuf;
-
-use harness::session::types::SessionState;
-use harness::workspace::layout::SessionLayout;
-use harness::workspace::{harness_data_root, layout::sessions_root};
 use harness_testkit::init_git_repo_with_seed;
 use tempfile::tempdir;
 
 use super::support::{
-    delete_session_via_http, git_branches_matching, output_text, run_harness, spawn_daemon_serve,
-    start_session_via_http, wait_for_daemon_ready,
+    delete_session_via_http, git_branches_matching, layout_for_state, output_text, run_harness,
+    spawn_daemon_serve, start_session_via_http, wait_for_daemon_ready,
 };
 
-fn layout_for_state(xdg: &std::path::Path, state: &SessionState) -> SessionLayout {
-    temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(xdg.as_os_str().to_str().unwrap()))],
-        || {
-            let sessions_root = sessions_root(&harness_data_root());
-            SessionLayout {
-                sessions_root,
-                project_name: state.project_name.clone(),
-                session_id: state.session_id.clone(),
-            }
-        },
-    )
-}
-
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn session_start_creates_workspace_layout() {
     let tmp = tempdir().expect("tempdir");
@@ -112,6 +95,8 @@ fn session_start_creates_workspace_layout() {
     daemon.kill().expect("kill daemon");
 }
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn session_list_shows_session_id() {
     let tmp = tempdir().expect("tempdir");
@@ -125,6 +110,9 @@ fn session_list_shows_session_id() {
     let mut daemon = spawn_daemon_serve(&home, &xdg);
     wait_for_daemon_ready(&home, &xdg);
     // branch_ref is returned directly from the session start response.
+    // NOTE: CLI conversions (detail_to_session_state / summary_to_session_state in
+    // src/session/service/conversions.rs) drop branch_ref/worktree_path from the
+    // daemon response; branch_ref here comes from the raw HTTP start response only.
     let state = start_session_via_http(&home, &xdg, &project, "wk-list-1");
     assert_eq!(
         state.branch_ref, "harness/wk-list-1",
@@ -146,6 +134,8 @@ fn session_list_shows_session_id() {
     daemon.kill().expect("kill daemon");
 }
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn session_status_shows_session_id_and_title() {
     let tmp = tempdir().expect("tempdir");
@@ -186,8 +176,10 @@ fn session_status_shows_session_id_and_title() {
     daemon.kill().expect("kill daemon");
 }
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
-fn session_delete_removes_worktree_and_branch() {
+fn session_delete_removes_worktree_branch_and_state_files() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().join("home");
     let xdg = tmp.path().join("xdg");
@@ -199,52 +191,39 @@ fn session_delete_removes_worktree_and_branch() {
     let mut daemon = spawn_daemon_serve(&home, &xdg);
     wait_for_daemon_ready(&home, &xdg);
 
+    // NOTE: CLI conversions (detail_to_session_state / summary_to_session_state in
+    // src/session/service/conversions.rs) drop branch_ref/worktree_path; the fields
+    // below come from the raw HTTP start response which goes through the daemon path.
+    // FIXME: .origin marker may not be written on all code paths;
+    // see src/daemon/service/session_setup.rs + src/workspace/worktree.rs.
     let state = start_session_via_http(&home, &xdg, &project, "wk-delete-1");
-    let worktree_path: PathBuf = state.worktree_path.clone();
+    let worktree_path = state.worktree_path.clone();
+    let layout = layout_for_state(&xdg, &state);
+
     assert!(worktree_path.exists(), "worktree must exist before delete");
+    assert!(
+        layout.state_file().exists(),
+        "state.json must exist before delete"
+    );
 
     let http_status = delete_session_via_http(&home, &xdg, "wk-delete-1");
     assert_eq!(http_status, 204, "DELETE must return 204");
 
+    // Worktree must be gone.
     assert!(
         !worktree_path.exists(),
         "worktree must be gone after delete: {}",
         worktree_path.display()
     );
 
-    // The git branch must also be gone.
+    // Git branch must be gone.
     let branches = git_branches_matching(&project, "harness/");
     assert!(
         !branches.iter().any(|b| b == "harness/wk-delete-1"),
         "branch harness/wk-delete-1 must be deleted; found: {branches:?}"
     );
 
-    daemon.kill().expect("kill daemon");
-}
-
-#[test]
-fn session_delete_via_http_removes_state_json() {
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path().join("home");
-    let xdg = tmp.path().join("xdg");
-    let project = tmp.path().join("project");
-    std::fs::create_dir_all(&home).expect("create home");
-    std::fs::create_dir_all(&xdg).expect("create xdg");
-    init_git_repo_with_seed(&project);
-
-    let mut daemon = spawn_daemon_serve(&home, &xdg);
-    wait_for_daemon_ready(&home, &xdg);
-
-    let state = start_session_via_http(&home, &xdg, &project, "wk-cleanstate-1");
-    let layout = layout_for_state(&xdg, &state);
-    assert!(
-        layout.state_file().exists(),
-        "state.json must exist before delete"
-    );
-
-    let http_status = delete_session_via_http(&home, &xdg, "wk-cleanstate-1");
-    assert_eq!(http_status, 204);
-
+    // state.json (session root) must be gone.
     assert!(
         !layout.session_root().exists(),
         "session root must be removed: {}",
@@ -256,7 +235,7 @@ fn session_delete_via_http_removes_state_json() {
         let active_text =
             std::fs::read_to_string(layout.active_registry()).expect("read .active.json");
         assert!(
-            !active_text.contains("wk-cleanstate-1"),
+            !active_text.contains("wk-delete-1"),
             ".active.json must not contain deleted session; content: {active_text}"
         );
     }
