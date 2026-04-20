@@ -347,6 +347,7 @@ pub(super) fn start_direct_session(
             session_id: Some(session_id.into()),
             project_dir: project.to_string_lossy().into(),
             policy_preset: policy_preset.map(ToString::to_string),
+            base_ref: None,
         },
         Some(db),
     )
