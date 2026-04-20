@@ -78,7 +78,7 @@ fn observe_scans_logs_via_legacy_session_fallback() {
             .find(|agent| agent.runtime == "codex")
             .expect("codex worker should be registered");
         let worker_id = worker.agent_id.clone();
-        crate::session::storage::update_state(project, &state.session_id, |state| {
+        crate::session::storage::update_state_legacy(project, &state.session_id, |state| {
             state
                 .agents
                 .get_mut(&worker_id)

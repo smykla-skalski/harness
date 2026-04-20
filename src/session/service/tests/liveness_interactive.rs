@@ -82,7 +82,7 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
         write_agent_log_file(project, "claude", "test-service");
 
         let fresh = utc_now();
-        storage::update_state(project, "sync-state-activity", |state| {
+        storage::update_state_legacy(project, "sync-state-activity", |state| {
             let worker = state.agents.get_mut(&worker_id).expect("worker");
             worker.last_activity_at = Some(fresh.clone());
             worker.updated_at = fresh.clone();

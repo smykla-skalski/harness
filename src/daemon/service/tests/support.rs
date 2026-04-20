@@ -92,7 +92,7 @@ pub(super) fn set_log_mtime_seconds_ago(path: &Path, seconds: u64) {
 
 pub(super) fn age_leader_state_activity(project: &Path, session_id: &str, seconds: i64) {
     let stale = (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339();
-    crate::session::storage::update_state(project, session_id, |state| {
+    crate::session::storage::update_state_legacy(project, session_id, |state| {
         let leader_id = state.leader_id.clone();
         if let Some(leader_id) = leader_id
             && let Some(leader) = state.agents.get_mut(&leader_id)

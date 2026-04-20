@@ -37,7 +37,7 @@ pub fn sync_agent_liveness(
     let mut result = LivenessSyncResult::default();
     let activity_map = collect_agent_activity(session_id, project_dir)?;
 
-    storage::update_state_if_changed(project_dir, session_id, |state| {
+    storage::update_state_if_changed_legacy(project_dir, session_id, |state| {
         require_active(state)?;
         let changed = apply_liveness_transitions(state, &activity_map, &now, &mut result);
         if changed {
@@ -47,7 +47,7 @@ pub fn sync_agent_liveness(
     })?;
 
     if !result.disconnected.is_empty() || !result.idled.is_empty() {
-        let _ = storage::append_log_entry(
+        let _ = storage::append_log_entry_legacy(
             project_dir,
             session_id,
             SessionTransition::LivenessSynced {

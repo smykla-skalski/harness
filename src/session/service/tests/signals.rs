@@ -52,7 +52,7 @@ fn checkpoint_record_updates_task_summary_and_log() {
         );
 
         let checkpoints =
-            storage::load_task_checkpoints(project, "s5", &task.task_id).expect("checkpoints");
+            storage::load_task_checkpoints_legacy(project, "s5", &task.task_id).expect("checkpoints");
         assert_eq!(checkpoints.len(), 1);
         assert_eq!(checkpoints[0].checkpoint_id, checkpoint.checkpoint_id);
     });
