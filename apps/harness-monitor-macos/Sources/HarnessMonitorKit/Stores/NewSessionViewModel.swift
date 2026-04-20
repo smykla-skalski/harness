@@ -1,4 +1,21 @@
 import Foundation
+import OSLog
+
+// MARK: - Log sink protocol
+
+public protocol NewSessionLogSink: Sendable {
+  func info(_ message: String)
+  func error(_ message: String)
+  func debug(_ message: String)
+}
+
+public struct LiveNewSessionLogSink: NewSessionLogSink {
+  private static let logger = Logger(subsystem: "io.harnessmonitor", category: "sessions")
+  public init() {}
+  public func info(_ message: String) { Self.logger.info("\(message, privacy: .public)") }
+  public func error(_ message: String) { Self.logger.error("\(message, privacy: .public)") }
+  public func debug(_ message: String) { Self.logger.debug("\(message)") }
+}
 
 @MainActor
 @Observable
@@ -43,13 +60,15 @@ public final class NewSessionViewModel {
   private let client: any HarnessMonitorClientProtocol
   private let isSandboxedCheck: @Sendable () -> Bool
   private let bookmarkResolver: BookmarkResolver
+  private let logSink: any NewSessionLogSink
 
   public init(
     store: HarnessMonitorStore,
     bookmarkStore: BookmarkStore,
     client: any HarnessMonitorClientProtocol,
     isSandboxed: @Sendable @escaping () -> Bool = NewSessionViewModel.liveIsSandboxed,
-    bookmarkResolver: BookmarkResolver? = nil
+    bookmarkResolver: BookmarkResolver? = nil,
+    logSink: any NewSessionLogSink = LiveNewSessionLogSink()
   ) {
     self.store = store
     self.bookmarkStore = bookmarkStore
@@ -57,6 +76,7 @@ public final class NewSessionViewModel {
     self.isSandboxedCheck = isSandboxed
     self.bookmarkResolver = bookmarkResolver
       ?? Self.makeDefaultResolver(bookmarkStore: bookmarkStore)
+    self.logSink = logSink
   }
 
   public func submit() async -> Result<SessionSummary, SubmitError> {
@@ -64,11 +84,13 @@ public final class NewSessionViewModel {
     guard !trimmedTitle.isEmpty else {
       let error = SubmitError.validation(.titleRequired)
       lastError = error
+      logSink.error("new-session submit failed kind=titleRequired")
       return .failure(error)
     }
     guard let bookmarkId = selectedBookmarkId else {
       let error = SubmitError.validation(.projectRequired)
       lastError = error
+      logSink.error("new-session submit failed kind=projectRequired")
       return .failure(error)
     }
 
@@ -81,18 +103,25 @@ public final class NewSessionViewModel {
     } catch let error as BookmarkStoreError {
       let submitError = classifyBookmarkError(error, bookmarkId: bookmarkId)
       lastError = submitError
+      logSink.debug("new-session bookmark resolution failed id=\(bookmarkId)")
+      logSink.error("new-session submit failed kind=bookmarkRevoked")
       return .failure(submitError)
     } catch {
       let submitError = SubmitError.unexpected(String(describing: error))
       lastError = submitError
+      logSink.error("new-session submit failed kind=unexpected")
       return .failure(submitError)
     }
 
     if resolved.isStale {
       let error = SubmitError.bookmarkStale(id: bookmarkId)
       lastError = error
+      logSink.error("new-session submit failed kind=bookmarkStale")
       return .failure(error)
     }
+
+    logSink.info("new-session submit started")
+    logSink.debug("new-session bookmark id=\(bookmarkId)")
 
     let projectDir = isSandboxedCheck() ? bookmarkId : resolved.projectDir
     let request = SessionStartRequest(
@@ -111,9 +140,11 @@ public final class NewSessionViewModel {
     } catch {
       let submitError = classify(error: error)
       lastError = submitError
+      logSink.error("new-session submit failed kind=\(submitErrorKind(submitError))")
       return .failure(submitError)
     }
 
+    logSink.info("new-session submit succeeded id=\(summary.sessionId)")
     await store.selectSession(summary.sessionId)
     lastError = nil
     return .success(summary)
@@ -128,6 +159,23 @@ public final class NewSessionViewModel {
   }
 
   // MARK: - Private
+
+  private func submitErrorKind(_ error: SubmitError) -> String {
+    switch error {
+    case .validation(let validationError):
+      switch validationError {
+      case .titleRequired: return "titleRequired"
+      case .projectRequired: return "projectRequired"
+      case .bookmarkUnavailable: return "bookmarkUnavailable"
+      }
+    case .bookmarkRevoked: return "bookmarkRevoked"
+    case .bookmarkStale: return "bookmarkStale"
+    case .daemonUnreachable: return "daemonUnreachable"
+    case .worktreeCreateFailed: return "worktreeCreateFailed"
+    case .invalidBaseRef: return "invalidBaseRef"
+    case .unexpected: return "unexpected"
+    }
+  }
 
   private func classifyBookmarkError(
     _ error: BookmarkStoreError,

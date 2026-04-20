@@ -20,7 +20,8 @@ struct NewSessionViewModelTests {
     store: HarnessMonitorStore? = nil,
     client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
     isSandboxed: @Sendable @escaping () -> Bool = { true },
-    bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil
+    bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil,
+    logSink: (any NewSessionLogSink)? = nil
   ) -> NewSessionViewModel {
     let resolvedStore = store ?? makeStore()
     let bookmarkStore = makeBookmarkStore()
@@ -29,7 +30,8 @@ struct NewSessionViewModelTests {
       bookmarkStore: bookmarkStore,
       client: client,
       isSandboxed: isSandboxed,
-      bookmarkResolver: bookmarkResolver
+      bookmarkResolver: bookmarkResolver,
+      logSink: logSink ?? LiveNewSessionLogSink()
     )
   }
 
@@ -255,6 +257,54 @@ struct NewSessionViewModelTests {
     }
     #expect(vm.lastError == nil)
   }
+
+  // MARK: - Log sink
+
+  @Test("submit emits started and succeeded logs on happy path")
+  func submitEmitsStartedAndSucceededLogsOnHappyPath() async {
+    let spy = SpyLogSink()
+    let vm = makeViewModel(
+      bookmarkResolver: stubResolver(id: "B-log", path: "/tmp/log"),
+      logSink: spy
+    )
+    vm.title = "Logged Session"
+    vm.selectedBookmarkId = "B-log"
+
+    _ = await vm.submit()
+
+    #expect(spy.infoMessages.contains("new-session submit started"))
+    #expect(spy.infoMessages.contains { $0.hasPrefix("new-session submit succeeded id=") })
+  }
+
+  @Test("submit emits error log on daemon unreachable")
+  func submitEmitsErrorLogOnDaemonUnreachable() async {
+    let spy = SpyLogSink()
+    let spyClient = SpyHarnessClient(error: URLError(.cannotConnectToHost))
+    let vm = makeViewModel(
+      client: spyClient,
+      bookmarkResolver: stubResolver(id: "B-err", path: "/tmp/err"),
+      logSink: spy
+    )
+    vm.title = "Fail Session"
+    vm.selectedBookmarkId = "B-err"
+
+    _ = await vm.submit()
+
+    #expect(spy.errorMessages.contains { $0.contains("kind=daemonUnreachable") })
+  }
+}
+
+// MARK: - SpyLogSink
+
+private final class SpyLogSink: NewSessionLogSink, @unchecked Sendable {
+  private let lock = NSLock()
+  private(set) var infoMessages: [String] = []
+  private(set) var errorMessages: [String] = []
+  private(set) var debugMessages: [String] = []
+
+  func info(_ message: String) { lock.lock(); infoMessages.append(message); lock.unlock() }
+  func error(_ message: String) { lock.lock(); errorMessages.append(message); lock.unlock() }
+  func debug(_ message: String) { lock.lock(); debugMessages.append(message); lock.unlock() }
 }
 
 // MARK: - SpyHarnessClient
