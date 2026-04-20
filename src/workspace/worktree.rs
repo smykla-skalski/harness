@@ -42,9 +42,22 @@ impl WorktreeController {
             None => resolve_base_ref(origin).await?,
         };
         let branch = layout.branch_ref();
+        // NOTE: callers must serialize concurrent create() against the same origin — git's own index.lock surfaces as CreateFailed under contention.
         run_worktree_add(origin, layout, &branch, &resolved_ref).await?;
-        fs::create_dir_all(layout.memory())?;
-        fs::write(layout.origin_marker(), origin.to_string_lossy().as_bytes())?;
+        let post_add = async {
+            fs::create_dir_all(layout.memory())?;
+            fs::write(layout.origin_marker(), origin.to_string_lossy().as_bytes())?;
+            Ok::<(), WorktreeError>(())
+        };
+        if let Err(err) = post_add.await {
+            if let Err(rm_err) = run_worktree_remove(origin, layout).await {
+                warn!(%rm_err, "rollback: worktree remove failed");
+            }
+            if let Err(del_err) = run_branch_delete(origin, &branch).await {
+                warn!(%del_err, "rollback: branch delete failed");
+            }
+            return Err(err);
+        }
         info!(path = %layout.workspace().display(), branch = %branch, "created worktree");
         Ok(())
     }
@@ -52,13 +65,19 @@ impl WorktreeController {
     /// # Errors
     /// Returns `WorktreeError::RemoveFailed`/`BranchDeleteFailed` on git errors,
     /// `WorktreeError::Io` on filesystem errors.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
     pub async fn destroy(
         origin: &Path,
         layout: &SessionLayout,
     ) -> Result<(), WorktreeError> {
         run_worktree_remove(origin, layout).await?;
         run_branch_delete(origin, &layout.branch_ref()).await?;
-        let _ = fs::remove_dir_all(layout.session_root());
+        if let Err(err) = fs::remove_dir_all(layout.session_root()) {
+            warn!(%err, path = %layout.session_root().display(), "session root cleanup failed");
+        }
         Ok(())
     }
 }
@@ -91,10 +110,6 @@ async fn run_worktree_add(
     ))
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
 async fn run_worktree_remove(origin: &Path, layout: &SessionLayout) -> Result<(), WorktreeError> {
     let remove = Command::new("git")
         .arg("-C")
@@ -115,7 +130,6 @@ async fn run_worktree_remove(origin: &Path, layout: &SessionLayout) -> Result<()
     if stderr.contains("not a working tree") {
         return Ok(());
     }
-    warn!(%stderr, "worktree remove stderr; continuing to branch delete");
     Err(WorktreeError::RemoveFailed(stderr.to_string()))
 }
 

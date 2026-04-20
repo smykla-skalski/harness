@@ -50,3 +50,45 @@ async fn destroy_removes_worktree_and_branch() {
         .output().await.unwrap();
     assert!(std::str::from_utf8(&branches.stdout).unwrap().trim().is_empty());
 }
+
+/// Verify that when a post-add filesystem step fails, `create` rolls back
+/// the worktree and branch so no orphans are left in the origin repo.
+///
+/// Injection: pre-create a regular file at `layout.memory()` so that
+/// `fs::create_dir_all(memory())` fails with ENOTDIR, triggering rollback.
+#[tokio::test]
+async fn rollback_on_memory_create_failure() {
+    let origin = TempDir::new().unwrap();
+    init_origin_repo(origin.path()).await;
+    let sessions = TempDir::new().unwrap();
+    let layout = SessionLayout {
+        sessions_root: sessions.path().into(),
+        project_name: "origin".into(),
+        session_id: "cd345678".into(),
+    };
+    // Ensure the session root exists so we can plant the blocking file.
+    std::fs::create_dir_all(layout.session_root()).unwrap();
+    // Plant a regular file where memory/ would be; create_dir_all will fail.
+    std::fs::write(layout.memory(), b"blocker").unwrap();
+    // Make the session root read-only so write() on origin_marker also fails
+    // if the memory failure were somehow skipped (belt-and-suspenders).
+    // The primary failure trigger is the file-at-memory-path above.
+
+    let result = WorktreeController::create(origin.path(), &layout, None).await;
+    assert!(result.is_err(), "expected create to fail due to blocked memory dir");
+
+    // Worktree must have been rolled back.
+    assert!(!layout.workspace().exists(), "workspace should have been removed by rollback");
+
+    // Branch must have been rolled back.
+    let branches = Command::new("git")
+        .current_dir(origin.path())
+        .args(["branch", "--list", "harness/*"])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        std::str::from_utf8(&branches.stdout).unwrap().trim().is_empty(),
+        "harness branch should have been deleted by rollback"
+    );
+}
