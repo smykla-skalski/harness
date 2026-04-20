@@ -167,28 +167,16 @@ pub enum Command {
     },
 }
 
-/// Migrate the harness data root from the legacy macOS location; logs on failure.
-#[cfg(target_os = "macos")]
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn run_data_root_migration() {
-    use crate::sandbox::migration::migrate;
-    use crate::workspace::{harness_data_root, legacy_macos_root};
-
-    if let Err(err) = migrate(&legacy_macos_root(), &harness_data_root()) {
-        tracing::warn!(%err, "data-root migration failed; continuing with new root");
-    }
-}
-
 /// Dispatch a parsed command to its owning subsystem.
 ///
 /// # Errors
 /// Returns `CliError` when the selected command fails.
 pub fn dispatch(command: &Command) -> Result<i32, CliError> {
     #[cfg(target_os = "macos")]
-    run_data_root_migration();
+    {
+        use crate::sandbox::migration::run_startup_migration;
+        run_startup_migration();
+    }
 
     let ctx = AppContext::production();
     match command {
