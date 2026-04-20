@@ -126,3 +126,6 @@ ON CONFLICT(scope) DO UPDATE SET
     version = version + 1,
     updated_at = excluded.updated_at,
     change_seq = excluded.change_seq";
+
+pub(super) const DELETE_SESSION_ROW_SQL: &str =
+    "DELETE FROM sessions WHERE session_id = ?1";
