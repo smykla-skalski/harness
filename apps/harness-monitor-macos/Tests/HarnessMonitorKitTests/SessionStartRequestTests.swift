@@ -1,11 +1,15 @@
-import XCTest
 @testable import HarnessMonitorKit
+import XCTest
 
 final class SessionStartRequestTests: XCTestCase {
   func testEncodesSnakeCase() throws {
     let req = SessionStartRequest(
-      title: "t", context: "c", runtime: "claude",
-      sessionId: nil, projectDir: "B-abc", policyPreset: nil,
+      title: "t",
+      context: "c",
+      runtime: "claude",
+      sessionId: nil,
+      projectDir: "B-abc",
+      policyPreset: nil,
       baseRef: "main"
     )
     let encoder = JSONEncoder()
@@ -18,8 +22,12 @@ final class SessionStartRequestTests: XCTestCase {
 
   func testOmitsNilBaseRef() throws {
     let req = SessionStartRequest(
-      title: "t", context: "c", runtime: "claude",
-      sessionId: nil, projectDir: "B-abc", policyPreset: nil,
+      title: "t",
+      context: "c",
+      runtime: "claude",
+      sessionId: nil,
+      projectDir: "B-abc",
+      policyPreset: nil,
       baseRef: nil
     )
     let encoder = JSONEncoder()
