@@ -66,6 +66,7 @@ struct SidebarView: View {
       SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
     }
     .toolbar {
+      SidebarToolbarNewSessionToolbarItem(store: store)
       SidebarToolbarFilterToolbarItem(
         store: store,
         controls: controls,
@@ -203,6 +204,22 @@ struct SidebarView: View {
   private func applyRecentSearch(_ query: String) {
     store.searchText = query
     submitSearch()
+  }
+}
+
+private struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
+  let store: HarnessMonitorStore
+
+  var body: some ToolbarContent {
+    ToolbarItem(placement: .primaryAction) {
+      Button {
+        store.presentedSheet = .newSession
+      } label: {
+        Label("New Session", systemImage: "plus")
+      }
+      .help("Start a new session")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarNewSessionButton)
+    }
   }
 }
 
