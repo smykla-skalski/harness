@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 struct NewSessionSheetView: View {
@@ -9,6 +10,7 @@ struct NewSessionSheetView: View {
   private var dismiss
   @State private var bookmarks: [BookmarkStore.Record] = []
   @State private var isAdvancedExpanded = false
+  @State private var showImporter = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -21,8 +23,15 @@ struct NewSessionSheetView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionSheet)
     .task { bookmarks = await viewModel.availableBookmarks() }
-    .onChange(of: store.openFolderRequest) {
-      Task { bookmarks = await viewModel.availableBookmarks() }
+    .fileImporter(
+      isPresented: $showImporter,
+      allowedContentTypes: [.folder],
+      allowsMultipleSelection: false
+    ) { result in
+      Task {
+        await store.handleImportedFolder(result)
+        bookmarks = await viewModel.availableBookmarks()
+      }
     }
   }
 
@@ -77,7 +86,7 @@ struct NewSessionSheetView: View {
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
       Button("Add Folder…") {
-        store.requestOpenFolder()
+        showImporter = true
       }
       .harnessActionButtonStyle(variant: .borderless, tint: HarnessMonitorTheme.accent)
       .scaledFont(.callout)
