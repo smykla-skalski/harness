@@ -46,7 +46,14 @@ pub(super) fn watch_target_from_path_with_cache(
     watch_target_from_path_with(
         path,
         resolve_cache,
-        &mut index::resolve_session_id_for_runtime_session,
+        &mut |context_root, runtime_name, runtime_session_id| {
+            let project = index::discovered_project_for_context_root(context_root);
+            index::resolve_session_id_for_runtime_session(
+                &project,
+                runtime_name,
+                runtime_session_id,
+            )
+        },
     )
 }
 

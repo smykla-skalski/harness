@@ -32,12 +32,13 @@ pub fn register_agent_runtime_session(
             },
         );
     }
-    if storage::load_state_legacy(project_dir, session_id)?.is_none() {
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    if storage::load_state(&layout)?.is_none() {
         return Ok(false);
     }
     let now = utc_now();
     let mut registered = false;
-    let _ = storage::update_state_if_changed_legacy(project_dir, session_id, |state| {
+    let _ = storage::update_state_if_changed(&layout, |state| {
         registered = apply_register_agent_runtime_session(
             state,
             runtime_name,

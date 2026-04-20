@@ -44,7 +44,9 @@ fn observe_session_with_db_persists_tasks_without_touching_state_file() {
         )
         .expect("observe session");
 
-        let file_state = crate::session::storage::load_state_legacy(project, &state.session_id)
+        let layout = crate::session::storage::layout_from_project_dir(project, &state.session_id)
+            .expect("layout");
+        let file_state = crate::session::storage::load_state(&layout)
             .expect("load state")
             .expect("file-backed state");
         let db_state = db

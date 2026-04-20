@@ -159,12 +159,9 @@ fn index_round_trip_smoke_covers_public_surface() {
         let conversation_events =
             load_conversation_events(&project, "codex", "worker-session", &worker_agent_id)
                 .expect("load conversation events");
-        let runtime_session = resolve_session_id_for_runtime_session(
-            &project.context_root,
-            "codex",
-            "worker-session",
-        )
-        .expect("resolve runtime session");
+        let runtime_session =
+            resolve_session_id_for_runtime_session(&project, "codex", "worker-session")
+                .expect("resolve runtime session");
 
         assert_eq!(projects_root(), tmp.path().join("harness/projects"));
         assert_eq!(fast_counts(), (1, 0, 1));
@@ -445,12 +442,56 @@ fn infer_ledger_cwd_uses_last_nonempty_line() {
     assert_eq!(cwd, std::path::PathBuf::from("/tmp/second"));
 }
 
-// Former test `resolve_runtime_session_uses_context_root_state_instead_of_checkout_storage`
-// removed in Task 8. It asserted that session state lives inside `context_root` and
-// that the resolver reads state there regardless of what `project-origin.json`
-// says. After the B-layout cut, session state lives at
-// `<sessions_root>/<project_name>/<sid>/state.json`, keyed by project_name rather
-// than by context_root identity, so the "context_root is authoritative" axiom no
-// longer applies. Task 9 will rewire the resolver to take a `SessionLayout`
-// (or `DiscoveredProject`) instead of a bare `context_root`; the replacement
-// test belongs there.
+/// Replacement for the Task-8-removed
+/// `resolve_runtime_session_uses_context_root_state_instead_of_checkout_storage`:
+/// the resolver now takes a `&DiscoveredProject` and must read state from the
+/// new layout at `<sessions_root>/<project_name>/<sid>/state.json` scoped to
+/// the project bucket.
+#[test]
+fn resolve_session_id_scopes_to_project_bucket_under_new_layout() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let project_dir = tmp.path().join("workspace").join("alpha");
+        init_git_repo(&project_dir);
+
+        let session_id = "alphasid";
+        let project = discovered_project_for_checkout(&project_dir);
+        let layout = crate::session::storage::layout_from_project_dir(&project_dir, session_id)
+            .expect("build layout");
+        fs::create_dir_all(layout.session_root()).expect("session root");
+        let now = "2026-04-20T00:00:00Z";
+        let mut state =
+            session_service::build_new_session("title", "ctx", session_id, "claude", None, now);
+        state
+            .agents
+            .values_mut()
+            .next()
+            .expect("leader agent")
+            .agent_session_id = Some("runtime-leader-codex".into());
+        state
+            .agents
+            .values_mut()
+            .next()
+            .expect("leader agent")
+            .runtime = "codex".into();
+        crate::session::storage::create_state(&layout, &state).expect("write state");
+        crate::session::storage::register_active(&layout).expect("register active");
+
+        let resolved =
+            resolve_session_id_for_runtime_session(&project, "codex", "runtime-leader-codex")
+                .expect("resolve runtime session");
+        assert_eq!(resolved.as_deref(), Some(session_id));
+
+        let unrelated_project = discovered_project_for_checkout(&tmp.path().join("unrelated"));
+        let unrelated_match = resolve_session_id_for_runtime_session(
+            &unrelated_project,
+            "codex",
+            "runtime-leader-codex",
+        )
+        .expect("unrelated lookup");
+        assert!(
+            unrelated_match.is_none(),
+            "lookup must be scoped to project bucket"
+        );
+    });
+}

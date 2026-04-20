@@ -85,11 +85,11 @@ pub fn start_session_with_policy(
         .as_deref()
         .expect("new session always has a leader");
 
-    storage::register_active_legacy(project_dir, &state.session_id)?;
+    let layout = storage::layout_from_project_dir(project_dir, &state.session_id)?;
+    storage::register_active(&layout)?;
     let _ = storage::record_project_origin(project_dir);
-    storage::append_log_entry_legacy(
-        project_dir,
-        &state.session_id,
+    storage::append_log_entry(
+        &layout,
         log_session_started(title, context),
         Some(leader_id),
         None,
@@ -177,8 +177,9 @@ pub fn join_session_with_fallback(
     let now = utc_now();
     let mut joined_agent_id = None;
     let mut joined_role = role;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    let state = storage::update_state_legacy(project_dir, session_id, |state| {
+    let state = storage::update_state(&layout, |state| {
         joined_role = resolve_join_role(state, role, fallback_role)?;
         let agent_id = apply_join_session(
             state,
@@ -195,9 +196,8 @@ pub fn join_session_with_fallback(
     })?;
 
     let agent_id = joined_agent_id.expect("join_session must record the new agent ID");
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_agent_joined(&agent_id, joined_role, runtime_name),
         None,
         None,
@@ -224,22 +224,22 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
 
     let now = utc_now();
     let mut leave_signals = Vec::new();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         leave_signals = prepare_end_session_leave_signals(state, actor_id, &now)?;
         write_prepared_leave_signals(project_dir, &leave_signals, "end session")?;
         apply_end_session(state, actor_id, &now)
     })?;
 
     append_leave_signal_logs(project_dir, session_id, actor_id, &leave_signals)?;
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_session_ended(),
         Some(actor_id),
         None,
     )?;
-    storage::deregister_active_legacy(project_dir, session_id)?;
+    storage::deregister_active(&layout)?;
 
     Ok(())
 }
@@ -271,15 +271,15 @@ pub fn assign_role(
 
     let now = utc_now();
     let mut from_role = SessionRole::Worker;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         from_role = apply_assign_role(state, agent_id, role, actor_id, &now)?;
         Ok(())
     })?;
 
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_role_changed(agent_id, from_role, role),
         Some(actor_id),
         reason,
@@ -311,8 +311,9 @@ pub fn remove_agent(
 
     let now = utc_now();
     let mut leave_signal = None;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         leave_signal = prepare_remove_agent_leave_signal(state, agent_id, actor_id, &now)?;
         if let Some(ref signal) = leave_signal {
             write_prepared_leave_signals(project_dir, slice::from_ref(signal), "remove agent")?;
@@ -323,9 +324,8 @@ pub fn remove_agent(
     if let Some(ref signal) = leave_signal {
         append_leave_signal_logs(project_dir, session_id, actor_id, slice::from_ref(signal))?;
     }
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_agent_removed(agent_id),
         Some(actor_id),
         None,
@@ -359,8 +359,9 @@ pub fn transfer_leader(
 
     let now = utc_now();
     let mut transfer = None;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         transfer = Some(apply_transfer_leader(
             state,
             new_leader_id,
@@ -378,9 +379,8 @@ pub fn transfer_leader(
     })?;
 
     if let Some(request) = transfer.pending_request {
-        storage::append_log_entry_legacy(
-            project_dir,
-            session_id,
+        storage::append_log_entry(
+            &layout,
             SessionTransition::LeaderTransferRequested {
                 from: request.current_leader_id,
                 to: request.new_leader_id,
@@ -422,13 +422,13 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
     }
 
     let now = utc_now();
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    storage::update_state(&layout, |state| {
         apply_leave_session(state, agent_id, &now)
     })?;
 
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         SessionTransition::AgentLeft {
             agent_id: agent_id.to_string(),
         },
@@ -459,7 +459,8 @@ pub fn update_session_title(
 
     let project = resolve_session_project_dir(session_id, project_dir)?;
     let now = utc_now();
-    storage::update_state_legacy(&project, session_id, |state| {
+    let layout = storage::layout_from_project_dir(&project, session_id)?;
+    storage::update_state(&layout, |state| {
         apply_update_session_title(state, title, &now)
     })
 }

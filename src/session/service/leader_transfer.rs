@@ -228,10 +228,10 @@ pub(crate) fn append_leader_transfer_logs(
     actor_id: &str,
     outcome: &LeaderTransferOutcome,
 ) -> Result<(), CliError> {
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
     if outcome.log_request_before_transfer {
-        storage::append_log_entry_legacy(
-            project_dir,
-            session_id,
+        storage::append_log_entry(
+            &layout,
             SessionTransition::LeaderTransferRequested {
                 from: outcome.old_leader.clone(),
                 to: outcome.new_leader_id.clone(),
@@ -241,9 +241,8 @@ pub(crate) fn append_leader_transfer_logs(
         )?;
     }
     if let Some(confirmed_by) = outcome.confirmed_by.as_deref() {
-        storage::append_log_entry_legacy(
-            project_dir,
-            session_id,
+        storage::append_log_entry(
+            &layout,
             SessionTransition::LeaderTransferConfirmed {
                 from: outcome.old_leader.clone(),
                 to: outcome.new_leader_id.clone(),
@@ -253,9 +252,8 @@ pub(crate) fn append_leader_transfer_logs(
             outcome.reason.as_deref(),
         )?;
     }
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         SessionTransition::LeaderTransferred {
             from: outcome.old_leader.clone(),
             to: outcome.new_leader_id.clone(),

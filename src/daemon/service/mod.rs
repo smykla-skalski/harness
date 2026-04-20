@@ -217,6 +217,7 @@ mod observe_persistence;
 mod observe_stream;
 mod read_reconciliation;
 mod serve;
+mod session_setup;
 mod sessions;
 mod signals;
 mod signals_async;

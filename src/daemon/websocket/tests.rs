@@ -1,7 +1,5 @@
 use axum::extract::ws::Message;
-use fs_err as fs;
 use std::path::Path;
-use std::process::Command;
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
@@ -124,14 +122,7 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
 }
 
 pub(super) fn init_git_project(project_dir: &Path) {
-    fs::create_dir_all(project_dir).expect("create project dir");
-    let status = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .arg(project_dir)
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init should succeed");
+    harness_testkit::init_git_repo_with_seed(project_dir);
 }
 
 pub(super) async fn start_async_session(

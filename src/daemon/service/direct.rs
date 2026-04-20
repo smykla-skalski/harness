@@ -1,122 +1,109 @@
+use super::session_setup::{PreparedSession, prepare_session, rollback_session_artifacts};
 use super::{
-    CliError, CliErrorKind, Path, SessionState, agents_service, build_log_entry, index,
+    CliError, Path, SessionState, agents_service, build_log_entry, index,
     record_signal_ack, resolve_hook_agent, session_not_found, session_service, session_storage,
     utc_now,
 };
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 ///
-/// Falls back to file-based session creation when `db` is `None`.
+/// Always creates a per-session git worktree under
+/// `<sessions_root>/<project_name>/<session_id>/workspace/` and records the
+/// state file under that same session root.
 ///
 /// # Errors
-/// Returns `CliError` when the runtime is unknown or DB operations fail.
+/// Returns `CliError` when the runtime is unknown, the worktree cannot be
+/// created, or DB operations fail.
 pub fn start_session_direct(
     request: &super::protocol::SessionStartRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
-    let runtime_name = &request.runtime;
-    session_service::validate_policy_preset(request.policy_preset.as_deref())?;
-    let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
-            "session start requires a known runtime, got '{runtime_name}'"
-        )))
-    })?;
+    let Some(db) = db else {
+        // No local DB: forward to a running daemon (or fall back to the
+        // file-based path) without creating a worktree here. The receiving
+        // daemon owns worktree lifecycle for its own sessions.
+        return session_service::start_session_with_policy(
+            &request.context,
+            &request.title,
+            Path::new(&request.project_dir),
+            Some(&request.runtime),
+            request.session_id.as_deref(),
+            request.policy_preset.as_deref(),
+        );
+    };
+    let prepared = prepare_session(request)?;
+    let PreparedSession {
+        layout,
+        canonical_origin,
+        state,
+    } = prepared;
 
-    let project_dir = Path::new(&request.project_dir);
-    let leader_agent_session_id =
-        agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
-    let now = utc_now();
-    let session_id = request
-        .session_id
-        .clone()
-        .unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().format("%Y%m%d%H%M%S%f")));
-
-    let state = session_service::build_new_session_with_policy(
-        &request.context,
-        &request.title,
-        &session_id,
-        runtime_name,
-        leader_agent_session_id.as_deref(),
-        &now,
-        request.policy_preset.as_deref(),
-    );
-
-    if let Some(db) = db {
-        let project_id = ensure_project_registered(db, project_dir)?;
-        db.create_session_record(&project_id, &state)?;
-        let leader_id = state.leader_id.as_deref().unwrap_or("");
-        db.append_log_entry(&build_log_entry(
-            &session_id,
-            session_service::log_session_started(&request.title, &request.context),
-            Some(leader_id),
-            None,
-        ))?;
-        db.bump_change(&session_id)?;
-        db.bump_change("global")?;
-        return Ok(state);
+    let project_id = match ensure_project_registered(db, &canonical_origin) {
+        Ok(id) => id,
+        Err(error) => {
+            rollback_session_artifacts(&canonical_origin, &layout);
+            return Err(error);
+        }
+    };
+    if let Err(error) = db.create_session_record(&project_id, &state) {
+        rollback_session_artifacts(&canonical_origin, &layout);
+        return Err(error);
     }
-
-    // File-based fallback
-    session_service::start_session_with_policy(
-        &request.context,
-        &request.title,
-        project_dir,
-        Some(runtime_name),
-        Some(&session_id),
-        request.policy_preset.as_deref(),
-    )
+    let leader_id = state.leader_id.as_deref().unwrap_or("");
+    db.append_log_entry(&build_log_entry(
+        &state.session_id,
+        session_service::log_session_started(&request.title, &request.context),
+        Some(leader_id),
+        None,
+    ))?;
+    db.bump_change(&state.session_id)?;
+    db.bump_change("global")?;
+    Ok(state)
 }
 
 /// Start a new session through the canonical async daemon DB.
 ///
+/// Always creates a per-session worktree; rolls it back on DB failure.
+///
 /// # Errors
-/// Returns `CliError` when the runtime is unknown or async DB operations fail.
+/// Returns `CliError` when the runtime is unknown, the worktree cannot be
+/// created, or async DB operations fail.
 pub(crate) async fn start_session_direct_async(
     request: &super::protocol::SessionStartRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    let runtime_name = &request.runtime;
-    session_service::validate_policy_preset(request.policy_preset.as_deref())?;
-    let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
-            "session start requires a known runtime, got '{runtime_name}'"
-        )))
-    })?;
+    let prepared = prepare_session(request)?;
+    let PreparedSession {
+        layout,
+        canonical_origin,
+        state,
+    } = prepared;
 
-    let project_dir = Path::new(&request.project_dir);
-    let leader_agent_session_id =
-        agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
-    let now = utc_now();
-    let session_id = request
-        .session_id
-        .clone()
-        .unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().format("%Y%m%d%H%M%S%f")));
-
-    let state = session_service::build_new_session_with_policy(
-        &request.context,
-        &request.title,
-        &session_id,
-        runtime_name,
-        leader_agent_session_id.as_deref(),
-        &now,
-        request.policy_preset.as_deref(),
-    );
-
-    let project_id = ensure_project_registered_async(async_db, project_dir).await?;
-    async_db.create_session_record(&project_id, &state).await?;
+    let project_id = match ensure_project_registered_async(async_db, &canonical_origin).await {
+        Ok(id) => id,
+        Err(error) => {
+            rollback_session_artifacts(&canonical_origin, &layout);
+            return Err(error);
+        }
+    };
+    if let Err(error) = async_db.create_session_record(&project_id, &state).await {
+        rollback_session_artifacts(&canonical_origin, &layout);
+        return Err(error);
+    }
     let leader_id = state.leader_id.as_deref().unwrap_or("");
     async_db
         .append_log_entry(&build_log_entry(
-            &session_id,
+            &state.session_id,
             session_service::log_session_started(&request.title, &request.context),
             Some(leader_id),
             None,
         ))
         .await?;
-    async_db.bump_change(&session_id).await?;
+    async_db.bump_change(&state.session_id).await?;
     async_db.bump_change("global").await?;
     Ok(state)
 }
+
 
 pub(crate) fn ensure_project_registered(
     db: &super::db::DaemonDb,

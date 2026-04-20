@@ -48,7 +48,9 @@ fn list_sessions_skips_liveness_disk_probe_when_db_session_has_no_live_agents() 
             "daemon-dead-session-summaries",
         );
         let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
-        storage::update_state_legacy(project, &fixture.state.session_id, |state| {
+        let layout = storage::layout_from_project_dir(project, &fixture.state.session_id)
+            .expect("layout");
+        storage::update_state(&layout, |state| {
             state.last_activity_at = Some(stale.clone());
             for agent in state.agents.values_mut() {
                 agent.last_activity_at = Some(stale.clone());
