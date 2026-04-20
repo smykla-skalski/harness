@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::io;
+use std::io::Write as _;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -85,16 +86,30 @@ pub fn load(path: &Path) -> Result<PersistedStore, BookmarkError> {
 
 /// Persist `store` to `path`, creating parent directories as needed.
 ///
+/// The write is atomic: the JSON lands in a sibling tempfile first, then
+/// `persist` (rename) takes over. A crash mid-write leaves the previous
+/// `bookmarks.json` intact instead of a half-written file.
+///
 /// # Errors
 ///
-/// Returns [`BookmarkError::Io`] on write failure or [`BookmarkError::Json`]
+/// Returns [`BookmarkError::Io`] on I/O failure or [`BookmarkError::Json`]
 /// if serialization fails.
 pub fn save(path: &Path, store: &PersistedStore) -> Result<(), BookmarkError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+    let parent = path.parent().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "bookmarks.json path has no parent directory: {}",
+                path.display()
+            ),
+        )
+    })?;
+    fs::create_dir_all(parent)?;
     let json = serde_json::to_vec_pretty(store)?;
-    fs::write(path, json)?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(&json)?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(path).map_err(|e| e.error)?;
     Ok(())
 }
 
