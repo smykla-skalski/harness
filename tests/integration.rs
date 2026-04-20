@@ -26,4 +26,5 @@ mod integration {
     mod preflight;
     mod sandbox;
     mod universal;
+    mod workspace;
 }
