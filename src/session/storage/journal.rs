@@ -43,7 +43,6 @@ pub(crate) fn append_log_entry(
 ///
 /// # Errors
 /// Returns `CliError` on parse or I/O failure.
-#[allow(dead_code)]
 pub(crate) fn load_log_entries(
     layout: &SessionLayout,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
@@ -73,7 +72,6 @@ pub(crate) fn append_task_checkpoint(
 ///
 /// # Errors
 /// Returns `CliError` on parse or I/O failure.
-#[allow(dead_code)]
 pub(crate) fn load_task_checkpoints(
     layout: &SessionLayout,
     task_id: &str,
@@ -141,7 +139,6 @@ pub(crate) fn append_task_checkpoint_legacy(
 /// Legacy: load task checkpoints by `project_dir` + `session_id`.
 ///
 /// # TODO(b-task-8): migrate callers to `load_task_checkpoints(layout, ...)`.
-#[allow(dead_code)]
 pub(crate) fn load_task_checkpoints_legacy(
     project_dir: &Path,
     session_id: &str,

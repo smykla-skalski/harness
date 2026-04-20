@@ -67,7 +67,7 @@ pub(super) fn io_err(error: &dyn fmt::Display) -> CliError {
 /// that does not start with `.` (skips `.active.json` and similar).
 ///
 /// TODO(b-task-8): will be the primary list function after cascade migration.
-#[allow(dead_code)]
+#[expect(dead_code, reason = "consumed after b-task-8 cascade")]
 pub(crate) fn list_known_session_ids_for_layout(layout: &SessionLayout) -> Result<Vec<String>, CliError> {
     list_session_ids_in_project_dir(&layout.project_dir())
 }
@@ -112,7 +112,6 @@ pub(super) fn append_json_line<T: Serialize>(path: &Path, value: &T) -> Result<(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub(super) fn read_json_lines<T>(path: &Path, label: &str) -> Result<Vec<T>, CliError>
 where
     T: DeserializeOwned,
