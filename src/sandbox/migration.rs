@@ -166,5 +166,19 @@ fn write_marker(new_root: &Path, old_root: &Path) -> Result<(), MigrationError> 
     Ok(())
 }
 
+/// Run the startup data-root migration on macOS. Logs failures and returns;
+/// never panics. Callers invoke this once from `dispatch()` at process start.
+#[cfg(target_os = "macos")]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub fn run_startup_migration() {
+    use crate::workspace::{harness_data_root, legacy_macos_root};
+    if let Err(err) = migrate(&legacy_macos_root(), &harness_data_root()) {
+        warn!(%err, "data-root migration failed; continuing with new root");
+    }
+}
+
 #[cfg(test)]
 mod tests;

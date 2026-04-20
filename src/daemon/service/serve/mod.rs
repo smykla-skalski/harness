@@ -14,26 +14,11 @@ use tracing::field::{Empty, display};
 
 use binary_stamp::current_binary_stamp;
 
-/// Migrate the harness data root from the legacy macOS location; logs on failure.
-#[cfg(target_os = "macos")]
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn run_data_root_migration() {
-    use crate::{sandbox::migration::migrate, workspace::{harness_data_root, legacy_macos_root}};
-    if let Err(err) = migrate(&legacy_macos_root(), &harness_data_root()) {
-        tracing::warn!(%err, "data-root migration failed; continuing with new root");
-    }
-}
 /// Start the daemon TCP server and service all incoming connections.
 ///
 /// # Errors
 /// Returns [`CliError`] if the server fails to start or bind.
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
-    #[cfg(target_os = "macos")]
-    run_data_root_migration();
-
     validate_serve_config(&config)?;
     log_sandbox_startup(config.sandboxed);
 
