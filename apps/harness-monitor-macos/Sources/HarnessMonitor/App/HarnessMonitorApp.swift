@@ -142,6 +142,9 @@ struct HarnessMonitorApp: App {
     ) { result in
       Task { await handleOpenFolder(result) }
     }
+    .onChange(of: store.openFolderRequest) { _, _ in
+      showOpenFolder = true
+    }
   }
 
   private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
