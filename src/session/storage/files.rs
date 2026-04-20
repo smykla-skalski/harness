@@ -138,6 +138,23 @@ where
 // Task 8 can finish the full cascade.
 // ---------------------------------------------------------------------------
 
+/// Derive `(sessions_root, project_name)` from a legacy `project_dir`.
+///
+/// This is the single canonical place that extracts a project name from a
+/// directory path.  All three legacy paths (`layout_from_project_dir`,
+/// `list_known_session_ids`, and `registry::load_active_registry_for`) call
+/// this helper so the derivation logic is not duplicated.
+///
+/// # TODO(b-task-8)
+/// Remove once every legacy adapter is gone.
+pub(crate) fn project_layout_parts_from_dir(project_dir: &Path) -> (PathBuf, String) {
+    let sessions_root = workspace_sessions_root(&harness_data_root());
+    let project_name = project_dir
+        .file_name()
+        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
+    (sessions_root, project_name)
+}
+
 /// Build a `SessionLayout` from the old-style `project_dir` + `session_id`
 /// pair.
 ///
@@ -154,10 +171,7 @@ pub(crate) fn layout_from_project_dir(
     project_dir: &Path,
     session_id: &str,
 ) -> SessionLayout {
-    let sessions_root = workspace_sessions_root(&harness_data_root());
-    let project_name = project_dir
-        .file_name()
-        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
+    let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir);
     SessionLayout {
         sessions_root,
         project_name,
@@ -169,9 +183,6 @@ pub(crate) fn layout_from_project_dir(
 ///
 /// # TODO(b-task-8): migrate callers to `list_known_session_ids_for_layout`.
 pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, CliError> {
-    let sessions_root = workspace_sessions_root(&harness_data_root());
-    let project_name = project_dir
-        .file_name()
-        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
+    let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir);
     list_session_ids_in_project_dir(&sessions_root.join(project_name))
 }
