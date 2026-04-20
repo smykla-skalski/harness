@@ -34,14 +34,14 @@ Sub-project A moves the data root into the app group container; this spec assume
 | Decision | Choice | Rationale |
 | --- | --- | --- |
 | Root location | `<data-root>/sessions/<project>/<sid>/` | Data root lands from A at `<group>/harness/`. `sessions/` spelled out at the top level for readability; deep names are where path pressure bites. |
-| Per-session subdirs | `w/` (worktree) + `s/` (shared) + sibling state files | Matches user's intent from brainstorm. State files (`state.json`, `log.jsonl`, `tasks/`, `.locks/`) live as siblings to `w/` and `s/`, not inside a metadata directory - fewer levels, same as today. |
+| Per-session subdirs | `workspace/` (git worktree) + `memory/` (shared inter-agent scratch) + sibling state files | State files (`state.json`, `log.jsonl`, `tasks/`, `.locks/`) live as siblings to `workspace/` and `memory/`, not inside a metadata directory - fewer levels, same as today. Spelled-out names avoid cryptic single-letter directories in user-visible paths. |
 | Session id | 8-char random alphanumeric (`[a-z0-9]{8}`) | User choice. ~2.8 × 10^12 keyspace. Collision-safe in practice. Creation time is metadata in `state.json`, not in the id. |
 | Project directory name | folder basename, de-collided with `-<4hex>` suffix | Two checkouts both called `kuma` → `kuma` and `kuma-a7c2`. The 4-hex suffix is the first 4 chars of SHA256 of the canonical checkout path (same digest as today's `project-{8hex}` id, just truncated more). Deterministic and stable. |
 | Sockets | Flat `<group>/sock/<sid>-<purpose>.sock` | Short absolute paths regardless of project name length. 68-byte group container prefix + `sock/` + 8-char sid + purpose = comfortably under 104. |
 | Worktree owner | Daemon via subprocess `git` | Daemon already has git in PATH, already manages session lifecycle, already runs under `HARNESS_SANDBOXED` with the `temporary-exception` removed (from A). Worktree creation uses the resolved bookmark from A's `BookmarkResolver`. |
 | Worktree base branch | `refs/remotes/origin/HEAD` | Falls back to current branch if origin isn't set. Session creation API exposes a `base_ref` override that sub-project C can wire into a UI later. Default matches the most common case. |
-| Worktree branch name | `harness/s/<sid>` | Namespaced so it never collides with user branches. `harness/` is recognizable in `git branch --list`. |
-| Cleanup on delete | `git worktree remove --force <path>` + `git branch -D harness/s/<sid>` | Atomic. If either step fails, daemon logs `warn!` and leaves the entry in `active.json` with `cleanup_failed: true` so support can recover manually. |
+| Worktree branch name | `harness/session/<sid>` | Namespaced so it never collides with user branches. `harness/` is recognizable in `git branch --list`. |
+| Cleanup on delete | `git worktree remove --force <path>` + `git branch -D harness/session/<sid>` | Atomic. If either step fails, daemon logs `warn!` and leaves the entry in `active.json` with `cleanup_failed: true` so support can recover manually. |
 | Version impact | **Major** | Persisted layout changes, CLI on-disk contract breaks. Clean cut means no backward-read path. Bump in the PR that lands this. |
 
 ## Architecture
@@ -58,8 +58,8 @@ New on-disk layout (macOS, post-A):
 │   └── sessions/                                  (NEW from B)
 │       └── <project-name>[-<4hex>]/
 │           ├── <sid>/                             (8-char lowercase alphanumeric)
-│           │   ├── w/                             (git worktree, branch harness/s/<sid>)
-│           │   ├── s/                             (shared agent scratch)
+│           │   ├── workspace/                     (git worktree, branch harness/session/<sid>)
+│           │   ├── memory/                        (shared inter-agent scratch)
 │           │   ├── state.json
 │           │   ├── log.jsonl
 │           │   ├── tasks/
@@ -76,7 +76,7 @@ Non-macOS (CLI-only, XDG path):
 
 ```
 ~/.local/share/harness/
-├── sessions/<project>[-<4hex>]/<sid>/{w,s,state.json,log.jsonl,tasks/,.locks/}
+├── sessions/<project>[-<4hex>]/<sid>/{workspace,memory,state.json,log.jsonl,tasks/,.locks/}
 └── sock/<sid>-<purpose>.sock
 ```
 
@@ -97,13 +97,13 @@ pub struct SessionLayout {
 
 impl SessionLayout {
     pub fn session_root(&self) -> PathBuf;    // <base>/<proj>/<sid>/
-    pub fn worktree(&self) -> PathBuf;        // <session_root>/w/
-    pub fn shared(&self) -> PathBuf;          // <session_root>/s/
+    pub fn worktree(&self) -> PathBuf;        // <session_root>/workspace/
+    pub fn shared(&self) -> PathBuf;          // <session_root>/memory/
     pub fn state_file(&self) -> PathBuf;      // <session_root>/state.json
     pub fn log_file(&self) -> PathBuf;        // <session_root>/log.jsonl
     pub fn tasks_dir(&self) -> PathBuf;       // <session_root>/tasks/
     pub fn locks_dir(&self) -> PathBuf;       // <session_root>/.locks/
-    pub fn branch_ref(&self) -> String;       // "harness/s/<sid>"
+    pub fn branch_ref(&self) -> String;       // "harness/session/<sid>"
 }
 
 pub struct ProjectNameResolver;
@@ -154,13 +154,13 @@ impl WorktreeController {
 
 `create` runs:
 1. `git -C <origin> rev-parse refs/remotes/origin/HEAD` (or falls back to current branch).
-2. `git -C <origin> worktree add -b harness/s/<sid> <layout.worktree()> <resolved_ref>`.
+2. `git -C <origin> worktree add -b harness/session/<sid> <layout.worktree()> <resolved_ref>`.
 3. Seeds `<layout.shared()>` as an empty directory.
 4. Writes `<layout.session_root()>/.origin` with the canonical origin path for diagnostics.
 
 `destroy` runs:
 1. `git -C <origin> worktree remove --force <layout.worktree()>`.
-2. `git -C <origin> branch -D harness/s/<sid>` (tolerates "not found" as success since a cleaned worktree may already have deleted the branch).
+2. `git -C <origin> branch -D harness/session/<sid>` (tolerates "not found" as success since a cleaned worktree may already have deleted the branch).
 3. `fs::remove_dir_all(<layout.session_root()>)`.
 
 Failure modes are categorized (`WorktreeCreateFailed`, `WorktreeRemoveFailed`, `BranchDeleteFailed`) with structured fields so callers can decide between "retry", "leave for manual cleanup", or "abort session creation".
@@ -227,7 +227,7 @@ pub struct SessionState {
     pub worktree_path: String,
     pub shared_path: String,
     pub origin_path: String,
-    pub branch_ref: String,            // "harness/s/<sid>"
+    pub branch_ref: String,            // "harness/session/<sid>"
 }
 ```
 
@@ -244,7 +244,7 @@ Fields that existed for the old layout (`is_worktree`, `worktree_name`, `recorde
 
 ### Integration (Rust)
 
-- `tests/integration/workspace/session_lifecycle.rs`: create session via HTTP API → worktree exists, `s/` exists, `state.json` exists, `active.json` updated. Delete session → worktree gone, branch gone, directory gone, `active.json` updated.
+- `tests/integration/workspace/session_lifecycle.rs`: create session via HTTP API → `workspace/` exists, `memory/` exists, `state.json` exists, `active.json` updated. Delete session → worktree gone, branch gone, directory gone, `active.json` updated.
 - `tests/integration/workspace/parallel_sessions.rs`: create two sessions against the same origin → two independent worktrees with distinct branches, no interference.
 - `tests/integration/workspace/collision.rs`: two canonical paths both ending in `/kuma` → distinct project directories `kuma` and `kuma-<hash>`.
 
