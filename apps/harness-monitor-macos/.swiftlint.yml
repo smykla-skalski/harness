@@ -126,6 +126,15 @@ custom_rules:
       - "Sources/HarnessMonitor"
     excluded:
       - "HarnessMonitorGlass\\.swift"
+  forbid_raw_security_scoped_resource:
+    name: "Raw security-scoped resource access"
+    regex: '\.startAccessingSecurityScopedResource\(\)'
+    match_kinds:
+      - identifier
+    excluded:
+      - "Sources/HarnessMonitorKit/Sandbox/URL\\+SecurityScope\\.swift"
+    message: "Use URL.withSecurityScope { ... } instead."
+    severity: error
 file_length:
   warning: 420
   error: 520
