@@ -382,6 +382,15 @@ impl Execute for SessionStatusArgs {
                 state.metrics.in_progress_task_count + state.metrics.blocked_task_count,
                 state.metrics.completed_task_count,
             );
+            if !state.branch_ref.is_empty() {
+                println!("  branch:   {}", state.branch_ref);
+            }
+            if !state.worktree_path.as_os_str().is_empty() {
+                println!("  worktree: {}", state.worktree_path.display());
+            }
+            if !state.shared_path.as_os_str().is_empty() {
+                println!("  shared:   {}", state.shared_path.display());
+            }
         }
         Ok(0)
     }
@@ -417,9 +426,15 @@ impl Execute for SessionListArgs {
                 } else {
                     &session.title
                 };
+                let branch_suffix = if session.branch_ref.is_empty() {
+                    String::new()
+                } else {
+                    format!(" [{}]", session.branch_ref)
+                };
                 println!(
-                    "{} \"{}\" [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
+                    "{}{} \"{}\" [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
                     session.session_id,
+                    branch_suffix,
                     title_display,
                     session.status,
                     session.context,
