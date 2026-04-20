@@ -125,7 +125,7 @@ fn data_root_prefers_app_group_container_when_present() {
             ("HARNESS_APP_GROUP_ID", Some("Q498EB36N4.io.harnessmonitor")),
         ],
         || {
-            let home = dirs_home();
+            let home = super::super::paths::host_home_dir();
             let group = home
                 .join("Library")
                 .join("Group Containers")

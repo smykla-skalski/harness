@@ -17,18 +17,31 @@ pub fn data_root() -> PathBuf {
         return PathBuf::from(value);
     }
     #[cfg(target_os = "macos")]
-    if let Some(group_id) = normalized_env_value("HARNESS_APP_GROUP_ID") {
-        let group_root = host_home_dir()
-            .join("Library")
-            .join("Group Containers")
-            .join(&group_id);
-        if group_root.exists() {
-            return group_root;
-        }
-        // Legacy fallback: pre-migration Application Support path.
-        return host_home_dir().join("Library").join("Application Support");
+    if let Some(root) = macos_monitor_data_root() {
+        return root;
     }
     user_dirs::data_dir().unwrap_or_else(|_| dirs_home().join(".local").join("share"))
+}
+
+#[cfg(target_os = "macos")]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn macos_monitor_data_root() -> Option<PathBuf> {
+    let group_id = normalized_env_value("HARNESS_APP_GROUP_ID")?;
+    let group_root = host_home_dir()
+        .join("Library")
+        .join("Group Containers")
+        .join(&group_id);
+    if group_root.exists() {
+        return Some(group_root);
+    }
+    tracing::warn!(
+        group_id = %group_id,
+        "app group container not found; falling back to Application Support"
+    );
+    Some(host_home_dir().join("Library").join("Application Support"))
 }
 
 /// Suite root: `harness_data_root/suites`.
