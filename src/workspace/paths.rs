@@ -64,6 +64,18 @@ pub fn harness_data_root() -> PathBuf {
     super::session::data_root().join("harness")
 }
 
+/// Legacy macOS data root used before the App Sandbox migration.
+///
+/// Returns `~/Library/Application Support/harness`.
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn legacy_macos_root() -> PathBuf {
+    host_home_dir()
+        .join("Library")
+        .join("Application Support")
+        .join("harness")
+}
+
 /// Shorten an absolute path for human-readable terminal output.
 ///
 /// Paths under the harness data root become `~harness/<rest>`.
