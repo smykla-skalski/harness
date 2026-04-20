@@ -253,6 +253,8 @@ fn sample_state_for_runtime(
         last_activity_at: Some("2026-03-28T14:05:00Z".into()),
         observe_id: Some(OBSERVE_ID.into()),
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics::default(),
     }
 }

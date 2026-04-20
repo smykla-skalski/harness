@@ -40,6 +40,8 @@ pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> Sessi
         last_activity_at: detail.session.last_activity_at.clone(),
         observe_id: detail.session.observe_id.clone(),
         pending_leader_transfer: detail.session.pending_leader_transfer.clone(),
+        external_origin: None,
+        adopted_at: None,
         metrics: detail.session.metrics.clone(),
     }
 }
@@ -71,6 +73,8 @@ pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> Se
         last_activity_at: summary.last_activity_at.clone(),
         observe_id: summary.observe_id.clone(),
         pending_leader_transfer: summary.pending_leader_transfer.clone(),
+        external_origin: None,
+        adopted_at: None,
         metrics: summary.metrics.clone(),
     }
 }

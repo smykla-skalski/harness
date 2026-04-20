@@ -164,6 +164,8 @@ pub(super) fn sample_session_state() -> SessionState {
         last_activity_at: Some("2026-04-03T12:05:00Z".into()),
         observe_id: None,
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics::default(),
     }
 }
@@ -347,6 +349,8 @@ pub(super) fn performance_session_state(
         last_activity_at: Some(timestamp),
         observe_id: None,
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics {
             agent_count: 1,
             active_agent_count: 1,
