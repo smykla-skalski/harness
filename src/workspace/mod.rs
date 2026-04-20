@@ -5,6 +5,7 @@ mod paths;
 pub mod project_resolver;
 mod remote_kubernetes;
 mod session;
+pub mod socket_paths;
 
 pub use git::{
     GitCheckoutIdentity, GitCheckoutKind, canonical_checkout_root, resolve_git_checkout_identity,
