@@ -23,10 +23,10 @@ pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> Sessi
         state_version: 0,
         session_id: detail.session.session_id.clone(),
         project_name: detail.session.project_name.clone(),
-        worktree_path: PathBuf::new(),
-        shared_path: PathBuf::new(),
-        origin_path: PathBuf::new(),
-        branch_ref: String::new(),
+        worktree_path: PathBuf::from(&detail.session.worktree_path),
+        shared_path: PathBuf::from(&detail.session.shared_path),
+        origin_path: PathBuf::from(&detail.session.origin_path),
+        branch_ref: detail.session.branch_ref.clone(),
         title: detail.session.title.clone(),
         context: detail.session.context.clone(),
         status: detail.session.status,
@@ -54,10 +54,10 @@ pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> Se
         state_version: 0,
         session_id: summary.session_id.clone(),
         project_name: summary.project_name.clone(),
-        worktree_path: PathBuf::new(),
-        shared_path: PathBuf::new(),
-        origin_path: PathBuf::new(),
-        branch_ref: String::new(),
+        worktree_path: PathBuf::from(&summary.worktree_path),
+        shared_path: PathBuf::from(&summary.shared_path),
+        origin_path: PathBuf::from(&summary.origin_path),
+        branch_ref: summary.branch_ref.clone(),
         title: summary.title.clone(),
         context: summary.context.clone(),
         status: summary.status,
@@ -125,5 +125,73 @@ fn resolve_runtime_session_via_legacy_fanout(
             "runtime session '{runtime_session_id}' for runtime '{runtime_name}' maps to multiple orchestration sessions"
         ))
         .into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::types::SessionMetrics;
+
+    fn summary_fixture() -> protocol::SessionSummary {
+        protocol::SessionSummary {
+            project_id: "proj-id".into(),
+            project_name: "demo".into(),
+            project_dir: Some("/origin".into()),
+            context_root: "/origin".into(),
+            worktree_path: "/data/sessions/demo/abc12345/workspace".into(),
+            shared_path: "/data/sessions/demo/abc12345/memory".into(),
+            origin_path: "/origin".into(),
+            branch_ref: "harness/abc12345".into(),
+            session_id: "abc12345".into(),
+            title: "t".into(),
+            context: "c".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-04-20T00:00:00Z".into(),
+            updated_at: "2026-04-20T00:00:00Z".into(),
+            last_activity_at: None,
+            leader_id: None,
+            observe_id: None,
+            pending_leader_transfer: None,
+            metrics: SessionMetrics::default(),
+        }
+    }
+
+    #[test]
+    fn summary_to_session_state_forwards_workspace_fields() {
+        let state = summary_to_session_state(&summary_fixture());
+        assert_eq!(state.branch_ref, "harness/abc12345");
+        assert_eq!(
+            state.worktree_path,
+            PathBuf::from("/data/sessions/demo/abc12345/workspace")
+        );
+        assert_eq!(
+            state.shared_path,
+            PathBuf::from("/data/sessions/demo/abc12345/memory")
+        );
+        assert_eq!(state.origin_path, PathBuf::from("/origin"));
+    }
+
+    #[test]
+    fn detail_to_session_state_forwards_workspace_fields() {
+        let detail = protocol::SessionDetail {
+            session: summary_fixture(),
+            agents: Vec::new(),
+            tasks: Vec::new(),
+            signals: Vec::new(),
+            observer: None,
+            agent_activity: Vec::new(),
+        };
+        let state = detail_to_session_state(&detail);
+        assert_eq!(state.branch_ref, "harness/abc12345");
+        assert_eq!(
+            state.worktree_path,
+            PathBuf::from("/data/sessions/demo/abc12345/workspace")
+        );
+        assert_eq!(
+            state.shared_path,
+            PathBuf::from("/data/sessions/demo/abc12345/memory")
+        );
+        assert_eq!(state.origin_path, PathBuf::from("/origin"));
     }
 }
