@@ -16,19 +16,26 @@ mod state_tests;
 mod test_support;
 
 // New SessionLayout-based API
-// These are unused until Task 8+9 migrate callers; allow to avoid spurious warnings.
-#[allow(unused_imports)]
+#[expect(
+    unused_imports,
+    reason = "consumed after b-task-8 cascade"
+)]
 pub(crate) use files::{list_known_session_ids_for_layout, list_session_ids_in_project_dir};
-#[allow(unused_imports)]
-pub(crate) use journal::{
-    append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints,
-};
-#[allow(unused_imports)]
-pub(crate) use registry::{
-    ActiveRegistry, ProjectOriginRecord, deregister_active, load_active_registry_for_layout,
-    load_project_origin, record_project_origin, register_active,
-};
-#[allow(unused_imports)]
+#[expect(
+    unused_imports,
+    reason = "consumed after b-task-8 cascade"
+)]
+pub(crate) use journal::{append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints};
+pub(crate) use registry::{ActiveRegistry, ProjectOriginRecord, load_project_origin, record_project_origin};
+#[expect(
+    unused_imports,
+    reason = "consumed after b-task-8 cascade"
+)]
+pub(crate) use registry::{deregister_active, load_active_registry_for_layout, register_active};
+#[expect(
+    unused_imports,
+    reason = "consumed after b-task-8 cascade"
+)]
 pub(crate) use state_store::{create_state, load_state, update_state, update_state_if_changed};
 
 // Legacy adapters (TODO(b-task-8): remove after cascade migration)
