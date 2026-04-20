@@ -124,7 +124,7 @@ public final class NewSessionViewModel {
   }
 
   nonisolated public static func liveIsSandboxed() -> Bool {
-    ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+    ProcessInfo.processInfo.environment["HARNESS_SANDBOXED"] != nil
   }
 
   // MARK: - Private
