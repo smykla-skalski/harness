@@ -82,6 +82,5 @@ async fn on_path(cmd: &str) -> bool {
         .arg(cmd)
         .output()
         .await
-        .map(|out| out.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|out| out.status.success())
 }
