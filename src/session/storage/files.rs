@@ -61,19 +61,10 @@ pub(super) fn io_err(error: &dyn fmt::Display) -> CliError {
     CliErrorKind::workflow_io(format!("session storage: {error}")).into()
 }
 
-/// List all session ids recorded under the new sessions layout for a project.
+/// List session ids in a project directory.
 ///
-/// Reads `<sessions_root>/<project_name>/` and returns every subdirectory name
-/// that does not start with `.` (skips `.active.json` and similar).
-///
-/// TODO(b-task-8): will be the primary list function after cascade migration.
-#[expect(dead_code, reason = "consumed after b-task-8 cascade")]
-pub(crate) fn list_known_session_ids_for_layout(layout: &SessionLayout) -> Result<Vec<String>, CliError> {
-    list_session_ids_in_project_dir(&layout.project_dir())
-}
-
-/// List session ids in a project directory (shared between new layout and
-/// legacy-compat adapter).
+/// Reads `<project_dir>/` and returns every subdirectory name that does not
+/// start with `.` (skips `.active.json` and similar).
 pub(crate) fn list_session_ids_in_project_dir(project_dir: &Path) -> Result<Vec<String>, CliError> {
     if !project_dir.is_dir() {
         return Ok(Vec::new());
@@ -132,25 +123,22 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Legacy adapter — used by callers that have not yet been migrated to
-// `SessionLayout`.  Every call site is annotated with `TODO(b-task-8)` so
-// Task 8 can finish the full cascade.
+// Project-dir → SessionLayout helpers.
+//
+// Callers that receive a `project_dir` from CLI/HTTP rather than a fully
+// constructed `SessionLayout` go through these helpers to derive the layout.
 // ---------------------------------------------------------------------------
 
-/// Derive `(sessions_root, project_name)` from a legacy `project_dir`.
+/// Derive `(sessions_root, project_name)` from a `project_dir`.
 ///
-/// This is the single canonical place that extracts a project name from a
-/// directory path.  All three legacy paths (`layout_from_project_dir`,
-/// `list_known_session_ids`, and `registry::load_active_registry_for`) call
-/// this helper so the derivation logic is not duplicated.
+/// Single canonical place that extracts a project name from a directory
+/// path. Used by `layout_from_project_dir`, `list_known_session_ids`, and
+/// `registry::load_active_registry_for`.
 ///
 /// # Errors
 /// Returns `CliError` (variant `InvalidProjectDir`) when `project_dir` has no
-/// `file_name` component (e.g. it is `/` or ends with `..`).  In debug builds
+/// `file_name` component (e.g. it is `/` or ends with `..`). In debug builds
 /// the same condition panics immediately to surface the bug earlier.
-///
-/// # TODO(b-task-8)
-/// Remove once every legacy adapter is gone.
 pub(crate) fn project_layout_parts_from_dir(
     project_dir: &Path,
 ) -> Result<(PathBuf, String), CliError> {
@@ -169,22 +157,15 @@ pub(crate) fn project_layout_parts_from_dir(
     Ok((sessions_root, project_name))
 }
 
-/// Build a `SessionLayout` from the old-style `project_dir` + `session_id`
-/// pair.
+/// Build a `SessionLayout` from a `project_dir` + `session_id` pair.
+///
+/// Used by callers (CLI, HTTP handlers, daemon services) that receive a
+/// project path from a user and need to derive the canonical
+/// `<sessions_root>/<project_name>/<session_id>` layout.
 ///
 /// # Errors
 /// Returns `CliError` (variant `InvalidProjectDir`) when `project_dir` has no
-/// `file_name` component.  See [`project_layout_parts_from_dir`].
-///
-/// # TODO(b-task-8)
-/// This adapter exists only to keep callers compiling during the Task 7
-/// storage rewrite.  Task 8 will rewrite every caller to pass a real
-/// `SessionLayout` derived from the new sessions path.
-///
-/// The layout it produces points at the **new** path schema
-/// `<sessions_root>/<project_name>/<session_id>`, using the basename of
-/// `project_dir` as the project name and `crate::workspace::layout::sessions_root`
-/// to anchor the root.
+/// `file_name` component. See [`project_layout_parts_from_dir`].
 pub fn layout_from_project_dir(
     project_dir: &Path,
     session_id: &str,
@@ -197,13 +178,11 @@ pub fn layout_from_project_dir(
     })
 }
 
-/// Legacy wrapper: `list_known_session_ids` taking `project_dir`.
+/// List known session ids for a project directory.
 ///
 /// # Errors
 /// Returns `CliError` when `project_dir` has no `file_name` component, or on
 /// underlying I/O failures.
-///
-/// # TODO(b-task-8): migrate callers to `list_known_session_ids_for_layout`.
 pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, CliError> {
     let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir)?;
     list_session_ids_in_project_dir(&sessions_root.join(project_name))

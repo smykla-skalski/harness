@@ -10,7 +10,8 @@ use crate::session::storage;
 use crate::workspace::{project_context_dir, resolve_git_checkout_identity};
 
 use super::io::read_last_nonempty_line;
-use super::sessions::list_session_ids_from_context_root;
+use super::projects::discovered_project_for_context_root;
+use super::sessions::list_session_ids_for_project;
 
 #[derive(Debug, Clone)]
 pub(super) struct InferredCheckout {
@@ -140,7 +141,8 @@ fn origin_checkout_root(origin: &storage::ProjectOriginRecord) -> Option<PathBuf
 }
 
 fn context_has_sessions(context_root: &Path) -> Result<bool, CliError> {
-    Ok(!list_session_ids_from_context_root(context_root)?.is_empty())
+    let project = discovered_project_for_context_root(context_root);
+    Ok(!list_session_ids_for_project(&project)?.is_empty())
 }
 
 fn context_has_agent_activity(context_root: &Path) -> bool {

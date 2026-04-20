@@ -2,7 +2,6 @@ use super::*;
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use fs_err as fs;

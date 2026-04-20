@@ -86,7 +86,9 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
         let injected = collect_signal_context(HookAgent::Codex, &context).expect("signal text");
         assert!(injected.contains("follow the queued task"));
 
-        let entries = session_storage::load_log_entries_legacy(project, "hook-sess").expect("entries");
+        let layout =
+            session_storage::layout_from_project_dir(project, "hook-sess").expect("layout");
+        let entries = session_storage::load_log_entries(&layout).expect("entries");
         assert!(entries.into_iter().any(|entry| {
             matches!(
                 entry.transition,
@@ -184,8 +186,9 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
         assert_eq!(acks.len(), 1);
         assert_eq!(acks[0].result, runtime::signal::AckResult::Expired);
 
-        let entries =
-            session_storage::load_log_entries_legacy(project, "hook-expired-sess").expect("entries");
+        let layout = session_storage::layout_from_project_dir(project, "hook-expired-sess")
+            .expect("layout");
+        let entries = session_storage::load_log_entries(&layout).expect("entries");
         assert!(entries.into_iter().any(|entry| {
             matches!(
                 entry.transition,

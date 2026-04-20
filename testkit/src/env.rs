@@ -1,4 +1,44 @@
 use std::path::Path;
+use std::process::Command;
+
+/// Initialize an empty git repository at `path` with a single seed commit so
+/// downstream callers (notably the daemon's `WorktreeController`) have a
+/// resolvable HEAD to branch from.
+///
+/// Creates the directory if it does not exist; panics on any git failure
+/// because tests rely on a deterministic repo state.
+pub fn init_git_repo_with_seed(path: &Path) {
+    std::fs::create_dir_all(path).expect("create git repo dir");
+    let init = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .arg(path)
+        .status()
+        .expect("git init");
+    assert!(init.success(), "git init failed at {}", path.display());
+    std::fs::write(path.join("README.md"), b"seed\n").expect("seed README");
+    let add = Command::new("git")
+        .current_dir(path)
+        .args(["add", "README.md"])
+        .status()
+        .expect("git add");
+    assert!(add.success(), "git add failed at {}", path.display());
+    let commit = Command::new("git")
+        .current_dir(path)
+        .args([
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "user.name=test",
+            "commit",
+            "-q",
+            "-m",
+            "seed",
+        ])
+        .status()
+        .expect("git commit");
+    assert!(commit.success(), "git commit failed at {}", path.display());
+}
 
 /// Run a closure inside an isolated Harness filesystem scope.
 ///

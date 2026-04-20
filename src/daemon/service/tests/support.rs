@@ -23,16 +23,16 @@ pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
         temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
             let project = tmp.path().join("project");
             fs::create_dir_all(&project).expect("create project dir");
-            let status = Command::new("git")
-                .arg("init")
-                .arg("-q")
-                .arg(&project)
-                .status()
-                .expect("git init");
-            assert!(status.success(), "git init should succeed");
+            init_git_with_seed_commit(&project);
             test_fn(&project);
         });
     });
+}
+
+/// Initialize a git repository at `project` with a single seed commit so the
+/// daemon's worktree controller has a HEAD to branch from.
+pub(super) fn init_git_with_seed_commit(project: &Path) {
+    harness_testkit::init_git_repo_with_seed(project);
 }
 
 pub(super) fn append_project_ledger_entry(project_dir: &Path) {
@@ -92,7 +92,9 @@ pub(super) fn set_log_mtime_seconds_ago(path: &Path, seconds: u64) {
 
 pub(super) fn age_leader_state_activity(project: &Path, session_id: &str, seconds: i64) {
     let stale = (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339();
-    crate::session::storage::update_state_legacy(project, session_id, |state| {
+    let layout =
+        crate::session::storage::layout_from_project_dir(project, session_id).expect("layout");
+    crate::session::storage::update_state(&layout, |state| {
         let leader_id = state.leader_id.clone();
         if let Some(leader_id) = leader_id
             && let Some(leader) = state.agents.get_mut(&leader_id)

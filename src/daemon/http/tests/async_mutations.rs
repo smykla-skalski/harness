@@ -1,10 +1,8 @@
-use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use fs_err as fs;
 use tempfile::tempdir;
 use tokio::sync::broadcast;
 
@@ -78,14 +76,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
 }
 
 pub(super) fn init_git_project(project_dir: &std::path::Path) {
-    fs::create_dir_all(project_dir).expect("create project dir");
-    let status = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .arg(project_dir)
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init should succeed");
+    harness_testkit::init_git_repo_with_seed(project_dir);
 }
 
 pub(super) async fn start_async_http_session(

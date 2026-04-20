@@ -138,6 +138,16 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
     Ok(projects)
 }
 
+/// Build a `DiscoveredProject` from an existing `context_root` directory.
+///
+/// Used by callers (e.g. the watch path) that have a transcript path under
+/// `<context_root>/orchestration/...` and need to scope a session lookup to
+/// the project's bucket without reloading the full discovery list.
+#[must_use]
+pub fn discovered_project_for_context_root(context_root: &Path) -> DiscoveredProject {
+    build_discovered_project(context_root).unwrap_or_else(|| fallback_project(context_root))
+}
+
 #[must_use]
 pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject {
     let checkout_root = canonical_checkout_root(project_dir);

@@ -63,9 +63,7 @@ pub(crate) fn deregister_active(layout: &SessionLayout) -> Result<(), CliError> 
 }
 
 /// Load the active-session registry for a layout.
-///
-/// TODO(b-task-8): will be the primary load function after cascade migration.
-#[expect(dead_code, reason = "consumed after b-task-8 cascade")]
+#[cfg(test)]
 pub(crate) fn load_active_registry_for_layout(layout: &SessionLayout) -> ActiveRegistry {
     load_registry_at(&files::active_registry_path(layout))
 }
@@ -74,39 +72,10 @@ fn load_registry_at(path: &Path) -> ActiveRegistry {
     read_json_typed::<ActiveRegistry>(path).unwrap_or_default()
 }
 
-// ---------------------------------------------------------------------------
-// Legacy adapters — callers that have not been migrated to SessionLayout yet.
-// Every call site is annotated with `TODO(b-task-8)`.
-// ---------------------------------------------------------------------------
-
-/// Legacy: register by `project_dir` + `session_id`.
-///
-/// # TODO(b-task-8): migrate callers to `register_active(layout)`.
-pub(crate) fn register_active_legacy(
-    project_dir: &Path,
-    session_id: &str,
-) -> Result<(), CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id)?;
-    register_active(&layout)
-}
-
-/// Legacy: deregister by `project_dir` + `session_id`.
-///
-/// # TODO(b-task-8): migrate callers to `deregister_active(layout)`.
-pub(crate) fn deregister_active_legacy(
-    project_dir: &Path,
-    session_id: &str,
-) -> Result<(), CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id)?;
-    deregister_active(&layout)
-}
-
-/// Legacy: load active registry for `project_dir`.
+/// Load the active-session registry for a project directory.
 ///
 /// # Errors
 /// Returns `CliError` when `project_dir` has no `file_name` component.
-///
-/// # TODO(b-task-8): migrate callers to `load_active_registry_for_layout`.
 pub(crate) fn load_active_registry_for(project_dir: &Path) -> Result<ActiveRegistry, CliError> {
     let (sessions_root, project_name) = files::project_layout_parts_from_dir(project_dir)?;
     let path = sessions_root.join(project_name).join(".active.json");

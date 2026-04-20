@@ -83,8 +83,9 @@ fn change_role_records_reason_from_request() {
             .expect("status")
             .tasks;
         assert!(entries.is_empty());
-        let log_entries =
-            crate::session::storage::load_log_entries_legacy(project, "daemon-role").expect("log");
+        let layout =
+            crate::session::storage::layout_from_project_dir(project, "daemon-role").expect("layout");
+        let log_entries = crate::session::storage::load_log_entries(&layout).expect("log");
         assert!(log_entries.into_iter().any(|entry| {
             entry.reason.as_deref() == Some("route triage through a reviewer")
                 && matches!(

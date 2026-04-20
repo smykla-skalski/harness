@@ -49,8 +49,9 @@ pub fn send_signal(
     let now = utc_now();
     let mut runtime_name = String::new();
     let mut target_agent_session_id = None;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         let (name, session_id) = apply_send_signal_state(state, agent_id, actor_id, &now)?;
         runtime_name = name;
         target_agent_session_id = session_id;
@@ -75,9 +76,8 @@ pub fn send_signal(
 
     let signal_session_id = target_agent_session_id.as_deref().unwrap_or(session_id);
     runtime.write_signal(project_dir, signal_session_id, &signal)?;
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_signal_sent(&signal.signal_id, agent_id, command),
         Some(actor_id),
         None,
@@ -159,9 +159,9 @@ pub fn cancel_signal(
     };
     write_signal_ack(&signal_dir, &ack)?;
 
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    storage::append_log_entry(
+        &layout,
         log_signal_acknowledged(signal_id, agent_id, AckResult::Rejected),
         Some(actor_id),
         None,
@@ -241,7 +241,8 @@ pub fn resolve_session_agent_for_runtime_session(
     let mut matches = Vec::new();
 
     for session_id in active_session_ids {
-        let Some(state) = storage::load_state_legacy(project_dir, &session_id)? else {
+        let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
+        let Some(state) = storage::load_state(&layout)? else {
             continue;
         };
         for (agent_id, agent) in &state.agents {
@@ -290,7 +291,8 @@ pub fn record_signal_acknowledgment(
         );
     }
 
-    let already_logged = storage::load_log_entries_legacy(project_dir, session_id)?
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    let already_logged = storage::load_log_entries(&layout)?
         .into_iter()
         .any(|entry| {
             matches!(
@@ -310,7 +312,7 @@ pub fn record_signal_acknowledgment(
     });
     let mut started_task = None;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         if let Some(signal) = signal.as_ref() {
             started_task = apply_signal_ack_result(state, agent_id, &signal.signal, result, &now);
             refresh_session(state, &now);
@@ -319,18 +321,16 @@ pub fn record_signal_acknowledgment(
     })?;
 
     if let Some(task_id) = started_task.as_deref() {
-        storage::append_log_entry_legacy(
-            project_dir,
-            session_id,
+        storage::append_log_entry(
+            &layout,
             log_task_assigned(task_id, agent_id),
             Some(agent_id),
             None,
         )?;
     }
 
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_signal_acknowledged(signal_id, agent_id, result),
         Some(agent_id),
         None,

@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::session::types::{CURRENT_VERSION, SessionState};
@@ -123,60 +121,3 @@ where
         })
 }
 
-// ---------------------------------------------------------------------------
-// Legacy adapters — callers not yet migrated to `SessionLayout`.
-// Every call site carries `TODO(b-task-8)`.
-// ---------------------------------------------------------------------------
-
-/// Legacy: load state by `project_dir` + `session_id`.
-///
-/// # TODO(b-task-8): migrate callers to `load_state(layout)`.
-pub(crate) fn load_state_legacy(
-    project_dir: &Path,
-    session_id: &str,
-) -> Result<Option<SessionState>, CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id)?;
-    load_state(&layout)
-}
-
-/// Legacy: create state by `project_dir` + `session_id`.
-///
-/// # TODO(b-task-8): migrate callers to `create_state(layout, state)`.
-pub(crate) fn create_state_legacy(
-    project_dir: &Path,
-    session_id: &str,
-    state: &SessionState,
-) -> Result<bool, CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id)?;
-    create_state(&layout, state)
-}
-
-/// Legacy: update state by `project_dir` + `session_id`.
-///
-/// # TODO(b-task-8): migrate callers to `update_state(layout, fn)`.
-pub(crate) fn update_state_legacy<F>(
-    project_dir: &Path,
-    session_id: &str,
-    update: F,
-) -> Result<SessionState, CliError>
-where
-    F: FnOnce(&mut SessionState) -> Result<(), CliError>,
-{
-    let layout = files::layout_from_project_dir(project_dir, session_id)?;
-    update_state(&layout, update)
-}
-
-/// Legacy: update state if changed by `project_dir` + `session_id`.
-///
-/// # TODO(b-task-8): migrate callers to `update_state_if_changed(layout, fn)`.
-pub(crate) fn update_state_if_changed_legacy<F>(
-    project_dir: &Path,
-    session_id: &str,
-    update: F,
-) -> Result<SessionState, CliError>
-where
-    F: FnOnce(&mut SessionState) -> Result<bool, CliError>,
-{
-    let layout = files::layout_from_project_dir(project_dir, session_id)?;
-    update_state_if_changed(&layout, update)
-}

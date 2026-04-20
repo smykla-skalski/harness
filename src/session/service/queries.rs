@@ -106,7 +106,8 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
 
     let mut sessions = Vec::new();
     for session_id in session_ids {
-        if let Some(mut state) = storage::load_state_legacy(project_dir, &session_id)? {
+        let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
+        if let Some(mut state) = storage::load_state(&layout)? {
             state.metrics = SessionMetrics::recalculate(&state);
             sessions.push(state);
         }
@@ -161,7 +162,8 @@ pub fn resolve_session_project_dir(
     session_id: &str,
     local_project_dir: &Path,
 ) -> Result<PathBuf, CliError> {
-    if storage::load_state_legacy(local_project_dir, session_id)?.is_some() {
+    let local_layout = storage::layout_from_project_dir(local_project_dir, session_id)?;
+    if storage::load_state(&local_layout)?.is_some() {
         return Ok(local_project_dir.to_path_buf());
     }
     if let Some(client) = DaemonClient::try_connect() {

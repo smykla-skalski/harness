@@ -102,6 +102,36 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
 }
 
 #[test]
+fn start_session_direct_creates_worktree() {
+    with_temp_project(|project| {
+        let db = setup_db_with_project(project);
+        let state = start_session_direct(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "worktree start".into(),
+                context: "wires the worktree controller".into(),
+                runtime: "claude".into(),
+                session_id: None,
+                project_dir: project.to_string_lossy().into_owned(),
+                policy_preset: None,
+            },
+            Some(&db),
+        )
+        .expect("start session creates worktree");
+
+        assert_eq!(state.session_id.len(), 8, "session id is 8 chars");
+        assert_eq!(state.branch_ref, format!("harness/{}", state.session_id));
+        assert!(state.worktree_path.exists(), "worktree workspace dir should exist");
+        assert!(state.worktree_path.join("README.md").exists(), "checked-out README.md must exist");
+        assert!(state.shared_path.exists(), "shared (memory) dir should exist");
+        assert!(state.origin_path.exists(), "origin path should resolve to a real dir");
+        assert_eq!(
+            state.project_name,
+            project.file_name().expect("file_name").to_string_lossy()
+        );
+    });
+}
+
+#[test]
 fn start_session_direct_rejects_unknown_policy_preset() {
     with_temp_project(|project| {
         let db = setup_db_with_project(project);

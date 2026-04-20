@@ -66,8 +66,9 @@ pub fn create_task_with_source(
 
     let now = utc_now();
     let mut created_item = None;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         created_item = Some(apply_create_task(state, spec, actor_id, &now)?);
         Ok(())
     })?;
@@ -77,9 +78,8 @@ pub fn create_task_with_source(
             "task creation did not persist state".to_string(),
         ))
     })?;
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_task_created(spec, &item),
         Some(actor_id),
         None,
@@ -112,14 +112,14 @@ pub fn assign_task(
     }
 
     let now = utc_now();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         apply_assign_task(state, task_id, agent_id, actor_id, &now)
     })?;
 
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_task_assigned(task_id, agent_id),
         Some(actor_id),
         None,
@@ -156,7 +156,8 @@ pub fn drop_task(
 
     let now = utc_now();
     let mut effects = Vec::new();
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    storage::update_state(&layout, |state| {
         effects = apply_drop_task(state, task_id, target, queue_policy, actor_id, &now)?;
         Ok(())
     })?;
@@ -181,7 +182,8 @@ pub fn update_task_queue_policy(
 ) -> Result<(), CliError> {
     let now = utc_now();
     let mut effects = Vec::new();
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    storage::update_state(&layout, |state| {
         effects = apply_update_task_queue_policy(state, task_id, queue_policy, actor_id, &now)?;
         Ok(())
     })?;
@@ -251,8 +253,9 @@ pub fn update_task(
     let now = utc_now();
     let mut from_status = TaskStatus::Open;
     let mut effects = Vec::new();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         from_status = apply_update_task(state, task_id, status, note, actor_id, &now)?;
         effects = apply_advance_queued_tasks(state, actor_id, &now)?;
         refresh_session(state, &now);
@@ -261,9 +264,8 @@ pub fn update_task(
 
     let start_signals = started_task_signals(&effects);
     write_prepared_task_start_signals(project_dir, &start_signals)?;
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_log_entry(
+        &layout,
         log_task_status_changed(task_id, from_status, status),
         Some(actor_id),
         None,
@@ -309,8 +311,9 @@ pub fn record_task_checkpoint(
 
     let now = utc_now();
     let mut checkpoint = None;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state_legacy(project_dir, session_id, |state| {
+    storage::update_state(&layout, |state| {
         checkpoint = Some(apply_record_checkpoint(
             state, task_id, actor_id, summary, progress, &now,
         )?);
@@ -322,10 +325,9 @@ pub fn record_task_checkpoint(
             "task checkpoint did not persist state".to_string(),
         ))
     })?;
-    storage::append_task_checkpoint_legacy(project_dir, session_id, task_id, &checkpoint)?;
-    storage::append_log_entry_legacy(
-        project_dir,
-        session_id,
+    storage::append_task_checkpoint(&layout, task_id, &checkpoint)?;
+    storage::append_log_entry(
+        &layout,
         log_checkpoint_recorded(task_id, &checkpoint.checkpoint_id, progress),
         Some(actor_id),
         None,

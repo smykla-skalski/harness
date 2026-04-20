@@ -137,15 +137,8 @@ pub(super) fn run_harness_with_timeout(
     }
 }
 
-pub(super) fn init_git_repo(path: &Path) {
-    std::fs::create_dir_all(path).expect("create project");
-    let status = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .arg(path)
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init failed");
+pub(crate) fn init_git_repo(path: &Path) {
+    harness_testkit::init_git_repo_with_seed(path);
 }
 
 pub(super) fn wait_for_child_exit(child: &mut ManagedChild) {
