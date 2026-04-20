@@ -118,7 +118,7 @@ struct HarnessMonitorAppCommands: Commands {
       Divider()
 
       Button("Observe Selected Session", action: observeSelectedSession)
-        .keyboardShortcut("o", modifiers: [.command, .shift])
+        .keyboardShortcut("o", modifiers: [.command, .option])
         .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
 
       Button("End Selected Session", action: endSelectedSession)
