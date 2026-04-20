@@ -2,6 +2,7 @@ pub mod compact;
 pub mod ids;
 mod git;
 pub mod layout;
+pub mod orphan_cleanup;
 mod paths;
 pub mod project_resolver;
 mod remote_kubernetes;
