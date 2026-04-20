@@ -76,16 +76,17 @@ struct PersistenceIntegrationTestHarness {
           (token * 3) % 60,
           (token * 7) % 60
         )
+        let sessionId = "sess\(String(format: "%04d", token))"
         let session = SessionSummary(
           projectId: projectId,
           projectName: projectName,
           projectDir: projectDir,
           contextRoot: contextRoot,
-          checkoutId: "checkout-\(projectIndex)",
-          checkoutRoot: projectDir,
-          isWorktree: false,
-          worktreeName: nil,
-          sessionId: "session-\(projectIndex)-\(sessionIndex)",
+          sessionId: sessionId,
+          worktreePath: "\(contextRoot)/\(sessionId)/workspace",
+          sharedPath: "\(contextRoot)/\(sessionId)/memory",
+          originPath: projectDir,
+          branchRef: "harness/\(sessionId)",
           title: "Regression \(projectIndex)-\(sessionIndex)",
           context: "Regression lane \(projectIndex)-\(sessionIndex)",
           status: token.isMultiple(of: 5) ? .ended : .active,

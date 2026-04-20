@@ -8,7 +8,7 @@ public func sessionAccessibilityLabel(
   [
     session.displayTitle,
     session.projectName,
-    session.checkoutDisplayName,
+    session.worktreeDisplayName,
     presentation.accessibilityStatusText,
     presentation.agentStat.helpText,
     presentation.taskStat.helpText,

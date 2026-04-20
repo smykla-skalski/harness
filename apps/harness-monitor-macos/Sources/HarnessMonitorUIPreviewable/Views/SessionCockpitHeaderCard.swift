@@ -199,10 +199,7 @@ struct SessionCockpitHeaderCard: View {
 }
 
 private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
-  if session.isWorktree {
-    return "\(session.projectName) • \(session.checkoutDisplayName) • \(session.sessionId)"
-  }
-  return "\(session.projectName) • \(session.sessionId)"
+  "\(session.projectName) • \(session.worktreeDisplayName) • \(session.sessionId)"
 }
 
 #Preview("Cockpit header") {

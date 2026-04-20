@@ -134,12 +134,14 @@ extension PreviewHarnessClient.Fixtures {
         projectName: "harness",
         projectDir: "/Users/example/Projects/harness",
         contextRoot:
-          "/Users/example/Library/Application Support/harness/projects/project-toolbar-harness",
-        checkoutId: "checkout-toolbar-harness",
-        checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
-        isWorktree: true,
-        worktreeName: "session-title",
-        sessionId: "sess-toolbar-harness-1",
+          "/Users/example/Library/Application Support/harness/sessions/harness",
+        sessionId: "tbhrn001",
+        worktreePath:
+          "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn001/workspace",
+        sharedPath:
+          "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn001/memory",
+        originPath: "/Users/example/Projects/harness",
+        branchRef: "harness/tbhrn001",
         title: "Toolbar count fix",
         context: "Primary regression session",
         status: .active,
@@ -163,12 +165,14 @@ extension PreviewHarnessClient.Fixtures {
         projectName: "harness",
         projectDir: "/Users/example/Projects/harness",
         contextRoot:
-          "/Users/example/Library/Application Support/harness/projects/project-toolbar-harness",
-        checkoutId: "checkout-toolbar-harness",
-        checkoutRoot: "/Users/example/Projects/harness/.claude/worktrees/session-title",
-        isWorktree: true,
-        worktreeName: "session-title",
-        sessionId: "sess-toolbar-harness-2",
+          "/Users/example/Library/Application Support/harness/sessions/harness",
+        sessionId: "tbhrn002",
+        worktreePath:
+          "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn002/workspace",
+        sharedPath:
+          "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn002/memory",
+        originPath: "/Users/example/Projects/harness",
+        branchRef: "harness/tbhrn002",
         title: "Cache sweep validation",
         context: "Secondary regression session",
         status: .active,
@@ -192,12 +196,14 @@ extension PreviewHarnessClient.Fixtures {
         projectName: "kuma",
         projectDir: "/Users/example/Projects/kuma",
         contextRoot:
-          "/Users/example/Library/Application Support/harness/projects/project-toolbar-kuma",
-        checkoutId: "checkout-toolbar-kuma",
-        checkoutRoot: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
-        isWorktree: true,
-        worktreeName: "fix-motb",
-        sessionId: "sess-toolbar-kuma-1",
+          "/Users/example/Library/Application Support/harness/sessions/kuma",
+        sessionId: "tbkuma01",
+        worktreePath:
+          "/Users/example/Library/Application Support/harness/sessions/kuma/tbkuma01/workspace",
+        sharedPath:
+          "/Users/example/Library/Application Support/harness/sessions/kuma/tbkuma01/memory",
+        originPath: "/Users/example/Projects/kuma",
+        branchRef: "harness/tbkuma01",
         title: "Kuma validation",
         context: "Cross-project summary row",
         status: .active,

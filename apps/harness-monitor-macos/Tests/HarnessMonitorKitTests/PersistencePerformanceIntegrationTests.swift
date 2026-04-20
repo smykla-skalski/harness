@@ -52,11 +52,11 @@ struct PersistencePerformanceIntegrationTests {
         projectName: baseline.projectName,
         projectDir: baseline.projectDir,
         contextRoot: baseline.contextRoot,
-        checkoutId: baseline.checkoutId,
-        checkoutRoot: baseline.checkoutRoot,
-        isWorktree: baseline.isWorktree,
-        worktreeName: baseline.worktreeName,
         sessionId: baseline.sessionId,
+        worktreePath: baseline.worktreePath,
+        sharedPath: baseline.sharedPath,
+        originPath: baseline.originPath,
+        branchRef: baseline.branchRef,
         title: "Regression 0-0 iter \(iteration)",
         context: "Regression lane 0-0 iteration \(iteration)",
         status: iteration.isMultiple(of: 2) ? .ended : .active,
@@ -128,7 +128,7 @@ struct PersistencePerformanceIntegrationTests {
       "Regression 0",
       "leader-2",
       "observe-3",
-      "session-4",
+      "sess0004",
     ]
     var iteration = 0
 

@@ -23,12 +23,12 @@ struct HarnessMonitorSessionModelsTests {
         "project_id": "project-b72ed763e074d381",
         "project_name": "harness",
         "project_dir": "/tmp/project",
-        "context_root": "/tmp/project/context",
-        "checkout_id": "project-b72ed763e074d381",
-        "checkout_root": "/tmp/project",
-        "is_worktree": false,
-        "worktree_name": null,
-        "session_id": "sess-signal",
+        "context_root": "/tmp/harness/sessions/harness",
+        "session_id": "sig12345",
+        "worktree_path": "/tmp/harness/sessions/harness/sig12345/workspace",
+        "shared_path": "/tmp/harness/sessions/harness/sig12345/memory",
+        "origin_path": "/tmp/project",
+        "branch_ref": "harness/sig12345",
         "context": "Signal decode proof",
         "status": "active",
         "created_at": "2026-04-03T17:23:26Z",
@@ -216,15 +216,19 @@ struct HarnessMonitorSessionModelsTests {
           "project_id": "project-9fe5ce4237976a0a",
           "project_name": "project-9fe5ce4237976a0a",
           "project_dir": null,
-          "context_root": "/tmp/project",
-          "session_id": "sess-20260402100345527324000",
+          "context_root": "/tmp/harness/sessions/project-9fe5ce4237976a0a",
+          "session_id": "abc12345",
+          "worktree_path": "/tmp/harness/sessions/project-9fe5ce4237976a0a/abc12345/workspace",
+          "shared_path": "/tmp/harness/sessions/project-9fe5ce4237976a0a/abc12345/memory",
+          "origin_path": "/tmp/project",
+          "branch_ref": "harness/abc12345",
           "context": "Create a test suite",
           "status": "active",
           "created_at": "2026-04-02T10:03:45Z",
           "updated_at": "2026-04-02T11:42:11Z",
           "last_activity_at": "2026-04-02T11:42:11Z",
           "leader_id": "claude-leader",
-          "observe_id": "observe-sess-20260402100345527324000",
+          "observe_id": "observe-abc12345",
           "pending_leader_transfer": null,
           "metrics": {
             "agent_count": 2,
@@ -283,7 +287,7 @@ struct HarnessMonitorSessionModelsTests {
 
     let detail = try decoder.decode(SessionDetail.self, from: Data(json.utf8))
 
-    #expect(detail.session.sessionId == "sess-20260402100345527324000")
+    #expect(detail.session.sessionId == "abc12345")
     #expect(detail.tasks.count == 1)
     #expect(detail.tasks[0].notes.isEmpty)
     #expect(detail.tasks[0].source == .manual)
@@ -317,12 +321,12 @@ struct HarnessMonitorSessionModelsTests {
         "project_id": "project-890e1bdc449e2a7b",
         "project_name": "kuma",
         "project_dir": "/tmp/project",
-        "context_root": "/tmp/project/context",
-        "checkout_id": "project-9fe5ce4237976a0a",
-        "checkout_root": "/tmp/project/.claude/worktrees/fix-motb-dangling-accesslog",
-        "is_worktree": true,
-        "worktree_name": "fix-motb-dangling-accesslog",
-        "session_id": "sess-20260402100345527324000",
+        "context_root": "/tmp/harness/sessions/kuma",
+        "session_id": "ldgrd001",
+        "worktree_path": "/tmp/harness/sessions/kuma/ldgrd001/workspace",
+        "shared_path": "/tmp/harness/sessions/kuma/ldgrd001/memory",
+        "origin_path": "/tmp/project",
+        "branch_ref": "harness/ldgrd001",
         "title": "Create a test suite",
         "context": "Create a test suite",
         "status": "leaderless_degraded",
@@ -330,7 +334,7 @@ struct HarnessMonitorSessionModelsTests {
         "updated_at": "2026-04-17T08:14:49Z",
         "last_activity_at": "2026-04-17T08:14:49Z",
         "leader_id": null,
-        "observe_id": "observe-sess-20260402100345527324000",
+        "observe_id": "observe-ldgrd001",
         "pending_leader_transfer": null,
         "metrics": {
           "agent_count": 0,

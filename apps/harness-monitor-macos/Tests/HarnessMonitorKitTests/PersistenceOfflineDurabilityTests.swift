@@ -277,10 +277,10 @@ struct PersistenceOfflineDurabilityTests {
 
     #expect(sessions.count == 1)
     #expect(migratedSession?.sessionId == "sess-1")
-    #expect(migratedSession?.checkoutId == "proj-1")
-    #expect(migratedSession?.checkoutRoot == "/tmp/harness")
-    #expect(migratedSession?.isWorktree == false)
-    #expect(migratedSession?.worktreeName == nil)
+    #expect(migratedSession?.projectId == "proj-1")
+    #expect(migratedSession?.worktreePath.isEmpty == true)
+    #expect(migratedSession?.sharedPath.isEmpty == true)
+    #expect(migratedSession?.branchRef.isEmpty == true)
     #expect(sessions.first?.metricsData == metricsData)
   }
 }
