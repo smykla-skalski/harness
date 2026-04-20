@@ -10,7 +10,7 @@ grep -rn "FileManager\|URL(fileURLWithPath:\|homeDirectoryForCurrentUser\|applic
   apps/harness-monitor-macos/Sources/
 ```
 
-Total raw hits: 50 lines across 23 files.
+Total raw hits: 49 lines across 25 files.
 
 ---
 
@@ -46,7 +46,7 @@ Total raw hits: 50 lines across 23 files.
 
 | File | Line | Call | Notes |
 | --- | --- | --- | --- |
-| `Support/HarnessMonitorPaths.swift` | 102-104 (old) | `harnessRoot()` delegated to `dataRoot()` which had a `DaemonOwnership.external` bypass returning `~/Library/Application Support` | Replaced with standalone implementation that always prefers `containerURL(forSecurityApplicationGroupIdentifier:)` before falling back to `~/Library/Application Support/harness`; the external-daemon bypass is removed |
+| `Support/HarnessMonitorPaths.swift` | 102-146 | `harnessRoot()` delegated to `dataRoot()` which had a `DaemonOwnership.external` bypass returning `~/Library/Application Support` | Rewritten to use shared `resolveBaseRoot(using:preferExternalDaemon:)` helper; external-daemon bypass is PRESERVED symmetrically (same ordering as `dataRoot`); managed builds fatalError when group container is unavailable instead of silently falling back to a sandbox-denied path |
 
 ## Bucket 4: Outside sandbox - bookmark-mediated (deferred to C/D consumers)
 
@@ -65,7 +65,7 @@ Total raw hits: 50 lines across 23 files.
 
 ## Summary
 
-- Total FS access sites: 50 grep hits (23 files)
-- Migrated to app group in this task: 1 (the `harnessRoot()` standalone rewrite removes the `DaemonOwnership.external` bypass)
+- Total FS access sites: 49 grep hits (25 files)
+- Migrated to app group in this task: 1 (`harnessRoot()` now routes through `resolveBaseRoot` which always prefers the group container; external-daemon bypass preserved symmetrically with `dataRoot`)
 - Remaining bookmark-mediated sites: 10 (handled by sub-projects C and D)
 - No per-site wraps added in this task - all app-owned data paths resolve via the updated `harnessRoot()` and need no individual changes

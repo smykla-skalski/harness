@@ -32,6 +32,28 @@ public enum HarnessMonitorPaths {
   }
 
   public static func dataRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
+    if let base = resolveBaseRoot(using: environment, preferExternalDaemon: true) {
+      return base
+    }
+    return appGroupContainerURL(identifier: HarnessMonitorAppGroup.identifier, using: environment)
+  }
+
+  /// Resolves the base data-root URL using a consistent priority chain.
+  ///
+  /// Resolution order:
+  /// 1. Explicit configured root (`HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME`).
+  /// 2. App group container override via `HARNESS_APP_GROUP_ID` env var.
+  /// 3. System `containerURL(forSecurityApplicationGroupIdentifier:)`.
+  /// 4. External-daemon bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1`, debug builds only):
+  ///    returns `~/Library/Application Support` directly so dev mode skips the
+  ///    group-container lookup and stays symmetric with the pre-Task-11 behaviour.
+  ///    Only evaluated when `preferExternalDaemon` is true.
+  ///
+  /// Returns `nil` when none of the above resolves — callers decide how to handle that.
+  private static func resolveBaseRoot(
+    using environment: HarnessMonitorEnvironment,
+    preferExternalDaemon: Bool
+  ) -> URL? {
     if let configuredRoot = configuredDataHomeRoot(using: environment) {
       return configuredRoot
     }
@@ -49,13 +71,13 @@ public enum HarnessMonitorPaths {
       return containerURL
     }
 
-    if DaemonOwnership(environment: environment) == .external {
+    if preferExternalDaemon, DaemonOwnership(environment: environment) == .external {
       return environment.homeDirectory
         .appendingPathComponent("Library", isDirectory: true)
         .appendingPathComponent("Application Support", isDirectory: true)
     }
 
-    return appGroupContainerURL(identifier: HarnessMonitorAppGroup.identifier, using: environment)
+    return nil
   }
 
   private static func appGroupContainerURL(
@@ -100,25 +122,24 @@ public enum HarnessMonitorPaths {
   }
 
   public static func harnessRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
-    if let configuredRoot = configuredDataHomeRoot(using: environment) {
-      return configuredRoot.appendingPathComponent("harness", isDirectory: true)
+    if let base = resolveBaseRoot(using: environment, preferExternalDaemon: true) {
+      return base.appendingPathComponent("harness", isDirectory: true)
     }
 
-    if let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines),
-      !value.isEmpty
-    {
-      return appGroupContainerURL(identifier: value, using: environment)
-        .appendingPathComponent("harness", isDirectory: true)
+    // resolveBaseRoot returned nil: the group container was unavailable.
+    // In a managed (sandboxed release) build this is a non-recoverable misconfiguration —
+    // the app lacks the required entitlement and any I/O to the legacy path will be denied.
+    if DaemonOwnership(environment: environment) == .managed {
+      HarnessMonitorLogger.store.error(
+        "Group container unavailable in managed build — check app group entitlement"
+      )
+      fatalError("group container unavailable in managed build — check app group entitlement")
     }
 
-    if let containerURL = FileManager.default.containerURL(
-      forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
-    ) {
-      return containerURL.appendingPathComponent("harness", isDirectory: true)
-    }
-
-    // Dev / preview fallback (non-sandboxed): fall back to ~/Library/Application Support/harness
+    // Debug or external-daemon fallback: the app is unsandboxed, so the legacy path is accessible.
+    HarnessMonitorLogger.store.warning(
+      "App group container unavailable; falling back to ~/Library/Application Support/harness"
+    )
     return environment.homeDirectory
       .appendingPathComponent("Library", isDirectory: true)
       .appendingPathComponent("Application Support", isDirectory: true)
