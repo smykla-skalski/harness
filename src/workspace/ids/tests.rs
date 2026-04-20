@@ -6,7 +6,8 @@ fn generates_8_lowercase_alphanumeric_chars() {
         let id = new_session_id();
         assert_eq!(id.len(), 8, "id: {id}");
         assert!(
-            id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
+            id.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
             "id: {id}",
         );
     }

@@ -35,7 +35,10 @@ pub fn validate(id: &str) -> Result<(), IdError> {
     if id.len() != SESSION_ID_LEN {
         return Err(IdError::Invalid(id.to_string()));
     }
-    if !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) {
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    {
         return Err(IdError::Invalid(id.to_string()));
     }
     Ok(())

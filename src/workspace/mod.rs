@@ -1,6 +1,6 @@
 pub mod compact;
-pub mod ids;
 mod git;
+pub mod ids;
 pub mod layout;
 pub mod orphan_cleanup;
 mod paths;
@@ -13,9 +13,9 @@ pub mod worktree;
 pub use git::{
     GitCheckoutIdentity, GitCheckoutKind, canonical_checkout_root, resolve_git_checkout_identity,
 };
-pub use paths::{HARNESS_PREFIX, dirs_home, harness_data_root, shorten_path, utc_now};
 #[cfg(target_os = "macos")]
 pub use paths::legacy_macos_root;
+pub use paths::{HARNESS_PREFIX, dirs_home, harness_data_root, shorten_path, utc_now};
 pub(crate) use paths::{host_home_dir, normalized_env_value};
 pub(crate) use remote_kubernetes::{
     RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState, cleanup_remote_install_state,

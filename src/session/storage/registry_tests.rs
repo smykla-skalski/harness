@@ -1,8 +1,6 @@
 use crate::workspace::layout::SessionLayout;
 
-use super::registry::{
-    deregister_active, load_active_registry_for_layout, register_active,
-};
+use super::registry::{deregister_active, load_active_registry_for_layout, register_active};
 
 fn layout(tmp: &std::path::Path, session_id: &str) -> SessionLayout {
     SessionLayout {
@@ -29,7 +27,11 @@ fn active_registry_round_trip() {
 
     deregister_active(&layout_a).expect("remove a");
     let registry = load_active_registry_for_layout(&layout_a);
-    assert_eq!(registry.sessions.len(), 1, "expected 1 session after deregister");
+    assert_eq!(
+        registry.sessions.len(),
+        1,
+        "expected 1 session after deregister"
+    );
     assert!(registry.sessions.contains_key("sess-b"));
 }
 
@@ -43,8 +45,5 @@ fn registry_stored_at_project_dir_active_json() {
 
     let expected = layout.active_registry();
     assert!(expected.exists(), ".active.json must exist at project dir");
-    assert_eq!(
-        expected,
-        tmp.path().join("sessions/demo/.active.json"),
-    );
+    assert_eq!(expected, tmp.path().join("sessions/demo/.active.json"),);
 }

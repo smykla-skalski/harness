@@ -11,9 +11,7 @@ use super::migrations::{
 };
 
 /// Build a `VersionedJsonRepository` for the session state file.
-fn state_repository(
-    layout: &SessionLayout,
-) -> VersionedJsonRepository<SessionState> {
+fn state_repository(layout: &SessionLayout) -> VersionedJsonRepository<SessionState> {
     VersionedJsonRepository::new(files::state_path(layout), CURRENT_VERSION).with_migrations(vec![
         Box::new(migrate_v1_to_v2),
         Box::new(migrate_v2_to_v3),
@@ -37,10 +35,7 @@ pub(crate) fn load_state(layout: &SessionLayout) -> Result<Option<SessionState>,
 ///
 /// # Errors
 /// Returns `CliError` on I/O or serialization failures.
-pub(crate) fn create_state(
-    layout: &SessionLayout,
-    state: &SessionState,
-) -> Result<bool, CliError> {
+pub(crate) fn create_state(layout: &SessionLayout, state: &SessionState) -> Result<bool, CliError> {
     files::validate_session_id(&layout.session_id)?;
     let repository = state_repository(layout);
     let mut created = false;
@@ -120,4 +115,3 @@ where
             })
         })
 }
-

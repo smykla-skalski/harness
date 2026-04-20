@@ -367,8 +367,7 @@ fn current_leader_confirms_pending_transfer() {
         assert_eq!(updated.leader_id.as_deref(), Some(observer_id.as_str()));
         assert!(updated.pending_leader_transfer.is_none());
 
-        let layout =
-            storage::layout_from_project_dir(project, "transfer-confirm").expect("layout");
+        let layout = storage::layout_from_project_dir(project, "transfer-confirm").expect("layout");
         let entries = storage::load_log_entries(&layout).expect("entries");
         assert!(entries.iter().any(|entry| {
             matches!(
