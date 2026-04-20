@@ -136,7 +136,8 @@ fn session_mutation_response_contains_state() {
 
 #[test]
 fn session_start_request_accepts_optional_base_ref() {
-    let raw = r#"{"title":"t","context":"c","runtime":"claude","project_dir":"/tmp","base_ref":"main"}"#;
+    let raw =
+        r#"{"title":"t","context":"c","runtime":"claude","project_dir":"/tmp","base_ref":"main"}"#;
     let req: SessionStartRequest = serde_json::from_str(raw).expect("parse");
     assert_eq!(req.base_ref.as_deref(), Some("main"));
 }
