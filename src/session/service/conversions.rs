@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::{
     BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, DaemonClient, ResolvedRuntimeSessionAgent,
     SessionState, SessionStatus, protocol, runtime_session_matches_agent,
@@ -20,6 +22,11 @@ pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> Sessi
         schema_version: CURRENT_VERSION,
         state_version: 0,
         session_id: detail.session.session_id.clone(),
+        project_name: detail.session.project_name.clone(),
+        worktree_path: PathBuf::new(),
+        shared_path: PathBuf::new(),
+        origin_path: PathBuf::new(),
+        branch_ref: String::new(),
         title: detail.session.title.clone(),
         context: detail.session.context.clone(),
         status: detail.session.status,
@@ -46,6 +53,11 @@ pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> Se
         schema_version: CURRENT_VERSION,
         state_version: 0,
         session_id: summary.session_id.clone(),
+        project_name: summary.project_name.clone(),
+        worktree_path: PathBuf::new(),
+        shared_path: PathBuf::new(),
+        origin_path: PathBuf::new(),
+        branch_ref: String::new(),
         title: summary.title.clone(),
         context: summary.context.clone(),
         status: summary.status,

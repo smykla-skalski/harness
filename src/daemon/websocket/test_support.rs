@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::env::temp_dir;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use serde_json::json;
@@ -280,6 +281,11 @@ fn sample_session_state() -> SessionState {
         schema_version: 3,
         state_version: 1,
         session_id: "sess-test-1".into(),
+        project_name: String::new(),
+        worktree_path: PathBuf::new(),
+        shared_path: PathBuf::new(),
+        origin_path: PathBuf::new(),
+        branch_ref: String::new(),
         title: "sess-test-1".into(),
         context: "agent tui websocket fixture".into(),
         status: SessionStatus::Active,

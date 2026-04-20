@@ -445,71 +445,12 @@ fn infer_ledger_cwd_uses_last_nonempty_line() {
     assert_eq!(cwd, std::path::PathBuf::from("/tmp/second"));
 }
 
-#[test]
-fn resolve_runtime_session_uses_context_root_state_instead_of_checkout_storage() {
-    let tmp = tempdir().expect("tempdir");
-    with_isolated_harness_env(tmp.path(), || {
-        let correct_project = tmp.path().join("correct-project");
-        let wrong_project = tmp.path().join("wrong-project");
-        init_git_repo(&correct_project);
-        init_git_repo(&wrong_project);
-
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
-            session_service::start_session(
-                "correct",
-                "",
-                &correct_project,
-                Some("claude"),
-                Some("shared-session"),
-            )
-            .expect("start correct session");
-            session_service::start_session(
-                "wrong",
-                "",
-                &wrong_project,
-                Some("claude"),
-                Some("shared-session"),
-            )
-            .expect("start wrong session");
-        });
-
-        temp_env::with_vars(
-            [
-                ("CLAUDE_SESSION_ID", Some("leader-session")),
-                ("CODEX_SESSION_ID", Some("worker-session")),
-            ],
-            || {
-                session_service::join_session(
-                    "shared-session",
-                    SessionRole::Worker,
-                    "codex",
-                    &[],
-                    None,
-                    &correct_project,
-                    None,
-                )
-                .expect("join correct worker");
-            },
-        );
-
-        let context_root = project_context_dir(&correct_project);
-        write_text(
-            &context_root.join("project-origin.json"),
-            &serde_json::json!({
-                "recorded_from_dir": wrong_project.display().to_string(),
-                "repository_root": wrong_project.display().to_string(),
-                "checkout_root": wrong_project.display().to_string(),
-                "is_worktree": false,
-                "worktree_name": null,
-                "recorded_at": "2026-04-14T12:00:00Z",
-            })
-            .to_string(),
-        );
-
-        assert_eq!(
-            resolve_session_id_for_runtime_session(&context_root, "codex", "worker-session",)
-                .expect("resolve runtime session"),
-            Some("shared-session".to_string())
-        );
-    });
-}
+// Former test `resolve_runtime_session_uses_context_root_state_instead_of_checkout_storage`
+// removed in Task 8. It asserted that session state lives inside `context_root` and
+// that the resolver reads state there regardless of what `project-origin.json`
+// says. After the B-layout cut, session state lives at
+// `<sessions_root>/<project_name>/<sid>/state.json`, keyed by project_name rather
+// than by context_root identity, so the "context_root is authoritative" axiom no
+// longer applies. Task 9 will rewire the resolver to take a `SessionLayout`
+// (or `DiscoveredProject`) instead of a bare `context_root`; the replacement
+// test belongs there.

@@ -1,10 +1,8 @@
 use serde_json::json;
 
-use crate::session::types::CURRENT_VERSION;
-
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
-    migrate_v6_to_v7,
+    migrate_v6_to_v7, migrate_v7_to_v8,
 };
 use super::registry::{ProjectOriginRecord, merge_project_origin};
 
@@ -165,7 +163,7 @@ fn migrate_v6_to_v7_backfills_swarm_policy() {
     }))
     .expect("migrate v6");
 
-    assert_eq!(migrated["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(migrated["schema_version"], json!(7));
     assert_eq!(
         migrated["policy"],
         json!({
@@ -182,6 +180,36 @@ fn migrate_v6_to_v7_backfills_swarm_policy() {
             }
         })
     );
+}
+
+#[test]
+fn migrate_v7_to_v8_adds_layout_fields() {
+    let migrated = migrate_v7_to_v8(json!({
+        "schema_version": 7,
+        "state_version": 3,
+        "session_id": "sess-1",
+        "title": "session title",
+        "context": "session goal",
+        "status": "active",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "agents": {},
+        "tasks": {},
+        "leader_id": null,
+        "archived_at": null,
+        "last_activity_at": null,
+        "observe_id": null,
+        "pending_leader_transfer": null,
+        "metrics": {}
+    }))
+    .expect("migrate v7");
+
+    assert_eq!(migrated["schema_version"], json!(8));
+    assert_eq!(migrated["project_name"], json!(""));
+    assert_eq!(migrated["worktree_path"], json!(""));
+    assert_eq!(migrated["shared_path"], json!(""));
+    assert_eq!(migrated["origin_path"], json!(""));
+    assert_eq!(migrated["branch_ref"], json!(""));
 }
 
 // TODO(b-task-8): is_worktree and worktree_name were removed from ProjectOriginRecord.

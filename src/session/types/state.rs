@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +8,7 @@ use super::{
 };
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 7;
+pub const CURRENT_VERSION: u32 = 8;
 
 /// Server-derived principal for daemon-authenticated control-plane mutations.
 ///
@@ -25,6 +26,21 @@ pub struct SessionState {
     #[serde(default)]
     pub state_version: u64,
     pub session_id: String,
+    /// Canonicalized directory-component name (matches `SessionLayout::project_name`).
+    #[serde(default)]
+    pub project_name: String,
+    /// Per-session worktree directory (`<sessions_root>/<project>/<sid>/workspace`).
+    #[serde(default)]
+    pub worktree_path: PathBuf,
+    /// Per-session shared directory for cross-agent artefacts.
+    #[serde(default)]
+    pub shared_path: PathBuf,
+    /// User's original repository root (pre-worktree).
+    #[serde(default)]
+    pub origin_path: PathBuf,
+    /// Git branch owned by this session (`harness/<sid>`).
+    #[serde(default)]
+    pub branch_ref: String,
     /// Short human-readable session name.
     #[serde(default)]
     pub title: String,

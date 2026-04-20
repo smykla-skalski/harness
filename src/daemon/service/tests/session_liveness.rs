@@ -67,11 +67,12 @@ fn list_sessions_skips_liveness_disk_probe_when_db_session_has_no_live_agents() 
         let db = setup_db_with_session(project, &fixture.state.session_id);
         clear_session_liveness_refresh_cache_entry(&fixture.state.session_id);
 
-        let state_path = crate::workspace::project_context_dir(project)
-            .join("orchestration")
-            .join("sessions")
-            .join(&fixture.state.session_id)
-            .join("state.json");
+        let layout = storage::layout_from_project_dir(
+            project,
+            &fixture.state.session_id,
+        )
+        .expect("layout from project");
+        let state_path = layout.state_file();
         fs::write(&state_path, "{not-valid-json").expect("corrupt state");
 
         let summary = list_sessions(true, Some(&db))
@@ -108,10 +109,12 @@ fn list_sessions_reconciles_orphaned_active_session_without_state_file() {
         db.sync_session(&project_id, &stale_state).expect("sync");
         clear_session_liveness_refresh_cache_entry(&stale_state.session_id);
 
-        let state_dir = crate::workspace::project_context_dir(project)
-            .join("orchestration")
-            .join("sessions")
-            .join(&stale_state.session_id);
+        let layout = storage::layout_from_project_dir(
+            project,
+            &stale_state.session_id,
+        )
+        .expect("layout from project");
+        let state_dir = layout.session_root();
         fs::remove_dir_all(&state_dir).expect("remove state dir");
         fs::remove_file(&fixture.leader_log).expect("remove leader log");
         fs::remove_file(&fixture.worker_log).expect("remove worker log");
@@ -169,10 +172,12 @@ fn session_detail_async_reconciles_orphaned_active_session_without_state_file() 
                 .expect("save stale state");
             clear_session_liveness_refresh_cache_entry(&stale_state.session_id);
 
-            let state_dir = crate::workspace::project_context_dir(project)
-                .join("orchestration")
-                .join("sessions")
-                .join(&stale_state.session_id);
+            let layout = storage::layout_from_project_dir(
+                project,
+                &stale_state.session_id,
+            )
+            .expect("layout from project");
+            let state_dir = layout.session_root();
             fs::remove_dir_all(&state_dir).expect("remove state dir");
             fs::remove_file(&fixture.leader_log).expect("remove leader log");
             fs::remove_file(&fixture.worker_log).expect("remove worker log");

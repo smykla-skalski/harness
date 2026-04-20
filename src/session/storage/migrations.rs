@@ -145,3 +145,26 @@ pub(super) fn migrate_v6_to_v7(mut value: Value) -> Result<Value, CliError> {
 
     Ok(value)
 }
+
+pub(super) fn migrate_v7_to_v8(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    object.insert("schema_version".to_string(), json!(8));
+    object
+        .entry("project_name".to_string())
+        .or_insert(json!(""));
+    object
+        .entry("worktree_path".to_string())
+        .or_insert(json!(""));
+    object
+        .entry("shared_path".to_string())
+        .or_insert(json!(""));
+    object
+        .entry("origin_path".to_string())
+        .or_insert(json!(""));
+    object.entry("branch_ref".to_string()).or_insert(json!(""));
+
+    Ok(value)
+}

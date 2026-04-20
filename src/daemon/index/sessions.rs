@@ -11,7 +11,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
-use crate::workspace::project_context_dir;
+use crate::workspace::layout::sessions_root as workspace_sessions_root;
+use crate::workspace::{harness_data_root, project_context_dir};
 
 use super::io::{for_each_nonempty_line, read_json_lines};
 use super::paths::{
@@ -211,45 +212,119 @@ pub fn resolve_session_id_for_runtime_session(
 pub(super) fn list_session_ids_from_context_root(
     context_root: &Path,
 ) -> Result<Vec<String>, CliError> {
-    let root = context_root.join("orchestration").join("sessions");
-    if !root.is_dir() {
+    let mut session_ids = list_session_ids_legacy(context_root)?;
+    // TODO(b-task-9): scope this to the specific project bucket once callers
+    // pass a `SessionLayout` or `project_name` instead of `context_root`.
+    session_ids.extend(list_session_ids_new_layout());
+    session_ids.sort_unstable();
+    session_ids.dedup();
+    Ok(session_ids)
+}
+
+fn list_session_ids_legacy(context_root: &Path) -> Result<Vec<String>, CliError> {
+    let legacy_root = context_root.join("orchestration").join("sessions");
+    if !legacy_root.is_dir() {
         return Ok(Vec::new());
     }
-    let mut session_ids = Vec::new();
-    for entry in fs::read_dir(root)
+    let mut ids = Vec::new();
+    for entry in fs::read_dir(&legacy_root)
         .map_err(|error| CliErrorKind::workflow_io(format!("read session root: {error}")))?
     {
-        let Ok(entry) = entry else {
-            continue;
-        };
+        let Ok(entry) = entry else { continue };
         if entry.file_type().ok().is_some_and(|kind| kind.is_dir()) {
-            session_ids.push(entry.file_name().to_string_lossy().to_string());
+            ids.push(entry.file_name().to_string_lossy().to_string());
         }
     }
-    session_ids.sort_unstable();
-    Ok(session_ids)
+    Ok(ids)
+}
+
+fn list_session_ids_new_layout() -> Vec<String> {
+    let new_root = workspace_sessions_root(&harness_data_root());
+    let Ok(project_entries) = fs::read_dir(&new_root) else {
+        return Vec::new();
+    };
+    let mut ids = Vec::new();
+    for project_entry in project_entries.flatten() {
+        if !project_entry
+            .file_type()
+            .ok()
+            .is_some_and(|kind| kind.is_dir())
+        {
+            continue;
+        }
+        let Ok(session_entries) = fs::read_dir(project_entry.path()) else {
+            continue;
+        };
+        for session_entry in session_entries.flatten() {
+            if session_entry
+                .file_type()
+                .ok()
+                .is_some_and(|kind| kind.is_dir())
+            {
+                ids.push(session_entry.file_name().to_string_lossy().to_string());
+            }
+        }
+    }
+    ids
 }
 
 pub(super) fn list_active_session_ids_from_context_root(
     context_root: &Path,
 ) -> Result<Vec<String>, CliError> {
-    let path = context_root.join("orchestration").join("active.json");
-    if !path.is_file() {
-        return Ok(Vec::new());
+    let mut active_ids = Vec::new();
+
+    let legacy_path = context_root.join("orchestration").join("active.json");
+    if legacy_path.is_file() {
+        let registry = read_json_typed::<storage::ActiveRegistry>(&legacy_path)?;
+        active_ids.extend(registry.sessions.into_keys());
     }
-    let registry = read_json_typed::<storage::ActiveRegistry>(&path)?;
-    Ok(registry.sessions.into_keys().collect())
+
+    // TODO(b-task-9): scope this to the specific project bucket once callers
+    // pass a `SessionLayout` or `project_name` instead of `context_root`.
+    let new_root = workspace_sessions_root(&harness_data_root());
+    if new_root.is_dir()
+        && let Ok(project_entries) = fs::read_dir(&new_root)
+    {
+        for project_entry in project_entries.flatten() {
+            let active_path = project_entry.path().join(".active.json");
+            if !active_path.is_file() {
+                continue;
+            }
+            if let Ok(registry) = read_json_typed::<storage::ActiveRegistry>(&active_path) {
+                active_ids.extend(registry.sessions.into_keys());
+            }
+        }
+    }
+
+    active_ids.sort_unstable();
+    active_ids.dedup();
+    Ok(active_ids)
 }
 
 fn load_session_state_from_context_root(
     context_root: &Path,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
-    let path = session_state_path(context_root, session_id);
-    if !path.is_file() {
-        return Ok(None);
+    let legacy_path = session_state_path(context_root, session_id);
+    if legacy_path.is_file() {
+        return read_json_typed(&legacy_path).map(Some);
     }
-    read_json_typed(&path).map(Some)
+
+    // TODO(b-task-9): scope to the specific project bucket once callers pass a
+    // `SessionLayout` or `project_name` instead of `context_root`.
+    let new_root = workspace_sessions_root(&harness_data_root());
+    if new_root.is_dir()
+        && let Ok(project_entries) = fs::read_dir(&new_root)
+    {
+        for project_entry in project_entries.flatten() {
+            let state_path = project_entry.path().join(session_id).join("state.json");
+            if state_path.is_file() {
+                return read_json_typed(&state_path).map(Some);
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 fn load_native_conversation_events(

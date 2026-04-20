@@ -185,7 +185,7 @@ pub(crate) fn project_layout_parts_from_dir(
 /// `<sessions_root>/<project_name>/<session_id>`, using the basename of
 /// `project_dir` as the project name and `crate::workspace::layout::sessions_root`
 /// to anchor the root.
-pub(crate) fn layout_from_project_dir(
+pub fn layout_from_project_dir(
     project_dir: &Path,
     session_id: &str,
 ) -> Result<SessionLayout, CliError> {

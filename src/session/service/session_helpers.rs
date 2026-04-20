@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::{
     AgentRegistration, AgentStatus, BTreeMap, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, CliError,
     CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND, LeaveSignalRecord, Path, SessionAction,
@@ -260,6 +262,11 @@ pub(crate) fn build_initial_state(
         schema_version: CURRENT_VERSION,
         state_version: 1,
         session_id: session_id.to_string(),
+        project_name: String::new(),
+        worktree_path: PathBuf::new(),
+        shared_path: PathBuf::new(),
+        origin_path: PathBuf::new(),
+        branch_ref: format!("harness/{session_id}"),
         title: title.to_string(),
         context: context.to_string(),
         status: SessionStatus::Active,
