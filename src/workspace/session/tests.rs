@@ -115,3 +115,27 @@ fn is_project_context_dir_name_validates_format() {
     assert!(!is_project_context_dir_name("notaproject-9fe5ce4237976a0a"));
     assert!(!is_project_context_dir_name("project-9fe5ce4237976a0a0")); // 17 chars
 }
+
+#[test]
+#[cfg(target_os = "macos")]
+fn data_root_prefers_app_group_container_when_present() {
+    temp_env::with_vars(
+        vec![
+            ("XDG_DATA_HOME", None::<&str>),
+            ("HARNESS_APP_GROUP_ID", Some("Q498EB36N4.io.harnessmonitor")),
+        ],
+        || {
+            let home = dirs_home();
+            let group = home
+                .join("Library")
+                .join("Group Containers")
+                .join("Q498EB36N4.io.harnessmonitor");
+            let expected = if group.exists() {
+                group
+            } else {
+                home.join("Library").join("Application Support")
+            };
+            assert_eq!(super::data_root(), expected);
+        },
+    );
+}
