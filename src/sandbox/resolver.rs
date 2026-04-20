@@ -1,0 +1,121 @@
+//! macOS-only resolver for security-scoped bookmarks.
+
+#![cfg(target_os = "macos")]
+#![allow(unsafe_code)]
+
+use std::env;
+use std::ffi::c_void;
+use std::path::{Path, PathBuf};
+use std::ptr;
+
+use core_foundation::base::{Boolean, TCFType};
+use core_foundation::data::CFData;
+use core_foundation::url::{
+    CFURL, CFURLCreateByResolvingBookmarkData, CFURLStartAccessingSecurityScopedResource,
+    CFURLStopAccessingSecurityScopedResource, kCFURLBookmarkResolutionWithSecurityScope,
+    kCFURLBookmarkResolutionWithoutUIMask,
+};
+
+use crate::sandbox::bookmarks::BookmarkError;
+
+/// A resolved bookmark with an active security-scoped access grant.
+///
+/// Dropping this value releases the grant via
+/// `CFURLStopAccessingSecurityScopedResource`.
+pub struct ResolvedBookmark {
+    path: PathBuf,
+    is_stale: bool,
+    _scope: BookmarkScope,
+}
+
+impl ResolvedBookmark {
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    #[must_use]
+    pub fn is_stale(&self) -> bool {
+        self.is_stale
+    }
+}
+
+/// RAII guard for `CFURLStartAccessingSecurityScopedResource`.
+pub struct BookmarkScope {
+    cf_url: CFURL,
+    started: bool,
+}
+
+impl BookmarkScope {
+    fn start(cf_url: CFURL) -> Self {
+        // SAFETY: cf_url is a valid CFURL created by CFURLCreateByResolvingBookmarkData.
+        let started =
+            unsafe { CFURLStartAccessingSecurityScopedResource(cf_url.as_concrete_TypeRef()) != 0 };
+        Self { cf_url, started }
+    }
+}
+
+impl Drop for BookmarkScope {
+    fn drop(&mut self) {
+        if self.started {
+            // SAFETY: cf_url remains valid for our lifetime; CFURLStart was called in ::start.
+            unsafe {
+                CFURLStopAccessingSecurityScopedResource(self.cf_url.as_concrete_TypeRef());
+            }
+        }
+    }
+}
+
+/// Return `true` when the process runs under the macOS app sandbox.
+///
+/// Gated on the `HARNESS_SANDBOXED=1` env var set by the launch agent plist.
+#[must_use]
+pub fn is_sandboxed() -> bool {
+    env::var_os("HARNESS_SANDBOXED").is_some()
+}
+
+/// Resolve a security-scoped bookmark's bytes to a filesystem path + active scope.
+///
+/// # Errors
+///
+/// Returns [`BookmarkError::Resolution`] when the Core Foundation call fails
+/// (invalid bytes, path no longer reachable, etc.).
+pub fn resolve(bytes: &[u8]) -> Result<ResolvedBookmark, BookmarkError> {
+    let cf_data = CFData::from_buffer(bytes);
+    let mut is_stale: Boolean = 0;
+    let mut err = ptr::null_mut();
+    // SAFETY: all pointer arguments are either null (valid sentinel) or valid
+    // CF references.  The returned CFURLRef is either null (on error) or a
+    // +1-retain object consumed by CFURL::wrap_under_create_rule.
+    let cf_url_ref = unsafe {
+        CFURLCreateByResolvingBookmarkData(
+            ptr::null(),
+            cf_data.as_concrete_TypeRef(),
+            kCFURLBookmarkResolutionWithSecurityScope | kCFURLBookmarkResolutionWithoutUIMask,
+            ptr::null(),
+            ptr::null(),
+            &raw mut is_stale,
+            &raw mut err,
+        )
+    };
+    if cf_url_ref.is_null() {
+        return Err(BookmarkError::Resolution(format!(
+            "CFURLCreateByResolvingBookmarkData returned null (err: {:p})",
+            err.cast::<c_void>()
+        )));
+    }
+    // SAFETY: cf_url_ref is a non-null +1-retain CFURLRef from the call above.
+    let cf_url = unsafe { CFURL::wrap_under_create_rule(cf_url_ref) };
+    let path = cf_url
+        .to_path()
+        .ok_or_else(|| BookmarkError::Resolution("CFURL::to_path failed".into()))?;
+    let scope = BookmarkScope::start(cf_url);
+    Ok(ResolvedBookmark {
+        path,
+        is_stale: is_stale != 0,
+        _scope: scope,
+    })
+}
+
+#[cfg(test)]
+mod tests;
