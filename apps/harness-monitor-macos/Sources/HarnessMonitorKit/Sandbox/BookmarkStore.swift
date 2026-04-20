@@ -1,6 +1,11 @@
 import Foundation
 import os
 
+/// Persists security-scoped bookmarks so the app remembers user-authorized folders.
+///
+/// Assumes a single Swift writer per bookmark file; the Rust daemon reads the file but
+/// does not mutate it. Two concurrent Monitor app instances sharing the same app-group
+/// container will race on writes (last-writer-wins); callers should serialize upstream.
 public actor BookmarkStore {
   public static let mruCap = 20
   public static let logger = Logger(subsystem: "io.harnessmonitor", category: "sandbox")
@@ -55,7 +60,7 @@ public actor BookmarkStore {
       includingResourceValuesForKeys: nil,
       relativeTo: nil
     )
-    var store = (try? loadAndValidate()) ?? PersistedStore()
+    var store = try loadForMutation()
     let record = Record(
       kind: kind,
       displayName: url.lastPathComponent,
@@ -71,13 +76,13 @@ public actor BookmarkStore {
   }
 
   public func remove(id: String) throws {
-    var store = (try? loadAndValidate()) ?? PersistedStore()
+    var store = try loadForMutation()
     store.bookmarks.removeAll { $0.id == id }
     try save(store)
   }
 
   public func touch(id: String) throws {
-    var store = (try? loadAndValidate()) ?? PersistedStore()
+    var store = try loadForMutation()
     guard let idx = store.bookmarks.firstIndex(where: { $0.id == id }) else {
       throw BookmarkStoreError.notFound(id: id)
     }
@@ -88,7 +93,7 @@ public actor BookmarkStore {
   }
 
   public func resolve(id: String) throws -> ResolvedScope {
-    var store = (try? loadAndValidate()) ?? PersistedStore()
+    var store = try loadForMutation()
     guard let idx = store.bookmarks.firstIndex(where: { $0.id == id }) else {
       throw BookmarkStoreError.notFound(id: id)
     }
@@ -107,6 +112,8 @@ public actor BookmarkStore {
     }
     if isStale {
       record.staleCount += 1
+      Self.logger.warning(
+        "refreshing stale bookmark id=\(id, privacy: .public) count=\(record.staleCount)")
       let refreshed = try url.bookmarkData(
         options: .withSecurityScope,
         includingResourceValuesForKeys: nil,
@@ -121,6 +128,18 @@ public actor BookmarkStore {
     return ResolvedScope(url: url, isStale: isStale)
   }
 
+  /// Loads the store for a mutating operation. Unlike `all()`, every error
+  /// propagates so a write never silently clobbers a future-schema file or a
+  /// file we could not read. A missing file is the one acceptable start-fresh
+  /// case and is detected at the filesystem level rather than by parsing
+  /// error messages.
+  private func loadForMutation() throws -> PersistedStore {
+    guard FileManager.default.fileExists(atPath: storeFile.path) else {
+      return PersistedStore()
+    }
+    return try loadAndValidate()
+  }
+
   private func save(_ store: PersistedStore) throws {
     let data = try Self.encoder.encode(store)
     let tmp = storeFile.deletingLastPathComponent()
@@ -130,6 +149,7 @@ public actor BookmarkStore {
       _ = try FileManager.default.replaceItemAt(storeFile, withItemAt: tmp)
     } catch {
       try? FileManager.default.removeItem(at: tmp)
+      Self.logger.error("bookmarks save failed: \(String(describing: error), privacy: .public)")
       throw BookmarkStoreError.ioError(String(describing: error))
     }
     cached = store
