@@ -21,6 +21,7 @@ pub mod mcp;
 pub mod observe;
 pub(crate) mod platform;
 pub mod run;
+pub mod sandbox;
 pub mod session;
 pub mod setup;
 pub(crate) mod suite_defaults;
