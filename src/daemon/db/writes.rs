@@ -322,6 +322,25 @@ impl DaemonDb {
         Ok(())
     }
 
+    /// Delete a session row and all cascade-dependent rows.
+    ///
+    /// Relies on `ON DELETE CASCADE` foreign keys in the schema (agents, tasks,
+    /// log, signals, timeline, etc.). Returns `Ok(true)` when a row was deleted,
+    /// `Ok(false)` when no row matched.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+        let rows_affected = self
+            .conn
+            .execute(
+                "DELETE FROM sessions WHERE session_id = ?1",
+                [session_id],
+            )
+            .map_err(|error| db_error(format!("delete session row: {error}")))?;
+        Ok(rows_affected > 0)
+    }
+
     /// Return the most recent change-tracking sequence value.
     ///
     /// # Errors

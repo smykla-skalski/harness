@@ -1,3 +1,6 @@
+use crate::workspace::harness_data_root;
+use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
+use crate::workspace::worktree::WorktreeController;
 use super::session_setup::{PreparedSession, prepare_session, rollback_session_artifacts};
 use super::{
     CliError, Path, SessionState, agents_service, build_log_entry, index,
@@ -6,10 +9,8 @@ use super::{
 };
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
-///
-/// Always creates a per-session git worktree under
-/// `<sessions_root>/<project_name>/<session_id>/workspace/` and records the
-/// state file under that same session root.
+/// Creates a per-session git worktree and records the state file under the
+/// session root.
 ///
 /// # Errors
 /// Returns `CliError` when the runtime is unknown, the worktree cannot be
@@ -67,8 +68,7 @@ pub fn start_session_direct(
 }
 
 /// Start a new session through the canonical async daemon DB.
-///
-/// Always creates a per-session worktree; rolls it back on DB failure.
+/// Creates a per-session worktree; rolls it back on DB failure.
 ///
 /// # Errors
 /// Returns `CliError` when the runtime is unknown, the worktree cannot be
@@ -109,7 +109,6 @@ pub(crate) async fn start_session_direct_async(
     Ok(state)
 }
 
-
 pub(crate) fn ensure_project_registered(
     db: &super::db::DaemonDb,
     project_dir: &Path,
@@ -129,7 +128,6 @@ pub(crate) async fn ensure_project_registered_async(
     async_db.sync_project(&project).await?;
     Ok(project.project_id)
 }
-
 /// Join an existing session, writing directly to `SQLite` when a DB is available.
 ///
 /// # Errors
@@ -391,7 +389,6 @@ pub fn disconnect_agent_direct(
 }
 
 /// Mark a session agent as disconnected through the canonical async daemon DB.
-///
 /// Returns `Ok(false)` when the agent is already non-live or missing.
 ///
 /// # Errors
@@ -467,4 +464,62 @@ pub fn record_signal_ack_direct(
         project_dir,
         db,
     )
+}
+
+/// Destroy the session worktree, deregister it from the active registry,
+/// and delete the DB row. Returns `Ok(false)` when not found.
+///
+/// # Errors
+/// DB write failures return [`CliError`].
+pub fn delete_session_direct(
+    session_id: &str,
+    db: &super::db::DaemonDb,
+) -> Result<bool, CliError> {
+    let Some(state) = db.load_session_state(session_id)? else {
+        return Ok(false);
+    };
+    destroy_session_artifacts(&state);
+    db.delete_session_row(session_id)?;
+    db.bump_change(session_id)?;
+    db.bump_change("global")?;
+    Ok(true)
+}
+
+/// Async variant of [`delete_session_direct`].
+///
+/// # Errors
+/// Returns [`CliError`] on DB failures.
+pub(crate) async fn delete_session_direct_async(
+    session_id: &str,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<bool, CliError> {
+    let Some(resolved) = async_db.resolve_session(session_id).await? else {
+        return Ok(false);
+    };
+    destroy_session_artifacts(&resolved.state);
+    async_db.delete_session_row(session_id).await?;
+    async_db.bump_change(session_id).await?;
+    async_db.bump_change("global").await?;
+    Ok(true)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn destroy_session_artifacts(state: &SessionState) {
+    let sessions_root = workspace_sessions_root(&harness_data_root());
+    let layout = SessionLayout {
+        sessions_root,
+        project_name: state.project_name.clone(),
+        session_id: state.session_id.clone(),
+    };
+    if let Err(error) = session_storage::deregister_active(&layout) {
+        tracing::warn!(%error, session_id = %state.session_id, "deregister active failed");
+    }
+    if !state.origin_path.as_os_str().is_empty()
+        && let Err(error) = WorktreeController::destroy(&state.origin_path, &layout)
+    {
+        tracing::warn!(%error, session_id = %state.session_id, "worktree destroy failed");
+    }
 }
