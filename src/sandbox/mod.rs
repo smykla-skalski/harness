@@ -4,6 +4,5 @@
 //! resolves them via `security-framework` when `HARNESS_SANDBOXED=1`.
 
 pub mod bookmarks;
-
+pub mod migration;
 pub mod resolver; // macOS-only; resolver.rs is gated by #![cfg(target_os = "macos")]
-// pub mod migration;  // added in Task 8
