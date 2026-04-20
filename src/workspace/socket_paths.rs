@@ -2,11 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use sha2::{Digest, Sha256};
 use thiserror::Error;
-
-/// Unix domain socket path limit on macOS and Linux.
-const UNIX_SOCKET_PATH_LIMIT: usize = 104;
 
 #[derive(Debug, Error)]
 pub enum SocketPathError {
@@ -15,7 +11,8 @@ pub enum SocketPathError {
 }
 
 /// # Errors
-/// Returns `SocketPathError::InvalidPurpose` when the purpose is empty or contains '/'.
+/// Returns `SocketPathError::InvalidPurpose` when the purpose is empty or
+/// contains `'/'`.
 pub fn validate_purpose(purpose: &str) -> Result<(), SocketPathError> {
     if purpose.is_empty() || purpose.contains('/') {
         return Err(SocketPathError::InvalidPurpose(purpose.to_string()));
@@ -23,27 +20,16 @@ pub fn validate_purpose(purpose: &str) -> Result<(), SocketPathError> {
     Ok(())
 }
 
-/// Returns a socket path under `root` for the given session and purpose.
+/// Returns the flat `<root>/<session_id>-<purpose>.sock` path.
 ///
-/// When the human-readable name `{session_id}-{purpose}.sock` fits within the
-/// unix socket path limit, it is used as-is. When the root directory is long
-/// (e.g. on macOS with a group-container path) and the full path would exceed
-/// the limit, a two-hex-char SHA-256 prefix of the pair is used instead so the
-/// path always fits.
+/// The path must fit within the `sun_path` budget (104 bytes on macOS/Linux).
+/// The module test `path_fits_sun_path_limit_with_long_home` is the early
+/// guardrail the design doc calls for: if a new purpose would breach the
+/// budget on the synthetic long-home fixture, the test fails and either the
+/// purpose must be shortened or the socket root relocated.
 #[must_use]
 pub fn session_socket(root: &Path, session_id: &str, purpose: &str) -> PathBuf {
-    let full_name = format!("{session_id}-{purpose}.sock");
-    let full_path = root.join(&full_name);
-    if full_path.as_os_str().len() < UNIX_SOCKET_PATH_LIMIT {
-        return full_path;
-    }
-    let mut hasher = Sha256::new();
-    hasher.update(session_id.as_bytes());
-    hasher.update(b"-");
-    hasher.update(purpose.as_bytes());
-    let hash = hasher.finalize();
-    let short = hex::encode(&hash[..1]);
-    root.join(format!("{short}.sock"))
+    root.join(format!("{session_id}-{purpose}.sock"))
 }
 
 /// Preferred socket root given the data root. On macOS, places sockets at the
