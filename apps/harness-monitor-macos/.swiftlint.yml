@@ -128,7 +128,7 @@ custom_rules:
       - "HarnessMonitorGlass\\.swift"
   forbid_raw_security_scoped_resource:
     name: "Raw security-scoped resource access"
-    regex: '\.startAccessingSecurityScopedResource\(\)'
+    regex: '\.startAccessingSecurityScopedResource\b'
     match_kinds:
       - identifier
     excluded:
