@@ -42,5 +42,7 @@ apps/harness-monitor-macos/.build/
 apps/harness-monitor-macos/build/
 apps/harness-monitor-macos/DerivedData/
 apps/harness-monitor-macos/DerivedData*
+apps/harness-monitor-macos/xcode-derived/
+apps/harness-monitor-macos/xcode-derived*
 apps/harness-monitor-macos/*.xcodeproj/xcuserdata/
 apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
