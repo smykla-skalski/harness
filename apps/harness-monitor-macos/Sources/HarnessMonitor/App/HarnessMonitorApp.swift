@@ -73,6 +73,7 @@ struct HarnessMonitorApp: App {
         inspectSessionOverview: inspectSessionOverview,
         inspectObserver: inspectObserver
       )
+      NewSessionCommand(store: store)
       OpenFolderCommand(isPresented: $showOpenFolder)
     }
 

@@ -19,6 +19,7 @@ private struct HarnessMonitorSheetMetrics {
 struct HarnessMonitorSheetRouter: View {
   let store: HarnessMonitorStore
   let sheet: HarnessMonitorStore.PresentedSheet
+  @State private var newSessionViewModel: NewSessionViewModel?
 
   var body: some View {
     sheetContent
@@ -27,6 +28,11 @@ struct HarnessMonitorSheetRouter: View {
         idealWidth: metrics.idealWidth,
         minHeight: metrics.minHeight
       )
+      .onAppear {
+        if case .newSession = sheet, newSessionViewModel == nil {
+          newSessionViewModel = store.makeNewSessionViewModel()
+        }
+      }
   }
 
   @ViewBuilder private var sheetContent: some View {
@@ -34,7 +40,9 @@ struct HarnessMonitorSheetRouter: View {
     case .sendSignal(let agentID):
       SendSignalSheetView(store: store, agentID: agentID)
     case .newSession:
-      EmptyView()
+      if let viewModel = newSessionViewModel {
+        NewSessionSheetView(store: store, viewModel: viewModel)
+      }
     }
   }
 
