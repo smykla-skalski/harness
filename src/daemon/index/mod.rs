@@ -13,7 +13,8 @@ mod tests;
 
 pub use paths::{agent_transcript_path, observe_snapshot_path, signals_root};
 pub use projects::{
-    discover_projects, discovered_project_for_checkout, fast_counts, projects_root,
+    discover_projects, discovered_project_for_checkout, discovered_project_for_context_root,
+    fast_counts, projects_root,
 };
 pub use sessions::{
     discover_sessions, discover_sessions_for, load_conversation_events, load_log_entries,

@@ -21,7 +21,7 @@ use super::helpers::ManagedChild;
 mod bridge;
 mod daemon_api;
 mod lifecycle;
-mod process;
+pub(crate) mod process;
 mod tui;
 mod tui_attach;
 

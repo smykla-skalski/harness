@@ -190,7 +190,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let project = tmp.path().join("project");
-    std::fs::create_dir_all(&project).expect("create project");
+    crate::integration::daemon_control::process::init_git_repo(&project);
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())
@@ -291,7 +291,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let project = tmp.path().join("project");
-    std::fs::create_dir_all(&project).expect("create project");
+    crate::integration::daemon_control::process::init_git_repo(&project);
 
     let mut bridge = ManagedChild::spawn(
         Command::new(harness_binary())

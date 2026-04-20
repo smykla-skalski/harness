@@ -213,7 +213,10 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     );
                 });
 
-                let file_state = session_storage::load_state_legacy(&project_dir, "ws-sync-observe")
+                let layout =
+                    session_storage::layout_from_project_dir(&project_dir, "ws-sync-observe")
+                        .expect("layout");
+                let file_state = session_storage::load_state(&layout)
                     .expect("load state")
                     .expect("file state");
                 assert!(file_state.tasks.is_empty());
