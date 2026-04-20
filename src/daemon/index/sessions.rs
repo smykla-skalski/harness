@@ -90,8 +90,9 @@ pub fn load_session_state(
     project: &DiscoveredProject,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
+    // TODO(b-task-8): migrate to storage::load_state(&layout) after SessionLayout cascade.
     if let Some(project_dir) = project.project_dir.as_deref()
-        && let Some(state) = storage::load_state(project_dir, session_id)?
+        && let Some(state) = storage::load_state_legacy(project_dir, session_id)?
     {
         return Ok(Some(state));
     }
@@ -107,8 +108,9 @@ pub fn load_log_entries(
     project: &DiscoveredProject,
     session_id: &str,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
+    // TODO(b-task-8): migrate to storage::load_log_entries(&layout) after SessionLayout cascade.
     if let Some(project_dir) = project.project_dir.as_deref() {
-        let entries = storage::load_log_entries(project_dir, session_id)?;
+        let entries = storage::load_log_entries_legacy(project_dir, session_id)?;
         if !entries.is_empty() {
             return Ok(entries);
         }
@@ -128,8 +130,9 @@ pub fn load_task_checkpoints(
     session_id: &str,
     task_id: &str,
 ) -> Result<Vec<TaskCheckpoint>, CliError> {
+    // TODO(b-task-8): migrate to storage::load_task_checkpoints(&layout, task_id) after SessionLayout cascade.
     if let Some(project_dir) = project.project_dir.as_deref() {
-        let checkpoints = storage::load_task_checkpoints(project_dir, session_id, task_id)?;
+        let checkpoints = storage::load_task_checkpoints_legacy(project_dir, session_id, task_id)?;
         if !checkpoints.is_empty() {
             return Ok(checkpoints);
         }

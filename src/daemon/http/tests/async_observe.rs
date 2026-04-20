@@ -214,7 +214,7 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                     assert_eq!(body["tasks"].as_array().map(Vec::len), Some(1));
                 });
 
-                let file_state = session_storage::load_state(&project_dir, "http-sync-observe")
+                let file_state = session_storage::load_state_legacy(&project_dir, "http-sync-observe")
                     .expect("load state")
                     .expect("file state");
                 assert!(file_state.tasks.is_empty());

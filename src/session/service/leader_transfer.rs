@@ -229,7 +229,7 @@ pub(crate) fn append_leader_transfer_logs(
     outcome: &LeaderTransferOutcome,
 ) -> Result<(), CliError> {
     if outcome.log_request_before_transfer {
-        storage::append_log_entry(
+        storage::append_log_entry_legacy(
             project_dir,
             session_id,
             SessionTransition::LeaderTransferRequested {
@@ -241,7 +241,7 @@ pub(crate) fn append_leader_transfer_logs(
         )?;
     }
     if let Some(confirmed_by) = outcome.confirmed_by.as_deref() {
-        storage::append_log_entry(
+        storage::append_log_entry_legacy(
             project_dir,
             session_id,
             SessionTransition::LeaderTransferConfirmed {
@@ -253,7 +253,7 @@ pub(crate) fn append_leader_transfer_logs(
             outcome.reason.as_deref(),
         )?;
     }
-    storage::append_log_entry(
+    storage::append_log_entry_legacy(
         project_dir,
         session_id,
         SessionTransition::LeaderTransferred {

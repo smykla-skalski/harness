@@ -388,7 +388,7 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
         );
 
         let log_entries =
-            crate::session::storage::load_log_entries(project, "daemon-cancel").expect("log");
+            crate::session::storage::load_log_entries_legacy(project, "daemon-cancel").expect("log");
         assert!(log_entries.into_iter().any(|entry| matches!(
             entry.transition,
             crate::session::types::SessionTransition::SignalAcknowledged {

@@ -304,7 +304,7 @@ fn observer_can_create_task_in_leaderless_degraded_session() {
             .agent_id
             .clone();
 
-        storage::update_state(project, "degraded-observer-task", |state| {
+        storage::update_state_legacy(project, "degraded-observer-task", |state| {
             let previous_leader = state.leader_id.take().expect("leader");
             state.status = SessionStatus::LeaderlessDegraded;
             let leader = state

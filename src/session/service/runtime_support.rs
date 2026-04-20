@@ -31,7 +31,7 @@ pub(crate) fn load_state_or_err(
     session_id: &str,
     project_dir: &Path,
 ) -> Result<SessionState, CliError> {
-    storage::load_state(project_dir, session_id)?.ok_or_else(|| {
+    storage::load_state_legacy(project_dir, session_id)?.ok_or_else(|| {
         CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
     })
 }

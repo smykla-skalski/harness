@@ -184,6 +184,9 @@ fn migrate_v6_to_v7_backfills_swarm_policy() {
     );
 }
 
+// TODO(b-task-8): is_worktree and worktree_name were removed from ProjectOriginRecord.
+// The merge function no longer needs to track worktree metadata since the daemon
+// always creates worktrees and the information is available via git itself.
 #[test]
 fn merge_project_origin_preserves_existing_git_identity() {
     let merged = merge_project_origin(
@@ -191,16 +194,12 @@ fn merge_project_origin_preserves_existing_git_identity() {
             recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
             repository_root: None,
             checkout_root: None,
-            is_worktree: false,
-            worktree_name: None,
             recorded_at: "2026-04-10T10:00:00Z".to_string(),
         },
         Some(&ProjectOriginRecord {
             recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
             repository_root: Some("/repo".to_string()),
             checkout_root: Some("/repo/.claude/worktrees/feature".to_string()),
-            is_worktree: true,
-            worktree_name: Some("feature".to_string()),
             recorded_at: "2026-04-10T09:00:00Z".to_string(),
         }),
     );
@@ -210,6 +209,4 @@ fn merge_project_origin_preserves_existing_git_identity() {
         merged.checkout_root.as_deref(),
         Some("/repo/.claude/worktrees/feature")
     );
-    assert!(merged.is_worktree);
-    assert_eq!(merged.worktree_name.as_deref(), Some("feature"));
 }

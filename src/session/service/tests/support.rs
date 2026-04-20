@@ -33,7 +33,7 @@ pub(super) fn set_log_mtime_seconds_ago(path: &std::path::Path, seconds: u64) {
 
 pub(super) fn age_agent_activity(project: &Path, session_id: &str, agent_id: &str, seconds: i64) {
     let stale = (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339();
-    storage::update_state(project, session_id, |state| {
+    storage::update_state_legacy(project, session_id, |state| {
         let agent = state.agents.get_mut(agent_id).expect("agent");
         agent.last_activity_at = Some(stale.clone());
         agent.updated_at = stale.clone();

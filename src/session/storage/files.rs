@@ -10,96 +10,96 @@ use serde::de::DeserializeOwned;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::workspace::project_context_dir;
+use crate::workspace::harness_data_root;
+use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
 
-pub(super) fn orchestration_root(project_dir: &Path) -> PathBuf {
-    project_context_dir(project_dir).join("orchestration")
-}
-
-fn sessions_root(project_dir: &Path) -> PathBuf {
-    orchestration_root(project_dir).join("sessions")
-}
-
+/// Validate a session id (must not be empty or contain path traversal).
 pub(super) fn validate_session_id(session_id: &str) -> Result<(), CliError> {
     validate_safe_segment(session_id)
 }
 
-pub(super) fn session_dir(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
-    validate_session_id(session_id)?;
-    Ok(sessions_root(project_dir).join(session_id))
+/// Path to the state file for a session.
+pub(super) fn state_path(layout: &SessionLayout) -> PathBuf {
+    layout.state_file()
 }
 
-pub(super) fn state_path(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
-    Ok(session_dir(project_dir, session_id)?.join("state.json"))
+/// Path to the append-only event log for a session.
+pub(super) fn log_path(layout: &SessionLayout) -> PathBuf {
+    layout.log_file()
 }
 
-pub(super) fn log_path(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
-    Ok(session_dir(project_dir, session_id)?.join("log.jsonl"))
+/// Path to the checkpoints JSONL file for a task inside a session.
+pub(super) fn checkpoints_path(layout: &SessionLayout, task_id: &str) -> PathBuf {
+    layout.tasks_dir().join(task_id).join("checkpoints.jsonl")
 }
 
-fn tasks_root(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
-    Ok(session_dir(project_dir, session_id)?.join("tasks"))
+/// Path to the per-project active-session registry.
+pub(super) fn active_registry_path(layout: &SessionLayout) -> PathBuf {
+    layout.active_registry()
 }
 
-fn task_dir(project_dir: &Path, session_id: &str, task_id: &str) -> Result<PathBuf, CliError> {
-    Ok(tasks_root(project_dir, session_id)?.join(task_id))
+/// Path to a named advisory lock file for a session.
+fn lock_path(layout: &SessionLayout, name: &str) -> PathBuf {
+    layout.locks_dir().join(format!("{name}.lock"))
 }
 
-pub(super) fn checkpoints_path(
-    project_dir: &Path,
-    session_id: &str,
-    task_id: &str,
-) -> Result<PathBuf, CliError> {
-    Ok(task_dir(project_dir, session_id, task_id)?.join("checkpoints.jsonl"))
-}
-
-pub(super) fn active_registry_path(project_dir: &Path) -> PathBuf {
-    orchestration_root(project_dir).join("active.json")
-}
-
-fn lock_path(project_dir: &Path, name: &str) -> PathBuf {
-    orchestration_root(project_dir)
-        .join(".locks")
-        .join(format!("{name}.lock"))
-}
-
+/// Run `action` under an exclusive file lock keyed by `name`.
 pub(super) fn with_lock<T>(
-    project_dir: &Path,
+    layout: &SessionLayout,
     name: &str,
     action: impl FnOnce() -> Result<T, CliError>,
 ) -> Result<T, CliError> {
     with_exclusive_flock(
-        &lock_path(project_dir, name),
+        &lock_path(layout, name),
         FlockErrorContext::new("session storage"),
         action,
     )
 }
 
+/// Convenience for wrapping an I/O error in a session-storage `CliError`.
 pub(super) fn io_err(error: &dyn fmt::Display) -> CliError {
     CliErrorKind::workflow_io(format!("session storage: {error}")).into()
 }
 
-pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, CliError> {
-    let root = sessions_root(project_dir);
-    if !root.is_dir() {
+/// List all session ids recorded under the new sessions layout for a project.
+///
+/// Reads `<sessions_root>/<project_name>/` and returns every subdirectory name
+/// that does not start with `.` (skips `.active.json` and similar).
+///
+/// TODO(b-task-8): will be the primary list function after cascade migration.
+#[allow(dead_code)]
+pub(crate) fn list_known_session_ids_for_layout(layout: &SessionLayout) -> Result<Vec<String>, CliError> {
+    list_session_ids_in_project_dir(&layout.project_dir())
+}
+
+/// List session ids in a project directory (shared between new layout and
+/// legacy-compat adapter).
+pub(crate) fn list_session_ids_in_project_dir(project_dir: &Path) -> Result<Vec<String>, CliError> {
+    if !project_dir.is_dir() {
         return Ok(Vec::new());
     }
 
-    let mut session_ids: Vec<String> = fs::read_dir(root)
+    let mut session_ids: Vec<String> = fs::read_dir(project_dir)
         .map_err(|error| io_err(&error))?
         .filter_map(Result::ok)
         .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            // Skip hidden files (e.g. .active.json, .origin)
+            if name.starts_with('.') {
+                return None;
+            }
             entry
                 .file_type()
                 .ok()
                 .filter(FileType::is_dir)
-                .and_then(|_| entry.file_name().into_string().ok())
+                .map(|_| name)
         })
         .collect();
     session_ids.sort_unstable();
     Ok(session_ids)
 }
 
+/// Append a single JSON-serialisable value as a newline to `path`.
 pub(super) fn append_json_line<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
     let line = serde_json::to_string(value)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("session log: {error}")))?;
@@ -130,4 +130,48 @@ where
                 .map_err(|error| CliErrorKind::workflow_parse(format!("{label}: {error}")).into())
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Legacy adapter — used by callers that have not yet been migrated to
+// `SessionLayout`.  Every call site is annotated with `TODO(b-task-8)` so
+// Task 8 can finish the full cascade.
+// ---------------------------------------------------------------------------
+
+/// Build a `SessionLayout` from the old-style `project_dir` + `session_id`
+/// pair.
+///
+/// # TODO(b-task-8)
+/// This adapter exists only to keep callers compiling during the Task 7
+/// storage rewrite.  Task 8 will rewrite every caller to pass a real
+/// `SessionLayout` derived from the new sessions path.
+///
+/// The layout it produces points at the **new** path schema
+/// `<sessions_root>/<project_name>/<session_id>`, using the basename of
+/// `project_dir` as the project name and `crate::workspace::layout::sessions_root`
+/// to anchor the root.
+pub(crate) fn layout_from_project_dir(
+    project_dir: &Path,
+    session_id: &str,
+) -> SessionLayout {
+    let sessions_root = workspace_sessions_root(&harness_data_root());
+    let project_name = project_dir
+        .file_name()
+        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
+    SessionLayout {
+        sessions_root,
+        project_name,
+        session_id: session_id.to_string(),
+    }
+}
+
+/// Legacy wrapper: `list_known_session_ids` taking `project_dir`.
+///
+/// # TODO(b-task-8): migrate callers to `list_known_session_ids_for_layout`.
+pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, CliError> {
+    let sessions_root = workspace_sessions_root(&harness_data_root());
+    let project_name = project_dir
+        .file_name()
+        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
+    list_session_ids_in_project_dir(&sessions_root.join(project_name))
 }

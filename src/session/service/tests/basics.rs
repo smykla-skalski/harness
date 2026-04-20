@@ -85,7 +85,7 @@ fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
             Some("swarm-default"),
         )
         .expect("start");
-        storage::update_state(project, "recover-manual", |state| {
+        storage::update_state_legacy(project, "recover-manual", |state| {
             let previous_leader = state.leader_id.take().expect("leader");
             state.status = SessionStatus::LeaderlessDegraded;
             let leader = state

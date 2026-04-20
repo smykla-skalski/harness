@@ -133,7 +133,7 @@ pub(crate) fn append_leave_signal_logs(
     signals: &[LeaveSignalRecord],
 ) -> Result<(), CliError> {
     for signal in signals {
-        storage::append_log_entry(
+        storage::append_log_entry_legacy(
             project_dir,
             session_id,
             log_signal_sent(
@@ -157,7 +157,7 @@ pub(crate) fn append_task_drop_effect_logs(
     for effect in effects {
         match effect {
             TaskDropEffect::Started(signal) => {
-                storage::append_log_entry(
+                storage::append_log_entry_legacy(
                     project_dir,
                     session_id,
                     log_signal_sent(
@@ -170,7 +170,7 @@ pub(crate) fn append_task_drop_effect_logs(
                 )?;
             }
             TaskDropEffect::Queued { task_id, agent_id } => {
-                storage::append_log_entry(
+                storage::append_log_entry_legacy(
                     project_dir,
                     session_id,
                     log_task_queued(task_id, agent_id),

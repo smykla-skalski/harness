@@ -51,7 +51,7 @@ fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
         assert!(signals.iter().any(|record| record.agent_id == leader_id));
         assert!(signals.iter().any(|record| record.agent_id == worker_id));
 
-        let entries = storage::load_log_entries(project, "end-leave").expect("entries");
+        let entries = storage::load_log_entries_legacy(project, "end-leave").expect("entries");
         assert_eq!(
             entries
                 .iter()
@@ -147,7 +147,7 @@ fn end_session_fails_visibly_when_leave_signal_cannot_be_delivered() {
             .find(|id| id.starts_with("codex-"))
             .expect("worker id")
             .clone();
-        storage::update_state(project, "end-leave-fail", |state| {
+        storage::update_state_legacy(project, "end-leave-fail", |state| {
             state.agents.get_mut(&worker_id).expect("worker").runtime = "unknown".into();
             Ok(())
         })

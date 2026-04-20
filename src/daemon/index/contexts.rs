@@ -64,6 +64,8 @@ pub(super) fn infer_checkout_identity(context_root: &Path) -> Option<InferredChe
                 worktree_name,
             });
         }
+        // TODO(b-task-8): is_worktree and worktree_name are no longer stored in
+        // ProjectOriginRecord; resolve via git identity when available.
         let repository_root = origin
             .repository_root
             .as_deref()
@@ -71,8 +73,8 @@ pub(super) fn infer_checkout_identity(context_root: &Path) -> Option<InferredChe
         return Some(InferredCheckout {
             repository_root,
             checkout_root,
-            is_worktree: origin.is_worktree,
-            worktree_name: origin.worktree_name,
+            is_worktree: false,
+            worktree_name: None,
         });
     }
 
