@@ -10,4 +10,21 @@ extension HarnessMonitorStore {
   public func dismissSheet() {
     presentedSheet = nil
   }
+
+  public func makeNewSessionViewModel() -> NewSessionViewModel {
+    let resolvedBookmarkStore = bookmarkStore
+      ?? BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
+    let resolvedClient: any HarnessMonitorClientProtocol = client
+      ?? HarnessMonitorAPIClient(
+        connection: HarnessMonitorConnection(
+          endpoint: URL(string: "http://127.0.0.1:0")!,
+          token: ""
+        )
+      )
+    return NewSessionViewModel(
+      store: self,
+      bookmarkStore: resolvedBookmarkStore,
+      client: resolvedClient
+    )
+  }
 }
