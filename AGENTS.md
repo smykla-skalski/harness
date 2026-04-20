@@ -25,9 +25,9 @@ For `apps/harness-monitor-macos`, treat `HarnessMonitor.xcodeproj` as tracked so
 
 Harness Monitor app validation expectations:
 
-- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath tmp/xcode-derived build CODE_SIGNING_ALLOWED=NO`
-- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath tmp/xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessMonitorUITests`
-- All xcodebuild invocations must use `-derivedDataPath tmp/xcode-derived` so build artifacts land in a single, known location inside `tmp/`. Never create variant-named directories like `tmp/xcode-derived-foo` - one directory, reused across builds.
+- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived build CODE_SIGNING_ALLOWED=NO`
+- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessMonitorUITests`
+- All xcodebuild invocations must use `-derivedDataPath xcode-derived` so build artifacts land in a single, known location at the repo root (gitignored). Never create variant-named directories like `xcode-derived-foo` - one directory, reused across builds.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
 - Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.

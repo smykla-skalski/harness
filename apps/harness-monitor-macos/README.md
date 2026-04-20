@@ -27,18 +27,18 @@ apps/harness-monitor-macos/Scripts/run-quality-gates.sh
 apps/harness-monitor-macos/Scripts/test-swift.sh
 ```
 
-When you need a raw local build command, prefer the lock-aware wrapper so concurrent monitor lanes do not corrupt or lock the shared `tmp/xcode-derived` build database:
+When you need a raw local build command, prefer the lock-aware wrapper so concurrent monitor lanes do not corrupt or lock the shared `xcode-derived` build database:
 
 ```bash
-apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath tmp/xcode-derived build CODE_SIGNING_ALLOWED=NO
+apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived build CODE_SIGNING_ALLOWED=NO
 ```
 
-`monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against `tmp/xcode-derived`.
+`monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against `xcode-derived`.
 
 `monitor:macos:test` runs the same quality gates first, then executes:
 
 ```bash
-xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -destination platform=macOS -derivedDataPath tmp/xcode-derived test-without-building
+xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -destination platform=macOS -derivedDataPath xcode-derived test-without-building
 ```
 
 For routine work, prefer the smallest targeted command instead of the full `monitor:macos:test` lane. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
@@ -50,7 +50,7 @@ Do not pass `CODE_SIGNING_ALLOWED=NO` to `HarnessMonitorUITests`. macOS UI tests
 Example targeted UI regression:
 
 ```bash
-xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath tmp/xcode-derived -destination 'platform=macOS' test -only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow
+xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived -destination 'platform=macOS' test -only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow
 ```
 
 The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. Lint enforcement lives in the monitor quality-gate scripts and CI instead.

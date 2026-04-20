@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 DESTINATION="${XCODEBUILD_DESTINATION:-platform=macOS}"
-DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/tmp/xcode-derived}"
+DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$ROOT/Scripts/xcodebuild-with-lock.sh}"
 FORMAT_CONFIG="$ROOT/.swift-format"
 SWIFT_BIN="${SWIFT_BIN:-$(command -v swift || true)}"
