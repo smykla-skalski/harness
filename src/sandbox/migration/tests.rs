@@ -46,6 +46,29 @@ fn skips_when_old_absent() {
 }
 
 #[test]
+fn preserves_symlinks_on_cross_volume_fallback() {
+    // Simulate the copy_recursive path directly (cross-volume rename
+    // requires distinct mount points which we cannot fabricate here).
+    let tmp = TempDir::new().unwrap();
+    let src_dir = tmp.path().join("src");
+    let dst_dir = tmp.path().join("dst");
+    fs::create_dir_all(&src_dir).unwrap();
+    std::os::unix::fs::symlink("/nonexistent/target", src_dir.join("link")).unwrap();
+    super::copy_recursive(&src_dir, &dst_dir).unwrap();
+    let copied = dst_dir.join("link");
+    assert!(
+        fs::symlink_metadata(&copied)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(
+        fs::read_link(&copied).unwrap(),
+        std::path::PathBuf::from("/nonexistent/target")
+    );
+}
+
+#[test]
 fn idempotent_after_marker() {
     let tmp = TempDir::new().unwrap();
     let old = tmp.path().join("old/harness");
