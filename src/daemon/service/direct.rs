@@ -19,9 +19,14 @@ pub fn start_session_direct(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
     let Some(db) = db else {
-        // No local DB: forward to a running daemon (or fall back to the
-        // file-based path) without creating a worktree here. The receiving
-        // daemon owns worktree lifecycle for its own sessions.
+        // No local DB: route through start_session_with_policy. That helper
+        // first tries to forward to a running harness daemon over HTTP - the
+        // receiving daemon (which always has its own DB) creates the worktree
+        // via start_session_direct_async. When no daemon is reachable, the
+        // helper falls back to the legacy file-based path which intentionally
+        // does NOT create a worktree, since per the workspace-layout spec the
+        // daemon owns worktree lifecycle and a file-only fallback session
+        // never gains one.
         return session_service::start_session_with_policy(
             &request.context,
             &request.title,
