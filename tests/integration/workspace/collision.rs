@@ -81,31 +81,52 @@ fn two_origins_same_basename_get_distinct_project_names() {
     );
 
     // Verify .origin marker content for both sessions.
-    // NOTE: .origin is written by WorktreeController::create in src/workspace/worktree.rs.
-    // FIXME: marker may not be written on all code paths (see src/daemon/service/session_setup.rs).
+    // Session-level marker is written by WorktreeController::create; project-level
+    // marker is written by session_setup::prepare_session for collision detection.
     let layout_a = layout_for_state(&xdg, &state_a);
     let layout_b = layout_for_state(&xdg, &state_b);
     let origin_text_a =
         std::fs::read_to_string(layout_a.origin_marker()).expect("read .origin for session A");
     let origin_text_b =
         std::fs::read_to_string(layout_b.origin_marker()).expect("read .origin for session B");
+    let canonical_a = origin_a
+        .canonicalize()
+        .expect("canonicalize origin A")
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let canonical_b = origin_b
+        .canonicalize()
+        .expect("canonicalize origin B")
+        .to_str()
+        .unwrap()
+        .to_owned();
     assert_eq!(
         origin_text_a.trim(),
-        origin_a
-            .canonicalize()
-            .expect("canonicalize origin A")
-            .to_str()
-            .unwrap(),
+        canonical_a,
         ".origin for session A must contain canonical origin path"
     );
     assert_eq!(
         origin_text_b.trim(),
-        origin_b
-            .canonicalize()
-            .expect("canonicalize origin B")
-            .to_str()
-            .unwrap(),
+        canonical_b,
         ".origin for session B must contain canonical origin path"
+    );
+
+    let project_marker_a = layout_a.project_dir().join(".origin");
+    let project_marker_b = layout_b.project_dir().join(".origin");
+    assert_eq!(
+        std::fs::read_to_string(&project_marker_a)
+            .expect("read project-level .origin A")
+            .trim(),
+        canonical_a,
+        "project-level .origin for A must hold canonical origin path"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&project_marker_b)
+            .expect("read project-level .origin B")
+            .trim(),
+        canonical_b,
+        "project-level .origin for B must hold canonical origin path"
     );
 
     daemon.kill().expect("kill daemon");

@@ -194,8 +194,6 @@ fn session_delete_removes_worktree_branch_and_state_files() {
     // NOTE: CLI conversions (detail_to_session_state / summary_to_session_state in
     // src/session/service/conversions.rs) drop branch_ref/worktree_path; the fields
     // below come from the raw HTTP start response which goes through the daemon path.
-    // FIXME: .origin marker may not be written on all code paths;
-    // see src/daemon/service/session_setup.rs + src/workspace/worktree.rs.
     let state = start_session_via_http(&home, &xdg, &project, "wk-delete-1");
     let worktree_path = state.worktree_path.clone();
     let layout = layout_for_state(&xdg, &state);
