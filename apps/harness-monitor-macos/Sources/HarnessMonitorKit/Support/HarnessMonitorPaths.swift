@@ -204,13 +204,21 @@ extension HarnessMonitorPaths {
       .appendingPathComponent(sessionId, isDirectory: true)
   }
 
-  public static func sessionWorktree(projectName: String, sessionId: String) -> URL {
-    sessionRoot(projectName: projectName, sessionId: sessionId)
+  public static func sessionWorktree(
+    projectName: String,
+    sessionId: String,
+    using env: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    sessionRoot(projectName: projectName, sessionId: sessionId, using: env)
       .appendingPathComponent("workspace", isDirectory: true)
   }
 
-  public static func sessionShared(projectName: String, sessionId: String) -> URL {
-    sessionRoot(projectName: projectName, sessionId: sessionId)
+  public static func sessionShared(
+    projectName: String,
+    sessionId: String,
+    using env: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    sessionRoot(projectName: projectName, sessionId: sessionId, using: env)
       .appendingPathComponent("memory", isDirectory: true)
   }
 

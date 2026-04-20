@@ -47,10 +47,10 @@ extension HarnessMonitorSchemaV5 {
     var projectName: String
     var projectDir: String?
     var contextRoot: String
-    var worktreePath: String = ""
-    var sharedPath: String = ""
-    var originPath: String = ""
-    var branchRef: String = ""
+    var checkoutId: String = ""
+    var checkoutRoot: String = ""
+    var isWorktree: Bool = false
+    var worktreeName: String?
     var title: String = ""
     var context: String
     var statusRaw: String
@@ -89,10 +89,10 @@ extension HarnessMonitorSchemaV5 {
       projectName: String,
       projectDir: String?,
       contextRoot: String,
-      worktreePath: String = "",
-      sharedPath: String = "",
-      originPath: String = "",
-      branchRef: String = "",
+      checkoutId: String,
+      checkoutRoot: String,
+      isWorktree: Bool,
+      worktreeName: String?,
       title: String = "",
       context: String,
       statusRaw: String,
@@ -112,10 +112,10 @@ extension HarnessMonitorSchemaV5 {
       self.projectName = projectName
       self.projectDir = projectDir
       self.contextRoot = contextRoot
-      self.worktreePath = worktreePath
-      self.sharedPath = sharedPath
-      self.originPath = originPath
-      self.branchRef = branchRef
+      self.checkoutId = checkoutId
+      self.checkoutRoot = checkoutRoot
+      self.isWorktree = isWorktree
+      self.worktreeName = worktreeName
       self.title = title
       self.context = context
       self.statusRaw = statusRaw

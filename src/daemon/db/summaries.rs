@@ -381,23 +381,16 @@ impl SessionSummaryRow {
             db.sync_session(&project.project_id, &state)?;
         }
         let pending_leader_transfer = state.pending_leader_transfer.clone();
-        let worktree_name = project
-            .worktree_name
-            .clone()
-            .or_else(|| project.is_worktree.then_some(project.checkout_name.clone()));
 
         Ok(daemon_protocol::SessionSummary {
             project_id: project.summary_project_id(),
             project_name: project.summary_project_name(),
             project_dir: project.summary_project_dir(),
             context_root: project.summary_context_root(),
-            checkout_id: project.checkout_id.clone(),
-            checkout_root: project
-                .project_dir
-                .as_ref()
-                .map_or_else(String::new, |path| path.display().to_string()),
-            is_worktree: project.is_worktree,
-            worktree_name,
+            worktree_path: state.worktree_path.to_string_lossy().into_owned(),
+            shared_path: state.shared_path.to_string_lossy().into_owned(),
+            origin_path: state.origin_path.to_string_lossy().into_owned(),
+            branch_ref: state.branch_ref.clone(),
             session_id: state.session_id,
             title: state.title,
             context: state.context,

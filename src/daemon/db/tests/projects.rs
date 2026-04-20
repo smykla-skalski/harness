@@ -154,11 +154,9 @@ fn session_summaries_group_worktree_project_fields_under_repository_root() {
         "unexpected repository context root: {}",
         summary.context_root
     );
-    assert_eq!(summary.checkout_id, worktree.checkout_id);
-    assert_eq!(
-        summary.checkout_root,
-        "/tmp/kuma/.claude/worktrees/feature-a"
-    );
-    assert!(summary.is_worktree);
-    assert_eq!(summary.worktree_name.as_deref(), Some("feature-a"));
+    // workspace layout fields come from SessionState; sample state has empty paths
+    assert_eq!(summary.worktree_path, "");
+    assert_eq!(summary.shared_path, "");
+    assert_eq!(summary.origin_path, "");
+    assert_eq!(summary.branch_ref, "");
 }
