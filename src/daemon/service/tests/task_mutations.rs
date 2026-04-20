@@ -119,6 +119,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                         session_id: Some("daemon-async-task".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )
@@ -224,6 +225,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                         session_id: Some("daemon-async-role".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )
@@ -316,6 +318,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                             session_id: Some("daemon-async-task-lifecycle".into()),
                             project_dir: project.to_string_lossy().into(),
                             policy_preset: None,
+                            base_ref: None,
                         },
                         &async_db,
                     )

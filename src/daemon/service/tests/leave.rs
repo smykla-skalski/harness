@@ -51,6 +51,7 @@ fn leave_session_async_direct_marks_leaderless_degraded_without_successor() {
                     session_id: Some("daemon-async-leave".into()),
                     project_dir: project.to_string_lossy().into(),
                     policy_preset: None,
+                    base_ref: None,
                 },
                 &async_db,
             )

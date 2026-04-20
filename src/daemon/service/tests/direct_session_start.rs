@@ -81,6 +81,7 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
                 session_id: Some("daemon-client-start".into()),
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: Some("swarm-default".into()),
+                base_ref: None,
             },
             None,
         )
@@ -113,6 +114,7 @@ fn start_session_direct_creates_worktree() {
                 session_id: None,
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: None,
+                base_ref: None,
             },
             Some(&db),
         )
@@ -143,6 +145,7 @@ fn start_session_direct_rejects_unknown_policy_preset() {
                 session_id: Some("unknown-policy-preset".into()),
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: Some("swarm-future".into()),
+                base_ref: None,
             },
             Some(&db),
         )

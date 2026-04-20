@@ -339,6 +339,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                     session_id: Some("sess-sandbox-tui".into()),
                     project_dir: project.to_string_lossy().into_owned(),
                     policy_preset: None,
+                    base_ref: None,
                 },
                 Some(&db),
             )
