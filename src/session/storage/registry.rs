@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::workspace::harness_data_root;
-use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
+use crate::workspace::layout::SessionLayout;
 use crate::workspace::project_context_dir;
 use crate::workspace::utc_now;
 
@@ -106,10 +105,7 @@ pub(crate) fn deregister_active_legacy(
 ///
 /// # TODO(b-task-8): migrate callers to `load_active_registry_for_layout`.
 pub(crate) fn load_active_registry_for(project_dir: &Path) -> ActiveRegistry {
-    let sessions_root = workspace_sessions_root(&harness_data_root());
-    let project_name = project_dir
-        .file_name()
-        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
+    let (sessions_root, project_name) = files::project_layout_parts_from_dir(project_dir);
     let path = sessions_root.join(project_name).join(".active.json");
     load_registry_at(&path)
 }
