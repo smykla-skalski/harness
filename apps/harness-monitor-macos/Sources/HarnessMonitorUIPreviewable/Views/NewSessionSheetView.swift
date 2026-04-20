@@ -15,7 +15,6 @@ struct NewSessionSheetView: View {
       header
       Divider()
       formContent
-        .padding(HarnessMonitorTheme.spacingLG)
       Divider()
       footer
     }
@@ -44,21 +43,26 @@ struct NewSessionSheetView: View {
   // MARK: - Form
 
   private var formContent: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      projectSection
-      detailsSection
-      advancedSection
+    VStack(alignment: .leading, spacing: 0) {
+      Form {
+        projectSection
+        detailsSection
+        Section {
+          DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
+            advancedContent
+          }
+        }
+      }
       if let error = viewModel.lastError {
         errorBanner(for: error)
+          .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+          .padding(.bottom, HarnessMonitorTheme.spacingSM)
       }
     }
   }
 
   private var projectSection: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Project")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    Section("Project") {
       Picker("Project", selection: $viewModel.selectedBookmarkId) {
         Text("Select a folder…").tag(String?.none)
         ForEach(bookmarks, id: \.id) { record in
@@ -71,7 +75,6 @@ struct NewSessionSheetView: View {
           .tag(Optional(record.id))
         }
       }
-      .labelsHidden()
       .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
       Button("Add Folder…") {
         store.requestOpenFolder()
@@ -82,16 +85,10 @@ struct NewSessionSheetView: View {
   }
 
   private var detailsSection: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Title")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    Section("Details") {
       TextField("Session title", text: $viewModel.title)
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTitle)
-      Text("Context")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       TextEditor(text: $viewModel.context)
         .harnessNativeFormControl()
         .frame(minHeight: 60)
@@ -99,26 +96,16 @@ struct NewSessionSheetView: View {
     }
   }
 
-  private var advancedSection: some View {
-    DisclosureGroup(
-      isExpanded: $isAdvancedExpanded,
-      content: {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          TextField("origin/HEAD", text: $viewModel.baseRef)
-            .harnessNativeFormControl()
-            .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
-          Text("Leave blank for the default branch")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-        .padding(.top, HarnessMonitorTheme.spacingXS)
-      },
-      label: {
-        Text("Advanced")
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-    )
+  private var advancedContent: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      TextField("origin/HEAD", text: $viewModel.baseRef)
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
+      Text("Leave blank for the default branch")
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .padding(.top, HarnessMonitorTheme.spacingXS)
   }
 
   private func errorBanner(for error: NewSessionViewModel.SubmitError) -> some View {
