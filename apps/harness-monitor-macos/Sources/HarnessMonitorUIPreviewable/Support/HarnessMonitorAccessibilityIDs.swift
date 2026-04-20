@@ -242,6 +242,14 @@ public enum HarnessMonitorAccessibility {
   public static let agentsCodexFinalMessage = "harness.window.agents.codex.final"
   public static let agentsCodexLatestSummary = "harness.window.agents.codex.latest"
   public static let agentsCodexErrorMessage = "harness.window.agents.codex.error"
+  public static let newSessionSheet = "harness.new-session.sheet"
+  public static let newSessionTitle = "harness.new-session.title"
+  public static let newSessionContext = "harness.new-session.context"
+  public static let newSessionBaseRef = "harness.new-session.base-ref"
+  public static let newSessionProjectPicker = "harness.new-session.project-picker"
+  public static let newSessionCreateButton = "harness.new-session.create-button"
+  public static let newSessionCancelButton = "harness.new-session.cancel-button"
+  public static let newSessionErrorBanner = "harness.new-session.error-banner"
   public static let sendSignalSheet = "harness.sheet.send-signal"
   public static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   public static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
@@ -401,9 +409,7 @@ public enum HarnessMonitorAccessibility {
   }
 
   private static func slug(_ value: String) -> String {
-    let lowercased = value.lowercased()
-    return
-      lowercased
+    value.lowercased()
       .replacing(" ", with: "-")
       .replacing("_", with: "-")
       .replacing(":", with: "-")
