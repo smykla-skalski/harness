@@ -23,6 +23,7 @@ public enum HarnessMonitorAccessibility {
   public static let sidebarFiltersCard = "harness.sidebar.filters"
   public static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
   public static let sidebarFilterMenu = "harness.toolbar.sidebar-filters"
+  public static let sidebarNewSessionButton = "harness.sidebar.new-session"
   public static let sidebarFilterState = "harness.sidebar.filter.state"
   public static let sidebarFiltersToggle = sidebarFilterMenu
   public static let sidebarSearchField = "harness.sidebar.search"
@@ -86,13 +87,10 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesTitle = "harness.preferences.title"
   public static let preferencesThemeModePicker = "harness.preferences.theme-mode"
   public static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
-  public static let preferencesBackgroundCollectionPicker =
-    "harness.preferences.background-collection"
+  public static let preferencesBackgroundCollectionPicker = "harness.preferences.background-collection"
   public static let preferencesBackgroundGallery = "harness.preferences.background-gallery"
-  public static let preferencesBackgroundRecentsSection =
-    "harness.preferences.background.recents-section"
-  public static let preferencesBackgroundRecentState =
-    "harness.preferences.background.recents-state"
+  public static let preferencesBackgroundRecentsSection = "harness.preferences.background.recents-section"
+  public static let preferencesBackgroundRecentState = "harness.preferences.background.recents-state"
   public static let preferencesTextSizePicker = "harness.preferences.text-size"
   public static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   public static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
