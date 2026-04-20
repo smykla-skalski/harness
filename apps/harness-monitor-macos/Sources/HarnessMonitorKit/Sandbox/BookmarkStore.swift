@@ -167,4 +167,19 @@ public actor BookmarkStore {
     enc.outputFormatting = [.prettyPrinted, .sortedKeys]
     return enc
   }()
+
+  #if DEBUG
+    /// Inserts a record directly without generating real bookmark data.
+    ///
+    /// Only available in DEBUG builds. Intended exclusively for UI-test preseed
+    /// scenarios where the real `.fileImporter` flow must be bypassed.
+    public func insertForTesting(_ record: Record) throws {
+      var store = try loadForMutation()
+      store.bookmarks.insert(record, at: 0)
+      if store.bookmarks.count > Self.mruCap {
+        store.bookmarks.removeLast(store.bookmarks.count - Self.mruCap)
+      }
+      try save(store)
+    }
+  #endif
 }
