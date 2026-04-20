@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::layout::sessions_root as workspace_sessions_root;
 use crate::workspace::{
     canonical_checkout_root, harness_data_root, project_context_dir, resolve_git_checkout_identity,
 };
@@ -20,6 +21,14 @@ pub fn projects_root() -> PathBuf {
 /// operations, no JSON parsing, no state loading.
 #[must_use]
 pub fn fast_counts() -> (usize, usize, usize) {
+    let (mut project_count, worktree_count, mut session_count) = legacy_fast_counts();
+    let (new_projects, new_sessions) = new_layout_fast_counts();
+    project_count += new_projects;
+    session_count += new_sessions;
+    (project_count, worktree_count, session_count)
+}
+
+fn legacy_fast_counts() -> (usize, usize, usize) {
     let root = projects_root();
     if !root.is_dir() {
         return (0, 0, 0);
@@ -57,6 +66,37 @@ pub fn fast_counts() -> (usize, usize, usize) {
         }
     }
     (project_count, worktree_count, session_count)
+}
+
+fn new_layout_fast_counts() -> (usize, usize) {
+    let root = workspace_sessions_root(&harness_data_root());
+    let Ok(entries) = fs::read_dir(&root) else {
+        return (0, 0);
+    };
+    let mut project_count = 0;
+    let mut session_count = 0;
+    for project_entry in entries.flatten() {
+        if !project_entry
+            .file_type()
+            .ok()
+            .is_some_and(|kind| kind.is_dir())
+        {
+            continue;
+        }
+        let Ok(sessions) = fs::read_dir(project_entry.path()) else {
+            continue;
+        };
+        let this_session_count = sessions
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
+            .count();
+        if this_session_count == 0 {
+            continue;
+        }
+        project_count += 1;
+        session_count += this_session_count;
+    }
+    (project_count, session_count)
 }
 
 /// Discover harness project context roots on disk.
