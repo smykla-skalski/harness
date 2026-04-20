@@ -1,3 +1,4 @@
+pub mod adopter;
 pub mod compact;
 mod git;
 pub mod ids;
