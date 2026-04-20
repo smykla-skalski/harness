@@ -122,8 +122,9 @@ extension HarnessMonitorStoreTests {
     let (projects, sessions) = makeToolbarCountFixtures()
     store.applySessionIndexSnapshot(projects: projects, sessions: sessions)
 
+    // All 3 sessions are worktree-backed in the new layout, so worktreeCount == sessionCount.
     #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
-    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 2)
+    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 3)
     #expect(store.contentUI.toolbar.toolbarMetrics.sessionCount == 3)
   }
 
@@ -194,18 +195,17 @@ extension HarnessMonitorStoreTests {
     project1: ProjectSummary,
     project2: ProjectSummary
   ) -> [SessionSummary] {
-    let rootA = "/Users/example/Projects/harness/.claude/worktrees/session-title"
-    let rootB = "/Users/example/Projects/kuma/.claude/worktrees/fix-motb"
+    let sessionsRoot = "/Users/example/Library/Application Support/harness/sessions"
     let session1 = SessionSummary(
       projectId: project1.projectId,
       projectName: project1.name,
       projectDir: project1.projectDir,
-      contextRoot: project1.contextRoot,
-      checkoutId: "checkout-a",
-      checkoutRoot: rootA,
-      isWorktree: true,
-      worktreeName: "session-title",
-      sessionId: "sess-a-1",
+      contextRoot: "\(sessionsRoot)/harness",
+      sessionId: "sessa001",
+      worktreePath: "\(sessionsRoot)/harness/sessa001/workspace",
+      sharedPath: "\(sessionsRoot)/harness/sessa001/memory",
+      originPath: project1.projectDir ?? "",
+      branchRef: "harness/sessa001",
       title: "Primary",
       context: "Primary",
       status: .active,
@@ -228,12 +228,12 @@ extension HarnessMonitorStoreTests {
       projectId: project1.projectId,
       projectName: project1.name,
       projectDir: project1.projectDir,
-      contextRoot: project1.contextRoot,
-      checkoutId: "checkout-a",
-      checkoutRoot: rootA,
-      isWorktree: true,
-      worktreeName: "session-title",
-      sessionId: "sess-a-2",
+      contextRoot: "\(sessionsRoot)/harness",
+      sessionId: "sessa002",
+      worktreePath: "\(sessionsRoot)/harness/sessa002/workspace",
+      sharedPath: "\(sessionsRoot)/harness/sessa002/memory",
+      originPath: project1.projectDir ?? "",
+      branchRef: "harness/sessa002",
       title: "Secondary",
       context: "Secondary",
       status: .active,
@@ -256,12 +256,12 @@ extension HarnessMonitorStoreTests {
       projectId: project2.projectId,
       projectName: project2.name,
       projectDir: project2.projectDir,
-      contextRoot: project2.contextRoot,
-      checkoutId: "checkout-b",
-      checkoutRoot: rootB,
-      isWorktree: true,
-      worktreeName: "fix-motb",
-      sessionId: "sess-b-1",
+      contextRoot: "\(sessionsRoot)/kuma",
+      sessionId: "sessb001",
+      worktreePath: "\(sessionsRoot)/kuma/sessb001/workspace",
+      sharedPath: "\(sessionsRoot)/kuma/sessb001/memory",
+      originPath: project2.projectDir ?? "",
+      branchRef: "harness/sessb001",
       title: "Kuma",
       context: "Kuma",
       status: .active,

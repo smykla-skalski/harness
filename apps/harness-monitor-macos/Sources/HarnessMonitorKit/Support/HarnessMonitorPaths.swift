@@ -188,3 +188,39 @@ public enum HarnessMonitorPaths {
     "Contents/Library/LaunchAgents/\(launchAgentPlistName)"
   }
 }
+
+extension HarnessMonitorPaths {
+  public static func sessionsRoot(using env: HarnessMonitorEnvironment = .current) -> URL {
+    harnessRoot(using: env).appendingPathComponent("sessions", isDirectory: true)
+  }
+
+  public static func sessionRoot(
+    projectName: String,
+    sessionId: String,
+    using env: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    sessionsRoot(using: env)
+      .appendingPathComponent(projectName, isDirectory: true)
+      .appendingPathComponent(sessionId, isDirectory: true)
+  }
+
+  public static func sessionWorktree(projectName: String, sessionId: String) -> URL {
+    sessionRoot(projectName: projectName, sessionId: sessionId)
+      .appendingPathComponent("workspace", isDirectory: true)
+  }
+
+  public static func sessionShared(projectName: String, sessionId: String) -> URL {
+    sessionRoot(projectName: projectName, sessionId: sessionId)
+      .appendingPathComponent("memory", isDirectory: true)
+  }
+
+  public static func socketDirectory(using env: HarnessMonitorEnvironment = .current) -> URL {
+    let groupID = HarnessMonitorAppGroup.identifier
+    let container = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: groupID)
+    guard let group = container else {
+      return harnessRoot(using: env).appendingPathComponent("sock", isDirectory: true)
+    }
+    return group.appendingPathComponent("sock", isDirectory: true)
+  }
+}

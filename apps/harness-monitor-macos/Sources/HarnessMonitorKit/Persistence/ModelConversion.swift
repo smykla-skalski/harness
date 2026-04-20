@@ -64,8 +64,6 @@ extension CachedSession {
   }
 
   func toSessionSummary() -> SessionSummary {
-    let normalizedCheckoutId = checkoutId.isEmpty ? projectId : checkoutId
-    let normalizedCheckoutRoot = checkoutRoot.isEmpty ? (projectDir ?? contextRoot) : checkoutRoot
     let metrics =
       (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))
       ?? SessionMetrics(
@@ -89,11 +87,11 @@ extension CachedSession {
       projectName: projectName,
       projectDir: projectDir,
       contextRoot: contextRoot,
-      checkoutId: normalizedCheckoutId,
-      checkoutRoot: normalizedCheckoutRoot,
-      isWorktree: isWorktree,
-      worktreeName: worktreeName,
       sessionId: sessionId,
+      worktreePath: worktreePath,
+      sharedPath: sharedPath,
+      originPath: originPath,
+      branchRef: branchRef,
       title: title,
       context: context,
       status: SessionStatus(rawValue: statusRaw) ?? .active,
@@ -123,10 +121,10 @@ extension CachedSession {
     projectName = summary.projectName
     projectDir = summary.projectDir
     contextRoot = summary.contextRoot
-    checkoutId = summary.checkoutId
-    checkoutRoot = summary.checkoutRoot
-    isWorktree = summary.isWorktree
-    worktreeName = summary.worktreeName
+    worktreePath = summary.worktreePath
+    sharedPath = summary.sharedPath
+    originPath = summary.originPath
+    branchRef = summary.branchRef
     title = summary.title
     context = summary.context
     statusRaw = summary.status.rawValue
@@ -149,10 +147,10 @@ extension SessionSummary {
       projectName: projectName,
       projectDir: projectDir,
       contextRoot: contextRoot,
-      checkoutId: checkoutId,
-      checkoutRoot: checkoutRoot,
-      isWorktree: isWorktree,
-      worktreeName: worktreeName,
+      worktreePath: worktreePath,
+      sharedPath: sharedPath,
+      originPath: originPath,
+      branchRef: branchRef,
       title: title,
       context: context,
       statusRaw: status.rawValue,

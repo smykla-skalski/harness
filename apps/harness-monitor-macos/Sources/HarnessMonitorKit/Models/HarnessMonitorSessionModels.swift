@@ -108,11 +108,11 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
   public let projectName: String
   public let projectDir: String?
   public let contextRoot: String
-  public let checkoutId: String
-  public let checkoutRoot: String
-  public let isWorktree: Bool
-  public let worktreeName: String?
   public let sessionId: String
+  public let worktreePath: String
+  public let sharedPath: String
+  public let originPath: String
+  public let branchRef: String
   public let title: String
   public let context: String
   public let status: SessionStatus
@@ -131,13 +131,13 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
   public init(
     projectId: String,
     projectName: String,
-    projectDir: String?,
-    contextRoot: String,
-    checkoutId: String? = nil,
-    checkoutRoot: String? = nil,
-    isWorktree: Bool = false,
-    worktreeName: String? = nil,
+    projectDir: String? = nil,
+    contextRoot: String = "",
     sessionId: String,
+    worktreePath: String = "",
+    sharedPath: String = "",
+    originPath: String = "",
+    branchRef: String = "",
     title: String = "",
     context: String,
     status: SessionStatus,
@@ -153,11 +153,11 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     self.projectName = projectName
     self.projectDir = projectDir
     self.contextRoot = contextRoot
-    self.checkoutId = checkoutId ?? projectId
-    self.checkoutRoot = checkoutRoot ?? projectDir ?? contextRoot
-    self.isWorktree = isWorktree
-    self.worktreeName = worktreeName
     self.sessionId = sessionId
+    self.worktreePath = worktreePath
+    self.sharedPath = sharedPath
+    self.originPath = originPath
+    self.branchRef = branchRef
     self.title = title
     self.context = context
     self.status = status
@@ -170,36 +170,34 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     self.metrics = metrics
   }
 
-  public var checkoutDisplayName: String {
-    if isWorktree {
-      return worktreeName ?? URL(fileURLWithPath: checkoutRoot).lastPathComponent
+  /// Display name for the worktree branch, derived from `branchRef`.
+  public var worktreeDisplayName: String {
+    if branchRef.hasPrefix("harness/") {
+      return String(branchRef.dropFirst("harness/".count))
     }
-    return "Repository"
+    return branchRef.isEmpty ? sessionId : branchRef
   }
 
-  enum CodingKeys: String, CodingKey {
+  enum CodingKeys: CodingKey {
     case projectId, projectName, projectDir, contextRoot
-    case checkoutId, checkoutRoot, isWorktree, worktreeName
-    case sessionId, title, context, status, createdAt, updatedAt, lastActivityAt
+    case sessionId, worktreePath, sharedPath, originPath, branchRef
+    case title, context, status
+    case createdAt, updatedAt, lastActivityAt
     case leaderId, observeId, pendingLeaderTransfer, metrics
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    let projectId = try container.decode(String.self, forKey: .projectId)
-    let projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
-    let contextRoot = try container.decode(String.self, forKey: .contextRoot)
     self.init(
-      projectId: projectId,
-      projectName: try container.decode(String.self, forKey: .projectName),
-      projectDir: projectDir,
-      contextRoot: contextRoot,
-      checkoutId: try container.decodeIfPresent(String.self, forKey: .checkoutId) ?? projectId,
-      checkoutRoot: try container.decodeIfPresent(String.self, forKey: .checkoutRoot)
-        ?? projectDir ?? contextRoot,
-      isWorktree: try container.decodeIfPresent(Bool.self, forKey: .isWorktree) ?? false,
-      worktreeName: try container.decodeIfPresent(String.self, forKey: .worktreeName),
+      projectId: try container.decode(String.self, forKey: .projectId),
+      projectName: try container.decodeIfPresent(String.self, forKey: .projectName) ?? "",
+      projectDir: try container.decodeIfPresent(String.self, forKey: .projectDir),
+      contextRoot: try container.decodeIfPresent(String.self, forKey: .contextRoot) ?? "",
       sessionId: try container.decode(String.self, forKey: .sessionId),
+      worktreePath: try container.decodeIfPresent(String.self, forKey: .worktreePath) ?? "",
+      sharedPath: try container.decodeIfPresent(String.self, forKey: .sharedPath) ?? "",
+      originPath: try container.decodeIfPresent(String.self, forKey: .originPath) ?? "",
+      branchRef: try container.decodeIfPresent(String.self, forKey: .branchRef) ?? "",
       title: try container.decodeIfPresent(String.self, forKey: .title) ?? "",
       context: try container.decode(String.self, forKey: .context),
       status: try container.decode(SessionStatus.self, forKey: .status),
