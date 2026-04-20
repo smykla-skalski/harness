@@ -52,8 +52,8 @@ pub(super) fn prepare_session(
             sessions_root.display()
         )))
     })?;
-    let project_name = project_resolver::resolve_name(&canonical_origin, &sessions_root)
-        .map_err(|error| {
+    let project_name =
+        project_resolver::resolve_name(&canonical_origin, &sessions_root).map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(
                 "resolve project name for '{}': {error}",
                 canonical_origin.display()
@@ -85,11 +85,13 @@ pub(super) fn prepare_session(
         },
     )?;
 
-    WorktreeController::create(&canonical_origin, &layout, None).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "create session worktree: {error}"
-        )))
-    })?;
+    WorktreeController::create(&canonical_origin, &layout, request.base_ref.as_deref()).map_err(
+        |error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "create session worktree: {error}"
+            )))
+        },
+    )?;
 
     let now = utc_now();
     let mut state = session_service::build_new_session_with_policy(

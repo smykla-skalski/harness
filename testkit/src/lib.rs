@@ -12,7 +12,7 @@ pub mod fake_toolchain;
 
 // Re-export everything from builders for convenience.
 pub use builders::*;
-pub use env::{init_git_repo_with_seed, with_isolated_harness_env};
+pub use env::{init_git_repo_with_branches, init_git_repo_with_seed, with_isolated_harness_env};
 pub use fake_toolchain::FakeToolchain;
 
 /// Build an `assert_cmd::Command` for the harness binary.

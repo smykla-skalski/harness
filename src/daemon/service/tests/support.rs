@@ -35,6 +35,12 @@ pub(super) fn init_git_with_seed_commit(project: &Path) {
     harness_testkit::init_git_repo_with_seed(project);
 }
 
+/// Initialize a git repository at `project` with a seed commit on `main` and
+/// a distinct branch `branch_name` carrying one extra commit.
+pub(super) fn init_git_with_branches(project: &Path, branch_name: &str) {
+    harness_testkit::init_git_repo_with_branches(project, branch_name);
+}
+
 pub(super) fn append_project_ledger_entry(project_dir: &Path) {
     let ledger_path = project_context_dir(project_dir)
         .join("agents")
