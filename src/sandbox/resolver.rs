@@ -1,15 +1,18 @@
 //! macOS-only resolver for security-scoped bookmarks.
 
 #![cfg(target_os = "macos")]
-#![allow(unsafe_code)]
+#![expect(
+    unsafe_code,
+    reason = "Core Foundation FFI for security-scoped bookmarks"
+)]
 
 use std::env;
-use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
 use core_foundation::base::{Boolean, TCFType};
 use core_foundation::data::CFData;
+use core_foundation::error::CFError;
 use core_foundation::url::{
     CFURL, CFURLCreateByResolvingBookmarkData, CFURLStartAccessingSecurityScopedResource,
     CFURLStopAccessingSecurityScopedResource, kCFURLBookmarkResolutionWithSecurityScope,
@@ -34,10 +37,18 @@ impl ResolvedBookmark {
         &self.path
     }
 
+    /// Returns `true` when the OS reports the bookmark as stale.
+    /// Callers should re-create the bookmark and persist fresh bytes.
     #[must_use]
     pub fn is_stale(&self) -> bool {
         self.is_stale
     }
+}
+
+fn describe_cf_error(err: &CFError) -> String {
+    let desc = err.description();
+    let text: String = desc.to_string();
+    format!("code={} description={text}", err.code())
 }
 
 /// RAII guard for `CFURLStartAccessingSecurityScopedResource`.
@@ -99,9 +110,16 @@ pub fn resolve(bytes: &[u8]) -> Result<ResolvedBookmark, BookmarkError> {
         )
     };
     if cf_url_ref.is_null() {
+        let detail = if err.is_null() {
+            "no CFError provided".to_string()
+        } else {
+            // SAFETY: err is a +1-retain CFErrorRef from the call above; wrap
+            // under the create rule so CFRelease fires on drop (prevents leak).
+            let cf_err = unsafe { CFError::wrap_under_create_rule(err) };
+            describe_cf_error(&cf_err)
+        };
         return Err(BookmarkError::Resolution(format!(
-            "CFURLCreateByResolvingBookmarkData returned null (err: {:p})",
-            err.cast::<c_void>()
+            "CFURLCreateByResolvingBookmarkData failed: {detail}"
         )));
     }
     // SAFETY: cf_url_ref is a non-null +1-retain CFURLRef from the call above.
