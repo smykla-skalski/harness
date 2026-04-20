@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use axum::extract::{Path, Query, State};
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -26,7 +26,10 @@ use super::{DaemonHttpState, require_async_db};
 pub(super) fn session_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route("/v1/sessions", get(get_sessions).post(post_session_start))
-        .route("/v1/sessions/{session_id}", get(get_session))
+        .route(
+            "/v1/sessions/{session_id}",
+            get(get_session).delete(delete_session),
+        )
         .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
         .route("/v1/sessions/{session_id}/stream", get(stream_session))
         .route("/v1/sessions/{session_id}/join", post(post_session_join))
@@ -440,7 +443,7 @@ async fn leave_session_response(
     service::leave_session(session_id, request, Some(&db_guard))
 }
 
-async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {
+async fn broadcast_session_snapshot_for(state: &DaemonHttpState, session_id: &str) {
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_session_snapshot_async(
             &state.sender,
@@ -454,42 +457,45 @@ async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {
         let db_guard = db.lock().expect("db lock");
         service::broadcast_session_snapshot(&state.sender, session_id, Some(&db_guard));
     }
+}
+
+async fn broadcast_session_join(state: &DaemonHttpState, session_id: &str) {
+    broadcast_session_snapshot_for(state, session_id).await;
 }
 
 async fn broadcast_session_title(state: &DaemonHttpState, session_id: &str) {
-    if let Some(async_db) = state.async_db.get() {
-        service::broadcast_session_snapshot_async(
-            &state.sender,
-            session_id,
-            Some(async_db.as_ref()),
-        )
-        .await;
-        return;
-    }
-    if let Ok(db) = ensure_shared_db(&state.db) {
-        let db_guard = db.lock().expect("db lock");
-        service::broadcast_session_snapshot(&state.sender, session_id, Some(&db_guard));
-    }
+    broadcast_session_snapshot_for(state, session_id).await;
 }
 
 async fn broadcast_session_end(state: &DaemonHttpState, session_id: &str) {
-    if let Some(async_db) = state.async_db.get() {
-        service::broadcast_session_snapshot_async(
-            &state.sender,
-            session_id,
-            Some(async_db.as_ref()),
-        )
-        .await;
-        return;
-    }
-    if let Ok(db) = ensure_shared_db(&state.db) {
-        let db_guard = db.lock().expect("db lock");
-        service::broadcast_session_snapshot(&state.sender, session_id, Some(&db_guard));
-    }
+    broadcast_session_snapshot_for(state, session_id).await;
 }
 
 fn session_mutation_response(session_state: SessionState) -> SessionMutationResponse {
     SessionMutationResponse {
         state: session_state,
+    }
+}
+
+pub(super) async fn delete_session(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    use axum::response::IntoResponse as _;
+    if let Err(r) = require_auth(&headers, &state) {
+        return *r;
+    }
+    let found = if let Some(async_db) = state.async_db.get() {
+        service::delete_session_direct_async(&session_id, async_db.as_ref()).await
+    } else {
+        ensure_shared_db(&state.db).and_then(|db| {
+            service::delete_session_direct(&session_id, &db.lock().expect("db lock"))
+        })
+    };
+    match found {
+        Ok(true) => { broadcast_session_start(&state).await; StatusCode::NO_CONTENT.into_response() }
+        Ok(false) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "session not found"}))).into_response(),
+        Err(error) => super::response::map_json(Err::<SessionState, _>(error)),
     }
 }

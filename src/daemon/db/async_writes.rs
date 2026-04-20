@@ -4,10 +4,10 @@ mod sql;
 
 use self::sql::{
     ADVANCE_CHANGE_SEQUENCE_SQL, CURRENT_CHANGE_SEQUENCE_SQL, DELETE_SESSION_AGENTS_SQL,
-    DELETE_SESSION_TASKS_SQL, ENSURE_SESSION_TIMELINE_STATE_SQL, INSERT_AGENT_SQL,
-    INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, INSERT_TASK_SQL, MARK_SESSION_ACTIVE_SQL,
-    NEXT_LOG_SEQUENCE_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL, UPSERT_SESSION_SQL,
-    UPSERT_TIMELINE_ENTRY_SQL, UPSERT_TIMELINE_STATE_SQL,
+    DELETE_SESSION_ROW_SQL, DELETE_SESSION_TASKS_SQL, ENSURE_SESSION_TIMELINE_STATE_SQL,
+    INSERT_AGENT_SQL, INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, INSERT_TASK_SQL,
+    MARK_SESSION_ACTIVE_SQL, NEXT_LOG_SEQUENCE_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL,
+    UPSERT_SESSION_SQL, UPSERT_TIMELINE_ENTRY_SQL, UPSERT_TIMELINE_STATE_SQL,
 };
 use super::{
     AgentRegistration, AsyncDaemonDb, BTreeMap, CliError, DiscoveredProject, SessionLogEntry,
@@ -168,6 +168,21 @@ impl AsyncDaemonDb {
         })?;
         Ok(())
     }
+    /// Delete a session row and all cascade-dependent rows through the async DB.
+    ///
+    /// Returns `Ok(true)` when a row was deleted, `Ok(false)` when none matched.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub(crate) async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+        let result = query(DELETE_SESSION_ROW_SQL)
+            .bind(session_id)
+            .execute(self.pool())
+            .await
+            .map_err(|error| db_error(format!("delete async session row: {error}")))?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Increment one change-tracking scope through the canonical async daemon DB.
     ///
     /// # Errors

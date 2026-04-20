@@ -226,11 +226,12 @@ mod status;
 mod sync_support;
 
 pub use direct::{
-    disconnect_agent_direct, join_session_direct, record_signal_ack_direct,
-    register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
+    delete_session_direct, disconnect_agent_direct, join_session_direct,
+    record_signal_ack_direct, register_agent_runtime_session_direct, start_session_direct,
+    update_session_title_direct,
 };
 pub(crate) use direct::{
-    disconnect_agent_direct_async, join_session_direct_async,
+    delete_session_direct_async, disconnect_agent_direct_async, join_session_direct_async,
     register_agent_runtime_session_direct_async, start_session_direct_async,
     update_session_title_direct_async,
 };
