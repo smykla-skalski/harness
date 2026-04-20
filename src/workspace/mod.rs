@@ -2,6 +2,7 @@ pub mod compact;
 pub mod ids;
 mod git;
 mod paths;
+pub mod project_resolver;
 mod remote_kubernetes;
 mod session;
 
