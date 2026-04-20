@@ -149,14 +149,10 @@ pub(super) fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummar
         project_name: resolved.project.summary_project_name(),
         project_dir: resolved.project.summary_project_dir(),
         context_root: resolved.project.summary_context_root(),
-        checkout_id: resolved.project.checkout_id.clone(),
-        checkout_root: resolved
-            .project
-            .project_dir
-            .as_ref()
-            .map_or_else(String::new, |path| path.display().to_string()),
-        is_worktree: resolved.project.is_worktree,
-        worktree_name: resolved.project.worktree_name.clone(),
+        worktree_path: resolved.state.worktree_path.to_string_lossy().into_owned(),
+        shared_path: resolved.state.shared_path.to_string_lossy().into_owned(),
+        origin_path: resolved.state.origin_path.to_string_lossy().into_owned(),
+        branch_ref: resolved.state.branch_ref.clone(),
         session_id: resolved.state.session_id.clone(),
         title: resolved.state.title.clone(),
         context: resolved.state.context.clone(),

@@ -170,6 +170,12 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     toVersion: HarnessMonitorSchemaV5.self
   )
 
+  // V5 uses checkoutId/checkoutRoot/isWorktree/worktreeName; V6 uses worktreePath/sharedPath/originPath/branchRef.
+  // The old fields are removed and new ones added with empty-string defaults. SwiftData lightweight
+  // migration handles this: it drops removed columns and populates new ones with their declared defaults.
+  // The daemon refreshes all workspace layout fields on the next sync cycle, so "" defaults are safe.
+  // If a best-effort branchRef seed from V5.isWorktree is needed, replace with a .custom stage;
+  // for now lightweight is correct and avoids the SwiftData cast-to-typealias pitfall.
   static let migrateV5toV6 = MigrationStage.lightweight(
     fromVersion: HarnessMonitorSchemaV5.self,
     toVersion: HarnessMonitorSchemaV6.self
