@@ -358,6 +358,7 @@
 		ADF102401308D6AFEBDCA095 /* HarnessMonitorStore+SelectionTimelinePaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755A65FB49DC1C394965A7B4 /* HarnessMonitorStore+SelectionTimelinePaging.swift */; };
 		AE383AABEF59F45CE8306D35 /* BookmarkRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF572C8F48DF20B44AC12886 /* BookmarkRecord.swift */; };
 		AE472F325B9FAF8193B49D01 /* HarnessMonitorUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F0AA6735AE12601CF3DFEF /* HarnessMonitorUITestSupport.swift */; };
+		AF27C4689989F69300B33449 /* PresentedSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 924B4EEC757DC679F3C66568 /* PresentedSheetTests.swift */; };
 		AF56300AD89D3A4AA9C2071F /* ServerSentEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E7C6AD7FC7DC6B8F574285 /* ServerSentEventsTests.swift */; };
 		B112BC9721AA6983EF6CD536 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6DFA230C28165C5AF0365371 /* Lottie */; };
 		B143D542E18D56F5990DDB25 /* HarnessVoiceInputButton+ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6BF573ABAB05A10E848696 /* HarnessVoiceInputButton+ViewModel.swift */; };
@@ -921,6 +922,7 @@
 		8ECB7F667C719A10D7786C5E /* HarnessMonitorStore+StreamControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+StreamControl.swift"; sourceTree = "<group>"; };
 		8EE5FD02C3984ECB9419D3A1 /* HarnessMonitorStoreCodexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreCodexTests.swift; sourceTree = "<group>"; };
 		8F992BE47CA7A3EEC9B3C629 /* PreferencesSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesSidebar.swift; sourceTree = "<group>"; };
+		924B4EEC757DC679F3C66568 /* PresentedSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentedSheetTests.swift; sourceTree = "<group>"; };
 		9277EB39AF2DF97F3A7C1529 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
 		93097EB15F24C61DB8411A15 /* BookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStoreTests.swift; sourceTree = "<group>"; };
 		936E1FE50EEB4F7EF0A67E80 /* ContentSessionSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentSessionSurface.swift; sourceTree = "<group>"; };
@@ -1524,6 +1526,7 @@
 				185671B93D54AD6DFEE1746F /* PersistenceSnapshotIntegrationTests+Hydration.swift */,
 				984820BDFFADE6551E75890D /* PersistenceSnapshotIntegrationTests+Ordering.swift */,
 				748BFDC6EFDA6017847B7613 /* PersistenceUserDataIntegrationTests.swift */,
+				924B4EEC757DC679F3C66568 /* PresentedSheetTests.swift */,
 				23697760C3BFCF13C2694250 /* RecordingDaemonController.swift */,
 				543C8B9F4CC1380F7B0F97EF /* RecordingHarnessClient+AgentTui.swift */,
 				70B66A1CA3B1BD4163C03A3E /* RecordingHarnessClient+Base.swift */,
@@ -2487,6 +2490,7 @@
 				E919E31C6D44EA1D6C712BF3 /* PersistenceSnapshotIntegrationTests+Ordering.swift in Sources */,
 				A7069CDCA0EF1850476AEBE4 /* PersistenceSnapshotIntegrationTests.swift in Sources */,
 				293298424C14724193DC78F0 /* PersistenceUserDataIntegrationTests.swift in Sources */,
+				AF27C4689989F69300B33449 /* PresentedSheetTests.swift in Sources */,
 				5E5A70CFBF5648EB9CCA7732 /* RecordingDaemonController.swift in Sources */,
 				41F1466B59622244818900A5 /* RecordingHarnessClient+AgentTui.swift in Sources */,
 				5E7FEDEFC89A8BDD761D5B34 /* RecordingHarnessClient+Base.swift in Sources */,
