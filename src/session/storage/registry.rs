@@ -65,7 +65,7 @@ pub(crate) fn deregister_active(layout: &SessionLayout) -> Result<(), CliError> 
 /// Load the active-session registry for a layout.
 ///
 /// TODO(b-task-8): will be the primary load function after cascade migration.
-#[allow(dead_code)]
+#[expect(dead_code, reason = "consumed after b-task-8 cascade")]
 pub(crate) fn load_active_registry_for_layout(layout: &SessionLayout) -> ActiveRegistry {
     load_registry_at(&files::active_registry_path(layout))
 }
