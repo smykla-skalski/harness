@@ -56,10 +56,8 @@ struct NewSessionSheetView: View {
       Form {
         projectSection
         detailsSection
-        Section {
-          DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
-            advancedContent
-          }
+        DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
+          advancedContent
         }
       }
       if let error = viewModel.lastError {
