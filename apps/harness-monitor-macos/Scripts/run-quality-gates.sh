@@ -72,3 +72,25 @@ if [ -n "$SANDBOX_VIOLATIONS" ]; then
   printf '\n=== Sandbox violations detected ===\n%s\n' "$SANDBOX_VIOLATIONS" >&2
   exit 1
 fi
+
+# Verify sandbox entitlements on the built app + daemon
+APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/Harness Monitor.app"
+DAEMON_PATH="$APP_PATH/Contents/Library/LaunchAgents/io.harnessmonitor.daemon"
+
+if [[ -d "$APP_PATH" ]]; then
+  entitlements="$(codesign --display --entitlements :- "$APP_PATH" 2>/dev/null || true)"
+  for key in user-selected.read-write bookmarks.app-scope bookmarks.document-scope; do
+    echo "$entitlements" | grep -q "com.apple.security.files.$key" \
+      || { echo "missing app entitlement: $key"; exit 1; }
+  done
+fi
+
+if [[ -x "$DAEMON_PATH" ]]; then
+  daemon_ent="$(codesign --display --entitlements :- "$DAEMON_PATH" 2>/dev/null || true)"
+  if echo "$daemon_ent" | grep -q "com.apple.security.temporary-exception.files.home-relative-path"; then
+    echo "daemon still has temporary-exception entitlement"
+    exit 1
+  fi
+  echo "$daemon_ent" | grep -q "com.apple.security.files.bookmarks.app-scope" \
+    || { echo "daemon missing bookmarks.app-scope"; exit 1; }
+fi
