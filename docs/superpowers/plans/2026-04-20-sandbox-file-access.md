@@ -226,29 +226,28 @@ Expected: compile error ("Value of type 'URL' has no member 'withSecurityScope'"
 
 - [ ] **Step 4: Implement the helper**
 
+> **Deviation from initial plan:** Swift 6 overload resolution picks the sync variant over the async variant when the closure is `{ $0 }` in an async context, generating spurious `await` warnings under warnings-as-errors. The async variant is named separately as `withSecurityScopeAsync` to avoid the ambiguity. Subsequent tasks that need scoped access in an async context call `withSecurityScopeAsync`.
+
 Create `URL+SecurityScope.swift`:
 
 ```swift
 import Foundation
 
-public extension URL {
-    /// Runs `body` with `startAccessingSecurityScopedResource` held for the
-    /// duration of the call. The scope is released even when `body` throws.
-    ///
-    /// If the URL does not carry a security scope (e.g. it's inside the app
-    /// container), `body` still runs - `startAccessing...` returns `false`
-    /// and we simply don't pair it with a `stopAccessing...` call.
-    func withSecurityScope<T>(_ body: (URL) throws -> T) rethrows -> T {
-        let started = startAccessingSecurityScopedResource()
-        defer { if started { stopAccessingSecurityScopedResource() } }
-        return try body(self)
-    }
+extension URL {
+  /// Runs `body` with `startAccessingSecurityScopedResource` held for the
+  /// duration of the call. The scope is released even when `body` throws.
+  public func withSecurityScope<T>(_ body: (URL) throws -> T) rethrows -> T {
+    let started = startAccessingSecurityScopedResource()
+    defer { if started { stopAccessingSecurityScopedResource() } }
+    return try body(self)
+  }
 
-    func withSecurityScope<T>(_ body: (URL) async throws -> T) async rethrows -> T {
-        let started = startAccessingSecurityScopedResource()
-        defer { if started { stopAccessingSecurityScopedResource() } }
-        return try await body(self)
-    }
+  /// Async counterpart; separate name avoids Swift 6 overload ambiguity.
+  public func withSecurityScopeAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T {
+    let started = startAccessingSecurityScopedResource()
+    defer { if started { stopAccessingSecurityScopedResource() } }
+    return try await body(self)
+  }
 }
 ```
 
