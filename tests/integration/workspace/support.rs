@@ -191,6 +191,76 @@ pub fn start_session_via_http(
     })
 }
 
+pub fn start_session_with_base_ref(
+    home: &Path,
+    xdg: &Path,
+    project_dir: &Path,
+    session_id: &str,
+    base_ref: &str,
+) -> SessionState {
+    let project_arg = project_dir.to_str().expect("utf8 project path");
+    let request_body = json!({
+        "title": "workspace integration test",
+        "context": "testing base_ref routing",
+        "runtime": "codex",
+        "session_id": session_id,
+        "project_dir": project_arg,
+        "base_ref": base_ref,
+    });
+
+    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    loop {
+        let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
+        let url = format!("{}/v1/sessions", endpoint.trim_end_matches('/'));
+        let client = reqwest::Client::new();
+        let response = runtime().block_on(async {
+            client
+                .post(&url)
+                .bearer_auth(&token)
+                .json(&request_body)
+                .timeout(DAEMON_HTTP_TIMEOUT)
+                .send()
+                .await
+        });
+
+        match response {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                let body = runtime()
+                    .block_on(async { response.json::<Value>().await.expect("json body") });
+                if status == 200 {
+                    return serde_json::from_value::<SessionMutationResponse>(body)
+                        .expect("parse session start")
+                        .state;
+                }
+                let body_text = body.to_string();
+                panic!("session start failed: status={status} body={body_text}");
+            }
+            Err(error) if error.is_connect() || error.is_timeout() => {
+                assert!(
+                    Instant::now() < deadline,
+                    "daemon connection timed out: {error}"
+                );
+                thread::sleep(DAEMON_WAIT_INTERVAL);
+            }
+            Err(error) => panic!("session start request failed: {error}"),
+        }
+    }
+}
+
+pub fn git_head_sha(repo: &Path, refname: &str) -> String {
+    let out = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["log", refname, "-1", "--format=%H"])
+        .output()
+        .expect("git log");
+    assert!(out.status.success(), "git log failed for {refname}");
+    String::from_utf8(out.stdout)
+        .expect("utf8")
+        .trim()
+        .to_owned()
+}
+
 pub fn delete_session_via_http(home: &Path, xdg: &Path, session_id: &str) -> u16 {
     let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
     let url = format!(

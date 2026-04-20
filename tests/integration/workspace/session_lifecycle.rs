@@ -4,12 +4,13 @@
 // state.json at the new `<sessions_root>/<project>/<sid>/` layout, and that
 // DELETE /v1/sessions/<id> tears all of that down cleanly.
 
-use harness_testkit::init_git_repo_with_seed;
+use harness_testkit::{init_git_repo_with_branches, init_git_repo_with_seed};
 use tempfile::tempdir;
 
 use super::support::{
-    delete_session_via_http, git_branches_matching, layout_for_state, output_text, run_harness,
-    spawn_daemon_serve, start_session_via_http, wait_for_daemon_ready,
+    delete_session_via_http, git_branches_matching, git_head_sha, layout_for_state, output_text,
+    run_harness, spawn_daemon_serve, start_session_via_http, start_session_with_base_ref,
+    wait_for_daemon_ready,
 };
 
 /// Slow: spawns daemon.
@@ -234,6 +235,40 @@ fn session_delete_removes_worktree_branch_and_state_files() {
             ".active.json must not contain deleted session; content: {active_text}"
         );
     }
+
+    daemon.kill().expect("kill daemon");
+}
+
+/// Slow: spawns daemon; verifies that base_ref routes worktree to the named branch tip.
+#[ignore]
+#[test]
+fn session_start_with_base_ref_routes_to_requested_branch() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo_with_branches(&project, "release");
+
+    let mut daemon = spawn_daemon_serve(&home, &xdg);
+    wait_for_daemon_ready(&home, &xdg);
+
+    let state = start_session_with_base_ref(&home, &xdg, &project, "wk-base-ref-1", "release");
+
+    assert!(
+        state.branch_ref.starts_with("harness/"),
+        "branch_ref must be a harness/ branch; got {}",
+        state.branch_ref
+    );
+
+    // The per-session worktree must be on the 'release' tip.
+    let expected_tip = git_head_sha(&project, "release");
+    let actual_tip = git_head_sha(&project, &state.branch_ref);
+    assert_eq!(
+        expected_tip, actual_tip,
+        "harness/<sid> branch must point at the release tip"
+    );
 
     daemon.kill().expect("kill daemon");
 }
