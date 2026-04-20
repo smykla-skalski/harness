@@ -3,6 +3,7 @@ import HarnessMonitorRegistry
 import HarnessMonitorUIPreviewable
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 @MainActor
@@ -15,6 +16,7 @@ struct HarnessMonitorApp: App {
   private let notificationController: HarnessMonitorUserNotificationController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
+  @State private var showOpenFolder = false
   @State private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var preferencesSelectedSection: PreferencesSection
@@ -71,6 +73,7 @@ struct HarnessMonitorApp: App {
         inspectSessionOverview: inspectSessionOverview,
         inspectObserver: inspectObserver
       )
+      OpenFolderCommand(isPresented: $showOpenFolder)
     }
 
     Window("Preferences", id: HarnessMonitorWindowID.preferences) {
@@ -118,6 +121,13 @@ struct HarnessMonitorApp: App {
       )
       .modelContainer(container)
       .mcpAccessibilityServiceGate()
+      .fileImporter(
+        isPresented: $showOpenFolder,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false
+      ) { result in
+        Task { await handleOpenFolder(result) }
+      }
     } else {
       HarnessMonitorWindowRootView(
         delegate: delegate,
@@ -129,6 +139,27 @@ struct HarnessMonitorApp: App {
         perfScenario: perfScenario
       )
       .mcpAccessibilityServiceGate()
+      .fileImporter(
+        isPresented: $showOpenFolder,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false
+      ) { result in
+        Task { await handleOpenFolder(result) }
+      }
+    }
+  }
+
+  private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
+    switch result {
+    case .success(let urls):
+      guard let url = urls.first else { return }
+      do {
+        _ = try await store.bookmarkStore.add(url: url, kind: .projectRoot)
+      } catch {
+        store.presentFailureFeedback("Could not bookmark folder: \(error.localizedDescription)")
+      }
+    case .failure(let error):
+      store.presentFailureFeedback("Could not open folder: \(error.localizedDescription)")
     }
   }
 
