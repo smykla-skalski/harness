@@ -1,7 +1,6 @@
-use crate::workspace::harness_data_root;
-use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
-use crate::workspace::worktree::WorktreeController;
+use crate::errors::CliErrorKind;
 use super::session_setup::{PreparedSession, prepare_session, rollback_session_artifacts};
+use super::session_teardown::destroy_session_artifacts;
 use super::{
     CliError, Path, SessionState, agents_service, build_log_entry, index,
     record_signal_ack, resolve_hook_agent, session_not_found, session_service, session_storage,
@@ -470,12 +469,16 @@ pub fn record_signal_ack_direct(
 /// and delete the DB row. Returns `Ok(false)` when not found.
 ///
 /// # Errors
-/// DB write failures return [`CliError`].
+/// DB write failures return [`CliError`]. `None` db returns an error because
+/// DELETE has no file-based fallback path.
 pub fn delete_session_direct(
     session_id: &str,
-    db: &super::db::DaemonDb,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<bool, CliError> {
-    let Some(state) = db.load_session_state(session_id)? else {
+    let Some(db) = db else {
+        return Err(CliErrorKind::workflow_io("delete requires a daemon DB").into());
+    };
+    let Some(state) = db.load_session_state_for_mutation(session_id)? else {
         return Ok(false);
     };
     destroy_session_artifacts(&state);
@@ -501,25 +504,4 @@ pub(crate) async fn delete_session_direct_async(
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await?;
     Ok(true)
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn destroy_session_artifacts(state: &SessionState) {
-    let sessions_root = workspace_sessions_root(&harness_data_root());
-    let layout = SessionLayout {
-        sessions_root,
-        project_name: state.project_name.clone(),
-        session_id: state.session_id.clone(),
-    };
-    if let Err(error) = session_storage::deregister_active(&layout) {
-        tracing::warn!(%error, session_id = %state.session_id, "deregister active failed");
-    }
-    if !state.origin_path.as_os_str().is_empty()
-        && let Err(error) = WorktreeController::destroy(&state.origin_path, &layout)
-    {
-        tracing::warn!(%error, session_id = %state.session_id, "worktree destroy failed");
-    }
 }
