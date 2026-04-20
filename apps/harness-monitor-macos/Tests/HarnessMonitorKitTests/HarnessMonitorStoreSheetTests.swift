@@ -82,4 +82,27 @@ struct HarnessMonitorStoreSheetTests {
     case .newSession: break
     }
   }
+
+  // MARK: - makeNewSessionViewModel
+
+  @Test("makeNewSessionViewModel returns nil when client is nil")
+  func makeNewSessionViewModelReturnsNilWhenClientIsNil() {
+    // A freshly-constructed store has no client until bootstrap connects.
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    let viewModel = store.makeNewSessionViewModel()
+
+    #expect(viewModel == nil)
+  }
+
+  @Test("makeNewSessionViewModel returns a view model after bootstrap")
+  func makeNewSessionViewModelReturnsViewModelAfterBootstrap() async {
+    let store = await makeBootstrappedStore()
+
+    let viewModel = store.makeNewSessionViewModel()
+
+    // bookmarkStore is available in DEBUG builds (temp dir fallback).
+    // client is set by bootstrap. Both must be non-nil for a result.
+    #expect(viewModel != nil)
+  }
 }

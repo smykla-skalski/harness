@@ -42,11 +42,35 @@ struct HarnessMonitorSheetRouter: View {
     case .newSession:
       if let viewModel = newSessionViewModel {
         NewSessionSheetView(store: store, viewModel: viewModel)
+      } else {
+        NewSessionOfflinePlaceholder(store: store)
       }
     }
   }
 
   private var metrics: HarnessMonitorSheetMetrics {
     .metrics(for: sheet)
+  }
+}
+
+private struct NewSessionOfflinePlaceholder: View {
+  let store: HarnessMonitorStore
+
+  var body: some View {
+    VStack(spacing: 16) {
+      Image(systemName: "network.slash")
+        .font(.system(size: 36))
+        .foregroundStyle(.secondary)
+      Text("Harness daemon not connected.")
+        .font(.headline)
+      Text("Start the daemon and try again.")
+        .foregroundStyle(.secondary)
+      Button("Dismiss") {
+        store.dismissSheet()
+      }
+      .keyboardShortcut(.cancelAction)
+    }
+    .padding(32)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }

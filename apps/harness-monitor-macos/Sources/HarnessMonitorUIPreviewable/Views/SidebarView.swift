@@ -218,6 +218,7 @@ private struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
         Label("New Session", systemImage: "plus")
       }
       .help("Start a new session")
+      .disabled(store.connectionState != .online)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarNewSessionButton)
     }
   }
