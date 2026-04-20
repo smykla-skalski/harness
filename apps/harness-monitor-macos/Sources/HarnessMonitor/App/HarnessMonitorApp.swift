@@ -109,52 +109,53 @@ struct HarnessMonitorApp: App {
   }
 
   @ViewBuilder private var mainWindowContent: some View {
-    if let container {
-      HarnessMonitorWindowRootView(
-        delegate: delegate,
-        store: store,
-        notifications: notificationController,
-        windowCommandRouting: windowCommandRouting,
-        themeMode: $themeMode,
-        preferencesSelectedSection: $preferencesSelectedSection,
-        perfScenario: perfScenario
-      )
-      .modelContainer(container)
-      .mcpAccessibilityServiceGate()
-      .fileImporter(
-        isPresented: $showOpenFolder,
-        allowedContentTypes: [.folder],
-        allowsMultipleSelection: false
-      ) { result in
-        Task { await handleOpenFolder(result) }
+    Group {
+      if let container {
+        HarnessMonitorWindowRootView(
+          delegate: delegate,
+          store: store,
+          notifications: notificationController,
+          windowCommandRouting: windowCommandRouting,
+          themeMode: $themeMode,
+          preferencesSelectedSection: $preferencesSelectedSection,
+          perfScenario: perfScenario
+        )
+        .modelContainer(container)
+        .mcpAccessibilityServiceGate()
+      } else {
+        HarnessMonitorWindowRootView(
+          delegate: delegate,
+          store: store,
+          notifications: notificationController,
+          windowCommandRouting: windowCommandRouting,
+          themeMode: $themeMode,
+          preferencesSelectedSection: $preferencesSelectedSection,
+          perfScenario: perfScenario
+        )
+        .mcpAccessibilityServiceGate()
       }
-    } else {
-      HarnessMonitorWindowRootView(
-        delegate: delegate,
-        store: store,
-        notifications: notificationController,
-        windowCommandRouting: windowCommandRouting,
-        themeMode: $themeMode,
-        preferencesSelectedSection: $preferencesSelectedSection,
-        perfScenario: perfScenario
-      )
-      .mcpAccessibilityServiceGate()
-      .fileImporter(
-        isPresented: $showOpenFolder,
-        allowedContentTypes: [.folder],
-        allowsMultipleSelection: false
-      ) { result in
-        Task { await handleOpenFolder(result) }
-      }
+    }
+    .fileImporter(
+      isPresented: $showOpenFolder,
+      allowedContentTypes: [.folder],
+      allowsMultipleSelection: false
+    ) { result in
+      Task { await handleOpenFolder(result) }
     }
   }
 
   private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
+    guard let bookmarkStore = store.bookmarkStore else {
+      store.presentFailureFeedback("Bookmark store unavailable: app group container missing")
+      return
+    }
     switch result {
     case .success(let urls):
       guard let url = urls.first else { return }
       do {
-        _ = try await store.bookmarkStore.add(url: url, kind: .projectRoot)
+        try await url.withSecurityScopeAsync { scopedURL in
+          _ = try await bookmarkStore.add(url: scopedURL, kind: .projectRoot)
+        }
       } catch {
         store.presentFailureFeedback("Could not bookmark folder: \(error.localizedDescription)")
       }
