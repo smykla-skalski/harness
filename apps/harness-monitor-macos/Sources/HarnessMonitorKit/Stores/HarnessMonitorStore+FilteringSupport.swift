@@ -259,10 +259,8 @@ extension HarnessMonitorStore.SessionIndexSlice {
     to updated: SessionSummary
   ) -> Bool {
     existing.projectId != updated.projectId
-      || existing.checkoutId != updated.checkoutId
-      || existing.isWorktree != updated.isWorktree
-      || existing.worktreeName != updated.worktreeName
-      || existing.checkoutRoot != updated.checkoutRoot
+      || existing.branchRef != updated.branchRef
+      || existing.worktreePath != updated.worktreePath
   }
 
   func requiresOrderingRefresh(
@@ -311,7 +309,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     }
     guard
       let checkoutIndex = projectCatalogs[projectIndex].checkouts.firstIndex(where: {
-        $0.checkoutId == updatedSummary.checkoutId
+        $0.checkoutId == updatedSummary.sessionId
       })
     else {
       return
@@ -352,13 +350,14 @@ extension HarnessMonitorStore.SessionIndexSlice {
     [
       summary.projectName,
       summary.projectId,
-      summary.checkoutId,
-      summary.checkoutDisplayName,
       summary.sessionId,
+      summary.worktreeDisplayName,
+      summary.branchRef,
       summary.title,
       summary.context,
       summary.projectDir ?? "",
-      summary.checkoutRoot,
+      summary.originPath,
+      summary.worktreePath,
       summary.contextRoot,
       summary.leaderId ?? "",
       summary.observeId ?? "",

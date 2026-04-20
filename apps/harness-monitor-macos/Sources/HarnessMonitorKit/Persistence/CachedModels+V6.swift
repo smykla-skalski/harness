@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV3 {
+extension HarnessMonitorSchemaV6 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -63,6 +63,7 @@ extension HarnessMonitorSchemaV3 {
     var lastCachedAt: Date
     var metricsData: Data
     var pendingTransferData: Data?
+    var timelineWindowData: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \CachedAgent.session)
     var agents: [CachedAgent]
@@ -103,7 +104,8 @@ extension HarnessMonitorSchemaV3 {
       lastViewedAt: Date? = nil,
       lastCachedAt: Date = .now,
       metricsData: Data,
-      pendingTransferData: Data? = nil
+      pendingTransferData: Data? = nil,
+      timelineWindowData: Data? = nil
     ) {
       self.sessionId = sessionId
       self.projectId = projectId
@@ -126,6 +128,7 @@ extension HarnessMonitorSchemaV3 {
       self.lastCachedAt = lastCachedAt
       self.metricsData = metricsData
       self.pendingTransferData = pendingTransferData
+      self.timelineWindowData = timelineWindowData
       self.agents = []
       self.tasks = []
       self.signals = []
@@ -193,6 +196,8 @@ extension HarnessMonitorSchemaV3 {
     var severityRaw: String
     var statusRaw: String
     var assignedTo: String?
+    var queuePolicyRaw: String = TaskQueuePolicy.locked.rawValue
+    var queuedAt: String?
     var createdAt: String
     var updatedAt: String
     var createdBy: String?
@@ -212,6 +217,8 @@ extension HarnessMonitorSchemaV3 {
       severityRaw: String,
       statusRaw: String,
       assignedTo: String?,
+      queuePolicyRaw: String = TaskQueuePolicy.locked.rawValue,
+      queuedAt: String? = nil,
       createdAt: String,
       updatedAt: String,
       createdBy: String?,
@@ -228,6 +235,8 @@ extension HarnessMonitorSchemaV3 {
       self.severityRaw = severityRaw
       self.statusRaw = statusRaw
       self.assignedTo = assignedTo
+      self.queuePolicyRaw = queuePolicyRaw
+      self.queuedAt = queuedAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.createdBy = createdBy
@@ -374,3 +383,12 @@ extension HarnessMonitorSchemaV3 {
     }
   }
 }
+
+typealias CachedProject = HarnessMonitorCurrentSchema.CachedProject
+typealias CachedSession = HarnessMonitorCurrentSchema.CachedSession
+typealias CachedAgent = HarnessMonitorCurrentSchema.CachedAgent
+typealias CachedWorkItem = HarnessMonitorCurrentSchema.CachedWorkItem
+typealias CachedSignalRecord = HarnessMonitorCurrentSchema.CachedSignalRecord
+typealias CachedTimelineEntry = HarnessMonitorCurrentSchema.CachedTimelineEntry
+typealias CachedObserver = HarnessMonitorCurrentSchema.CachedObserver
+typealias CachedAgentActivity = HarnessMonitorCurrentSchema.CachedAgentActivity

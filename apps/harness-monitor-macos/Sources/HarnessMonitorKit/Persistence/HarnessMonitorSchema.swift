@@ -113,6 +113,27 @@ public enum HarnessMonitorSchemaV5: VersionedSchema {
   }
 }
 
+public enum HarnessMonitorSchemaV6: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(6, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      Self.CachedProject.self,
+      Self.CachedSession.self,
+      Self.CachedAgent.self,
+      Self.CachedWorkItem.self,
+      Self.CachedSignalRecord.self,
+      Self.CachedTimelineEntry.self,
+      Self.CachedObserver.self,
+      Self.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -121,11 +142,12 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV3.self,
       HarnessMonitorSchemaV4.self,
       HarnessMonitorSchemaV5.self,
+      HarnessMonitorSchemaV6.self,
     ]
   }
 
   public static var stages: [MigrationStage] {
-    [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5]
+    [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6]
   }
 
   static let migrateV1toV2 = MigrationStage.lightweight(
@@ -147,6 +169,11 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV4.self,
     toVersion: HarnessMonitorSchemaV5.self
   )
+
+  static let migrateV5toV6 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV5.self,
+    toVersion: HarnessMonitorSchemaV6.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV5
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV6

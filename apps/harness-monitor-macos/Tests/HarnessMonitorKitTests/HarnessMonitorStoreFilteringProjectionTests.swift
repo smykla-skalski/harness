@@ -199,9 +199,11 @@ struct HarnessMonitorStoreProjectionTests {
     ]
     store.sessionFilter = .all
 
+    // In the new layout every session is its own worktree checkout, so checkouts are
+    // ordered alphabetically by worktreeDisplayName (== sessionId when branchRef is empty).
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
-        == ["bravo", "zeta", "alpha"]
+        == ["alpha", "bravo", "zeta"]
     )
 
     let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
@@ -222,7 +224,7 @@ struct HarnessMonitorStoreProjectionTests {
 
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
-        == ["bravo", "alpha", "zeta"]
+        == ["alpha", "bravo", "zeta"]
     )
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == projectionAfterNameSort + 1)
@@ -342,7 +344,9 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(didChange)
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
-    #expect(store.visibleSessionIDs == ["second", "first"])
+    // In the new layout each session is its own checkout, ordered alphabetically by
+    // worktreeDisplayName. Within-session activity changes no longer reorder across checkouts.
+    #expect(store.visibleSessionIDs == ["first", "second"])
   }
 
 }
