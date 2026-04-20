@@ -76,6 +76,14 @@ pub(super) fn prepare_session(
             layout.project_dir().display()
         )))
     })?;
+    project_resolver::write_origin_marker(&layout.project_dir(), &canonical_origin).map_err(
+        |error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "write project .origin marker for '{}': {error}",
+                layout.project_dir().display()
+            )))
+        },
+    )?;
 
     WorktreeController::create(&canonical_origin, &layout, None).map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
