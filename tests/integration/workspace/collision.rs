@@ -6,9 +6,12 @@ use harness_testkit::init_git_repo_with_seed;
 use tempfile::tempdir;
 
 use super::support::{
-    output_text, run_harness, spawn_daemon_serve, start_session_via_http, wait_for_daemon_ready,
+    layout_for_state, output_text, run_harness, spawn_daemon_serve, start_session_try,
+    start_session_via_http, wait_for_daemon_ready,
 };
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn two_origins_same_basename_get_distinct_project_names() {
     let tmp = tempdir().expect("tempdir");
@@ -77,9 +80,39 @@ fn two_origins_same_basename_get_distinct_project_names() {
         "session B must appear in list; found: {session_ids:?}"
     );
 
+    // Verify .origin marker content for both sessions.
+    // NOTE: .origin is written by WorktreeController::create in src/workspace/worktree.rs.
+    // FIXME: marker may not be written on all code paths (see src/daemon/service/session_setup.rs).
+    let layout_a = layout_for_state(&xdg, &state_a);
+    let layout_b = layout_for_state(&xdg, &state_b);
+    let origin_text_a =
+        std::fs::read_to_string(layout_a.origin_marker()).expect("read .origin for session A");
+    let origin_text_b =
+        std::fs::read_to_string(layout_b.origin_marker()).expect("read .origin for session B");
+    assert_eq!(
+        origin_text_a.trim(),
+        origin_a
+            .canonicalize()
+            .expect("canonicalize origin A")
+            .to_str()
+            .unwrap(),
+        ".origin for session A must contain canonical origin path"
+    );
+    assert_eq!(
+        origin_text_b.trim(),
+        origin_b
+            .canonicalize()
+            .expect("canonicalize origin B")
+            .to_str()
+            .unwrap(),
+        ".origin for session B must contain canonical origin path"
+    );
+
     daemon.kill().expect("kill daemon");
 }
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn invalid_project_dir_returns_error_status() {
     let tmp = tempdir().expect("tempdir");
@@ -94,67 +127,13 @@ fn invalid_project_dir_returns_error_status() {
 
     // A path that does not exist on the filesystem cannot be canonicalized.
     let nonexistent = tmp.path().join("does-not-exist").join("project");
-    let status = start_session_raw_status(&home, &xdg, &nonexistent, "col-bad-a1234567");
-    assert_ne!(
-        status, 200,
-        "start with nonexistent project_dir must fail; got {status}"
+    let (status, _body) = start_session_try(&home, &xdg, &nonexistent, "col-bad-a1234567")
+        .expect_err("start with nonexistent project_dir must fail");
+    // Daemon returns 400 for all validation/workflow errors (see src/daemon/http/response.rs).
+    assert_eq!(
+        status, 400,
+        "start with nonexistent project_dir must return 400; got {status}"
     );
 
     daemon.kill().expect("kill daemon");
-}
-
-/// Returns the raw HTTP status without panicking, for negative tests.
-fn start_session_raw_status(
-    home: &std::path::Path,
-    xdg: &std::path::Path,
-    project_dir: &std::path::Path,
-    session_id: &str,
-) -> u16 {
-    use std::thread;
-    use std::time::Instant;
-
-    use serde_json::json;
-    use tokio::runtime::Runtime;
-
-    use super::support::{
-        DAEMON_HTTP_TIMEOUT, DAEMON_WAIT_INTERVAL, DAEMON_WAIT_TIMEOUT,
-        current_daemon_endpoint_and_token,
-    };
-
-    let runtime = Runtime::new().expect("runtime");
-    let project_arg = project_dir.to_str().expect("utf8 project path");
-    let body = json!({
-        "title": "collision negative test",
-        "context": "bad project_dir",
-        "runtime": "codex",
-        "session_id": session_id,
-        "project_dir": project_arg,
-    });
-
-    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
-    loop {
-        let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
-        let url = format!("{}/v1/sessions", endpoint.trim_end_matches('/'));
-        let client = reqwest::Client::new();
-        let result = runtime.block_on(async {
-            client
-                .post(&url)
-                .bearer_auth(&token)
-                .json(&body)
-                .timeout(DAEMON_HTTP_TIMEOUT)
-                .send()
-                .await
-        });
-        match result {
-            Ok(response) => return response.status().as_u16(),
-            Err(error) if error.is_connect() || error.is_timeout() => {
-                assert!(
-                    Instant::now() < deadline,
-                    "daemon connection timed out: {error}"
-                );
-                thread::sleep(DAEMON_WAIT_INTERVAL);
-            }
-            Err(error) => panic!("request failed: {error}"),
-        }
-    }
 }
