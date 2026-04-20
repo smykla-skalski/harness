@@ -73,7 +73,7 @@ fi
 # 3. Monitor.app build
 
 section "Harness Monitor.app"
-app_path="tmp/xcode-derived/Build/Products/Debug/Harness Monitor.app"
+app_path="xcode-derived/Build/Products/Debug/Harness Monitor.app"
 if [[ -d "$app_path" ]]; then
   ok "Debug build present" "$app_path"
 else

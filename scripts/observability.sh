@@ -758,7 +758,7 @@ run_monitor_smoke() {
       -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
       -scheme "HarnessMonitor" \
       -configuration Debug \
-      -derivedDataPath "$ROOT/tmp/xcode-derived" \
+      -derivedDataPath "$ROOT/xcode-derived" \
       -skipPackagePluginValidation \
       test \
       CODE_SIGNING_ALLOWED=NO \
