@@ -38,7 +38,8 @@ pub(super) fn prepare_session(
     })?;
 
     // Sandboxed callers may pass a bookmark id; the scope guard MUST stay
-    // alive until WorktreeController::create finishes its git subprocess.
+    // alive while the origin is touched (WorktreeController::create runs the
+    // git subprocess against it).
     let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
     let canonical_origin = project_scope.path().to_path_buf();
     let leader_agent_session_id =
