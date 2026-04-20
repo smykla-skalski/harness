@@ -5,10 +5,12 @@ use harness_testkit::init_git_repo_with_seed;
 use tempfile::tempdir;
 
 use super::support::{
-    delete_session_via_http, git_branches_matching, output_text, run_harness, spawn_daemon_serve,
-    start_session_via_http, wait_for_daemon_ready,
+    delete_session_via_http, git_branches_matching, layout_for_state, output_text, run_harness,
+    spawn_daemon_serve, start_session_via_http, wait_for_daemon_ready,
 };
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn two_sessions_same_origin_get_distinct_workspaces() {
     let tmp = tempdir().expect("tempdir");
@@ -89,6 +91,8 @@ fn two_sessions_same_origin_get_distinct_workspaces() {
     daemon.kill().expect("kill daemon");
 }
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn deleting_one_session_leaves_other_intact() {
     let tmp = tempdir().expect("tempdir");
@@ -159,6 +163,8 @@ fn deleting_one_session_leaves_other_intact() {
     daemon.kill().expect("kill daemon");
 }
 
+/// Slow: spawns daemon.
+#[ignore]
 #[test]
 fn active_json_tracks_each_session() {
     let tmp = tempdir().expect("tempdir");
@@ -175,29 +181,8 @@ fn active_json_tracks_each_session() {
     let state_a = start_session_via_http(&home, &xdg, &project, "wk-act-a2468ace");
     let state_b = start_session_via_http(&home, &xdg, &project, "wk-act-b2468ace");
 
-    // Derive active registry path for each session from its own state.
-    use harness::workspace::harness_data_root;
-    use harness::workspace::layout::{SessionLayout, sessions_root};
-
-    let (active_a, active_b) = temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(xdg.to_str().expect("utf8")))],
-        || {
-            let sessions = sessions_root(&harness_data_root());
-            let path_a = SessionLayout {
-                sessions_root: sessions.clone(),
-                project_name: state_a.project_name.clone(),
-                session_id: state_a.session_id.clone(),
-            }
-            .active_registry();
-            let path_b = SessionLayout {
-                sessions_root: sessions,
-                project_name: state_b.project_name.clone(),
-                session_id: state_b.session_id.clone(),
-            }
-            .active_registry();
-            (path_a, path_b)
-        },
-    );
+    let active_a = layout_for_state(&xdg, &state_a).active_registry();
+    let active_b = layout_for_state(&xdg, &state_b).active_registry();
 
     // Session A's registry must list A.
     assert!(

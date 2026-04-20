@@ -2,17 +2,27 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use harness::daemon::protocol::SessionMutationResponse;
 use harness::session::types::SessionState;
+use harness::workspace::layout::SessionLayout;
+use harness::workspace::{harness_data_root, layout::sessions_root};
 use serde_json::{Value, json};
 use tokio::runtime::Runtime;
 
 pub const DAEMON_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 pub const DAEMON_WAIT_INTERVAL: Duration = Duration::from_millis(250);
 pub const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Shared Tokio runtime for all HTTP helpers in this module.
+static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+
+fn runtime() -> &'static Runtime {
+    RUNTIME.get_or_init(|| Runtime::new().expect("tokio runtime"))
+}
 
 pub fn harness_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness")
@@ -24,6 +34,7 @@ pub fn spawn_daemon_serve(home: &Path, xdg: &Path) -> super::super::helpers::Man
         .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("XDG_DATA_HOME", xdg)
+        .env_remove("CLAUDE_SESSION_ID")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -36,6 +47,7 @@ pub fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
         .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("XDG_DATA_HOME", xdg)
+        .env_remove("CLAUDE_SESSION_ID")
         .output()
         .expect("run harness")
 }
@@ -92,13 +104,14 @@ pub fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, St
     }
 }
 
-pub fn start_session_via_http(
+/// Attempt a session start and return `Ok(state)` on 200, or `Err((status, body))` on any
+/// non-success, non-409 response. Retries on connection errors until the daemon is reachable.
+pub fn start_session_try(
     home: &Path,
     xdg: &Path,
     project_dir: &Path,
     session_id: &str,
-) -> SessionState {
-    let runtime = Runtime::new().expect("runtime");
+) -> Result<SessionState, (u16, String)> {
     let project_arg = project_dir.to_str().expect("utf8 project path");
     let request_body = json!({
         "title": "workspace integration test",
@@ -113,7 +126,7 @@ pub fn start_session_via_http(
         let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
         let url = format!("{}/v1/sessions", endpoint.trim_end_matches('/'));
         let client = reqwest::Client::new();
-        let response = runtime.block_on(async {
+        let response = runtime().block_on(async {
             client
                 .post(&url)
                 .bearer_auth(&token)
@@ -126,12 +139,12 @@ pub fn start_session_via_http(
         match response {
             Ok(response) => {
                 let status = response.status().as_u16();
-                let body =
-                    runtime.block_on(async { response.json::<Value>().await.expect("json body") });
+                let body = runtime()
+                    .block_on(async { response.json::<Value>().await.expect("json body") });
                 if status == 200 {
-                    return serde_json::from_value::<SessionMutationResponse>(body)
+                    return Ok(serde_json::from_value::<SessionMutationResponse>(body)
                         .expect("parse session start")
-                        .state;
+                        .state);
                 }
                 if status == 409 {
                     // Already exists - try to read it.
@@ -148,11 +161,12 @@ pub fn start_session_via_http(
                         ],
                     );
                     if status_out.status.success() {
-                        return serde_json::from_slice(&status_out.stdout)
-                            .expect("parse session status");
+                        return Ok(serde_json::from_slice(&status_out.stdout)
+                            .expect("parse session status"));
                     }
                 }
-                panic!("session start failed: status={status} body={body}");
+                let body_text = body.to_string();
+                return Err((status, body_text));
             }
             Err(error) if error.is_connect() || error.is_timeout() => {
                 assert!(
@@ -166,8 +180,18 @@ pub fn start_session_via_http(
     }
 }
 
+pub fn start_session_via_http(
+    home: &Path,
+    xdg: &Path,
+    project_dir: &Path,
+    session_id: &str,
+) -> SessionState {
+    start_session_try(home, xdg, project_dir, session_id).unwrap_or_else(|(status, body)| {
+        panic!("session start failed: status={status} body={body}")
+    })
+}
+
 pub fn delete_session_via_http(home: &Path, xdg: &Path, session_id: &str) -> u16 {
-    let runtime = Runtime::new().expect("runtime");
     let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
     let url = format!(
         "{}/v1/sessions/{}",
@@ -175,7 +199,7 @@ pub fn delete_session_via_http(home: &Path, xdg: &Path, session_id: &str) -> u16
         session_id
     );
     let client = reqwest::Client::new();
-    let response = runtime.block_on(async {
+    let response = runtime().block_on(async {
         client
             .delete(&url)
             .bearer_auth(&token)
@@ -202,4 +226,18 @@ pub fn git_branches_matching(repo: &Path, prefix: &str) -> Vec<String> {
         })
         .filter(|line| !line.is_empty())
         .collect()
+}
+
+pub fn layout_for_state(xdg: &std::path::Path, state: &SessionState) -> SessionLayout {
+    temp_env::with_vars(
+        [("XDG_DATA_HOME", Some(xdg.as_os_str().to_str().unwrap()))],
+        || {
+            let root = sessions_root(&harness_data_root());
+            SessionLayout {
+                sessions_root: root,
+                project_name: state.project_name.clone(),
+                session_id: state.session_id.clone(),
+            }
+        },
+    )
 }
