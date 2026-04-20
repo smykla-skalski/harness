@@ -8,9 +8,7 @@ use super::{
 };
 use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::telemetry::current_trace_id;
-use crate::workspace::harness_data_root;
-use crate::workspace::layout::sessions_root;
-use crate::workspace::orphan_cleanup::cleanup_orphans;
+use crate::workspace::orphan_cleanup::run_startup_sweep;
 use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
@@ -21,17 +19,10 @@ use binary_stamp::current_binary_stamp;
 ///
 /// # Errors
 /// Returns [`CliError`] if the server fails to start or bind.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     validate_serve_config(&config)?;
     log_sandbox_startup(config.sandboxed);
-
-    if let Err(err) = cleanup_orphans(&sessions_root(&harness_data_root())) {
-        tracing::warn!(%err, "orphan cleanup failed; continuing");
-    }
+    run_startup_sweep();
 
     state::ensure_daemon_dirs()?;
     super::voice::cleanup_abandoned_sessions()?;
