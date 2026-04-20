@@ -21,6 +21,8 @@ pub enum WorkflowError {
     SessionPermissionDenied { detail: Cow<'static, str> },
     #[error("session agent conflict: {detail}")]
     SessionAgentConflict { detail: Cow<'static, str> },
+    #[error("invalid project directory (no file_name component): {path}")]
+    InvalidProjectDir { path: Cow<'static, str> },
 }
 
 impl WorkflowError {
@@ -36,6 +38,7 @@ impl WorkflowError {
             Self::SessionNotActive { .. } => "KSRCLI090",
             Self::SessionPermissionDenied { .. } => "KSRCLI091",
             Self::SessionAgentConflict { .. } => "KSRCLI092",
+            Self::InvalidProjectDir { .. } => "KSRCLI093",
         }
     }
 
@@ -105,6 +108,11 @@ impl WorkflowError {
         Self::SessionAgentConflict {
             detail: detail.into(),
         }
+    }
+
+    #[must_use]
+    pub fn invalid_project_dir(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::InvalidProjectDir { path: path.into() }
     }
 
     #[must_use]

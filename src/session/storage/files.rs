@@ -145,18 +145,37 @@ where
 /// `list_known_session_ids`, and `registry::load_active_registry_for`) call
 /// this helper so the derivation logic is not duplicated.
 ///
+/// # Errors
+/// Returns `CliError` (variant `InvalidProjectDir`) when `project_dir` has no
+/// `file_name` component (e.g. it is `/` or ends with `..`).  In debug builds
+/// the same condition panics immediately to surface the bug earlier.
+///
 /// # TODO(b-task-8)
 /// Remove once every legacy adapter is gone.
-pub(crate) fn project_layout_parts_from_dir(project_dir: &Path) -> (PathBuf, String) {
-    let sessions_root = workspace_sessions_root(&harness_data_root());
+pub(crate) fn project_layout_parts_from_dir(
+    project_dir: &Path,
+) -> Result<(PathBuf, String), CliError> {
+    debug_assert!(
+        project_dir.file_name().is_some(),
+        "project_dir must have a file_name component: {}",
+        project_dir.display()
+    );
     let project_name = project_dir
         .file_name()
-        .map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
-    (sessions_root, project_name)
+        .map(|n| n.to_string_lossy().into_owned())
+        .ok_or_else(|| -> CliError {
+            CliErrorKind::invalid_project_dir(project_dir.to_string_lossy().into_owned()).into()
+        })?;
+    let sessions_root = workspace_sessions_root(&harness_data_root());
+    Ok((sessions_root, project_name))
 }
 
 /// Build a `SessionLayout` from the old-style `project_dir` + `session_id`
 /// pair.
+///
+/// # Errors
+/// Returns `CliError` (variant `InvalidProjectDir`) when `project_dir` has no
+/// `file_name` component.  See [`project_layout_parts_from_dir`].
 ///
 /// # TODO(b-task-8)
 /// This adapter exists only to keep callers compiling during the Task 7
@@ -170,19 +189,23 @@ pub(crate) fn project_layout_parts_from_dir(project_dir: &Path) -> (PathBuf, Str
 pub(crate) fn layout_from_project_dir(
     project_dir: &Path,
     session_id: &str,
-) -> SessionLayout {
-    let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir);
-    SessionLayout {
+) -> Result<SessionLayout, CliError> {
+    let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir)?;
+    Ok(SessionLayout {
         sessions_root,
         project_name,
         session_id: session_id.to_string(),
-    }
+    })
 }
 
 /// Legacy wrapper: `list_known_session_ids` taking `project_dir`.
 ///
+/// # Errors
+/// Returns `CliError` when `project_dir` has no `file_name` component, or on
+/// underlying I/O failures.
+///
 /// # TODO(b-task-8): migrate callers to `list_known_session_ids_for_layout`.
 pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, CliError> {
-    let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir);
+    let (sessions_root, project_name) = project_layout_parts_from_dir(project_dir)?;
     list_session_ids_in_project_dir(&sessions_root.join(project_name))
 }

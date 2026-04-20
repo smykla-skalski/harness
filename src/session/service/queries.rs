@@ -98,7 +98,7 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
     let session_ids = if include_all {
         storage::list_known_session_ids(project_dir)?
     } else {
-        storage::load_active_registry_for(project_dir)
+        storage::load_active_registry_for(project_dir)?
             .sessions
             .into_keys()
             .collect()

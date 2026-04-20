@@ -134,7 +134,7 @@ pub(crate) fn load_state_legacy(
     project_dir: &Path,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     load_state(&layout)
 }
 
@@ -146,7 +146,7 @@ pub(crate) fn create_state_legacy(
     session_id: &str,
     state: &SessionState,
 ) -> Result<bool, CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     create_state(&layout, state)
 }
 
@@ -161,7 +161,7 @@ pub(crate) fn update_state_legacy<F>(
 where
     F: FnOnce(&mut SessionState) -> Result<(), CliError>,
 {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     update_state(&layout, update)
 }
 
@@ -176,6 +176,6 @@ pub(crate) fn update_state_if_changed_legacy<F>(
 where
     F: FnOnce(&mut SessionState) -> Result<bool, CliError>,
 {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     update_state_if_changed(&layout, update)
 }

@@ -47,4 +47,9 @@ impl CliErrorKind {
     pub fn session_agent_conflict(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::session_agent_conflict(detail))
     }
+
+    #[must_use]
+    pub fn invalid_project_dir(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::invalid_project_dir(path))
+    }
 }
