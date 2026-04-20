@@ -3,6 +3,7 @@
 
 use std::fs;
 use std::io;
+use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
@@ -10,12 +11,14 @@ use serde::Serialize;
 use thiserror::Error;
 use tracing::{info, warn};
 
+#[must_use]
 #[derive(Debug)]
 pub enum MigrationOutcome {
     Migrated,
     AlreadyMigrated,
     SkippedOldAbsent,
     SkippedNewNotEmpty,
+    ConcurrentlyMigrating,
 }
 
 #[derive(Debug, Error)]
@@ -27,6 +30,7 @@ pub enum MigrationError {
 }
 
 const MARKER_NAME: &str = ".migrated-from";
+const LOCK_NAME: &str = ".migration.lock";
 
 #[derive(Debug, Serialize)]
 struct Marker {
@@ -59,10 +63,40 @@ pub fn migrate(old_root: &Path, new_root: &Path) -> Result<MigrationOutcome, Mig
     }
 
     fs::create_dir_all(new_root)?;
+    let Some(_lock) = acquire_lock(new_root)? else {
+        // Another process is mid-migration; back off.
+        return Ok(MigrationOutcome::ConcurrentlyMigrating);
+    };
     move_contents(old_root, new_root)?;
     write_marker(new_root, old_root)?;
     info!(from = %old_root.display(), to = %new_root.display(), "migrated data root");
     Ok(MigrationOutcome::Migrated)
+}
+
+/// Advisory lock: `O_CREAT | O_EXCL` on a sibling file. Caller holds the
+/// returned guard for the duration of the critical section; Drop removes
+/// the lock file so a subsequent restart can proceed.
+fn acquire_lock(new_root: &Path) -> io::Result<Option<LockGuard>> {
+    let lock_path = new_root.join(LOCK_NAME);
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&lock_path)
+    {
+        Ok(_) => Ok(Some(LockGuard { path: lock_path })),
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+struct LockGuard {
+    path: PathBuf,
+}
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
 }
 
 fn dir_is_empty(path: &Path) -> io::Result<bool> {
@@ -88,7 +122,15 @@ fn move_contents(from: &Path, to: &Path) -> io::Result<()> {
 }
 
 fn copy_recursive(src: &Path, dst: &Path) -> io::Result<()> {
-    if src.is_dir() {
+    let meta = fs::symlink_metadata(src)?;
+    let ty = meta.file_type();
+    if ty.is_symlink() {
+        // Recreate the symlink at dst instead of following it. fs::copy
+        // would dereference and capture the target's contents into a
+        // plain file - bad if the link points outside the data root.
+        let target = fs::read_link(src)?;
+        unix_fs::symlink(target, dst)?;
+    } else if ty.is_dir() {
         fs::create_dir_all(dst)?;
         for entry in fs::read_dir(src)? {
             let entry = entry?;
@@ -115,7 +157,12 @@ fn write_marker(new_root: &Path, old_root: &Path) -> Result<(), MigrationError> 
         harness_version: env!("CARGO_PKG_VERSION"),
     };
     let bytes = serde_json::to_vec_pretty(&marker)?;
-    fs::write(new_root.join(MARKER_NAME), bytes)?;
+    // Atomic marker write so a crash between truncate and write cannot
+    // leave a half-written marker that forensic tooling cannot parse.
+    let final_path = new_root.join(MARKER_NAME);
+    let tmp_path = new_root.join(format!("{MARKER_NAME}.tmp"));
+    fs::write(&tmp_path, bytes)?;
+    fs::rename(&tmp_path, &final_path)?;
     Ok(())
 }
 
