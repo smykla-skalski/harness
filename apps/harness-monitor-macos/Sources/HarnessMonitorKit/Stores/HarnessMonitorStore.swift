@@ -15,6 +15,8 @@ public final class HarnessMonitorStore {
   public let toast: ToastSlice
   public let bookmarkStore: BookmarkStore?
 
+  public var openFolderRequest = 0
+
   public var persistenceError: String? {
     didSet {
       guard oldValue != persistenceError else { return }
