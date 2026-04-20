@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::sandbox;
 use crate::session::types::SessionState;
 use crate::workspace::ids;
 use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
@@ -36,13 +37,10 @@ pub(super) fn prepare_session(
         )))
     })?;
 
-    let project_dir = Path::new(&request.project_dir);
-    let canonical_origin = fs::canonicalize(project_dir).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "session start could not canonicalize project_dir '{}': {error}",
-            project_dir.display()
-        )))
-    })?;
+    // Sandboxed callers may pass a bookmark id; the scope guard MUST stay
+    // alive until WorktreeController::create finishes its git subprocess.
+    let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
+    let canonical_origin = project_scope.path().to_path_buf();
     let leader_agent_session_id =
         agents_service::resolve_known_session_id(leader_runtime, &canonical_origin, None)?;
 
@@ -113,6 +111,7 @@ pub(super) fn prepare_session(
         let _ = fs::create_dir_all(project_context_dir(&canonical_origin));
     }
 
+    drop(project_scope);
     Ok(PreparedSession {
         layout,
         canonical_origin,
