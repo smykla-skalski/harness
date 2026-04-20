@@ -110,6 +110,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func startSession(request: SessionStartRequest) async throws -> SessionSummary {
+    struct Response: Decodable { let state: SessionSummary }
+    let params = try encodeParams(request, extra: [:])
+    let value = try await send(method: "session.start", params: params)
+    let response: Response = try decode(value)
+    return response.state
+  }
+
   public func endSession(
     sessionID: String,
     request: SessionEndRequest

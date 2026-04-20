@@ -242,6 +242,34 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return try await sessionDetail(id: "")
   }
 
+  public func startSession(request: SessionStartRequest) async throws -> SessionSummary {
+    try await performActionDelay()
+    return SessionSummary(
+      projectId: fixtures.sessions.first?.projectId ?? "project-preview",
+      projectName: fixtures.sessions.first?.projectName ?? "harness",
+      projectDir: request.projectDir,
+      contextRoot: "",
+      sessionId: request.sessionId ?? "sess-preview-new",
+      title: request.title,
+      context: request.context,
+      status: .active,
+      createdAt: "2026-04-20T12:00:00Z",
+      updatedAt: "2026-04-20T12:00:00Z",
+      lastActivityAt: nil,
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 0,
+        activeAgentCount: 0,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+  }
+
   public func endSession(
     sessionID _: String,
     request _: SessionEndRequest

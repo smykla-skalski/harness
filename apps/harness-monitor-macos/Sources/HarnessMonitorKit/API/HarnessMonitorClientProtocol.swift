@@ -83,6 +83,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     sessionID: String,
     request: LeaderTransferRequest
   ) async throws -> SessionDetail
+  func startSession(request: SessionStartRequest) async throws -> SessionSummary
   func endSession(
     sessionID: String,
     request: SessionEndRequest
