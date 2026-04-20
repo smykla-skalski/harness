@@ -148,7 +148,7 @@ fn invalid_project_dir_returns_error_status() {
 
     // A path that does not exist on the filesystem cannot be canonicalized.
     let nonexistent = tmp.path().join("does-not-exist").join("project");
-    let (status, _body) = start_session_try(&home, &xdg, &nonexistent, "col-bad-a1234567")
+    let (status, _body) = start_session_try(&home, &xdg, &nonexistent, "col-bad-a1234567", None)
         .expect_err("start with nonexistent project_dir must fail");
     // Daemon returns 400 for all validation/workflow errors (see src/daemon/http/response.rs).
     assert_eq!(
