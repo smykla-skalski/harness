@@ -10,6 +10,8 @@ private struct HarnessMonitorSheetMetrics {
     switch sheet {
     case .sendSignal:
       Self(minWidth: 420, idealWidth: 500, minHeight: 300)
+    case .newSession:
+      Self(minWidth: 480, idealWidth: 560, minHeight: 360)
     }
   }
 }
@@ -31,6 +33,8 @@ struct HarnessMonitorSheetRouter: View {
     switch sheet {
     case .sendSignal(let agentID):
       SendSignalSheetView(store: store, agentID: agentID)
+    case .newSession:
+      EmptyView()
     }
   }
 

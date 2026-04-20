@@ -74,11 +74,12 @@ struct HarnessMonitorStoreSheetTests {
     #expect(sheet1.id != sheet2.id)
   }
 
-  @Test("PresentedSheet only includes sendSignal")
-  func presentedSheetOnlyIncludesSendSignal() {
+  @Test("PresentedSheet cases are exhaustively matchable")
+  func presentedSheetCasesAreExhaustivelyMatchable() {
     let sheet = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")
     switch sheet {
     case .sendSignal: break
+    case .newSession: break
     }
   }
 }
