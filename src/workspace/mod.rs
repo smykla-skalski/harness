@@ -1,4 +1,5 @@
 pub mod compact;
+pub mod ids;
 mod git;
 mod paths;
 mod remote_kubernetes;
