@@ -111,6 +111,8 @@ pub struct SessionStartRequest {
     pub project_dir: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_preset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

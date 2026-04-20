@@ -59,6 +59,7 @@ pub fn start_session_with_policy(
             session_id: session_id.map(ToString::to_string),
             project_dir: project_dir.to_string_lossy().into_owned(),
             policy_preset: policy_preset.map(ToString::to_string),
+            base_ref: None,
         });
     }
 

@@ -14,6 +14,7 @@ fn session_start_request_round_trips() {
         session_id: Some("my-session".into()),
         project_dir: "/tmp/project".into(),
         policy_preset: Some("swarm-default".into()),
+        base_ref: None,
     };
     let json = serde_json::to_value(&request).expect("serialize");
     assert_eq!(json["title"], "auth fix session");
@@ -131,4 +132,20 @@ fn session_mutation_response_contains_state() {
     });
     let response: SessionMutationResponse = serde_json::from_value(json).expect("deserialize");
     assert_eq!(response.state.session_id, "sess-1");
+}
+
+#[test]
+fn session_start_request_accepts_optional_base_ref() {
+    let raw = r#"{"title":"t","context":"c","runtime":"claude","project_dir":"/tmp","base_ref":"main"}"#;
+    let req: SessionStartRequest = serde_json::from_str(raw).expect("parse");
+    assert_eq!(req.base_ref.as_deref(), Some("main"));
+}
+
+#[test]
+fn session_start_request_base_ref_optional_on_wire() {
+    let raw = r#"{"title":"t","context":"c","runtime":"claude","project_dir":"/tmp"}"#;
+    let req: SessionStartRequest = serde_json::from_str(raw).expect("parse");
+    assert!(req.base_ref.is_none());
+    let back = serde_json::to_string(&req).expect("serialize");
+    assert!(!back.contains("base_ref"), "serialize should skip None");
 }

@@ -162,6 +162,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                         session_id: Some("daemon-async-remove".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )
@@ -230,6 +231,7 @@ fn start_session_db_direct_creates_in_sqlite() {
                 session_id: Some("daemon-start-1".into()),
                 project_dir: project.to_string_lossy().into(),
                 policy_preset: None,
+                base_ref: None,
             },
             Some(&db),
         )
@@ -268,6 +270,7 @@ fn end_session_async_direct_marks_inactive() {
                         session_id: Some("daemon-async-end".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )
@@ -337,6 +340,7 @@ fn start_session_db_direct_registers_fresh_project_for_discovery() {
                 session_id: Some("daemon-start-fresh".into()),
                 project_dir: canonical_project.to_string_lossy().into_owned(),
                 policy_preset: None,
+                base_ref: None,
             },
             Some(&db),
         )
@@ -379,6 +383,7 @@ fn join_session_db_direct_adds_agent() {
                 session_id: Some("daemon-join-1".into()),
                 project_dir: project.to_string_lossy().into(),
                 policy_preset: None,
+                base_ref: None,
             },
             Some(&db),
         )
@@ -430,6 +435,7 @@ fn start_session_direct_async_creates_in_sqlite() {
                     session_id: Some("daemon-async-start-1".into()),
                     project_dir: project.to_string_lossy().into(),
                     policy_preset: None,
+                    base_ref: None,
                 },
                 &async_db,
             )
@@ -476,6 +482,7 @@ fn join_session_direct_async_adds_agent() {
                         session_id: Some("daemon-async-join-1".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )

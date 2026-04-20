@@ -61,6 +61,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                         session_id: Some("daemon-async-signal-send".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )
@@ -138,6 +139,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                             session_id: Some("daemon-async-signal-cancel".into()),
                             project_dir: project.to_string_lossy().into(),
                             policy_preset: None,
+                            base_ref: None,
                         },
                         &async_db,
                     )
@@ -226,6 +228,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                         session_id: Some("daemon-async-signal-ack".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
+                        base_ref: None,
                     },
                     &async_db,
                 )
@@ -320,6 +323,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                             session_id: Some("daemon-async-signal-expired".into()),
                             project_dir: project.to_string_lossy().into(),
                             policy_preset: None,
+                            base_ref: None,
                         },
                         &async_db,
                     )

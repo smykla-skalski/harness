@@ -83,6 +83,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                     session_id: Some("daemon-active-signal".into()),
                     project_dir: project.to_string_lossy().into(),
                     policy_preset: None,
+                    base_ref: None,
                 },
                 Some(&db_guard),
             )
@@ -209,6 +210,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                     session_id: Some("daemon-timed-signal".into()),
                     project_dir: project.to_string_lossy().into(),
                     policy_preset: None,
+                    base_ref: None,
                 },
                 Some(&db_guard),
             )

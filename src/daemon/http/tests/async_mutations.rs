@@ -94,6 +94,7 @@ pub(super) async fn start_async_http_session(
             session_id: Some(session_id.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),
             policy_preset: None,
+            base_ref: None,
         }),
     )
     .await;
