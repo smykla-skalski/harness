@@ -49,4 +49,5 @@ public extension BookmarkStore {
     }
 }
 
+// Stub - replaced by the full implementation in BookmarkStore.swift (Task 4).
 public actor BookmarkStore {}
