@@ -13,7 +13,7 @@ public final class HarnessMonitorStore {
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
-  public let bookmarkStore: BookmarkStore
+  public let bookmarkStore: BookmarkStore?
 
   public var persistenceError: String? {
     didSet {
@@ -188,19 +188,21 @@ public final class HarnessMonitorStore {
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.toast = ToastSlice()
-    let containerURL: URL
     if let groupContainer = SandboxPaths.appGroupContainerURL() {
-      containerURL = groupContainer
+      self.bookmarkStore = BookmarkStore(containerURL: groupContainer)
     } else {
       #if DEBUG
-        containerURL = FileManager.default.temporaryDirectory
-      #else
-        preconditionFailure(
-          "App group container unavailable outside debug builds; check entitlements"
+        HarnessMonitorLogger.store.warning(
+          "App group container unavailable; using temp dir for BookmarkStore — check entitlements"
         )
+        self.bookmarkStore = BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
+      #else
+        HarnessMonitorLogger.store.warning(
+          "App group container unavailable; bookmark store disabled — check entitlements"
+        )
+        self.bookmarkStore = nil
       #endif
     }
-    self.bookmarkStore = BookmarkStore(containerURL: containerURL)
     self.daemonController = daemonController
     self.daemonOwnership = daemonOwnership
     self.fileViewer = fileViewer

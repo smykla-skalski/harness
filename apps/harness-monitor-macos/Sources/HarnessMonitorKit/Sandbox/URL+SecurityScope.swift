@@ -18,7 +18,9 @@ extension URL {
   /// Named separately because Swift 6 overload resolution between sync and
   /// async throwing closures causes spurious `await` warnings when the two
   /// share a name. Callers use `withSecurityScopeAsync` in async contexts.
-  public func withSecurityScopeAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T {
+  public func withSecurityScopeAsync<T>(
+    _ body: @Sendable (URL) async throws -> T
+  ) async rethrows -> T {
     let started = startAccessingSecurityScopedResource()
     defer { if started { stopAccessingSecurityScopedResource() } }
     return try await body(self)
