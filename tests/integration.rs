@@ -24,5 +24,6 @@ mod integration {
     mod grafana_connector;
     mod hooks;
     mod preflight;
+    mod sandbox;
     mod universal;
 }
