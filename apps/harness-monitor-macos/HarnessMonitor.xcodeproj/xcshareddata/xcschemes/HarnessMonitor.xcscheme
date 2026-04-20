@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2640"
-   version = "1.7">
+   version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES"
-      runPostActionsOnFailure = "NO">
+      buildImplicitDependencies = "YES">
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -16,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4CFA53E461E3B9F02750C66C"
-               BuildableName = "HarnessMonitor.app"
+               BuildableName = "Harness Monitor.app"
                BlueprintName = "HarnessMonitor"
                ReferencedContainer = "container:HarnessMonitor.xcodeproj">
             </BuildableReference>
@@ -56,17 +55,23 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "NO"
-      codeCoverageEnabled = "YES"
-      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      codeCoverageEnabled = "YES">
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4CFA53E461E3B9F02750C66C"
-            BuildableName = "HarnessMonitor.app"
+            BuildableName = "Harness Monitor.app"
             BlueprintName = "HarnessMonitor"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "HARNESS_DAEMON_DATA_HOME"
+            value = "/tmp/harness-monitor-tests"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
       <Testables>
          <TestableReference
             skipped = "NO"
@@ -80,8 +85,7 @@
             </BuildableReference>
          </TestableReference>
          <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
+            skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "F9098B1A3BB9AC697A09E432"
@@ -91,15 +95,6 @@
             </BuildableReference>
          </TestableReference>
       </Testables>
-      <CommandLineArguments>
-      </CommandLineArguments>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "HARNESS_DAEMON_DATA_HOME"
-            value = "/tmp/harness-monitor-tests"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -116,13 +111,11 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4CFA53E461E3B9F02750C66C"
-            BuildableName = "HarnessMonitor.app"
+            BuildableName = "Harness Monitor.app"
             BlueprintName = "HarnessMonitor"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "HARNESS_OTEL_EXPORT"
@@ -147,7 +140,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4CFA53E461E3B9F02750C66C"
-            BuildableName = "HarnessMonitor.app"
+            BuildableName = "Harness Monitor.app"
             BlueprintName = "HarnessMonitor"
             ReferencedContainer = "container:HarnessMonitor.xcodeproj">
          </BuildableReference>
