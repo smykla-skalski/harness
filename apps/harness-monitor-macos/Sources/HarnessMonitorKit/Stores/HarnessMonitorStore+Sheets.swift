@@ -11,34 +11,23 @@ extension HarnessMonitorStore {
     presentedSheet = nil
   }
 
-  public func makeNewSessionViewModel() -> NewSessionViewModel {
-    let resolvedBookmarkStore: BookmarkStore
-    if let store = bookmarkStore {
-      resolvedBookmarkStore = store
-    } else {
+  public func makeNewSessionViewModel() -> NewSessionViewModel? {
+    guard let bookmarkStore else {
       HarnessMonitorLogger.store.warning(
-        "bookmarkStore is nil; falling back to temporaryDirectory — bookmark persistence will not work"
+        "bookmarkStore is nil; cannot present New Session sheet"
       )
-      resolvedBookmarkStore = BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
+      return nil
     }
-    let resolvedClient: any HarnessMonitorClientProtocol
-    if let apiClient = client {
-      resolvedClient = apiClient
-    } else {
+    guard let client else {
       HarnessMonitorLogger.store.warning(
-        "client is nil; falling back to stub — submit() will fail until a real connection is established"
+        "client is nil; cannot present New Session sheet"
       )
-      resolvedClient = HarnessMonitorAPIClient(
-        connection: HarnessMonitorConnection(
-          endpoint: URL(string: "http://127.0.0.1:0")!,
-          token: ""
-        )
-      )
+      return nil
     }
     return NewSessionViewModel(
       store: self,
-      bookmarkStore: resolvedBookmarkStore,
-      client: resolvedClient
+      bookmarkStore: bookmarkStore,
+      client: client
     )
   }
 }
