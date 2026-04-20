@@ -12,6 +12,12 @@ pub enum IdError {
     Invalid(String),
 }
 
+/// Generate a fresh 8-character lowercase alphanumeric session id.
+///
+/// Drawn from a 36-character alphabet (`0-9a-z`). Uses the thread-local
+/// CSPRNG so values are not predictable across processes. At 36^8 ≈ 2.8 ×
+/// 10^12 keys the birthday bound reaches ~50 % at roughly 1.7 million
+/// concurrent ids — plenty of headroom for the sessions namespace.
 #[must_use]
 pub fn new_session_id() -> String {
     let mut rng = rand::rng();
