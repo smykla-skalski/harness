@@ -282,6 +282,8 @@ pub(crate) fn build_initial_state(
         last_activity_at: Some(now.to_string()),
         observe_id: Some(format!("observe-{session_id}")),
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics::default(),
     };
     refresh_session(&mut state, now);
