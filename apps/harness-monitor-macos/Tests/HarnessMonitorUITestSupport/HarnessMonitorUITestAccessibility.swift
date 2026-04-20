@@ -156,6 +156,14 @@ enum HarnessMonitorUITestAccessibility {
     "harness.preferences.notifications.attachment"
   static let preferencesNotificationsTriggerPicker = "harness.preferences.notifications.trigger"
   static let preferencesNotificationsSendButton = "harness.preferences.notifications.send"
+  static let preferencesAuthorizedFoldersSection = "harness.preferences.section.authorizedfolders"
+  static let preferencesAuthorizedFoldersAddButton = "harness.preferences.authorized-folders.add"
+  static let preferencesAuthorizedFoldersEmpty = "harness.preferences.authorized-folders.empty"
+
+  static func preferencesAuthorizedFolderRow(_ id: String) -> String {
+    "harness.preferences.authorized-folders.row.\(id)"
+  }
+
   static let preferencesDatabaseStatistics = "harness.preferences.database.statistics"
   static let preferencesDatabaseStatisticsPicker =
     "harness.preferences.database.statistics-picker"
