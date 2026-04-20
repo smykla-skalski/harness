@@ -75,5 +75,21 @@ pub fn cleanup_orphans(sessions_root: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Run the orphan sweep against the default sessions root, logging failures.
+///
+/// Callers (typically the daemon at startup) use this one-liner instead of
+/// constructing the path themselves. Errors are swallowed after being logged —
+/// an orphan-sweep failure must never block startup.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub fn run_startup_sweep() {
+    use crate::workspace::{harness_data_root, layout::sessions_root};
+    if let Err(err) = cleanup_orphans(&sessions_root(&harness_data_root())) {
+        warn!(%err, "orphan cleanup failed; continuing");
+    }
+}
+
 #[cfg(test)]
 mod tests;
