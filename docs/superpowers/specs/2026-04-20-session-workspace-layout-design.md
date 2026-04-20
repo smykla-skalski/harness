@@ -40,8 +40,8 @@ Sub-project A moves the data root into the app group container; this spec assume
 | Sockets | Flat `<group>/sock/<sid>-<purpose>.sock` | Short absolute paths regardless of project name length. 68-byte group container prefix + `sock/` + 8-char sid + purpose = comfortably under 104. |
 | Worktree owner | Daemon via subprocess `git` | Daemon already has git in PATH, already manages session lifecycle, already runs under `HARNESS_SANDBOXED` with the `temporary-exception` removed (from A). Worktree creation uses the resolved bookmark from A's `BookmarkResolver`. |
 | Worktree base branch | `refs/remotes/origin/HEAD` | Falls back to current branch if origin isn't set. Session creation API exposes a `base_ref` override that sub-project C can wire into a UI later. Default matches the most common case. |
-| Worktree branch name | `harness/session/<sid>` | Namespaced so it never collides with user branches. `harness/` is recognizable in `git branch --list`. |
-| Cleanup on delete | `git worktree remove --force <path>` + `git branch -D harness/session/<sid>` | Atomic. If either step fails, daemon logs `warn!` and leaves the entry in `active.json` with `cleanup_failed: true` so support can recover manually. |
+| Worktree branch name | `harness/<sid>` | Namespaced so it never collides with user branches. `harness/` is recognizable in `git branch --list`. |
+| Cleanup on delete | `git worktree remove --force <path>` + `git branch -D harness/<sid>` | Atomic. If either step fails, daemon logs `warn!` and leaves the entry in `active.json` with `cleanup_failed: true` so support can recover manually. |
 | Version impact | **Major** | Persisted layout changes, CLI on-disk contract breaks. Clean cut means no backward-read path. Bump in the PR that lands this. |
 
 ## Architecture
@@ -58,7 +58,7 @@ New on-disk layout (macOS, post-A):
 │   └── sessions/                                  (NEW from B)
 │       └── <project-name>[-<4hex>]/
 │           ├── <sid>/                             (8-char lowercase alphanumeric)
-│           │   ├── workspace/                     (git worktree, branch harness/session/<sid>)
+│           │   ├── workspace/                     (git worktree, branch harness/<sid>)
 │           │   ├── memory/                        (shared inter-agent scratch)
 │           │   ├── state.json
 │           │   ├── log.jsonl
@@ -103,7 +103,7 @@ impl SessionLayout {
     pub fn log_file(&self) -> PathBuf;        // <session_root>/log.jsonl
     pub fn tasks_dir(&self) -> PathBuf;       // <session_root>/tasks/
     pub fn locks_dir(&self) -> PathBuf;       // <session_root>/.locks/
-    pub fn branch_ref(&self) -> String;       // "harness/session/<sid>"
+    pub fn branch_ref(&self) -> String;       // "harness/<sid>"
 }
 
 pub struct ProjectNameResolver;
@@ -154,13 +154,13 @@ impl WorktreeController {
 
 `create` runs:
 1. `git -C <origin> rev-parse refs/remotes/origin/HEAD` (or falls back to current branch).
-2. `git -C <origin> worktree add -b harness/session/<sid> <layout.worktree()> <resolved_ref>`.
+2. `git -C <origin> worktree add -b harness/<sid> <layout.worktree()> <resolved_ref>`.
 3. Seeds `<layout.shared()>` as an empty directory.
 4. Writes `<layout.session_root()>/.origin` with the canonical origin path for diagnostics.
 
 `destroy` runs:
 1. `git -C <origin> worktree remove --force <layout.worktree()>`.
-2. `git -C <origin> branch -D harness/session/<sid>` (tolerates "not found" as success since a cleaned worktree may already have deleted the branch).
+2. `git -C <origin> branch -D harness/<sid>` (tolerates "not found" as success since a cleaned worktree may already have deleted the branch).
 3. `fs::remove_dir_all(<layout.session_root()>)`.
 
 Failure modes are categorized (`WorktreeCreateFailed`, `WorktreeRemoveFailed`, `BranchDeleteFailed`) with structured fields so callers can decide between "retry", "leave for manual cleanup", or "abort session creation".
@@ -227,7 +227,7 @@ pub struct SessionState {
     pub worktree_path: String,
     pub shared_path: String,
     pub origin_path: String,
-    pub branch_ref: String,            // "harness/session/<sid>"
+    pub branch_ref: String,            // "harness/<sid>"
 }
 ```
 
