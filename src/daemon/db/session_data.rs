@@ -27,7 +27,8 @@ impl DaemonDb {
             return Ok(());
         };
         let project_dir = Path::new(&project_dir);
-        let Some(file_state) = session_storage::load_state(project_dir, session_id)? else {
+        // TODO(b-task-8): migrate to session_storage::load_state(&layout) after SessionLayout cascade.
+        let Some(file_state) = session_storage::load_state_legacy(project_dir, session_id)? else {
             return Ok(());
         };
         let file_version = i64::try_from(file_state.state_version).unwrap_or(i64::MAX);

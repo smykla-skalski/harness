@@ -85,7 +85,7 @@ fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
 
         let state = session_status("sync-legacy", project).expect("status");
         let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
-        storage::update_state(project, "sync-legacy", |state| {
+        storage::update_state_legacy(project, "sync-legacy", |state| {
             state
                 .agents
                 .get_mut(&worker_id)

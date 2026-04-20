@@ -34,7 +34,7 @@ pub(crate) fn create_initial_session(
             now,
             policy_preset,
         );
-        if !storage::create_state(project_dir, &session_id, &candidate)? {
+        if !storage::create_state_legacy(project_dir, &session_id, &candidate)? {
             return Err(CliErrorKind::session_agent_conflict(format!(
                 "session '{session_id}' already exists"
             ))
@@ -54,7 +54,7 @@ pub(crate) fn create_initial_session(
             now,
             policy_preset,
         );
-        if storage::create_state(project_dir, &session_id, &candidate)? {
+        if storage::create_state_legacy(project_dir, &session_id, &candidate)? {
             return Ok(candidate);
         }
     }

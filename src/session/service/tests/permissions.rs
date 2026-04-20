@@ -367,7 +367,7 @@ fn current_leader_confirms_pending_transfer() {
         assert_eq!(updated.leader_id.as_deref(), Some(observer_id.as_str()));
         assert!(updated.pending_leader_transfer.is_none());
 
-        let entries = storage::load_log_entries(project, "transfer-confirm").expect("entries");
+        let entries = storage::load_log_entries_legacy(project, "transfer-confirm").expect("entries");
         assert!(entries.iter().any(|entry| {
             matches!(
                 entry.transition,
@@ -421,7 +421,7 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
             .expect("observer id")
             .clone();
 
-        storage::update_state(project, "transfer-timeout", |state| {
+        storage::update_state_legacy(project, "transfer-timeout", |state| {
             let stale = (Utc::now() - Duration::seconds(600)).to_rfc3339();
             let leader = state.agents.get_mut(&leader_id).expect("leader");
             leader.last_activity_at = Some(stale.clone());
