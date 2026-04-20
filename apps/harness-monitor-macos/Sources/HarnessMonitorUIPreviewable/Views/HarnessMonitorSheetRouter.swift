@@ -29,7 +29,7 @@ struct HarnessMonitorSheetRouter: View {
         minHeight: metrics.minHeight
       )
       .onAppear {
-        if case .newSession = sheet, newSessionViewModel == nil {
+        if case .newSession = sheet {
           newSessionViewModel = store.makeNewSessionViewModel()
         }
       }
