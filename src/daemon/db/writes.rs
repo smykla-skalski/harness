@@ -331,12 +331,10 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+        const DELETE_SESSION_ROW_SQL: &str = "DELETE FROM sessions WHERE session_id = ?1";
         let rows_affected = self
             .conn
-            .execute(
-                "DELETE FROM sessions WHERE session_id = ?1",
-                [session_id],
-            )
+            .execute(DELETE_SESSION_ROW_SQL, [session_id])
             .map_err(|error| db_error(format!("delete session row: {error}")))?;
         Ok(rows_affected > 0)
     }
