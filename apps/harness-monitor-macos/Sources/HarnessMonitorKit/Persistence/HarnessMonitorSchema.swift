@@ -170,12 +170,17 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     toVersion: HarnessMonitorSchemaV5.self
   )
 
-  // V5 uses checkoutId/checkoutRoot/isWorktree/worktreeName; V6 uses worktreePath/sharedPath/originPath/branchRef.
-  // The old fields are removed and new ones added with empty-string defaults. SwiftData lightweight
-  // migration handles this: it drops removed columns and populates new ones with their declared defaults.
-  // The daemon refreshes all workspace layout fields on the next sync cycle, so "" defaults are safe.
-  // If a best-effort branchRef seed from V5.isWorktree is needed, replace with a .custom stage;
-  // for now lightweight is correct and avoids the SwiftData cast-to-typealias pitfall.
+  // V5 fields isWorktree/worktreeName/checkoutId/checkoutRoot are removed; V6 adds
+  // worktreePath/sharedPath/originPath/branchRef with empty-string defaults. SwiftData lightweight
+  // migration drops removed columns and fills new ones with their declared defaults. The daemon
+  // refreshes all workspace layout fields on the next sync cycle, so "" defaults are safe and
+  // users see no visible data loss.
+  //
+  // A .custom stage that translates V5.isWorktree into a best-effort V6.branchRef seed was
+  // evaluated and rejected: calling `context.fetch(FetchDescriptor<HarnessMonitorSchemaV5.CachedSession>())`
+  // inside didMigrate trips a SwiftData typealias cast error at runtime. If a future migration
+  // needs real translation, use the raw SQLite path or a pre-migration pass that reads the
+  // SchemaV5 store directly; do NOT revive the FetchDescriptor-in-didMigrate approach.
   static let migrateV5toV6 = MigrationStage.lightweight(
     fromVersion: HarnessMonitorSchemaV5.self,
     toVersion: HarnessMonitorSchemaV6.self
