@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use crate::agents::runtime::RuntimeCapabilities;
 
@@ -50,6 +51,11 @@ pub(super) fn session_state(
         schema_version: CURRENT_VERSION,
         state_version: 1,
         session_id: "sess-1".into(),
+        project_name: String::new(),
+        worktree_path: PathBuf::new(),
+        shared_path: PathBuf::new(),
+        origin_path: PathBuf::new(),
+        branch_ref: String::new(),
         title: "test title".into(),
         context: "ctx".into(),
         status: SessionStatus::Active,

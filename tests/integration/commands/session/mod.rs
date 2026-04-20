@@ -1,5 +1,6 @@
 use harness::app::cli::Command;
 use harness::session::service;
+use harness::session::storage;
 use harness::session::transport::{
     SessionAssignArgs, SessionCommand, SessionTaskCommand, TaskCreateArgs, TaskListArgs,
 };
@@ -251,8 +252,9 @@ fn session_assign_supports_reason_via_cli_command() {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
 
-        let log_path = harness::workspace::project_context_dir(&project)
-            .join("orchestration/sessions/role-reason-1/log.jsonl");
+        let layout = storage::layout_from_project_dir(&project, "role-reason-1")
+            .expect("layout from project");
+        let log_path = layout.log_file();
         let log_text = std::fs::read_to_string(log_path).unwrap();
         assert!(log_text.contains("\"reason\":\"route final validation through review\""));
         assert!(log_text.contains(&format!("\"agent_id\":\"{worker_id}\"")));

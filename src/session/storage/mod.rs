@@ -40,6 +40,8 @@ pub(crate) use state_store::{create_state, load_state, update_state, update_stat
 
 // Legacy adapters (TODO(b-task-8): remove after cascade migration)
 pub(crate) use files::list_known_session_ids;
+// TODO(b-task-9): drop this re-export once every caller takes a SessionLayout.
+pub use files::layout_from_project_dir;
 pub(crate) use journal::{
     append_log_entry_legacy, append_task_checkpoint_legacy, load_log_entries_legacy,
     load_task_checkpoints_legacy,
