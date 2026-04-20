@@ -3,9 +3,9 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class URLSecurityScopeTests: XCTestCase {
-  func testSyncBodyReceivesSameURL() throws {
+  func testSyncBodyReceivesSameURL() {
     let tmp = FileManager.default.temporaryDirectory
-    let received = try tmp.withSecurityScope { $0 }
+    let received = tmp.withSecurityScope { $0 }
     XCTAssertEqual(received, tmp)
   }
 
@@ -19,9 +19,9 @@ final class URLSecurityScopeTests: XCTestCase {
     }
   }
 
-  func testAsyncBodyReceivesSameURL() async throws {
+  func testAsyncBodyReceivesSameURL() async {
     let tmp = FileManager.default.temporaryDirectory
-    let received = try await tmp.withSecurityScopeAsync { $0 }
+    let received = await tmp.withSecurityScopeAsync { $0 }
     XCTAssertEqual(received, tmp)
   }
 
