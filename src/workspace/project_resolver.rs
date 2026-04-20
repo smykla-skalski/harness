@@ -20,10 +20,7 @@ pub enum ResolverError {
 
 /// # Errors
 /// Returns `ResolverError::Io` on filesystem errors, `ResolverError::NoBasename` when canonical path lacks a basename.
-pub fn resolve_name(
-    canonical_path: &Path,
-    sessions_root: &Path,
-) -> Result<String, ResolverError> {
+pub fn resolve_name(canonical_path: &Path, sessions_root: &Path) -> Result<String, ResolverError> {
     let base = canonical_path
         .file_name()
         .ok_or_else(|| ResolverError::NoBasename(canonical_path.to_path_buf()))?

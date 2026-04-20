@@ -158,12 +158,8 @@ pub(super) fn migrate_v7_to_v8(mut value: Value) -> Result<Value, CliError> {
     object
         .entry("worktree_path".to_string())
         .or_insert(json!(""));
-    object
-        .entry("shared_path".to_string())
-        .or_insert(json!(""));
-    object
-        .entry("origin_path".to_string())
-        .or_insert(json!(""));
+    object.entry("shared_path".to_string()).or_insert(json!(""));
+    object.entry("origin_path".to_string()).or_insert(json!(""));
     object.entry("branch_ref".to_string()).or_insert(json!(""));
 
     Ok(value)

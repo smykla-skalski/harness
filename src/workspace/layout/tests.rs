@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use super::*;
+use std::path::PathBuf;
 
 fn fixture() -> SessionLayout {
     SessionLayout {
@@ -11,22 +11,34 @@ fn fixture() -> SessionLayout {
 
 #[test]
 fn session_root_composes_correctly() {
-    assert_eq!(fixture().session_root(), PathBuf::from("/data/sessions/kuma/abc12345"));
+    assert_eq!(
+        fixture().session_root(),
+        PathBuf::from("/data/sessions/kuma/abc12345")
+    );
 }
 
 #[test]
 fn workspace_subdir() {
-    assert_eq!(fixture().workspace(), PathBuf::from("/data/sessions/kuma/abc12345/workspace"));
+    assert_eq!(
+        fixture().workspace(),
+        PathBuf::from("/data/sessions/kuma/abc12345/workspace")
+    );
 }
 
 #[test]
 fn memory_subdir() {
-    assert_eq!(fixture().memory(), PathBuf::from("/data/sessions/kuma/abc12345/memory"));
+    assert_eq!(
+        fixture().memory(),
+        PathBuf::from("/data/sessions/kuma/abc12345/memory")
+    );
 }
 
 #[test]
 fn state_file_sibling() {
-    assert_eq!(fixture().state_file(), PathBuf::from("/data/sessions/kuma/abc12345/state.json"));
+    assert_eq!(
+        fixture().state_file(),
+        PathBuf::from("/data/sessions/kuma/abc12345/state.json")
+    );
 }
 
 #[test]
@@ -44,18 +56,30 @@ fn active_json_is_per_project_hidden_file() {
 
 #[test]
 fn project_dir_composes() {
-    assert_eq!(fixture().project_dir(), PathBuf::from("/data/sessions/kuma"));
+    assert_eq!(
+        fixture().project_dir(),
+        PathBuf::from("/data/sessions/kuma")
+    );
 }
 
 #[test]
 fn log_file_sibling() {
-    assert_eq!(fixture().log_file(), PathBuf::from("/data/sessions/kuma/abc12345/log.jsonl"));
+    assert_eq!(
+        fixture().log_file(),
+        PathBuf::from("/data/sessions/kuma/abc12345/log.jsonl")
+    );
 }
 
 #[test]
 fn tasks_and_locks_subdirs() {
-    assert_eq!(fixture().tasks_dir(), PathBuf::from("/data/sessions/kuma/abc12345/tasks"));
-    assert_eq!(fixture().locks_dir(), PathBuf::from("/data/sessions/kuma/abc12345/.locks"));
+    assert_eq!(
+        fixture().tasks_dir(),
+        PathBuf::from("/data/sessions/kuma/abc12345/tasks")
+    );
+    assert_eq!(
+        fixture().locks_dir(),
+        PathBuf::from("/data/sessions/kuma/abc12345/.locks")
+    );
 }
 
 #[test]

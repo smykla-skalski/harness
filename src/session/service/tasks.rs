@@ -78,12 +78,7 @@ pub fn create_task_with_source(
             "task creation did not persist state".to_string(),
         ))
     })?;
-    storage::append_log_entry(
-        &layout,
-        log_task_created(spec, &item),
-        Some(actor_id),
-        None,
-    )?;
+    storage::append_log_entry(&layout, log_task_created(spec, &item), Some(actor_id), None)?;
 
     Ok(item)
 }

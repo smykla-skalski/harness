@@ -43,9 +43,7 @@ pub(crate) fn append_log_entry(
 ///
 /// # Errors
 /// Returns `CliError` on parse or I/O failure.
-pub(crate) fn load_log_entries(
-    layout: &SessionLayout,
-) -> Result<Vec<SessionLogEntry>, CliError> {
+pub(crate) fn load_log_entries(layout: &SessionLayout) -> Result<Vec<SessionLogEntry>, CliError> {
     files::read_json_lines(&files::log_path(layout), "session log")
 }
 
@@ -92,4 +90,3 @@ fn next_log_sequence(path: &Path) -> u64 {
         .count();
     (count as u64) + 1
 }
-
