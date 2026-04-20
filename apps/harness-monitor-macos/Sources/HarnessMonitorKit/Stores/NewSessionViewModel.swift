@@ -138,7 +138,7 @@ public final class NewSessionViewModel {
       return .bookmarkRevoked(id: bookmarkId)
     case .notFound:
       return .bookmarkRevoked(id: bookmarkId)
-    default:
+    case .ioError, .unsupportedSchemaVersion:
       return .unexpected(String(describing: error))
     }
   }
