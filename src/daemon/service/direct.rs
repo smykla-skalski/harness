@@ -1,11 +1,10 @@
-use crate::errors::CliErrorKind;
 use super::session_setup::{PreparedSession, prepare_session, rollback_session_artifacts};
 use super::session_teardown::destroy_session_artifacts;
 use super::{
-    CliError, Path, SessionState, agents_service, build_log_entry, index,
-    record_signal_ack, resolve_hook_agent, session_not_found, session_service, session_storage,
-    utc_now,
+    CliError, Path, SessionState, agents_service, build_log_entry, index, record_signal_ack,
+    resolve_hook_agent, session_not_found, session_service, session_storage, utc_now,
 };
+use crate::errors::CliErrorKind;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 /// Creates a per-session git worktree and records the state file under the

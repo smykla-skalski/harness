@@ -81,9 +81,10 @@ fn try_resolve_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliErr
     let Some(record) = bookmarks::find(&store, input) else {
         return Ok(None);
     };
-    let resolved = super::resolver::resolve(&record.bookmark_data).map_err(|error| -> CliError {
-        CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
-    })?;
+    let resolved =
+        super::resolver::resolve(&record.bookmark_data).map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
+        })?;
     let path = resolved.path().to_path_buf();
     Ok(Some(ProjectInputScope {
         path,

@@ -234,12 +234,7 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
     })?;
 
     append_leave_signal_logs(project_dir, session_id, actor_id, &leave_signals)?;
-    storage::append_log_entry(
-        &layout,
-        log_session_ended(),
-        Some(actor_id),
-        None,
-    )?;
+    storage::append_log_entry(&layout, log_session_ended(), Some(actor_id), None)?;
     storage::deregister_active(&layout)?;
 
     Ok(())
@@ -325,12 +320,7 @@ pub fn remove_agent(
     if let Some(ref signal) = leave_signal {
         append_leave_signal_logs(project_dir, session_id, actor_id, slice::from_ref(signal))?;
     }
-    storage::append_log_entry(
-        &layout,
-        log_agent_removed(agent_id),
-        Some(actor_id),
-        None,
-    )?;
+    storage::append_log_entry(&layout, log_agent_removed(agent_id), Some(actor_id), None)?;
 
     Ok(())
 }
@@ -424,9 +414,7 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
 
     let now = utc_now();
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
-    storage::update_state(&layout, |state| {
-        apply_leave_session(state, agent_id, &now)
-    })?;
+    storage::update_state(&layout, |state| apply_leave_session(state, agent_id, &now))?;
 
     storage::append_log_entry(
         &layout,

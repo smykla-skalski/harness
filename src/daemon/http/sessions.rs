@@ -494,8 +494,15 @@ pub(super) async fn delete_session(
         })
     };
     match found {
-        Ok(true) => { broadcast_sessions_list_changed(&state).await; StatusCode::NO_CONTENT.into_response() }
-        Ok(false) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "session not found"}))).into_response(),
+        Ok(true) => {
+            broadcast_sessions_list_changed(&state).await;
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Ok(false) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "session not found"})),
+        )
+            .into_response(),
         Err(error) => super::response::map_json(Err::<SessionState, _>(error)),
     }
 }

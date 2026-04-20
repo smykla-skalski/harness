@@ -34,7 +34,10 @@ fn roundtrip_through_shared_json() {
     let bytes = &reloaded.bookmarks[0].bookmark_data;
     let resolved = resolve(bytes).expect("resolve");
     assert_eq!(
-        resolved.path().canonicalize().expect("canonicalize resolved"),
+        resolved
+            .path()
+            .canonicalize()
+            .expect("canonicalize resolved"),
         target.path().canonicalize().expect("canonicalize target"),
     );
 }

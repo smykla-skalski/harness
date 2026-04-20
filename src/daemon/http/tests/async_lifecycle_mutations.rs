@@ -14,8 +14,8 @@ use harness_testkit::with_isolated_harness_env;
 use super::async_mutations::{
     init_git_project, start_async_http_session, test_http_state_with_empty_async_db,
 };
-use crate::daemon::http::sessions::delete_session;
 use super::*;
+use crate::daemon::http::sessions::delete_session;
 
 async fn join_http_worker(
     state: &DaemonHttpState,
@@ -471,8 +471,7 @@ fn delete_session_removes_worktree_and_returns_204() {
                 let db_path = sandbox.path().join("daemon.sqlite");
                 let state = test_http_state_with_empty_async_db(&db_path).await;
                 let body =
-                    start_async_http_session(state.clone(), &project_dir, "http-delete-sess")
-                        .await;
+                    start_async_http_session(state.clone(), &project_dir, "http-delete-sess").await;
                 let worktree_path: std::path::PathBuf = body["state"]["worktree_path"]
                     .as_str()
                     .expect("worktree_path in response")
@@ -486,7 +485,10 @@ fn delete_session_removes_worktree_and_returns_204() {
                 )
                 .await;
                 assert_eq!(response.status(), StatusCode::NO_CONTENT);
-                assert!(!worktree_path.exists(), "worktree must be gone after delete");
+                assert!(
+                    !worktree_path.exists(),
+                    "worktree must be gone after delete"
+                );
 
                 let async_db = state.async_db.get().expect("async db");
                 let resolved = async_db

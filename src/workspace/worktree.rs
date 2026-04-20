@@ -152,7 +152,9 @@ fn resolve_base_ref(origin: &Path) -> Result<String, WorktreeError> {
         .args(["rev-parse", "--abbrev-ref", "origin/HEAD"])
         .output()?;
     if origin_head.status.success() {
-        let s = String::from_utf8_lossy(&origin_head.stdout).trim().to_string();
+        let s = String::from_utf8_lossy(&origin_head.stdout)
+            .trim()
+            .to_string();
         if !s.is_empty() && s != "HEAD" {
             return Ok(s);
         }

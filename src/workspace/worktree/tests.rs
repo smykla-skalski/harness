@@ -69,7 +69,12 @@ fn destroy_removes_worktree_and_branch() {
         .args(["branch", "--list", "harness/*"])
         .output()
         .unwrap();
-    assert!(std::str::from_utf8(&branches.stdout).unwrap().trim().is_empty());
+    assert!(
+        std::str::from_utf8(&branches.stdout)
+            .unwrap()
+            .trim()
+            .is_empty()
+    );
 }
 
 /// Verify that when a post-add filesystem step fails, `create` rolls back
@@ -91,9 +96,15 @@ fn rollback_on_memory_create_failure() {
     std::fs::write(layout.memory(), b"blocker").unwrap();
 
     let result = WorktreeController::create(origin.path(), &layout, None);
-    assert!(result.is_err(), "expected create to fail due to blocked memory dir");
+    assert!(
+        result.is_err(),
+        "expected create to fail due to blocked memory dir"
+    );
 
-    assert!(!layout.workspace().exists(), "workspace should have been removed by rollback");
+    assert!(
+        !layout.workspace().exists(),
+        "workspace should have been removed by rollback"
+    );
 
     let branches = Command::new("git")
         .current_dir(origin.path())
@@ -101,7 +112,10 @@ fn rollback_on_memory_create_failure() {
         .output()
         .unwrap();
     assert!(
-        std::str::from_utf8(&branches.stdout).unwrap().trim().is_empty(),
+        std::str::from_utf8(&branches.stdout)
+            .unwrap()
+            .trim()
+            .is_empty(),
         "harness branch should have been deleted by rollback"
     );
 }

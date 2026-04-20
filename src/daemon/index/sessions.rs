@@ -235,7 +235,9 @@ fn list_active_session_ids_for_project(
     project: &DiscoveredProject,
 ) -> Result<Vec<String>, CliError> {
     let mut active_ids = legacy_active_session_ids(&project.context_root)?;
-    active_ids.extend(new_layout_active_session_ids(project.project_dir.as_deref())?);
+    active_ids.extend(new_layout_active_session_ids(
+        project.project_dir.as_deref(),
+    )?);
     active_ids.sort_unstable();
     active_ids.dedup();
     Ok(active_ids)
@@ -250,17 +252,15 @@ fn legacy_active_session_ids(context_root: &Path) -> Result<Vec<String>, CliErro
     Ok(registry.sessions.into_keys().collect())
 }
 
-fn new_layout_active_session_ids(
-    project_dir: Option<&Path>,
-) -> Result<Vec<String>, CliError> {
+fn new_layout_active_session_ids(project_dir: Option<&Path>) -> Result<Vec<String>, CliError> {
     let layout_root = workspace_sessions_root(&harness_data_root());
     if let Some(dir) = project_dir {
-        let project_name = dir
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| -> CliError {
-                CliErrorKind::invalid_project_dir(dir.to_string_lossy().into_owned()).into()
-            })?;
+        let project_name =
+            dir.file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| -> CliError {
+                    CliErrorKind::invalid_project_dir(dir.to_string_lossy().into_owned()).into()
+                })?;
         return Ok(read_active_registry_at(
             &layout_root.join(project_name).join(".active.json"),
         ));
@@ -313,11 +313,7 @@ fn list_new_layout_session_ids_for_project_dir(project_dir: &Path) -> Vec<String
     };
     let mut ids = Vec::new();
     for entry in entries.flatten() {
-        if entry
-            .file_type()
-            .ok()
-            .is_some_and(|kind| kind.is_dir())
-        {
+        if entry.file_type().ok().is_some_and(|kind| kind.is_dir()) {
             ids.push(entry.file_name().to_string_lossy().to_string());
         }
     }

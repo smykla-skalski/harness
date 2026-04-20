@@ -148,8 +148,7 @@ fn end_session_fails_visibly_when_leave_signal_cannot_be_delivered() {
             .find(|id| id.starts_with("codex-"))
             .expect("worker id")
             .clone();
-        let layout =
-            storage::layout_from_project_dir(project, "end-leave-fail").expect("layout");
+        let layout = storage::layout_from_project_dir(project, "end-leave-fail").expect("layout");
         storage::update_state(&layout, |state| {
             state.agents.get_mut(&worker_id).expect("worker").runtime = "unknown".into();
             Ok(())

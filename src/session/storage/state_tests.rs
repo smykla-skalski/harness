@@ -25,7 +25,10 @@ fn state_file_uses_new_layout() {
     let state = sample_state("abc12345");
     assert!(create_state(&layout, &state).expect("create"));
 
-    assert!(layout.state_file().exists(), "state.json must be in session_root");
+    assert!(
+        layout.state_file().exists(),
+        "state.json must be in session_root"
+    );
 }
 
 #[test]
