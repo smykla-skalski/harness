@@ -82,6 +82,38 @@ pub struct AdoptionOutcome {
 
 pub struct SessionAdopter;
 
+fn validate_b_layout_dirs(session_root: &Path) -> Result<(), AdoptionError> {
+    if !session_root.join("workspace").is_dir() {
+        return Err(AdoptionError::LayoutViolation {
+            reason: "missing workspace/".into(),
+        });
+    }
+    if !session_root.join("memory").is_dir() {
+        return Err(AdoptionError::LayoutViolation {
+            reason: "missing memory/".into(),
+        });
+    }
+    Ok(())
+}
+
+fn read_and_match_origin(session_root: &Path, state: &SessionState) -> Result<(), AdoptionError> {
+    let marker_path = session_root.join(".origin");
+    if !marker_path.is_file() {
+        return Err(AdoptionError::LayoutViolation {
+            reason: "missing .origin".into(),
+        });
+    }
+    let marker = fs::read_to_string(&marker_path)?.trim().to_string();
+    let expected = state.origin_path.to_string_lossy().to_string();
+    if marker != expected {
+        return Err(AdoptionError::OriginMismatch {
+            expected,
+            found: marker,
+        });
+    }
+    Ok(())
+}
+
 impl SessionAdopter {
     /// Validate an on-disk B-layout session directory. Reads `state.json` and `.origin`
     /// without mutating anything. Does not re-check sandbox bookmarks; the caller is
@@ -112,7 +144,7 @@ impl SessionAdopter {
             .get("schema_version")
             .and_then(Value::as_u64)
             .and_then(|version| u32::try_from(version).ok())
-            .unwrap_or_default();
+            .ok_or_else(|| AdoptionError::Parse("state.json: missing schema_version".into()))?;
         if schema_version != CURRENT_VERSION {
             return Err(AdoptionError::UnsupportedSchemaVersion {
                 found: schema_version,
@@ -121,30 +153,8 @@ impl SessionAdopter {
         }
         let state: SessionState = serde_json::from_value(raw)
             .map_err(|error| AdoptionError::Parse(format!("state.json decode: {error}")))?;
-        if !session_root.join("workspace").is_dir() {
-            return Err(AdoptionError::LayoutViolation {
-                reason: "missing workspace/".into(),
-            });
-        }
-        if !session_root.join("memory").is_dir() {
-            return Err(AdoptionError::LayoutViolation {
-                reason: "missing memory/".into(),
-            });
-        }
-        let marker_path = session_root.join(".origin");
-        if !marker_path.is_file() {
-            return Err(AdoptionError::LayoutViolation {
-                reason: "missing .origin".into(),
-            });
-        }
-        let marker = fs::read_to_string(&marker_path)?.trim().to_string();
-        let expected = state.origin_path.to_string_lossy().to_string();
-        if marker != expected {
-            return Err(AdoptionError::OriginMismatch {
-                expected,
-                found: marker,
-            });
-        }
+        validate_b_layout_dirs(session_root)?;
+        read_and_match_origin(session_root, &state)?;
         info!(target: "harness::adopter", session_id = %state.session_id, "probe ok");
         Ok(ProbedSession {
             state,
@@ -181,7 +191,7 @@ impl SessionAdopter {
             .parent()
             .ok_or(AdoptionError::InvalidProjectDir)?
             .to_path_buf();
-        let sessions_root_for_layout = project_dir
+        let sessions_root = project_dir
             .parent()
             .ok_or(AdoptionError::InvalidProjectDir)?
             .to_path_buf();
@@ -191,12 +201,12 @@ impl SessionAdopter {
             .ok_or(AdoptionError::InvalidProjectDir)?;
 
         let layout = SessionLayout {
-            sessions_root: sessions_root_for_layout.clone(),
+            sessions_root: sessions_root.clone(),
             project_name,
             session_id: state.session_id.clone(),
         };
 
-        let external_origin = if sessions_root_for_layout.starts_with(data_root_sessions) {
+        let external_origin = if sessions_root.starts_with(data_root_sessions) {
             None
         } else {
             Some(session_root)
@@ -208,8 +218,12 @@ impl SessionAdopter {
         // file as evidence of prior registration.
         // Read the registry directly from the layout path to avoid going through
         // the daemon's canonical harness_data_root().
-        let registry: ActiveRegistry =
-            read_json_typed(&layout.active_registry()).unwrap_or_default();
+        let registry: ActiveRegistry = if layout.active_registry().is_file() {
+            read_json_typed(&layout.active_registry())
+                .map_err(|error| AdoptionError::Storage(error.to_string()))?
+        } else {
+            ActiveRegistry::default()
+        };
         if registry.sessions.contains_key(&state.session_id) {
             return Err(AdoptionError::AlreadyAttached {
                 session_id: state.session_id,

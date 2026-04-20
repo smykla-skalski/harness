@@ -6,7 +6,7 @@ fn write_valid_session(root: &Path, sid: &str, origin: &str) {
     fs::create_dir_all(root.join("workspace")).unwrap();
     fs::create_dir_all(root.join("memory")).unwrap();
     let state = format!(
-        "{{\"schema_version\":9,\"session_id\":\"{sid}\",\"project_name\":\"demo\",\
+        "{{\"schema_version\":{CURRENT_VERSION},\"session_id\":\"{sid}\",\"project_name\":\"demo\",\
           \"origin_path\":\"{origin}\",\"worktree_path\":\"\",\"shared_path\":\"\",\
           \"branch_ref\":\"harness/{sid}\",\"title\":\"t\",\"context\":\"c\",\
           \"status\":\"active\",\"created_at\":\"2026-04-20T00:00:00Z\",\
