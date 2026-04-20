@@ -234,7 +234,7 @@ pub fn resolve_session_agent_for_runtime_session(
         return resolve_runtime_session_via_daemon(&client, runtime_name, runtime_session_id);
     }
 
-    let active_session_ids: Vec<_> = storage::load_active_registry_for(project_dir)
+    let active_session_ids: Vec<_> = storage::load_active_registry_for(project_dir)?
         .sessions
         .into_keys()
         .collect();

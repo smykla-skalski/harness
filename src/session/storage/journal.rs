@@ -110,7 +110,7 @@ pub(crate) fn append_log_entry_legacy(
     actor_id: Option<&str>,
     reason: Option<&str>,
 ) -> Result<(), CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     append_log_entry(&layout, transition, actor_id, reason)
 }
 
@@ -121,7 +121,7 @@ pub(crate) fn load_log_entries_legacy(
     project_dir: &Path,
     session_id: &str,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     load_log_entries(&layout)
 }
 
@@ -134,7 +134,7 @@ pub(crate) fn append_task_checkpoint_legacy(
     task_id: &str,
     checkpoint: &TaskCheckpoint,
 ) -> Result<(), CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     append_task_checkpoint(&layout, task_id, checkpoint)
 }
 
@@ -147,6 +147,6 @@ pub(crate) fn load_task_checkpoints_legacy(
     session_id: &str,
     task_id: &str,
 ) -> Result<Vec<TaskCheckpoint>, CliError> {
-    let layout = files::layout_from_project_dir(project_dir, session_id);
+    let layout = files::layout_from_project_dir(project_dir, session_id)?;
     load_task_checkpoints(&layout, task_id)
 }

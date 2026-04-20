@@ -326,10 +326,8 @@ fn list_session_ids(
         let session_ids = if include_all {
             storage::list_known_session_ids(project_dir)
         } else {
-            Ok(storage::load_active_registry_for(project_dir)
-                .sessions
-                .into_keys()
-                .collect())
+            storage::load_active_registry_for(project_dir)
+                .map(|registry| registry.sessions.into_keys().collect())
         }?;
         if !session_ids.is_empty() || project_context_dir(project_dir) == project.context_root {
             return Ok(session_ids);
