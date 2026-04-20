@@ -8,7 +8,7 @@ use super::{
 };
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 8;
+pub const CURRENT_VERSION: u32 = 9;
 
 /// Server-derived principal for daemon-authenticated control-plane mutations.
 ///
@@ -72,6 +72,12 @@ pub struct SessionState {
     /// Pending leadership transfer request awaiting confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending_leader_transfer: Option<PendingLeaderTransfer>,
+    /// Path of the external session directory this session was adopted from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_origin: Option<PathBuf>,
+    /// Timestamp when this session was adopted from an external origin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adopted_at: Option<String>,
     /// Cached counts for fast daemon and UI list rendering.
     #[serde(default)]
     pub metrics: SessionMetrics,

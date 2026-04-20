@@ -69,6 +69,8 @@ pub(super) fn session_state(
         last_activity_at: None,
         observe_id: None,
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics::default(),
     }
 }

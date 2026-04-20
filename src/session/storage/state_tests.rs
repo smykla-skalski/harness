@@ -102,6 +102,66 @@ fn load_state_migrates_v3_state_and_persists_current_schema() {
 }
 
 #[test]
+fn state_defaults_external_origin_none() {
+    let state = sample_state("abc12345");
+    assert_eq!(state.schema_version, 9);
+    assert!(state.external_origin.is_none());
+    assert!(state.adopted_at.is_none());
+}
+
+#[test]
+fn load_state_migrates_v8_state_to_v9_passthrough() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = test_layout(tmp.path(), "sess-v8");
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+    write_json_pretty(
+        &layout.state_file(),
+        &json!({
+            "schema_version": 8,
+            "state_version": 0,
+            "session_id": "sess-v8",
+            "project_name": "demo",
+            "worktree_path": "",
+            "shared_path": "",
+            "origin_path": "",
+            "branch_ref": "",
+            "title": "t",
+            "context": "c",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+            "leader_id": null,
+            "archived_at": null,
+            "last_activity_at": null,
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+                "agent_count": 0,
+                "active_agent_count": 0,
+                "idle_agent_count": 0,
+                "open_task_count": 0,
+                "in_progress_task_count": 0,
+                "blocked_task_count": 0,
+                "completed_task_count": 0
+            }
+        }),
+    )
+    .expect("write v8 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert!(loaded.external_origin.is_none());
+    assert!(loaded.adopted_at.is_none());
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    // Fields with Option::is_none skipped during serialize
+    assert!(persisted.get("external_origin").is_none_or(|v| v.is_null()));
+}
+
+#[test]
 fn create_state_rejects_unsafe_session_id() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let escape_dir = tmp.path().join("escape");

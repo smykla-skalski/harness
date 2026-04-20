@@ -450,6 +450,8 @@ pub(super) fn sample_session_state() -> SessionState {
         last_activity_at: Some(now),
         observe_id: None,
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics::default(),
     }
 }

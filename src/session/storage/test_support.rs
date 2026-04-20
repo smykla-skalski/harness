@@ -69,6 +69,8 @@ pub(super) fn sample_state(session_id: &str) -> SessionState {
         last_activity_at: Some("2026-01-01T00:00:00Z".into()),
         observe_id: Some(format!("observe-{session_id}")),
         pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
         metrics: SessionMetrics::default(),
     }
 }
