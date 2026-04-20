@@ -10,9 +10,10 @@ use tokio::sync::oneshot;
 use super::client::{RegistryClient, RegistryError};
 use super::path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, SOCKET_OVERRIDE_ENV, default_socket_path};
 use super::types::{ListWindowsResult, RegistryRequest};
+use crate::workspace::socket_paths::session_socket;
 
 fn socket_path(dir: &TempDir) -> PathBuf {
-    dir.path().join("registry.sock")
+    session_socket(dir.path(), "testid00", "registry")
 }
 
 async fn spawn_fake_server<F>(path: PathBuf, responder: F) -> oneshot::Receiver<String>
