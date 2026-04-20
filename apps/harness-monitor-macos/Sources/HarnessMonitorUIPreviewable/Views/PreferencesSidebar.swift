@@ -8,6 +8,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case connection
   case codex
   case mcp
+  case authorizedFolders
   case database
   case diagnostics
 
@@ -22,6 +23,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     case .connection: "Connection"
     case .codex: "Codex"
     case .mcp: "MCP"
+    case .authorizedFolders: "Authorized Folders"
     case .database: "Database"
     case .diagnostics: "Diagnostics"
     }
@@ -36,6 +38,7 @@ public enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
     case .connection: "bolt.horizontal.circle"
     case .codex: "terminal"
     case .mcp: "bolt.shield"
+    case .authorizedFolders: "folder.badge.person.crop"
     case .database: "cylinder.split.1x2"
     case .diagnostics: "stethoscope"
     }

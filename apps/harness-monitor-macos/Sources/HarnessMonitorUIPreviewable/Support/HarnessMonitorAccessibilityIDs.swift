@@ -263,6 +263,16 @@ public enum HarnessMonitorAccessibility {
     "harness.preferences.database.statistics-picker"
   public static let preferencesDatabaseOperations = "harness.preferences.database.operations"
   public static let preferencesDatabaseHealth = "harness.preferences.database.health"
+  public static let preferencesAuthorizedFoldersAddButton =
+    "harness.preferences.authorized-folders.add"
+  public static let preferencesAuthorizedFoldersUnavailable =
+    "harness.preferences.authorized-folders.unavailable"
+  public static let preferencesAuthorizedFoldersEmpty =
+    "harness.preferences.authorized-folders.empty"
+
+  public static func preferencesAuthorizedFolderRow(_ id: String) -> String {
+    "harness.preferences.authorized-folders.row.\(id)"
+  }
   public static let voiceInputPopover = "harness.voice-input.popover"
   public static let voiceInputTranscript = "harness.voice-input.transcript"
   public static let voiceInputInsertButton = "harness.voice-input.insert"
