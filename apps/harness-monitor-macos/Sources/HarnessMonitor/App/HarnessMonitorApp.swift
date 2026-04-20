@@ -149,27 +149,7 @@ struct HarnessMonitorApp: App {
   }
 
   private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
-    switch result {
-    case .success(let urls):
-      guard let url = urls.first else { return }
-      guard let bookmarkStore = store.bookmarkStore else {
-        store.presentFailureFeedback("Bookmark store unavailable: app group container missing")
-        return
-      }
-      do {
-        // The `.fileImporter` URL is already scoped for this process, so the
-        // outer `withSecurityScopeAsync` is a no-op on this path; we keep it
-        // for symmetry with resolve-time reuse flows that *do* require the
-        // start/stop dance and to avoid two different call shapes.
-        try await url.withSecurityScopeAsync { scopedURL in
-          _ = try await bookmarkStore.add(url: scopedURL, kind: .projectRoot)
-        }
-      } catch {
-        store.presentFailureFeedback("Could not bookmark folder: \(error.localizedDescription)")
-      }
-    case .failure(let error):
-      store.presentFailureFeedback("Could not open folder: \(error.localizedDescription)")
-    }
+    await store.handleImportedFolder(result)
   }
 
   private func increaseTextSize() {
