@@ -235,7 +235,7 @@ fn list_active_session_ids_for_project(
     project: &DiscoveredProject,
 ) -> Result<Vec<String>, CliError> {
     let mut active_ids = legacy_active_session_ids(&project.context_root)?;
-    active_ids.extend(new_layout_active_session_ids(project.project_dir.as_deref()));
+    active_ids.extend(new_layout_active_session_ids(project.project_dir.as_deref())?);
     active_ids.sort_unstable();
     active_ids.dedup();
     Ok(active_ids)
@@ -250,22 +250,28 @@ fn legacy_active_session_ids(context_root: &Path) -> Result<Vec<String>, CliErro
     Ok(registry.sessions.into_keys().collect())
 }
 
-fn new_layout_active_session_ids(project_dir: Option<&Path>) -> Vec<String> {
+fn new_layout_active_session_ids(
+    project_dir: Option<&Path>,
+) -> Result<Vec<String>, CliError> {
     let layout_root = workspace_sessions_root(&harness_data_root());
     if let Some(dir) = project_dir {
-        let project_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if project_name.is_empty() {
-            return Vec::new();
-        }
-        return read_active_registry_at(&layout_root.join(project_name).join(".active.json"));
+        let project_name = dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| -> CliError {
+                CliErrorKind::invalid_project_dir(dir.to_string_lossy().into_owned()).into()
+            })?;
+        return Ok(read_active_registry_at(
+            &layout_root.join(project_name).join(".active.json"),
+        ));
     }
     let Ok(entries) = fs::read_dir(&layout_root) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
-    entries
+    Ok(entries
         .flatten()
         .flat_map(|entry| read_active_registry_at(&entry.path().join(".active.json")))
-        .collect()
+        .collect())
 }
 
 fn read_active_registry_at(path: &Path) -> Vec<String> {
@@ -374,14 +380,16 @@ fn load_session_state_from_context_root(
         return read_json_typed(&legacy_path).map(Some);
     }
 
-    // TODO(b-task-9): scope to the specific project bucket once callers pass a
-    // `SessionLayout` or `project_name` instead of `context_root`.
-    let new_root = workspace_sessions_root(&harness_data_root());
-    if new_root.is_dir()
-        && let Ok(project_entries) = fs::read_dir(&new_root)
-    {
-        for project_entry in project_entries.flatten() {
-            let state_path = project_entry.path().join(session_id).join("state.json");
+    // Scope the new-layout lookup to the specific project bucket using the
+    // `project-origin.json` record that session start writes under the
+    // context root. Avoids an O(projects) scan on every index load.
+    if let Some(origin) = storage::load_project_origin(context_root) {
+        let project_dir = Path::new(&origin.recorded_from_dir);
+        if let Some(project_name) = project_dir.file_name().and_then(|name| name.to_str()) {
+            let state_path = workspace_sessions_root(&harness_data_root())
+                .join(project_name)
+                .join(session_id)
+                .join("state.json");
             if state_path.is_file() {
                 return read_json_typed(&state_path).map(Some);
             }

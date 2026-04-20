@@ -452,7 +452,7 @@ fn resolve_session_id_scopes_to_project_bucket_under_new_layout() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
         let project_dir = tmp.path().join("workspace").join("alpha");
-        init_git_repo(&project_dir);
+        harness_testkit::init_git_repo_with_seed(&project_dir);
 
         let session_id = "alphasid";
         let project = discovered_project_for_checkout(&project_dir);
