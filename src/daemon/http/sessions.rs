@@ -313,7 +313,7 @@ pub(super) async fn post_session_start(
     }
     let result = start_session_response(&state, &request).await;
     if result.is_ok() {
-        broadcast_session_start(&state).await;
+        broadcast_sessions_list_changed(&state).await;
     }
     timed_json("POST", "/v1/sessions", &request_id, start, result)
 }
@@ -374,7 +374,7 @@ async fn start_session_response(
     service::start_session_direct(request, Some(&db_guard)).map(session_mutation_response)
 }
 
-async fn broadcast_session_start(state: &DaemonHttpState) {
+async fn broadcast_sessions_list_changed(state: &DaemonHttpState) {
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
         return;
@@ -490,11 +490,11 @@ pub(super) async fn delete_session(
         service::delete_session_direct_async(&session_id, async_db.as_ref()).await
     } else {
         ensure_shared_db(&state.db).and_then(|db| {
-            service::delete_session_direct(&session_id, &db.lock().expect("db lock"))
+            service::delete_session_direct(&session_id, Some(&db.lock().expect("db lock")))
         })
     };
     match found {
-        Ok(true) => { broadcast_session_start(&state).await; StatusCode::NO_CONTENT.into_response() }
+        Ok(true) => { broadcast_sessions_list_changed(&state).await; StatusCode::NO_CONTENT.into_response() }
         Ok(false) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "session not found"}))).into_response(),
         Err(error) => super::response::map_json(Err::<SessionState, _>(error)),
     }

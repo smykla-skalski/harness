@@ -218,6 +218,7 @@ mod observe_stream;
 mod read_reconciliation;
 mod serve;
 mod session_setup;
+mod session_teardown;
 mod sessions;
 mod signals;
 mod signals_async;
