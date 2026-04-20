@@ -79,7 +79,9 @@ public struct AuthorizedFoldersSection: View {
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
         Menu {
-          Button("Reveal in Finder") { reveal(record) }
+          Button("Reveal in Finder") {
+            Task { await reveal(record) }
+          }
           Button("Remove", role: .destructive) {
             Task { await remove(record) }
           }
@@ -117,9 +119,19 @@ public struct AuthorizedFoldersSection: View {
     }
   }
 
-  private func reveal(_ record: BookmarkStore.Record) {
-    let url = URL(fileURLWithPath: record.lastResolvedPath)
-    NSWorkspace.shared.activateFileViewerSelecting([url])
+  private func reveal(_ record: BookmarkStore.Record) async {
+    guard let bookmarkStore = store.bookmarkStore else { return }
+    do {
+      let resolved = try await bookmarkStore.resolve(id: record.id)
+      NSWorkspace.shared.activateFileViewerSelecting([resolved.url])
+      if resolved.isStale {
+        await reload()
+      }
+    } catch {
+      store.presentFailureFeedback(
+        "Could not reveal folder: \(error.localizedDescription)"
+      )
+    }
   }
 }
 
