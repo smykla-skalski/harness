@@ -106,20 +106,25 @@ pub fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, St
 
 /// Attempt a session start and return `Ok(state)` on 200, or `Err((status, body))` on any
 /// non-success, non-409 response. Retries on connection errors until the daemon is reachable.
+/// Pass `base_ref` to route the session to a specific git ref workspace.
 pub fn start_session_try(
     home: &Path,
     xdg: &Path,
     project_dir: &Path,
     session_id: &str,
+    base_ref: Option<&str>,
 ) -> Result<SessionState, (u16, String)> {
     let project_arg = project_dir.to_str().expect("utf8 project path");
-    let request_body = json!({
+    let mut request_body = json!({
         "title": "workspace integration test",
         "context": "testing workspace layout",
         "runtime": "codex",
         "session_id": session_id,
         "project_dir": project_arg,
     });
+    if let Some(bref) = base_ref {
+        request_body["base_ref"] = json!(bref);
+    }
 
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
@@ -186,7 +191,7 @@ pub fn start_session_via_http(
     project_dir: &Path,
     session_id: &str,
 ) -> SessionState {
-    start_session_try(home, xdg, project_dir, session_id).unwrap_or_else(|(status, body)| {
+    start_session_try(home, xdg, project_dir, session_id, None).unwrap_or_else(|(status, body)| {
         panic!("session start failed: status={status} body={body}")
     })
 }
@@ -198,58 +203,13 @@ pub fn start_session_with_base_ref(
     session_id: &str,
     base_ref: &str,
 ) -> SessionState {
-    let project_arg = project_dir.to_str().expect("utf8 project path");
-    let request_body = json!({
-        "title": "workspace integration test",
-        "context": "testing base_ref routing",
-        "runtime": "codex",
-        "session_id": session_id,
-        "project_dir": project_arg,
-        "base_ref": base_ref,
-    });
-
-    let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
-    loop {
-        let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
-        let url = format!("{}/v1/sessions", endpoint.trim_end_matches('/'));
-        let client = reqwest::Client::new();
-        let response = runtime().block_on(async {
-            client
-                .post(&url)
-                .bearer_auth(&token)
-                .json(&request_body)
-                .timeout(DAEMON_HTTP_TIMEOUT)
-                .send()
-                .await
-        });
-
-        match response {
-            Ok(response) => {
-                let status = response.status().as_u16();
-                let body = runtime()
-                    .block_on(async { response.json::<Value>().await.expect("json body") });
-                if status == 200 {
-                    return serde_json::from_value::<SessionMutationResponse>(body)
-                        .expect("parse session start")
-                        .state;
-                }
-                let body_text = body.to_string();
-                panic!("session start failed: status={status} body={body_text}");
-            }
-            Err(error) if error.is_connect() || error.is_timeout() => {
-                assert!(
-                    Instant::now() < deadline,
-                    "daemon connection timed out: {error}"
-                );
-                thread::sleep(DAEMON_WAIT_INTERVAL);
-            }
-            Err(error) => panic!("session start request failed: {error}"),
-        }
-    }
+    start_session_try(home, xdg, project_dir, session_id, Some(base_ref)).unwrap_or_else(
+        |(status, body)| panic!("session start failed: status={status} body={body}"),
+    )
 }
 
 pub fn git_head_sha(repo: &Path, refname: &str) -> String {
-    let out = std::process::Command::new("git")
+    let out = Command::new("git")
         .current_dir(repo)
         .args(["log", refname, "-1", "--format=%H"])
         .output()
