@@ -29,8 +29,8 @@ The temporary-exception entitlement is scrutinized by App Store review and is a 
 
 | Decision | Choice | Rationale |
 | --- | --- | --- |
-| Data root location | Move to app group container: `~/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/` | Eliminates the need for a data-root bookmark. App and daemon both have `application-groups` already; CLI (unsandboxed) reads the same path directly. |
-| Migration from old data root | Silent on first run | User confirmed. Old path exists at `~/Library/Application Support/harness/`. If new path is empty and old has data, move. |
+| Data root location | `harness_data_root()` resolves `XDG_DATA_HOME` first, then on macOS `HARNESS_APP_GROUP_ID` -> `~/Library/Group Containers/<id>`, then `user_dirs::data_dir()` fallback; `harness_data_root()` appends `/harness` in `src/workspace/paths.rs`. There is no `HARNESS_DATA_ROOT` env. | Keeps CLI/dev fallback intact while making the Monitor app and daemon converge on the app-group path when the container exists. No data-root bookmark is needed. |
+| Migration from old data root | Silent on first run via `src/sandbox/migration.rs::run_startup_migration()` | User confirmed. Old path exists at `~/Library/Application Support/harness/`. If new path is empty and old has data, move. Current code enters this from `src/app/cli.rs::dispatch()` on macOS, not from bootstrap or daemon startup. |
 | Bookmark persistence format | Typed JSON in the app group container | Cross-process readable (Swift + Rust). Schema versioned. Easier to audit than UserDefaults binary plist. |
 | Rust FFI | `security-framework` crate | Maintained, safe bindings. Avoids owning raw `extern "C"` CFURL bindings. |
 | Daemon resolver gate | `HARNESS_SANDBOXED=1` env var | Matches existing gate pattern. Dev-mode daemon skips resolution (already has unrestricted FS). |
@@ -48,10 +48,11 @@ Swift app process                                  Rust daemon process
 │ BookmarkStore (actor)            │              │ BookmarkResolver module          │
 │  - load/save bookmarks.json      │◄── shared ──►│  - reads bookmarks.json          │
 │  - MRU ordering                  │   JSON file  │  - security-framework crate      │
-│  - stale-bookmark refresh        │              │  - gated on HARNESS_SANDBOXED=1  │
+│  - stale-bookmark auto-refresh   │              │  - gated on HARNESS_SANDBOXED=1  │
 │         │                        │              │         │                        │
 │         ▼                        │              │         ▼                        │
-│ URL.withSecurityScope closure    │              │ BookmarkScope RAII struct        │
+│ URL.withSecurityScope            │              │ BookmarkScope RAII struct        │
+│ URL.withSecurityScopeAsync       │              │                                  │
 │         │                        │              │         │                        │
 │         ▼                        │              │         ▼                        │
 │ FileManager / NSFileCoordinator  │              │ std::fs / tokio::fs             │
@@ -99,22 +100,15 @@ Privacy manifest (`Resources/PrivacyInfo.xcprivacy`) already declares file times
 
 ### 2. Data root relocation
 
-Rust `harness_data_root()` resolution order becomes:
+Rust `harness_data_root()` resolution order is:
 
-1. `HARNESS_DATA_ROOT` env var (unchanged).
-2. On macOS, if `~/Library/Group Containers/Q498EB36N4.io.harnessmonitor/` exists: return `<group>/harness/`.
-3. Fall back to XDG (`~/.local/share/harness/` on non-macOS; `~/Library/Application Support/harness/` was the previous macOS default and is now the migration source only).
+1. `XDG_DATA_HOME`, if set.
+2. On macOS, `HARNESS_APP_GROUP_ID` -> `~/Library/Group Containers/<id>` when that directory exists.
+3. `user_dirs::data_dir()` fallback.
 
-The app group container is created by the system when either the Monitor app or the sandboxed daemon is installed. CLI-only users without the Monitor app keep using XDG. Mixed users - Monitor installed, CLI occasionally invoked - both point at the app group container.
+`harness_data_root()` then appends `/harness` in `src/workspace/paths.rs`. There is no `HARNESS_DATA_ROOT` env.
 
-Migration lives in `src/bootstrap/data_root_migration.rs`:
-
-- Runs once on daemon startup and once on CLI startup per binary.
-- If new path is absent or empty AND `~/Library/Application Support/harness/` has content: rename (same-volume fast path) or copy-then-delete (cross-volume). Atomic enough that a crash mid-migration leaves both paths in a recoverable state.
-- If both new and old paths have content: new wins, old is left alone, `warn!` is emitted with both paths so support can diagnose the split state. No automatic merge (would risk data divergence).
-- Writes a `.migrated-from` marker at the new path with the old path and timestamp so support can diagnose later.
-- Idempotent - a second run finds the marker and does nothing.
-- Tracing: `info!` for success, `warn!` on partial state.
+The one-shot migration lives in `src/sandbox/migration.rs` and is entered via `run_startup_migration()` from `src/app/cli.rs::dispatch()` on macOS. It migrates from `legacy_macos_root()` to `harness_data_root()`, preserves a `.migrated-from` marker, and uses a small advisory lock plus cross-volume copy fallback. The current code is not wired through `src/bootstrap/data_root_migration.rs` or `src/daemon/mod.rs`.
 
 No user confirmation. Consented in this spec.
 
@@ -148,7 +142,6 @@ public actor BookmarkStore {
     public func remove(id: String)
     public func touch(id: String)
     public func resolve(id: String) throws -> ResolvedScope
-    public func refreshStale(id: String, resolved: URL) throws
 }
 
 public struct ResolvedScope: Sendable {
@@ -160,12 +153,12 @@ public struct ResolvedScope: Sendable {
 Persistence:
 
 - File: `<group-container>/sandbox/bookmarks.json`
-- Atomic writes via `Data.write(to:options:[.atomic])`
+- Writes go through a temp file and `FileManager.replaceItemAt(_:withItemAt:)`; this is not a bare `Data.write(.atomic)` contract.
 - Schema versioned; unknown future versions refuse to load and surface an `.unsupportedSchemaVersion` error to the caller. The UI renders a recoverable banner ("Your bookmarks file was written by a newer build; please upgrade or remove `bookmarks.json`") rather than silently wiping the file.
 
-Access API: consumers call `resolve(id:)` which returns a `ResolvedScope`. The caller is responsible for invoking `url.withSecurityScope { ... }` around I/O. Resolving does NOT implicitly start the scope - that belongs at the call site so scope lifetime matches I/O lifetime.
+Access API: consumers call `resolve(id:)` which returns a `ResolvedScope`. The caller uses `url.withSecurityScope { ... }` or `url.withSecurityScopeAsync { ... }` around I/O. Resolving does not permanently start a scope; the helper handles start/stop around the call site.
 
-Stale handling: when `URL(resolvingBookmarkData:...)` returns `isStale == true`, `resolve` records `staleCount += 1` and surfaces the resolved URL; the caller can optionally regenerate by calling `refreshStale(id:resolved:)` with a fresh bookmark from the resolved URL. If resolution fails with `NSFileReadUnknownError`, the record is marked unresolvable (UI shows "Reconnect" action that re-prompts the picker).
+Stale handling: when `URL(resolvingBookmarkData:...)` returns `isStale == true`, `resolve` records `staleCount += 1`, refreshes the bookmark bytes itself, persists the updated record, and still returns the resolved URL. There is no separate `refreshStale` API in the current code. If resolution fails with `NSFileReadUnknownError`, the record is marked unresolvable (UI shows "Reconnect" action that re-prompts the picker).
 
 ### 4. URL security-scope helper
 
@@ -179,7 +172,7 @@ public extension URL {
         return try body(self)
     }
 
-    func withSecurityScope<T>(_ body: (URL) async throws -> T) async rethrows -> T {
+    func withSecurityScopeAsync<T>(_ body: @Sendable (URL) async throws -> T) async rethrows -> T {
         let started = startAccessingSecurityScopedResource()
         defer { if started { stopAccessingSecurityScopedResource() } }
         return try await body(self)
@@ -200,7 +193,7 @@ Current inventory (to be updated during implementation):
 
 | File | Operation | Action |
 | --- | --- | --- |
-| `HarnessMonitorKit/Support/HarnessMonitorPaths.swift` | Resolves `~/Library/Application Support/harness/` | Switch to app group container path. |
+| `HarnessMonitorKit/Support/HarnessMonitorPaths.swift` | Resolves `HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME`, then `HARNESS_APP_GROUP_ID`, then system app-group container lookup, then managed-build fatalError fallback | Current code already uses the shared `resolveBaseRoot(using:preferExternalDaemon:)` helper; managed builds fatalError if the app-group container is unavailable instead of silently falling back to a denied path. |
 | `HarnessMonitorKit/API/DaemonController+ManifestLoading.swift` | Reads `manifest.json`, token attributes | Path resolves via new data root (app group). No bookmark needed. |
 | (any others found during the sweep) | - | Audit spreadsheet added to the plan doc. |
 
@@ -265,8 +258,8 @@ After the data-root migration lands, the `temporary-exception` entitlement is re
 
 ### Unit (Swift)
 
-- `BookmarkStoreTests`: round-trip add → save → reload → resolve. Verify MRU cap evicts oldest. Verify stale refresh replaces bytes. Verify schema-version mismatch refuses to load.
-- `URLSecurityScopeTests`: verify `withSecurityScope` balances start/stop even when body throws.
+- `BookmarkStoreTests`: round-trip add → save → reload → resolve. Verify MRU cap evicts oldest. Verify stale resolve refreshes and persists bytes. Verify schema-version mismatch refuses to load.
+- `URLSecurityScopeTests`: verify `withSecurityScope` and `withSecurityScopeAsync` balance start/stop even when body throws.
 
 ### Unit (Rust)
 
@@ -296,10 +289,10 @@ After the data-root migration lands, the `temporary-exception` entitlement is re
 ## Execution order (for the plan)
 
 1. Entitlements + privacy manifest + `codesign` validation in `run-quality-gates.sh`.
-2. `URL.withSecurityScope` helper + unit tests (red → green).
+2. `URL.withSecurityScope` / `URL.withSecurityScopeAsync` helper + unit tests (red → green).
 3. `BookmarkStore` actor + schema + unit tests.
 4. Rust `src/sandbox/bookmarks.rs` module + FFI + unit tests.
-5. Data-root resolution change in `harness_data_root()` + migration module + Rust tests.
+5. Data-root resolution change in `harness_data_root()` + `src/sandbox/migration.rs` + Rust tests.
 6. Daemon path references retargeted to new data root.
 7. Daemon entitlement removal (temporary-exception out; bookmarks.app-scope in) + `codesign` assertion.
 8. Swift FS audit sweep: inventory every outside-container read; wrap or move.

@@ -66,6 +66,6 @@ Total raw hits: 49 lines across 25 files.
 ## Summary
 
 - Total FS access sites: 49 grep hits (25 files)
-- Migrated to app group in this task: 1 (`harnessRoot()` now routes through `resolveBaseRoot` which always prefers the group container; external-daemon bypass preserved symmetrically with `dataRoot`)
+- Migrated to app group in this task: 1 (`harnessRoot()` now routes through `resolveBaseRoot`; managed builds fatalError if the group container is unavailable, and the external-daemon fallback remains in the current precedence chain)
 - Remaining bookmark-mediated sites: 10 (handled by sub-projects C and D)
 - No per-site wraps added in this task - all app-owned data paths resolve via the updated `harnessRoot()` and need no individual changes
