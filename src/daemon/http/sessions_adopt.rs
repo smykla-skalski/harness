@@ -6,7 +6,7 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 
-use crate::daemon::protocol::SessionMutationResponse;
+use crate::daemon::protocol::{AdoptSessionRequest, SessionMutationResponse};
 use crate::errors::CliError;
 use crate::workspace::adopter::{AdoptionError, SessionAdopter};
 use crate::workspace::harness_data_root;
@@ -16,17 +16,10 @@ use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 
-#[derive(Debug, serde::Deserialize)]
-pub(super) struct AdoptRequest {
-    #[serde(default)]
-    pub bookmark_id: Option<String>,
-    pub session_root: String,
-}
-
 pub(super) async fn post_session_adopt(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<AdoptRequest>,
+    Json(request): Json<AdoptSessionRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);

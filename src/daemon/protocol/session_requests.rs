@@ -152,6 +152,13 @@ pub struct SessionMutationResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdoptSessionRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bookmark_id: Option<String>,
+    pub session_root: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRuntimeSessionRegistrationRequest {
     pub tui_id: String,
     pub runtime: String,

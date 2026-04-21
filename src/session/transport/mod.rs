@@ -18,9 +18,9 @@ pub use managed_agents::{
 };
 pub use recover::SessionRecoverLeaderArgs;
 pub use session_commands::{
-    SessionAssignArgs, SessionEndArgs, SessionJoinArgs, SessionLeaveArgs, SessionListArgs,
-    SessionObserveArgs, SessionRemoveArgs, SessionStartArgs, SessionStatusArgs, SessionSyncArgs,
-    SessionTitleArgs, SessionTransferLeaderArgs,
+    SessionAdoptArgs, SessionAssignArgs, SessionEndArgs, SessionJoinArgs, SessionLeaveArgs,
+    SessionListArgs, SessionObserveArgs, SessionRemoveArgs, SessionStartArgs, SessionStatusArgs,
+    SessionSyncArgs, SessionTitleArgs, SessionTransferLeaderArgs,
 };
 pub use signal::{SignalListArgs, SignalSendArgs};
 pub use task::{TaskAssignArgs, TaskCheckpointArgs, TaskCreateArgs, TaskListArgs, TaskUpdateArgs};
@@ -29,6 +29,8 @@ pub use task::{TaskAssignArgs, TaskCheckpointArgs, TaskCreateArgs, TaskListArgs,
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum SessionCommand {
+    /// Adopt an existing on-disk session directory into this daemon.
+    Adopt(SessionAdoptArgs),
     /// Create a new multi-agent orchestration session.
     Start(SessionStartArgs),
     /// Register an agent into an existing session.
@@ -101,6 +103,7 @@ pub enum SessionSignalCommand {
 impl Execute for SessionCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
+            Self::Adopt(args) => args.execute(context),
             Self::Start(args) => args.execute(context),
             Self::Join(args) => args.execute(context),
             Self::End(args) => args.execute(context),

@@ -25,6 +25,8 @@ mod observe;
 mod run;
 #[path = "tests/session.rs"]
 mod session;
+#[path = "tests/session_adopt.rs"]
+mod session_adopt;
 #[path = "tests/setup.rs"]
 mod setup;
 

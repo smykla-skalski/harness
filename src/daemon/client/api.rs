@@ -1,6 +1,6 @@
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
-    AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
+    AdoptSessionRequest, AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
     CodexSteerRequest, LeaderTransferRequest, ManagedAgentListResponse, ManagedAgentSnapshot,
     RoleChangeRequest, RuntimeSessionResolutionResponse, SessionDetail, SessionEndRequest,
@@ -66,6 +66,11 @@ impl DaemonClient {
 
     pub fn start_session(&self, request: &SessionStartRequest) -> Result<SessionState, CliError> {
         let response: SessionMutationResponse = self.post("/v1/sessions", request)?;
+        Ok(response.state)
+    }
+
+    pub fn adopt_session(&self, request: &AdoptSessionRequest) -> Result<SessionState, CliError> {
+        let response: SessionMutationResponse = self.post("/v1/sessions/adopt", request)?;
         Ok(response.state)
     }
 
