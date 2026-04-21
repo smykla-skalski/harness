@@ -14,7 +14,9 @@ extension HarnessMonitorStore {
         bookmarkID: bookmarkID,
         sessionRoot: preview.sessionRoot
       )
-      HarnessMonitorLogger.store.info("adopted external session \(summary.sessionId, privacy: .public)")
+      HarnessMonitorLogger.store.info(
+        "adopted external session \(summary.sessionId, privacy: .public)"
+      )
       await refresh()
       dismissSheet()
     } catch let apiError as HarnessMonitorAPIError {

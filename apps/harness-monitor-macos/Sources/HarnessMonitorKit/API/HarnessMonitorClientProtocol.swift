@@ -264,7 +264,10 @@ extension HarnessMonitorClientProtocol {
     MonitorConfiguration(personas: [], runtimeModels: [])
   }
 
-  public func adoptSession(bookmarkID _: String?, sessionRoot _: URL) async throws -> SessionSummary {
+  public func adoptSession(
+    bookmarkID _: String?,
+    sessionRoot _: URL
+  ) async throws -> SessionSummary {
     throw HarnessMonitorAPIError.server(code: 501, message: "Adopt session unavailable.")
   }
 

@@ -231,6 +231,7 @@
 		6EC9F074B18B9F777C6A830C /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E008AEF09B9B96314305C0 /* SidebarView.swift */; };
 		6EDD99815C50E6C3E4380DA4 /* HarnessMonitorMarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEFF844552E93638FC510E5 /* HarnessMonitorMarkdownText.swift */; };
 		6EEAB654721BB5ED2E3068A1 /* HarnessMonitorObservabilitySmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B631DFDD9A19A6915FB4E6BE /* HarnessMonitorObservabilitySmokeTests.swift */; };
+		6F4CAC4AECC61DCEEB0CDD18 /* RecordingHarnessClient+SessionMutations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B2FA4581269CD754F140E40 /* RecordingHarnessClient+SessionMutations.swift */; };
 		6FDFEDF6C1DACB8899D6E649 /* HarnessMonitorThemeMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF471732B53BBFB163405A4 /* HarnessMonitorThemeMode.swift */; };
 		6FEE216E9F2F73E68FB278B3 /* HarnessMonitorStoreUpdateStreamTests+PushFallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7344F0973FCE3D5545E93B2 /* HarnessMonitorStoreUpdateStreamTests+PushFallback.swift */; };
 		70581683266CEEBD2B536973 /* InspectorTaskNotesSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D314BACEDF0E5CCDB286A80 /* InspectorTaskNotesSupport.swift */; };
@@ -734,6 +735,7 @@
 		19BBE392E8070647D7427DAD /* DaemonControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonControllerTests.swift; sourceTree = "<group>"; };
 		1AB82E5CCE4166F4C26CE944 /* HarnessVoiceInputButton+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessVoiceInputButton+Support.swift"; sourceTree = "<group>"; };
 		1B00F09FA7776D59366CE176 /* HarnessMonitorStore+Enums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Enums.swift"; sourceTree = "<group>"; };
+		1B2FA4581269CD754F140E40 /* RecordingHarnessClient+SessionMutations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingHarnessClient+SessionMutations.swift"; sourceTree = "<group>"; };
 		1B6DE2FEC9C2406F5E07D0EF /* PreferencesVoiceSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesVoiceSection.swift; sourceTree = "<group>"; };
 		1BBB863FC1191D3B82A20DED /* HarnessMonitorStore+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+Persistence.swift"; sourceTree = "<group>"; };
 		1BFF73F1B39138B550E9576E /* InspectorTaskAgentCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorTaskAgentCards.swift; sourceTree = "<group>"; };
@@ -1576,6 +1578,7 @@
 				6F3B86F5C4D60F01C244C360 /* RecordingHarnessClient+Config.swift */,
 				7FC9A1B91E7E0FAAAA19E228 /* RecordingHarnessClient+Mutations.swift */,
 				FDAEA070F292BE40D84186E5 /* RecordingHarnessClient+ReadCalls.swift */,
+				1B2FA4581269CD754F140E40 /* RecordingHarnessClient+SessionMutations.swift */,
 				DB97C7E65CB3D50284F67935 /* RecordingHarnessClient+State.swift */,
 				B918572AD5DE96BF8CE5B3A5 /* RecordingHarnessClient+Timeline.swift */,
 				8DEBC7E5C8D72E2B942812B4 /* RecordingHarnessClient+Voice.swift */,
@@ -2556,6 +2559,7 @@
 				6AA840C014CA18008F69E3FC /* RecordingHarnessClient+Config.swift in Sources */,
 				2CFF39AA6EB37A7B2A146BE3 /* RecordingHarnessClient+Mutations.swift in Sources */,
 				C4B84F3AF9320FF429C29CCD /* RecordingHarnessClient+ReadCalls.swift in Sources */,
+				6F4CAC4AECC61DCEEB0CDD18 /* RecordingHarnessClient+SessionMutations.swift in Sources */,
 				3C41721AAA3569D744CE4181 /* RecordingHarnessClient+State.swift in Sources */,
 				52AFDE6D63CD6A5300A996DF /* RecordingHarnessClient+Timeline.swift in Sources */,
 				29146CC8E9E9F43534459570 /* RecordingHarnessClient+Voice.swift in Sources */,
