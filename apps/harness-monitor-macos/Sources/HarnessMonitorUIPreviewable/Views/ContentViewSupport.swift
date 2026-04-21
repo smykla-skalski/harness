@@ -24,13 +24,14 @@ public enum ContentInspectorVisibilitySource {
   case framework
 }
 
-public enum ContentInspectorStartupPresentation {
-  public static func resolve(
-    hydratedPresentation: Bool,
-    persistedPreference: Bool,
-    hasHydratedPersistedPreference: Bool
-  ) -> Bool {
-    hasHydratedPersistedPreference ? hydratedPresentation : persistedPreference
+public enum ContentInspectorInitialPresentation {
+  private static let storageKey = "showInspector"
+
+  public static func resolve(defaults: UserDefaults = .standard) -> Bool {
+    guard defaults.object(forKey: storageKey) != nil else {
+      return true
+    }
+    return defaults.bool(forKey: storageKey)
   }
 }
 

@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -6,26 +7,21 @@ import Testing
 
 @Suite("Content inspector visibility policy")
 struct ContentInspectorVisibilityPolicyTests {
-  @Test("Startup presentation follows the persisted preference before hydration")
-  func startupPresentationUsesPersistedPreferenceBeforeHydration() {
-    #expect(
-      ContentInspectorStartupPresentation.resolve(
-        hydratedPresentation: false,
-        persistedPreference: true,
-        hasHydratedPersistedPreference: false
-      ) == true
-    )
+  @Test("Initial presentation uses the registered default when no persisted preference exists")
+  func initialPresentationFallsBackToRegisteredDefault() {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+
+    #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == true)
   }
 
-  @Test("Startup presentation follows the hydrated state after hydration")
-  func startupPresentationUsesHydratedStateAfterHydration() {
-    #expect(
-      ContentInspectorStartupPresentation.resolve(
-        hydratedPresentation: false,
-        persistedPreference: true,
-        hasHydratedPersistedPreference: true
-      ) == false
-    )
+  @Test("Initial presentation uses the persisted preference without a hydration pass")
+  func initialPresentationUsesPersistedPreferenceImmediately() {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+    defaults.set(false, forKey: "showInspector")
+
+    #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == false)
   }
 
   @Test("Explicit user toggles persist the preference and suppress layout geometry")
