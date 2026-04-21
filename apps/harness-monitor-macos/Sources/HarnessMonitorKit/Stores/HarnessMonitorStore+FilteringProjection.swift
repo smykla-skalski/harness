@@ -113,6 +113,7 @@ extension HarnessMonitorStore {
     searchText = ""
     sessionFilter = .all
     sessionFocusFilter = .all
+    sessionSortOrder = .recentActivity
     flushPendingSearchRebuild()
   }
 }

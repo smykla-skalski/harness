@@ -6,6 +6,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -461,6 +462,161 @@ EOF
             )
             self.assertNotIn("<CommandLineArguments>", kit_scheme)
             self.assertIn('parallelizable = "NO"', kit_scheme)
+
+    def test_normalized_schemes_remain_well_formed_xml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            app_root = temp_root / "HarnessMonitor"
+            scripts_root = app_root / "Scripts"
+            schemes_root = (
+                app_root / "HarnessMonitor.xcodeproj" / "xcshareddata" / "xcschemes"
+            )
+            fake_xcodegen = temp_root / "xcodegen"
+
+            schemes_root.mkdir(parents=True)
+            scripts_root.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(SCRIPT_PATH, scripts_root / "generate-project.sh")
+            (app_root / "project.yml").write_text("name: HarnessMonitor\n")
+
+            write_executable(
+                fake_xcodegen,
+                """#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "--version" ]]; then
+  echo "Version: 2.45.4"
+  exit 0
+fi
+if [[ "${1:-}" != "generate" ]]; then
+  echo "unexpected xcodegen invocation: $*" >&2
+  exit 99
+fi
+
+project_root=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project)
+      project_root="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+mkdir -p "$project_root/HarnessMonitor.xcodeproj/xcshareddata/xcschemes"
+
+cat > "$project_root/HarnessMonitor.xcodeproj/project.pbxproj" <<'EOF'
+ABCDEF1234567890 /* XCLocalSwiftPackageReference "../../mcp-servers/harness-monitor-registry" */ = {
+			isa = XCLocalSwiftPackageReference;
+};
+		DEADBEEF12345678 /* HarnessMonitorRegistry */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HarnessMonitorRegistry;
+};
+LastUpgradeCheck = 1430;
+/* HarnessMonitor.app */
+path = HarnessMonitor.app;
+/* HarnessMonitorUITestHost.app */
+path = HarnessMonitorUITestHost.app;
+EOF
+
+cat > "$project_root/HarnessMonitor.xcodeproj/xcshareddata/xcschemes/HarnessMonitor.xcscheme" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1430"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      runPostActionsOnFailure = "NO">
+      <BuildActionEntries>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      codeCoverageEnabled = "YES"
+      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "KIT_TESTS"
+               BuildableName = "HarnessMonitorKitTests.xctest"
+               BlueprintName = "HarnessMonitorKitTests"
+               ReferencedContainer = "container:HarnessMonitor.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "UI_TESTS"
+               BuildableName = "HarnessMonitorUITests.xctest"
+               BlueprintName = "HarnessMonitorUITests"
+               ReferencedContainer = "container:HarnessMonitor.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+</Scheme>
+EOF
+
+cat > "$project_root/HarnessMonitor.xcodeproj/xcshareddata/xcschemes/HarnessMonitorKitTests.xcscheme" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1430"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      runPostActionsOnFailure = "NO">
+      <BuildActionEntries>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      <Testables>
+      </Testables>
+   </TestAction>
+</Scheme>
+EOF
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "XCODEGEN_BIN": str(fake_xcodegen),
+                    "HARNESS_MONITOR_SKIP_VERSION_SYNC": "1",
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(scripts_root / "generate-project.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+            monitor_scheme = (schemes_root / "HarnessMonitor.xcscheme").read_text()
+            kit_scheme = (schemes_root / "HarnessMonitorKitTests.xcscheme").read_text()
+
+            ET.fromstring(monitor_scheme)
+            ET.fromstring(kit_scheme)
 
 
 if __name__ == "__main__":

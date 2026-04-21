@@ -72,7 +72,7 @@ struct NewSessionSheetView: View {
         Text("Choose a folder…").tag(String?.none)
         ForEach(bookmarks, id: \.id) { record in
           Text(record.displayName)
-          .tag(Optional(record.id))
+            .tag(Optional(record.id))
         }
       }
       .pickerStyle(.menu)

@@ -210,7 +210,6 @@ extension HarnessMonitorStore {
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
-    public var searchFocusRequest = 0
     public var projectCount = 0
     public var worktreeCount = 0
     public var sessionCount = 0
@@ -231,9 +230,6 @@ extension HarnessMonitorStore {
       }
       if bookmarkedSessionIds != state.bookmarkedSessionIds {
         bookmarkedSessionIds = state.bookmarkedSessionIds
-      }
-      if searchFocusRequest != state.searchFocusRequest {
-        searchFocusRequest = state.searchFocusRequest
       }
       if projectCount != state.projectCount {
         projectCount = state.projectCount
