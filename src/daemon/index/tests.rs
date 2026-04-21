@@ -11,6 +11,7 @@ use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::{canonical_checkout_root, project_context_dir};
 
+mod adopted_external;
 mod repair_context_root;
 
 fn write_text(path: &Path, contents: &str) {
