@@ -31,4 +31,29 @@ final class AuthorizedFoldersTests: HarnessMonitorUITestCase {
       .firstMatch
     XCTAssertTrue(row.waitForExistence(timeout: Self.actionTimeout))
   }
+
+  func testPreseedBookmarkUsesReadableSampleFolderName() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PRESEED_BOOKMARK": "1"]
+    )
+
+    openSettings(in: app)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+
+    selectPreferencesSection(
+      in: app,
+      identifier: Accessibility.preferencesAuthorizedFoldersSection,
+      expectedTitle: "Authorized Folders"
+    )
+
+    XCTAssertTrue(
+      app.staticTexts["Sample Project Folder"].firstMatch.waitForExistence(
+        timeout: Self.actionTimeout
+      ),
+      "The seeded authorized folder should use a readable sample folder label"
+    )
+  }
 }

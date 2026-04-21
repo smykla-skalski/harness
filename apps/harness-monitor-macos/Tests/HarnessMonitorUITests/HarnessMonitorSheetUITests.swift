@@ -89,6 +89,63 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     app.typeKey(.escape, modifierFlags: [])
   }
 
+  func testNewSessionSheetUsesNativeLabeledFieldsAndReadableSampleFolder() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PRESEED_BOOKMARK": "1"
+      ]
+    )
+
+    tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
+
+    let sheetRoot = element(in: app, identifier: Accessibility.newSessionSheet)
+    XCTAssertTrue(
+      sheetRoot.waitForExistence(timeout: Self.actionTimeout),
+      "New Session sheet should appear from the toolbar action"
+    )
+
+    XCTAssertTrue(
+      app.staticTexts["Project folder"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should show a visible Project folder label"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Session title"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should show a visible Session title label"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Context"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should show a visible Context label for the multiline field"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Base ref"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should surface the advanced Base ref row"
+    )
+
+    let baseRefField = editableField(in: app, identifier: Accessibility.newSessionBaseRef)
+    XCTAssertTrue(
+      baseRefField.waitForExistence(timeout: Self.fastActionTimeout),
+      "Base ref should be visible instead of hidden behind a broken disclosure row"
+    )
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.newSessionProjectPicker,
+      optionTitle: "Sample Project Folder"
+    )
+
+    let titleField = editableField(in: app, identifier: Accessibility.newSessionTitle)
+    XCTAssertTrue(titleField.waitForExistence(timeout: Self.fastActionTimeout))
+    tapViaCoordinate(in: app, element: titleField)
+    titleField.typeText("Native sheet regression")
+
+    let createButton = button(in: app, identifier: Accessibility.newSessionCreateButton)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) { createButton.exists && createButton.isEnabled },
+      "Create should enable once the sheet has a visible sample folder and title"
+    )
+  }
+
   func testSendSignalVoicePopoverRecordsPreviewTranscript() throws {
     let app = launchInCockpitPreview()
 

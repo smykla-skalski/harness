@@ -43,8 +43,14 @@ struct HarnessMonitorApp: App {
     isUITesting = configuration.isUITesting
     launchMode = configuration.launchMode
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
-    let notificationController = HarnessMonitorUserNotificationController()
-    notificationController.activate()
+    let notificationController =
+      configuration.isUITesting
+      ? HarnessMonitorUserNotificationController.preview()
+      : {
+          let controller = HarnessMonitorUserNotificationController()
+          controller.activate()
+          return controller
+        }()
     self.notificationController = notificationController
     perfScenario = configuration.perfScenario
     _store = State(initialValue: configuration.store)

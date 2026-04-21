@@ -227,7 +227,15 @@ public final class HarnessMonitorStore {
 
   private static func makeBookmarkStore() -> BookmarkStore? {
     #if DEBUG
-      if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+      let environment = ProcessInfo.processInfo.environment
+      if environment["XCTestConfigurationFilePath"] != nil
+        || environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+      {
+        // The dedicated UI-test host is not launched by `xctest`, so it does
+        // not inherit `XCTestConfigurationFilePath`. Treat the explicit
+        // HARNESS_MONITOR_UI_TESTS launch contract the same way so the host
+        // stays on a temp bookmark store and never touches the shared app-group
+        // container that triggers macOS app-data permission prompts.
         return BookmarkStore(containerURL: debugBookmarkStoreContainerURL())
       }
     #endif

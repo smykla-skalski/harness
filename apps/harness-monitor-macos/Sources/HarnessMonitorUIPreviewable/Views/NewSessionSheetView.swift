@@ -9,7 +9,6 @@ struct NewSessionSheetView: View {
   @Environment(\.dismiss)
   private var dismiss
   @State private var bookmarks: [BookmarkStore.Record] = []
-  @State private var isAdvancedExpanded = false
   @State private var showImporter = false
 
   var body: some View {
@@ -56,10 +55,9 @@ struct NewSessionSheetView: View {
       Form {
         projectSection
         detailsSection
-        DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
-          advancedContent
-        }
+        advancedSection
       }
+      .harnessNativeFormContainer()
       if let error = viewModel.lastError {
         errorBanner(for: error)
           .padding(.horizontal, HarnessMonitorTheme.spacingLG)
@@ -69,50 +67,67 @@ struct NewSessionSheetView: View {
   }
 
   private var projectSection: some View {
-    Section("Project") {
-      Picker("Project", selection: $viewModel.selectedBookmarkId) {
-        Text("Select a folder…").tag(String?.none)
+    Section {
+      Picker("Project folder", selection: $viewModel.selectedBookmarkId) {
+        Text("Choose a folder…").tag(String?.none)
         ForEach(bookmarks, id: \.id) { record in
-          VStack(alignment: .leading, spacing: 2) {
-            Text(record.displayName)
-            Text(record.lastResolvedPath)
-              .scaledFont(.caption.monospaced())
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
+          Text(record.displayName)
           .tag(Optional(record.id))
         }
       }
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
       .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
+
+      if let selectedBookmark {
+        LabeledContent("Path") {
+          Text(abbreviateHomePath(selectedBookmark.lastResolvedPath))
+            .scaledFont(.caption.monospaced())
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .textSelection(.enabled)
+        }
+      }
+
       Button("Add Folder…") {
         showImporter = true
       }
-      .harnessActionButtonStyle(variant: .borderless, tint: HarnessMonitorTheme.accent)
-      .scaledFont(.callout)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    } footer: {
+      Text("Choose a Git project folder to start a session.")
     }
   }
 
   private var detailsSection: some View {
-    Section("Details") {
-      TextField("Session title", text: $viewModel.title)
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTitle)
-      TextEditor(text: $viewModel.context)
-        .harnessNativeFormControl()
-        .frame(minHeight: 60)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
+    Section {
+      LabeledContent("Session title") {
+        TextField("", text: $viewModel.title)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTitle)
+      }
+
+      LabeledContent("Context") {
+        TextField("", text: $viewModel.context, axis: .vertical)
+          .harnessNativeFormControl()
+          .lineLimit(4, reservesSpace: true)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
+      }
     }
   }
 
-  private var advancedContent: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      TextField("origin/HEAD", text: $viewModel.baseRef)
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
-      Text("Leave blank for the default branch")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+  private var advancedSection: some View {
+    Section {
+      LabeledContent("Base ref") {
+        TextField("", text: $viewModel.baseRef)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
+      }
+    } header: {
+      Text("Advanced")
+    } footer: {
+      Text("Leave blank to use the default branch.")
     }
-    .padding(.top, HarnessMonitorTheme.spacingXS)
   }
 
   private func errorBanner(for error: NewSessionViewModel.SubmitError) -> some View {
@@ -182,6 +197,10 @@ struct NewSessionSheetView: View {
     !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && viewModel.selectedBookmarkId != nil
       && !viewModel.isSubmitting
+  }
+
+  private var selectedBookmark: BookmarkStore.Record? {
+    bookmarks.first { $0.id == viewModel.selectedBookmarkId }
   }
 
   private func submitAndDismiss() async {
