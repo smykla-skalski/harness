@@ -10,6 +10,7 @@ use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{AdoptSessionRequest, SessionMutationResponse};
 use crate::daemon::service;
 use crate::errors::CliError;
+use crate::sandbox;
 use crate::workspace::adopter::{AdoptionError, AdoptionOutcome, SessionAdopter};
 use crate::workspace::harness_data_root;
 use crate::workspace::layout::sessions_root;
@@ -28,34 +29,60 @@ pub(super) async fn post_session_adopt(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    // TODO: resolve bookmark_id via sandbox resolver when daemon runs sandboxed.
-    let _ = request.bookmark_id;
 
-    let result = adopt_response(&state, &request.session_root).await;
+    let result = {
+        #[cfg(target_os = "macos")]
+        {
+            let input = if sandbox::resolver::is_sandboxed() {
+                request
+                    .bookmark_id
+                    .as_deref()
+                    .unwrap_or(request.session_root.as_str())
+            } else {
+                request.session_root.as_str()
+            };
+            let session_root_scope = match sandbox::resolve_project_input(input) {
+                Ok(session_root_scope) => session_root_scope,
+                Err(error) => {
+                    return timed_json(
+                        "POST",
+                        "/v1/sessions/adopt",
+                        &request_id,
+                        start,
+                        Err::<SessionMutationResponse, _>(error),
+                    );
+                }
+            };
+            adopt_session(session_root_scope.path())
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            adopt_session(Path::new(&request.session_root))
+        }
+    };
+
     match result {
-        Ok(payload) => timed_json(
-            "POST",
-            "/v1/sessions/adopt",
-            &request_id,
-            start,
-            Ok::<_, CliError>(payload),
-        ),
+        Ok(outcome) => {
+            record_adopt_in_db(&state, &outcome).await;
+            timed_json(
+                "POST",
+                "/v1/sessions/adopt",
+                &request_id,
+                start,
+                Ok::<_, CliError>(SessionMutationResponse {
+                    state: outcome.state,
+                }),
+            )
+        }
         Err(ref adoption_error) => adoption_error_response(adoption_error),
     }
 }
 
-async fn adopt_response(
-    state: &DaemonHttpState,
-    session_root: &str,
-) -> Result<SessionMutationResponse, AdoptionError> {
-    let path = Path::new(session_root);
-    let probed = SessionAdopter::probe(path)?;
+fn adopt_session(session_root: &Path) -> Result<AdoptionOutcome, AdoptionError> {
+    let probed = SessionAdopter::probe(session_root)?;
     let data_root_sessions = sessions_root(&harness_data_root());
-    let outcome = SessionAdopter::register(probed, &data_root_sessions)?;
-    record_adopt_in_db(state, &outcome).await;
-    Ok(SessionMutationResponse {
-        state: outcome.state,
-    })
+    SessionAdopter::register(probed, &data_root_sessions)
 }
 
 #[expect(

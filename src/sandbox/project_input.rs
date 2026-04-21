@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
-use crate::workspace::data_root;
+use crate::workspace::harness_data_root;
 
 #[cfg(target_os = "macos")]
 use super::resolver::ResolvedBookmark;
@@ -74,7 +74,7 @@ mod tests;
 #[cfg(target_os = "macos")]
 fn try_resolve_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliError> {
     use super::bookmarks;
-    let store_path = data_root().join("bookmarks.json");
+    let store_path = harness_data_root().join("bookmarks.json");
     let store = bookmarks::load(&store_path).map_err(|error| -> CliError {
         CliErrorKind::workflow_io(format!("load bookmarks store: {error}")).into()
     })?;
