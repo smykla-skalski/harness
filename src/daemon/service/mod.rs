@@ -207,6 +207,7 @@ use crate::daemon::protocol;
 use crate::daemon::voice;
 use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
+mod adopt;
 mod direct;
 mod leave;
 mod mutations;
@@ -226,6 +227,8 @@ mod signals_async_send;
 mod status;
 mod sync_support;
 
+pub use adopt::adopt_session_record;
+pub(crate) use adopt::adopt_session_record_async;
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,
     register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
