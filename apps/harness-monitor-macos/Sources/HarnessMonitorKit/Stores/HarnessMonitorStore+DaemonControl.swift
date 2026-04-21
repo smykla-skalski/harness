@@ -44,10 +44,6 @@ extension HarnessMonitorStore {
     return registrationState
   }
 
-  public func focusSidebarSearch() {
-    sidebarUI.searchFocusRequest += 1
-  }
-
   func awaitManagedDaemonWarmUpWithRecovery() async throws
     -> any HarnessMonitorClientProtocol
   {

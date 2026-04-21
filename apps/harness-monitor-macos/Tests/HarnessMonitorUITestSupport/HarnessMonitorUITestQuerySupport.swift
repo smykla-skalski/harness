@@ -278,9 +278,17 @@ extension HarnessMonitorUITestCase {
 
   func sidebarToggleButton(in app: XCUIApplication) -> XCUIElement {
     let toolbarButtons = mainWindow(in: app).toolbars.buttons.allElementsBoundByIndex
+    let excludedIdentifiers: Set<String> = [
+      HarnessMonitorUITestAccessibility.navigateBackButton,
+      HarnessMonitorUITestAccessibility.navigateForwardButton,
+      HarnessMonitorUITestAccessibility.refreshButton,
+      HarnessMonitorUITestAccessibility.sleepPreventionButton,
+      HarnessMonitorUITestAccessibility.inspectorToggleButton,
+      HarnessMonitorUITestAccessibility.sidebarNewSessionButton,
+      HarnessMonitorUITestAccessibility.sidebarFilterMenu,
+    ]
     if let button = toolbarButtons.first(where: { button in
-      let identifier = button.identifier
-      return identifier != HarnessMonitorUITestAccessibility.refreshButton
+      !excludedIdentifiers.contains(button.identifier)
     }) {
       return button
     }

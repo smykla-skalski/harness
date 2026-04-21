@@ -281,7 +281,6 @@ extension HarnessMonitorStore {
         selectedSessionID: selection.selectedSessionID,
         isPersistenceAvailable: isPersistenceAvailable,
         bookmarkedSessionIds: userData.bookmarkedSessionIds,
-        searchFocusRequest: sidebarUI.searchFocusRequest,
         projectCount: indexedProjectCount,
         worktreeCount: indexedWorktreeCount,
         sessionCount: indexedSessionCount,

@@ -62,10 +62,7 @@ public struct SidebarToolbarFilterMenu: View {
 
       Section {
         Button("Clear Filters") {
-          store.searchText = ""
-          store.sessionFilter = .all
-          store.sessionFocusFilter = .all
-          store.sessionSortOrder = .recentActivity
+          store.resetFilters()
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
         .disabled(!hasActiveFilters)

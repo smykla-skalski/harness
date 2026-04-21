@@ -147,6 +147,7 @@ struct HarnessMonitorStoreTests {
     store.searchText = "harness leader-alpha"
     store.flushPendingSearchRebuild()
     store.sessionFilter = .all
+    store.sessionSortOrder = .status
 
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-a"])
 
@@ -155,6 +156,7 @@ struct HarnessMonitorStoreTests {
     #expect(store.searchText.isEmpty)
     #expect(store.sessionFilter == .all)
     #expect(store.sessionFocusFilter == .all)
+    #expect(store.sessionSortOrder == .recentActivity)
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-a", "sess-b"])
   }
 

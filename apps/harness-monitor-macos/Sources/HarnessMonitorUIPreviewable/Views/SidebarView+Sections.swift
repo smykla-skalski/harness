@@ -76,23 +76,29 @@ struct SidebarSessionListContent: View {
   @ViewBuilder private var sidebarRows: some View {
     switch renderState.emptyState {
     case .noSessions:
-      SidebarEmptyState(
-        title: "No sessions indexed yet",
-        systemImage: "tray",
-        message: "Start the daemon or refresh after launching a harness session."
-      )
+      Section {
+        SidebarEmptyState(
+          title: "No sessions indexed yet",
+          systemImage: "tray",
+          message: "Start the daemon or refresh after launching a harness session."
+        )
+      }
     case .noMatches:
-      SidebarEmptyState(
-        title: "No sessions match",
-        systemImage: "magnifyingglass",
-        message: "Try a broader search or clear filters."
-      )
+      Section {
+        SidebarEmptyState(
+          title: "No sessions match",
+          systemImage: "magnifyingglass",
+          message: "Try a broader search or clear filters."
+        )
+      }
     case .sessionsAvailable:
       if renderState.usesFlatSearchResults {
-        flatSearchResults
-          .accessibilityElement(children: .contain)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
+        Section {
+          flatSearchResults
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
+        .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
       } else if let firstGroup = renderState.projectionGroups.first {
         projectSection(for: firstGroup)
           .accessibilityElement(children: .contain)

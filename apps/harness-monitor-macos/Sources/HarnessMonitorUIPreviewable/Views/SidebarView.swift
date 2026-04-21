@@ -7,48 +7,17 @@ struct SidebarView: View {
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
-  let sidebarVisible: Bool
-  let focusParticipationEnabled: Bool
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
   var fontScale
 
   @State private var collapsedCheckoutKeys: Set<String> = []
-  @State private var sidebarWidth: CGFloat = 260
-  @State private var sidebarVisibilityPhase = 1.0
-  @State private var isSidebarVisibilityAnimating = false
-  @State private var pendingSidebarWidth: CGFloat?
-  @State private var sidebarVisibilityResetTask: Task<Void, Never>?
-  @State private var hasPendingSearchFocusRequest = false
-  @FocusState private var isSearchFocused: Bool
-  private static let sidebarWidthMeasurementQuantum: CGFloat = 4
-  private static let filterToolbarFadeHiddenWidth: CGFloat = 96
-  private static let filterToolbarFadeVisibleWidth: CGFloat = 220
-  private static let sidebarAnimationDurationSeconds = 0.18
-  private static let sidebarAnimationDurationNanoseconds: UInt64 = 180_000_000
-
-  private var sidebarSearchText: Binding<String> {
-    Binding(
-      get: { store.searchText },
-      set: { store.searchText = $0 }
-    )
-  }
-
-  // Keep the filter menu in the window toolbar while fading it with the
-  // sidebar width and split-view visibility so it follows collapse/expand
-  // transitions without popping in or out mid-animation.
-  private var filterToolbarVisibilityProgress: Double {
-    let hiddenWidth = Self.filterToolbarFadeHiddenWidth
-    let visibleWidth = Self.filterToolbarFadeVisibleWidth
-    let widthProgress = Double(
-      max(0, min(1, (sidebarWidth - hiddenWidth) / (visibleWidth - hiddenWidth))))
-    return min(widthProgress, sidebarVisibilityPhase)
-  }
 
   var body: some View {
     SidebarSessionListColumn(
       store: store,
+      controls: controls,
       projection: projection,
       searchResults: searchResults,
       sidebarUI: sidebarUI,
@@ -60,41 +29,16 @@ struct SidebarView: View {
     .listStyle(.sidebar)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .safeAreaInset(edge: .top, spacing: 0) {
-      sidebarHeader
+      SidebarSearchAccessoryBar(
+        store: store,
+        controls: controls
+      )
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
     }
     .toolbar {
       SidebarToolbarNewSessionToolbarItem(store: store)
-      SidebarToolbarFilterToolbarItem(
-        store: store,
-        controls: controls,
-        searchResults: searchResults,
-        visibilityProgress: filterToolbarVisibilityProgress
-      )
-    }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      updateSidebarWidth(width)
-    }
-    .onChange(of: sidebarVisible, initial: true) { _, isVisible in
-      let nextPhase = isVisible ? 1.0 : 0.0
-      guard sidebarVisibilityPhase != nextPhase else {
-        return
-      }
-      beginSidebarVisibilityTransition(to: nextPhase)
-    }
-    .onChange(of: sidebarUI.searchFocusRequest) { _, _ in
-      requestSearchFocus()
-    }
-    .onChange(of: focusParticipationEnabled, initial: true) { _, isEnabled in
-      applyPendingSearchFocusRequestIfNeeded(isEnabled: isEnabled)
-    }
-    .onDisappear {
-      sidebarVisibilityResetTask?.cancel()
-      sidebarVisibilityResetTask = nil
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
@@ -108,88 +52,6 @@ struct SidebarView: View {
     }
   }
 
-  @ViewBuilder private var sidebarHeader: some View {
-    SidebarRecentSearchesHeader(
-      searchText: sidebarSearchText,
-      isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
-      isSearchFocused: isSearchFocused,
-      searchFocus: $isSearchFocused,
-      submitSearch: submitSearch,
-      applyQuery: applyRecentSearch,
-      clearHistory: { _ = store.clearSearchHistory() }
-    )
-  }
-
-  private func submitSearch() {
-    store.flushPendingSearchRebuild()
-    if sidebarUI.isPersistenceAvailable {
-      _ = store.recordSearch(store.searchText)
-    }
-  }
-
-  private func requestSearchFocus() {
-    guard focusParticipationEnabled else {
-      hasPendingSearchFocusRequest = true
-      return
-    }
-    isSearchFocused = true
-  }
-
-  private func applyPendingSearchFocusRequestIfNeeded(isEnabled: Bool) {
-    guard isEnabled, hasPendingSearchFocusRequest else {
-      return
-    }
-    hasPendingSearchFocusRequest = false
-    isSearchFocused = true
-  }
-
-  func updateSidebarWidth(_ width: CGFloat) {
-    let quantizedWidth =
-      max(
-        (width / Self.sidebarWidthMeasurementQuantum).rounded()
-          * Self.sidebarWidthMeasurementQuantum,
-        0
-      )
-    guard abs(quantizedWidth - sidebarWidth) >= 1 else {
-      return
-    }
-    guard !isSidebarVisibilityAnimating else {
-      pendingSidebarWidth = quantizedWidth
-      return
-    }
-    sidebarWidth = quantizedWidth
-  }
-
-  private func beginSidebarVisibilityTransition(to nextPhase: Double) {
-    isSidebarVisibilityAnimating = true
-    sidebarVisibilityResetTask?.cancel()
-    withAnimation(.easeInOut(duration: Self.sidebarAnimationDurationSeconds)) {
-      sidebarVisibilityPhase = nextPhase
-    }
-    sidebarVisibilityResetTask = Task { @MainActor in
-      try? await Task.sleep(
-        nanoseconds: Self.sidebarAnimationDurationNanoseconds
-      )
-      guard !Task.isCancelled else {
-        return
-      }
-      isSidebarVisibilityAnimating = false
-      applyPendingSidebarWidthIfNeeded()
-      sidebarVisibilityResetTask = nil
-    }
-  }
-
-  private func applyPendingSidebarWidthIfNeeded() {
-    guard let pendingSidebarWidth else {
-      return
-    }
-    self.pendingSidebarWidth = nil
-    guard abs(pendingSidebarWidth - sidebarWidth) >= 1 else {
-      return
-    }
-    sidebarWidth = pendingSidebarWidth
-  }
-
   func setCheckoutCollapsed(
     checkoutKey: String,
     isCollapsed: Bool
@@ -199,11 +61,6 @@ struct SidebarView: View {
     } else {
       collapsedCheckoutKeys.remove(checkoutKey)
     }
-  }
-
-  private func applyRecentSearch(_ query: String) {
-    store.searchText = query
-    submitSearch()
   }
 }
 
@@ -220,43 +77,6 @@ private struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
       .help("Start a new session")
       .disabled(store.connectionState != .online)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarNewSessionButton)
-    }
-  }
-}
-
-private struct SidebarToolbarFilterToolbarItem: ToolbarContent {
-  let store: HarnessMonitorStore
-  let controls: HarnessMonitorStore.SessionControlsSlice
-  let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
-  let visibilityProgress: Double
-
-  private var hasActiveFilters: Bool {
-    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || controls.sessionFilter != .all
-      || controls.sessionFocusFilter != .all
-      || controls.sessionSortOrder != .recentActivity
-  }
-
-  var body: some ToolbarContent {
-    if visibilityProgress > 0.02 {
-      ToolbarItem(placement: .primaryAction) {
-        SidebarToolbarFilterMenu(
-          store: store,
-          sessionFilter: controls.sessionFilter,
-          sessionFocusFilter: controls.sessionFocusFilter,
-          sessionSortOrder: controls.sessionSortOrder,
-          hasActiveFilters: hasActiveFilters
-        )
-        .opacity(visibilityProgress)
-        .scaleEffect(
-          x: 0.94 + (0.06 * visibilityProgress),
-          y: 0.94 + (0.06 * visibilityProgress),
-          anchor: .trailing
-        )
-        .allowsHitTesting(visibilityProgress > 0.85)
-        .accessibilityHidden(visibilityProgress < 0.15)
-        .animation(.easeInOut(duration: 0.12), value: visibilityProgress)
-      }
     }
   }
 }
@@ -288,6 +108,7 @@ private struct SidebarFilterStateMarker: View {
 
 private struct SidebarSessionListColumn: View {
   let store: HarnessMonitorStore
+  let controls: HarnessMonitorStore.SessionControlsSlice
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice

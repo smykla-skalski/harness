@@ -47,10 +47,10 @@ struct HarnessMonitorApp: App {
       configuration.isUITesting
       ? HarnessMonitorUserNotificationController.preview()
       : {
-          let controller = HarnessMonitorUserNotificationController()
-          controller.activate()
-          return controller
-        }()
+        let controller = HarnessMonitorUserNotificationController()
+        controller.activate()
+        return controller
+      }()
     self.notificationController = notificationController
     perfScenario = configuration.perfScenario
     _store = State(initialValue: configuration.store)
@@ -78,7 +78,6 @@ struct HarnessMonitorApp: App {
         decreaseTextSize: decreaseTextSize,
         resetTextSize: resetTextSize,
         refreshStore: refreshStore,
-        focusSidebarSearch: focusSidebarSearch,
         startDaemon: startDaemon,
         installLaunchAgent: installLaunchAgent,
         observeSelectedSession: observeSelectedSession,
@@ -188,10 +187,6 @@ struct HarnessMonitorApp: App {
     Task {
       await store.refresh()
     }
-  }
-
-  private func focusSidebarSearch() {
-    store.focusSidebarSearch()
   }
 
   private func startDaemon() {

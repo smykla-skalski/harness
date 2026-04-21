@@ -106,7 +106,8 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     )
 
     XCTAssertTrue(
-      app.staticTexts["Project folder"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      app.staticTexts["Project folder"].firstMatch
+        .waitForExistence(timeout: Self.fastActionTimeout),
       "New Session should show a visible Project folder label"
     )
     XCTAssertTrue(
