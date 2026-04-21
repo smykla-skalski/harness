@@ -5,16 +5,57 @@ ROOT="${SRCROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 XCODEGEN_BIN="${XCODEGEN_BIN:-$(command -v xcodegen || true)}"
 BUILD_SERVER_VERSION="1.3.0"
+EXPECTED_XCODEGEN_VERSION="${HARNESS_MONITOR_EXPECTED_XCODEGEN_VERSION:-2.45.4}"
+SCHEMES_DIR="$ROOT/HarnessMonitor.xcodeproj/xcshareddata/xcschemes"
 
 if [ -z "${XCODEGEN_BIN}" ]; then
   echo "xcodegen is required on PATH or via XCODEGEN_BIN" >&2
   exit 1
 fi
 
+detect_xcodegen_version() {
+  local raw
+  raw="$("$XCODEGEN_BIN" --version 2>/dev/null | head -n1 || true)"
+  if [[ "$raw" =~ ([0-9]+(\.[0-9]+)+) ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  fi
+}
+
+enforce_supported_xcodegen_version() {
+  local actual_version
+
+  if [ "${HARNESS_MONITOR_ALLOW_UNSUPPORTED_XCODEGEN:-0}" = "1" ]; then
+    return
+  fi
+
+  actual_version="$(detect_xcodegen_version)"
+  if [ -z "$actual_version" ]; then
+    echo \
+      "could not determine xcodegen version from $XCODEGEN_BIN --version; expected $EXPECTED_XCODEGEN_VERSION" \
+      >&2
+    exit 1
+  fi
+
+  if [ "$actual_version" != "$EXPECTED_XCODEGEN_VERSION" ]; then
+    cat >&2 <<EOF
+unsupported xcodegen version: $actual_version
+expected xcodegen version: $EXPECTED_XCODEGEN_VERSION
+refusing to rewrite tracked Harness Monitor project files because mismatched xcodegen versions churn shared scheme XML
+set HARNESS_MONITOR_ALLOW_UNSUPPORTED_XCODEGEN=1 only for an intentional generator upgrade
+EOF
+    exit 1
+  fi
+}
+
+enforce_supported_xcodegen_version
+
+# XcodeGen preserves pre-existing shared scheme files instead of replacing them,
+# so stale XML can survive regeneration and keep showing up as dirty churn.
+rm -rf "$SCHEMES_DIR"
+
 "$XCODEGEN_BIN" generate --spec "$ROOT/project.yml" --project "$ROOT"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
-SCHEMES_DIR="$ROOT/HarnessMonitor.xcodeproj/xcshareddata/xcschemes"
 LOCAL_REGISTRY_PACKAGE_RELATIVE_PATH="../../mcp-servers/harness-monitor-registry"
 LOCAL_REGISTRY_PRODUCT_NAME="HarnessMonitorRegistry"
 
@@ -36,6 +77,174 @@ repair_local_package_product_link() {
           or die "missing package product dependency for $product_name\n";
       }
     ' "$pbxproj_path"
+}
+
+normalize_shared_schemes() {
+  trim_line() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+  }
+
+  normalize_scheme_line() {
+    local line="$1"
+    line="${line/version = \"1.7\"/version = \"1.3\"}"
+    line="${line/BuildableName = \"HarnessMonitor.app\"/BuildableName = \"Harness Monitor.app\"}"
+    line="${line/BuildableName = \"HarnessMonitorUITestHost.app\"/BuildableName = \"Harness Monitor UI Testing.app\"}"
+    printf '%s' "$line"
+  }
+
+  reorder_test_action_environment() {
+    local index
+    local test_action_started=0
+    local testables_start=-1
+    local testables_end=-1
+    local environment_start=-1
+    local environment_end=-1
+
+    for index in "${!normalized_lines[@]}"; do
+      local line="${normalized_lines[index]}"
+      local trimmed_line
+      trimmed_line="$(trim_line "$line")"
+
+      if (( test_action_started == 0 )); then
+        if [[ "$line" == *"<TestAction"* ]]; then
+          test_action_started=1
+        fi
+        continue
+      fi
+
+      if (( testables_start < 0 )) && [[ "$trimmed_line" == "<Testables>" ]]; then
+        testables_start=$index
+        continue
+      fi
+
+      if (( testables_start >= 0 && testables_end < 0 )) && [[ "$trimmed_line" == "</Testables>" ]]; then
+        testables_end=$index
+        continue
+      fi
+
+      if (( environment_start < 0 )) && [[ "$trimmed_line" == "<EnvironmentVariables>" ]]; then
+        environment_start=$index
+        continue
+      fi
+
+      if (( environment_start >= 0 && environment_end < 0 )) && [[ "$trimmed_line" == "</EnvironmentVariables>" ]]; then
+        environment_end=$index
+        continue
+      fi
+
+      if [[ "$line" == *"</TestAction>"* ]]; then
+        break
+      fi
+    done
+
+    if (( testables_start < 0 || testables_end < 0 || environment_start < 0 || environment_end < 0 || environment_start < testables_start )); then
+      return
+    fi
+
+    local reordered_lines=()
+
+    for (( index = 0; index < testables_start; index += 1 )); do
+      reordered_lines+=("${normalized_lines[index]}")
+    done
+
+    for (( index = environment_start; index <= environment_end; index += 1 )); do
+      reordered_lines+=("${normalized_lines[index]}")
+    done
+
+    for (( index = testables_end + 1; index < environment_start; index += 1 )); do
+      reordered_lines+=("${normalized_lines[index]}")
+    done
+
+    for (( index = testables_start; index <= testables_end; index += 1 )); do
+      reordered_lines+=("${normalized_lines[index]}")
+    done
+
+    for (( index = environment_end + 1; index < ${#normalized_lines[@]}; index += 1 )); do
+      reordered_lines+=("${normalized_lines[index]}")
+    done
+
+    normalized_lines=("${reordered_lines[@]}")
+  }
+
+  local scheme_path
+  for scheme_path in "$SCHEMES_DIR"/*.xcscheme; do
+    [ -e "$scheme_path" ] || continue
+
+    local raw_lines=()
+    while IFS= read -r line || [ -n "$line" ]; do
+      raw_lines+=("$line")
+    done < "$scheme_path"
+
+    local normalized_lines=()
+    local index=0
+
+    while (( index < ${#raw_lines[@]} )); do
+      local line
+      line="$(normalize_scheme_line "${raw_lines[index]}")"
+
+      if [[ "$line" == *'runPostActionsOnFailure = "NO"'* ]] || [[ "$line" == *'onlyGenerateCoverageForSpecifiedTargets = "NO"'* ]]; then
+        (( index += 1 ))
+        continue
+      fi
+
+      local trimmed_line
+      trimmed_line="$(trim_line "$line")"
+
+      if [[ "$trimmed_line" == "<CommandLineArguments>" ]]; then
+        local next_line=""
+        if (( index + 1 < ${#raw_lines[@]} )); then
+          next_line="$(normalize_scheme_line "${raw_lines[index + 1]}")"
+        fi
+
+        if [[ "$(trim_line "$next_line")" == "</CommandLineArguments>" ]]; then
+          (( index += 2 ))
+          continue
+        fi
+      fi
+
+      if [[ "$line" == *"<TestableReference"* ]]; then
+        local testable_lines=()
+        local ui_test_bundle=0
+
+        while (( index < ${#raw_lines[@]} )); do
+          local testable_line
+          testable_line="$(normalize_scheme_line "${raw_lines[index]}")"
+          if [[ "$testable_line" == *'BuildableName = "HarnessMonitorUITests.xctest"'* ]] || [[ "$testable_line" == *'BuildableName = "HarnessMonitorAgentsE2ETests.xctest"'* ]]; then
+            ui_test_bundle=1
+          fi
+          testable_lines+=("$testable_line")
+          if [[ "$testable_line" == *"</TestableReference>"* ]]; then
+            break
+          fi
+          (( index += 1 ))
+        done
+
+        local testable_line
+        for testable_line in "${testable_lines[@]}"; do
+          if (( ui_test_bundle )) && [[ "$testable_line" == *'parallelizable = "NO"'* ]]; then
+            continue
+          fi
+          normalized_lines+=("$testable_line")
+        done
+
+        (( index += 1 ))
+        continue
+      fi
+
+      normalized_lines+=("$line")
+      (( index += 1 ))
+    done
+
+    reorder_test_action_environment
+
+    local temp_file
+    temp_file="$(mktemp)"
+    printf '%s\n' "${normalized_lines[@]}" > "$temp_file"
+    mv "$temp_file" "$scheme_path"
+  done
 }
 
 # XcodeGen does not expose LastUpgradeCheck or product bundle file-reference names.
@@ -62,6 +271,8 @@ repair_local_package_product_link "$PBXPROJ"
 for scheme in "$SCHEMES_DIR"/*.xcscheme; do
   sed -i '' -E 's/LastUpgradeVersion *= *"1430"/LastUpgradeVersion = "2640"/g' "$scheme"
 done
+
+normalize_shared_schemes
 
 if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
   "$REPO_ROOT/scripts/version.sh" sync-monitor
