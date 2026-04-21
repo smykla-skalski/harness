@@ -6,10 +6,11 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse as _;
 use tempfile::TempDir;
 
+use crate::daemon::protocol::AdoptSessionRequest;
 use crate::session::types::CURRENT_VERSION;
 use crate::workspace::adopter::AdoptionError;
 
-use super::{AdoptRequest, adoption_error_response, post_session_adopt};
+use super::{adoption_error_response, post_session_adopt};
 use crate::daemon::http::tests::{auth_headers, response_json, test_http_state_with_db};
 
 fn write_valid_session(root: &std::path::Path, sid: &str, origin: &str) {
@@ -47,7 +48,7 @@ fn returns_200_on_valid_session() {
             let response = post_session_adopt(
                 auth_headers(),
                 State(state),
-                Json(AdoptRequest {
+                Json(AdoptSessionRequest {
                     bookmark_id: None,
                     session_root: session_dir.to_string_lossy().into_owned(),
                 }),
@@ -80,7 +81,7 @@ fn returns_409_on_duplicate() {
             let first = post_session_adopt(
                 auth_headers(),
                 State(state.clone()),
-                Json(AdoptRequest {
+                Json(AdoptSessionRequest {
                     bookmark_id: None,
                     session_root: session_dir.to_string_lossy().into_owned(),
                 }),
@@ -93,7 +94,7 @@ fn returns_409_on_duplicate() {
             let second = post_session_adopt(
                 auth_headers(),
                 State(state),
-                Json(AdoptRequest {
+                Json(AdoptSessionRequest {
                     bookmark_id: None,
                     session_root: session_dir.to_string_lossy().into_owned(),
                 }),
@@ -121,7 +122,7 @@ fn returns_422_on_layout_violation() {
             let response = post_session_adopt(
                 auth_headers(),
                 State(state),
-                Json(AdoptRequest {
+                Json(AdoptSessionRequest {
                     bookmark_id: None,
                     session_root: session_dir.to_string_lossy().into_owned(),
                 }),
