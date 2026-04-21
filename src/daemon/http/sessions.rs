@@ -27,6 +27,10 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route("/v1/sessions", get(get_sessions).post(post_session_start))
         .route(
+            "/v1/sessions/adopt",
+            post(super::sessions_adopt::post_session_adopt),
+        )
+        .route(
             "/v1/sessions/{session_id}",
             get(get_session).delete(delete_session),
         )
