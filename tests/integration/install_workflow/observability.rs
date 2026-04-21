@@ -113,6 +113,45 @@ fn observability_script_smoke_restore_recreates_sqlite_snapshot_grafana_and_sqli
 }
 
 #[test]
+fn observability_script_waits_longer_for_service_graph_edges_than_generic_signals() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_bin = tmp.path().join("fake-bin");
+    let counter_path = tmp.path().join("curl-attempts.txt");
+
+    write_fake_shell_tool(
+        &fake_bin.join("curl"),
+        "#!/bin/sh\nset -eu\ncount_file=\"$FAKE_CURL_COUNT_FILE\"\ncount=0\nif [ -f \"$count_file\" ]; then\n  count=$(cat \"$count_file\")\nfi\ncount=$((count + 1))\nprintf '%s' \"$count\" >\"$count_file\"\nif [ \"$count\" -lt 4 ]; then\n  printf '%s' '{\"status\":\"success\",\"data\":{\"result\":[]}}'\n  exit 0\nfi\nprintf '%s' '{\"status\":\"success\",\"data\":{\"result\":[{\"metric\":{\"client\":\"harness-monitor\",\"server\":\"harness-daemon\"},\"value\":[0,\"1\"]}]}}'\n",
+    );
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("--wait-for-service-graph-edge-fixture")
+        .arg("harness-monitor")
+        .arg("harness-daemon")
+        .current_dir(&repo)
+        .env("BASH_ENV", "/dev/null")
+        .env("HOME", tmp.path().join("home"))
+        .env("FAKE_CURL_COUNT_FILE", &counter_path)
+        .env("HARNESS_OBSERVABILITY_SIGNAL_MAX_ATTEMPTS", "2")
+        .env("HARNESS_OBSERVABILITY_SERVICE_GRAPH_MAX_ATTEMPTS", "4")
+        .env("MISE_TRUSTED_CONFIG_PATHS", &repo)
+        .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
+        .output()
+        .expect("run service graph wait fixture");
+
+    assert!(
+        output.status.success(),
+        "fixture failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let attempts = std::fs::read_to_string(&counter_path).expect("read curl attempt count");
+    assert_eq!(attempts, "4");
+}
+
+#[test]
 fn sqlite_snapshot_sync_copies_live_databases_into_stable_read_targets() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

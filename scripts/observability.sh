@@ -614,6 +614,7 @@ wait_for_signal() {
   local url="$1"
   local description="$2"
   local query="$3"
+  local max_attempts="${4:-$(signal_max_attempts)}"
   local attempt=0
   local response
   local compact_response
@@ -624,12 +625,36 @@ wait_for_signal() {
       return
     fi
     attempt=$((attempt + 1))
-    if [ "$attempt" -ge 30 ]; then
+    if [ "$attempt" -ge "$max_attempts" ]; then
       printf 'timed out waiting for %s\n' "$description" >&2
       exit 1
     fi
     sleep 2
   done
+}
+
+signal_max_attempts() {
+  local value="${HARNESS_OBSERVABILITY_SIGNAL_MAX_ATTEMPTS:-30}"
+  case "$value" in
+    ''|*[!0-9]*|0)
+      printf '30\n'
+      ;;
+    *)
+      printf '%s\n' "$value"
+      ;;
+  esac
+}
+
+service_graph_signal_max_attempts() {
+  local value="${HARNESS_OBSERVABILITY_SERVICE_GRAPH_MAX_ATTEMPTS:-90}"
+  case "$value" in
+    ''|*[!0-9]*|0)
+      printf '90\n'
+      ;;
+    *)
+      printf '%s\n' "$value"
+      ;;
+  esac
 }
 
 response_contains_signal() {
@@ -883,7 +908,8 @@ wait_for_service_graph_edge() {
   wait_for_signal \
     "$PROMETHEUS_URL/api/v1/query" \
     "Prometheus service graph ${client_name} -> ${server_name}" \
-    "$query"
+    "$query" \
+    "$(service_graph_signal_max_attempts)"
 }
 
 wait_for_loki_service() {
@@ -1199,6 +1225,9 @@ case "$command" in
     ;;
   --restore-smoke-stack-fixture)
     recreate_sqlite_mount_consumers
+    ;;
+  --wait-for-service-graph-edge-fixture)
+    wait_for_service_graph_edge "$2" "$3" "${4:-}"
     ;;
   *)
     cat <<'EOF' >&2
