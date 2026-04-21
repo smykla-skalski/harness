@@ -1,12 +1,15 @@
+use std::path::PathBuf;
+
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::protocol::AdoptSessionRequest;
 use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
 use crate::session::{observe, service};
 
-use super::support::{agent_to_str, print_json, resolve_project_dir};
+use super::support::{agent_to_str, daemon_client, print_json, resolve_project_dir};
 
 #[derive(Debug, Clone, Args)]
 pub struct SessionStartArgs {
@@ -446,6 +449,28 @@ impl Execute for SessionListArgs {
                 );
             }
         }
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SessionAdoptArgs {
+    /// Filesystem path to the on-disk session directory to adopt.
+    pub path: PathBuf,
+    /// Optional security-scoped bookmark id (used when the daemon runs sandboxed).
+    #[arg(long = "bookmark-id")]
+    pub bookmark_id: Option<String>,
+}
+
+impl Execute for SessionAdoptArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = AdoptSessionRequest {
+            bookmark_id: self.bookmark_id.clone(),
+            session_root: self.path.to_string_lossy().into_owned(),
+        };
+        let state = daemon_client()?.adopt_session(&request)?;
+        println!("Attached session {}", state.session_id);
+        print_json(&state)?;
         Ok(0)
     }
 }
