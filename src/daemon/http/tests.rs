@@ -78,7 +78,7 @@ pub(super) fn auth_headers() -> HeaderMap {
     headers
 }
 
-fn test_http_state_with_db() -> DaemonHttpState {
+pub(super) fn test_http_state_with_db() -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
