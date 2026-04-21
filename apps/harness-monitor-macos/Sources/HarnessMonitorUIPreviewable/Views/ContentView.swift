@@ -22,7 +22,6 @@ public struct ContentView<CornerContent: View>: View {
   @AppStorage("inspectorColumnWidth")
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @State private var showInspector = false
-  @State private var hasHydratedInspectorVisibility = false
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
   @State private var isSidebarSearchPresented = false
   @State private var hasPendingSidebarSearchFocusRequest = false
@@ -47,7 +46,7 @@ public struct ContentView<CornerContent: View>: View {
       "harness.view.surface":
         contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit",
       "harness.view.column_visibility": "\(columnVisibility)",
-      "harness.view.inspector_presented": effectiveShowInspector ? "true" : "false",
+      "harness.view.inspector_presented": showInspector ? "true" : "false",
       "harness.view.search_presented": isSidebarSearchPresented ? "true" : "false",
       "harness.view.connection_state": contentToolbar.connectionState.profilingLabel,
       "harness.view.status_message_count": "\(contentToolbar.statusMessages.count)",
@@ -75,17 +74,9 @@ public struct ContentView<CornerContent: View>: View {
     )
   }
 
-  private var effectiveShowInspector: Bool {
-    ContentInspectorStartupPresentation.resolve(
-      hydratedPresentation: showInspector,
-      persistedPreference: persistedShowInspector,
-      hasHydratedPersistedPreference: hasHydratedInspectorVisibility
-    )
-  }
-
   private var inspectorPresentationBinding: Binding<Bool> {
     Binding(
-      get: { effectiveShowInspector },
+      get: { showInspector },
       set: { newValue in
         applyInspectorVisibilityChange(to: newValue, source: .framework)
       }
@@ -109,6 +100,7 @@ public struct ContentView<CornerContent: View>: View {
     self.contentDashboard = store.contentUI.dashboard
     self.toast = store.toast
     self.auditBuildState = Self.resolveAuditBuildState()
+    _showInspector = State(initialValue: ContentInspectorInitialPresentation.resolve())
   }
 
   public var body: some View {
@@ -152,7 +144,6 @@ public struct ContentView<CornerContent: View>: View {
         return
       }
       applyPendingSidebarSearchPresentationRequestIfNeeded(isEnabled: isEnabled)
-      hydrateInspectorVisibilityIfNeeded()
     }
     .onChange(of: persistedShowInspector) { _, newValue in
       applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
@@ -254,7 +245,7 @@ public struct ContentView<CornerContent: View>: View {
       contentSessionDetail: contentSessionDetail,
       contentToolbar: contentToolbar,
       dashboardUI: contentDashboard,
-      showInspector: effectiveShowInspector,
+      showInspector: showInspector,
       setInspectorVisibility: applyInspectorVisibilityChange,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       onDetailColumnWidthChange: updateDetailColumnWidth
@@ -325,7 +316,7 @@ public struct ContentView<CornerContent: View>: View {
 
   private func updateInspectorWidth(_ width: CGFloat) {
     guard !isLayoutAnimating,
-      effectiveShowInspector,
+      showInspector,
       width >= HarnessMonitorInspectorLayout.minWidth,
       width <= HarnessMonitorInspectorLayout.maxWidth
     else {
@@ -349,14 +340,6 @@ public struct ContentView<CornerContent: View>: View {
   }
   func presentSidebarSearchNow() {
     (isSidebarSearchPresented, isSidebarSearchFocused) = (true, true)
-  }
-
-  private func hydrateInspectorVisibilityIfNeeded() {
-    guard !hasHydratedInspectorVisibility else {
-      return
-    }
-    hasHydratedInspectorVisibility = true
-    showInspector = persistedShowInspector
   }
 
   private func enableStartupFocusParticipation() {
