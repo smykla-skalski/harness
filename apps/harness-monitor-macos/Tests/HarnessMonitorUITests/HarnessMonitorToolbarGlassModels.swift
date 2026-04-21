@@ -58,13 +58,13 @@ struct ToolbarAverageColor {
 struct SplitBoundaryTintMeasurement {
   let sidebarToolbar: ToolbarAverageColor
   let sidebarBelowToolbar: ToolbarAverageColor
-  let detailToolbar: ToolbarAverageColor
+  let detailBelowToolbar: ToolbarAverageColor
   let debugContext: String
 
   static let zero = Self(
     sidebarToolbar: .zero,
     sidebarBelowToolbar: .zero,
-    detailToolbar: .zero,
+    detailBelowToolbar: .zero,
     debugContext: ""
   )
 
@@ -76,7 +76,7 @@ struct SplitBoundaryTintMeasurement {
     let summary = """
       sidebarToolbar[\(sidebarToolbar.debugDescription)] \
       sidebarBelowToolbar[\(sidebarBelowToolbar.debugDescription)] \
-      detailToolbar[\(detailToolbar.debugDescription)] \
+      detailBelowToolbar[\(detailBelowToolbar.debugDescription)] \
       sidebarSeamDistance=\(String(format: "%.4f", sidebarSeamDistance))
       """
     guard !debugContext.isEmpty else {

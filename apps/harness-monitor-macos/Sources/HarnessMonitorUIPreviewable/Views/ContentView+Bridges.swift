@@ -67,6 +67,7 @@ struct ContentAccessibilityOverlayBridge: View {
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode
   let appChromeAccessibilityValue: String
+  let toolbarBackgroundMarker: String
   let auditBuildAccessibilityValue: String?
 
   var body: some View {
@@ -79,7 +80,8 @@ struct ContentAccessibilityOverlayBridge: View {
           )
           ContentToolbarChromeAccessibilityMarker(
             contentSession: contentSession,
-            contentSessionDetail: contentSessionDetail
+            contentSessionDetail: contentSessionDetail,
+            toolbarBackgroundMarker: toolbarBackgroundMarker
           )
           AccessibilityTextMarker(
             identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
@@ -186,6 +188,7 @@ struct ContentSceneRestorationBridge: View {
 private struct ContentToolbarChromeAccessibilityMarker: View {
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
+  let toolbarBackgroundMarker: String
 
   private var windowTitle: String {
     contentSessionDetail.presentedSessionDetail != nil ? "Cockpit" : "Dashboard"
@@ -197,6 +200,7 @@ private struct ContentToolbarChromeAccessibilityMarker: View {
       text: [
         "toolbarTitle=native-window",
         "windowTitle=\(windowTitle)",
+        "toolbarBackground=\(toolbarBackgroundMarker)",
       ].joined(separator: ", ")
     )
   }

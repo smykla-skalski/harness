@@ -155,11 +155,11 @@ extension HarnessMonitorToolbarGlassUITests {
       width: 2,
       height: 2
     )
-    let detailToolbarRect = CGRect(
+    let detailBelowToolbarRect = CGRect(
       x: detailProbeX,
-      y: toolbarProbeY,
+      y: belowToolbarProbeY,
       width: 4,
-      height: toolbarProbeHeight
+      height: 2
     )
 
     let debugContext =
@@ -184,9 +184,9 @@ extension HarnessMonitorToolbarGlassUITests {
           scaleY: context.scaleY
         )
       ),
-      detailToolbar: sampleAverageColor(
+      detailBelowToolbar: sampleAverageColor(
         image: context.image,
-        rect: scaledRect(detailToolbarRect, scaleX: context.scaleX, scaleY: context.scaleY)
+        rect: scaledRect(detailBelowToolbarRect, scaleX: context.scaleX, scaleY: context.scaleY)
       ),
       debugContext: debugContext
     )
