@@ -17,8 +17,10 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.store.info(
         "adopted external session \(summary.sessionId, privacy: .public)"
       )
-      await refresh()
       dismissSheet()
+      await refresh(using: client, preserveSelection: false)
+      await selectSession(summary.sessionId)
+      presentSuccessFeedback("Attach external session")
     } catch let apiError as HarnessMonitorAPIError {
       presentFailureFeedback(apiError.errorDescription ?? "Adopt failed.")
     } catch {

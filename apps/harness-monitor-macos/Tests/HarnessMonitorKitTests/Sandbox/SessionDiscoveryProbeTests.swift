@@ -65,6 +65,22 @@ final class SessionDiscoveryProbeTests: XCTestCase {
     let preview = try await probe.probe(url: fixture.url)
     XCTAssertNotEqual(preview.createdAt, Date(timeIntervalSince1970: 0))
   }
+
+  func testProbeRejectsMissingOriginPath() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    try fixture.removeField("origin_path")
+    let probe = SessionDiscoveryProbe(existingSessionIDs: [])
+    do {
+      _ = try await probe.probe(url: fixture.url)
+      XCTFail("expected missing origin_path failure")
+    } catch let failure as SessionDiscoveryProbe.Failure {
+      guard case .notAHarnessSession(let reason) = failure else {
+        XCTFail("wrong failure: \(failure)")
+        return
+      }
+      XCTAssertEqual(reason, "missing origin_path")
+    }
+  }
 }
 
 struct SessionProbeFixture {
@@ -119,6 +135,17 @@ struct SessionProbeFixture {
       throw NSError(domain: "SessionProbeFixture", code: 1)
     }
     json[key] = value
+    let rewritten = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
+    try rewritten.write(to: stateURL)
+  }
+
+  func removeField(_ key: String) throws {
+    let stateURL = url.appendingPathComponent("state.json")
+    let data = try Data(contentsOf: stateURL)
+    guard var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw NSError(domain: "SessionProbeFixture", code: 1)
+    }
+    json.removeValue(forKey: key)
     let rewritten = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
     try rewritten.write(to: stateURL)
   }
