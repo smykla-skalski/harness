@@ -6,7 +6,7 @@
 
 **Goal:** Let the sandboxed Monitor app reach arbitrary user-picked folders via security-scoped bookmarks, move app-owned data into the app group container, and remove the daemon's `temporary-exception` entitlement.
 
-**Architecture:** Swift creates app-scope bookmarks via `.fileImporter`, persists them as typed JSON in the shared app-group container. Rust daemon resolves the same bookmarks via the `security-framework` crate, gated on `HARNESS_SANDBOXED=1`. Every filesystem access site wraps resolution in `URL.withSecurityScope { ... }` (Swift) or a `BookmarkScope` RAII guard (Rust). App-owned data migrates from `~/Library/Application Support/harness/` to `~/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/` in a silent one-shot migration.
+**Architecture:** Swift creates app-scope bookmarks via `.fileImporter`, persists them as typed JSON in the shared app-group container. Rust daemon resolves the same bookmarks via the `security-framework` crate, gated on `HARNESS_SANDBOXED=1`. Every filesystem access site wraps resolution in `URL.withSecurityScope { ... }` or `URL.withSecurityScopeAsync { ... }` (Swift) or a `BookmarkScope` RAII guard (Rust). App-owned data migrates from `~/Library/Application Support/harness/` to the app-group-backed `harness_data_root()` on macOS via a silent one-shot migration.
 
 **Tech stack:** Swift 6 (actors, async/await), SwiftUI (.fileImporter, Settings scene), Rust 2024 (clippy pedantic), `security-framework = "3"` crate, XcodeGen, SwiftLint.
 
@@ -20,9 +20,9 @@
 
 | Path | Responsibility |
 | --- | --- |
-| `Sources/HarnessMonitorKit/Sandbox/URL+SecurityScope.swift` | `URL.withSecurityScope` closure helper (sync + async) |
-| `Sources/HarnessMonitorKit/Sandbox/BookmarkRecord.swift` | `BookmarkStore.Record` struct, `Kind` enum, schema version constant |
-| `Sources/HarnessMonitorKit/Sandbox/BookmarkStore.swift` | `BookmarkStore` actor, persistence, MRU, stale refresh |
+| `Sources/HarnessMonitorKit/Sandbox/URL+SecurityScope.swift` | `URL.withSecurityScope` + `URL.withSecurityScopeAsync` helpers |
+| `Sources/HarnessMonitorKit/Sandbox/BookmarkRecord.swift` | `BookmarkStore.Record` / `PersistedStore`, `Kind` enum, schema version constant |
+| `Sources/HarnessMonitorKit/Sandbox/BookmarkStore.swift` | `BookmarkStore` actor, persistence, MRU, stale auto-refresh |
 | `Sources/HarnessMonitorKit/Sandbox/BookmarkStoreError.swift` | Typed errors (`.unsupportedSchemaVersion`, `.unresolvable`, `.ioError`) |
 | `Sources/HarnessMonitorKit/Sandbox/SandboxPaths.swift` | `bookmarksFileURL`, app group root helpers |
 | `Sources/HarnessMonitorUI/Views/Preferences/AuthorizedFoldersSection.swift` | Settings section with row list + actions |
@@ -39,7 +39,7 @@
 | `HarnessMonitorDaemon.entitlements` | Add `bookmarks.app-scope`; remove `temporary-exception.files.home-relative-path.read-write` |
 | `HarnessMonitorUITestHost.entitlements` | Mirror app additions |
 | `project.yml` | Register new Swift sources with XcodeGen |
-| `Sources/HarnessMonitorKit/Support/HarnessMonitorPaths.swift` | Resolve data root to group container; drop Application Support fallback on macOS |
+| `Sources/HarnessMonitorKit/Support/HarnessMonitorPaths.swift` | Use the current `resolveBaseRoot` precedence chain; managed builds fatalError if the group container is unavailable |
 | `Sources/HarnessMonitorUI/Views/PreferencesView.swift` | Insert `AuthorizedFoldersSection` |
 | `Sources/HarnessMonitor/HarnessMonitorApp.swift` | Register `OpenFolderCommand` in `.commands { ... }` |
 | `.swiftlint.yml` | Custom rule forbidding `startAccessingSecurityScopedResource` outside the helper file |
@@ -54,7 +54,7 @@
 | `src/sandbox/bookmarks/tests.rs` | Store round-trip tests |
 | `src/sandbox/resolver.rs` | `resolve`, `BookmarkScope` RAII (macOS-only via cfg) |
 | `src/sandbox/resolver/tests.rs` | FFI round-trip (`#[cfg(target_os = "macos")]`) |
-| `src/sandbox/migration.rs` | Old-path → app-group one-shot migration |
+| `src/sandbox/migration.rs` | Old-path → app-group one-shot migration (`run_startup_migration()`) |
 | `src/sandbox/migration/tests.rs` | Fixture-based migration tests |
 | `tests/integration/sandbox/bookmark_resolution.rs` | End-to-end Swift-written bookmark → Rust resolves |
 | `tests/integration/sandbox/mod.rs` | Module root |
@@ -65,10 +65,9 @@
 | --- | --- |
 | `Cargo.toml` | `security-framework = "3"` dependency, macOS-only cfg |
 | `src/lib.rs` | Register `pub mod sandbox;` |
-| `src/workspace/session.rs:15` (`data_root`) | Prefer app group container on macOS when present |
-| `src/workspace/paths.rs` | (knock-on: `harness_data_root` inherits new resolution) |
-| `src/daemon/mod.rs` | Call `sandbox::migration::run_once()` at startup |
-| `src/app/cli.rs` | Call `sandbox::migration::run_once()` early in CLI dispatch |
+| `src/workspace/session.rs:15` (`data_root`) | `XDG_DATA_HOME` -> macOS `HARNESS_APP_GROUP_ID` group container -> `user_dirs::data_dir()` fallback |
+| `src/workspace/paths.rs` | `harness_data_root()` appends `/harness`; legacy macOS root helper remains separate |
+| `src/app/cli.rs` | Call `sandbox::migration::run_startup_migration()` early in CLI dispatch on macOS |
 | `tests/integration/mod.rs` | Register new `sandbox` integration module |
 
 ### Modified scripts + config
@@ -183,7 +182,7 @@ final class URLSecurityScopeTests: XCTestCase {
 
     func testAsyncBodyReceivesSameURL() async throws {
         let tmp = FileManager.default.temporaryDirectory
-        let received = try await tmp.withSecurityScope { $0 }
+        let received = try await tmp.withSecurityScopeAsync { $0 }
         XCTAssertEqual(received, tmp)
     }
 
@@ -191,7 +190,7 @@ final class URLSecurityScopeTests: XCTestCase {
         struct Boom: Error {}
         let tmp = FileManager.default.temporaryDirectory
         do {
-            try await tmp.withSecurityScope { _ in throw Boom() }
+            try await tmp.withSecurityScopeAsync { _ in throw Boom() }
             XCTFail("expected throw")
         } catch is Boom {
             // expected
@@ -226,7 +225,7 @@ Expected: compile error ("Value of type 'URL' has no member 'withSecurityScope'"
 
 - [ ] **Step 4: Implement the helper**
 
-> **Deviation from initial plan:** Swift 6 overload resolution picks the sync variant over the async variant when the closure is `{ $0 }` in an async context, generating spurious `await` warnings under warnings-as-errors. The async variant is named separately as `withSecurityScopeAsync` to avoid the ambiguity. Subsequent tasks that need scoped access in an async context call `withSecurityScopeAsync`.
+> **Deviation from the original sketch:** Swift 6 overload resolution picks the sync variant over the async variant when the closure is `{ $0 }` in an async context, generating spurious `await` warnings under warnings-as-errors. The async variant is named separately as `withSecurityScopeAsync` to avoid the ambiguity. Current async call sites already use `withSecurityScopeAsync`.
 
 Create `URL+SecurityScope.swift`:
 
@@ -243,7 +242,7 @@ extension URL {
   }
 
   /// Async counterpart; separate name avoids Swift 6 overload ambiguity.
-  public func withSecurityScopeAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T {
+  public func withSecurityScopeAsync<T>(_ body: @Sendable (URL) async throws -> T) async rethrows -> T {
     let started = startAccessingSecurityScopedResource()
     defer { if started { stopAccessingSecurityScopedResource() } }
     return try await body(self)
@@ -371,7 +370,7 @@ xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' \
   -skipPackagePluginValidation build
 ```
 
-Expected: types compile; `BookmarkStore` itself does not yet exist - the `public extension BookmarkStore` requires the type to exist, so this file compilation is deferred until Task 4. Stub the `BookmarkStore` declaration at the bottom of `BookmarkRecord.swift` for now:
+Expected: types compile. The current codebase already has `BookmarkStore` in `BookmarkStore.swift`; this task record reflects the original plan, while the live implementation keeps `Record` / `PersistedStore` in `BookmarkRecord.swift` and `BookmarkStoreError` separate.
 
 ```swift
 public actor BookmarkStore {}
@@ -391,8 +390,10 @@ git -c commit.gpgsign=true commit -sS -m "feat(sandbox): add bookmark record typ
 
 ## Task 4: BookmarkStore actor + tests
 
+Current code note: `BookmarkStore` already lives in `BookmarkStore.swift`. The live implementation also auto-refreshes stale bookmarks during `resolve(id:)` and persists through a temp file plus `FileManager.replaceItemAt(_:withItemAt:)`.
+
 **Files:**
-- Modify: `Sources/HarnessMonitorKit/Sandbox/BookmarkRecord.swift` (remove stub actor declaration)
+- Modify: `Sources/HarnessMonitorKit/Sandbox/BookmarkRecord.swift` (remove stub actor declaration in the original plan; the live actor already exists in `BookmarkStore.swift`)
 - Create: `Sources/HarnessMonitorKit/Sandbox/BookmarkStore.swift`
 - Create: `Sources/HarnessMonitorKit/Sandbox/SandboxPaths.swift`
 - Create: `Tests/HarnessMonitorKitTests/Sandbox/BookmarkStoreTests.swift`
@@ -1133,10 +1134,11 @@ fn data_root_prefers_app_group_container_when_present() {
         ],
         || {
             // When the group container path exists, data_root should point
-            // into ~/Library/Group Containers/<id>/ rather than the old
-            // Application Support fallback.
+            // into ~/Library/Group Containers/<id>/ rather than falling all
+            // the way back to the generic data-dir fallback.
             // This test relies on the host actually having the group
-            // container directory; if absent, it falls back to the old path.
+            // container directory; if absent, it falls back to the current
+            // data-dir behavior.
             let home = dirs_home();
             let group = home
                 .join("Library")
@@ -1145,7 +1147,9 @@ fn data_root_prefers_app_group_container_when_present() {
             let expected = if group.exists() {
                 group
             } else {
-                home.join("Library").join("Application Support")
+                user_dirs::data_dir().unwrap_or_else(|| {
+                    home.join("Library").join("Application Support")
+                })
             };
             assert_eq!(super::data_root(), expected);
         },
@@ -1159,13 +1163,16 @@ fn data_root_prefers_app_group_container_when_present() {
 cargo test --lib workspace::session::tests::data_root_prefers_app_group_container_when_present
 ```
 
-Expected: fail because current impl returns `Application Support` unconditionally when `HARNESS_APP_GROUP_ID` is set.
+Expected: on the original red run this failed because the implementation returned `Application Support` when `HARNESS_APP_GROUP_ID` was set. The live code now uses the full precedence chain, so treat this as historical context.
 
 - [ ] **Step 3: Implement**
 
-Replace the macOS branch in `data_root()` (src/workspace/session.rs:19-22):
+Replace the macOS branch in `data_root()` (src/workspace/session.rs:19-22) with the current precedence chain:
 
 ```rust
+    if let Some(value) = normalized_env_value("XDG_DATA_HOME") {
+        return PathBuf::from(value);
+    }
     #[cfg(target_os = "macos")]
     if let Some(group_id) = normalized_env_value("HARNESS_APP_GROUP_ID") {
         let group_root = host_home_dir()
@@ -1175,9 +1182,8 @@ Replace the macOS branch in `data_root()` (src/workspace/session.rs:19-22):
         if group_root.exists() {
             return group_root;
         }
-        // Legacy fallback: pre-migration Application Support path.
-        return host_home_dir().join("Library").join("Application Support");
     }
+    user_dirs::data_dir().unwrap_or_else(|_| dirs_home().join(".local").join("share"))
 ```
 
 - [ ] **Step 4: Run green + full session tests**
@@ -1198,6 +1204,8 @@ git -c commit.gpgsign=true commit -sS -m "feat(sandbox): prefer app group data r
 ---
 
 ## Task 8: Data-root migration module
+
+Current code note: the live migration includes an advisory lock, symlink-preserving copy fallback, and the macOS entrypoint is `run_startup_migration()` in `src/sandbox/migration.rs`.
 
 **Files:**
 - Create: `src/sandbox/migration.rs`
@@ -1411,15 +1419,14 @@ git -c commit.gpgsign=true commit -sS -m "feat(sandbox): add data-root migration
 
 ---
 
-## Task 9: Wire migration into daemon + CLI startup
+## Task 9: Wire migration into CLI startup
 
 **Files:**
-- Modify: `src/daemon/mod.rs`
 - Modify: `src/app/cli.rs`
 
 - [ ] **Step 1: Identify old + new data root helpers**
 
-The macOS legacy path is `<home>/Library/Application Support/harness` and the new is computed by `harness_data_root()` once Task 7 lands. Add a helper `legacy_macos_root()` next to `harness_data_root()` in `src/workspace/paths.rs`:
+The macOS legacy path is `<home>/Library/Application Support/harness` and the current new path is computed by `harness_data_root()` in `src/workspace/paths.rs`. The helper `legacy_macos_root()` already exists next to it:
 
 ```rust
 #[cfg(target_os = "macos")]
@@ -1431,23 +1438,13 @@ pub fn legacy_macos_root() -> PathBuf {
 }
 ```
 
-- [ ] **Step 2: Call migrate at daemon startup**
+- [ ] **Step 2: Call migrate at CLI startup**
 
-In `src/daemon/mod.rs`, locate the service init function (follow `pub fn start(...)` or equivalent). Add near the top, before any FS reads:
+In `src/app/cli.rs`, at the top of `dispatch()` on macOS, call `crate::sandbox::migration::run_startup_migration()`. The current code does not wire a separate daemon startup hook.
 
-```rust
-#[cfg(target_os = "macos")]
-if let Err(err) = crate::sandbox::migration::migrate(
-    &crate::workspace::paths::legacy_macos_root(),
-    &crate::workspace::paths::harness_data_root(),
-) {
-    warn!(%err, "data-root migration failed; continuing with new root");
-}
-```
+- [ ] **Step 3: Keep the startup hook centralized**
 
-- [ ] **Step 3: Call migrate at CLI startup**
-
-In `src/app/cli.rs`, at the top of the dispatch function (before any command runs), add the same block.
+Do not add a second `migrate(...)` call in `src/daemon/mod.rs`; the current implementation keeps startup migration in CLI dispatch only.
 
 - [ ] **Step 4: Build + smoke test**
 
@@ -1456,12 +1453,12 @@ cargo build --bin harness
 mise run test
 ```
 
-Expected: green.
+Expected: green. If the migration path changes again, update the current `run_startup_migration()` entrypoint rather than duplicating startup hooks.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/workspace/paths.rs src/daemon/mod.rs src/app/cli.rs
+git add src/app/cli.rs
 git -c commit.gpgsign=true commit -sS -m "feat(sandbox): run data-root migration at start"
 ```
 
@@ -1533,6 +1530,8 @@ git -c commit.gpgsign=true commit -sS -m "feat(sandbox): drop temporary-exceptio
 
 ## Task 11: Swift FS audit sweep + HarnessMonitorPaths update
 
+Current code note: `HarnessMonitorPaths` already uses `HARNESS_DAEMON_DATA_HOME`, `XDG_DATA_HOME`, `HARNESS_APP_GROUP_ID`, `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`, and a managed-build `fatalError` when the group container is unavailable. Keep this section aligned to that precedence chain rather than a simplified "always use the group container" sketch.
+
 **Files:**
 - Modify: `Sources/HarnessMonitorKit/Support/HarnessMonitorPaths.swift`
 - Modify: `Sources/HarnessMonitorKit/API/DaemonController+ManifestLoading.swift` (and any others found)
@@ -1554,21 +1553,22 @@ Review each hit. Classify into three buckets:
 
 Write the classified list to `docs/superpowers/plans/2026-04-20-sandbox-file-access-fs-audit.md`.
 
-- [ ] **Step 2: Update `HarnessMonitorPaths` to target group container**
+- [ ] **Step 2: Update `HarnessMonitorPaths` to match the current precedence chain**
 
-`HarnessMonitorPaths.swift` - locate the `daemonRoot` / `harnessRoot` accessor (around lines 46-49 + 106-108 per the Explore agent). Rewrite so it always prefers the app group container:
+`HarnessMonitorPaths.swift` - locate the `daemonRoot` / `harnessRoot` accessor (around lines 46-49 + 106-108 per the Explore agent). Keep the current precedence chain intact:
 
 ```swift
 public static func harnessRoot(using environment: HarnessMonitorEnvironment = .current) -> URL {
-    if let containerURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
-    ) {
-        return containerURL.appendingPathComponent("harness", isDirectory: true)
+    if let base = resolveBaseRoot(using: environment, preferExternalDaemon: true) {
+        return base.appendingPathComponent("harness", isDirectory: true)
     }
-    // Dev / preview fallback (non-sandboxed): fall back to ~/Library/Application Support/harness
-    // NEVER shipped in a sandboxed binary - the container URL is always present there.
-    return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-        .first!.appendingPathComponent("harness", isDirectory: true)
+    if DaemonOwnership(environment: environment) == .managed {
+        fatalError("group container unavailable in managed build")
+    }
+    return environment.homeDirectory
+        .appendingPathComponent("Library", isDirectory: true)
+        .appendingPathComponent("Application Support", isDirectory: true)
+        .appendingPathComponent("harness", isDirectory: true)
 }
 ```
 
