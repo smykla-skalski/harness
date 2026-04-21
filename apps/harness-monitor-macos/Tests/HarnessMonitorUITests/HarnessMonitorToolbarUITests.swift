@@ -3,6 +3,50 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
+  func testCockpitUsesSingleToolbarActionSet() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let refreshButtons = app.toolbars.buttons.matching(identifier: Accessibility.refreshButton)
+    let inspectorButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.inspectorToggleButton
+    )
+
+    func distinctVisibleFrames(for query: XCUIElementQuery) -> Set<String> {
+      Set(
+        query.allElementsBoundByIndex.compactMap { element in
+          guard element.exists else {
+            return nil
+          }
+          let frame = element.frame
+          guard frame.width >= 40, frame.height >= 40 else {
+            return nil
+          }
+          return
+            "\(Int(frame.minX.rounded())):"
+            + "\(Int(frame.minY.rounded())):"
+            + "\(Int(frame.width.rounded())):"
+            + "\(Int(frame.height.rounded()))"
+        })
+    }
+
+    let hasSingleToolbarSet = waitUntil(timeout: Self.actionTimeout) {
+      distinctVisibleFrames(for: refreshButtons).count == 1
+        && distinctVisibleFrames(for: inspectorButtons).count == 1
+    }
+
+    if !hasSingleToolbarSet {
+      attachWindowScreenshot(in: app, named: "cockpit-toolbar-action-set")
+      attachAppHierarchy(in: app, named: "cockpit-toolbar-action-set-hierarchy")
+    }
+
+    XCTAssertTrue(
+      hasSingleToolbarSet,
+      "Expected exactly one visible refresh/hide-inspector control set in cockpit state"
+    )
+  }
+
   func testHiddenInspectorUsesSingleToolbarActionSet() throws {
     let app = launch(mode: "empty")
     let hideInspectorButton = toolbarButton(
