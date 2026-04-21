@@ -78,6 +78,58 @@ struct HarnessMonitorStoreExternalSessionTests {
     }
   }
 
+  @Test("Importing an external session ignores a poisoned shared temp bookmark file")
+  func handleImportedExternalSessionFolderIgnoresPoisonedSharedTempBookmarkFile() async throws {
+    let sharedBookmarksURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("sandbox", isDirectory: true)
+      .appendingPathComponent("bookmarks.json")
+    try FileManager.default.createDirectory(
+      at: sharedBookmarksURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Data(#"{"schemaVersion": 99, "bookmarks": []}"#.utf8).write(to: sharedBookmarksURL)
+
+    let store = await makeBootstrappedStore()
+    let fixture = try SessionProbeFixture.makeValid()
+
+    await store.handleAttachSessionPicker(.success([fixture.url]))
+
+    guard case .attachExternal(let bookmarkID, let preview?) = store.presentedSheet else {
+      Issue.record("expected attach sheet with preview")
+      return
+    }
+
+    #expect(!bookmarkID.isEmpty)
+    #expect(preview.sessionId == "abc12345")
+    #expect(preview.sessionRoot == fixture.url)
+
+    if let bookmarkStore = store.bookmarkStore {
+      try await bookmarkStore.remove(id: bookmarkID)
+    }
+  }
+
+  @Test("Bootstrapped stores isolate bookmark persistence during tests")
+  func bootstrappedStoresIsolateBookmarkPersistence() async throws {
+    let first = await makeBootstrappedStore()
+    let second = await makeBootstrappedStore()
+
+    guard let firstBookmarks = first.bookmarkStore,
+      let secondBookmarks = second.bookmarkStore
+    else {
+      Issue.record("expected bookmark stores")
+      return
+    }
+
+    let record = try await firstBookmarks.add(
+      url: FileManager.default.temporaryDirectory,
+      kind: .projectRoot
+    )
+
+    #expect(await secondBookmarks.all().isEmpty)
+
+    try await firstBookmarks.remove(id: record.id)
+  }
+
   @Test("Requesting external session attach increments the importer request")
   func requestAttachExternalSessionIncrementsImporterRequest() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
