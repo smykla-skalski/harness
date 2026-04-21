@@ -98,85 +98,6 @@ extension HarnessMonitorStore {
   }
 }
 
-extension HarnessMonitorStore.ContentToolbarSlice {
-  fileprivate var toolbarCenterpieceModel: ToolbarCenterpieceModel {
-    ToolbarCenterpieceModel(
-      workspaceName: "Harness Monitor",
-      destinationName: "My Mac",
-      destinationSystemImage: "laptopcomputer"
-    )
-  }
-
-  fileprivate var toolbarStatusMessages: [ToolbarStatusMessage] {
-    statusMessages.map(ToolbarStatusMessage.init)
-  }
-}
-
-// MARK: - Content toolbar items
-
-public struct ContentNavigationToolbarItems: ToolbarContent {
-  public let store: HarnessMonitorStore
-  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-
-  public init(store: HarnessMonitorStore, toolbarUI: HarnessMonitorStore.ContentToolbarSlice) {
-    self.store = store
-    self.toolbarUI = toolbarUI
-  }
-
-  public var body: some ToolbarContent {
-    ContentNavigationToolbar(
-      store: store,
-      canNavigateBack: toolbarUI.canNavigateBack,
-      canNavigateForward: toolbarUI.canNavigateForward
-    )
-  }
-}
-
-public struct ContentCenterpieceToolbarItems: ToolbarContent {
-  public let store: HarnessMonitorStore
-  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  public let displayMode: ToolbarCenterpieceDisplayMode
-  public let availableDetailWidth: CGFloat
-
-  public init(
-    store: HarnessMonitorStore,
-    toolbarUI: HarnessMonitorStore.ContentToolbarSlice,
-    displayMode: ToolbarCenterpieceDisplayMode,
-    availableDetailWidth: CGFloat
-  ) {
-    self.store = store
-    self.toolbarUI = toolbarUI
-    self.displayMode = displayMode
-    self.availableDetailWidth = availableDetailWidth
-  }
-
-  public var body: some ToolbarContent {
-    ContentCenterpieceToolbar(
-      model: toolbarUI.toolbarCenterpieceModel,
-      displayMode: displayMode,
-      availableDetailWidth: availableDetailWidth,
-      statusMessages: toolbarUI.toolbarStatusMessages,
-      connectionState: toolbarUI.connectionState
-    )
-  }
-}
-
-struct ContentPrimaryToolbarItems: ToolbarContent {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let showInspector: Bool
-  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
-
-  var body: some ToolbarContent {
-    InspectorToolbarActions(
-      store: store,
-      toolbarUI: toolbarUI,
-      showInspector: showInspector,
-      setInspectorVisibility: setInspectorVisibility
-    )
-  }
-}
-
 public struct ContentCornerOverlayModifier<CornerContent: View>: ViewModifier {
   public let isPresented: Bool
   public let cornerAnimationContent: CornerContent
@@ -215,7 +136,6 @@ public struct ContentDetailColumn: View {
   public let contentChrome: HarnessMonitorStore.ContentChromeSlice
   public let contentSession: HarnessMonitorStore.ContentSessionSlice
   public let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
-  public let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   public let showInspector: Bool
   public let layoutSuppressionPhase: Int
@@ -232,7 +152,6 @@ public struct ContentDetailColumn: View {
     contentChrome: HarnessMonitorStore.ContentChromeSlice,
     contentSession: HarnessMonitorStore.ContentSessionSlice,
     contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice,
-    contentToolbar: HarnessMonitorStore.ContentToolbarSlice,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
     showInspector: Bool,
     layoutSuppressionPhase: Int,
@@ -245,7 +164,6 @@ public struct ContentDetailColumn: View {
     self.contentChrome = contentChrome
     self.contentSession = contentSession
     self.contentSessionDetail = contentSessionDetail
-    self.contentToolbar = contentToolbar
     self.dashboardUI = dashboardUI
     self.showInspector = showInspector
     self.layoutSuppressionPhase = layoutSuppressionPhase
@@ -259,6 +177,10 @@ public struct ContentDetailColumn: View {
 
   private var navigationSubtitleText: String? {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
+  }
+
+  private var contentToolbar: HarnessMonitorStore.ContentToolbarSlice {
+    store.contentUI.toolbar
   }
 
   private var toolbarLayoutWidth: CGFloat {
@@ -355,7 +277,6 @@ public struct ContentDetailColumn: View {
       return .ignored
     }
   }
-
   private func suppressToolbarLayoutGeometry() {
     toolbarLayoutSuppressionTask?.cancel()
     isToolbarLayoutAnimating = true
@@ -367,54 +288,6 @@ public struct ContentDetailColumn: View {
       toolbarLayoutState.flushPendingMeasurement()
       isToolbarLayoutAnimating = false
       toolbarLayoutSuppressionTask = nil
-    }
-  }
-}
-
-struct InspectorToolbarActions: ToolbarContent {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let showInspector: Bool
-  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
-
-  var body: some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
-      Button {
-        store.sleepPreventionEnabled.toggle()
-      } label: {
-        Label(
-          toolbarUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: toolbarUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
-        )
-      }
-      .tint(toolbarUI.sleepPreventionEnabled ? .orange : nil)
-      .help(
-        toolbarUI.sleepPreventionEnabled
-          ? "Click to allow system sleep"
-          : "Prevent sleep while sessions are active"
-      )
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
-
-      RefreshToolbarButton(isRefreshing: toolbarUI.isRefreshing) {
-        Task { await store.refresh() }
-      }
-      .help("Refresh sessions")
-    }
-
-    ToolbarSpacer(.fixed, placement: .primaryAction)
-
-    ToolbarItem(placement: .primaryAction) {
-      Button {
-        setInspectorVisibility(!showInspector, .explicitUserPreference)
-      } label: {
-        Label(
-          showInspector ? "Hide Inspector" : "Show Inspector",
-          systemImage: "sidebar.trailing"
-        )
-      }
-      .accessibilityLabel(showInspector ? "Hide Inspector" : "Show Inspector")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorToggleButton)
-      .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 }
