@@ -1,0 +1,106 @@
+import XCTest
+
+@testable import HarnessMonitorKit
+
+final class SessionDiscoveryProbeTests: XCTestCase {
+  func testProbeAcceptsValidSession() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    let probe = SessionDiscoveryProbe(existingSessionIDs: [])
+    let preview = try await probe.probe(url: fixture.url)
+    XCTAssertEqual(preview.sessionId, "abc12345")
+    XCTAssertEqual(preview.projectName, "demo")
+  }
+
+  func testProbeReportsAlreadyAttached() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    let probe = SessionDiscoveryProbe(existingSessionIDs: ["abc12345"])
+    do {
+      _ = try await probe.probe(url: fixture.url)
+      XCTFail("expected already-attached")
+    } catch let failure as SessionDiscoveryProbe.Failure {
+      guard case .alreadyAttached(let sid) = failure else {
+        XCTFail("wrong failure: \(failure)")
+        return
+      }
+      XCTAssertEqual(sid, "abc12345")
+    }
+  }
+
+  func testProbeRejectsMissingWorkspace() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    try FileManager.default.removeItem(at: fixture.url.appendingPathComponent("workspace"))
+    let probe = SessionDiscoveryProbe(existingSessionIDs: [])
+    do {
+      _ = try await probe.probe(url: fixture.url)
+      XCTFail("expected missing workspace failure")
+    } catch let failure as SessionDiscoveryProbe.Failure {
+      guard case .notAHarnessSession = failure else {
+        XCTFail("wrong failure: \(failure)")
+        return
+      }
+    }
+  }
+
+  func testProbeRejectsSchemaMismatch() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    try fixture.rewriteSchema(to: 7)
+    let probe = SessionDiscoveryProbe(existingSessionIDs: [])
+    do {
+      _ = try await probe.probe(url: fixture.url)
+      XCTFail("expected schema mismatch")
+    } catch let failure as SessionDiscoveryProbe.Failure {
+      guard case .unsupportedSchemaVersion(let found, let supported) = failure else {
+        XCTFail("wrong failure: \(failure)")
+        return
+      }
+      XCTAssertEqual(found, 7)
+      XCTAssertEqual(supported, 9)
+    }
+  }
+}
+
+struct SessionProbeFixture {
+  let url: URL
+
+  static func makeValid() throws -> Self {
+    let tmp = try FileManager.default.url(
+      for: .itemReplacementDirectory,
+      in: .userDomainMask,
+      appropriateFor: FileManager.default.temporaryDirectory,
+      create: true
+    ).appendingPathComponent("session-\(UUID().uuidString)")
+    let sessionDir = tmp.appendingPathComponent("kuma/abc12345")
+    try FileManager.default.createDirectory(
+      at: sessionDir.appendingPathComponent("workspace"),
+      withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+      at: sessionDir.appendingPathComponent("memory"),
+      withIntermediateDirectories: true
+    )
+    let origin = "/Users/me/src/kuma"
+    let state = """
+      {"schema_version":9,"session_id":"abc12345","project_name":"demo","title":"demo session",\
+      "origin_path":"\(origin)","worktree_path":"","shared_path":"","branch_ref":"harness/abc12345",\
+      "status":"active","context":"c","created_at":"2026-04-20T12:34:56Z",\
+      "updated_at":"2026-04-20T12:34:56Z","agents":{},"tasks":{},\
+      "metrics":{"agent_count":0,"active_agent_count":0,"idle_agent_count":0,\
+      "open_task_count":0,"in_progress_task_count":0,"blocked_task_count":0,\
+      "completed_task_count":0}}
+      """
+    try Data(state.utf8).write(to: sessionDir.appendingPathComponent("state.json"))
+    try Data(origin.utf8).write(to: sessionDir.appendingPathComponent(".origin"))
+    return Self(url: sessionDir)
+  }
+
+  func rewriteSchema(to version: Int) throws {
+    let stateURL = url.appendingPathComponent("state.json")
+    let data = try Data(contentsOf: stateURL)
+    guard var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+    json["schema_version"] = version
+    let rewritten = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
+    try rewritten.write(to: stateURL)
+  }
+}
