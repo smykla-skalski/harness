@@ -26,6 +26,12 @@ pub(crate) fn log_session_ended() -> SessionTransition {
     SessionTransition::SessionEnded
 }
 
+pub(crate) fn log_session_adopted(session_id: &str) -> SessionTransition {
+    SessionTransition::SessionAdopted {
+        session_id: session_id.to_string(),
+    }
+}
+
 pub(crate) fn log_role_changed(
     agent_id: &str,
     from: SessionRole,
