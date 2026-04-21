@@ -6,7 +6,7 @@ Sub-project A shipped sandboxed folder access via security-scoped bookmarks, inc
 
 A harness session can now be created in three ways today:
 
-1. From the Monitor app (future sub-project C).
+1. From the Monitor app (sub-project C, now shipped).
 2. From the `harness` CLI against a project checkout.
 3. By some external tool that writes the B layout into the data root.
 
@@ -14,7 +14,7 @@ Only route 1 produces an entry the Monitor app shows. Routes 2 and 3 land on dis
 
 The sandbox spec left this capability as follow-up work. The B spec reaffirmed it as sequenced after A and B so there is exactly one layout to discover. B's layout is the contract D reads.
 
-Current implementation status: Rust `SessionAdopter` and `POST /v1/sessions/adopt` already exist. Swift `SessionDiscoveryProbe`, `HarnessMonitorAPIClient.adoptSession`, `PresentedSheet.attachExternal`, `HarnessMonitorSheetRouter`, and `AttachSessionSheetView` also exist. The missing pieces today are the attach command/file-importer entry point, the store-side adoption workflow (`adoptExternalSession` is still a stub), server-side bookmark resolution when the daemon runs sandboxed, and any routed delete semantics for adopted external sessions.
+Current implementation status: D is now implemented across Swift, Rust, and CLI. The Monitor exposes `Attach External Session…` from `HarnessMonitorAppCommands`, presents the importer via `HarnessMonitorApp+AttachSession`, probes through `SessionDiscoveryProbe`, adopts through `HarnessMonitorStore.adoptExternalSession(...)`, and records the last attach outcome in the diagnostics pane. The daemon resolves `bookmark_id` when sandboxed, persists `external_origin` plus `adopted_at`, and `DELETE /v1/sessions/{id}` skips worktree teardown for externally rooted sessions.
 
 ## Goals
 
@@ -74,7 +74,8 @@ Swift app                                              Rust daemon
 │         ▼                          │              │                                  │
 │ HarnessMonitorAPIClient            │   HTTP       │ POST /v1/sessions/adopt          │
 │  .adoptSession(bookmarkId, path)   │─────────────►│  1. accept bookmark_id + path    │
-│                                    │              │     (bookmark resolution TODO)   │
+│                                    │              │     (resolve bookmark when       │
+│                                    │              │      sandboxed)                  │
 │                                    │              │  2. SessionAdopter::probe        │
 │                                    │              │  3. SessionAdopter::register     │
 │                                    │              │  4. mark external_origin         │
@@ -97,7 +98,7 @@ Swift app                                              Rust daemon
 
 ### 1. Swift entry point + command
 
-Location: no attach command exists in the current tree yet. The cleanest landing spot is a dedicated `apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/AttachSessionCommand.swift` plus `HarnessMonitorApp.swift` state that mirrors the existing `showOpenFolder` / `.fileImporter` pattern.
+Location: `apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorAppCommands.swift` owns the File-menu command and `apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorApp+AttachSession.swift` owns the importer binding.
 
 Menu item under File: "Attach External Session" with shortcut `Cmd Shift A`. It should present a second `.fileImporter` for directories only (`allowedContentTypes: [.folder]`, `allowsMultipleSelection: false`) without disturbing the existing Open Folder flow.
 
@@ -135,7 +136,7 @@ Steps:
 1. Confirm `state.json` exists at the session root. If missing: `.notAHarnessSession("missing state.json")`.
 2. Decode `state.json` via the existing `HarnessMonitorSessionModels` decoder. Check `schema_version` against `SessionState.supportedSchemaVersion`. Version mismatch -> `.unsupportedSchemaVersion`.
 3. Confirm `workspace/` and `memory/` directories exist. Missing either -> `.notAHarnessSession("missing workspace/memory")`.
-4. Read `.origin` marker at session root. Compare with `state.origin_path` in `state.json`. Mismatch -> `.notAHarnessSession("origin mismatch")`.
+4. Read `.origin` marker at session root. Compare with `state.origin_path` in `state.json`. Mismatch -> `.belongsToAnotherProject(expected:found:)`.
 5. Check the origin path for read access. Unreachable sets `originReachable = false` but does not fail the probe.
 6. Cross-check against `store.sessionSummaries`: if `state.session_id` is already in the list, return `.alreadyAttached`.
 
@@ -145,7 +146,7 @@ Probe runs in a detached Task. All file reads happen inside `url.withSecuritySco
 
 Location: `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/AttachSessionSheetView.swift` (already in the tree).
 
-The current sheet already renders preview rows (`projectName`, `sessionId`, `title`, `createdAt`, workspace, memory), failure states, and the warning for `originReachable == false`. The missing piece is the caller that presents it from a real attach command and drives the attach button through a non-stub store workflow.
+The current sheet renders preview rows (`projectName`, `sessionId`, `title`, `createdAt`, workspace, memory), failure states, and the warning for `originReachable == false`. It is already driven from the live attach command and store workflow.
 
 Sheet state lives on the existing `HarnessMonitorStore.presentedSheet`: add case `case attachExternal(bookmarkId: String, probe: SessionDiscoveryProbe.Preview?)` to `PresentedSheet` in `HarnessMonitorStore+Enums.swift`.
 
@@ -157,7 +158,7 @@ Adds `adoptSession(bookmarkID: String, sessionRoot: URL) async throws -> Session
 
 ### 5. Store integration
 
-Location: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+Sheets.swift` currently holds the `adoptExternalSession(bookmarkID:preview:)` stub. A dedicated `HarnessMonitorStore+ExternalSession.swift` split is still reasonable if the flow grows.
+Location: the attach entry point lives in `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+ExternalSession.swift`; the adopt action remains in `HarnessMonitorStore+Sheets.swift`.
 
 ```swift
 extension HarnessMonitorStore {
@@ -168,9 +169,9 @@ extension HarnessMonitorStore {
 
 Flow:
 
-1. The future attach command opens the picker from `HarnessMonitorApp`.
+1. The attach command increments `store.attachSessionRequest`, and `HarnessMonitorApp+AttachSession` presents the importer.
 2. On picker success, the app/store writes the bookmark, runs the probe, and sets `presentedSheet = .attachExternal(bookmarkId, preview: .init(...))`.
-3. On Attach button tap, the sheet calls `adoptExternalSession`, which must stop being a stub and invoke the API client.
+3. On Attach button tap, the sheet calls `adoptExternalSession`, which invokes the API client and records the outcome for diagnostics.
 4. On 200, the store refreshes the session list (existing path) and dismisses the sheet. On failure, the store keeps the sheet open with the error rendered.
 
 ### 6. Rust adoption service
@@ -193,30 +194,30 @@ pub struct AdoptionOutcome {
 
 impl SessionAdopter {
     pub fn probe(session_root: &Path) -> Result<ProbedSession, AdoptionError>;
-    pub fn register(probed: ProbedSession, bookmark_id: Option<String>) -> Result<AdoptionOutcome, AdoptionError>;
+    pub fn register(probed: ProbedSession, data_root_sessions: &Path) -> Result<AdoptionOutcome, AdoptionError>;
 }
 ```
 
 `probe` reads `state.json`, validates `schema_version == CURRENT_VERSION`, confirms `workspace/` and `memory/` exist, reads `.origin` marker, cross-checks with `state.origin_path`, canonicalizes paths.
 
-`register` computes the `SessionLayout` from the probed session root, decides whether the session lives under `workspace_sessions_root(&harness_data_root())` or outside, flips `external_origin = Some(actual_session_root_parent_parent)` when outside, and invokes `session_storage::register_active(&layout)`. If the layout is outside the sessions-root hierarchy, `register_active` needs to work against the externally located `.active.json` in the sibling project directory; `SessionAdopter::register` passes that directly rather than going through `workspace_sessions_root`.
+`register` computes the `SessionLayout` from the probed session root, decides whether the session lives under the canonical sessions root or outside, flips `external_origin = Some(session_root)` when outside, and invokes `session_storage::register_active(&layout)`. If the layout is outside the sessions-root hierarchy, `register_active` works against the externally located `.active.json` in the sibling project directory.
 
 ### 7. New HTTP route
 
-Location: `src/daemon/http/sessions.rs` (modified, stays under 520 lines; helper moves into `src/daemon/http/sessions_adopt.rs` if size threatens).
+Location: `src/daemon/http/sessions.rs` routes to `src/daemon/http/sessions_adopt.rs`.
 
 Current route: `POST /v1/sessions/adopt`. Handler:
 
 1. Require auth.
 2. Deserialize `{ bookmark_id, session_root }`.
-3. Accept `bookmark_id` in the request, but the current daemon path ignores it and adopts the supplied `session_root` directly. Server-side bookmark resolution when sandboxed is still a follow-up.
+3. When sandboxed on macOS, resolve the session root through `bookmark_id` first and fall back to the raw path in unsandboxed/dev flows.
 4. Call `SessionAdopter::probe`, translate errors to 422 with structured body.
 5. Call `SessionAdopter::register`, translate `AdoptionError::AlreadyAttached` to 409.
 6. Return `SessionMutationResponse { state }`.
 
 ### 8. CLI parity
 
-Location: `src/app/cli.rs` (modified) and `src/app/cli/tests/session_adopt.rs` (not yet in the current tree).
+Location: `src/session/transport/session_commands.rs` and its tests.
 
 ```
 harness session adopt <path> [--bookmark-id <id>]
@@ -243,7 +244,7 @@ Both default to `None`, so old state files deserialize untouched. `CURRENT_VERSI
 
 - Rust: `tracing` spans under `target = "harness::adopter"`. Events: `info!` on `probe_ok`, `register_ok`; `warn!` on `probe_layout_violation`, `probe_origin_unreachable`; `error!` on `register_already_attached` (once per bookmark id, dedup handled by span context).
 - Swift: `os_log` category `discovery`. Events include bookmark id, never full paths at `info` level.
-- Monitor diagnostics pane (existing) gains an "External Sessions" row showing count of attached-external sessions and the last attach attempt outcome.
+- Monitor diagnostics pane includes an "External Sessions" row showing count of attached-external sessions and the last attach attempt outcome.
 
 ## Wire format
 
@@ -339,13 +340,14 @@ Same shape as today. For an externally rooted session the same write happens one
 | Picked directory has no `state.json` | Swift probe | `.notAHarnessSession("missing state.json")` + sheet disabled |
 | `state.json` fails to decode | Swift probe | `.notAHarnessSession("malformed state.json")` |
 | `state.schema_version` not supported | Swift probe + Rust adopter | `.unsupportedSchemaVersion` (Swift) / 422 (HTTP) |
-| `.origin` missing or disagrees with `state.origin_path` | Swift probe + Rust adopter | `.notAHarnessSession("origin mismatch")` / 422 |
+| `.origin` missing | Swift probe + Rust adopter | `.notAHarnessSession("missing origin_path")` / 422 |
+| `.origin` disagrees with `state.origin_path` | Swift probe + Rust adopter | `.belongsToAnotherProject(expected:found:)` / 422 `origin-mismatch` |
 | `workspace/` or `memory/` missing | Swift probe + Rust adopter | `.notAHarnessSession("missing workspace/memory")` / 422 |
 | Session id already attached | Swift probe (optimistic) + Rust adopter (authoritative) | `.alreadyAttached` / 409 |
 | Origin unreadable under sandbox | Swift probe | `originReachable = false`; attach still succeeds; Monitor surfaces banner |
-| Bookmark resolve failure on the daemon | Not implemented yet | Follow-up only: the current route ignores `bookmark_id` and does not return `bookmark-unresolvable` today |
+| Bookmark resolve failure on the daemon | Existing sandbox resolver | Request fails before adopt; no dedicated `bookmark-unresolvable` payload is used |
 | Rename of session root mid-adopt (TOCTOU) | Rust adopter | 422 `layout-violation` on re-probe |
-| Delete of an externally attached session | Future `DELETE /v1/sessions/{id}` handler | Not implemented yet. When it exists, it must deregister from `.active.json` only and skip `WorktreeController::destroy` for `state.external_origin.is_some()`. |
+| Delete of an externally attached session | Existing `DELETE /v1/sessions/{id}` handler | Deregisters the session and skips `WorktreeController::destroy` when `state.external_origin.is_some()` |
 
 ## Testing strategy
 
@@ -374,7 +376,7 @@ Not added. Per project rules we never run the full UI suite in gates. Targeted `
 - **Risk: attaching a foreign session whose origin is inaccessible under sandbox.** Mitigation: probe reports `originReachable=false` and the current UI only shows a warning. A dedicated re-authorization action is a follow-up, so the session stays effectively read-only until the user reauthorizes the origin through existing folder-bookmark flows.
 - **Risk: user attaches a session, user manually deletes the directory, Monitor still lists it.** Mitigation: B's startup `orphan_cleanup` only helps for sessions under the daemon's canonical sessions root. Externally rooted sessions still need an explicit refresh / soft-remove follow-up; document that gap rather than assuming it already exists.
 - **Risk: two Monitor instances on the same data root race on adopt.** Mitigation: `session_storage::register_active` takes a per-project file lock via `files::with_lock`. A second register with the same id and a full-file rewrite is idempotent.
-- **Risk: a future DELETE on an externally attached session would destroy data the daemon never created.** Mitigation: when that route exists, it must inspect `state.external_origin.is_some()` and skip `WorktreeController::destroy`, only removing the registry entry.
+- **Risk: delete of an externally attached session would destroy data the daemon never created.** Mitigation: the current delete path inspects `state.external_origin.is_some()` and skips `WorktreeController::destroy`, only removing the registry entry.
 - **Risk: schema v8 state files on disk from B.** Mitigation: `migrate_v8_to_v9` is a no-op passthrough; existing sessions upgrade at load time, no manual migration needed.
 
 ## Execution order (for the plan)
@@ -382,7 +384,7 @@ Not added. Per project rules we never run the full UI suite in gates. Targeted `
 1. `SessionState` schema bump (v9 passthrough migration) + `external_origin`, `adopted_at` fields + Rust tests.
 2. Rust `SessionAdopter` probe + register + unit tests.
 3. `POST /v1/sessions/adopt` HTTP route + handler tests.
-4. `DELETE /v1/sessions/{id}` guard for `external_origin` (future follow-up; no delete route exists today).
+4. `DELETE /v1/sessions/{id}` guard for `external_origin` + teardown tests.
 5. CLI `harness session adopt <path>` + snapshot tests.
 6. Swift `SessionDiscoveryProbe` + unit tests.
 7. Swift `AttachSessionSheet` + preview fixture.
@@ -395,5 +397,5 @@ Each step lands as its own `-sS` signed commit.
 ## Open questions
 
 - Do we want to expose an "Attach All Sessions Under This Folder" bulk flow at the outset? Ruled out for D. Sub-project E candidate if demand materializes.
-- Should we record the sandbox bookmark id into `state.json` so a daemon restart can re-resolve the external path? Tentatively yes for sessions outside the daemon's sessions-root; optional field `attached_bookmark_id: Option<String>`. Folded into the v9 migration or left for a v10. Default in this spec: not persisted; re-adoption required on daemon restart for external-root sessions. Revisit if the rollout shows it matters.
+- Bookmark-id persistence is not required for restart discovery in the current implementation. Adopted state persists `external_origin` and the daemon reindexes adopted external sessions on startup; persisting a bookmark id would only matter for a future re-authorization workflow.
 - `harness session adopt` from a sandboxed Monitor-spawned CLI would need a bookmark id; today we don't ship such a CLI, so the flag stays optional for future use.

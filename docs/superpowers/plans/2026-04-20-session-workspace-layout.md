@@ -4,7 +4,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-04-20-session-workspace-layout-design.md`
 
-**Goal:** Replace the current `projects/project-{8hex}/orchestration/sessions/sess-...` layout with `sessions/<project>[-<4hex>]/<8char-sid>/{workspace/, memory/, state.json, log.jsonl, tasks/, .locks/}`. Daemon owns git-worktree lifecycle. Sockets move to a flat `<group>/sock/` namespace on macOS.
+**Goal:** Move the primary session write path from `projects/project-{8hex}/orchestration/sessions/sess-...` to `sessions/<project>[-<4hex>]/<8char-sid>/{workspace/, memory/, state.json, log.jsonl, tasks/, .locks/}` while retaining targeted legacy compatibility reads until older context consumers are removed. Daemon owns git-worktree lifecycle. Sockets move to a flat `<group>/sock/` namespace on macOS.
 
 **Architecture:** `src/workspace/layout.rs` owns the session path primitives, `src/workspace/project_resolver.rs` resolves project directory names, `src/workspace/worktree.rs` runs synchronous `git worktree add/remove`, and `src/workspace/socket_paths.rs` keeps socket paths short. The project-level `.origin` marker and the session-level `.origin` marker are both intentional. HTTP session responses keep the same `SessionState` family but with the new layout fields, so this is a **major** version bump.
 
@@ -44,17 +44,17 @@
 | Path | Change |
 | --- | --- |
 | `Cargo.toml` | Ensure `rand = "0.9"` is present; no `fd-lock` dependency is needed |
-| `src/workspace/mod.rs` | Register new modules; remove `project_context_dir` and friends |
-| `src/workspace/session.rs` | Remove `project_context_dir`, `session_scope_key`, `orchestration_root`, `sessions_root` - clean cut |
+| `src/workspace/mod.rs` | Register new modules; keep legacy context helpers available while compatibility reads remain |
+| `src/workspace/session.rs` | Retain `project_context_dir` and related helpers for legacy context consumers during the rollout |
 | `src/workspace/compact/paths.rs` | Rewrite to use new `SessionLayout` |
 | `src/workspace/remote_kubernetes.rs` | Rewrite to use new `SessionLayout` |
 | `src/session/storage/files.rs` | Rewrite every path builder to use `SessionLayout` |
-| `src/session/storage/registry.rs` | Move `active.json` to `<sessions_root>/<project>/.active.json`; drop `is_worktree`, `worktree_name`, `recorded_from_dir` fields |
+| `src/session/storage/registry.rs` | Move `active.json` to `<sessions_root>/<project>/.active.json`; keep legacy metadata fields only where compatibility still needs them |
 | `src/daemon/service/session_setup.rs` | Wire `WorktreeController::create` on session creation |
 | `src/daemon/http/sessions.rs` | Route `POST /v1/sessions` to session setup; `POST /v1/sessions/{id}/end` and `POST /v1/sessions/{id}/leave` remain the evidenced lifecycle endpoints |
 | `src/daemon/protocol/session_requests.rs` | `SessionStartRequest` already carries optional `base_ref`; `SessionState` carries `project_name`, `session_id`, `worktree_path`, `shared_path`, `origin_path`, `branch_ref` |
 | `src/app/cli.rs` + `src/app/cli/tests/session.rs` | Update CLI session commands + snapshots |
-| `src/mcp/registry/*` | Move socket paths to `socket_paths::session_socket()` |
+| `src/mcp/registry/*` | Keep daemon-global registry sockets on their existing paths; only session-scoped sockets move to `socket_paths::session_socket()` |
 | `src/daemon/bridge/runtime.rs`, `client.rs` | Same |
 
 ### Modified Swift files
@@ -936,7 +936,7 @@ fn state_file_uses_new_layout() {
 
 Rewrite `src/session/storage/files.rs` so every helper takes `&SessionLayout` instead of `project_dir: &Path`. Remove the old timestamp-based session id generator - the id is now passed in via `SessionLayout::session_id`.
 
-Rewrite `src/session/storage/registry.rs` to load/save `<sessions_root>/<project>/.active.json` (a `BTreeMap<String, String>` of session ids to creation timestamps). Drop `is_worktree`, `worktree_name`, and `recorded_from_dir` - they no longer apply since the daemon always creates worktrees.
+Rewrite `src/session/storage/registry.rs` to load/save `<sessions_root>/<project>/.active.json` (a `BTreeMap<String, String>` of session ids to creation timestamps). Keep legacy metadata only where compatibility paths still consume it; do not force a clean-cut removal in the same step.
 
 - [ ] **Step 4: Green + commit**
 
@@ -1079,7 +1079,7 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(daemon): follow up on session 
 grep -rn "UnixListener::bind\|UnixStream::connect" src/ --include="*.rs" > tmp/b-socket-sites.txt
 ```
 
-For each non-test site, replace the socket-path construction with `socket_paths::session_socket(socket_root, session_id, purpose)`.
+For each non-test site that owns a session-scoped socket, replace the path construction with `socket_paths::session_socket(socket_root, session_id, purpose)`. Daemon-global bridge and MCP sockets keep their existing paths.
 
 - [ ] **Step 2: Update tests to use the helper**
 
@@ -1146,7 +1146,7 @@ async fn create_then_delete_cleans_up_fully() {
     assert!(layout.state_file().exists());
 
     daemon.end_session(&sid).await;
-    assert!(layout.session_root().exists(), "delete is a future follow-up; end leaves the session root in place");
+    assert!(layout.session_root().exists(), "end leaves the session root in place; direct delete covers teardown separately");
     let branches = harness_testkit::git_branches_matching(origin.path(), "harness/").await;
     assert!(!branches.is_empty());
 }

@@ -2,7 +2,7 @@
 
 ## Background
 
-Current session state lives under `.../harness/sessions/<project-name>[-<4hex>]/<sid>/`. `SessionLayout` in `src/workspace/layout.rs` owns those paths, `src/workspace/project_resolver.rs` resolves the project directory name from the canonical checkout, and `src/workspace/worktree.rs` owns the session worktree lifecycle. The old `projects/project-{8hex}/orchestration/sessions/sess-YYYYMMDDHHMMSSffffff/` shape is obsolete for sessions, although other legacy `project_context_dir()` callers still exist for non-session artifacts.
+Current session writes live under `.../harness/sessions/<project-name>[-<4hex>]/<sid>/`. `SessionLayout` in `src/workspace/layout.rs` owns those paths, `src/workspace/project_resolver.rs` resolves the project directory name from the canonical checkout, and `src/workspace/worktree.rs` owns the session worktree lifecycle. Legacy `projects/project-{8hex}/orchestration/sessions/sess-YYYYMMDDHHMMSSffffff/` reads still exist in selected discovery, observe, and liveness paths during the compatibility window.
 
 The layout has four problems:
 
@@ -24,7 +24,7 @@ Sub-project A moves the data root into the app group container; this spec assume
 
 ## Non-goals
 
-- **No migration logic for old on-disk data.** The project has no external users yet; this spec does a clean cut. Every code path that references the old layout is rewritten. Old on-disk data is orphaned and harmless; the user can `rm -rf` the old tree after upgrade if they want.
+- **No in-place migration of old on-disk data.** New session writes use the B layout, but the implementation keeps targeted backward-read compatibility for legacy orchestration/session directories until those consumers are removed. Old on-disk data is not rewritten in place.
 - Any UI flow for session creation, project picking, or attaching external sessions - those are sub-projects C and D.
 - Any sandbox/bookmark work - sub-project A.
 - Multiple worktrees per session. One worktree, one session.
@@ -42,7 +42,7 @@ Sub-project A moves the data root into the app group container; this spec assume
 | Worktree base branch | `refs/remotes/origin/HEAD` | Falls back to the current branch if `origin/HEAD` is unavailable. The session start API accepts an optional `base_ref` override. |
 | Worktree branch name | `harness/<sid>` | Namespaced so it never collides with user branches. `harness/` is recognizable in `git branch --list`. |
 | Cleanup on delete | `git worktree remove --force <path>` + `git branch -D harness/<sid>` | Best-effort. The controller returns categorized errors and callers log warnings before continuing with DB cleanup. There is no `cleanup_failed` field in `ActiveRegistry`. |
-| Version impact | **Major** | Persisted layout changes, CLI on-disk contract breaks. Clean cut means no backward-read path. Bump in the PR that lands this. |
+| Version impact | **Major write-path change with compatibility reads retained** | Persisted layout changes and the primary on-disk contract moved, but the implementation kept selected backward-read paths for legacy contexts during rollout. |
 
 ## Architecture
 
@@ -164,7 +164,7 @@ Failure modes are categorized (`CreateFailed`, `RemoveFailed`, `BranchDeleteFail
 - Writes the session state, registers the session as active, and records the project origin.
 - Broadcasts the updated sessions list on success.
 
-The evidenced lifecycle endpoints here are `POST /v1/sessions`, `POST /v1/sessions/{id}/end`, and `POST /v1/sessions/{id}/leave`. A delete route is a separate future follow-up if it is reintroduced.
+The evidenced lifecycle endpoints here are `POST /v1/sessions`, `POST /v1/sessions/{id}/end`, `POST /v1/sessions/{id}/leave`, and `DELETE /v1/sessions/{id}`.
 
 ### 5. Socket path convention
 
@@ -180,7 +180,7 @@ Returns `<sock_root>/<sid>-<purpose>.sock` where `sock_root`:
 - macOS: `<group-container>/sock/` (for path budget)
 - else: `<data-root>/sock/`
 
-Every existing socket consumer is migrated to this helper. The commit (`71177d19 fix(mcp): shorten monitor registry socket path`) showed where the pressure points are; this consolidates them.
+Every session-scoped socket consumer is migrated to this helper. Daemon-global bridge and MCP sockets keep their existing paths; the commit (`71177d19 fix(mcp): shorten monitor registry socket path`) showed where the session-path pressure points were.
 
 ### 6. Active-session registry relocation
 
@@ -235,7 +235,7 @@ The older per-layout fields such as `is_worktree`, `worktree_name`, and `recorde
 
 ### Integration (Rust)
 
-- `tests/integration/workspace/session_lifecycle.rs`: create session via HTTP API → `workspace/` exists, `memory/` exists, `state.json` exists, `active.json` updated. End/leave flows should keep the session registry consistent; delete is a future follow-up.
+- `tests/integration/workspace/session_lifecycle.rs`: create session via HTTP API → `workspace/` exists, `memory/` exists, `state.json` exists, `active.json` updated. End/leave flows keep the session registry consistent, and direct delete covers teardown.
 - `tests/integration/workspace/parallel_sessions.rs`: create two sessions against the same origin → two independent worktrees with distinct branches, no interference.
 - `tests/integration/workspace/collision.rs`: two canonical paths both ending in `/kuma` → distinct project directories `kuma` and `kuma-<hash>`.
 
@@ -256,7 +256,7 @@ The older per-layout fields such as `is_worktree`, `worktree_name`, and `recorde
 - **Risk: worktree cleanup leaves dangling branches when `git worktree remove` succeeded but `git branch -D` failed.** Mitigation: categorized error with `warn!` logging during teardown. DB cleanup still proceeds, and manual cleanup is documented.
 - **Risk: parallel session creation against the same origin races on the git index lock.** Mitigation: the caller serializes creation for a given origin; the controller surfaces git contention as a create error rather than trying to hide it.
 - **Risk: session directory not cleaned if the daemon crashes mid-create.** Mitigation: on daemon startup, scan `sessions/*/<sid>/` for entries without a `state.json` and delete. Orphan cleanup is idempotent.
-- **Risk: clean-cut breakage for the user's local data.** Accepted - project has no external users per user's explicit choice. User can `rm -rf ~/.local/share/harness/projects/` and `rm -rf ~/Library/Application\ Support/harness/` after upgrade.
+- **Risk: new-layout session writes drift from legacy context readers that still exist.** Mitigation: the current implementation keeps union/fallback helpers in the index, observe, and liveness paths until those callers are intentionally removed.
 - **Risk: socket path budget still too tight for future agent sockets.** Mitigation: `socket_paths::tests` asserts the 104-byte limit on a synthetic long home. Test fails early if a new purpose string would breach.
 
 ## Execution order (for the plan)
@@ -267,10 +267,10 @@ The older per-layout fields such as `is_worktree`, `worktree_name`, and `recorde
 4. Introduce `workspace::socket_paths` helper + budget-assert tests.
 5. Rewrite `src/session/storage/files.rs`, `src/session/storage/registry.rs`, and related callers to use the new layout.
 6. Rewrite `src/daemon/service/session_setup.rs` session-creation path to invoke `WorktreeController::create` with the resolved `project_dir`.
-7. Keep the documented lifecycle surface on `POST /v1/sessions`, `POST /v1/sessions/{id}/end`, and `POST /v1/sessions/{id}/leave`; delete wiring is a future follow-up if it returns.
+7. Keep the documented lifecycle surface on `POST /v1/sessions`, `POST /v1/sessions/{id}/end`, `POST /v1/sessions/{id}/leave`, and `DELETE /v1/sessions/{id}`.
 8. Rewrite `SessionState` wire contract (new fields, removed fields). Update every serializer/deserializer.
 9. Rewrite Swift `HarnessMonitorPaths` + all Swift consumers of session paths.
-10. Migrate every existing socket consumer to `socket_paths::session_socket`.
+10. Migrate every session-scoped socket consumer to `socket_paths::session_socket`, while leaving daemon-global bridge/MCP sockets on their existing paths.
 11. Orphan cleanup on daemon startup: detect leftover session directories without `state.json` and remove.
 12. Update `harness session ...` CLI commands + snapshot fixtures for the new contract.
 13. Bump version to the next **major** in `Cargo.toml` and run `mise run version:sync`.

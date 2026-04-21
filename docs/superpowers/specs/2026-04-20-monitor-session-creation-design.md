@@ -35,7 +35,7 @@ The current implementation lets a user start a session from the File menu or the
 | Wire value for project_dir | Sandboxed: pass `BookmarkStore.Record.id`. Dev: resolve the bookmark then pass `URL.path` | The default resolver owns `withSecurityScopeAsync`; the view model just injects the resolved path. |
 | base_ref | Optional text field; empty means daemon chooses (`origin/HEAD` fallback). Rust and Swift both use `base_ref`/`baseRef` as the optional wire field. | Backward compatible; existing clients keep working. |
 | Runtime default | `claude` hardcoded; no UI to change it in C | YAGNI until runtime-picker becomes a real need. Future extension point. |
-| Title and context validation | Both trimmed. Title must be non-empty; context may be empty (the API already accepts empty `context`) | Matches `SessionStartRequest` field `context: String` (not `Option`) and `title` default-empty. |
+| Title and context validation | Title is trimmed and must be non-empty; context may be empty and is passed through as entered | Matches `SessionStartRequest` field `context: String` (not `Option`) and the current `NewSessionViewModel` submit behavior. |
 | Error surfacing | Inline banner via `NewSessionViewModel.lastError`; no toast is used here | Consistent with the current sheet implementation. |
 | Session list update | The store selects the new session after a successful POST, and the existing `sessionsUpdated` push event keeps the list in sync | No new websocket plumbing required. |
 | Version impact | Minor | Additive UI, one new optional protocol field, no wire break. |
@@ -165,7 +165,6 @@ public final class NewSessionViewModel {
     public enum ValidationError: Equatable, Sendable {
         case titleRequired
         case projectRequired
-        case bookmarkUnavailable
     }
 
     public enum SubmitError: Error, Equatable, Sendable {
@@ -173,6 +172,7 @@ public final class NewSessionViewModel {
         case bookmarkRevoked(id: String)
         case bookmarkStale(id: String)
         case daemonUnreachable
+        case invalidProject(reason: String)
         case worktreeCreateFailed(reason: String)
         case invalidBaseRef(ref: String, reason: String)
         case unexpected(String)
@@ -223,7 +223,7 @@ The submit method:
 2. Validates `selectedBookmarkId` is set.
 3. Resolves the bookmark through the injected resolver.
 4. If sandboxed, passes `record.id` as `projectDir`; otherwise the default resolver returns a `URL.path` from `withSecurityScopeAsync`.
-5. Maps `BookmarkStoreError.unresolvable` to `.bookmarkRevoked`, stale bookmark resolution to `.bookmarkStale`, connection refused to `.daemonUnreachable`, worktree failures to `.worktreeCreateFailed`, and `base_ref` resolution problems to `.invalidBaseRef`.
+5. Maps `BookmarkStoreError.unresolvable` to `.bookmarkRevoked`, stale bookmark resolution to `.bookmarkStale`, connection refused to `.daemonUnreachable`, HTTP 400 "no HEAD"/non-git failures to `.invalidProject`, worktree failures to `.worktreeCreateFailed`, and `base_ref` resolution problems to `.invalidBaseRef`.
 6. On success, selects the created session and clears `lastError`.
 
 ### 5. NewSessionSheetView
@@ -286,10 +286,10 @@ No new persisted Swift or Rust data. Consumes existing `BookmarkStore.Record` (A
 | --- | --- | --- |
 | Title empty | `.validation(.titleRequired)` | Inline banner in sheet; Create disabled. |
 | No project selected | `.validation(.projectRequired)` | Inline banner. |
-| Bookmark resolver unavailable | `.validation(.bookmarkUnavailable)` | Inline banner only. |
 | `BookmarkStoreError.unresolvable` | `.bookmarkRevoked(id)` | Inline banner with "Reauthorize" action re-firing Open Folder. |
 | Two-refresh stale loop | `.bookmarkStale(id)` | Inline banner with "Reauthorize" action. |
 | `URLError.cannotConnectToHost` | `.daemonUnreachable` | Inline banner. |
+| HTTP 400 with body containing `create session worktree` plus `no HEAD` / non-git failure text | `.invalidProject(reason)` | Inline banner explaining that the folder is not a Git checkout with a valid `HEAD`. |
 | HTTP 500 with body containing "create session worktree" | `.worktreeCreateFailed(reason)` | Inline banner with reason and "Try different base ref" hint. |
 | HTTP 400 with body containing "base_ref" or git `rev-parse` stderr | `.invalidBaseRef(ref, reason)` | Inline banner under the base ref field. |
 | Anything else | `.unexpected(msg)` | Inline banner with support-diagnostic link. |
@@ -305,6 +305,5 @@ None blocking. Two are flagged for the plan phase rather than the spec:
 
 ## Follow-ups
 
-- Sub-project D (external session attach) can reuse `NewSessionSheetView`'s `.fileImporter` bridge once its spec lands.
 - If a runtime picker becomes desirable, add it to the Advanced disclosure group in the same sheet without a breaking protocol change (runtime is already a `String` on the wire).
 - Version bump: C is a minor bump. Per the user's `feedback_no_bump_in_worktree` rule, the bump happens on main after C's branch merges and is NOT a task in this plan.
