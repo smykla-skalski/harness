@@ -22,6 +22,24 @@ public struct SessionDiscoveryProbe: Sendable {
   public static let supportedSchemaVersion = 9
   private static let logger = Logger(subsystem: "io.harnessmonitor", category: "discovery")
 
+  nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+
+  nonisolated(unsafe) private static let isoFormatterWithFractional: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
+
+  static func parseDate(_ value: String) -> Date {
+    if let date = isoFormatterWithFractional.date(from: value) { return date }
+    if let date = isoFormatter.date(from: value) { return date }
+    return Date(timeIntervalSince1970: 0)
+  }
+
   public let existingSessionIDs: Set<String>
 
   public init(existingSessionIDs: Set<String>) {
@@ -92,13 +110,16 @@ public struct SessionDiscoveryProbe: Sendable {
       throw Failure.notAHarnessSession(reason: "missing .origin")
     }
     if let statedOrigin = raw.originPath, marker != statedOrigin {
-      throw Failure.belongsToAnotherProject(expected: statedOrigin, found: marker)
+      throw Failure.notAHarnessSession(reason: "origin mismatch")
     }
+    let originReachable = FileManager.default.fileExists(atPath: marker)
+    // Note: under App Sandbox the marker path is outside the picked URL's
+    // security scope, so this check is always false for external origins.
+    // Callers treat originReachable as informational only; attach still proceeds.
     if existingSessionIDs.contains(raw.sessionId) {
       throw Failure.alreadyAttached(sessionId: raw.sessionId)
     }
-    let originReachable = FileManager.default.fileExists(atPath: marker)
-    let createdAt: Date = ISO8601DateFormatter().date(from: raw.createdAt) ?? Date(timeIntervalSince1970: 0)
+    let createdAt = Self.parseDate(raw.createdAt)
     logger.info("discovery probe ok: \(raw.sessionId, privacy: .public)")
     return Preview(
       sessionId: raw.sessionId,
