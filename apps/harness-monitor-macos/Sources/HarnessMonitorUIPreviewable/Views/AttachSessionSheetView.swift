@@ -58,10 +58,16 @@ struct AttachSessionSheetView: View {
 
   private func previewBody(_ preview: SessionDiscoveryProbe.Preview) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      row(label: "Project", value: preview.projectName.isEmpty ? "(unknown)" : preview.projectName)
+      row(
+        label: "Project",
+        value: preview.projectName.isEmpty ? "(unknown)" : preview.projectName
+      )
       row(label: "Session ID", value: preview.sessionId)
       row(label: "Title", value: preview.title.isEmpty ? "(untitled)" : preview.title)
-      row(label: "Created", value: preview.createdAt.formatted(date: .abbreviated, time: .shortened))
+      row(
+        label: "Created",
+        value: preview.createdAt.formatted(date: .abbreviated, time: .shortened)
+      )
       row(label: "Workspace", value: preview.sessionRoot.appendingPathComponent("workspace").path)
       row(label: "Memory", value: preview.sessionRoot.appendingPathComponent("memory").path)
       if !preview.originReachable {

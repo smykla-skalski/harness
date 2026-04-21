@@ -87,10 +87,13 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesTitle = "harness.preferences.title"
   public static let preferencesThemeModePicker = "harness.preferences.theme-mode"
   public static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
-  public static let preferencesBackgroundCollectionPicker = "harness.preferences.background-collection"
+  public static let preferencesBackgroundCollectionPicker =
+    "harness.preferences.background-collection"
   public static let preferencesBackgroundGallery = "harness.preferences.background-gallery"
-  public static let preferencesBackgroundRecentsSection = "harness.preferences.background.recents-section"
-  public static let preferencesBackgroundRecentState = "harness.preferences.background.recents-state"
+  public static let preferencesBackgroundRecentsSection =
+    "harness.preferences.background.recents-section"
+  public static let preferencesBackgroundRecentState =
+    "harness.preferences.background.recents-state"
   public static let preferencesTextSizePicker = "harness.preferences.text-size"
   public static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   public static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
@@ -162,8 +165,7 @@ public enum HarnessMonitorAccessibility {
   public static let cornerOverlay = "harness.corner-overlay"
   public static let agentsActionButton = "harness.session.agents"
   public static let agentTuiButton = agentsActionButton
-  public static let agentsSheet = agentTuiSheet
-  public static let agentsState = agentTuiState
+  public static let agentsSheet = agentTuiSheet, agentsState = agentTuiState
   public static let agentsCommandRoutingState = agentTuiCommandRoutingState
   public static let agentsCreateTab = agentTuiCreateTab
   public static let agentsCreateModePicker = agentTuiCreateModePicker

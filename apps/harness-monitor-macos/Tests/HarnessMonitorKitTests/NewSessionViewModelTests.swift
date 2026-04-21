@@ -7,15 +7,12 @@ import Testing
 @Suite("NewSessionViewModel")
 struct NewSessionViewModelTests {
   // MARK: - Helpers
-
   private func makeStore() -> HarnessMonitorStore {
     HarnessMonitorStore(daemonController: RecordingDaemonController())
   }
-
   private func makeBookmarkStore() -> BookmarkStore {
     BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
   }
-
   private func makeViewModel(
     store: HarnessMonitorStore? = nil,
     client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
@@ -54,7 +51,6 @@ struct NewSessionViewModelTests {
   private func failingResolver(error: any Error) -> NewSessionViewModel.BookmarkResolver {
     { _ in throw error }
   }
-
   // MARK: - Validation
 
   @Test("empty title returns titleRequired validation error")
@@ -62,9 +58,7 @@ struct NewSessionViewModelTests {
     let vm = makeViewModel()
     vm.title = ""
     vm.selectedBookmarkId = "B-some-id"
-
     let result = await vm.submit()
-
     #expect(result == .failure(.validation(.titleRequired)))
     #expect(vm.lastError == .validation(.titleRequired))
     #expect(vm.isSubmitting == false)
@@ -75,9 +69,7 @@ struct NewSessionViewModelTests {
     let vm = makeViewModel()
     vm.title = "   "
     vm.selectedBookmarkId = "B-some-id"
-
     let result = await vm.submit()
-
     #expect(result == .failure(.validation(.titleRequired)))
   }
 
@@ -86,14 +78,11 @@ struct NewSessionViewModelTests {
     let vm = makeViewModel()
     vm.title = "My Session"
     vm.selectedBookmarkId = nil
-
     let result = await vm.submit()
-
     #expect(result == .failure(.validation(.projectRequired)))
     #expect(vm.lastError == .validation(.projectRequired))
     #expect(vm.isSubmitting == false)
   }
-
   // MARK: - Happy path (sandboxed mode)
 
   @Test("sandboxed mode posts bookmark id as projectDir")
@@ -109,9 +98,7 @@ struct NewSessionViewModelTests {
     )
     vm.title = "Sandbox Session"
     vm.selectedBookmarkId = "B-sandbox-id"
-
     let result = await vm.submit()
-
     guard case .success = result else {
       Issue.record("Expected success, got \(result)")
       return
@@ -143,9 +130,7 @@ struct NewSessionViewModelTests {
     )
     vm.title = "Dev Session"
     vm.selectedBookmarkId = "B-dev-id"
-
     let result = await vm.submit()
-
     guard case .success = result else {
       Issue.record("Expected success, got \(result)")
       return
@@ -173,13 +158,10 @@ struct NewSessionViewModelTests {
     )
     vm.title = "Test"
     vm.selectedBookmarkId = "B-x"
-
     let result = await vm.submit()
-
     #expect(result == .failure(.daemonUnreachable))
     #expect(vm.lastError == .daemonUnreachable)
   }
-
   // MARK: - HTTP 500 worktree error mapping
 
   @Test("500 response with worktree message maps to worktreeCreateFailed")
@@ -195,9 +177,7 @@ struct NewSessionViewModelTests {
     )
     vm.title = "Test"
     vm.selectedBookmarkId = "B-x"
-
     let result = await vm.submit()
-
     guard case .failure(.worktreeCreateFailed(let reason)) = result else {
       Issue.record("Expected worktreeCreateFailed, got \(result)")
       return
@@ -218,9 +198,7 @@ struct NewSessionViewModelTests {
     )
     vm.title = "Test"
     vm.selectedBookmarkId = "B-stale-id"
-
     let result = await vm.submit()
-
     #expect(result == .failure(.bookmarkRevoked(id: "B-stale-id")))
     #expect(vm.lastError == .bookmarkRevoked(id: "B-stale-id"))
   }
@@ -302,9 +280,23 @@ private final class SpyLogSink: NewSessionLogSink, @unchecked Sendable {
   private(set) var errorMessages: [String] = []
   private(set) var debugMessages: [String] = []
 
-  func info(_ message: String) { lock.lock(); infoMessages.append(message); lock.unlock() }
-  func error(_ message: String) { lock.lock(); errorMessages.append(message); lock.unlock() }
-  func debug(_ message: String) { lock.lock(); debugMessages.append(message); lock.unlock() }
+  func info(_ message: String) {
+    lock.lock()
+    infoMessages.append(message)
+    lock.unlock()
+  }
+
+  func error(_ message: String) {
+    lock.lock()
+    errorMessages.append(message)
+    lock.unlock()
+  }
+
+  func debug(_ message: String) {
+    lock.lock()
+    debugMessages.append(message)
+    lock.unlock()
+  }
 }
 
 // MARK: - SpyHarnessClient

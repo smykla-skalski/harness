@@ -14,7 +14,10 @@ struct AttachSessionSheetTests {
   @Test("PresentedSheet.attachExternal id uses bookmark id")
   func presentedSheetIdentity() {
     let preview: SessionDiscoveryProbe.Preview? = nil
-    let sheet = HarnessMonitorStore.PresentedSheet.attachExternal(bookmarkId: "B-xyz", preview: preview)
+    let sheet = HarnessMonitorStore.PresentedSheet.attachExternal(
+      bookmarkId: "B-xyz",
+      preview: preview
+    )
     #expect(sheet.id == "attachExternal:B-xyz")
   }
 
@@ -29,7 +32,10 @@ struct AttachSessionSheetTests {
       originReachable: false,
       sessionRoot: URL(fileURLWithPath: "/tmp/session")
     )
-    let sheet = HarnessMonitorStore.PresentedSheet.attachExternal(bookmarkId: "B-abc", preview: preview)
+    let sheet = HarnessMonitorStore.PresentedSheet.attachExternal(
+      bookmarkId: "B-abc",
+      preview: preview
+    )
     #expect(sheet.id == "attachExternal:B-abc")
   }
 
@@ -51,10 +57,15 @@ struct AttachSessionSheetTests {
     let store = makeStore()
     let view = AttachSessionSheetView(store: store, bookmarkID: "B-1", preview: nil)
 
-    #expect(view.failureMessage(.notAHarnessSession(reason: "missing state.json")) == "missing state.json")
+    #expect(
+      view.failureMessage(.notAHarnessSession(reason: "missing state.json"))
+        == "missing state.json"
+    )
     let versionMsg = view.failureMessage(.unsupportedSchemaVersion(found: 3, supported: 9))
     #expect(versionMsg == "Schema version 3 is not supported. This Monitor expects v9.")
-    let projectMsg = view.failureMessage(.belongsToAnotherProject(expected: "/proj/a", found: "/proj/b"))
+    let projectMsg = view.failureMessage(
+      .belongsToAnotherProject(expected: "/proj/a", found: "/proj/b")
+    )
     #expect(projectMsg == "Expected origin /proj/a, found /proj/b.")
     #expect(
       view.failureMessage(.alreadyAttached(sessionId: "abc12345"))

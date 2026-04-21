@@ -34,7 +34,7 @@ struct AdoptSessionClientTests {
       )
       Issue.record("expected throw")
     } catch let error as HarnessMonitorAPIError {
-      guard case let .adoptAlreadyAttached(sid) = error else {
+      guard case .adoptAlreadyAttached(let sid) = error else {
         Issue.record("unexpected error: \(error)")
         return
       }
@@ -57,7 +57,7 @@ struct AdoptSessionClientTests {
       )
       Issue.record("expected throw")
     } catch let error as HarnessMonitorAPIError {
-      guard case let .adoptLayoutViolation(reason) = error else {
+      guard case .adoptLayoutViolation(let reason) = error else {
         Issue.record("unexpected error: \(error)")
         return
       }
@@ -80,7 +80,7 @@ struct AdoptSessionClientTests {
       )
       Issue.record("expected throw")
     } catch let error as HarnessMonitorAPIError {
-      guard case let .adoptOriginMismatch(expected, found) = error else {
+      guard case .adoptOriginMismatch(let expected, let found) = error else {
         Issue.record("unexpected error: \(error)")
         return
       }
@@ -104,7 +104,7 @@ struct AdoptSessionClientTests {
       )
       Issue.record("expected throw")
     } catch let error as HarnessMonitorAPIError {
-      guard case let .adoptUnsupportedSchemaVersion(found, supported) = error else {
+      guard case .adoptUnsupportedSchemaVersion(let found, let supported) = error else {
         Issue.record("unexpected error: \(error)")
         return
       }
@@ -141,9 +141,12 @@ private func makeClient() -> HarnessMonitorAPIClient {
   let configuration = URLSessionConfiguration.ephemeral
   configuration.protocolClasses = [AdoptSessionURLProtocol.self]
   let session = URLSession(configuration: configuration)
+  guard let endpoint = URL(string: "http://127.0.0.1:9999") else {
+    preconditionFailure("expected valid test endpoint")
+  }
   return HarnessMonitorAPIClient(
     connection: HarnessMonitorConnection(
-      endpoint: URL(string: "http://127.0.0.1:9999")!,
+      endpoint: endpoint,
       token: "token"
     ),
     session: session
