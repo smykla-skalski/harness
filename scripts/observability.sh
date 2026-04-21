@@ -196,6 +196,39 @@ shared_config_paths() {
   fi
 }
 
+shared_config_read_candidates() {
+  local runtime_path monitor_path
+  runtime_path="$(runtime_shared_config_path)"
+  monitor_path="$(monitor_shared_config_path)"
+  printf '%s\n' "$runtime_path"
+  if [ "$monitor_path" != "$runtime_path" ]; then
+    printf '%s\n' "$monitor_path"
+  fi
+}
+
+first_existing_shared_config_path() {
+  local config_path
+  while IFS= read -r config_path; do
+    [ -n "$config_path" ] || continue
+    if [ -f "$config_path" ]; then
+      printf '%s\n' "$config_path"
+      return 0
+    fi
+  done < <(shared_config_read_candidates)
+  return 1
+}
+
+repair_runtime_shared_config_from() {
+  local source_path="$1"
+  local runtime_path
+  runtime_path="$(runtime_shared_config_path)"
+  if [ "$source_path" = "$runtime_path" ]; then
+    return
+  fi
+  mkdir -p "$(dirname "$runtime_path")"
+  cp "$source_path" "$runtime_path"
+}
+
 monitor_smoke_data_home_marker_path() {
   printf '%s/tmp/observability/monitor-smoke-data-home.txt\n' "$ROOT"
 }
@@ -273,13 +306,15 @@ PY
 }
 
 read_grafana_url_from_shared_config() {
-  local config_path
-  config_path="$(runtime_shared_config_path)"
-  if [ ! -f "$config_path" ]; then
-    printf 'missing observability config: %s\n' "$config_path" >&2
+  local config_path runtime_path
+  runtime_path="$(runtime_shared_config_path)"
+  config_path="$(first_existing_shared_config_path || true)"
+  if [ -z "$config_path" ]; then
+    printf 'missing observability config: %s\n' "$runtime_path" >&2
     printf 'start the local stack with scripts/observability.sh start first\n' >&2
     exit 1
   fi
+  repair_runtime_shared_config_from "$config_path"
   python_json_eval "$(tr -d '\n' <"$config_path")" "grafana_url"
 }
 

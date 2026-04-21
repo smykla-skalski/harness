@@ -20,6 +20,10 @@ FINGERPRINT_SETTLE_SECONDS = 0.5
 TRACE_PATH_ENV = "HARNESS_GRAFANA_MCP_TRACE"
 CLIENT_TRANSPORT_FRAMED = "framed"
 CLIENT_TRANSPORT_LINE = "line"
+HARNESS_MONITOR_APP_GROUP_ID_DEFAULT = os.environ.get(
+    "HARNESS_MONITOR_APP_GROUP_ID_DEFAULT",
+    "Q498EB36N4.io.harnessmonitor",
+)
 
 
 def trace(message: str, payload: dict[str, Any] | None = None) -> None:
@@ -51,6 +55,33 @@ def resolve_config_root() -> pathlib.Path:
 
 def runtime_shared_config_path() -> pathlib.Path:
     return resolve_data_root() / "harness" / "observability" / "config.json"
+
+
+def resolve_monitor_data_root() -> pathlib.Path:
+    daemon_data_home = os.environ.get("HARNESS_DAEMON_DATA_HOME", "").strip()
+    if daemon_data_home:
+        return pathlib.Path(daemon_data_home)
+    xdg_data_home = os.environ.get("XDG_DATA_HOME", "").strip()
+    if xdg_data_home:
+        return pathlib.Path(xdg_data_home)
+    app_group_id = os.environ.get("HARNESS_APP_GROUP_ID", "").strip()
+    if sys.platform == "darwin":
+        if not app_group_id:
+            app_group_id = HARNESS_MONITOR_APP_GROUP_ID_DEFAULT
+        return pathlib.Path.home() / "Library" / "Group Containers" / app_group_id
+    return resolve_data_root()
+
+
+def monitor_shared_config_path() -> pathlib.Path:
+    return resolve_monitor_data_root() / "harness" / "observability" / "config.json"
+
+
+def shared_config_candidates() -> list[pathlib.Path]:
+    runtime_path = runtime_shared_config_path()
+    monitor_path = monitor_shared_config_path()
+    if monitor_path == runtime_path:
+        return [runtime_path]
+    return [runtime_path, monitor_path]
 
 
 def grafana_mcp_token_path() -> pathlib.Path:
@@ -153,10 +184,13 @@ class Supervisor:
         self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
 
     def compute_fingerprint(self) -> bytes | None:
-        config_path = runtime_shared_config_path()
-        if not config_path.exists():
+        config_bytes: bytes | None = None
+        for config_path in shared_config_candidates():
+            if config_path.exists():
+                config_bytes = config_path.read_bytes()
+                break
+        if config_bytes is None:
             return None
-        config_bytes = config_path.read_bytes()
         token_path = grafana_mcp_token_path()
         if token_path.exists():
             token_bytes = token_path.read_bytes()
