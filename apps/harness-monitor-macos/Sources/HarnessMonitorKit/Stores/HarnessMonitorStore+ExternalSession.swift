@@ -6,9 +6,9 @@ extension HarnessMonitorStore {
     attachSessionRequest += 1
   }
 
-  /// Handles the result of the Attach External Session fileImporter: bookmarks
-  /// the selected directory as `.sessionDirectory`, probes it, and presents the
-  /// Attach sheet with the preview (or failure).
+  /// Handles the result of the Attach External Session fileImporter by probing
+  /// the selected directory first, then persisting a bookmark only for session
+  /// roots we can actually attach.
   public func handleAttachSessionPicker(_ result: Result<[URL], any Error>) async {
     switch result {
     case .success(let urls):
@@ -17,25 +17,22 @@ extension HarnessMonitorStore {
         presentFailureFeedback("Bookmark store unavailable: app group container missing")
         return
       }
+      let existingIDs = Set(sessions.map(\.sessionId))
+      let probe = SessionDiscoveryProbe(existingSessionIDs: existingIDs)
       do {
-        let record = try await url.withSecurityScopeAsync { scopedURL in
-          try await bookmarks.add(url: scopedURL, kind: .sessionDirectory)
+        let (record, preview) = try await url.withSecurityScopeAsync { scopedURL in
+          let preview = try await probe.probe(url: scopedURL)
+          let record = try await bookmarks.add(url: scopedURL, kind: .sessionDirectory)
+          return (record, preview)
         }
-        let existingIDs = Set(sessions.map(\.sessionId))
-        let probe = SessionDiscoveryProbe(existingSessionIDs: existingIDs)
-        do {
-          let preview = try await url.withSecurityScopeAsync { scopedURL in
-            try await probe.probe(url: scopedURL)
-          }
-          presentedSheet = .attachExternal(bookmarkId: record.id, preview: preview)
-        } catch let failure as SessionDiscoveryProbe.Failure {
-          presentFailureFeedback(failureSummary(failure))
-        }
+        presentedSheet = .attachExternal(bookmarkId: record.id, preview: preview)
+      } catch let failure as SessionDiscoveryProbe.Failure {
+        presentFailureFeedback(failureSummary(failure))
       } catch {
-        presentFailureFeedback("Could not bookmark folder: \(error.localizedDescription)")
+        presentFailureFeedback("Could not attach session: \(error.localizedDescription)")
       }
     case .failure(let error):
-      presentFailureFeedback("Could not open folder: \(error.localizedDescription)")
+      presentFailureFeedback("Could not open session folder: \(error.localizedDescription)")
     }
   }
 }

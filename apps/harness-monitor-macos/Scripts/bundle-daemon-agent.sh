@@ -9,29 +9,14 @@ if [ "${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE:-}" = "1" ]; then
   exit 0
 fi
 
-resolve_repo_root() {
-  local candidate="$PROJECT_DIR"
-  while [ "$candidate" != "/" ]; do
-    # Git worktrees expose `.git` as a file, not a directory.
-    if [ -e "$candidate/.git" ]; then
-      printf '%s\n' "$candidate"
-      return
-    fi
-    candidate="$(dirname "$candidate")"
-  done
-  printf '%s\n' "$PROJECT_DIR"
-}
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# Shared helpers keep path selection testable without executing the bundle flow.
+source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
 
 repo_root="$(resolve_repo_root)"
 cd "$repo_root"
 
-if [ -n "${CARGO_TARGET_DIR:-}" ]; then
-  target_dir="$CARGO_TARGET_DIR"
-elif [ -n "${TARGET_TEMP_DIR:-}" ]; then
-  target_dir="$TARGET_TEMP_DIR/cargo-target"
-else
-  target_dir="$repo_root/target"
-fi
+target_dir="$(resolve_cargo_target_dir)"
 configuration="${CONFIGURATION:-Debug}"
 profile_dir="debug"
 cargo_args=(rustc --bin harness)
