@@ -18,11 +18,16 @@ public struct HarnessMonitorNotificationAssetWriter: HarnessMonitorNotificationA
   }
 
   public func sampleImageURL() throws -> URL {
-    let directory = HarnessMonitorPaths.harnessRoot(using: environment)
+    let directory = HarnessMonitorPaths.notificationCacheRoot(using: environment)
+    let legacyDirectory = HarnessMonitorPaths.harnessRoot(using: environment)
       .appendingPathComponent("cache", isDirectory: true)
       .appendingPathComponent("notifications", isDirectory: true)
     let fileManager = FileManager.default
-    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    try HarnessMonitorPaths.prepareGeneratedCacheDirectory(
+      directory,
+      cleaningLegacyDirectories: [legacyDirectory],
+      fileManager: fileManager
+    )
 
     let url = directory.appendingPathComponent(Self.sampleImageName)
     if !fileManager.fileExists(atPath: url.path) || Self.cachedSampleImageRequiresRewrite(at: url) {

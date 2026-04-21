@@ -94,6 +94,49 @@ struct HarnessMonitorPathsTests {
     )
   }
 
+  @Test("Generated caches use a noindex root")
+  func generatedCachesUseNoIndexRoot() {
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+    let expectedCacheRoot =
+      "/Users/example/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/cache.noindex"
+
+    #expect(
+      HarnessMonitorPaths.thumbnailCacheRoot(using: environment).path
+        == "\(expectedCacheRoot)/thumbnails"
+    )
+    #expect(
+      HarnessMonitorPaths.notificationCacheRoot(using: environment).path
+        == "\(expectedCacheRoot)/notifications"
+    )
+  }
+
+  @Test("Preparing a generated cache directory removes indexed legacy cache directories")
+  func preparingGeneratedCacheDirectoryRemovesLegacyCacheDirectories() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-generated-cache-\(UUID().uuidString)", isDirectory: true)
+    let targetDirectory =
+      root.appendingPathComponent("cache.noindex/notifications", isDirectory: true)
+    let legacyDirectory =
+      root.appendingPathComponent("cache/notifications", isDirectory: true)
+
+    try FileManager.default.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+    try Data("legacy".utf8).write(
+      to: legacyDirectory.appendingPathComponent("legacy.txt"),
+      options: .atomic
+    )
+
+    try HarnessMonitorPaths.prepareGeneratedCacheDirectory(
+      targetDirectory,
+      cleaningLegacyDirectories: [legacyDirectory]
+    )
+
+    #expect(FileManager.default.fileExists(atPath: targetDirectory.path))
+    #expect(FileManager.default.fileExists(atPath: legacyDirectory.path) == false)
+  }
+
   @Test("Shared observability config defaults to Application Support")
   func sharedObservabilityConfigDefaultsToApplicationSupport() {
     let environment = HarnessMonitorEnvironment(

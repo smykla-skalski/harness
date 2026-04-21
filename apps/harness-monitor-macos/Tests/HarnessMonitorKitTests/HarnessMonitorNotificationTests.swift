@@ -58,6 +58,26 @@ struct HarnessMonitorNotificationTests {
     #expect(try sampleImageHasAlpha(at: url) == false)
   }
 
+  @Test("Asset writer stores notification sample images in a noindex cache directory")
+  func assetWriterStoresSampleImagesInNoIndexCacheDirectory() throws {
+    let environment = try temporaryEnvironment()
+    let legacyDirectory = HarnessMonitorPaths.harnessRoot(using: environment)
+      .appendingPathComponent("cache", isDirectory: true)
+      .appendingPathComponent("notifications", isDirectory: true)
+    try FileManager.default.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+    try Data("legacy".utf8).write(
+      to: legacyDirectory.appendingPathComponent("legacy.txt"),
+      options: .atomic
+    )
+    let writer = HarnessMonitorNotificationAssetWriter(environment: environment)
+
+    let url = try writer.sampleImageURL()
+
+    #expect(url.path.contains("/cache.noindex/notifications/"))
+    #expect(FileManager.default.fileExists(atPath: url.path))
+    #expect(FileManager.default.fileExists(atPath: legacyDirectory.path) == false)
+  }
+
   @Test("Factory registers status, text input, and full control categories")
   func factoryRegistersActionCategories() {
     let categories = HarnessMonitorNotificationRequestFactory.categories()
