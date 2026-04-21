@@ -76,6 +76,7 @@ extension HarnessMonitorStore {
 
     withUISyncBatch {
       connectionState = .online
+      markConnectionOnline()
     }
     appendConnectionEvent(kind: .connected, detail: connectedEventDetail(for: transport))
     startConnectionProbe(using: client)
