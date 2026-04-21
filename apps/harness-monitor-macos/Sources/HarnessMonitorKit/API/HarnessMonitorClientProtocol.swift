@@ -84,6 +84,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     request: LeaderTransferRequest
   ) async throws -> SessionDetail
   func startSession(request: SessionStartRequest) async throws -> SessionSummary
+  func adoptSession(bookmarkID: String?, sessionRoot: URL) async throws -> SessionSummary
   func endSession(
     sessionID: String,
     request: SessionEndRequest
@@ -181,7 +182,6 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func configuration() async throws -> MonitorConfiguration
   func logLevel() async throws -> LogLevelResponse
   func setLogLevel(_ level: String) async throws -> LogLevelResponse
-  func adoptSession(bookmarkID: String?, sessionRoot: URL) async throws -> SessionSummary
 }
 
 extension HarnessMonitorClientProtocol {
@@ -195,6 +195,13 @@ extension HarnessMonitorClientProtocol {
     request _: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport {
     throw HarnessMonitorAPIError.server(code: 501, message: "Host bridge unavailable.")
+  }
+
+  public func adoptSession(
+    bookmarkID _: String?,
+    sessionRoot _: URL
+  ) async throws -> SessionSummary {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Session adoption unavailable.")
   }
 
   public func sessionDetail(id: String) async throws -> SessionDetail {
@@ -262,13 +269,6 @@ extension HarnessMonitorClientProtocol {
 
   public func configuration() async throws -> MonitorConfiguration {
     MonitorConfiguration(personas: [], runtimeModels: [])
-  }
-
-  public func adoptSession(
-    bookmarkID _: String?,
-    sessionRoot _: URL
-  ) async throws -> SessionSummary {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Adopt session unavailable.")
   }
 
   private func timelineWindowResponse(

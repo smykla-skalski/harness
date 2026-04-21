@@ -407,13 +407,4 @@ public enum HarnessMonitorAccessibility {
   public static func segmentedOption(_ controlID: String, option: String) -> String {
     "\(controlID).option.\(slug(option))"
   }
-
-  private static func slug(_ value: String) -> String {
-    value.lowercased()
-      .replacing(" ", with: "-")
-      .replacing("_", with: "-")
-      .replacing(":", with: "-")
-      .replacing("/", with: "-")
-      .replacing(".", with: "")
-  }
 }

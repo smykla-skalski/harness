@@ -2,6 +2,24 @@ import Foundation
 import OSLog
 
 public struct SessionDiscoveryProbe: Sendable {
+  private struct RawState: Decodable {
+    let schemaVersion: Int
+    let sessionId: String
+    let projectName: String?
+    let title: String?
+    let createdAt: String
+    let originPath: String?
+
+    enum CodingKeys: String, CodingKey {
+      case schemaVersion = "schema_version"
+      case sessionId = "session_id"
+      case projectName = "project_name"
+      case title
+      case createdAt = "created_at"
+      case originPath = "origin_path"
+    }
+  }
+
   public struct Preview: Sendable, Equatable {
     public let sessionId: String
     public let projectName: String
@@ -24,13 +42,15 @@ public struct SessionDiscoveryProbe: Sendable {
 
   nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
+    let options: ISO8601DateFormatter.Options = [.withInternetDateTime]
+    formatter.formatOptions = options
     return formatter
   }()
 
   nonisolated(unsafe) private static let isoFormatterWithFractional: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let options: ISO8601DateFormatter.Options = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.formatOptions = options
     return formatter
   }()
 
@@ -57,74 +77,17 @@ public struct SessionDiscoveryProbe: Sendable {
     guard FileManager.default.fileExists(atPath: stateURL.path) else {
       throw Failure.notAHarnessSession(reason: "missing state.json")
     }
-    let data: Data
-    do {
-      data = try Data(contentsOf: stateURL)
-    } catch {
-      throw Failure.notAHarnessSession(
-        reason: "cannot read state.json: \(error.localizedDescription)"
-      )
-    }
-
-    struct RawState: Decodable {
-      let schemaVersion: Int
-      let sessionId: String
-      let projectName: String?
-      let title: String?
-      let createdAt: String
-      let originPath: String?
-      enum CodingKeys: String, CodingKey {
-        case schemaVersion = "schema_version"
-        case sessionId = "session_id"
-        case projectName = "project_name"
-        case title
-        case createdAt = "created_at"
-        case originPath = "origin_path"
-      }
-    }
-
-    let raw: RawState
-    do {
-      raw = try JSONDecoder().decode(RawState.self, from: data)
-    } catch {
-      throw Failure.notAHarnessSession(
-        reason: "malformed state.json: \(error.localizedDescription)"
-      )
-    }
+    let raw = try loadRawState(from: stateURL)
     guard raw.schemaVersion == supportedSchemaVersion else {
       throw Failure.unsupportedSchemaVersion(
         found: raw.schemaVersion,
         supported: supportedSchemaVersion
       )
     }
-    var isDir: ObjCBool = false
-    let workspace = url.appendingPathComponent("workspace")
-    guard
-      FileManager.default.fileExists(atPath: workspace.path, isDirectory: &isDir),
-      isDir.boolValue
-    else {
-      throw Failure.notAHarnessSession(reason: "missing workspace/")
-    }
-    let memory = url.appendingPathComponent("memory")
-    guard
-      FileManager.default.fileExists(atPath: memory.path, isDirectory: &isDir),
-      isDir.boolValue
-    else {
-      throw Failure.notAHarnessSession(reason: "missing memory/")
-    }
-    let originMarkerURL = url.appendingPathComponent(".origin")
-    guard let markerData = try? Data(contentsOf: originMarkerURL),
-      let rawMarker = String(data: markerData, encoding: .utf8)
-    else {
-      throw Failure.notAHarnessSession(reason: "missing .origin")
-    }
-    let marker = rawMarker.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !marker.isEmpty else {
-      throw Failure.notAHarnessSession(reason: "missing .origin")
-    }
-    if let statedOrigin = raw.originPath, marker != statedOrigin {
-      throw Failure.notAHarnessSession(reason: "origin mismatch")
-    }
+    try requireDirectory(url.appendingPathComponent("workspace"), reason: "missing workspace/")
+    try requireDirectory(url.appendingPathComponent("memory"), reason: "missing memory/")
+    let marker = try loadOriginMarker(from: url.appendingPathComponent(".origin"))
+    let statedOrigin = try validatedOriginPath(from: raw, marker: marker)
     let originReachable = FileManager.default.fileExists(atPath: marker)
     // Note: under App Sandbox the marker path is outside the picked URL's
     // security scope, so this check is always false for external origins.
@@ -139,9 +102,61 @@ public struct SessionDiscoveryProbe: Sendable {
       projectName: raw.projectName ?? "",
       title: raw.title ?? "",
       createdAt: createdAt,
-      originPath: marker,
+      originPath: statedOrigin,
       originReachable: originReachable,
       sessionRoot: url
     )
+  }
+
+  private static func loadRawState(from stateURL: URL) throws -> RawState {
+    let data: Data
+    do {
+      data = try Data(contentsOf: stateURL)
+    } catch {
+      throw Failure.notAHarnessSession(
+        reason: "cannot read state.json: \(error.localizedDescription)"
+      )
+    }
+
+    do {
+      return try JSONDecoder().decode(RawState.self, from: data)
+    } catch {
+      throw Failure.notAHarnessSession(
+        reason: "malformed state.json: \(error.localizedDescription)"
+      )
+    }
+  }
+
+  private static func requireDirectory(_ url: URL, reason: String) throws {
+    var isDir: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue
+    else {
+      throw Failure.notAHarnessSession(reason: reason)
+    }
+  }
+
+  private static func loadOriginMarker(from url: URL) throws -> String {
+    guard let markerData = try? Data(contentsOf: url),
+      let rawMarker = String(data: markerData, encoding: .utf8)
+    else {
+      throw Failure.notAHarnessSession(reason: "missing .origin")
+    }
+    let marker = rawMarker.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !marker.isEmpty else {
+      throw Failure.notAHarnessSession(reason: "missing .origin")
+    }
+    return marker
+  }
+
+  private static func validatedOriginPath(from raw: RawState, marker: String) throws -> String {
+    guard let statedOrigin = raw.originPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !statedOrigin.isEmpty
+    else {
+      throw Failure.notAHarnessSession(reason: "missing origin_path")
+    }
+    guard marker == statedOrigin else {
+      throw Failure.notAHarnessSession(reason: "origin mismatch")
+    }
+    return statedOrigin
   }
 }
