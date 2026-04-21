@@ -74,7 +74,8 @@ public final class NewSessionViewModel {
     self.bookmarkStore = bookmarkStore
     self.client = client
     self.isSandboxedCheck = isSandboxed
-    self.bookmarkResolver = bookmarkResolver
+    self.bookmarkResolver =
+      bookmarkResolver
       ?? Self.makeDefaultResolver(bookmarkStore: bookmarkStore)
     self.logSink = logSink
   }

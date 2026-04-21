@@ -2,7 +2,10 @@ import Foundation
 
 extension HarnessMonitorStore {
   // Task 9 fills in the adopt logic (bookmark resolution, daemon call, dismiss on success).
-  public func adoptExternalSession(bookmarkID: String, preview: SessionDiscoveryProbe.Preview) async {}
+  public func adoptExternalSession(
+    bookmarkID: String,
+    preview: SessionDiscoveryProbe.Preview
+  ) async {}
 
   public func presentSendSignalSheet(agentID: String) {
     guard guardSessionActionsAvailable() else { return }

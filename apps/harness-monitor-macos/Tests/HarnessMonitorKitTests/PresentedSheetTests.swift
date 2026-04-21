@@ -1,5 +1,6 @@
-@testable import HarnessMonitorKit
 import XCTest
+
+@testable import HarnessMonitorKit
 
 final class PresentedSheetTests: XCTestCase {
   func testNewSessionCaseIsIdentifiable() {
