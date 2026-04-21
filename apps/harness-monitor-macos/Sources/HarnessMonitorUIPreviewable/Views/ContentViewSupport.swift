@@ -17,61 +17,6 @@ public enum HarnessMonitorInspectorLayout {
   public static let maxWidth: CGFloat = 480
 }
 
-// MARK: - Content status backdrop
-
-private enum ContentStatusBackdropLayout {
-  static let gradientRadius: CGFloat = 380
-  // Navigation buttons (back/forward) + spacing to title
-  static let titleLeadingPadding: CGFloat = 75
-}
-
-public struct ContentStatusBackdrop: View {
-  public let status: SessionStatus
-  public let isStale: Bool
-  public let titleLeadingEdge: CGFloat
-
-  public init(status: SessionStatus, isStale: Bool, titleLeadingEdge: CGFloat) {
-    self.status = status
-    self.isStale = isStale
-    self.titleLeadingEdge = titleLeadingEdge
-  }
-
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-
-  private var color: Color {
-    isStale ? HarnessMonitorTheme.ink.opacity(0.55) : statusColor(for: status)
-  }
-
-  private var tintOpacity: Double {
-    colorSchemeContrast == .increased ? 0.28 : 0.22
-  }
-
-  public var body: some View {
-    let radius = ContentStatusBackdropLayout.gradientRadius
-    Circle()
-      .fill(
-        RadialGradient(
-          colors: [
-            color.opacity(tintOpacity),
-            color.opacity(tintOpacity * 0.5),
-            .clear,
-          ],
-          center: .center,
-          startRadius: 0,
-          endRadius: radius
-        )
-      )
-      .frame(width: radius * 2, height: radius * 2)
-      .offset(
-        x: titleLeadingEdge + ContentStatusBackdropLayout.titleLeadingPadding - radius,
-        y: -radius
-      )
-      .allowsHitTesting(false)
-      .accessibilityHidden(true)
-  }
-}
-
 public enum ContentInspectorVisibilitySource {
   case persistedPreference
   case explicitUserPreference
@@ -302,6 +247,10 @@ public struct ContentDetailColumn: View {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
   }
 
+  private var statusBackdropDetail: SessionDetail? {
+    contentSessionDetail.presentedSessionDetail
+  }
+
   public var body: some View {
     ZStack {
       if toolbarGlassReproConfiguration.disablesContentDetailChrome {
@@ -319,6 +268,14 @@ public struct ContentDetailColumn: View {
       proxy.size.width
     } action: { width in
       onDetailColumnWidthChange(width)
+    }
+    .background(alignment: .topLeading) {
+      if let detail = statusBackdropDetail {
+        ContentStatusBackdrop(
+          status: detail.session.status,
+          isStale: contentChrome.sessionDataAvailability != .live
+        )
+      }
     }
     .toolbar {
       ContentPrimaryToolbarItems(
