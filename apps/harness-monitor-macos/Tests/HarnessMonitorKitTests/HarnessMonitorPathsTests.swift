@@ -137,6 +137,48 @@ struct HarnessMonitorPathsTests {
     #expect(FileManager.default.fileExists(atPath: legacyDirectory.path) == false)
   }
 
+  @Test("Migrating generated caches removes indexed legacy thumbnail and notification directories")
+  func migratingGeneratedCachesRemovesIndexedLegacyDirectories() throws {
+    let dataHome = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-generated-cache-migration-\(UUID().uuidString)")
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": dataHome.path],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    let legacyThumbnailDirectory =
+      harnessRoot.appendingPathComponent("cache/thumbnails", isDirectory: true)
+    let legacyNotificationDirectory =
+      harnessRoot.appendingPathComponent("cache/notifications", isDirectory: true)
+
+    try FileManager.default.createDirectory(
+      at: legacyThumbnailDirectory,
+      withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+      at: legacyNotificationDirectory,
+      withIntermediateDirectories: true
+    )
+    try Data("thumbnail".utf8).write(
+      to: legacyThumbnailDirectory.appendingPathComponent("thumb.jpg"),
+      options: .atomic
+    )
+    try Data("notification".utf8).write(
+      to: legacyNotificationDirectory.appendingPathComponent("notice.png"),
+      options: .atomic
+    )
+
+    try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: environment)
+
+    #expect(
+      FileManager.default.fileExists(
+        atPath: HarnessMonitorPaths.generatedCacheRoot(using: environment).path
+      )
+    )
+    #expect(FileManager.default.fileExists(atPath: legacyThumbnailDirectory.path) == false)
+    #expect(FileManager.default.fileExists(atPath: legacyNotificationDirectory.path) == false)
+  }
+
   @Test("Shared observability config defaults to Application Support")
   func sharedObservabilityConfigDefaultsToApplicationSupport() {
     let environment = HarnessMonitorEnvironment(

@@ -193,6 +193,17 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("notifications", isDirectory: true)
   }
 
+  public static func migrateLegacyGeneratedCaches(
+    using environment: HarnessMonitorEnvironment = .current,
+    fileManager: FileManager = .default
+  ) throws {
+    try Self.prepareGeneratedCacheDirectory(
+      Self.generatedCacheRoot(using: environment),
+      cleaningLegacyDirectories: Self.legacyGeneratedCacheDirectories(using: environment),
+      fileManager: fileManager
+    )
+  }
+
   public static func prepareGeneratedCacheDirectory(
     _ directory: URL,
     cleaningLegacyDirectories legacyDirectories: [URL] = [],
@@ -213,6 +224,17 @@ public enum HarnessMonitorPaths {
     {
       try fileManager.removeItem(at: legacyDirectory)
     }
+  }
+
+  private static func legacyGeneratedCacheDirectories(
+    using environment: HarnessMonitorEnvironment
+  ) -> [URL] {
+    let legacyCacheRoot = Self.harnessRoot(using: environment)
+      .appendingPathComponent("cache", isDirectory: true)
+    return [
+      legacyCacheRoot.appendingPathComponent("thumbnails", isDirectory: true),
+      legacyCacheRoot.appendingPathComponent("notifications", isDirectory: true),
+    ]
   }
 
   public static var launchAgentPlistName: String {
