@@ -64,11 +64,13 @@ extension HarnessMonitorStore {
   public enum PresentedSheet: Identifiable, Equatable {
     case sendSignal(agentID: String)
     case newSession
+    case attachExternal(bookmarkId: String, preview: SessionDiscoveryProbe.Preview?)
 
     public var id: String {
       switch self {
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       case .newSession: "newSession"
+      case .attachExternal(let bookmarkId, _): "attachExternal:\(bookmarkId)"
       }
     }
   }

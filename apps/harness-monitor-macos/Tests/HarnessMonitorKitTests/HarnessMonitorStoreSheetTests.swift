@@ -80,6 +80,7 @@ struct HarnessMonitorStoreSheetTests {
     switch sheet {
     case .sendSignal: break
     case .newSession: break
+    case .attachExternal: break
     }
   }
 
