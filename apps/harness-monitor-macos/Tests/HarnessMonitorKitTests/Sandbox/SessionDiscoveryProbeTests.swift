@@ -57,6 +57,14 @@ final class SessionDiscoveryProbeTests: XCTestCase {
       XCTAssertEqual(supported, 9)
     }
   }
+
+  func testProbeParsesFractionalSecondsCreatedAt() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    try fixture.rewriteField("created_at", to: "2026-04-20T12:34:56.123456Z")
+    let probe = SessionDiscoveryProbe(existingSessionIDs: [])
+    let preview = try await probe.probe(url: fixture.url)
+    XCTAssertNotEqual(preview.createdAt, Date(timeIntervalSince1970: 0))
+  }
 }
 
 struct SessionProbeFixture {
@@ -100,6 +108,17 @@ struct SessionProbeFixture {
       throw CocoaError(.fileReadCorruptFile)
     }
     json["schema_version"] = version
+    let rewritten = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
+    try rewritten.write(to: stateURL)
+  }
+
+  func rewriteField(_ key: String, to value: Any) throws {
+    let stateURL = url.appendingPathComponent("state.json")
+    let data = try Data(contentsOf: stateURL)
+    guard var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw NSError(domain: "SessionProbeFixture", code: 1)
+    }
+    json[key] = value
     let rewritten = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
     try rewritten.write(to: stateURL)
   }
