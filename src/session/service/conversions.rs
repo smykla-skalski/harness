@@ -40,8 +40,8 @@ pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> Sessi
         last_activity_at: detail.session.last_activity_at.clone(),
         observe_id: detail.session.observe_id.clone(),
         pending_leader_transfer: detail.session.pending_leader_transfer.clone(),
-        external_origin: None,
-        adopted_at: None,
+        external_origin: detail.session.external_origin.as_ref().map(PathBuf::from),
+        adopted_at: detail.session.adopted_at.clone(),
         metrics: detail.session.metrics.clone(),
     }
 }
@@ -73,8 +73,8 @@ pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> Se
         last_activity_at: summary.last_activity_at.clone(),
         observe_id: summary.observe_id.clone(),
         pending_leader_transfer: summary.pending_leader_transfer.clone(),
-        external_origin: None,
-        adopted_at: None,
+        external_origin: summary.external_origin.as_ref().map(PathBuf::from),
+        adopted_at: summary.adopted_at.clone(),
         metrics: summary.metrics.clone(),
     }
 }
@@ -157,6 +157,8 @@ mod tests {
             leader_id: None,
             observe_id: None,
             pending_leader_transfer: None,
+            external_origin: None,
+            adopted_at: None,
             metrics: SessionMetrics::default(),
         }
     }
@@ -174,6 +176,21 @@ mod tests {
             PathBuf::from("/data/sessions/demo/abc12345/memory")
         );
         assert_eq!(state.origin_path, PathBuf::from("/origin"));
+    }
+
+    #[test]
+    fn summary_to_session_state_preserves_adoption_metadata() {
+        let mut summary = summary_fixture();
+        summary.external_origin = Some("/external/session-root".into());
+        summary.adopted_at = Some("2026-04-20T02:03:04Z".into());
+
+        let state = summary_to_session_state(&summary);
+
+        assert_eq!(
+            state.external_origin,
+            Some(PathBuf::from("/external/session-root"))
+        );
+        assert_eq!(state.adopted_at.as_deref(), Some("2026-04-20T02:03:04Z"));
     }
 
     #[test]
@@ -197,5 +214,29 @@ mod tests {
             PathBuf::from("/data/sessions/demo/abc12345/memory")
         );
         assert_eq!(state.origin_path, PathBuf::from("/origin"));
+    }
+
+    #[test]
+    fn detail_to_session_state_preserves_adoption_metadata() {
+        let mut summary = summary_fixture();
+        summary.external_origin = Some("/external/session-root".into());
+        summary.adopted_at = Some("2026-04-20T02:03:04Z".into());
+
+        let detail = protocol::SessionDetail {
+            session: summary,
+            agents: Vec::new(),
+            tasks: Vec::new(),
+            signals: Vec::new(),
+            observer: None,
+            agent_activity: Vec::new(),
+        };
+
+        let state = detail_to_session_state(&detail);
+
+        assert_eq!(
+            state.external_origin,
+            Some(PathBuf::from("/external/session-root"))
+        );
+        assert_eq!(state.adopted_at.as_deref(), Some("2026-04-20T02:03:04Z"));
     }
 }

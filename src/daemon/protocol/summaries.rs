@@ -122,6 +122,10 @@ pub struct SessionSummary {
     pub leader_id: Option<String>,
     pub observe_id: Option<String>,
     pub pending_leader_transfer: Option<PendingLeaderTransfer>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_origin: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adopted_at: Option<String>,
     pub metrics: SessionMetrics,
 }
 
