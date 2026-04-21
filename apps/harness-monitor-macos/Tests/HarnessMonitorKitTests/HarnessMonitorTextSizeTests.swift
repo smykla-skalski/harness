@@ -222,6 +222,34 @@ struct TaskDragFeedbackMetricsTests {
 }
 
 @MainActor
+@Suite("Connection toolbar badge layout")
+struct ConnectionToolbarBadgeLayoutTests {
+  @Test("Toolbar badge keeps a stable fitting width when connection details appear")
+  func toolbarBadgeKeepsAStableFittingWidthWhenConnectionDetailsAppear() {
+    var disconnected = ConnectionMetrics.initial
+    disconnected.transportKind = .webSocket
+
+    var connected = disconnected
+    connected.connectedSince = Date(timeIntervalSinceReferenceDate: 123_456)
+    connected.latencyMs = 24
+
+    let disconnectedSize = fittingSize(for: ConnectionToolbarBadge(metrics: disconnected))
+    let connectedSize = fittingSize(for: ConnectionToolbarBadge(metrics: connected))
+
+    #expect(abs(connectedSize.width - disconnectedSize.width) <= 1)
+  }
+
+  private func fittingSize<Content: View>(
+    for view: Content
+  ) -> CGSize {
+    let host = NSHostingView(rootView: view)
+    host.frame = CGRect(x: 0, y: 0, width: 220, height: 48)
+    host.layoutSubtreeIfNeeded()
+    return host.fittingSize
+  }
+}
+
+@MainActor
 @Suite("Session task card layout")
 struct SessionTaskCardLayoutTests {
   @Test("Compact severity badge stays on one line at narrow widths")

@@ -505,6 +505,7 @@
 		E70445CF2A6AAE8E2BE1324C /* SessionTimelinePageSizePicker+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F9A4634A7E10121083A27D /* SessionTimelinePageSizePicker+Support.swift */; };
 		E7D1B11195239DA9FD89BB90 /* HarnessMonitorAppStoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C455AFFDC1CCFF5F2DC0B4 /* HarnessMonitorAppStoreFactory.swift */; };
 		E897CD3592C070D375C68F46 /* HarnessMonitorNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B59E3AD71F2105CE1FCE29B3 /* HarnessMonitorNavigationUITests.swift */; };
+		E8F406769A4144830C1B3F92 /* ConnectionViewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C84C148AC1C4E09F1DA0B5 /* ConnectionViewSupport.swift */; };
 		E919E31C6D44EA1D6C712BF3 /* PersistenceSnapshotIntegrationTests+Ordering.swift in Sources */ = {isa = PBXBuildFile; fileRef = 984820BDFFADE6551E75890D /* PersistenceSnapshotIntegrationTests+Ordering.swift */; };
 		EC2E1628FB11E654AA3AF5E5 /* CachedModels+V4.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887ADE4E8E23E634AC8DA07E /* CachedModels+V4.swift */; };
 		ECA23A1E6F086D4A37F21F23 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CF36D41E55BA5AF7F79BAE98 /* Assets.xcassets */; };
@@ -684,6 +685,7 @@
 		0078395048BD22D435F463D7 /* HarnessMonitorStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreTests.swift; sourceTree = "<group>"; };
 		008D1CDC1AF4DB7304D2B662 /* HarnessMonitorStoreDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreDatabaseTests.swift; sourceTree = "<group>"; };
 		0093E3DD520DE33127DB1979 /* PreferencesDiagnosticsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesDiagnosticsSection.swift; sourceTree = "<group>"; };
+		00C84C148AC1C4E09F1DA0B5 /* ConnectionViewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionViewSupport.swift; sourceTree = "<group>"; };
 		0143A1BACAAE538108C311B0 /* ObserverSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverSummaryTests.swift; sourceTree = "<group>"; };
 		01C8E39483466303C09321D5 /* SidebarRecentSearchesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRecentSearchesView.swift; sourceTree = "<group>"; };
 		01F9A4634A7E10121083A27D /* SessionTimelinePageSizePicker+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionTimelinePageSizePicker+Support.swift"; sourceTree = "<group>"; };
@@ -1847,6 +1849,7 @@
 				EA401168BA4BDCE7F6690482 /* AttachSessionSheetView.swift */,
 				7541832E2A6E122762A548FD /* AuthorizedFoldersSection.swift */,
 				A5C297C2E9C35F10BA2AB470 /* ConnectionViews.swift */,
+				00C84C148AC1C4E09F1DA0B5 /* ConnectionViewSupport.swift */,
 				9BE5D49679620AA4B71F536F /* ContentAuditBuildBadge.swift */,
 				71E97AD56106E2CECE867E80 /* ContentChromeSupport.swift */,
 				BD112FC9F1F893D74D7AB5AF /* ContentChromeToolbarBaseline.swift */,
@@ -2852,6 +2855,7 @@
 				F9942E5CB4EDFD1596573F82 /* BackgroundThumbnailCache+DiskCache.swift in Sources */,
 				081C61568F5CE346D0FC6F8C /* BackgroundThumbnailCache+ImageProcessing.swift in Sources */,
 				BC6CD6A293E577C28F0CE3D1 /* BackgroundThumbnailCache.swift in Sources */,
+				E8F406769A4144830C1B3F92 /* ConnectionViewSupport.swift in Sources */,
 				D7E1BC953A8FD1F6470A5018 /* ConnectionViews.swift in Sources */,
 				BC3F96F0677A5A136B21D2D2 /* ContentAuditBuildBadge.swift in Sources */,
 				FFF55A48BFCB4A7CAA443704 /* ContentChromeSupport.swift in Sources */,
@@ -3097,7 +3101,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3119,7 +3123,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 28.5.1;
+				MARKETING_VERSION = 28.5.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -3142,7 +3146,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3171,7 +3175,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3268,7 +3272,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3296,7 +3300,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 28.5.1;
+				MARKETING_VERSION = 28.5.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -3369,7 +3373,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COMPILER_INDEX_STORE_ENABLE = NO;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3607,7 +3611,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3686,7 +3690,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COMPILER_INDEX_STORE_ENABLE = NO;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3714,7 +3718,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 28.5.1;
+				MARKETING_VERSION = 28.5.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -3780,7 +3784,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3827,7 +3831,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 28.5.1;
+				CURRENT_PROJECT_VERSION = 28.5.2;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
