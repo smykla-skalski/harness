@@ -99,6 +99,36 @@ struct DaemonControllerTests {
     }
   }
 
+  @Test("auto transport bootstrap does not wait for a slow WebSocket upgrade")
+  func autoTransportBootstrapDoesNotWaitForSlowWebSocketUpgrade() async throws {
+    let httpClient = RecordingHarnessClient()
+    let webSocketClient = RecordingHarnessClient()
+    let controller = DaemonController(
+      transportPreference: .auto,
+      launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+      sessionFactory: { _ in httpClient },
+      webSocketBootstrapper: { _ in
+        try? await Task.sleep(for: .milliseconds(400))
+        return webSocketClient
+      }
+    )
+    let connection = HarnessMonitorConnection(
+      endpoint: try #require(URL(string: "http://127.0.0.1:65535")),
+      token: "test-token"
+    )
+    let clock = ContinuousClock()
+    let start = clock.now
+
+    let client = try await controller.bootstrap(connection: connection)
+
+    let elapsed = start.duration(to: clock.now)
+    #expect(client as AnyObject === httpClient as AnyObject)
+    #expect(elapsed < .milliseconds(200))
+    #expect(httpClient.readCallCount(.health) == 1)
+    #expect(httpClient.shutdownCallCount() == 0)
+    #expect(webSocketClient.shutdownCallCount() == 0)
+  }
+
   @Test("awaitManifestWarmUp waits for managed manifest rewrite while the stale pid is still alive")
   func awaitManifestWarmUpWaitsForManagedManifestRewriteWhilePidIsAlive() async throws {
     try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in

@@ -22,12 +22,20 @@ public protocol DaemonControlling: Sendable {
 
 public struct DaemonController: DaemonControlling {
   private static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
+  private static let autoTransportWebSocketGracePeriodDefault: Duration = .milliseconds(150)
+
+  private enum AutoTransportBootstrapOutcome: Sendable {
+    case upgraded(any HarnessMonitorClientProtocol)
+    case unavailable
+    case timedOut
+  }
 
   let environment: HarnessMonitorEnvironment
   let sessionFactory: @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
   let webSocketBootstrapper:
     @Sendable (HarnessMonitorConnection) async -> (any HarnessMonitorClientProtocol)?
   let transportPreference: TransportPreference
+  let autoTransportWebSocketGracePeriod: Duration
   let launchAgentManager: any DaemonLaunchAgentManaging
   let ownership: DaemonOwnership
   let endpointProbe: @Sendable (URL) async -> Bool
@@ -41,6 +49,7 @@ public struct DaemonController: DaemonControlling {
     launchAgentManager: any DaemonLaunchAgentManaging =
       ServiceManagementDaemonLaunchAgentManager(),
     ownership: DaemonOwnership = .managed,
+    autoTransportWebSocketGracePeriod: Duration = .milliseconds(150),
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
         HarnessMonitorAPIClient(connection: $0)
@@ -81,6 +90,7 @@ public struct DaemonController: DaemonControlling {
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
+    self.autoTransportWebSocketGracePeriod = autoTransportWebSocketGracePeriod
     self.launchAgentManager = launchAgentManager
     self.ownership = ownership
     self.sessionFactory = sessionFactory
@@ -111,21 +121,65 @@ public struct DaemonController: DaemonControlling {
     )
     let httpClient = sessionFactory(connection)
     _ = try await httpClient.health()
+    guard transportPreference != .http else {
+      return httpClient
+    }
 
-    if transportPreference != .http {
-      if let wsClient = await webSocketBootstrapper(connection) {
+    if transportPreference == .auto {
+      switch await bootstrapAutoTransport(connection: connection) {
+      case .upgraded(let wsClient):
         await httpClient.shutdown()
         HarnessMonitorLogger.lifecycle.trace(
           "Upgraded daemon transport to WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
         )
         return wsClient
+      case .timedOut:
+        let gracePeriod = String(describing: autoTransportWebSocketGracePeriod)
+        HarnessMonitorLogger.lifecycle.info(
+          """
+          HTTP bootstrap is healthy; continuing startup on HTTP/SSE after \
+          WebSocket upgrade exceeded \(gracePeriod, privacy: .public)
+          """
+        )
+      case .unavailable:
+        break
       }
-      if transportPreference == .webSocket {
-        throw DaemonControlError.commandFailed("WebSocket connection failed")
-      }
+      return httpClient
     }
 
-    return httpClient
+    if let wsClient = await webSocketBootstrapper(connection) {
+      await httpClient.shutdown()
+      HarnessMonitorLogger.lifecycle.trace(
+        "Upgraded daemon transport to WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
+      )
+      return wsClient
+    }
+    throw DaemonControlError.commandFailed("WebSocket connection failed")
+  }
+
+  private func bootstrapAutoTransport(
+    connection: HarnessMonitorConnection
+  ) async -> AutoTransportBootstrapOutcome {
+    await withTaskGroup(
+      of: AutoTransportBootstrapOutcome.self,
+      returning: AutoTransportBootstrapOutcome.self
+    ) { group in
+      group.addTask {
+        if let wsClient = await webSocketBootstrapper(connection) {
+          return .upgraded(wsClient)
+        }
+        return .unavailable
+      }
+      let gracePeriod = autoTransportWebSocketGracePeriod
+      group.addTask {
+        try? await Task.sleep(for: gracePeriod)
+        return .timedOut
+      }
+
+      let outcome = await group.next() ?? .unavailable
+      group.cancelAll()
+      return outcome
+    }
   }
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
