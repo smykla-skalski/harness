@@ -23,7 +23,6 @@ public final class NewSessionViewModel {
   public enum ValidationError: Equatable, Sendable {
     case titleRequired
     case projectRequired
-    case bookmarkUnavailable
   }
 
   public enum SubmitError: Error, Equatable, Sendable {
@@ -31,6 +30,7 @@ public final class NewSessionViewModel {
     case bookmarkRevoked(id: String)
     case bookmarkStale(id: String)
     case daemonUnreachable
+    case invalidProject(reason: String)
     case worktreeCreateFailed(reason: String)
     case invalidBaseRef(ref: String, reason: String)
     case unexpected(String)
@@ -167,11 +167,11 @@ public final class NewSessionViewModel {
       switch validationError {
       case .titleRequired: return "titleRequired"
       case .projectRequired: return "projectRequired"
-      case .bookmarkUnavailable: return "bookmarkUnavailable"
       }
     case .bookmarkRevoked: return "bookmarkRevoked"
     case .bookmarkStale: return "bookmarkStale"
     case .daemonUnreachable: return "daemonUnreachable"
+    case .invalidProject: return "invalidProject"
     case .worktreeCreateFailed: return "worktreeCreateFailed"
     case .invalidBaseRef: return "invalidBaseRef"
     case .unexpected: return "unexpected"
@@ -199,6 +199,9 @@ public final class NewSessionViewModel {
     if let apiError = error as? HarnessMonitorAPIError,
       case .server(let code, let message) = apiError
     {
+      if code == 400, isInvalidProjectFailure(message: message) {
+        return .invalidProject(reason: message)
+      }
       if code == 500, message.contains("create session worktree") {
         return .worktreeCreateFailed(reason: message)
       }
@@ -219,5 +222,15 @@ public final class NewSessionViewModel {
         )
       }
     }
+  }
+
+  private func isInvalidProjectFailure(message: String) -> Bool {
+    let normalized = message.lowercased()
+    guard normalized.contains("create session worktree") else {
+      return false
+    }
+    return normalized.contains("no head")
+      || normalized.contains("not a git repository")
+      || normalized.contains("not in a git directory")
   }
 }

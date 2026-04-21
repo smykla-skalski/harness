@@ -7,6 +7,9 @@ public struct PreferencesDiagnosticsSnapshot {
   public let projectCount: Int
   public let worktreeCount: Int
   public let sessionCount: Int
+  public let externalSessionCount: Int
+  public let lastExternalSessionAttachOutcome: String?
+  public let lastExternalSessionAttachSucceeded: Bool?
   public let lastEvent: DaemonAuditEvent?
   public let paths: PreferencesDiagnosticsPaths
   public let recentEvents: [DaemonAuditEvent]
@@ -23,6 +26,9 @@ public struct PreferencesDiagnosticsSnapshot {
       store.daemonStatus?.worktreeCount
       ?? store.projects.reduce(0) { $0 + $1.worktrees.count }
     sessionCount = store.daemonStatus?.sessionCount ?? store.sessions.count
+    externalSessionCount = store.sessions.filter { $0.externalOrigin != nil }.count
+    lastExternalSessionAttachOutcome = store.lastExternalSessionAttachOutcome?.message
+    lastExternalSessionAttachSucceeded = store.lastExternalSessionAttachOutcome?.succeeded
     lastEvent = workspaceDiagnostics?.lastEvent
     paths = PreferencesDiagnosticsPaths(
       launchAgentPath: launchAgent?.path ?? "Unavailable",
@@ -52,6 +58,9 @@ public struct PreferencesDiagnosticsSection: View {
         projectCount: snapshot.projectCount,
         worktreeCount: snapshot.worktreeCount,
         sessionCount: snapshot.sessionCount,
+        externalSessionCount: snapshot.externalSessionCount,
+        lastExternalSessionAttachOutcome: snapshot.lastExternalSessionAttachOutcome,
+        lastExternalSessionAttachSucceeded: snapshot.lastExternalSessionAttachSucceeded,
         lastEvent: snapshot.lastEvent
       )
       PreferencesPathsSection(paths: snapshot.paths)

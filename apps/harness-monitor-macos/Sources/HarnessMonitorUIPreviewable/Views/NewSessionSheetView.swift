@@ -136,14 +136,17 @@ struct NewSessionSheetView: View {
       return "A session title is required."
     case .validation(.projectRequired):
       return "Select a project folder to continue."
-    case .validation(.bookmarkUnavailable):
-      return "The bookmark store is unavailable."
     case .bookmarkRevoked(let id):
       return "Access to folder \"\(id)\" was revoked. Re-add it via Add Folder\u{2026}"
     case .bookmarkStale(let id):
       return "Bookmark for \"\(id)\" is stale. Re-add the folder and try again."
     case .daemonUnreachable:
       return "The harness daemon is not reachable. Start it and try again."
+    case .invalidProject:
+      return """
+        The selected folder is not a Git checkout with a valid HEAD.
+        Create an initial commit or choose a different folder.
+        """
     case .worktreeCreateFailed(let reason):
       return "Could not create the session worktree: \(reason)"
     case .invalidBaseRef(let ref, _):
