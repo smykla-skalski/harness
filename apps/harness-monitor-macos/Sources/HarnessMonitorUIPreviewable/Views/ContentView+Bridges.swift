@@ -65,7 +65,6 @@ struct ContentAccessibilityOverlayBridge: View {
   let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
-  let toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode
   let appChromeAccessibilityValue: String
   let toolbarBackgroundMarker: String
   let auditBuildAccessibilityValue: String?
@@ -82,10 +81,6 @@ struct ContentAccessibilityOverlayBridge: View {
             contentSession: contentSession,
             contentSessionDetail: contentSessionDetail,
             toolbarBackgroundMarker: toolbarBackgroundMarker
-          )
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
-            text: toolbarCenterpieceDisplayMode.rawValue
           )
         }
         if let auditBuildAccessibilityValue {
