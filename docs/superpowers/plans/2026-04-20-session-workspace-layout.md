@@ -6,9 +6,9 @@
 
 **Goal:** Replace the current `projects/project-{8hex}/orchestration/sessions/sess-...` layout with `sessions/<project>[-<4hex>]/<8char-sid>/{workspace/, memory/, state.json, log.jsonl, tasks/, .locks/}`. Daemon owns git-worktree lifecycle. Sockets move to a flat `<group>/sock/` namespace on macOS.
 
-**Architecture:** New `src/workspace/layout.rs` module owns path construction. New `src/workspace/worktree.rs` runs `git worktree add/remove`. Every consumer of the old path layout is rewritten in-place; old on-disk data is orphaned (project has no external users, clean cut confirmed by user). HTTP API session contract changes - this is a **major** version bump.
+**Architecture:** `src/workspace/layout.rs` owns the session path primitives, `src/workspace/project_resolver.rs` resolves project directory names, `src/workspace/worktree.rs` runs synchronous `git worktree add/remove`, and `src/workspace/socket_paths.rs` keeps socket paths short. The project-level `.origin` marker and the session-level `.origin` marker are both intentional. HTTP session responses keep the same `SessionState` family but with the new layout fields, so this is a **major** version bump.
 
-**Tech stack:** Rust 2024 (clippy pedantic), `tokio::process::Command` for git, `fd-lock` for per-origin git index lock, Swift 6 on the Monitor side for path model updates.
+**Tech stack:** Rust 2024 (clippy pedantic), synchronous `std::process::Command` for git, Swift 6 on the Monitor side for path model updates.
 
 **Version impact:** **Major** bump at the end. Persisted layout contract changes; HTTP `SessionState` wire shape changes.
 
@@ -26,9 +26,9 @@
 | `src/workspace/layout/tests.rs` | Path round-trips, collision resolver, socket budget |
 | `src/workspace/ids.rs` | `new_session_id()`, validation |
 | `src/workspace/ids/tests.rs` | Format assertions |
-| `src/workspace/project_resolver.rs` | `ProjectNameResolver` with `.origin` marker |
+| `src/workspace/project_resolver.rs` | `resolve_name()` with project-level `.origin` marker |
 | `src/workspace/project_resolver/tests.rs` | Collision + idempotency |
-| `src/workspace/worktree.rs` | `WorktreeController` (create, destroy, health) |
+| `src/workspace/worktree.rs` | `WorktreeController` (create, destroy) |
 | `src/workspace/worktree/tests.rs` | Lifecycle on scratch git repo |
 | `src/workspace/socket_paths.rs` | `session_socket()`, cross-platform logic |
 | `src/workspace/socket_paths/tests.rs` | 104-byte budget on synthetic long home |
@@ -43,16 +43,16 @@
 
 | Path | Change |
 | --- | --- |
-| `Cargo.toml` | Add `fd-lock = "4"`, `rand = "0.9"` (verify not present) |
+| `Cargo.toml` | Ensure `rand = "0.9"` is present; no `fd-lock` dependency is needed |
 | `src/workspace/mod.rs` | Register new modules; remove `project_context_dir` and friends |
 | `src/workspace/session.rs` | Remove `project_context_dir`, `session_scope_key`, `orchestration_root`, `sessions_root` - clean cut |
 | `src/workspace/compact/paths.rs` | Rewrite to use new `SessionLayout` |
 | `src/workspace/remote_kubernetes.rs` | Rewrite to use new `SessionLayout` |
 | `src/session/storage/files.rs` | Rewrite every path builder to use `SessionLayout` |
 | `src/session/storage/registry.rs` | Move `active.json` to `<sessions_root>/<project>/.active.json`; drop `is_worktree`, `worktree_name`, `recorded_from_dir` fields |
-| `src/daemon/service/direct.rs` | Wire `WorktreeController::create` on session creation |
-| `src/daemon/http/sessions.rs` | Add `DELETE /v1/sessions/{id}` handler; remove legacy `project_dir` hashing |
-| `src/daemon/protocol/session_requests.rs` | Update `SessionStartRequest` (`project_dir` still accepts a path or bookmark id - gated), update `SessionState` (new fields: `project_name`, `session_id`, `worktree_path`, `shared_path`, `origin_path`, `branch_ref`) |
+| `src/daemon/service/session_setup.rs` | Wire `WorktreeController::create` on session creation |
+| `src/daemon/http/sessions.rs` | Route `POST /v1/sessions` to session setup; `POST /v1/sessions/{id}/end` and `POST /v1/sessions/{id}/leave` remain the evidenced lifecycle endpoints |
+| `src/daemon/protocol/session_requests.rs` | `SessionStartRequest` already carries optional `base_ref`; `SessionState` carries `project_name`, `session_id`, `worktree_path`, `shared_path`, `origin_path`, `branch_ref` |
 | `src/app/cli.rs` + `src/app/cli/tests/session.rs` | Update CLI session commands + snapshots |
 | `src/mcp/registry/*` | Move socket paths to `socket_paths::session_socket()` |
 | `src/daemon/bridge/runtime.rs`, `client.rs` | Same |
@@ -61,10 +61,10 @@
 
 | Path | Change |
 | --- | --- |
-| `Sources/HarnessMonitorKit/Support/HarnessMonitorPaths.swift` | Add `sessionsRoot`, `sessionRoot`, `sessionWorktree`, `sessionShared`, `socketDirectory` |
-| `Sources/HarnessMonitorKit/Models/HarnessMonitorSessionModels.swift` | Rewrite `SessionState` shape (new fields, dropped fields) |
-| `Sources/HarnessMonitorKit/Persistence/CachedModels.swift` and V4/V5 migration | New SwiftData migration V6 for the new session model |
-| `Sources/HarnessMonitorKit/Stores/HarnessMonitorStore*.swift` | Adopt new `SessionState` fields |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Support/HarnessMonitorPaths.swift` | Add `sessionsRoot`, `sessionRoot`, `sessionWorktree`, `sessionShared`, `socketDirectory` |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models/HarnessMonitorSessionModels.swift` | Rewrite `SessionState` shape (new fields, dropped fields) |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/CachedModels.swift` and V4/V5 migration | New SwiftData migration V6 for the new session model |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/HarnessMonitorStore*.swift` | Adopt new `SessionState` fields |
 
 ---
 
@@ -594,28 +594,28 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(workspace): add socket path he
 
 ```rust
 use std::path::PathBuf;
+use std::process::Command;
 use tempfile::TempDir;
-use tokio::process::Command;
 
 use super::*;
 use crate::workspace::layout::SessionLayout;
 
-async fn init_origin_repo(tmp: &std::path::Path) {
+fn init_origin_repo(tmp: &std::path::Path) {
     Command::new("git").arg("init").arg("-q").arg(tmp)
-        .output().await.unwrap();
+        .output().unwrap();
     // Create initial commit so refs/remotes/origin/HEAD can be simulated.
     std::fs::write(tmp.join("README"), b"seed").unwrap();
     Command::new("git").current_dir(tmp)
-        .args(["add", "."]).output().await.unwrap();
+        .args(["add", "."]).output().unwrap();
     Command::new("git").current_dir(tmp)
         .args(["-c", "user.email=a@b", "-c", "user.name=a",
-               "commit", "-q", "-m", "seed"]).output().await.unwrap();
+               "commit", "-q", "-m", "seed"]).output().unwrap();
 }
 
-#[tokio::test]
-async fn creates_worktree_and_branch() {
+#[test]
+fn creates_worktree_and_branch() {
     let origin = TempDir::new().unwrap();
-    init_origin_repo(origin.path()).await;
+    init_origin_repo(origin.path());
     let sessions = TempDir::new().unwrap();
     let layout = SessionLayout {
         sessions_root: sessions.path().into(),
@@ -624,16 +624,16 @@ async fn creates_worktree_and_branch() {
     };
     std::fs::create_dir_all(layout.project_dir()).unwrap();
 
-    WorktreeController::create(origin.path(), &layout, None).await.expect("create");
+    WorktreeController::create(origin.path(), &layout, None).expect("create");
 
     assert!(layout.workspace().join("README").exists());
     assert!(layout.memory().exists());
 }
 
-#[tokio::test]
-async fn destroy_removes_worktree_and_branch() {
+#[test]
+fn destroy_removes_worktree_and_branch() {
     let origin = TempDir::new().unwrap();
-    init_origin_repo(origin.path()).await;
+    init_origin_repo(origin.path());
     let sessions = TempDir::new().unwrap();
     let layout = SessionLayout {
         sessions_root: sessions.path().into(),
@@ -641,14 +641,14 @@ async fn destroy_removes_worktree_and_branch() {
         session_id: "ab234567".into(),
     };
     std::fs::create_dir_all(layout.project_dir()).unwrap();
-    WorktreeController::create(origin.path(), &layout, None).await.unwrap();
+    WorktreeController::create(origin.path(), &layout, None).unwrap();
 
-    WorktreeController::destroy(origin.path(), &layout).await.expect("destroy");
+    WorktreeController::destroy(origin.path(), &layout).expect("destroy");
     assert!(!layout.workspace().exists());
 
     let branches = Command::new("git").current_dir(origin.path())
         .args(["branch", "--list", "harness/*"])
-        .output().await.unwrap();
+        .output().unwrap();
     assert!(std::str::from_utf8(&branches.stdout).unwrap().trim().is_empty());
 }
 ```
@@ -663,7 +663,7 @@ async fn destroy_removes_worktree_and_branch() {
 use std::path::Path;
 
 use thiserror::Error;
-use tokio::process::Command;
+use std::process::Command;
 use tracing::{info, warn};
 
 use super::layout::SessionLayout;
@@ -683,14 +683,14 @@ pub enum WorktreeError {
 pub struct WorktreeController;
 
 impl WorktreeController {
-    pub async fn create(
+    pub fn create(
         origin: &Path,
         layout: &SessionLayout,
         base_ref: Option<&str>,
     ) -> Result<(), WorktreeError> {
         let resolved_ref = match base_ref {
             Some(r) => r.to_string(),
-            None => resolve_base_ref(origin).await?,
+            None => resolve_base_ref(origin)?,
         };
         let branch = layout.branch_ref();
         let output = Command::new("git")
@@ -705,8 +705,7 @@ impl WorktreeController {
                 layout.workspace().to_string_lossy().as_ref(),
                 &resolved_ref,
             ])
-            .output()
-            .await?;
+            .output()?;
         if !output.status.success() {
             return Err(WorktreeError::CreateFailed(
                 String::from_utf8_lossy(&output.stderr).to_string(),
@@ -718,7 +717,7 @@ impl WorktreeController {
         Ok(())
     }
 
-    pub async fn destroy(
+    pub fn destroy(
         origin: &Path,
         layout: &SessionLayout,
     ) -> Result<(), WorktreeError> {
@@ -732,8 +731,7 @@ impl WorktreeController {
                 "--force",
                 layout.workspace().to_string_lossy().as_ref(),
             ])
-            .output()
-            .await?;
+            .output()?;
         if !remove.status.success() {
             let stderr = String::from_utf8_lossy(&remove.stderr);
             if !stderr.contains("not a working tree") {
@@ -759,13 +757,12 @@ impl WorktreeController {
     }
 }
 
-async fn resolve_base_ref(origin: &Path) -> Result<String, WorktreeError> {
+fn resolve_base_ref(origin: &Path) -> Result<String, WorktreeError> {
     let origin_head = Command::new("git")
         .arg("-C")
         .arg(origin)
         .args(["rev-parse", "--abbrev-ref", "origin/HEAD"])
-        .output()
-        .await?;
+        .output()?;
     if origin_head.status.success() {
         let s = String::from_utf8_lossy(&origin_head.stdout).trim().to_string();
         if !s.is_empty() && s != "HEAD" {
@@ -777,8 +774,7 @@ async fn resolve_base_ref(origin: &Path) -> Result<String, WorktreeError> {
         .arg("-C")
         .arg(origin)
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()
-        .await?;
+        .output()?;
     if !head.status.success() {
         return Err(WorktreeError::CreateFailed("no HEAD".into()));
     }
@@ -938,9 +934,9 @@ fn state_file_uses_new_layout() {
 
 - [ ] **Step 3: Implement storage rewrite**
 
-Rewrite `src/session/storage/files.rs` so every helper takes `&SessionLayout` instead of `project_dir: &Path`. Remove the `sess-YYYYMMDDHHMMSSffffff` id generator - the id is now passed in via `SessionLayout::session_id`.
+Rewrite `src/session/storage/files.rs` so every helper takes `&SessionLayout` instead of `project_dir: &Path`. Remove the old timestamp-based session id generator - the id is now passed in via `SessionLayout::session_id`.
 
-Rewrite `src/session/storage/registry.rs` to load/save `<sessions_root>/<project>/.active.json` (a bare list of active session ids for that project). Drop `is_worktree`, `worktree_name`, `recorded_from_dir` - they no longer apply since the daemon always creates worktrees.
+Rewrite `src/session/storage/registry.rs` to load/save `<sessions_root>/<project>/.active.json` (a `BTreeMap<String, String>` of session ids to creation timestamps). Drop `is_worktree`, `worktree_name`, and `recorded_from_dir` - they no longer apply since the daemon always creates worktrees.
 
 - [ ] **Step 4: Green + commit**
 
@@ -979,48 +975,52 @@ git -c commit.gpgsign=true commit -sS -a -m "refactor(protocol): new SessionStat
 ## Task 9: Wire worktree controller into session creation
 
 **Files:**
-- Modify: `src/daemon/service/direct.rs`
+- Modify: `src/daemon/service/session_setup.rs`
 
 - [ ] **Step 1: Failing test**
 
 `src/daemon/service/tests/direct_session_start.rs` - add a test that asserts session creation produces a worktree on disk:
 
 ```rust
-#[tokio::test]
-async fn session_start_creates_worktree() {
-    let origin = tempfile::TempDir::new().unwrap();
-    init_origin_repo(origin.path()).await;
-    let data_root = tempfile::TempDir::new().unwrap();
+#[test]
+fn start_session_direct_creates_worktree() {
+    with_temp_project(|project| {
+        let db = setup_db_with_project(project);
+        let state = start_session_direct(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "worktree start".into(),
+                context: "wires the worktree controller".into(),
+                runtime: "claude".into(),
+                session_id: None,
+                project_dir: project.to_string_lossy().into_owned(),
+                policy_preset: None,
+                base_ref: None,
+            },
+            Some(&db),
+        )
+        .expect("start session creates worktree");
 
-    let req = SessionStartRequest {
-        title: "t".into(),
-        context: "c".into(),
-        runtime: "claude".into(),
-        session_id: None,
-        project_dir: origin.path().display().to_string(),
-        policy_preset: None,
-    };
-    let state = start_session_direct(&data_root.path().join("harness"), req).await.unwrap().state;
-    let sessions_root = data_root.path().join("harness/sessions");
-    let project = sessions_root.join(&state.project_name);
-    assert!(project.join(&state.session_id).join("workspace/README").exists());
-    assert!(project.join(&state.session_id).join("memory").exists());
-    assert_eq!(state.branch_ref, format!("harness/{}", state.session_id));
+        assert_eq!(state.session_id.len(), 8);
+        assert_eq!(state.branch_ref, format!("harness/{}", state.session_id));
+        assert!(state.worktree_path.join("README.md").exists());
+        assert!(state.shared_path.exists());
+        assert!(state.origin_path.exists());
+    });
 }
 ```
 
 - [ ] **Step 2: Implement**
 
-Rewrite `start_session_direct` in `src/daemon/service/direct.rs` to:
+Rewrite `prepare_session` in `src/daemon/service/session_setup.rs` to:
 
-1. Resolve `project_dir` (when `sandbox::resolver::is_sandboxed()`, treat string as bookmark id and resolve via A's resolver; otherwise treat as plain path).
-2. Canonicalize path, build `ProjectNameResolver::resolve_name(...)`.
+1. Resolve `project_dir` (when sandboxed, treat the string as a bookmark id and resolve via A's resolver; otherwise treat it as a plain path).
+2. Canonicalize the path and build `resolve_name(...)` from `src/workspace/project_resolver.rs`.
 3. Generate `session_id = ids::new_session_id()`.
 4. Build `SessionLayout`.
-5. `WorktreeController::create(origin, &layout, base_ref).await?` (abort if fails).
+5. Call `WorktreeController::create(origin, &layout, request.base_ref.as_deref())` and abort if it fails.
 6. Write initial `state.json`.
 7. Register in per-project `.active.json`.
-8. Return populated `SessionState`.
+8. Return the populated `SessionState`.
 
 - [ ] **Step 3: Green + commit**
 
@@ -1031,16 +1031,16 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(daemon): create worktree per s
 
 ---
 
-## Task 10: Add DELETE /v1/sessions/{id} endpoint
+## Task 10: Future follow-up - delete session endpoint
 
 **Files:**
 - Modify: `src/daemon/http/sessions.rs`
-- Modify: `src/daemon/service/direct.rs`
+- Modify: `src/daemon/service/session_teardown.rs`
 - Modify: `src/daemon/http/tests.rs`
 
 - [ ] **Step 1: Failing test**
 
-Add to `src/daemon/http/tests.rs`:
+If a delete route is reintroduced later, add a targeted HTTP test here:
 
 ```rust
 #[tokio::test]
@@ -1055,21 +1055,13 @@ async fn delete_session_removes_worktree() {
 
 - [ ] **Step 2: Implement**
 
-In `src/daemon/http/sessions.rs`, add a route `DELETE /v1/sessions/:id` calling a new `delete_session_direct(sid)` service function. That function:
-
-1. Load `SessionState` by sid.
-2. Build `SessionLayout` from it.
-3. Call `WorktreeController::destroy(origin_path, &layout).await?`.
-4. Remove from active registry.
-5. Return 204 on success.
-
-Wire into the axum (or whatever HTTP framework) routing.
+If the route returns, the teardown path should live in `src/daemon/service/session_teardown.rs`, which best-effort destroys the worktree and removes the active registry entry while letting DB cleanup proceed.
 
 - [ ] **Step 3: Green + commit**
 
 ```bash
 cargo test --lib daemon::http
-git -c commit.gpgsign=true commit -sS -a -m "feat(daemon): add session delete endpoint"
+git -c commit.gpgsign=true commit -sS -a -m "feat(daemon): follow up on session delete endpoint"
 ```
 
 ---
@@ -1153,16 +1145,16 @@ async fn create_then_delete_cleans_up_fully() {
     assert!(layout.memory().exists());
     assert!(layout.state_file().exists());
 
-    daemon.delete_session(&sid).await;
-    assert!(!layout.session_root().exists());
+    daemon.end_session(&sid).await;
+    assert!(layout.session_root().exists(), "delete is a future follow-up; end leaves the session root in place");
     let branches = harness_testkit::git_branches_matching(origin.path(), "harness/").await;
-    assert!(branches.is_empty());
+    assert!(!branches.is_empty());
 }
 ```
 
 - [ ] **Step 2: Implement parallel_sessions.rs**
 
-Create two sessions against the same origin; assert two worktrees, two branches, and they can be removed independently without affecting each other.
+Create two sessions against the same origin; assert two worktrees, two branches, and that each session can be ended independently without affecting the other.
 
 - [ ] **Step 3: Implement collision.rs**
 
@@ -1199,12 +1191,14 @@ public extension HarnessMonitorPaths {
             .appendingPathComponent(projectName, isDirectory: true)
             .appendingPathComponent(sessionId, isDirectory: true)
     }
-    static func sessionWorktree(projectName: String, sessionId: String) -> URL {
-        sessionRoot(projectName: projectName, sessionId: sessionId)
+    static func sessionWorktree(projectName: String, sessionId: String,
+                                using env: HarnessMonitorEnvironment = .current) -> URL {
+        sessionRoot(projectName: projectName, sessionId: sessionId, using: env)
             .appendingPathComponent("workspace", isDirectory: true)
     }
-    static func sessionShared(projectName: String, sessionId: String) -> URL {
-        sessionRoot(projectName: projectName, sessionId: sessionId)
+    static func sessionShared(projectName: String, sessionId: String,
+                              using env: HarnessMonitorEnvironment = .current) -> URL {
+        sessionRoot(projectName: projectName, sessionId: sessionId, using: env)
             .appendingPathComponent("memory", isDirectory: true)
     }
     static func socketDirectory(using env: HarnessMonitorEnvironment = .current) -> URL {
@@ -1323,7 +1317,7 @@ git -c commit.gpgsign=true commit -sS -a -m "chore: bump to 28.0.0 for session l
 | Worktree-owner (daemon via subprocess) | Task 5 + Task 9 |
 | Socket paths | Task 4 + Task 11 |
 | Session service integration | Task 9 |
-| DELETE endpoint | Task 10 |
+| DELETE endpoint follow-up | Task 10 |
 | SessionState wire contract | Task 8 |
 | Storage rewrite | Task 7 |
 | Active-session registry relocation | Task 7 |
