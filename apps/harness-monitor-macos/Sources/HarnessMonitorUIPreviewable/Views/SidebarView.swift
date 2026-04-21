@@ -14,41 +14,53 @@ struct SidebarView: View {
 
   @State private var collapsedCheckoutKeys: Set<String> = []
 
+  private var profilingAttributes: [String: String] {
+    [
+      "harness.view.session_filter": controls.sessionFilter.rawValue,
+      "harness.view.focus_filter": controls.sessionFocusFilter.rawValue,
+      "harness.view.sort_order": controls.sessionSortOrder.rawValue,
+      "harness.view.filtered_sessions": "\(searchResults.filteredSessionCount)",
+      "harness.view.total_sessions": "\(searchResults.totalSessionCount)",
+    ]
+  }
+
   var body: some View {
-    SidebarSessionListColumn(
-      store: store,
-      controls: controls,
-      projection: projection,
-      searchResults: searchResults,
-      sidebarUI: sidebarUI,
-      dateTimeConfiguration: dateTimeConfiguration,
-      fontScale: fontScale,
-      collapsedCheckoutKeys: collapsedCheckoutKeys,
-      setCheckoutCollapsed: setCheckoutCollapsed
-    )
-    .listStyle(.sidebar)
-    .scrollEdgeEffectStyle(.soft, for: .top)
-    .safeAreaInset(edge: .top, spacing: 0) {
-      SidebarSearchAccessoryBar(
+    ViewBodySignposter.trace(Self.self, "SidebarView", attributes: profilingAttributes) {
+      SidebarSessionListColumn(
         store: store,
-        controls: controls
-      )
-    }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
-    }
-    .toolbar {
-      SidebarToolbarNewSessionToolbarItem(store: store)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
-    .overlay {
-      SidebarFilterStateMarker(
         controls: controls,
-        searchResults: searchResults
+        projection: projection,
+        searchResults: searchResults,
+        sidebarUI: sidebarUI,
+        dateTimeConfiguration: dateTimeConfiguration,
+        fontScale: fontScale,
+        collapsedCheckoutKeys: collapsedCheckoutKeys,
+        setCheckoutCollapsed: setCheckoutCollapsed
       )
+      .listStyle(.sidebar)
+      .scrollEdgeEffectStyle(.soft, for: .top)
+      .safeAreaInset(edge: .top, spacing: 0) {
+        SidebarSearchAccessoryBar(
+          store: store,
+          controls: controls
+        )
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
+      }
+      .toolbar {
+        SidebarToolbarNewSessionToolbarItem(store: store)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarRoot)
+      .overlay {
+        SidebarFilterStateMarker(
+          controls: controls,
+          searchResults: searchResults
+        )
+      }
     }
   }
 
