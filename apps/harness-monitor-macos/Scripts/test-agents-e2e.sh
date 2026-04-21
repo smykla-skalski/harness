@@ -318,6 +318,7 @@ TEST_ARGS=(
 
 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}" \
+  CODE_SIGNING_ALLOWED=NO \
   build-for-testing
 
 GENERATED_XCTESTRUN="$(
@@ -358,6 +359,7 @@ create_session \
 if "$XCODEBUILD_RUNNER" \
   -xctestrun "$CONFIGURED_XCTESTRUN" \
   -destination "$DESTINATION" \
+  CODE_SIGNING_ALLOWED=NO \
   test-without-building \
   "-only-testing:${ONLY_TESTING}"
 then
