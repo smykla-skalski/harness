@@ -169,9 +169,17 @@ struct ConnectionToolbarBadge: View {
 
   private static let badgeFont = Font.system(.caption, design: .rounded, weight: .semibold)
     .monospacedDigit()
+  @ScaledMetric(relativeTo: .caption)
+  private var transportLabelWidth: CGFloat = 24
+  @ScaledMetric(relativeTo: .caption)
+  private var latencyLabelWidth: CGFloat = 34
 
   private var showsConnectionDetails: Bool {
     metrics.connectedSince != nil
+  }
+
+  private var showsLatencyValue: Bool {
+    showsConnectionDetails && metrics.latencyMs != nil
   }
 
   private var transportLabel: String {
@@ -179,7 +187,13 @@ struct ConnectionToolbarBadge: View {
   }
 
   private var latencyLabel: String {
-    metrics.latencyMs.map { "\($0)ms" } ?? "--ms"
+    guard let latencyMs = metrics.latencyMs else {
+      return "--ms"
+    }
+    if latencyMs >= 1_000 {
+      return "999+"
+    }
+    return "\(latencyMs)ms"
   }
 
   private var accessibilityLabel: String {
@@ -217,13 +231,29 @@ struct ConnectionToolbarBadge: View {
           .scaledFont(Self.badgeFont)
           .foregroundStyle(statusTint)
           .lineLimit(1)
-          .fixedSize()
+          .frame(width: transportLabelWidth, alignment: .leading)
+          .opacity(1)
         Text(latencyLabel)
           .scaledFont(Self.badgeFont)
           .foregroundStyle(statusTint.opacity(0.5))
           .lineLimit(1)
-          .fixedSize()
-          .opacity(metrics.latencyMs == nil ? 0 : 1)
+          .frame(width: latencyLabelWidth, alignment: .leading)
+          .opacity(showsLatencyValue ? 1 : 0)
+      } else {
+        Text(transportLabel)
+          .scaledFont(Self.badgeFont)
+          .foregroundStyle(statusTint)
+          .lineLimit(1)
+          .frame(width: transportLabelWidth, alignment: .leading)
+          .opacity(0)
+          .accessibilityHidden(true)
+        Text(latencyLabel)
+          .scaledFont(Self.badgeFont)
+          .foregroundStyle(statusTint.opacity(0.5))
+          .lineLimit(1)
+          .frame(width: latencyLabelWidth, alignment: .leading)
+          .opacity(0)
+          .accessibilityHidden(true)
       }
     }
     .accessibilityElement(children: .ignore)
@@ -362,28 +392,6 @@ private struct SparklineGeometry {
   var stepX: Double {
     guard sampleCount > 1 else { return 0 }
     return size.width / Double(sampleCount - 1)
-  }
-}
-
-extension ConnectionQuality {
-  var themeColor: Color {
-    switch self {
-    case .excellent, .good:
-      HarnessMonitorTheme.success
-    case .degraded:
-      HarnessMonitorTheme.caution
-    case .poor, .disconnected:
-      HarnessMonitorTheme.danger
-    }
-  }
-}
-
-extension ConnectionMetrics {
-  var latencyTint: Color {
-    guard latencyMs != nil else {
-      return HarnessMonitorTheme.ink
-    }
-    return quality.themeColor
   }
 }
 

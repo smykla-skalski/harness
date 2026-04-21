@@ -5,6 +5,17 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store connection metrics")
 struct HarnessMonitorStoreMetricsTests {
+  @Test("Resetting live connection metrics does not mark the store connected before online")
+  func resettingLiveConnectionMetricsDoesNotMarkStoreConnectedBeforeOnline() {
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: RecordingHarnessClient())
+    )
+
+    store.resetConnectionMetrics(for: .webSocket)
+
+    #expect(store.connectionMetrics.connectedSince == nil)
+  }
+
   @Test("Bootstrap records a latency sample without relying on transport ping")
   func bootstrapRecordsLatencySample() async {
     let client = RecordingHarnessClient()

@@ -198,10 +198,19 @@ extension HarnessMonitorStore {
     activeTransport = transport
     connectionMetrics = .initial
     connectionMetrics.transportKind = transport
-    connectionMetrics.connectedSince = .now
     connectionMetrics.isFallback = transport == .httpSSE
     latencySamplesMs.removeAll(keepingCapacity: true)
     trafficSampleTimes.removeAll(keepingCapacity: true)
+  }
+
+  func markConnectionOnline(recordedAt: Date = .now) {
+    guard maintainsLiveDaemonObservation else {
+      return
+    }
+    guard connectionMetrics.connectedSince == nil else {
+      return
+    }
+    connectionMetrics.connectedSince = recordedAt
   }
 
   func markConnectionOffline(_ message: String) {
