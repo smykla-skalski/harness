@@ -92,9 +92,18 @@ pub fn load_session_state(
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        let layout = storage::layout_from_project_dir(project_dir, session_id)?;
-        if let Some(state) = storage::load_state(&layout)? {
-            return Ok(Some(state));
+        for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
+            if let Some(state) = storage::load_state(&layout)? {
+                return Ok(Some(state));
+            }
+        }
+    } else {
+        for layout in
+            storage::layout_candidates_from_context_root(&project.context_root, session_id)
+        {
+            if let Some(state) = storage::load_state(&layout)? {
+                return Ok(Some(state));
+            }
         }
     }
 
@@ -110,10 +119,20 @@ pub fn load_log_entries(
     session_id: &str,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        let layout = storage::layout_from_project_dir(project_dir, session_id)?;
-        let entries = storage::load_log_entries(&layout)?;
-        if !entries.is_empty() {
-            return Ok(entries);
+        for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
+            let entries = storage::load_log_entries(&layout)?;
+            if !entries.is_empty() || layout.log_file().is_file() {
+                return Ok(entries);
+            }
+        }
+    } else {
+        for layout in
+            storage::layout_candidates_from_context_root(&project.context_root, session_id)
+        {
+            let entries = storage::load_log_entries(&layout)?;
+            if !entries.is_empty() || layout.log_file().is_file() {
+                return Ok(entries);
+            }
         }
     }
     read_json_lines(
@@ -132,10 +151,20 @@ pub fn load_task_checkpoints(
     task_id: &str,
 ) -> Result<Vec<TaskCheckpoint>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        let layout = storage::layout_from_project_dir(project_dir, session_id)?;
-        let checkpoints = storage::load_task_checkpoints(&layout, task_id)?;
-        if !checkpoints.is_empty() {
-            return Ok(checkpoints);
+        for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
+            let checkpoints = storage::load_task_checkpoints(&layout, task_id)?;
+            if !checkpoints.is_empty() {
+                return Ok(checkpoints);
+            }
+        }
+    } else {
+        for layout in
+            storage::layout_candidates_from_context_root(&project.context_root, session_id)
+        {
+            let checkpoints = storage::load_task_checkpoints(&layout, task_id)?;
+            if !checkpoints.is_empty() {
+                return Ok(checkpoints);
+            }
         }
     }
     read_json_lines(
@@ -222,9 +251,14 @@ pub(super) fn list_session_ids_for_project(
 ) -> Result<Vec<String>, CliError> {
     let mut session_ids = list_session_ids_legacy(&project.context_root)?;
     if let Some(project_dir) = project.project_dir.as_deref() {
-        session_ids.extend(list_new_layout_session_ids_for_project_dir(project_dir));
+        session_ids.extend(storage::list_known_session_ids(project_dir)?);
     } else {
-        session_ids.extend(list_session_ids_new_layout());
+        let context_ids = storage::list_known_session_ids_from_context_root(&project.context_root)?;
+        if context_ids.is_empty() {
+            session_ids.extend(list_session_ids_new_layout());
+        } else {
+            session_ids.extend(context_ids);
+        }
     }
     session_ids.sort_unstable();
     session_ids.dedup();
@@ -235,9 +269,21 @@ fn list_active_session_ids_for_project(
     project: &DiscoveredProject,
 ) -> Result<Vec<String>, CliError> {
     let mut active_ids = legacy_active_session_ids(&project.context_root)?;
-    active_ids.extend(new_layout_active_session_ids(
-        project.project_dir.as_deref(),
-    )?);
+    let new_layout_ids = if let Some(project_dir) = project.project_dir.as_deref() {
+        storage::load_active_registry_for(project_dir)?
+            .sessions
+            .into_keys()
+            .collect()
+    } else {
+        let context_registry =
+            storage::load_active_registry_for_context_root(&project.context_root);
+        if context_registry.sessions.is_empty() {
+            list_active_session_ids_new_layout()
+        } else {
+            context_registry.sessions.into_keys().collect()
+        }
+    };
+    active_ids.extend(new_layout_ids);
     active_ids.sort_unstable();
     active_ids.dedup();
     Ok(active_ids)
@@ -252,26 +298,15 @@ fn legacy_active_session_ids(context_root: &Path) -> Result<Vec<String>, CliErro
     Ok(registry.sessions.into_keys().collect())
 }
 
-fn new_layout_active_session_ids(project_dir: Option<&Path>) -> Result<Vec<String>, CliError> {
+fn list_active_session_ids_new_layout() -> Vec<String> {
     let layout_root = workspace_sessions_root(&harness_data_root());
-    if let Some(dir) = project_dir {
-        let project_name =
-            dir.file_name()
-                .and_then(|name| name.to_str())
-                .ok_or_else(|| -> CliError {
-                    CliErrorKind::invalid_project_dir(dir.to_string_lossy().into_owned()).into()
-                })?;
-        return Ok(read_active_registry_at(
-            &layout_root.join(project_name).join(".active.json"),
-        ));
-    }
     let Ok(entries) = fs::read_dir(&layout_root) else {
-        return Ok(Vec::new());
+        return Vec::new();
     };
-    Ok(entries
+    entries
         .flatten()
         .flat_map(|entry| read_active_registry_at(&entry.path().join(".active.json")))
-        .collect())
+        .collect()
 }
 
 fn read_active_registry_at(path: &Path) -> Vec<String> {
@@ -292,32 +327,15 @@ fn load_session_state_for_project(
         return read_json_typed(&legacy_path).map(Some);
     }
     if let Some(project_dir) = project.project_dir.as_deref() {
-        let layout = storage::layout_from_project_dir(project_dir, session_id)?;
-        if let Some(state) = storage::load_state(&layout)? {
-            return Ok(Some(state));
+        for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
+            if let Some(state) = storage::load_state(&layout)? {
+                return Ok(Some(state));
+            }
         }
     } else {
         return load_session_state_from_context_root(&project.context_root, session_id);
     }
-    Ok(None)
-}
-
-fn list_new_layout_session_ids_for_project_dir(project_dir: &Path) -> Vec<String> {
-    let layout_root = workspace_sessions_root(&harness_data_root());
-    let Some(project_name) = project_dir.file_name().and_then(|n| n.to_str()) else {
-        return Vec::new();
-    };
-    let project_bucket = layout_root.join(project_name);
-    let Ok(entries) = fs::read_dir(&project_bucket) else {
-        return Vec::new();
-    };
-    let mut ids = Vec::new();
-    for entry in entries.flatten() {
-        if entry.file_type().ok().is_some_and(|kind| kind.is_dir()) {
-            ids.push(entry.file_name().to_string_lossy().to_string());
-        }
-    }
-    ids
+    load_session_state_from_context_root(&project.context_root, session_id)
 }
 
 fn list_session_ids_legacy(context_root: &Path) -> Result<Vec<String>, CliError> {
@@ -374,6 +392,12 @@ fn load_session_state_from_context_root(
     let legacy_path = session_state_path(context_root, session_id);
     if legacy_path.is_file() {
         return read_json_typed(&legacy_path).map(Some);
+    }
+
+    for layout in storage::layout_candidates_from_context_root(context_root, session_id) {
+        if let Some(state) = storage::load_state(&layout)? {
+            return Ok(Some(state));
+        }
     }
 
     // Scope the new-layout lookup to the specific project bucket using the

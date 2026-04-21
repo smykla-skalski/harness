@@ -14,6 +14,13 @@ pub fn adopt_session_record(
 ) -> Result<(), CliError> {
     let canonical_origin = &outcome.state.origin_path;
     session_storage::record_project_origin(canonical_origin)?;
+    if let Some(external_origin) = outcome.external_origin.as_deref() {
+        session_storage::record_adopted_session_root(
+            canonical_origin,
+            &outcome.state.session_id,
+            external_origin,
+        )?;
+    }
     let project = index::discovered_project_for_checkout(canonical_origin);
     db.sync_project(&project)?;
     let project_id = project.project_id;
@@ -39,6 +46,13 @@ pub(crate) async fn adopt_session_record_async(
 ) -> Result<(), CliError> {
     let canonical_origin = &outcome.state.origin_path;
     session_storage::record_project_origin(canonical_origin)?;
+    if let Some(external_origin) = outcome.external_origin.as_deref() {
+        session_storage::record_adopted_session_root(
+            canonical_origin,
+            &outcome.state.session_id,
+            external_origin,
+        )?;
+    }
     let project = index::discovered_project_for_checkout(canonical_origin);
     async_db.sync_project(&project).await?;
     let project_id = project.project_id;
