@@ -12,6 +12,8 @@ private struct HarnessMonitorSheetMetrics {
       Self(minWidth: 420, idealWidth: 500, minHeight: 300)
     case .newSession:
       Self(minWidth: 480, idealWidth: 560, minHeight: 360)
+    case .attachExternal:
+      Self(minWidth: 480, idealWidth: 560, minHeight: 360)
     }
   }
 }
@@ -45,6 +47,8 @@ struct HarnessMonitorSheetRouter: View {
       } else {
         NewSessionOfflinePlaceholder(store: store)
       }
+    case .attachExternal(let bookmarkID, let preview):
+      AttachSessionSheetView(store: store, bookmarkID: bookmarkID, preview: preview)
     }
   }
 
