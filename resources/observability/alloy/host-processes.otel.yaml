@@ -1,0 +1,69 @@
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:10104
+
+receivers:
+  hostmetrics:
+    collection_interval: 15s
+    scrapers:
+      processes:
+      process:
+        include:
+          match_type: regexp
+          names:
+            - "^harness$"
+            - "^Harness Monitor$"
+            - "^Docker Desktop$"
+            - "^Cursor$"
+            - "^Code$"
+            - "^iTerm2$"
+            - "^Terminal$"
+            - "^Slack$"
+            - "^firefox$"
+            - "^Google Chrome$"
+            - "^zed$"
+        mute_process_all_errors: true
+        metrics:
+          process.cpu.utilization:
+            enabled: true
+          process.open_file_descriptors:
+            enabled: true
+          process.threads:
+            enabled: true
+          process.uptime:
+            enabled: true
+
+processors:
+  resource/process_cardinality:
+    attributes:
+      - key: process.pid
+        action: delete
+      - key: process.parent_pid
+        action: delete
+      - key: process.command
+        action: delete
+      - key: process.command_line
+        action: delete
+      - key: process.executable.path
+        action: delete
+  batch:
+    timeout: 10s
+
+exporters:
+  prometheus:
+    endpoint: 127.0.0.1:10103
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  extensions:
+    - health_check
+  pipelines:
+    metrics:
+      receivers:
+        - hostmetrics
+      processors:
+        - resource/process_cardinality
+        - batch
+      exporters:
+        - prometheus

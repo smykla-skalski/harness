@@ -8,7 +8,17 @@ DARWIN_EXPORTER_CONFIG="/etc/darwin-exporter/config.yml"
 DARWIN_EXPORTER_PLIST="/Library/LaunchDaemons/io.darwin-exporter.plist"
 DARWIN_EXPORTER_PORT="${DARWIN_EXPORTER_PORT:-10102}"
 
+ALLOY_BIN="${ALLOY_BIN:-$(command -v alloy 2>/dev/null || printf '%s' /opt/homebrew/bin/alloy)}"
 ALLOY_CONFIG="/opt/homebrew/etc/alloy/config.alloy"
+ALLOY_PROCESS_CONFIG_SOURCE="$ROOT/resources/observability/alloy/host-processes.otel.yaml"
+ALLOY_PROCESS_CONFIG="/opt/homebrew/etc/alloy/harness-host-processes.otel.yaml"
+ALLOY_PROCESS_LABEL="io.harness.alloy-host-processes"
+ALLOY_PROCESS_PLIST="$HOME/Library/LaunchAgents/${ALLOY_PROCESS_LABEL}.plist"
+ALLOY_PROCESS_PORT="10103"
+ALLOY_PROCESS_HEALTH_URL="http://127.0.0.1:10104"
+ALLOY_PROCESS_LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/harness/observability"
+ALLOY_PROCESS_LOG="$ALLOY_PROCESS_LOG_DIR/alloy-host-processes.log"
+ALLOY_PROCESS_ERR="$ALLOY_PROCESS_LOG_DIR/alloy-host-processes.err"
 PROMETHEUS_URL="${HARNESS_PROMETHEUS_URL:-http://127.0.0.1:9090}"
 
 require_macos() {
@@ -24,6 +34,66 @@ require_tool() {
     printf 'required tool not found: %s\n' "$tool" >&2
     exit 1
   fi
+}
+
+copy_alloy_process_config() {
+  if [ ! -f "$ALLOY_PROCESS_CONFIG_SOURCE" ]; then
+    printf 'missing Alloy host-process config source at %s\n' "$ALLOY_PROCESS_CONFIG_SOURCE" >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$ALLOY_PROCESS_CONFIG")"
+  cp "$ALLOY_PROCESS_CONFIG_SOURCE" "$ALLOY_PROCESS_CONFIG"
+  alloy otel validate --config "file:${ALLOY_PROCESS_CONFIG}" >/dev/null
+  printf 'wrote Alloy host-process config to %s\n' "$ALLOY_PROCESS_CONFIG"
+}
+
+write_alloy_process_plist() {
+  mkdir -p "$(dirname "$ALLOY_PROCESS_PLIST")" "$ALLOY_PROCESS_LOG_DIR"
+  cat >"$ALLOY_PROCESS_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${ALLOY_PROCESS_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${ALLOY_BIN}</string>
+        <string>otel</string>
+        <string>--config</string>
+        <string>file:${ALLOY_PROCESS_CONFIG}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${ALLOY_PROCESS_LOG}</string>
+    <key>StandardErrorPath</key>
+    <string>${ALLOY_PROCESS_ERR}</string>
+</dict>
+</plist>
+EOF
+}
+
+load_alloy_process_exporter() {
+  launchctl unload "$ALLOY_PROCESS_PLIST" 2>/dev/null || true
+  launchctl load "$ALLOY_PROCESS_PLIST"
+}
+
+unload_alloy_process_exporter() {
+  launchctl unload "$ALLOY_PROCESS_PLIST" 2>/dev/null || true
+}
+
+install_alloy_process_exporter() {
+  require_tool alloy
+
+  copy_alloy_process_config
+  write_alloy_process_plist
+  load_alloy_process_exporter
+
+  printf 'alloy host-process exporter installed and listening on port %s\n' "$ALLOY_PROCESS_PORT"
 }
 
 install_alloy() {
@@ -172,6 +242,7 @@ unload_darwin_exporter() {
 install_all() {
   require_macos
   install_alloy
+  install_alloy_process_exporter
   install_darwin_exporter
   printf '\nhost metrics installation complete\n'
   show_status
@@ -182,6 +253,10 @@ uninstall_all() {
 
   printf 'stopping alloy...\n'
   brew services stop grafana/grafana/alloy 2>/dev/null || true
+
+  printf 'stopping Alloy host-process exporter...\n'
+  unload_alloy_process_exporter
+  rm -f "$ALLOY_PROCESS_PLIST" "$ALLOY_PROCESS_CONFIG" "$ALLOY_PROCESS_LOG" "$ALLOY_PROCESS_ERR"
 
   printf 'stopping darwin-exporter...\n'
   unload_darwin_exporter
@@ -195,6 +270,8 @@ start_services() {
   require_macos
   printf 'starting alloy...\n'
   brew services start grafana/grafana/alloy || true
+  printf 'starting Alloy host-process exporter...\n'
+  load_alloy_process_exporter || true
   printf 'starting darwin-exporter...\n'
   load_darwin_exporter || true
   printf 'host metrics services started\n'
@@ -204,6 +281,8 @@ stop_services() {
   require_macos
   printf 'stopping alloy...\n'
   brew services stop grafana/grafana/alloy 2>/dev/null || true
+  printf 'stopping Alloy host-process exporter...\n'
+  unload_alloy_process_exporter
   printf 'stopping darwin-exporter...\n'
   unload_darwin_exporter
   printf 'host metrics services stopped\n'
@@ -227,6 +306,23 @@ show_status() {
     printf 'status: stopped\n'
   fi
 
+  printf '\n=== Alloy Host Processes ===\n'
+  if launchctl list 2>/dev/null | grep -q "$ALLOY_PROCESS_LABEL"; then
+    local pid
+    pid="$(launchctl list | grep "$ALLOY_PROCESS_LABEL" | awk '{print $1}')"
+    if [ "$pid" != "-" ] && [ -n "$pid" ]; then
+      printf 'status: running (pid %s)\n' "$pid"
+    else
+      printf 'status: loaded but not running\n'
+    fi
+    printf 'config: %s\n' "$ALLOY_PROCESS_CONFIG"
+    printf 'metrics: http://127.0.0.1:%s/metrics\n' "$ALLOY_PROCESS_PORT"
+    printf 'health: %s\n' "$ALLOY_PROCESS_HEALTH_URL"
+    printf 'logs: %s\n' "$ALLOY_PROCESS_LOG"
+  else
+    printf 'status: not installed\n'
+  fi
+
   printf '\n=== darwin-exporter ===\n'
   if sudo launchctl list 2>/dev/null | grep -q "io.darwin-exporter"; then
     local pid
@@ -246,7 +342,7 @@ show_status() {
   printf '\n=== Prometheus Targets ===\n'
   if curl -fsS "$PROMETHEUS_URL/-/healthy" >/dev/null 2>&1; then
     curl -fsS "$PROMETHEUS_URL/api/v1/targets" 2>/dev/null \
-      | jq -r '.data.activeTargets[] | select(.labels.job | test("darwin|integrations/unix")) | "\(.labels.job): \(.health)"' 2>/dev/null \
+      | jq -r '.data.activeTargets[] | select(.labels.job | test("darwin|integrations/unix|alloy-host-processes")) | "\(.labels.job): \(.health)"' 2>/dev/null \
       || printf 'could not query targets\n'
   else
     printf 'prometheus not reachable at %s\n' "$PROMETHEUS_URL"
@@ -268,6 +364,31 @@ show_metrics() {
   load1="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=node_load1" 2>/dev/null \
     | jq -r '.data.result[0].value[1] // "N/A"' 2>/dev/null || echo "N/A")"
   printf 'Load (1m): %s\n' "$load1"
+
+  printf '\n=== Process Metrics (Alloy OTel) ===\n'
+  local running_processes
+  running_processes="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=sum(system_processes_count%7Bstatus%3D%22running%22%7D)" 2>/dev/null \
+    | jq -r '.data.result[0].value[1] // "N/A"' 2>/dev/null || echo "N/A")"
+  printf 'Running processes: %s\n' "$running_processes"
+
+  local tracked_process_groups
+  tracked_process_groups="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=count(count%20by%20(process_executable_name)(process_memory_usage_bytes))" 2>/dev/null \
+    | jq -r '.data.result[0].value[1] // "N/A"' 2>/dev/null || echo "N/A")"
+  printf 'Tracked process groups: %s\n' "$tracked_process_groups"
+
+  local top_rss_name top_rss_value
+  top_rss_name="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=topk(1%2Csum%20by%20(process_executable_name)(process_memory_usage_bytes))" 2>/dev/null \
+    | jq -r '.data.result[0].metric.process_executable_name // "N/A"' 2>/dev/null || echo "N/A")"
+  top_rss_value="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=topk(1%2Csum%20by%20(process_executable_name)(process_memory_usage_bytes))" 2>/dev/null \
+    | jq -r '.data.result[0].value[1] // "N/A"' 2>/dev/null || echo "N/A")"
+  printf 'Top tracked RSS: %s (%s bytes)\n' "$top_rss_name" "$top_rss_value"
+
+  local top_cpu_name top_cpu_value
+  top_cpu_name="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=topk(1%2Csum%20by%20(process_executable_name)(process_cpu_utilization_ratio%7Bstate%3D~%22system%7Cuser%22%7D))" 2>/dev/null \
+    | jq -r '.data.result[0].metric.process_executable_name // "N/A"' 2>/dev/null || echo "N/A")"
+  top_cpu_value="$(curl -fsS "$PROMETHEUS_URL/api/v1/query?query=topk(1%2Csum%20by%20(process_executable_name)(process_cpu_utilization_ratio%7Bstate%3D~%22system%7Cuser%22%7D))" 2>/dev/null \
+    | jq -r '.data.result[0].value[1] // "N/A"' 2>/dev/null || echo "N/A")"
+  printf 'Top tracked CPU: %s (%s)\n' "$top_cpu_name" "$top_cpu_value"
 
   printf '\n=== macOS Metrics (darwin-exporter) ===\n'
   local cpu_temp
@@ -295,6 +416,8 @@ show_logs() {
   require_macos
   printf '=== Alloy logs ===\n'
   tail -20 /opt/homebrew/var/log/alloy.log 2>/dev/null || printf 'no alloy logs\n'
+  printf '\n=== Alloy host-process exporter logs ===\n'
+  tail -20 "$ALLOY_PROCESS_LOG" 2>/dev/null || printf 'no Alloy host-process exporter logs\n'
   printf '\n=== darwin-exporter logs ===\n'
   tail -20 /tmp/darwin-exporter.log 2>/dev/null || printf 'no darwin-exporter logs\n'
 }
@@ -335,7 +458,7 @@ case "$command" in
 usage: scripts/host-metrics.sh <install|uninstall|start|stop|restart|status|metrics|logs|build-darwin-exporter>
 
 commands:
-  install              Install and start Alloy and darwin-exporter
+  install              Install and start Alloy, the Alloy host-process exporter, and darwin-exporter
   uninstall            Stop and remove host metrics services
   start                Start host metrics services
   stop                 Stop host metrics services
