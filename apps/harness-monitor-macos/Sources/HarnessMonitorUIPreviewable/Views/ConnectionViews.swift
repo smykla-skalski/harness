@@ -206,61 +206,68 @@ struct ConnectionToolbarBadge: View {
     return "Connection: \(metrics.transportKind.title)"
   }
 
-  private var qualityColor: Color {
-    if metrics.connectedSince != nil, metrics.latencyMs == nil {
-      return HarnessMonitorTheme.success
-    }
-    return metrics.quality.themeColor
-  }
-
   private var statusTint: Color {
     metrics.latencyTint
   }
 
+  private var profilingAttributes: [String: String] {
+    [
+      "harness.view.transport": metrics.transportKind.rawValue,
+      "harness.view.has_connection_details": showsConnectionDetails ? "true" : "false",
+      "harness.view.has_latency": showsLatencyValue ? "true" : "false",
+    ]
+  }
+
   var body: some View {
-    HStack(spacing: 4) {
-      ActivityPulse(
-        isActive: showsConnectionDetails,
-        outerSize: 14,
-        innerSize: 6,
-        activeColor: statusTint
-      )
-      .accessibilityHidden(true)
-      if showsConnectionDetails {
-        Text(transportLabel)
-          .scaledFont(Self.badgeFont)
-          .foregroundStyle(statusTint)
-          .lineLimit(1)
-          .frame(width: transportLabelWidth, alignment: .leading)
-          .opacity(1)
-        Text(latencyLabel)
-          .scaledFont(Self.badgeFont)
-          .foregroundStyle(statusTint.opacity(0.5))
-          .lineLimit(1)
-          .frame(width: latencyLabelWidth, alignment: .leading)
-          .opacity(showsLatencyValue ? 1 : 0)
-      } else {
-        Text(transportLabel)
-          .scaledFont(Self.badgeFont)
-          .foregroundStyle(statusTint)
-          .lineLimit(1)
-          .frame(width: transportLabelWidth, alignment: .leading)
-          .opacity(0)
-          .accessibilityHidden(true)
-        Text(latencyLabel)
-          .scaledFont(Self.badgeFont)
-          .foregroundStyle(statusTint.opacity(0.5))
-          .lineLimit(1)
-          .frame(width: latencyLabelWidth, alignment: .leading)
-          .opacity(0)
-          .accessibilityHidden(true)
+    ViewBodySignposter.trace(
+      Self.self,
+      "ConnectionToolbarBadge",
+      attributes: profilingAttributes
+    ) {
+      HStack(spacing: 4) {
+        ActivityPulse(
+          isActive: showsConnectionDetails,
+          outerSize: 14,
+          innerSize: 6,
+          activeColor: statusTint
+        )
+        .accessibilityHidden(true)
+        if showsConnectionDetails {
+          Text(transportLabel)
+            .scaledFont(Self.badgeFont)
+            .foregroundStyle(statusTint)
+            .lineLimit(1)
+            .frame(width: transportLabelWidth, alignment: .leading)
+            .opacity(1)
+          Text(latencyLabel)
+            .scaledFont(Self.badgeFont)
+            .foregroundStyle(statusTint.opacity(0.5))
+            .lineLimit(1)
+            .frame(width: latencyLabelWidth, alignment: .leading)
+            .opacity(showsLatencyValue ? 1 : 0)
+        } else {
+          Text(transportLabel)
+            .scaledFont(Self.badgeFont)
+            .foregroundStyle(statusTint)
+            .lineLimit(1)
+            .frame(width: transportLabelWidth, alignment: .leading)
+            .opacity(0)
+            .accessibilityHidden(true)
+          Text(latencyLabel)
+            .scaledFont(Self.badgeFont)
+            .foregroundStyle(statusTint.opacity(0.5))
+            .lineLimit(1)
+            .frame(width: latencyLabelWidth, alignment: .leading)
+            .opacity(0)
+            .accessibilityHidden(true)
+        }
       }
+      .accessibilityElement(children: .ignore)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.connectionBadge)
+      .accessibilityLabel(accessibilityLabel)
+      .harnessUITestValue("chrome=glass-static")
+      .help(accessibilityLabel)
     }
-    .accessibilityElement(children: .ignore)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.connectionBadge)
-    .accessibilityLabel(accessibilityLabel)
-    .harnessUITestValue("chrome=glass-static")
-    .help(accessibilityLabel)
   }
 }
 

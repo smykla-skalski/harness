@@ -1,6 +1,21 @@
 import HarnessMonitorKit
 import SwiftUI
 
+extension HarnessMonitorStore.ConnectionState {
+  var profilingLabel: String {
+    switch self {
+    case .idle:
+      "idle"
+    case .connecting:
+      "connecting"
+    case .online:
+      "online"
+    case .offline:
+      "offline"
+    }
+  }
+}
+
 struct ContentCenterpieceToolbar: ToolbarContent {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
@@ -181,6 +196,14 @@ struct ToolbarCenterpieceView: View {
   private static let statusLeadingInset: CGFloat = 12
   private static let daemonTrailingInset: CGFloat = 10
 
+  private var profilingAttributes: [String: String] {
+    [
+      "harness.view.display_mode": displayMode.rawValue,
+      "harness.view.status_message_count": "\(statusMessages.count)",
+      "harness.view.connection_state": connectionState.profilingLabel,
+    ]
+  }
+
   init(
     model: ToolbarCenterpieceModel,
     displayMode: ToolbarCenterpieceDisplayMode,
@@ -196,27 +219,33 @@ struct ToolbarCenterpieceView: View {
   }
 
   var body: some View {
-    ZStack {
-      Color.clear
-        .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceFrame)
+    ViewBodySignposter.trace(
+      Self.self,
+      "ToolbarCenterpieceView",
+      attributes: profilingAttributes
+    ) {
+      ZStack {
+        Color.clear
+          .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarCenterpieceFrame)
 
-      HStack(spacing: 0) {
-        Spacer(minLength: 0)
+        HStack(spacing: 0) {
+          Spacer(minLength: 0)
 
-        if !statusMessages.isEmpty {
-          ToolbarStatusTickerCapsule(
-            messages: statusMessages
-          ) {
-            EmptyView()
+          if !statusMessages.isEmpty {
+            ToolbarStatusTickerCapsule(
+              messages: statusMessages
+            ) {
+              EmptyView()
+            }
+            .frame(width: displayMode.statusDropdownWidth(for: availableDetailWidth))
+            .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
           }
-          .frame(width: displayMode.statusDropdownWidth(for: availableDetailWidth))
-          .accessibilityFrameMarker(HarnessMonitorAccessibility.toolbarStatusTickerFrame)
-        }
 
-        daemonStatusDot
+          daemonStatusDot
+        }
+        .padding(.leading, Self.statusLeadingInset)
+        .padding(.trailing, Self.daemonTrailingInset)
       }
-      .padding(.leading, Self.statusLeadingInset)
-      .padding(.trailing, Self.daemonTrailingInset)
     }
     .frame(
       width: displayMode.centerpieceWidth(for: availableDetailWidth),
