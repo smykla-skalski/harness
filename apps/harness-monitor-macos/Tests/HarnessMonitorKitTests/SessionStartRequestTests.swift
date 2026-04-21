@@ -1,5 +1,6 @@
-@testable import HarnessMonitorKit
 import XCTest
+
+@testable import HarnessMonitorKit
 
 final class SessionStartRequestTests: XCTestCase {
   func testEncodesSnakeCase() throws {

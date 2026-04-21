@@ -61,7 +61,9 @@ public struct SessionDiscoveryProbe: Sendable {
     do {
       data = try Data(contentsOf: stateURL)
     } catch {
-      throw Failure.notAHarnessSession(reason: "cannot read state.json: \(error.localizedDescription)")
+      throw Failure.notAHarnessSession(
+        reason: "cannot read state.json: \(error.localizedDescription)"
+      )
     }
 
     struct RawState: Decodable {
@@ -85,23 +87,34 @@ public struct SessionDiscoveryProbe: Sendable {
     do {
       raw = try JSONDecoder().decode(RawState.self, from: data)
     } catch {
-      throw Failure.notAHarnessSession(reason: "malformed state.json: \(error.localizedDescription)")
+      throw Failure.notAHarnessSession(
+        reason: "malformed state.json: \(error.localizedDescription)"
+      )
     }
     guard raw.schemaVersion == supportedSchemaVersion else {
-      throw Failure.unsupportedSchemaVersion(found: raw.schemaVersion, supported: supportedSchemaVersion)
+      throw Failure.unsupportedSchemaVersion(
+        found: raw.schemaVersion,
+        supported: supportedSchemaVersion
+      )
     }
     var isDir: ObjCBool = false
     let workspace = url.appendingPathComponent("workspace")
-    guard FileManager.default.fileExists(atPath: workspace.path, isDirectory: &isDir), isDir.boolValue else {
+    guard
+      FileManager.default.fileExists(atPath: workspace.path, isDirectory: &isDir),
+      isDir.boolValue
+    else {
       throw Failure.notAHarnessSession(reason: "missing workspace/")
     }
     let memory = url.appendingPathComponent("memory")
-    guard FileManager.default.fileExists(atPath: memory.path, isDirectory: &isDir), isDir.boolValue else {
+    guard
+      FileManager.default.fileExists(atPath: memory.path, isDirectory: &isDir),
+      isDir.boolValue
+    else {
       throw Failure.notAHarnessSession(reason: "missing memory/")
     }
     let originMarkerURL = url.appendingPathComponent(".origin")
     guard let markerData = try? Data(contentsOf: originMarkerURL),
-          let rawMarker = String(data: markerData, encoding: .utf8)
+      let rawMarker = String(data: markerData, encoding: .utf8)
     else {
       throw Failure.notAHarnessSession(reason: "missing .origin")
     }
