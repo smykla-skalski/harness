@@ -52,6 +52,38 @@ struct BackgroundThumbnailCacheTests {
     #expect(Set(await cache.fullImageMemoryCache.keys) == Set([secondFullKey]))
     #expect(await cache.fullImageMemoryCache[firstFullKey] == nil)
   }
+
+  @Test(
+    "Disk cache writes thumbnails into a noindex directory and removes legacy indexed thumbnails"
+  )
+  func diskCacheUsesNoIndexDirectoryAndRemovesLegacyIndexedThumbnails() async {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let cacheDirectory = root.appendingPathComponent("cache.noindex/thumbnails", isDirectory: true)
+    let legacyDirectory = root.appendingPathComponent("cache/thumbnails", isDirectory: true)
+    try? FileManager.default.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+    try? Data("legacy".utf8).write(
+      to: legacyDirectory.appendingPathComponent("legacy.txt"),
+      options: .atomic
+    )
+
+    let cache = BackgroundThumbnailCache(
+      cacheDirectory: cacheDirectory,
+      maxPixelSize: 64,
+      thumbnailMemoryLimit: 2,
+      fullImageMemoryLimit: 1
+    )
+    let selection = HarnessMonitorBackgroundSelection.bundledLibrary[0]
+
+    _ = await cache.thumbnail(for: selection)
+
+    let key = await cache.cacheKey(for: selection)
+    let thumbnailURL = cacheDirectory.appendingPathComponent("\(key).jpg")
+
+    #expect(thumbnailURL.path.contains("/cache.noindex/thumbnails/"))
+    #expect(FileManager.default.fileExists(atPath: thumbnailURL.path))
+    #expect(FileManager.default.fileExists(atPath: legacyDirectory.path) == false)
+  }
 }
 
 @Suite("Background gallery prefetch plan")

@@ -58,10 +58,14 @@ extension BackgroundThumbnailCache {
   }
 
   func saveToDiskCache(image: CGImage, key: String, sourceMtime: TimeInterval?) {
+    let fileManager = FileManager.default
+    let legacyDirectories = indexedLegacyCacheDirectory().map { [$0] } ?? []
+
     do {
-      try FileManager.default.createDirectory(
-        at: cacheDirectory,
-        withIntermediateDirectories: true
+      try HarnessMonitorPaths.prepareGeneratedCacheDirectory(
+        cacheDirectory,
+        cleaningLegacyDirectories: legacyDirectories,
+        fileManager: fileManager
       )
     } catch {
       diskCacheLog.warning("Failed to create cache directory: \(error)")
@@ -87,20 +91,33 @@ extension BackgroundThumbnailCache {
 
     do {
       try jpegData.write(to: tmpJPEG, options: .atomic)
-      _ = try FileManager.default.replaceItemAt(jpegURL, withItemAt: tmpJPEG)
+      _ = try fileManager.replaceItemAt(jpegURL, withItemAt: tmpJPEG)
     } catch {
       diskCacheLog.warning("Failed to write thumbnail: \(error)")
-      try? FileManager.default.removeItem(at: tmpJPEG)
+      try? fileManager.removeItem(at: tmpJPEG)
       return
     }
 
     let metaContent = sourceMtime.map { String($0) } ?? "bundled"
     do {
       try metaContent.write(to: tmpMeta, atomically: true, encoding: .utf8)
-      _ = try FileManager.default.replaceItemAt(metaURL, withItemAt: tmpMeta)
+      _ = try fileManager.replaceItemAt(metaURL, withItemAt: tmpMeta)
     } catch {
       diskCacheLog.warning("Failed to write meta: \(error)")
-      try? FileManager.default.removeItem(at: tmpMeta)
+      try? fileManager.removeItem(at: tmpMeta)
     }
+  }
+
+  private func indexedLegacyCacheDirectory() -> URL? {
+    let noIndexRoot = cacheDirectory.deletingLastPathComponent()
+    guard cacheDirectory.lastPathComponent == "thumbnails",
+      noIndexRoot.lastPathComponent == "cache.noindex"
+    else {
+      return nil
+    }
+
+    return noIndexRoot.deletingLastPathComponent()
+      .appendingPathComponent("cache", isDirectory: true)
+      .appendingPathComponent("thumbnails", isDirectory: true)
   }
 }
