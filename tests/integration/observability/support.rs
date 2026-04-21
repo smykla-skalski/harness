@@ -20,7 +20,8 @@ pub(super) fn load_dashboard(name: &str) -> Value {
         .join("resources/observability/grafana/dashboards")
         .join(name);
     let content = fs::read_to_string(&path).unwrap();
-    serde_json::from_str(&content).unwrap()
+    let dashboard: Value = serde_json::from_str(&content).unwrap();
+    dashboard.get("spec").cloned().unwrap_or(dashboard)
 }
 
 pub(super) fn load_yaml_file<T>(relative_path: &str) -> T
