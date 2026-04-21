@@ -10,6 +10,9 @@ use super::model::{
 
 pub(super) fn load_skill_sources(repo_root: &Path) -> Result<Vec<SkillDefinition>, CliError> {
     let root = repo_root.join(SKILLS_ROOT);
+    if !root.is_dir() {
+        return Ok(Vec::new());
+    }
     let mut skills = Vec::new();
     for entry in root.read_dir().map_err(|error| io_err(&error))? {
         let entry = entry.map_err(|error| io_err(&error))?;
@@ -112,4 +115,18 @@ pub(super) fn discover_plugin_sources(root: &Path) -> Result<Vec<PluginSource>, 
     plugins.sort_by(|a, b| a.name.cmp(&b.name));
     plugins.dedup_by(|a, b| a.name == b.name);
     Ok(plugins)
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use super::load_skill_sources;
+
+    #[test]
+    fn load_skill_sources_returns_empty_when_shared_skills_root_is_missing() {
+        let tmp = TempDir::new().expect("tempdir");
+        let skills = load_skill_sources(tmp.path()).expect("missing skills root should be allowed");
+        assert!(skills.is_empty());
+    }
 }
