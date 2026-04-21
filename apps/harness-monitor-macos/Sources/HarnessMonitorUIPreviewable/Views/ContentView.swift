@@ -61,9 +61,17 @@ public struct ContentView<CornerContent: View>: View {
     )
   }
 
+  private var effectiveShowInspector: Bool {
+    ContentInspectorStartupPresentation.resolve(
+      hydratedPresentation: showInspector,
+      persistedPreference: persistedShowInspector,
+      hasHydratedPersistedPreference: hasHydratedInspectorVisibility
+    )
+  }
+
   private var inspectorPresentationBinding: Binding<Bool> {
     Binding(
-      get: { showInspector },
+      get: { effectiveShowInspector },
       set: { newValue in
         applyInspectorVisibilityChange(to: newValue, source: .framework)
       }
@@ -230,7 +238,7 @@ public struct ContentView<CornerContent: View>: View {
       contentSessionDetail: contentSessionDetail,
       contentToolbar: contentToolbar,
       dashboardUI: contentDashboard,
-      showInspector: showInspector,
+      showInspector: effectiveShowInspector,
       setInspectorVisibility: applyInspectorVisibilityChange,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
       onDetailColumnWidthChange: updateDetailColumnWidth
@@ -301,7 +309,7 @@ public struct ContentView<CornerContent: View>: View {
 
   private func updateInspectorWidth(_ width: CGFloat) {
     guard !isLayoutAnimating,
-      showInspector,
+      effectiveShowInspector,
       width >= HarnessMonitorInspectorLayout.minWidth,
       width <= HarnessMonitorInspectorLayout.maxWidth
     else {
@@ -332,10 +340,7 @@ public struct ContentView<CornerContent: View>: View {
       return
     }
     hasHydratedInspectorVisibility = true
-    applyInspectorVisibilityChange(
-      to: persistedShowInspector,
-      source: .persistedPreference
-    )
+    showInspector = persistedShowInspector
   }
 
   private func enableStartupFocusParticipation() {
