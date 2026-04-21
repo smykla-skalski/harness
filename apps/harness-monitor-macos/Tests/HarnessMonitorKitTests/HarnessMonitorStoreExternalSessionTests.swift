@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @MainActor
 @Suite("Harness Monitor store external sessions")
@@ -54,6 +55,87 @@ struct HarnessMonitorStoreExternalSessionTests {
       )
     )
     #expect(client.readCallCount(.sessionDetail(adoptedSummary.sessionId)) == 1)
+  }
+
+  @Test("Diagnostics snapshot tracks attached external session count and last successful attach")
+  func diagnosticsSnapshotTracksSuccessfulAttach() async throws {
+    let adoptedSummary = SessionSummary(
+      projectId: "project-a",
+      projectName: "demo",
+      projectDir: "/Users/example/Projects/demo",
+      contextRoot: "/Users/example/Library/Application Support/harness/projects/project-a",
+      sessionId: "sess-external",
+      worktreePath: "/tmp/sess-external/workspace",
+      sharedPath: "/tmp/sess-external/memory",
+      originPath: "/Users/example/Projects/demo",
+      branchRef: "harness/sess-external",
+      title: "External Session",
+      context: "Imported attach lane",
+      status: .active,
+      createdAt: "2026-04-20T12:00:00Z",
+      updatedAt: "2026-04-20T12:00:00Z",
+      lastActivityAt: "2026-04-20T12:00:00Z",
+      leaderId: "leader-external",
+      observeId: "observe-external",
+      pendingLeaderTransfer: nil,
+      externalOrigin: "/tmp/sess-external",
+      adoptedAt: "2026-04-20T12:00:00Z",
+      metrics: SessionMetrics(
+        agentCount: 2,
+        activeAgentCount: 2,
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+    let adoptedDetail = makeSessionDetail(
+      summary: adoptedSummary,
+      workerID: "worker-external",
+      workerName: "Worker External"
+    )
+    let client = RecordingHarnessClient(detail: adoptedDetail)
+    client.configureSessions(
+      summaries: [PreviewFixtures.summary],
+      detailsByID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail]
+    )
+    let store = await makeBootstrappedStore(client: client)
+    let preview = SessionDiscoveryProbe.Preview(
+      sessionId: adoptedSummary.sessionId,
+      projectName: adoptedSummary.projectName,
+      title: adoptedSummary.title,
+      createdAt: Date(timeIntervalSince1970: 0),
+      originPath: adoptedSummary.originPath,
+      originReachable: true,
+      sessionRoot: URL(fileURLWithPath: "/tmp/sess-external")
+    )
+
+    await store.adoptExternalSession(bookmarkID: "B-external", preview: preview)
+
+    let snapshot = PreferencesDiagnosticsSnapshot(store: store)
+    #expect(intField(named: "externalSessionCount", in: snapshot) == 1)
+    #expect(
+      stringField(named: "lastExternalSessionAttachOutcome", in: snapshot)
+        == "Attached session sess-external."
+    )
+    #expect(boolField(named: "lastExternalSessionAttachSucceeded", in: snapshot) == true)
+  }
+
+  @Test("Diagnostics snapshot tracks the last failed attach attempt")
+  func diagnosticsSnapshotTracksFailedAttachAttempt() async throws {
+    let store = await makeBootstrappedStore()
+
+    await store.handleAttachSessionPicker(
+      .failure(NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError))
+    )
+
+    let snapshot = PreferencesDiagnosticsSnapshot(store: store)
+    #expect(intField(named: "externalSessionCount", in: snapshot) == 0)
+    #expect(
+      stringField(named: "lastExternalSessionAttachOutcome", in: snapshot)?
+        .contains("Could not open session folder:") == true
+    )
+    #expect(boolField(named: "lastExternalSessionAttachSucceeded", in: snapshot) == false)
   }
 
   @Test("Importing an external session folder presents the attach sheet")
@@ -138,4 +220,16 @@ struct HarnessMonitorStoreExternalSessionTests {
 
     #expect(store.attachSessionRequest == 1)
   }
+}
+
+private func intField<T>(named name: String, in value: T) -> Int? {
+  Mirror(reflecting: value).children.first { $0.label == name }?.value as? Int
+}
+
+private func stringField<T>(named name: String, in value: T) -> String? {
+  Mirror(reflecting: value).children.first { $0.label == name }?.value as? String
+}
+
+private func boolField<T>(named name: String, in value: T) -> Bool? {
+  Mirror(reflecting: value).children.first { $0.label == name }?.value as? Bool
 }

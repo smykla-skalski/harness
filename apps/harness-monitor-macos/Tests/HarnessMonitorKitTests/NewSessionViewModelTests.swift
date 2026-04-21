@@ -185,6 +185,30 @@ struct NewSessionViewModelTests {
     #expect(reason.contains("create session worktree"))
   }
 
+  @Test("400 response with no HEAD maps to invalidProject")
+  func http400WithNoHeadMapsToInvalidProject() async {
+    let apiError = HarnessMonitorAPIError.server(
+      code: 400,
+      message: "create session worktree: worktree create failed: no HEAD"
+    )
+    let spyClient = SpyHarnessClient(error: apiError)
+    let vm = makeViewModel(
+      client: spyClient,
+      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
+    )
+    vm.title = "Test"
+    vm.selectedBookmarkId = "B-x"
+
+    let result = await vm.submit()
+
+    guard case .failure(.invalidProject(let reason)) = result else {
+      Issue.record("Expected invalidProject, got \(result)")
+      return
+    }
+    #expect(reason.contains("no HEAD"))
+    #expect(vm.lastError == .invalidProject(reason: reason))
+  }
+
   // MARK: - BookmarkStoreError mapping
 
   @Test("BookmarkStoreError.unresolvable maps to bookmarkRevoked")

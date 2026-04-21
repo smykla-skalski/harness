@@ -1,6 +1,16 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  public struct ExternalSessionAttachOutcome: Equatable, Sendable {
+    public let message: String
+    public let succeeded: Bool
+
+    public init(message: String, succeeded: Bool) {
+      self.message = message
+      self.succeeded = succeeded
+    }
+  }
+
   public enum ConnectionState: Equatable {
     case idle
     case connecting
