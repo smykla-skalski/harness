@@ -81,6 +81,24 @@ final class SessionDiscoveryProbeTests: XCTestCase {
       XCTAssertEqual(reason, "missing origin_path")
     }
   }
+
+  func testProbeReportsTypedOriginMismatch() async throws {
+    let fixture = try SessionProbeFixture.makeValid()
+    try fixture.rewriteField("origin_path", to: "/Users/me/src/other")
+    let probe = SessionDiscoveryProbe(existingSessionIDs: [])
+
+    do {
+      _ = try await probe.probe(url: fixture.url)
+      XCTFail("expected typed origin mismatch")
+    } catch let failure as SessionDiscoveryProbe.Failure {
+      guard case .belongsToAnotherProject(let expected, let found) = failure else {
+        XCTFail("wrong failure: \(failure)")
+        return
+      }
+      XCTAssertEqual(expected, "/Users/me/src/kuma")
+      XCTAssertEqual(found, "/Users/me/src/other")
+    }
+  }
 }
 
 struct SessionProbeFixture {

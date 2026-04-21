@@ -6,7 +6,9 @@ extension HarnessMonitorStore {
     preview: SessionDiscoveryProbe.Preview
   ) async {
     guard let client else {
-      presentFailureFeedback("Daemon client unavailable.")
+      let message = "Daemon client unavailable."
+      recordExternalSessionAttachOutcome(message: message, succeeded: false)
+      presentFailureFeedback(message)
       return
     }
     do {
@@ -17,14 +19,20 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.store.info(
         "adopted external session \(summary.sessionId, privacy: .public)"
       )
+      let message = "Attached session \(summary.sessionId)."
+      recordExternalSessionAttachOutcome(message: message, succeeded: true)
       dismissSheet()
       await refresh(using: client, preserveSelection: false)
       await selectSession(summary.sessionId)
-      presentSuccessFeedback("Attach external session")
+      presentSuccessFeedback(message)
     } catch let apiError as HarnessMonitorAPIError {
-      presentFailureFeedback(apiError.errorDescription ?? "Adopt failed.")
+      let message = apiError.errorDescription ?? "Adopt failed."
+      recordExternalSessionAttachOutcome(message: message, succeeded: false)
+      presentFailureFeedback(message)
     } catch {
-      presentFailureFeedback("Adopt failed: \(error.localizedDescription)")
+      let message = "Adopt failed: \(error.localizedDescription)"
+      recordExternalSessionAttachOutcome(message: message, succeeded: false)
+      presentFailureFeedback(message)
     }
   }
 

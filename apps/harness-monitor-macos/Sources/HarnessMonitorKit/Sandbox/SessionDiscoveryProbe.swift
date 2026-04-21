@@ -155,7 +155,7 @@ public struct SessionDiscoveryProbe: Sendable {
       throw Failure.notAHarnessSession(reason: "missing origin_path")
     }
     guard marker == statedOrigin else {
-      throw Failure.notAHarnessSession(reason: "origin mismatch")
+      throw Failure.belongsToAnotherProject(expected: marker, found: statedOrigin)
     }
     return statedOrigin
   }

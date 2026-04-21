@@ -14,7 +14,9 @@ extension HarnessMonitorStore {
     case .success(let urls):
       guard let url = urls.first else { return }
       guard let bookmarks = bookmarkStore else {
-        presentFailureFeedback("Bookmark store unavailable: app group container missing")
+        let message = "Bookmark store unavailable: app group container missing"
+        recordExternalSessionAttachOutcome(message: message, succeeded: false)
+        presentFailureFeedback(message)
         return
       }
       let existingIDs = Set(sessions.map(\.sessionId))
@@ -27,13 +29,26 @@ extension HarnessMonitorStore {
         }
         presentedSheet = .attachExternal(bookmarkId: record.id, preview: preview)
       } catch let failure as SessionDiscoveryProbe.Failure {
-        presentFailureFeedback(failureSummary(failure))
+        let message = failureSummary(failure)
+        recordExternalSessionAttachOutcome(message: message, succeeded: false)
+        presentFailureFeedback(message)
       } catch {
-        presentFailureFeedback("Could not attach session: \(error.localizedDescription)")
+        let message = "Could not attach session: \(error.localizedDescription)"
+        recordExternalSessionAttachOutcome(message: message, succeeded: false)
+        presentFailureFeedback(message)
       }
     case .failure(let error):
-      presentFailureFeedback("Could not open session folder: \(error.localizedDescription)")
+      let message = "Could not open session folder: \(error.localizedDescription)"
+      recordExternalSessionAttachOutcome(message: message, succeeded: false)
+      presentFailureFeedback(message)
     }
+  }
+
+  func recordExternalSessionAttachOutcome(message: String, succeeded: Bool) {
+    lastExternalSessionAttachOutcome = ExternalSessionAttachOutcome(
+      message: message,
+      succeeded: succeeded
+    )
   }
 }
 

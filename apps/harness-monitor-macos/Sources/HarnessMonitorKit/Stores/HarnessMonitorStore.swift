@@ -17,6 +17,7 @@ public final class HarnessMonitorStore {
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
+  public var lastExternalSessionAttachOutcome: ExternalSessionAttachOutcome?
 
   public var persistenceError: String? {
     didSet {
