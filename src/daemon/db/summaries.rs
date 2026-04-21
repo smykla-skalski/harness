@@ -401,6 +401,10 @@ impl SessionSummaryRow {
             leader_id: state.leader_id,
             observe_id: state.observe_id,
             pending_leader_transfer,
+            external_origin: state
+                .external_origin
+                .map(|path| path.to_string_lossy().into_owned()),
+            adopted_at: state.adopted_at,
             metrics: state.metrics,
         })
     }

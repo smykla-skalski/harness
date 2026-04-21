@@ -190,6 +190,77 @@ fn session_detail_includes_signals_observer_and_cache() {
 }
 
 #[test]
+fn snapshot_summary_and_detail_preserve_adoption_metadata() {
+    let tmp = tempdir().expect("tempdir");
+    temp_env::with_vars(
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
+        || {
+            let context_root = tmp.path().join("harness/projects/project-adopted");
+            let session_id = "sess-adopted";
+            let state_path = context_root
+                .join("orchestration")
+                .join("sessions")
+                .join(session_id)
+                .join("state.json");
+            seed_snapshot_fixture(&context_root, session_id);
+
+            let mut state = sample_state(session_id);
+            state.external_origin = Some("/external/session-root".into());
+            state.adopted_at = Some("2026-04-20T02:03:04Z".into());
+            write_json(&state_path, &state);
+
+            let summaries = session_summaries(true).expect("session summaries");
+            let detail = session_detail(session_id).expect("session detail");
+            let resolved = index::resolve_session(session_id).expect("resolve session");
+            let detail_from_resolved =
+                session_detail_from_resolved(&resolved).expect("resolved detail");
+            let db = DaemonDb::open_in_memory().expect("open db");
+            db.sync_project(&resolved.project).expect("sync project");
+            db.sync_session(&resolved.project.project_id, &resolved.state)
+                .expect("sync session");
+            let detail_from_db =
+                session_detail_from_resolved_with_db(&resolved, &db).expect("db detail");
+
+            assert_eq!(
+                summaries[0].external_origin.as_deref(),
+                Some("/external/session-root")
+            );
+            assert_eq!(
+                summaries[0].adopted_at.as_deref(),
+                Some("2026-04-20T02:03:04Z")
+            );
+            assert_eq!(
+                detail.session.external_origin.as_deref(),
+                Some("/external/session-root")
+            );
+            assert_eq!(
+                detail.session.adopted_at.as_deref(),
+                Some("2026-04-20T02:03:04Z")
+            );
+            assert_eq!(
+                detail_from_resolved.session.external_origin.as_deref(),
+                Some("/external/session-root")
+            );
+            assert_eq!(
+                detail_from_resolved.session.adopted_at.as_deref(),
+                Some("2026-04-20T02:03:04Z")
+            );
+            assert_eq!(
+                detail_from_db.session.external_origin.as_deref(),
+                Some("/external/session-root")
+            );
+            assert_eq!(
+                detail_from_db.session.adopted_at.as_deref(),
+                Some("2026-04-20T02:03:04Z")
+            );
+        },
+    );
+}
+
+#[test]
 fn session_detail_applies_shared_agent_and_task_ordering() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(

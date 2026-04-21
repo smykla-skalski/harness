@@ -1,5 +1,16 @@
 use super::*;
 
+fn set_adoption_metadata(project: &Path, session_id: &str) {
+    let layout =
+        crate::session::storage::layout_from_project_dir(project, session_id).expect("layout");
+    crate::session::storage::update_state(&layout, |state| {
+        state.external_origin = Some("/external/session-root".into());
+        state.adopted_at = Some("2026-04-20T02:03:04Z".into());
+        Ok(())
+    })
+    .expect("update adoption metadata");
+}
+
 #[test]
 fn session_detail_promotes_live_worker_and_hides_dead_leader() {
     with_temp_project(|project| {
@@ -128,6 +139,82 @@ fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
                 .expect("promoted agent");
             assert_eq!(promoted.runtime, "codex");
             assert_eq!(promoted.role, SessionRole::Leader);
+        });
+    });
+}
+
+#[test]
+fn db_session_reads_preserve_adoption_metadata() {
+    with_temp_project(|project| {
+        let fixture = setup_session_with_worker_logs(
+            project,
+            "daemon adopted metadata db",
+            "daemon-adopted-metadata-db",
+        );
+        set_adoption_metadata(project, &fixture.state.session_id);
+
+        let db = setup_db_with_session(project, &fixture.state.session_id);
+        let summary = list_sessions(true, Some(&db))
+            .expect("session summaries")
+            .into_iter()
+            .find(|summary| summary.session_id == fixture.state.session_id)
+            .expect("summary");
+        let detail = session_detail(&fixture.state.session_id, Some(&db)).expect("session detail");
+
+        assert_eq!(
+            summary.external_origin.as_deref(),
+            Some("/external/session-root")
+        );
+        assert_eq!(summary.adopted_at.as_deref(), Some("2026-04-20T02:03:04Z"));
+        assert_eq!(
+            detail.session.external_origin.as_deref(),
+            Some("/external/session-root")
+        );
+        assert_eq!(
+            detail.session.adopted_at.as_deref(),
+            Some("2026-04-20T02:03:04Z")
+        );
+    });
+}
+
+#[test]
+fn async_session_reads_preserve_adoption_metadata() {
+    with_temp_project(|project| {
+        let fixture = setup_session_with_worker_logs(
+            project,
+            "daemon adopted metadata async",
+            "daemon-adopted-metadata-async",
+        );
+        set_adoption_metadata(project, &fixture.state.session_id);
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let async_db = setup_async_db_with_session(project, &fixture.state.session_id).await;
+            clear_session_liveness_refresh_cache_entry(&fixture.state.session_id);
+
+            let summary = list_sessions_async(true, Some(async_db.as_ref()))
+                .await
+                .expect("session summaries")
+                .into_iter()
+                .find(|summary| summary.session_id == fixture.state.session_id)
+                .expect("summary");
+            let detail = session_detail_async(&fixture.state.session_id, Some(async_db.as_ref()))
+                .await
+                .expect("session detail");
+
+            assert_eq!(
+                summary.external_origin.as_deref(),
+                Some("/external/session-root")
+            );
+            assert_eq!(summary.adopted_at.as_deref(), Some("2026-04-20T02:03:04Z"));
+            assert_eq!(
+                detail.session.external_origin.as_deref(),
+                Some("/external/session-root")
+            );
+            assert_eq!(
+                detail.session.adopted_at.as_deref(),
+                Some("2026-04-20T02:03:04Z")
+            );
         });
     });
 }
