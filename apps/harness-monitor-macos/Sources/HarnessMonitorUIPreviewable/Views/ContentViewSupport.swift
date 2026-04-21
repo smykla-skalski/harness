@@ -218,9 +218,12 @@ public struct ContentDetailColumn: View {
   public let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   public let showInspector: Bool
+  public let layoutSuppressionPhase: Int
   public let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
   public let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  public let onDetailColumnWidthChange: (CGFloat) -> Void
+  @State private var toolbarLayoutState = ToolbarCenterpieceLayoutState()
+  @State private var isToolbarLayoutAnimating = false
+  @State private var toolbarLayoutSuppressionTask: Task<Void, Never>?
 
   public init(
     store: HarnessMonitorStore,
@@ -232,9 +235,9 @@ public struct ContentDetailColumn: View {
     contentToolbar: HarnessMonitorStore.ContentToolbarSlice,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
     showInspector: Bool,
+    layoutSuppressionPhase: Int,
     setInspectorVisibility: @escaping (Bool, ContentInspectorVisibilitySource) -> Void,
-    toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration,
-    onDetailColumnWidthChange: @escaping (CGFloat) -> Void
+    toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   ) {
     self.store = store
     self.toast = toast
@@ -245,9 +248,9 @@ public struct ContentDetailColumn: View {
     self.contentToolbar = contentToolbar
     self.dashboardUI = dashboardUI
     self.showInspector = showInspector
+    self.layoutSuppressionPhase = layoutSuppressionPhase
     self.setInspectorVisibility = setInspectorVisibility
     self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
-    self.onDetailColumnWidthChange = onDetailColumnWidthChange
   }
 
   private var navigationTitleText: String {
@@ -256,6 +259,14 @@ public struct ContentDetailColumn: View {
 
   private var navigationSubtitleText: String? {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
+  }
+
+  private var toolbarLayoutWidth: CGFloat {
+    toolbarLayoutState.toolbarLayoutWidth
+  }
+
+  private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
+    toolbarLayoutState.displayMode
   }
 
   private var statusBackdropDetail: SessionDetail? {
@@ -278,7 +289,7 @@ public struct ContentDetailColumn: View {
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
     } action: { width in
-      onDetailColumnWidthChange(width)
+      toolbarLayoutState.recordMeasurement(width, isSuppressed: isToolbarLayoutAnimating)
     }
     .background(alignment: .topLeading) {
       if let detail = statusBackdropDetail {
@@ -289,6 +300,12 @@ public struct ContentDetailColumn: View {
       }
     }
     .toolbar {
+      ContentCenterpieceToolbarItems(
+        store: store,
+        toolbarUI: contentToolbar,
+        displayMode: toolbarCenterpieceDisplayMode,
+        availableDetailWidth: toolbarLayoutWidth
+      )
       ContentPrimaryToolbarItems(
         store: store,
         toolbarUI: contentToolbar,
@@ -298,6 +315,9 @@ public struct ContentDetailColumn: View {
     }
     .navigationTitle(navigationTitleText)
     .navigationSubtitle(navigationSubtitleText ?? "")
+    .onChange(of: layoutSuppressionPhase) { _, _ in
+      suppressToolbarLayoutGeometry()
+    }
     .onChange(of: selection.inspectorSelection) { _, newValue in
       if newValue != .none, !showInspector {
         setInspectorVisibility(true, .contextualAutoOpen)
@@ -333,6 +353,20 @@ public struct ContentDetailColumn: View {
         return .handled
       }
       return .ignored
+    }
+  }
+
+  private func suppressToolbarLayoutGeometry() {
+    toolbarLayoutSuppressionTask?.cancel()
+    isToolbarLayoutAnimating = true
+    toolbarLayoutSuppressionTask = Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(400))
+      guard !Task.isCancelled else {
+        return
+      }
+      toolbarLayoutState.flushPendingMeasurement()
+      isToolbarLayoutAnimating = false
+      toolbarLayoutSuppressionTask = nil
     }
   }
 }

@@ -184,6 +184,62 @@ public enum ToolbarCenterpieceDisplayMode: String {
   }
 }
 
+public struct ToolbarCenterpieceLayoutState: Equatable {
+  public var detailColumnWidth: CGFloat
+  public var stabilizedDisplayMode: ToolbarCenterpieceDisplayMode?
+  public var pendingDetailColumnWidth: CGFloat?
+
+  public init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    self.detailColumnWidth = ContentToolbarLayoutWidth.initialValue(environment: environment)
+    self.stabilizedDisplayMode = nil
+    self.pendingDetailColumnWidth = nil
+  }
+
+  public var toolbarLayoutWidth: CGFloat {
+    ContentToolbarLayoutWidth.normalized(detailColumnWidth)
+  }
+
+  public var displayMode: ToolbarCenterpieceDisplayMode {
+    ToolbarCenterpieceDisplayMode.resolve(
+      current: stabilizedDisplayMode,
+      detailWidth: toolbarLayoutWidth
+    )
+  }
+
+  public mutating func recordMeasurement(_ width: CGFloat, isSuppressed: Bool) {
+    let nextWidth = ContentToolbarLayoutWidth.normalized(width)
+    if isSuppressed {
+      if abs(nextWidth - (pendingDetailColumnWidth ?? detailColumnWidth)) >= 1 {
+        pendingDetailColumnWidth = nextWidth
+      }
+      return
+    }
+
+    applyMeasurement(nextWidth)
+  }
+
+  public mutating func flushPendingMeasurement() {
+    guard let pendingDetailColumnWidth else {
+      return
+    }
+    applyMeasurement(pendingDetailColumnWidth)
+  }
+
+  private mutating func applyMeasurement(_ nextWidth: CGFloat) {
+    guard abs(nextWidth - detailColumnWidth) >= 1 else {
+      pendingDetailColumnWidth = nil
+      return
+    }
+
+    pendingDetailColumnWidth = nil
+    detailColumnWidth = nextWidth
+    stabilizedDisplayMode = ToolbarCenterpieceDisplayMode.resolve(
+      current: stabilizedDisplayMode,
+      detailWidth: nextWidth
+    )
+  }
+}
+
 struct ToolbarCenterpieceView: View {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
@@ -252,6 +308,12 @@ struct ToolbarCenterpieceView: View {
       height: Self.toolbarHeight
     )
     .offset(x: displayMode.principalHorizontalOffset)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.toolbarCenterpieceMode,
+        text: displayMode.rawValue
+      )
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
     .accessibilityLabel(model.accessibilityLabel)
