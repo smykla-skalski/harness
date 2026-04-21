@@ -22,6 +22,13 @@ public enum HarnessMonitorAppGroup {
 }
 
 public enum HarnessMonitorPaths {
+  public static func generatedCacheRoot(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.harnessRoot(using: environment)
+      .appendingPathComponent("cache.noindex", isDirectory: true)
+  }
+
   public static func sharedObservabilityConfigURL(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
@@ -175,9 +182,37 @@ public enum HarnessMonitorPaths {
   public static func thumbnailCacheRoot(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
-    Self.harnessRoot(using: environment)
-      .appendingPathComponent("cache", isDirectory: true)
+    Self.generatedCacheRoot(using: environment)
       .appendingPathComponent("thumbnails", isDirectory: true)
+  }
+
+  public static func notificationCacheRoot(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.generatedCacheRoot(using: environment)
+      .appendingPathComponent("notifications", isDirectory: true)
+  }
+
+  public static func prepareGeneratedCacheDirectory(
+    _ directory: URL,
+    cleaningLegacyDirectories legacyDirectories: [URL] = [],
+    fileManager: FileManager = .default
+  ) throws {
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+    var resourceValues = URLResourceValues()
+    resourceValues.isExcludedFromBackup = true
+    var mutableDirectory = directory
+    try mutableDirectory.setResourceValues(resourceValues)
+
+    let targetDirectory = directory.standardizedFileURL
+    for legacyDirectory in legacyDirectories.map(\.standardizedFileURL)
+    where
+      legacyDirectory != targetDirectory
+      && fileManager.fileExists(atPath: legacyDirectory.path)
+    {
+      try fileManager.removeItem(at: legacyDirectory)
+    }
   }
 
   public static var launchAgentPlistName: String {
