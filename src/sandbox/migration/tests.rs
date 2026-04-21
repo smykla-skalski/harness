@@ -46,6 +46,19 @@ fn skips_when_old_absent() {
 }
 
 #[test]
+fn returns_already_migrated_when_old_and_new_roots_match() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().join("shared/harness");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("state.json"), b"{}").unwrap();
+
+    let outcome = migrate(&root, &root).unwrap();
+    assert!(matches!(outcome, MigrationOutcome::AlreadyMigrated));
+    assert!(root.join("state.json").exists());
+    assert!(!root.join(".migrated-from").exists());
+}
+
+#[test]
 fn preserves_symlinks_on_cross_volume_fallback() {
     // Simulate the copy_recursive path directly (cross-volume rename
     // requires distinct mount points which we cannot fabricate here).
