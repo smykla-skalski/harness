@@ -140,4 +140,7 @@ pub enum SessionTransition {
         agent_id: String,
         result: AckResult,
     },
+    SessionAdopted {
+        session_id: String,
+    },
 }

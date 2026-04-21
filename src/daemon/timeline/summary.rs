@@ -88,6 +88,11 @@ pub(super) fn transition_summary(
                 idled.len()
             ),
         ),
+        SessionTransition::SessionAdopted { session_id } => (
+            "session_adopted",
+            None,
+            format!("Session adopted: {session_id}"),
+        ),
     }
 }
 
