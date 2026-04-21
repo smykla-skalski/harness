@@ -222,12 +222,17 @@ fn merge_project_origin_preserves_existing_git_identity() {
             recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
             repository_root: None,
             checkout_root: None,
+            adopted_session_roots: Default::default(),
             recorded_at: "2026-04-10T10:00:00Z".to_string(),
         },
         Some(&ProjectOriginRecord {
             recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
             repository_root: Some("/repo".to_string()),
             checkout_root: Some("/repo/.claude/worktrees/feature".to_string()),
+            adopted_session_roots: std::collections::BTreeMap::from([(
+                "abc12345".to_string(),
+                "/tmp/external/demo/abc12345".to_string(),
+            )]),
             recorded_at: "2026-04-10T09:00:00Z".to_string(),
         }),
     );
@@ -236,5 +241,12 @@ fn merge_project_origin_preserves_existing_git_identity() {
     assert_eq!(
         merged.checkout_root.as_deref(),
         Some("/repo/.claude/worktrees/feature")
+    );
+    assert_eq!(
+        merged
+            .adopted_session_roots
+            .get("abc12345")
+            .map(std::string::String::as_str),
+        Some("/tmp/external/demo/abc12345")
     );
 }
