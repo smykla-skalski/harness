@@ -27,33 +27,33 @@ None. The Rust surface is one field added to an existing struct plus a one-line 
 | Path | Change |
 | --- | --- |
 | `src/daemon/protocol/session_requests.rs` | Add `base_ref: Option<String>` field (serde-default, skip-if-none) to `SessionStartRequest`. |
-| `src/daemon/service/session_setup.rs` | Pass `request.base_ref.as_deref()` into `WorktreeController::create` instead of `None`. |
-| `src/daemon/service/tests/direct_session_start.rs` | Extend existing test to cover `base_ref = Some("main")` and assert the worktree is on that branch. |
+| `src/daemon/service/session_setup.rs` | Verify `request.base_ref.as_deref()` is passed into `WorktreeController::create`; keep the current call-site wiring intact. |
+| `src/daemon/service/tests/direct_session_start.rs` | Extend existing test coverage to confirm `base_ref = Some("main")` lands the worktree on that branch. |
 | `src/daemon/http/tests.rs` (or equivalent integration test file) | Add an HTTP-round-trip test posting `base_ref` and asserting the response state carries `branch_ref == "harness/<sid>"` while the worktree HEAD resolves to the requested base. |
 
 ### New Swift files
 
 | Path | Responsibility |
 | --- | --- |
-| `Sources/HarnessMonitorKit/Models/SessionStartRequest.swift` | `SessionStartRequest` Swift wire struct with snake-case keys. |
-| `Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift` | Validation, submit, error classification. |
-| `Sources/HarnessMonitorUIPreviewable/Views/NewSessionSheetView.swift` | SwiftUI sheet UI. |
-| `Sources/HarnessMonitor/Commands/NewSessionCommand.swift` | File menu command, `Cmd+N`. |
-| `Tests/HarnessMonitorKitTests/NewSessionViewModelTests.swift` | Unit tests for validation and submit. |
-| `Tests/HarnessMonitorKitTests/NewSessionAPIClientTests.swift` | Unit tests for the API client method against a mocked transport. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models/SessionStartRequest.swift` | `SessionStartRequest` Swift wire struct with snake-case keys. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift` | Validation, submit, error classification. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/NewSessionSheetView.swift` | SwiftUI sheet UI. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/NewSessionCommand.swift` | File menu command, `Cmd+N`. |
+| `apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/NewSessionViewModelTests.swift` | Unit tests for validation and submit. |
+| `apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/NewSessionAPIClientTests.swift` | Unit tests for the API client method against a mocked transport. |
 
 ### Modified Swift files
 
 | Path | Change |
 | --- | --- |
-| `Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+Enums.swift` | Add `.newSession` case to `PresentedSheet`. |
-| `Sources/HarnessMonitorKit/API/HarnessMonitorClientProtocol.swift` | Add `startSession(request:)` protocol method. |
-| `Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient.swift` | Implement `startSession(request:)`. |
-| `Sources/HarnessMonitorKit/Support/PreviewHarnessClient.swift` | Stub implementation returning a fixture `SessionSummary`. |
-| `Tests/HarnessMonitorKitTests/RecordingHarnessClient.swift` | Record + replay for `startSession`. |
-| `Sources/HarnessMonitor/App/HarnessMonitorApp.swift` | Wire `NewSessionCommand` and `.sheet(item:)` bound to `.newSession`. |
-| `Sources/HarnessMonitor/App/HarnessMonitorAppCommands.swift` | No-op or sibling changes for the File menu arrangement. |
-| `Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift` | Add `newSessionSheet*` identifier family. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+Enums.swift` | Add `.newSession` case to `PresentedSheet`. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorClientProtocol.swift` | Add `startSession(request:)` protocol method. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Sessions.swift` | Implement `startSession(request:)`. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Support/PreviewHarnessClient.swift` | Stub implementation returning a fixture `SessionSummary`. |
+| `apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/RecordingHarnessClient.swift` | Record + replay for `startSession`. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorApp.swift` | Register `NewSessionCommand`; the `.newSession` sheet route is handled by `HarnessMonitorSheetRouter`. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorAppCommands.swift` | No-op or sibling changes for the File menu arrangement. |
+| `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift` | Add `newSessionSheet*` identifier family. |
 | `apps/harness-monitor-macos/project.yml` | Register the five new Swift files. Regenerate project with `Scripts/generate-project.sh`. |
 
 ---
@@ -117,7 +117,7 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(protocol): add base_ref to ses
 
 ---
 
-## Task 2: Rust daemon - wire base_ref through session_setup
+## Task 2: Rust daemon - verify base_ref wiring in session_setup
 
 **Files:**
 - Modify: `src/daemon/service/session_setup.rs`
@@ -125,42 +125,7 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(protocol): add base_ref to ses
 
 - [ ] **Step 1: Failing test**
 
-Extend the existing `direct_session_start` coverage to assert the base_ref is honored:
-
-```rust
-#[tokio::test]
-async fn session_start_honors_custom_base_ref() {
-    use tokio::process::Command;
-    let origin = init_repo_with_branches(&["main", "experimental"]).await;
-    let req = SessionStartRequest {
-        title: "t".into(),
-        context: "c".into(),
-        runtime: "claude".into(),
-        session_id: None,
-        project_dir: origin.path().display().to_string(),
-        policy_preset: None,
-        base_ref: Some("experimental".into()),
-    };
-    let state = start_session_direct_async(&req, &db).await.expect("start").state;
-    let head = Command::new("git")
-        .current_dir(&state.worktree_path)
-        .args(["rev-parse", "--abbrev-ref", "HEAD@{upstream}"])
-        .output().await.ok();
-    let log_head = Command::new("git")
-        .current_dir(&state.worktree_path)
-        .args(["log", "-1", "--format=%s", "experimental"])
-        .output().await.unwrap();
-    assert!(log_head.status.success());
-    // Branch harness/<sid> was created off experimental
-    let commits = Command::new("git")
-        .current_dir(origin.path())
-        .args(["log", &state.branch_ref, "-1", "--format=%H"])
-        .output().await.unwrap();
-    assert!(commits.status.success());
-}
-```
-
-Fixture helper `init_repo_with_branches` can live in `tests/support.rs` if not already present. Keep it narrow.
+Extend the existing `direct_session_start` coverage to assert the base_ref is honored. The current tree already forwards `request.base_ref.as_deref()` in `session_setup.rs`, so this step is a regression check rather than a code-path discovery exercise.
 
 - [ ] **Step 2: Red**
 
@@ -168,11 +133,11 @@ Fixture helper `init_repo_with_branches` can live in `tests/support.rs` if not a
 cargo test --lib daemon::service::tests::direct_session_start
 ```
 
-Test must compile but fail because `session_setup.rs` passes `None` unconditionally.
+If you are backporting this plan to an older branch, make sure the test fails until `session_setup.rs` forwards `request.base_ref` into `WorktreeController::create(...)`.
 
 - [ ] **Step 3: Implement**
 
-In `src/daemon/service/session_setup.rs` around the existing `WorktreeController::create` call:
+In `src/daemon/service/session_setup.rs`, keep the existing `WorktreeController::create` call wired to `request.base_ref.as_deref()`:
 
 ```rust
 WorktreeController::create(&canonical_origin, &layout, request.base_ref.as_deref())
@@ -244,12 +209,12 @@ git -c commit.gpgsign=true commit -sS -a -m "test(daemon): cover base_ref over H
 ## Task 4: Swift protocol type - SessionStartRequest
 
 **Files:**
-- Create: `Sources/HarnessMonitorKit/Models/SessionStartRequest.swift`
+- Create: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models/SessionStartRequest.swift`
 - Modify: `project.yml`
 
 - [ ] **Step 1: Failing test**
 
-`Tests/HarnessMonitorKitTests/SessionStartRequestTests.swift`:
+`apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/SessionStartRequestTests.swift`:
 
 ```swift
 import XCTest
@@ -353,11 +318,11 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(kit): add SessionStartRequest 
 ## Task 5: Swift API client - startSession method
 
 **Files:**
-- Modify: `Sources/HarnessMonitorKit/API/HarnessMonitorClientProtocol.swift`
-- Modify: `Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient.swift`
-- Modify: `Sources/HarnessMonitorKit/Support/PreviewHarnessClient.swift`
-- Modify: `Tests/HarnessMonitorKitTests/RecordingHarnessClient.swift`
-- Create: `Tests/HarnessMonitorKitTests/NewSessionAPIClientTests.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorClientProtocol.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Sessions.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Support/PreviewHarnessClient.swift`
+- Modify: `apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/RecordingHarnessClient.swift`
+- Create: `apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/NewSessionAPIClientTests.swift`
 - Modify: `project.yml`
 
 - [ ] **Step 1: Failing test**
@@ -403,8 +368,8 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(kit): add startSession API cli
 ## Task 6: NewSessionViewModel
 
 **Files:**
-- Create: `Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift`
-- Create: `Tests/HarnessMonitorKitTests/NewSessionViewModelTests.swift`
+- Create: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift`
+- Create: `apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/NewSessionViewModelTests.swift`
 - Modify: `project.yml`
 
 - [ ] **Step 1: Failing tests**
@@ -441,11 +406,11 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(kit): add NewSessionViewModel"
 ## Task 7: PresentedSheet case + store helper
 
 **Files:**
-- Modify: `Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+Enums.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+Enums.swift`
 
 - [ ] **Step 1: Failing test**
 
-`Tests/HarnessMonitorKitTests/PresentedSheetTests.swift`:
+`apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/PresentedSheetTests.swift`:
 
 ```swift
 func testNewSessionCaseIsIdentifiable() {
@@ -468,13 +433,13 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(kit): add newSession presented
 ## Task 8: NewSessionSheetView + accessibility ids
 
 **Files:**
-- Create: `Sources/HarnessMonitorUIPreviewable/Views/NewSessionSheetView.swift`
-- Modify: `Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift`
+- Create: `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/NewSessionSheetView.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift`
 - Modify: `project.yml`
 
 - [ ] **Step 1: Failing test**
 
-`Tests/HarnessMonitorKitTests/NewSessionSheetRenderingTests.swift` verifies the view builds with a fake ViewModel in preview mode and that the error banner becomes visible when `viewModel` is seeded with a `.bookmarkRevoked` error. Use `ViewInspector` only if already a dependency; otherwise assert via a pure-state snapshot of the ViewModel.
+`apps/harness-monitor-macos/Tests/HarnessMonitorKitTests/NewSessionSheetRenderingTests.swift` verifies the view builds with a fake ViewModel in preview mode and that the error banner becomes visible when `viewModel` is seeded with a `.bookmarkRevoked` error. Use `ViewInspector` only if already a dependency; otherwise assert via a pure-state snapshot of the ViewModel.
 
 - [ ] **Step 2: Implement**
 
@@ -504,8 +469,8 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(ui): add NewSessionSheetView"
 ## Task 9: File menu command - Cmd+N
 
 **Files:**
-- Create: `Sources/HarnessMonitor/Commands/NewSessionCommand.swift`
-- Modify: `Sources/HarnessMonitor/App/HarnessMonitorApp.swift`
+- Create: `apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/NewSessionCommand.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorApp.swift`
 - Modify: `project.yml`
 
 - [ ] **Step 1: Implement**
@@ -514,12 +479,13 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(ui): add NewSessionSheetView"
 
 ```swift
 struct NewSessionCommand: Commands {
-    let onTrigger: () -> Void
+    let store: HarnessMonitorStore
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("New Session") { onTrigger() }
+            Button("New Session") { store.presentedSheet = .newSession }
                 .keyboardShortcut("n", modifiers: [.command])
+                .disabled(store.connectionState != .online)
         }
     }
 }
@@ -537,20 +503,7 @@ In `HarnessMonitorApp.swift`:
 
 - [ ] **Step 2: Sheet binding**
 
-`mainWindowContent` gains:
-
-```swift
-.sheet(item: $store.presentedSheet) { sheet in
-    switch sheet {
-    case .newSession:
-        NewSessionSheetView(store: store)
-    case .sendSignal(let agentID):
-        SendSignalSheetView(...)
-    }
-}
-```
-
-If a `.sheet(item:)` already exists for the other cases, extend the switch rather than creating a second sheet modifier.
+`HarnessMonitorSheetRouter` already owns the `.newSession` sheet route. Keep the routing there and create the `NewSessionViewModel` from `store.makeNewSessionViewModel()` when the sheet appears.
 
 - [ ] **Step 3: Build**
 
@@ -569,11 +522,11 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(app): add New Session menu and
 ## Task 10: Sessions-list entry point
 
 **Files:**
-- Modify: `Sources/HarnessMonitorUIPreviewable/Views/SidebarFooterAccessory.swift` (or the nearest sessions-list toolbar owner - inspect `SessionsBoardView.swift`)
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/SidebarView.swift`
 
 - [ ] **Step 1: Add button**
 
-A `Button("New Session", systemImage: "plus") { store.presentedSheet = .newSession }` surfaced in the sidebar toolbar. Apply `.glass` style per repo rules. Accessibility id `harness.sidebar.new-session`.
+The sidebar toolbar already exposes `Button("New Session", systemImage: "plus") { store.presentedSheet = .newSession }`. Keep the current styling and accessibility id `harness.sidebar.new-session`.
 
 - [ ] **Step 2: Snapshot assertions if any**
 
@@ -590,7 +543,7 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(ui): add sidebar New Session b
 ## Task 11: Observability - os_log the session creation flow
 
 **Files:**
-- Modify: `Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift`
+- Modify: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift`
 
 - [ ] **Step 1: Add logger**
 
@@ -624,7 +577,7 @@ git -c commit.gpgsign=true commit -sS -a -m "feat(kit): log new session submit l
 
 - [ ] **Step 1: Register new sources**
 
-Ensure every new Swift file under `Sources/HarnessMonitorKit/`, `Sources/HarnessMonitor/Commands/`, and `Sources/HarnessMonitorUIPreviewable/Views/` is listed so `generate-project.sh` picks it up.
+Ensure every new Swift file under `apps/harness-monitor-macos/Sources/HarnessMonitorKit/`, `apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/`, and `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/` is listed so `generate-project.sh` picks it up.
 
 - [ ] **Step 2: Regenerate**
 

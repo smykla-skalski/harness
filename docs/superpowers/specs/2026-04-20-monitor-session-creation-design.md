@@ -2,19 +2,17 @@
 
 ## Background
 
-Sub-project A landed sandboxed file access for the Monitor app, centered on `BookmarkStore` records of kind `projectRoot` persisted to the shared app-group `bookmarks.json`. Sub-project B landed the per-session worktree layout and rewired `POST /v1/sessions` so the daemon owns worktree creation. Crucially, B's `src/sandbox/project_input.rs` already canonicalizes `SessionStartRequest.project_dir` as either a plain path (dev / non-sandboxed) or a bookmark id (macOS + `HARNESS_SANDBOXED=1`).
+Sub-project A landed sandboxed file access for the Monitor app, centered on `BookmarkStore` records of kind `projectRoot` persisted to the shared app-group `bookmarks.json`. Sub-project B landed the per-session worktree layout and the daemon-side worktree controller. Sub-project C is the Monitor-side wiring that uses that layout: `NewSessionCommand`, `HarnessMonitorSheetRouter`, `NewSessionViewModel`, `NewSessionSheetView`, and `HarnessMonitorAPIClient+Sessions.swift`.
 
-What is still missing: there is no UI surface in the Monitor app that lets a user start a session. The existing command set (`HarnessMonitorAppCommands`) exposes Observe, End, and Open Folder, but nothing that creates a session. `HarnessMonitorAPIClient` has no `POST /v1/sessions` method yet - the daemon endpoint exists, but the Swift client and store never call it.
-
-Sub-project C fills this gap: a New Session sheet that turns a `BookmarkStore.Record` of kind `projectRoot` plus a user-supplied title, context, runtime, and optional `base_ref` into a daemon-side worktree, observes the result through the existing `sessionsUpdated` websocket stream, and surfaces errors distinctly for bookmark failures vs daemon failures vs worktree failures.
+The current implementation lets a user start a session from the File menu or the sidebar toolbar, pick a previously authorized `projectRoot` bookmark, and create a session through `POST /v1/sessions`. The view model keeps inline error state in `lastError`, uses a custom bookmark resolver, passes the bookmark id when sandboxed, and only the default resolver wraps `withSecurityScopeAsync`.
 
 ## Goals
 
-1. First-class "New Session" entry point: File menu item plus a discoverable button in the sessions list, routed to a single sheet.
+1. First-class "New Session" entry point: File menu item plus sidebar toolbar button, routed to a single sheet.
 2. Users pick a previously authorized folder from the existing `BookmarkStore` list, or reach Open Folder from the sheet to authorize a new one.
-3. The sheet POSTs `/v1/sessions` with the bookmark id (sandboxed) or resolved path (dev), and renders the new session through the existing session list via `sessionsUpdated`.
+3. The sheet POSTs `/v1/sessions` with the bookmark id (sandboxed) or resolved path (dev), and the new session appears through the existing `sessionsUpdated` websocket stream.
 4. Error surfaces distinguish: bookmark revoked or stale, daemon unreachable, worktree create failed, invalid repo (no git), and invalid `base_ref`.
-5. Swift ViewModel is covered by unit tests; Rust-side protocol addition (`base_ref`) is backward compatible and covered at the wire.
+5. Swift `NewSessionViewModel` is covered by unit tests; the Rust `base_ref` field is already backward compatible at the wire.
 6. Session creation UI is keyboard-reachable and VoiceOver-labeled.
 
 ## Non-goals
@@ -31,17 +29,17 @@ Sub-project C fills this gap: a New Session sheet that turns a `BookmarkStore.Re
 
 | Decision | Choice | Rationale |
 | --- | --- | --- |
-| Surface | Modal sheet bound to `HarnessMonitorStore.presentedSheet = .newSession` | Matches the existing `sendSignal` sheet pattern; avoids adding a new window id. |
-| Entry points | File > New Session (`Cmd+N`) plus a toolbar button in the sessions list | `Cmd+N` is already reserved conceptually but unused; installing it in the File menu aligns with platform rules. |
-| Project picker | Picker over `BookmarkStore.all()` filtered to `kind == .projectRoot`, with an inline "Add Folder..." row that triggers `store.requestOpenFolder()` | Reuses A's store directly; no parallel state. |
-| Wire value for project_dir | Sandboxed: pass `BookmarkStore.Record.id`. Dev: resolve the bookmark then pass `URL.path` | B's `resolve_project_input` handles both; keeps the scope guard alive across the HTTP round-trip. |
-| base_ref | Optional text field; empty means daemon chooses (`origin/HEAD` fallback). Protocol adds `base_ref: Option<String>` to `SessionStartRequest`, gated `#[serde(default, skip_serializing_if = "Option::is_none")]` | Backward compatible; existing clients keep working. B's `WorktreeController::create` already takes `Option<&str>`. |
+| Surface | Modal sheet bound to `HarnessMonitorStore.presentedSheet = .newSession` | Matches the existing `sendSignal` sheet pattern and the current `HarnessMonitorSheetRouter`. |
+| Entry points | File > New Session (`Cmd+N`) plus the sidebar toolbar button | Both routes target the same `.newSession` sheet state. |
+| Project picker | Picker over `BookmarkStore.all()` filtered to `kind == .projectRoot`, with an inline "Add Folder..." button that calls `store.handleImportedFolder` | Reuses A's store directly; no parallel state. |
+| Wire value for project_dir | Sandboxed: pass `BookmarkStore.Record.id`. Dev: resolve the bookmark then pass `URL.path` | The default resolver owns `withSecurityScopeAsync`; the view model just injects the resolved path. |
+| base_ref | Optional text field; empty means daemon chooses (`origin/HEAD` fallback). Rust and Swift both use `base_ref`/`baseRef` as the optional wire field. | Backward compatible; existing clients keep working. |
 | Runtime default | `claude` hardcoded; no UI to change it in C | YAGNI until runtime-picker becomes a real need. Future extension point. |
 | Title and context validation | Both trimmed. Title must be non-empty; context may be empty (the API already accepts empty `context`) | Matches `SessionStartRequest` field `context: String` (not `Option`) and `title` default-empty. |
-| Error surfacing | Toast via `store.presentFailureFeedback` for transient failures; inline banner in the sheet for validation failures | Consistent with A's pattern for Open Folder failures. |
-| Session list update | Rely on existing `sessionsUpdated` push event the daemon already broadcasts after `start_session_response` returns Ok | No new websocket plumbing required. |
+| Error surfacing | Inline banner via `NewSessionViewModel.lastError`; no toast is used here | Consistent with the current sheet implementation. |
+| Session list update | The store selects the new session after a successful POST, and the existing `sessionsUpdated` push event keeps the list in sync | No new websocket plumbing required. |
 | Version impact | Minor | Additive UI, one new optional protocol field, no wire break. |
-| Scope for security-scoped resource | Start scope before POST, stop after response; even sandboxed bookmark ids are passed as ids over HTTP but the daemon holds the guard via `ProjectInputScope`. The Swift side still wraps any local validation read inside `withSecurityScope` for symmetry. | Matches A's discipline that scope lifetime should match IO lifetime. |
+| Scope for security-scoped resource | The default bookmark resolver owns `withSecurityScopeAsync`; the sandboxed path sends the bookmark id directly and the daemon resolves it. | Keeps scope lifetime aligned with the actual filesystem read. |
 
 ## Architecture
 
@@ -67,7 +65,7 @@ Swift Monitor app                                      Rust daemon
 │  - validates fields                    │            │                                        │
 │  - projectDir = sandboxed ? record.id  │  POST      │                                        │
 │                           : resolvedPath   ─────────►│ POST /v1/sessions                    │
-│  - runs inside withSecurityScope       │            │  SessionStartRequest                   │
+│  - lastError stores inline failures    │            │  SessionStartRequest                   │
 │          │                             │            │  { title, context, runtime,            │
 │          │                             │            │    project_dir, base_ref?, ... }       │
 │          │                             │            │    │                                   │
@@ -118,11 +116,11 @@ pub struct SessionStartRequest {
 }
 ```
 
-In `src/daemon/service/session_setup.rs`, change the `WorktreeController::create(..., None)` call site to `..., request.base_ref.as_deref()`. `WorktreeController::create` already accepts an `Option<&str>` from B.
+In `src/daemon/service/session_setup.rs`, the `WorktreeController::create(..., request.base_ref.as_deref())` call site is already wired.
 
 ### 2. Swift wire model
 
-`Sources/HarnessMonitorKit/Models/HarnessMonitorRequests.swift` gains:
+`apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models/SessionStartRequest.swift` mirrors the Rust request:
 
 ```swift
 public struct SessionStartRequest: Codable, Equatable, Sendable {
@@ -138,26 +136,27 @@ public struct SessionStartRequest: Codable, Equatable, Sendable {
 
 `keyEncodingStrategy` is `.convertToSnakeCase` on the existing client, so `baseRef` serializes as `base_ref`.
 
-`Sources/HarnessMonitorKit/Models/HarnessMonitorRequests.swift` mirrors `SessionMutationResponse` if it is not already present; it wraps `SessionSummary` which already exists.
+`apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models/HarnessMonitorSessionModels.swift` already contains `SessionSummary`, which is what the Swift client decodes from `state`.
 
 ### 3. API client method
 
-`HarnessMonitorAPIClient`:
+`apps/harness-monitor-macos/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Sessions.swift`:
 
 ```swift
 public func startSession(
     request: SessionStartRequest
 ) async throws -> SessionSummary {
-    let response: SessionMutationResponse = try await post("/v1/sessions", body: request)
+    struct Response: Decodable { let state: SessionSummary }
+    let response: Response = try await post("/v1/sessions", body: request)
     return response.state
 }
 ```
 
-Protocol addition in `HarnessMonitorClientProtocol`. Preview clients (`PreviewHarnessClient`, `RecordingHarnessClient`) implement both the live and recording shapes.
+`HarnessMonitorClientProtocol` already includes `startSession(request:)`. Preview clients (`PreviewHarnessClient`, `RecordingHarnessClient`) implement the same shape.
 
 ### 4. NewSessionViewModel (Swift)
 
-Location: `Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift`.
+Location: `apps/harness-monitor-macos/Sources/HarnessMonitorKit/Stores/NewSessionViewModel.swift`.
 
 ```swift
 @MainActor
@@ -169,7 +168,7 @@ public final class NewSessionViewModel {
         case bookmarkUnavailable
     }
 
-    public enum SubmitError: Equatable, Sendable {
+    public enum SubmitError: Error, Equatable, Sendable {
         case validation(ValidationError)
         case bookmarkRevoked(id: String)
         case bookmarkStale(id: String)
@@ -184,22 +183,29 @@ public final class NewSessionViewModel {
     public var baseRef: String = ""
     public var selectedBookmarkId: String?
     public private(set) var isSubmitting = false
+    public private(set) var lastError: SubmitError?
 
     private let store: HarnessMonitorStore
     private let bookmarkStore: BookmarkStore
     private let client: any HarnessMonitorClientProtocol
-    private let isSandboxed: () -> Bool
+    private let isSandboxedCheck: @Sendable () -> Bool
+    private let bookmarkResolver: BookmarkResolver
+    private let logSink: any NewSessionLogSink
 
     public init(
         store: HarnessMonitorStore,
         bookmarkStore: BookmarkStore,
         client: any HarnessMonitorClientProtocol,
-        isSandboxed: @escaping () -> Bool = Self.liveIsSandboxed
+        isSandboxed: @Sendable @escaping () -> Bool = Self.liveIsSandboxed,
+        bookmarkResolver: BookmarkResolver? = nil,
+        logSink: any NewSessionLogSink = LiveNewSessionLogSink()
     ) {
         self.store = store
         self.bookmarkStore = bookmarkStore
         self.client = client
-        self.isSandboxed = isSandboxed
+        self.isSandboxedCheck = isSandboxed
+        self.bookmarkResolver = bookmarkResolver ?? Self.makeDefaultResolver(bookmarkStore: bookmarkStore)
+        self.logSink = logSink
     }
 
     public func submit() async -> Result<SessionSummary, SubmitError> { ... }
@@ -215,38 +221,36 @@ public final class NewSessionViewModel {
 The submit method:
 1. Validates `title.trimmingCharacters(.whitespacesAndNewlines)` is non-empty.
 2. Validates `selectedBookmarkId` is set.
-3. Resolves the bookmark via `bookmarkStore.resolve(id:)`.
-4. If `isSandboxed()` true: pass `record.id` as `projectDir`. Otherwise wrap `resolved.url.withSecurityScopeAsync { pass url.path }`.
-5. Maps thrown errors: `BookmarkStoreError.unresolvable` -> `.bookmarkRevoked`, `ResolvedScope.isStale == true` after two refresh attempts -> `.bookmarkStale`.
-6. Maps HTTP errors: URL error connection refused -> `.daemonUnreachable`; HTTP 5xx containing `"worktree"` -> `.worktreeCreateFailed`; HTTP 4xx containing `"base_ref"` or `"rev-parse"` -> `.invalidBaseRef`; otherwise `.unexpected`.
-7. On success: `store.selectSession(result.sessionId)`; returns `.success(summary)`. Caller dismisses the sheet.
+3. Resolves the bookmark through the injected resolver.
+4. If sandboxed, passes `record.id` as `projectDir`; otherwise the default resolver returns a `URL.path` from `withSecurityScopeAsync`.
+5. Maps `BookmarkStoreError.unresolvable` to `.bookmarkRevoked`, stale bookmark resolution to `.bookmarkStale`, connection refused to `.daemonUnreachable`, worktree failures to `.worktreeCreateFailed`, and `base_ref` resolution problems to `.invalidBaseRef`.
+6. On success, selects the created session and clears `lastError`.
 
 ### 5. NewSessionSheetView
 
-Location: `Sources/HarnessMonitorUIPreviewable/Views/NewSessionSheetView.swift`.
+Location: `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/NewSessionSheetView.swift`.
 
 Form with sections:
-- **Project** - Picker over `bookmarkStore.all().filter { $0.kind == .projectRoot }` showing `displayName` with `lastResolvedPath` secondary label. Inline button "Add Folder..." calls `store.requestOpenFolder()` and dismisses back to the sheet after the importer returns; the newly added record auto-selects.
+- **Project** - Picker backed by `viewModel.availableBookmarks()` showing `displayName` with `lastResolvedPath` as the secondary label. Inline button "Add Folder..." calls `store.handleImportedFolder` through the sheet's file importer and then reloads the list.
 - **Details** - Title TextField (required, accessibility id `harness.new-session.title`), Context TextEditor (optional, accessibility id `harness.new-session.context`).
 - **Advanced (disclosure)** - Base ref TextField with placeholder "origin/HEAD" and helper text "Leave blank for the default branch".
-- Footer - "Cancel" and "Create" buttons; Create disabled while `viewModel.isSubmitting`. Inline red banner renders the current `SubmitError` if any.
+- Footer - "Cancel" and "Create" buttons; Create disabled while `viewModel.isSubmitting`. Inline red banner renders `viewModel.lastError` if any.
 
 Accessibility identifiers for UI tests: `harness.new-session.sheet`, `.title`, `.context`, `.base-ref`, `.project-picker`, `.create-button`, `.cancel-button`, `.error-banner`.
 
 ### 6. Command and entry points
 
-`OpenFolderCommand.swift` adds a `NewSessionCommand.swift` peer. `HarnessMonitorApp` wires a `@State private var showNewSession = false` plus a sheet modifier on `mainWindowContent`.
+`apps/harness-monitor-macos/Sources/HarnessMonitor/Commands/NewSessionCommand.swift` adds the file-menu command. `apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorApp.swift` registers it alongside the existing `OpenFolderCommand`, and `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/HarnessMonitorSheetRouter.swift` owns the sheet routing and view-model creation.
 
 ```swift
 CommandGroup(after: .newItem) {
     Button("New Session") { store.presentedSheet = .newSession }
         .keyboardShortcut("n", modifiers: [.command])
-    Button("Open Folder...") { isPresented = true }
-        .keyboardShortcut("o", modifiers: [.command, .shift])
+        .disabled(store.connectionState != .online)
 }
 ```
 
-The sessions list toolbar also gets a "New Session" button that sets the same sheet.
+The sidebar toolbar also gets a "New Session" button that sets the same sheet.
 
 ### 7. PresentedSheet enum extension
 
@@ -269,7 +273,7 @@ public enum PresentedSheet: Identifiable, Equatable {
 ### 8. Observability
 
 - Swift: `os_log` category `sessions`. Log `start`, `submit`, `success(sessionId)`, `failure(kind)`. Never log bookmark ids or paths at `info`; paths at `debug` only.
-- Rust: no new logs; `start_session_direct_async` already logs via tracing.
+- Rust: no new logs are required for this feature; the existing daemon tracing is already in place.
 - The existing `sessionsUpdated` push event surfaces the new session in the sidebar automatically. No new stream events.
 
 ## Data model
@@ -282,15 +286,15 @@ No new persisted Swift or Rust data. Consumes existing `BookmarkStore.Record` (A
 | --- | --- | --- |
 | Title empty | `.validation(.titleRequired)` | Inline banner in sheet; Create disabled. |
 | No project selected | `.validation(.projectRequired)` | Inline banner. |
-| `bookmarkStore == nil` | `.validation(.bookmarkUnavailable)` | Inline banner with "Open Settings" link. |
+| Bookmark resolver unavailable | `.validation(.bookmarkUnavailable)` | Inline banner only. |
 | `BookmarkStoreError.unresolvable` | `.bookmarkRevoked(id)` | Inline banner with "Reauthorize" action re-firing Open Folder. |
 | Two-refresh stale loop | `.bookmarkStale(id)` | Inline banner with "Reauthorize" action. |
-| `URLError.cannotConnectToHost` | `.daemonUnreachable` | Inline banner with "Start Daemon" action; reuses `store.startDaemon()`. |
+| `URLError.cannotConnectToHost` | `.daemonUnreachable` | Inline banner. |
 | HTTP 500 with body containing "create session worktree" | `.worktreeCreateFailed(reason)` | Inline banner with reason and "Try different base ref" hint. |
 | HTTP 400 with body containing "base_ref" or git `rev-parse` stderr | `.invalidBaseRef(ref, reason)` | Inline banner under the base ref field. |
 | Anything else | `.unexpected(msg)` | Inline banner with support-diagnostic link. |
 
-The sheet stays open on every failure; success dismisses the sheet, selects the new session, and drops a toast "Created session `<title>`".
+The sheet stays open on every failure; success dismisses the sheet and selects the new session.
 
 ## Open questions
 
