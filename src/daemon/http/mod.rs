@@ -33,6 +33,7 @@ mod managed_agents;
 mod response;
 mod runtime_session;
 mod sessions;
+mod sessions_adopt;
 mod signals;
 mod stream;
 mod tasks;
