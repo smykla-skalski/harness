@@ -32,6 +32,17 @@
     {
       "asDropdown": false,
       "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Host Processes",
+      "type": "link",
+      "url": "/d/harness-host-processes"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
       "includeVars": true,
       "keepTime": true,
       "tags": [],
@@ -83,6 +94,28 @@
       "title": "Service Flow",
       "type": "link",
       "url": "/d/harness-service-map"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Metrics Drilldown",
+      "type": "link",
+      "url": "/a/grafana-metricsdrilldown-app/drilldown"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Logs Drilldown",
+      "type": "link",
+      "url": "/a/grafana-lokiexplore-app/explore"
     }
   ],
   "panels": [

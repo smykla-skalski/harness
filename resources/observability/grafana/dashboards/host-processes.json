@@ -25,75 +25,20 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
+      "title": "Investigation Cockpit",
+      "type": "link",
+      "url": "/d/harness-investigation-cockpit"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
       "title": "Host Machine",
       "type": "link",
       "url": "/d/harness-host-machine"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Host Processes",
-      "type": "link",
-      "url": "/d/harness-host-processes"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Runtime & Hooks",
-      "type": "link",
-      "url": "/d/harness-runtime-execution"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Daemon Transport",
-      "type": "link",
-      "url": "/d/harness-daemon-transport"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Monitor Client",
-      "type": "link",
-      "url": "/d/harness-monitor-client"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Storage & SQLite",
-      "type": "link",
-      "url": "/d/harness-sqlite-forensics"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Service Flow",
-      "type": "link",
-      "url": "/d/harness-service-map"
     },
     {
       "asDropdown": false,
@@ -116,17 +61,6 @@
       "title": "Logs Drilldown",
       "type": "link",
       "url": "/a/grafana-lokiexplore-app/explore"
-    },
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": false,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Traces Breakdown",
-      "type": "link",
-      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown"
     }
   ],
   "panels": [
@@ -135,7 +69,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Short-window hook latency across the local hook service.",
+      "description": "Number of distinct tracked executable groups exported by the low-cardinality process scraper.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -150,15 +84,15 @@
               },
               {
                 "color": "orange",
-                "value": 150
+                "value": 8
               },
               {
                 "color": "red",
-                "value": 500
+                "value": 12
               }
             ]
           },
-          "unit": "ms"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -169,14 +103,6 @@
         "y": 0
       },
       "id": 1,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Runtime & Hooks",
-          "url": "/d/harness-runtime-execution"
-        }
-      ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -194,11 +120,11 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_spanmetrics_duration_milliseconds_bucket{service_name=\"harness-hook\"}[5m]))) and on() (sum(rate(harness_spanmetrics_calls_total{service_name=\"harness-hook\"}[5m])) > 0)) or on() vector(0))",
+          "expr": "count(sum by (process_executable_name) (process_cpu_utilization_ratio{process_executable_name=~\"$process_name\"})) or on() vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Hook p95",
+      "title": "Tracked Process Groups",
       "type": "stat"
     },
     {
@@ -206,216 +132,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Daemon HTTP p95 over the active investigation window.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 300
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
-      "id": 2,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Daemon Transport",
-          "url": "/d/harness-daemon-transport"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Daemon HTTP p95",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Monitor HTTP p95 over the active investigation window.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 150
-              },
-              {
-                "color": "red",
-                "value": 500
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 0
-      },
-      "id": 3,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Monitor Client",
-          "url": "/d/harness-monitor-client"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Monitor HTTP p95",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Signals whether any non-nominal thermal pressure is active on the host.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "id": 4,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Machine",
-          "url": "/d/harness-host-machine"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "max(darwin_thermal_pressure{state=~\"fair|serious|critical\"}) or on() vector(0)",
-          "refId": "A"
-        }
-      ],
-      "title": "Thermal Pressure Active",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Current running process count for the workstation.",
+      "description": "Current running process count across the workstation.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -445,18 +162,10 @@
       "gridPos": {
         "h": 4,
         "w": 6,
-        "x": 0,
-        "y": 4
+        "x": 6,
+        "y": 0
       },
-      "id": 5,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
+      "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -486,7 +195,70 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Current zombie process count for the workstation.",
+      "description": "Current sleeping process count across the workstation.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 700
+              },
+              {
+                "color": "red",
+                "value": 900
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(system_processes_count{status=\"sleeping\"}) or on() vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Sleeping Processes",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Current zombie process count across the workstation.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -516,18 +288,10 @@
       "gridPos": {
         "h": 4,
         "w": 6,
-        "x": 6,
-        "y": 4
+        "x": 18,
+        "y": 0
       },
-      "id": 6,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
+      "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -587,18 +351,10 @@
       "gridPos": {
         "h": 4,
         "w": 6,
-        "x": 12,
+        "x": 0,
         "y": 4
       },
-      "id": 7,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
+      "id": 5,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -616,7 +372,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "topk(1, sum by (process_executable_name) (process_cpu_utilization_ratio))",
+          "expr": "topk(1, sum by (process_executable_name) (process_cpu_utilization_ratio{process_executable_name=~\"$process_name\"}))",
           "legendFormat": "{{process_executable_name}}",
           "refId": "A"
         }
@@ -659,18 +415,10 @@
       "gridPos": {
         "h": 4,
         "w": 6,
-        "x": 18,
+        "x": 6,
         "y": 4
       },
-      "id": 8,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
+      "id": 6,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -688,7 +436,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "topk(1, sum by (process_executable_name) (process_memory_usage_bytes))",
+          "expr": "topk(1, sum by (process_executable_name) (process_memory_usage_bytes{process_executable_name=~\"$process_name\"}))",
           "legendFormat": "{{process_executable_name}}",
           "refId": "A"
         }
@@ -701,12 +449,147 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Correlate host CPU, memory, and disk pressure before drilling into the host board.",
+      "description": "Tracked executable currently carrying the largest thread count.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 64
+              },
+              {
+                "color": "red",
+                "value": 128
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk(1, sum by (process_executable_name) (process_threads{process_executable_name=~\"$process_name\"}))",
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Threads Process",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Tracked executable currently holding the most open file descriptors.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 128
+              },
+              {
+                "color": "red",
+                "value": 256
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk(1, sum by (process_executable_name) (process_open_file_descriptors{process_executable_name=~\"$process_name\"}))",
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Open FDs Process",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Process state counts over time for the entire machine.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 18,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -717,131 +600,6 @@
         "y": 8
       },
       "id": 9,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Machine",
-          "url": "/d/harness-host-machine"
-        }
-      ],
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100",
-          "legendFormat": "CPU busy %",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "((node_memory_active_bytes + node_memory_wired_bytes + node_memory_compressed_bytes) / clamp_min(node_memory_total_bytes, 1)) * 100",
-          "legendFormat": "Memory pressure %",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "clamp_max(sum(rate(node_disk_read_time_seconds_total[5m]) + rate(node_disk_write_time_seconds_total[5m])), 1) * 100",
-          "legendFormat": "Disk busy %",
-          "refId": "C"
-        }
-      ],
-      "title": "Host Stress Correlation",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Correlate Harness request rate and HTTP latency before drilling into runtime surfaces.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 10,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Runtime & Hooks",
-          "url": "/d/harness-runtime-execution"
-        }
-      ],
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum(rate(harness_spanmetrics_calls_total[5m]))",
-          "legendFormat": "Span rate / s",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))",
-          "legendFormat": "Daemon p95 ms",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))",
-          "legendFormat": "Monitor p95 ms",
-          "refId": "C"
-        }
-      ],
-      "title": "Harness Stress Correlation",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Process state mix over time to spot stalls, buildup, or zombie churn.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "id": 11,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "table",
@@ -855,12 +613,12 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (status) (system_processes_count{status=~\"running|sleeping|blocked|zombies\"})",
+          "expr": "sum by (status) (system_processes_count)",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
       ],
-      "title": "Process State Pressure",
+      "title": "Process States Over Time",
       "type": "timeseries"
     },
     {
@@ -868,7 +626,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Top tracked executables by CPU over the investigation window.",
+      "description": "CPU utilization for the selected tracked executables.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -882,17 +640,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 8
       },
-      "id": 12,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
+      "id": 10,
       "options": {
         "legend": {
           "displayMode": "table",
@@ -902,12 +652,12 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "topk(8, sum by (process_executable_name) (process_cpu_utilization_ratio))",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_cpu_utilization_ratio{process_executable_name=~\"$process_name\"}))",
           "legendFormat": "{{process_executable_name}}",
           "refId": "A"
         }
       ],
-      "title": "Top Tracked Process CPU",
+      "title": "Process CPU by Name",
       "type": "timeseries"
     },
     {
@@ -915,7 +665,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Top tracked executables by resident memory over the investigation window.",
+      "description": "Resident memory for the selected tracked executables.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -929,17 +679,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 16
       },
-      "id": 13,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Host Processes",
-          "url": "/d/harness-host-processes"
-        }
-      ],
+      "id": 11,
       "options": {
         "legend": {
           "displayMode": "table",
@@ -949,12 +691,12 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "topk(8, sum by (process_executable_name) (process_memory_usage_bytes))",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_memory_usage_bytes{process_executable_name=~\"$process_name\"}))",
           "legendFormat": "{{process_executable_name}}",
           "refId": "A"
         }
       ],
-      "title": "Top Tracked Process RSS",
+      "title": "Process RSS by Name",
       "type": "timeseries"
     },
     {
@@ -962,13 +704,91 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Rank the slowest daemon and monitor routes in the current investigation window.",
+      "description": "Virtual memory footprint for the selected tracked executables.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "ms"
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_memory_virtual_bytes{process_executable_name=~\"$process_name\"}))",
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Process Virtual Memory by Name",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Thread counts for the selected tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_threads{process_executable_name=~\"$process_name\"}))",
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Process Threads by Name",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Open file descriptors for the selected tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -979,20 +799,6 @@
         "y": 24
       },
       "id": 14,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Daemon Transport",
-          "url": "/d/harness-daemon-transport"
-        },
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Monitor Client",
-          "url": "/d/harness-monitor-client"
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "table",
@@ -1002,19 +808,236 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "topk(8, histogram_quantile(0.95, sum by (le, http_route) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))))",
-          "legendFormat": "daemon {{http_route}}",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_open_file_descriptors{process_executable_name=~\"$process_name\"}))",
+          "legendFormat": "{{process_executable_name}}",
           "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "topk(8, histogram_quantile(0.95, sum by (le, url_path) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))))",
-          "legendFormat": "monitor {{url_path}}",
-          "refId": "B"
         }
       ],
-      "title": "Top Slow Routes",
+      "title": "Process Open FDs by Name",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Uptime for the selected tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_uptime_seconds{process_executable_name=~\"$process_name\"}))",
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Process Uptime by Name",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Current CPU utilization ranking for tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 16,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": false
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_cpu_utilization_ratio{process_executable_name=~\"$process_name\"}))",
+          "instant": true,
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top CPU Now",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Current resident memory ranking for tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "id": 17,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": false
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_memory_usage_bytes{process_executable_name=~\"$process_name\"}))",
+          "instant": true,
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top RSS Now",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Current thread-count ranking for tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "id": 18,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": false
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_threads{process_executable_name=~\"$process_name\"}))",
+          "instant": true,
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Threads Now",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Current open-file-descriptor ranking for tracked executables.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "id": 19,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": false
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "topk($process_limit, sum by (process_executable_name) (process_open_file_descriptors{process_executable_name=~\"$process_name\"}))",
+          "instant": true,
+          "legendFormat": "{{process_executable_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Open FDs Now",
+      "type": "bargauge"
     }
   ],
   "refresh": "10s",
@@ -1023,17 +1046,58 @@
   "tags": [
     "harness",
     "observability",
-    "overview",
+    "host",
+    "processes",
     "forensics"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(process_cpu_utilization_ratio, process_executable_name)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Tracked Process",
+        "multi": true,
+        "name": "process_name",
+        "options": [],
+        "query": "label_values(process_cpu_utilization_ratio, process_executable_name)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "10",
+          "value": "10"
+        },
+        "hide": 0,
+        "label": "Top N",
+        "multi": false,
+        "name": "process_limit",
+        "options": [],
+        "query": "5,10,15",
+        "type": "custom"
+      }
+    ]
   },
   "time": {
     "from": "now-15m",
     "to": "now"
   },
-  "title": "Harness Investigation Cockpit",
-  "uid": "harness-investigation-cockpit",
-  "version": 2
+  "title": "Harness Host Processes",
+  "uid": "harness-host-processes",
+  "version": 1
 }
