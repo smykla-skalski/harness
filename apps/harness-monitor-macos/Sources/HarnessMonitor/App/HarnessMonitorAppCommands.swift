@@ -89,6 +89,12 @@ struct HarnessMonitorAppCommands: Commands {
         destination: Self.documentationURL
       )
     }
+    CommandGroup(after: .newItem) {
+      Button("Attach External Session…") {
+        store.requestAttachExternalSession()
+      }
+      .keyboardShortcut("a", modifiers: [.command, .shift])
+    }
     CommandMenu("Harness Monitor") {
       Button("Find in Sessions", action: focusSidebarSearch)
         .keyboardShortcut("f", modifiers: .command)

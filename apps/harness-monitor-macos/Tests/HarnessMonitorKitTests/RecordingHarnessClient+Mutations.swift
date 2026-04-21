@@ -3,6 +3,35 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  func adoptSession(bookmarkID: String?, sessionRoot: URL) async throws -> SessionSummary {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(.adoptSession(bookmarkID: bookmarkID, sessionRoot: sessionRoot))
+    return SessionSummary(
+      projectId: detail.session.projectId,
+      projectName: detail.session.projectName,
+      projectDir: detail.session.projectDir,
+      contextRoot: detail.session.contextRoot,
+      sessionId: "sess-adopted",
+      title: "",
+      context: "",
+      status: .active,
+      createdAt: "2026-04-20T12:00:00Z",
+      updatedAt: "2026-04-20T12:00:00Z",
+      lastActivityAt: nil,
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 0,
+        activeAgentCount: 0,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+  }
+
   func startSession(request: SessionStartRequest) async throws -> SessionSummary {
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(

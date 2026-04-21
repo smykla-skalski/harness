@@ -1,11 +1,28 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  // Task 9 fills in the adopt logic (bookmark resolution, daemon call, dismiss on success).
   public func adoptExternalSession(
     bookmarkID: String,
     preview: SessionDiscoveryProbe.Preview
-  ) async {}
+  ) async {
+    guard let client else {
+      presentFailureFeedback("Daemon client unavailable.")
+      return
+    }
+    do {
+      let summary = try await client.adoptSession(
+        bookmarkID: bookmarkID,
+        sessionRoot: preview.sessionRoot
+      )
+      HarnessMonitorLogger.store.info("adopted external session \(summary.sessionId, privacy: .public)")
+      await refresh()
+      dismissSheet()
+    } catch let apiError as HarnessMonitorAPIError {
+      presentFailureFeedback(apiError.errorDescription ?? "Adopt failed.")
+    } catch {
+      presentFailureFeedback("Adopt failed: \(error.localizedDescription)")
+    }
+  }
 
   public func presentSendSignalSheet(agentID: String) {
     guard guardSessionActionsAvailable() else { return }
