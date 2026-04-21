@@ -42,6 +42,20 @@ public struct ContentView<CornerContent: View>: View {
       "controlGlass=native",
     ].joined(separator: ", ")
   }
+  private var profilingAttributes: [String: String] {
+    [
+      "harness.view.surface":
+        contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit",
+      "harness.view.column_visibility": "\(columnVisibility)",
+      "harness.view.inspector_presented": effectiveShowInspector ? "true" : "false",
+      "harness.view.search_presented": isSidebarSearchPresented ? "true" : "false",
+      "harness.view.connection_state": contentToolbar.connectionState.profilingLabel,
+      "harness.view.status_message_count": "\(contentToolbar.statusMessages.count)",
+      "harness.view.toolbar_mode": toolbarCenterpieceDisplayMode.rawValue,
+      "harness.view.detail_width": "\(Int(toolbarLayoutWidth.rounded()))",
+      "harness.view.layout_animating": isLayoutAnimating ? "true" : "false",
+    ]
+  }
 
   private var toolbarLayoutWidth: CGFloat {
     ContentToolbarLayoutWidth.normalized(detailColumnWidth)
@@ -98,13 +112,15 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   public var body: some View {
-    baseContent
-      .modifier(
-        ContentCornerOverlayModifier(
-          isPresented: showsCornerAnimation,
-          cornerAnimationContent: cornerAnimationContent
+    ViewBodySignposter.trace(Self.self, "ContentView", attributes: profilingAttributes) {
+      baseContent
+        .modifier(
+          ContentCornerOverlayModifier(
+            isPresented: showsCornerAnimation,
+            cornerAnimationContent: cornerAnimationContent
+          )
         )
-      )
+    }
   }
 
   private var baseContent: some View {
@@ -387,8 +403,6 @@ public struct ContentView<CornerContent: View>: View {
 extension ContentView where CornerContent == EmptyView {
   @MainActor
   public init(store: HarnessMonitorStore) {
-    self.init(store: store, showsCornerAnimation: false) {
-      EmptyView()
-    }
+    self.init(store: store, showsCornerAnimation: false) { EmptyView() }
   }
 }
