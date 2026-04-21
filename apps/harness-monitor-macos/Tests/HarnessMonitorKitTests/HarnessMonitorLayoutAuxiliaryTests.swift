@@ -119,6 +119,32 @@ struct HarnessMonitorAdaptiveGridLayoutCacheTests {
   }
 }
 
+@Suite("Content toolbar initial width")
+struct ContentToolbarInitialWidthTests {
+  @Test("Initial width uses the default launch window estimate")
+  func initialWidthUsesDefaultLaunchWindowEstimate() {
+    #expect(ContentToolbarLayoutWidth.initialValue(environment: [:]) == 1_344)
+  }
+
+  @Test("Initial width honors the UI testing window width override")
+  func initialWidthHonorsUITestingWindowWidthOverride() {
+    #expect(
+      ContentToolbarLayoutWidth.initialValue(
+        environment: ["HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1180"]
+      ) == 896
+    )
+  }
+
+  @Test("Initial width clamps very narrow launches to the minimum width")
+  func initialWidthClampsVeryNarrowLaunchesToMinimumWidth() {
+    #expect(
+      ContentToolbarLayoutWidth.initialValue(
+        environment: ["HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "500"]
+      ) == ContentToolbarLayoutWidth.minimumWidth
+    )
+  }
+}
+
 @Suite("Toolbar centerpiece display mode stabilization")
 struct ToolbarCenterpieceDisplayModeStabilizationTests {
   @Test("Standard mode ignores single-bucket activation jitter near the compact threshold")
@@ -159,6 +185,46 @@ struct ToolbarCenterpieceDisplayModeStabilizationTests {
     )
 
     #expect(stabilized == .compact)
+  }
+}
+
+@Suite("Toolbar centerpiece layout state")
+struct ToolbarCenterpieceLayoutStateTests {
+  @Test("Initial state seeds the launch width estimate and display mode")
+  func initialStateSeedsLaunchWidthEstimateAndDisplayMode() {
+    let state = ToolbarCenterpieceLayoutState(environment: [:])
+
+    #expect(state.detailColumnWidth == 1_344)
+    #expect(state.displayMode == .standard)
+    #expect(state.pendingDetailColumnWidth == nil)
+  }
+
+  @Test("Unsuppressed measurements update width and display mode immediately")
+  func unsuppressedMeasurementsUpdateWidthAndDisplayModeImmediately() {
+    var state = ToolbarCenterpieceLayoutState(environment: [:])
+
+    state.recordMeasurement(900, isSuppressed: false)
+
+    #expect(state.detailColumnWidth == 896)
+    #expect(state.displayMode == .compressed)
+    #expect(state.pendingDetailColumnWidth == nil)
+  }
+
+  @Test("Suppressed measurements queue width changes until flush")
+  func suppressedMeasurementsQueueWidthChangesUntilFlush() {
+    var state = ToolbarCenterpieceLayoutState(environment: [:])
+
+    state.recordMeasurement(900, isSuppressed: true)
+
+    #expect(state.detailColumnWidth == 1_344)
+    #expect(state.displayMode == .standard)
+    #expect(state.pendingDetailColumnWidth == 896)
+
+    state.flushPendingMeasurement()
+
+    #expect(state.detailColumnWidth == 896)
+    #expect(state.displayMode == .compressed)
+    #expect(state.pendingDetailColumnWidth == nil)
   }
 }
 

@@ -27,9 +27,7 @@ public struct ContentView<CornerContent: View>: View {
   @State private var hasPendingSidebarSearchFocusRequest = false
   @FocusState private var isSidebarSearchFocused: Bool
   @State private var shouldIgnoreNextInspectorMeasurement = false
-  @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
-  @State private var stabilizedToolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode?
-  @State private var pendingDetailColumnWidth: CGFloat?
+  @State private var detailColumnLayoutSuppressionPhase = 0
   @State private var isLayoutAnimating = false
   @State private var layoutSuppressionTask: Task<Void, Never>?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -50,27 +48,13 @@ public struct ContentView<CornerContent: View>: View {
       "harness.view.search_presented": isSidebarSearchPresented ? "true" : "false",
       "harness.view.connection_state": contentToolbar.connectionState.profilingLabel,
       "harness.view.status_message_count": "\(contentToolbar.statusMessages.count)",
-      "harness.view.toolbar_mode": toolbarCenterpieceDisplayMode.rawValue,
-      "harness.view.detail_width": "\(Int(toolbarLayoutWidth.rounded()))",
-      "harness.view.layout_animating": isLayoutAnimating ? "true" : "false",
     ]
-  }
-
-  private var toolbarLayoutWidth: CGFloat {
-    ContentToolbarLayoutWidth.normalized(detailColumnWidth)
   }
 
   private var sidebarSearchText: Binding<String> {
     Binding(
       get: { store.searchText },
       set: { store.searchText = $0 }
-    )
-  }
-
-  private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
-    ToolbarCenterpieceDisplayMode.resolve(
-      current: stabilizedToolbarCenterpieceDisplayMode,
-      detailWidth: toolbarLayoutWidth
     )
   }
 
@@ -185,12 +169,6 @@ public struct ContentView<CornerContent: View>: View {
       store: store,
       toolbarUI: contentToolbar
     )
-    ContentCenterpieceToolbarItems(
-      store: store,
-      toolbarUI: contentToolbar,
-      displayMode: toolbarCenterpieceDisplayMode,
-      availableDetailWidth: toolbarLayoutWidth
-    )
   }
 
   @ViewBuilder private var contentAccessibilityOverlay: some View {
@@ -198,7 +176,6 @@ public struct ContentView<CornerContent: View>: View {
       contentToolbar: contentToolbar,
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
-      toolbarCenterpieceDisplayMode: toolbarCenterpieceDisplayMode,
       appChromeAccessibilityValue: appChromeAccessibilityValue,
       toolbarBackgroundMarker: contentToolbarBackgroundMarker,
       auditBuildAccessibilityValue: auditBuildAccessibilityValue
@@ -246,9 +223,9 @@ public struct ContentView<CornerContent: View>: View {
       contentToolbar: contentToolbar,
       dashboardUI: contentDashboard,
       showInspector: showInspector,
+      layoutSuppressionPhase: detailColumnLayoutSuppressionPhase,
       setInspectorVisibility: applyInspectorVisibilityChange,
-      toolbarGlassReproConfiguration: toolbarGlassReproConfiguration,
-      onDetailColumnWidthChange: updateDetailColumnWidth
+      toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
     .inspector(isPresented: inspectorPresentationBinding) {
       inspectorColumn
@@ -273,50 +250,21 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   private func suppressLayoutGeometry() {
+    detailColumnLayoutSuppressionPhase += 1
     layoutSuppressionTask?.cancel()
     isLayoutAnimating = true
-    layoutSuppressionTask = Task {
+    layoutSuppressionTask = Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(400))
       guard !Task.isCancelled else {
         return
       }
-      if let pendingDetailColumnWidth,
-        abs(pendingDetailColumnWidth - detailColumnWidth) >= 1
-      {
-        detailColumnWidth = pendingDetailColumnWidth
-        stabilizedToolbarCenterpieceDisplayMode = ToolbarCenterpieceDisplayMode.resolve(
-          current: stabilizedToolbarCenterpieceDisplayMode,
-          detailWidth: pendingDetailColumnWidth
-        )
-      }
-      self.pendingDetailColumnWidth = nil
       isLayoutAnimating = false
       layoutSuppressionTask = nil
     }
   }
 
-  private func updateDetailColumnWidth(_ width: CGFloat) {
-    let nextWidth = ContentToolbarLayoutWidth.normalized(width)
-    if isLayoutAnimating {
-      if abs(nextWidth - (pendingDetailColumnWidth ?? detailColumnWidth)) >= 1 {
-        pendingDetailColumnWidth = nextWidth
-      }
-      return
-    }
-    guard abs(nextWidth - detailColumnWidth) >= 1 else {
-      return
-    }
-    pendingDetailColumnWidth = nil
-    detailColumnWidth = nextWidth
-    stabilizedToolbarCenterpieceDisplayMode = ToolbarCenterpieceDisplayMode.resolve(
-      current: stabilizedToolbarCenterpieceDisplayMode,
-      detailWidth: nextWidth
-    )
-  }
-
   private func updateInspectorWidth(_ width: CGFloat) {
-    guard !isLayoutAnimating,
-      showInspector,
+    guard showInspector,
       width >= HarnessMonitorInspectorLayout.minWidth,
       width <= HarnessMonitorInspectorLayout.maxWidth
     else {
