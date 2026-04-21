@@ -34,6 +34,12 @@ scrape_configs:
       - targets:
           - sqlite-exporter:9560
 
+  # low-cardinality host process metrics exported by the repo-managed Alloy OTel agent
+  - job_name: alloy-host-processes
+    static_configs:
+      - targets:
+          - host.docker.internal:10103
+
   # macOS host metrics (darwin-exporter for battery, thermal, wifi)
   - job_name: darwin-exporter
     static_configs:

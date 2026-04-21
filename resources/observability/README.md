@@ -10,11 +10,13 @@ The local Grafana Tempo data source is already provisioned with `serviceMap.data
 
 ## macOS host metrics
 
-Two native services collect host-level metrics from your Mac and feed them into the local Prometheus:
+Three native services collect local workstation metrics from your Mac and feed them into the local Prometheus:
 
-Grafana Alloy runs as a homebrew service and collects standard node_exporter-style metrics via its `prometheus.exporter.unix` component. It remote-writes directly to Prometheus.
+Grafana Alloy runs as a Homebrew service and collects standard node_exporter-style machine metrics via its `prometheus.exporter.unix` component. It remote-writes CPU, load, memory, disk, filesystem, and network metrics directly into Prometheus.
 
-darwin-exporter runs as a launchd daemon and collects macOS-specific metrics that node_exporter cannot provide: CPU/GPU/disk temperatures, battery health and cycle count, WiFi signal strength and connection details, and thermal pressure state. Prometheus scrapes it on port 10102.
+A repo-managed Alloy OTel launch agent exposes low-cardinality process metrics on port `10103` using the `hostmetrics` receiver's `processes` and `process` scrapers. The shipped config keeps only stable executable-name labels and deletes PID, parent PID, full command line, and executable path before Prometheus ingestion.
+
+darwin-exporter runs as a launchd daemon and collects macOS-specific metrics that node_exporter cannot provide: CPU/GPU/disk temperatures, battery health and cycle count, WiFi signal strength and connection details, and thermal pressure state. Prometheus scrapes it on port `10102`.
 
 ### Installation
 
@@ -22,8 +24,9 @@ darwin-exporter runs as a launchd daemon and collects macOS-specific metrics tha
 mise run host-metrics:install
 ```
 
-This installs both services:
-- Alloy via homebrew with a config at `/opt/homebrew/etc/alloy/config.alloy`
+This installs all three services:
+- Alloy via Homebrew with a config at `/opt/homebrew/etc/alloy/config.alloy`
+- a repo-managed Alloy OTel launch agent with config at `/opt/homebrew/etc/alloy/harness-host-processes.otel.yaml`
 - darwin-exporter built from `vendor/darwin-exporter` (requires Go), installed to `/usr/local/bin/darwin-exporter`
 
 ### Management commands
@@ -31,10 +34,10 @@ This installs both services:
 ```bash
 mise run host-metrics:status   # show service status and Prometheus targets
 mise run host-metrics:metrics  # query current host metrics
-mise run host-metrics:logs     # tail recent logs from both services
-mise run host-metrics:start    # start both services
-mise run host-metrics:stop     # stop both services
-mise run host-metrics:restart  # restart both services
+mise run host-metrics:logs     # tail recent logs from all host-metrics services
+mise run host-metrics:start    # start all host-metrics services
+mise run host-metrics:stop     # stop all host-metrics services
+mise run host-metrics:restart  # restart all host-metrics services
 ```
 
 ### Metrics available
@@ -45,6 +48,15 @@ From Alloy (node_exporter):
 - `node_filesystem_avail_bytes` - available disk space
 - `node_disk_*` - disk I/O statistics
 - `node_network_*` - network interface statistics
+
+From the Alloy OTel host-process exporter:
+- `system_processes_count` - process state counts across the whole workstation
+- `process_cpu_utilization_ratio` - tracked-process CPU utilization
+- `process_memory_usage_bytes` - tracked-process resident memory
+- `process_memory_virtual_bytes` - tracked-process virtual memory
+- `process_threads` - tracked-process thread counts
+- `process_open_file_descriptors` - tracked-process open file descriptors
+- `process_uptime_seconds` - tracked-process uptime
 
 From darwin-exporter:
 - `darwin_cpu_temperature_celsius` - CPU die temperature
@@ -63,7 +75,7 @@ From darwin-exporter:
 The local stack now provisions a repo-managed forensic suite into the `Harness Observability` folder:
 
 - `Harness Investigation Cockpit` - the landing page for short-window local slowdowns
-- `Harness Host Machine` - CPU, memory, swap, disk, filesystem, WiFi, battery, and thermal drilldown
+- `Harness Host Machine` - CPU, load, memory, swap, disk, filesystem, network, process states, tracked-process CPU/RSS/VM/thread/fd/uptime, WiFi, battery, and thermal drilldown
 - `Harness Runtime & Hooks` - CLI and hook execution bottlenecks
 - `Harness Daemon Transport` - HTTP and WS transport bottlenecks
 - `Harness Monitor Client` - monitor memory, websocket, cache, and client API pressure
