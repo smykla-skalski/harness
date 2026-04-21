@@ -24,6 +24,16 @@ public enum ContentInspectorVisibilitySource {
   case framework
 }
 
+public enum ContentInspectorStartupPresentation {
+  public static func resolve(
+    hydratedPresentation: Bool,
+    persistedPreference: Bool,
+    hasHydratedPersistedPreference: Bool
+  ) -> Bool {
+    hasHydratedPersistedPreference ? hydratedPresentation : persistedPreference
+  }
+}
+
 public struct ContentInspectorVisibilityChange: Equatable {
   public let nextPresentation: Bool
   public let persistedPreference: Bool?

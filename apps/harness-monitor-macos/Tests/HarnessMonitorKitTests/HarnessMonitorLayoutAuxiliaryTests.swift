@@ -6,6 +6,28 @@ import Testing
 
 @Suite("Content inspector visibility policy")
 struct ContentInspectorVisibilityPolicyTests {
+  @Test("Startup presentation follows the persisted preference before hydration")
+  func startupPresentationUsesPersistedPreferenceBeforeHydration() {
+    #expect(
+      ContentInspectorStartupPresentation.resolve(
+        hydratedPresentation: false,
+        persistedPreference: true,
+        hasHydratedPersistedPreference: false
+      ) == true
+    )
+  }
+
+  @Test("Startup presentation follows the hydrated state after hydration")
+  func startupPresentationUsesHydratedStateAfterHydration() {
+    #expect(
+      ContentInspectorStartupPresentation.resolve(
+        hydratedPresentation: false,
+        persistedPreference: true,
+        hasHydratedPersistedPreference: true
+      ) == false
+    )
+  }
+
   @Test("Explicit user toggles persist the preference and suppress layout geometry")
   func explicitUserTogglesPersistPreference() {
     let change = ContentInspectorVisibilityPolicy.resolve(
