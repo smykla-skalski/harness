@@ -17,6 +17,28 @@ fn host_machine_dashboard_uses_auto_grid_and_surfaces_host_and_process_views() {
         dashboard["layout"]["spec"]["columnWidth"].as_i64(),
         Some(300)
     );
+    assert_eq!(
+        dashboard["timepicker"]["refresh_intervals"]
+            .as_array()
+            .map(Vec::len),
+        Some(10),
+        "host machine dashboard should expose modern refresh interval shortcuts"
+    );
+
+    let process_variable = dashboard["templating"]["list"]
+        .as_array()
+        .expect("host machine dashboard should declare templating variables")
+        .iter()
+        .find(|variable| variable["name"].as_str() == Some("process_name"))
+        .expect("host machine dashboard should expose a tracked process selector");
+    assert_eq!(process_variable["type"].as_str(), Some("query"));
+    assert!(
+        process_variable["query"]
+            .as_str()
+            .expect("process_name should have a query")
+            .contains("label_values(process_cpu_utilization_ratio, process_executable_name)"),
+        "process_name should enumerate tracked executable names"
+    );
 
     for (title, metric_fragment) in [
         (
@@ -66,6 +88,10 @@ fn host_machine_dashboard_process_queries_do_not_reintroduce_high_cardinality_pi
             assert!(
                 !expr.contains("process_command_line"),
                 "{title} should not depend on command-line labels, got: {expr}"
+            );
+            assert!(
+                expr.contains("process_executable_name=~\"$process_name\""),
+                "{title} should respect the shared process selector, got: {expr}"
             );
             assert!(
                 expr.contains("process_executable_name"),

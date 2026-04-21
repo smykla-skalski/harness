@@ -13,11 +13,27 @@ fn dashboard_link_urls(dashboard: &serde_json::Value) -> Vec<&str> {
 fn host_process_dashboard_uses_responsive_panel_widths_and_scoped_process_filters() {
     let dashboard = load_dashboard("host-processes.json");
 
+    assert_eq!(
+        dashboard["timepicker"]["refresh_intervals"]
+            .as_array()
+            .map(Vec::len),
+        Some(10),
+        "host process dashboard should expose modern refresh interval shortcuts"
+    );
+    assert_eq!(
+        dashboard["timepicker"]["quick_ranges"]
+            .as_array()
+            .map(Vec::len),
+        Some(5),
+        "host process dashboard should expose quick time range shortcuts"
+    );
+
     for title in [
         "Tracked Process Groups",
         "Running Processes",
         "Sleeping Processes",
         "Zombie Processes",
+        "Process State Share",
         "Process States Over Time",
         "Process CPU by Name",
         "Top CPU Now",
@@ -55,6 +71,7 @@ fn host_process_dashboard_uses_responsive_panel_widths_and_scoped_process_filter
             "Zombie Processes",
             "system_processes_count{status=\"zombies\"}",
         ),
+        ("Process State Share", "system_processes_count"),
         ("Top CPU Process", "process_cpu_utilization_ratio"),
         ("Top RSS Process", "process_memory_usage_bytes"),
         ("Process States Over Time", "system_processes_count"),
@@ -78,6 +95,21 @@ fn host_process_dashboard_uses_responsive_panel_widths_and_scoped_process_filter
             "{title} should visualize {metric_fragment}, got: {exprs:?}"
         );
     }
+
+    assert_eq!(
+        panel_by_title(&dashboard, "Process State Share")["type"].as_str(),
+        Some("piechart"),
+        "host process dashboard should use a pie/donut summary for process-state share"
+    );
+
+    let cpu_legend = &panel_by_title(&dashboard, "Process CPU by Name")["options"]["legend"];
+    assert_eq!(cpu_legend["displayMode"].as_str(), Some("table"));
+    assert!(
+        cpu_legend["calcs"].as_array().is_some_and(|calcs| calcs
+            .iter()
+            .any(|calc| calc.as_str() == Some("lastNotNull"))),
+        "Process CPU by Name should expose legend calculations"
+    );
 }
 
 #[test]
@@ -131,11 +163,30 @@ fn host_process_dashboard_links_back_to_the_main_investigation_surfaces() {
             "host process dashboard should link to {expected}, got: {urls:?}"
         );
     }
+
+    let ranking_links = panel_by_title(&dashboard, "Top CPU Now")["links"]
+        .as_array()
+        .expect("Top CPU Now should declare panel links");
+    assert!(
+        ranking_links
+            .iter()
+            .filter_map(|link| link["url"].as_str())
+            .any(|url| url == "/a/grafana-metricsdrilldown-app/drilldown"),
+        "Top CPU Now should offer a direct path into Metrics Drilldown"
+    );
 }
 
 #[test]
 fn investigation_cockpit_uses_responsive_panel_widths_and_links_to_process_drilldown() {
     let dashboard = load_dashboard("investigation-cockpit.json");
+
+    assert_eq!(
+        dashboard["timepicker"]["refresh_intervals"]
+            .as_array()
+            .map(Vec::len),
+        Some(10),
+        "investigation cockpit should expose modern refresh interval shortcuts"
+    );
 
     for title in [
         "Hook p95",
@@ -176,4 +227,12 @@ fn investigation_cockpit_uses_responsive_panel_widths_and_links_to_process_drill
             "{title} should use {metric_fragment}, got: {expr}"
         );
     }
+
+    let cpu_legend = &panel_by_title(&dashboard, "Top Tracked Process CPU")["options"]["legend"];
+    assert!(
+        cpu_legend["calcs"]
+            .as_array()
+            .is_some_and(|calcs| calcs.iter().any(|calc| calc.as_str() == Some("max"))),
+        "Top Tracked Process CPU should expose legend calculations for quick ranking"
+    );
 }
