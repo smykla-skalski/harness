@@ -191,21 +191,7 @@ public final class HarnessMonitorStore {
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.toast = ToastSlice()
-    if let groupContainer = SandboxPaths.appGroupContainerURL() {
-      self.bookmarkStore = BookmarkStore(containerURL: groupContainer)
-    } else {
-      #if DEBUG
-        HarnessMonitorLogger.store.warning(
-          "App group container unavailable; using temp dir for BookmarkStore — check entitlements"
-        )
-        self.bookmarkStore = BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
-      #else
-        HarnessMonitorLogger.store.warning(
-          "App group container unavailable; bookmark store disabled — check entitlements"
-        )
-        self.bookmarkStore = nil
-      #endif
-    }
+    self.bookmarkStore = Self.makeBookmarkStore()
     self.daemonController = daemonController
     self.daemonOwnership = daemonOwnership
     self.fileViewer = fileViewer
@@ -237,6 +223,36 @@ public final class HarnessMonitorStore {
     refreshBookmarkedSessionIds()
     syncAllUI()
   }
+
+  private static func makeBookmarkStore() -> BookmarkStore? {
+    #if DEBUG
+      if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+        return BookmarkStore(containerURL: debugBookmarkStoreContainerURL())
+      }
+    #endif
+    if let groupContainer = SandboxPaths.appGroupContainerURL() {
+      return BookmarkStore(containerURL: groupContainer)
+    }
+    #if DEBUG
+      HarnessMonitorLogger.store.warning(
+        "App group container unavailable; using temp dir for BookmarkStore — check entitlements"
+      )
+      return BookmarkStore(containerURL: SandboxPaths.debugBookmarkFallbackContainerURL())
+    #else
+      HarnessMonitorLogger.store.warning(
+        "App group container unavailable; bookmark store disabled — check entitlements"
+      )
+      return nil
+    #endif
+  }
+
+  #if DEBUG
+    private static func debugBookmarkStoreContainerURL() -> URL {
+      SandboxPaths.debugBookmarkFallbackContainerURL()
+        .appendingPathComponent("xctest-bookmark-store", isDirectory: true)
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    }
+  #endif
 
   public func bootstrapIfNeeded() async {
     guard !hasBootstrapped else {
