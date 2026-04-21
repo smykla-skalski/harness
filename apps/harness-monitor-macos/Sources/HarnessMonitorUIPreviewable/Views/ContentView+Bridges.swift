@@ -62,7 +62,6 @@ struct ContentEscapeCommandBridge: View {
 }
 
 struct ContentAccessibilityOverlayBridge: View {
-  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let appChromeAccessibilityValue: String

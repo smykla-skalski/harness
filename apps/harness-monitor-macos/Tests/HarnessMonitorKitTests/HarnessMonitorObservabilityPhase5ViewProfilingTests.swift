@@ -197,12 +197,16 @@ struct Phase5ViewProfilingTests {
       || store.sessionSortOrder != .recentActivity
 
     #expect(contentAttributes["harness.view.surface"] == "dashboard")
+    #expect(contentAttributes["harness.view.connection_state"] == nil)
+    #expect(contentAttributes["harness.view.status_message_count"] == nil)
     #expect(sidebarAttributes["harness.view.session_filter"] == "active")
     #expect(
       accessoryAttributes["harness.view.has_active_filters"]
         == (hasActiveFilters ? "true" : "false")
     )
     #expect(toolbarAttributes["harness.view.display_mode"] == "standard")
+    #expect(toolbarAttributes["harness.view.connection_state"] == "online")
+    #expect(toolbarAttributes["harness.view.status_message_count"] == "1")
     #expect(badgeAttributes["harness.view.transport"] == "webSocket")
   }
 

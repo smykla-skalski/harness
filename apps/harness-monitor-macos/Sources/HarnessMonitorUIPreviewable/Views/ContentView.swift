@@ -9,7 +9,6 @@ public struct ContentView<CornerContent: View>: View {
   let showsCornerAnimation: Bool
   let cornerAnimationContent: CornerContent
   let contentShell: HarnessMonitorStore.ContentShellSlice
-  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
@@ -46,8 +45,6 @@ public struct ContentView<CornerContent: View>: View {
       "harness.view.column_visibility": "\(columnVisibility)",
       "harness.view.inspector_presented": showInspector ? "true" : "false",
       "harness.view.search_presented": isSidebarSearchPresented ? "true" : "false",
-      "harness.view.connection_state": contentToolbar.connectionState.profilingLabel,
-      "harness.view.status_message_count": "\(contentToolbar.statusMessages.count)",
     ]
   }
 
@@ -77,7 +74,6 @@ public struct ContentView<CornerContent: View>: View {
     self.showsCornerAnimation = showsCornerAnimation
     self.cornerAnimationContent = cornerAnimationContent()
     self.contentShell = store.contentUI.shell
-    self.contentToolbar = store.contentUI.toolbar
     self.contentChrome = store.contentUI.chrome
     self.contentSession = store.contentUI.session
     self.contentSessionDetail = store.contentUI.sessionDetail
@@ -165,15 +161,11 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   @ToolbarContentBuilder private var contentToolbarItems: some ToolbarContent {
-    ContentNavigationToolbarItems(
-      store: store,
-      toolbarUI: contentToolbar
-    )
+    ContentNavigationToolbarItems(store: store)
   }
 
   @ViewBuilder private var contentAccessibilityOverlay: some View {
     ContentAccessibilityOverlayBridge(
-      contentToolbar: contentToolbar,
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
       appChromeAccessibilityValue: appChromeAccessibilityValue,
@@ -220,7 +212,6 @@ public struct ContentView<CornerContent: View>: View {
       contentChrome: contentChrome,
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
-      contentToolbar: contentToolbar,
       dashboardUI: contentDashboard,
       showInspector: showInspector,
       layoutSuppressionPhase: detailColumnLayoutSuppressionPhase,
