@@ -50,6 +50,9 @@ struct Marker {
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 pub fn migrate(old_root: &Path, new_root: &Path) -> Result<MigrationOutcome, MigrationError> {
+    if old_root == new_root {
+        return Ok(MigrationOutcome::AlreadyMigrated);
+    }
     if new_root.join(MARKER_NAME).exists() {
         return Ok(MigrationOutcome::AlreadyMigrated);
     }
