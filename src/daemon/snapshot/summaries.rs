@@ -163,6 +163,12 @@ pub(super) fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummar
         leader_id: resolved.state.leader_id.clone(),
         observe_id: resolved.state.observe_id.clone(),
         pending_leader_transfer: resolved.state.pending_leader_transfer.clone(),
+        external_origin: resolved
+            .state
+            .external_origin
+            .as_ref()
+            .map(|path| path.to_string_lossy().into_owned()),
+        adopted_at: resolved.state.adopted_at.clone(),
         metrics: resolved.state.metrics.clone(),
     }
 }
