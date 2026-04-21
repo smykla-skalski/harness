@@ -130,7 +130,7 @@ extension HarnessMonitorUITests {
     dismissConfirmationDialog(in: app)
   }
 
-  func testSidebarSearchFieldLivesInToolbarAndFiltersSessions() throws {
+  func testSidebarSearchFieldFiltersSessions() throws {
     let app = launch(mode: "preview")
 
     let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)

@@ -5,6 +5,7 @@
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
+     >
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -56,6 +57,7 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       codeCoverageEnabled = "YES"
+     >
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
@@ -68,6 +70,7 @@
       <Testables>
          <TestableReference
             skipped = "NO"
+           >
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "49B957BAAB2D7151E1DB1BFE"

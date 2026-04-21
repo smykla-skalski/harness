@@ -20,7 +20,10 @@ public struct ContentView<CornerContent: View>: View {
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @State private var showInspector = false
   @State private var hasHydratedInspectorVisibility = false
-  @State private var isStartupFocusParticipationEnabled = false
+  @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
+  @State private var isSidebarSearchPresented = false
+  @State private var hasPendingSidebarSearchFocusRequest = false
+  @FocusState private var isSidebarSearchFocused: Bool
   @State private var shouldIgnoreNextInspectorMeasurement = false
   @State private var detailColumnWidth: CGFloat = ContentToolbarLayoutWidth.defaultWidth
   @State private var stabilizedToolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode?
@@ -41,6 +44,13 @@ public struct ContentView<CornerContent: View>: View {
 
   private var toolbarLayoutWidth: CGFloat {
     ContentToolbarLayoutWidth.normalized(detailColumnWidth)
+  }
+
+  private var sidebarSearchText: Binding<String> {
+    Binding(
+      get: { store.searchText },
+      set: { store.searchText = $0 }
+    )
   }
 
   private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
@@ -99,14 +109,28 @@ public struct ContentView<CornerContent: View>: View {
       detailColumn
     }
     .navigationSplitViewStyle(.prominentDetail)
+    .searchable(
+      text: sidebarSearchText,
+      isPresented: $isSidebarSearchPresented,
+      placement: .sidebar,
+      prompt: Text("Search sessions, projects, leaders")
+    )
+    .searchFocused($isSidebarSearchFocused)
+    .focusedSceneValue(\.harnessSidebarSearchFocusAction) {
+      requestSidebarSearchPresentation()
+    }
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .toolbar {
       contentToolbarItems
+    }
+    .onSubmit(of: .search) {
+      submitSidebarSearch()
     }
     .onChange(of: isStartupFocusParticipationEnabled, initial: true) { _, isEnabled in
       guard isEnabled else {
         return
       }
+      applyPendingSidebarSearchPresentationRequestIfNeeded(isEnabled: isEnabled)
       hydrateInspectorVisibilityIfNeeded()
     }
     .onChange(of: persistedShowInspector) { _, newValue in
@@ -202,9 +226,7 @@ public struct ContentView<CornerContent: View>: View {
       controls: store.sessionIndex.controls,
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
-      sidebarUI: store.sidebarUI,
-      sidebarVisible: columnVisibility != .detailOnly,
-      focusParticipationEnabled: isStartupFocusParticipationEnabled
+      sidebarUI: store.sidebarUI
     )
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
@@ -322,6 +344,16 @@ public struct ContentView<CornerContent: View>: View {
       return
     }
     inspectorColumnWidth = width
+  }
+
+  func canPresentSidebarSearch() -> Bool { isStartupFocusParticipationEnabled }
+  func schedulePendingSidebarSearchFocusRequest() { hasPendingSidebarSearchFocusRequest = true }
+  func consumePendingSidebarSearchFocusRequest() -> Bool {
+    defer { hasPendingSidebarSearchFocusRequest = false }
+    return hasPendingSidebarSearchFocusRequest
+  }
+  func presentSidebarSearchNow() {
+    (isSidebarSearchPresented, isSidebarSearchFocused) = (true, true)
   }
 
   private func hydrateInspectorVisibilityIfNeeded() {

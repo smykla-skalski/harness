@@ -92,6 +92,8 @@ normalize_shared_schemes() {
     line="${line/version = \"1.7\"/version = \"1.3\"}"
     line="${line/BuildableName = \"HarnessMonitor.app\"/BuildableName = \"Harness Monitor.app\"}"
     line="${line/BuildableName = \"HarnessMonitorUITestHost.app\"/BuildableName = \"Harness Monitor UI Testing.app\"}"
+    line="${line/ runPostActionsOnFailure = \"NO\"/}"
+    line="${line/ onlyGenerateCoverageForSpecifiedTargets = \"NO\"/}"
     printf '%s' "$line"
   }
 
@@ -185,11 +187,6 @@ normalize_shared_schemes() {
       local line
       line="$(normalize_scheme_line "${raw_lines[index]}")"
 
-      if [[ "$line" == *'runPostActionsOnFailure = "NO"'* ]] || [[ "$line" == *'onlyGenerateCoverageForSpecifiedTargets = "NO"'* ]]; then
-        (( index += 1 ))
-        continue
-      fi
-
       local trimmed_line
       trimmed_line="$(trim_line "$line")"
 
@@ -224,8 +221,8 @@ normalize_shared_schemes() {
 
         local testable_line
         for testable_line in "${testable_lines[@]}"; do
-          if (( ui_test_bundle )) && [[ "$testable_line" == *'parallelizable = "NO"'* ]]; then
-            continue
+          if (( ui_test_bundle )); then
+            testable_line="${testable_line/ parallelizable = \"NO\"/}"
           fi
           normalized_lines+=("$testable_line")
         done
