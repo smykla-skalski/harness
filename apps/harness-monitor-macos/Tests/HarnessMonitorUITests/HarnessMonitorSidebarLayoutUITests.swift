@@ -46,6 +46,22 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testMainWindowUsesSystemManagedToolbarBackground() throws {
+    let app = launch(mode: "preview")
+    let toolbarChromeState = element(in: app, identifier: Accessibility.toolbarChromeState)
+
+    XCTAssertTrue(waitForElement(toolbarChromeState, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) {
+        toolbarChromeState.label.contains("toolbarBackground=automatic")
+      },
+      """
+      Expected the main window to keep the system-managed toolbar background \
+      instead of opting out with a hidden toolbar background
+      """
+    )
+  }
+
   func testSidebarCheckoutHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
     let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
