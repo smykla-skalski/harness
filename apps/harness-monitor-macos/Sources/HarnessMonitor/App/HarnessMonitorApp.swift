@@ -31,6 +31,13 @@ struct HarnessMonitorApp: App {
     ])
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
+    do {
+      try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: configuration.environment)
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "Failed to migrate generated caches: \(String(describing: error), privacy: .public)"
+      )
+    }
     HarnessMonitorTelemetry.shared.bootstrap(using: configuration.environment)
     container = configuration.container
     isUITesting = configuration.isUITesting
