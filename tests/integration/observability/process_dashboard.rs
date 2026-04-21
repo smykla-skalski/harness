@@ -134,7 +134,7 @@ fn host_process_dashboard_links_back_to_the_main_investigation_surfaces() {
 }
 
 #[test]
-fn investigation_cockpit_uses_auto_grid_and_links_to_process_drilldown() {
+fn investigation_cockpit_uses_responsive_panel_widths_and_links_to_process_drilldown() {
     let dashboard = load_dashboard("investigation-cockpit.json");
 
     for title in [
