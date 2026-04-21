@@ -36,4 +36,5 @@ clear_gatekeeper_metadata
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
+  CODE_SIGNING_ALLOWED=NO \
   test-without-building
