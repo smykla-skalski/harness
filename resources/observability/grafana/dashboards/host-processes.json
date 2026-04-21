@@ -577,6 +577,80 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Current process-state distribution as a proportional snapshot.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 20,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Host Machine",
+          "url": "/d/harness-host-machine"
+        },
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Metrics Drilldown",
+          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+        }
+      ],
+      "options": {
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "hideZeros": true,
+          "mode": "all",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (status) (system_processes_count)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Process State Share",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "Process state counts over time for the entire machine.",
       "fieldConfig": {
         "defaults": {
@@ -596,12 +670,16 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 8
       },
       "id": 9,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -639,14 +717,23 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 16
       },
       "id": 10,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
@@ -678,14 +765,23 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 16
       },
       "id": 11,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
@@ -717,14 +813,23 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 16
+        "x": 0,
+        "y": 24
       },
       "id": 12,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
@@ -756,14 +861,23 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 24
       },
       "id": 13,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
@@ -795,14 +909,23 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 24
+        "x": 0,
+        "y": 32
       },
       "id": 14,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
@@ -834,14 +957,23 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 32
       },
       "id": 15,
       "options": {
         "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
           "displayMode": "table",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
@@ -873,10 +1005,24 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 32
+        "x": 0,
+        "y": 40
       },
       "id": 16,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Metrics Drilldown",
+          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+        },
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Host Machine",
+          "url": "/d/harness-host-machine"
+        }
+      ],
       "options": {
         "displayMode": "gradient",
         "orientation": "horizontal",
@@ -919,10 +1065,24 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 40
       },
       "id": 17,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Metrics Drilldown",
+          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+        },
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Host Machine",
+          "url": "/d/harness-host-machine"
+        }
+      ],
       "options": {
         "displayMode": "gradient",
         "orientation": "horizontal",
@@ -965,10 +1125,24 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 40
+        "x": 0,
+        "y": 48
       },
       "id": 18,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Metrics Drilldown",
+          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+        },
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Host Machine",
+          "url": "/d/harness-host-machine"
+        }
+      ],
       "options": {
         "displayMode": "gradient",
         "orientation": "horizontal",
@@ -1011,10 +1185,24 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 48
       },
       "id": 19,
+      "links": [
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Metrics Drilldown",
+          "url": "/a/grafana-metricsdrilldown-app/drilldown"
+        },
+        {
+          "keepTime": true,
+          "targetBlank": false,
+          "title": "Open Host Machine",
+          "url": "/d/harness-host-machine"
+        }
+      ],
       "options": {
         "displayMode": "gradient",
         "orientation": "horizontal",
@@ -1096,6 +1284,47 @@
   "time": {
     "from": "now-15m",
     "to": "now"
+  },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Last 15 minutes",
+        "from": "now-15m",
+        "to": "now"
+      },
+      {
+        "display": "Last 30 minutes",
+        "from": "now-30m",
+        "to": "now"
+      },
+      {
+        "display": "Last 1 hour",
+        "from": "now-1h",
+        "to": "now"
+      },
+      {
+        "display": "Last 6 hours",
+        "from": "now-6h",
+        "to": "now"
+      },
+      {
+        "display": "Last 24 hours",
+        "from": "now-24h",
+        "to": "now"
+      }
+    ],
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
   },
   "title": "Harness Host Processes",
   "uid": "harness-host-processes",
