@@ -5,22 +5,37 @@ fn host_machine_dashboard_uses_auto_grid_and_surfaces_host_and_process_views() {
     let dashboard = load_dashboard("host-machine.json");
 
     assert_eq!(dashboard["layout"]["kind"].as_str(), Some("auto-grid"));
-    assert_eq!(dashboard["layout"]["spec"]["maxColumnCount"].as_i64(), Some(4));
-    assert_eq!(dashboard["layout"]["spec"]["columnWidthMode"].as_str(), Some("custom"));
-    assert_eq!(dashboard["layout"]["spec"]["columnWidth"].as_i64(), Some(300));
+    assert_eq!(
+        dashboard["layout"]["spec"]["maxColumnCount"].as_i64(),
+        Some(4)
+    );
+    assert_eq!(
+        dashboard["layout"]["spec"]["columnWidthMode"].as_str(),
+        Some("custom")
+    );
+    assert_eq!(
+        dashboard["layout"]["spec"]["columnWidth"].as_i64(),
+        Some(300)
+    );
 
     for (title, metric_fragment) in [
-        ("Network I/O by Interface", "node_network_receive_bytes_total"),
-        ("Network I/O by Interface", "node_network_transmit_bytes_total"),
+        (
+            "Network I/O by Interface",
+            "node_network_receive_bytes_total",
+        ),
+        (
+            "Network I/O by Interface",
+            "node_network_transmit_bytes_total",
+        ),
         ("Process States", "system_processes_count"),
         ("Tracked Process CPU", "process_cpu_utilization_ratio"),
         ("Tracked Process RSS", "process_memory_usage_bytes"),
-        ("Tracked Process Virtual Memory", "process_memory_virtual_bytes"),
-        ("Tracked Process Threads", "process_threads"),
         (
-            "Tracked Process Open FDs",
-            "process_open_file_descriptors",
+            "Tracked Process Virtual Memory",
+            "process_memory_virtual_bytes",
         ),
+        ("Tracked Process Threads", "process_threads"),
+        ("Tracked Process Open FDs", "process_open_file_descriptors"),
         ("Tracked Process Uptime", "process_uptime_seconds"),
     ] {
         let exprs = panel_exprs(&dashboard, title);
@@ -62,7 +77,8 @@ fn host_machine_dashboard_process_queries_do_not_reintroduce_high_cardinality_pi
 
 #[test]
 fn prometheus_scrapes_the_host_process_exporter_endpoint() {
-    let config: serde_yml::Value = load_yaml_file("resources/observability/prometheus/prometheus.yml");
+    let config: serde_yml::Value =
+        load_yaml_file("resources/observability/prometheus/prometheus.yml");
     let scrape_configs = config["scrape_configs"]
         .as_sequence()
         .expect("prometheus.yml should declare scrape_configs");

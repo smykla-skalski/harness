@@ -76,6 +76,7 @@ The local stack now provisions a repo-managed forensic suite into the `Harness O
 
 - `Harness Investigation Cockpit` - the landing page for short-window local slowdowns
 - `Harness Host Machine` - CPU, load, memory, swap, disk, filesystem, network, process states, tracked-process CPU/RSS/VM/thread/fd/uptime, WiFi, battery, and thermal drilldown
+- `Harness Host Processes` - low-cardinality process triage with top offenders, process-state pressure, per-process CPU/RSS/VM/thread/fd/uptime trends, and current rankings
 - `Harness Runtime & Hooks` - CLI and hook execution bottlenecks
 - `Harness Daemon Transport` - HTTP and WS transport bottlenecks
 - `Harness Monitor Client` - monitor memory, websocket, cache, and client API pressure
