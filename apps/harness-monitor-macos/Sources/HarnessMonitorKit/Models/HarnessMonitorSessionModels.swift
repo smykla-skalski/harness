@@ -122,6 +122,8 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
   public let leaderId: String?
   public let observeId: String?
   public let pendingLeaderTransfer: PendingLeaderTransfer?
+  public let externalOrigin: String?
+  public let adoptedAt: String?
   public let metrics: SessionMetrics
 
   public var id: String { sessionId }
@@ -147,6 +149,8 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     leaderId: String?,
     observeId: String?,
     pendingLeaderTransfer: PendingLeaderTransfer?,
+    externalOrigin: String? = nil,
+    adoptedAt: String? = nil,
     metrics: SessionMetrics
   ) {
     self.projectId = projectId
@@ -167,6 +171,8 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     self.leaderId = leaderId
     self.observeId = observeId
     self.pendingLeaderTransfer = pendingLeaderTransfer
+    self.externalOrigin = externalOrigin
+    self.adoptedAt = adoptedAt
     self.metrics = metrics
   }
 
@@ -183,7 +189,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     case sessionId, worktreePath, sharedPath, originPath, branchRef
     case title, context, status
     case createdAt, updatedAt, lastActivityAt
-    case leaderId, observeId, pendingLeaderTransfer, metrics
+    case leaderId, observeId, pendingLeaderTransfer, externalOrigin, adoptedAt, metrics
   }
 
   public init(from decoder: Decoder) throws {
@@ -210,6 +216,8 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
         PendingLeaderTransfer.self,
         forKey: .pendingLeaderTransfer
       ),
+      externalOrigin: try container.decodeIfPresent(String.self, forKey: .externalOrigin),
+      adoptedAt: try container.decodeIfPresent(String.self, forKey: .adoptedAt),
       metrics: try container.decode(SessionMetrics.self, forKey: .metrics)
     )
   }
