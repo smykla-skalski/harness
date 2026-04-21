@@ -181,6 +181,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func configuration() async throws -> MonitorConfiguration
   func logLevel() async throws -> LogLevelResponse
   func setLogLevel(_ level: String) async throws -> LogLevelResponse
+  func adoptSession(bookmarkID: String?, sessionRoot: URL) async throws -> SessionSummary
 }
 
 extension HarnessMonitorClientProtocol {
@@ -261,6 +262,10 @@ extension HarnessMonitorClientProtocol {
 
   public func configuration() async throws -> MonitorConfiguration {
     MonitorConfiguration(personas: [], runtimeModels: [])
+  }
+
+  public func adoptSession(bookmarkID _: String?, sessionRoot _: URL) async throws -> SessionSummary {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Adopt session unavailable.")
   }
 
   private func timelineWindowResponse(

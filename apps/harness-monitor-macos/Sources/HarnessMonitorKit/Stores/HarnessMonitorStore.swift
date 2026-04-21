@@ -16,6 +16,7 @@ public final class HarnessMonitorStore {
   public let bookmarkStore: BookmarkStore?
 
   public var openFolderRequest = 0
+  public var attachSessionRequest = 0
 
   public var persistenceError: String? {
     didSet {

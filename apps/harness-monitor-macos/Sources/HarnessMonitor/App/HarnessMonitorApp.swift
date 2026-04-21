@@ -146,6 +146,7 @@ struct HarnessMonitorApp: App {
     .onChange(of: store.openFolderRequest) { _, _ in
       showOpenFolder = true
     }
+    .attachExternalSessionImporter(store: store)
   }
 
   private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
