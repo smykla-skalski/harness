@@ -25,7 +25,7 @@ sanitize_segment() {
 
 rtk_supports_cargo_subcommand() {
   case "${1:-}" in
-    build|check|clippy|install|nextest|test)
+    build|check|clippy|fmt|install|nextest|test)
       return 0
       ;;
     *)
