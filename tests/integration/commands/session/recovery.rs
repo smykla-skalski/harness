@@ -9,10 +9,9 @@ fn recover_leader_builds_managed_tui_request_from_policy_preset() {
     with_session_test_env(tmp.path(), "recover-leader", || {
         let project = tmp.path().join("project");
         let state = service::start_session_with_policy(
-            "recover leader",
             "",
+            "recover leader",
             &project,
-            Some("claude"),
             Some("recover-1"),
             Some("swarm-default"),
         )

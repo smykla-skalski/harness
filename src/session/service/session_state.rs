@@ -28,16 +28,16 @@ pub(crate) fn build_new_session(
     context: &str,
     title: &str,
     session_id: &str,
-    _runtime_name: &str,
-    _agent_session_id: Option<&str>,
+    runtime_name: &str,
+    agent_session_id: Option<&str>,
     now: &str,
 ) -> SessionState {
     build_new_session_with_policy(
         context,
         title,
         session_id,
-        _runtime_name,
-        _agent_session_id,
+        runtime_name,
+        agent_session_id,
         now,
         None,
     )
@@ -47,11 +47,12 @@ pub(crate) fn build_new_session_with_policy(
     context: &str,
     title: &str,
     session_id: &str,
-    _runtime_name: &str,
-    _agent_session_id: Option<&str>,
+    runtime_name: &str,
+    agent_session_id: Option<&str>,
     now: &str,
     policy_preset: Option<&str>,
 ) -> SessionState {
+    let _ = (runtime_name, agent_session_id);
     build_initial_state(context, title, session_id, now, policy_preset)
 }
 

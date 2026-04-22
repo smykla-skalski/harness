@@ -23,6 +23,7 @@ fn roundtrip_through_shared_json() {
             display_name: "integ".into(),
             last_resolved_path: target.path().display().to_string(),
             bookmark_data: bookmark_bytes,
+            handoff_bookmark_data: None,
             created_at: now,
             last_accessed_at: now,
             stale_count: 0,

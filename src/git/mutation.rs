@@ -1,9 +1,15 @@
 #![allow(dead_code)]
 
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use fs_err as fs;
-use gix::refs::transaction::{Change, PreviousValue, RefEdit, RefLog};
+use gix::progress::Discard;
+use gix::refs::{
+    FullName,
+    transaction::{Change, PreviousValue, RefEdit, RefLog},
+};
+use gix::worktree::state::{self, checkout::Options};
 
 use crate::git::{GitError, GitResult};
 
@@ -38,8 +44,7 @@ pub(crate) fn create_linked_worktree(
     .map_err(|error| GitError::mutation(repo_path, error))?;
 
     let worktree_git_dir = common_dir.join("worktrees").join(worktree_name);
-    fs::create_dir_all(&worktree_git_dir)
-        .map_err(|error| GitError::mutation(repo_path, error))?;
+    fs::create_dir_all(&worktree_git_dir).map_err(|error| GitError::mutation(repo_path, error))?;
 
     let worktree_dot_git = worktree_path.join(".git");
     fs::write(
@@ -54,16 +59,15 @@ pub(crate) fn create_linked_worktree(
     )
     .map_err(|error| GitError::mutation(repo_path, error))?;
 
-    let relative_common = pathdiff::diff_paths(&common_dir, &worktree_git_dir)
-        .unwrap_or_else(|| common_dir.clone());
+    let relative_common =
+        pathdiff::diff_paths(&common_dir, &worktree_git_dir).unwrap_or_else(|| common_dir.clone());
     fs::write(
         worktree_git_dir.join("commondir"),
         format!("{}\n", relative_common.display()),
     )
     .map_err(|error| GitError::mutation(repo_path, error))?;
 
-    fs::create_dir_all(worktree_path)
-        .map_err(|error| GitError::mutation(repo_path, error))?;
+    fs::create_dir_all(worktree_path).map_err(|error| GitError::mutation(repo_path, error))?;
     fs::write(
         &worktree_dot_git,
         format!("gitdir: {}\n", worktree_git_dir.display()),
@@ -94,18 +98,18 @@ fn checkout_head(repo: &gix::Repository, error_path: &Path) -> GitResult<()> {
         .workdir()
         .ok_or_else(|| GitError::mutation(error_path, "repository has no work directory"))?;
 
-    let options = gix::worktree::state::checkout::Options {
+    let options = Options {
         overwrite_existing: true,
         ..Default::default()
     };
 
-    gix::worktree::state::checkout(
+    state::checkout(
         &mut index.into(),
         workdir,
         repo.objects.clone().into_arc().expect("object cache"),
-        &gix::progress::Discard,
-        &gix::progress::Discard,
-        &std::sync::atomic::AtomicBool::new(false),
+        &Discard,
+        &Discard,
+        &AtomicBool::new(false),
         options,
     )
     .map_err(|error| GitError::mutation(error_path, error))?;
@@ -123,8 +127,7 @@ pub(crate) fn remove_linked_worktree(
     let worktree_git_dir = common_dir.join("worktrees").join(worktree_name);
 
     if worktree_path.exists() {
-        fs::remove_dir_all(worktree_path)
-            .map_err(|error| GitError::mutation(repo_path, error))?;
+        fs::remove_dir_all(worktree_path).map_err(|error| GitError::mutation(repo_path, error))?;
     }
 
     if worktree_git_dir.exists() {
@@ -139,7 +142,7 @@ pub(crate) fn delete_local_branch(repo_path: &Path, branch_name: &str) -> GitRes
     let repo = open(repo_path)?;
     let ref_name = format!("refs/heads/{branch_name}");
 
-    let full_name: gix::refs::FullName = ref_name
+    let full_name: FullName = ref_name
         .try_into()
         .map_err(|error| GitError::mutation(repo_path, error))?;
 

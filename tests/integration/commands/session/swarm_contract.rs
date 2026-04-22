@@ -16,10 +16,9 @@ fn leader_request_with_fallback_stays_non_leader_until_transfer() {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
         let state = service::start_session_with_policy(
-            "fallback transfer",
             "",
+            "fallback transfer",
             &project,
-            Some("claude"),
             Some("swarm-fallback-1"),
             Some("swarm-default"),
         )
@@ -86,10 +85,9 @@ fn observer_creates_open_tasks_and_leader_assigns_worker() {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
         let state = service::start_session_with_policy(
-            "observer triage",
             "",
+            "observer triage",
             &project,
-            Some("claude"),
             Some("swarm-tasks-1"),
             Some("swarm-default"),
         )
