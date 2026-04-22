@@ -4,7 +4,7 @@ use super::frames::{
 };
 use super::mutations::{
     dispatch_mutation_prefer_async, dispatch_mutation_with_agent_prefer_async,
-    dispatch_mutation_with_task_prefer_async, dispatch_query,
+    dispatch_mutation_with_task_prefer_async, dispatch_session_start, dispatch_set_log_level,
 };
 use super::queries::{
     dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
@@ -13,9 +13,9 @@ use super::queries::{
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SetLogLevelRequest, SignalCancelRequest, SignalSendRequest,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, WsRequest, WsResponse,
+    SessionEndRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
+    TaskUpdateRequest, WsRequest, WsResponse,
 };
 use crate::daemon::service;
 use crate::telemetry::{
@@ -237,27 +237,34 @@ async fn dispatch_session_mutation(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
+    if let Some(response) = dispatch_session_control_mutation(request, state).await {
+        return Some(response);
+    }
+    dispatch_session_signal_mutation(request, state).await
+}
+
+async fn dispatch_session_control_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
     match request.method.as_str() {
+        "session.start" => Some(dispatch_session_start(request, state).await),
         "leader.transfer" => Some(dispatch_leader_transfer(request, state).await),
         "session.end" => Some(dispatch_session_end(request, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_session_signal_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         "signal.send" => Some(dispatch_signal_send(request, state).await),
         "signal.cancel" => Some(dispatch_signal_cancel(request, state).await),
         "session.observe" => Some(dispatch_session_observe(request, state).await),
         _ => None,
     }
-}
-fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
-        Ok(body) => body,
-        Err(error) => {
-            return error_response(
-                &request.id,
-                "INVALID_PARAMS",
-                &format!("invalid set_log_level params: {error}"),
-            );
-        }
-    };
-    dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
 }
 async fn dispatch_task_create(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     dispatch_mutation_prefer_async(
