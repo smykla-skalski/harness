@@ -79,12 +79,10 @@ impl AgentTuiManagerHandle {
         &self,
         tui_id: &str,
     ) -> Result<Arc<super::AgentTuiProcess>, CliError> {
-        self.active_tui(tui_id)?
-            .process
-            .ok_or_else(|| {
-                CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
-                    .into()
-            })
+        self.active_tui(tui_id)?.process.ok_or_else(|| {
+            CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
+                .into()
+        })
     }
 
     pub(crate) fn active_tui(&self, tui_id: &str) -> Result<ActiveAgentTui, CliError> {

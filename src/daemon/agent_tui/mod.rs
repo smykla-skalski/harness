@@ -29,9 +29,7 @@ pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub use input::{AgentTuiInput, AgentTuiKey};
-pub use input_request::{
-    AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
-};
+pub use input_request::{AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep};
 pub use manager::AgentTuiManagerHandle;
 pub use model::{
     AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiResizeRequest,
