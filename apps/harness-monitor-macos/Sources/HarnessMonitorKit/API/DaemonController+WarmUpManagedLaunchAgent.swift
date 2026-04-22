@@ -1,31 +1,46 @@
 import Foundation
 
+actor ManagedLaunchAgentDeferredRefreshState {
+  private var pendingStamp: ManagedLaunchAgentBundleStamp?
+
+  func setPending(_ stamp: ManagedLaunchAgentBundleStamp) {
+    pendingStamp = stamp
+  }
+
+  func takePending() -> ManagedLaunchAgentBundleStamp? {
+    defer { pendingStamp = nil }
+    return pendingStamp
+  }
+
+  func clear() {
+    pendingStamp = nil
+  }
+}
+
 extension DaemonController {
-  func refreshManagedLaunchAgentIfBundledHelperChanged() throws -> Bool {
+  func managedLaunchAgentRefreshNeededForBundledHelperChange()
+    throws -> ManagedLaunchAgentBundleStamp?
+  {
     guard ownership == .managed else {
-      return false
+      return nil
     }
     guard launchAgentManager.registrationState() == .enabled else {
-      return false
+      return nil
     }
     guard let currentStamp = try managedLaunchAgentCurrentBundleStamp() else {
-      return false
+      return nil
     }
 
     let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
     guard let persistedStamp = loadManagedLaunchAgentBundleStamp(from: stampURL) else {
       try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
-      return false
+      return nil
     }
     guard persistedStamp != currentStamp else {
-      return false
+      return nil
     }
 
-    HarnessMonitorLogger.lifecycle.notice(
-      "Bundled managed daemon helper changed; refreshing launch agent before warm-up"
-    )
-    try refreshManagedLaunchAgent(currentStamp: currentStamp)
-    return true
+    return currentStamp
   }
 
   func refreshManagedLaunchAgent(currentStamp: ManagedLaunchAgentBundleStamp) throws {
@@ -36,6 +51,14 @@ extension DaemonController {
     if launchAgentManager.registrationState() == .enabled {
       try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
     }
+  }
+
+  func queueDeferredManagedLaunchAgentRefresh(_ stamp: ManagedLaunchAgentBundleStamp) async {
+    await managedLaunchAgentDeferredRefreshState.setPending(stamp)
+  }
+
+  func clearDeferredManagedLaunchAgentRefresh() async {
+    await managedLaunchAgentDeferredRefreshState.clear()
   }
 
   func persistCurrentManagedLaunchAgentBundleStamp() throws {
@@ -77,5 +100,69 @@ extension DaemonController {
 
   func clearManagedLaunchAgentBundleStamp(at url: URL) {
     try? FileManager.default.removeItem(at: url)
+  }
+
+  func managedLaunchAgentDeferredRefreshCandidate(
+    for manifest: DaemonManifest,
+    state: inout WarmUpLoopState
+  ) throws -> ManagedLaunchAgentBundleStamp? {
+    guard ownership == .managed else {
+      state.pendingBundleStampRefresh = nil
+      return nil
+    }
+    if let pendingRefresh = state.pendingBundleStampRefresh {
+      let currentStamp = try managedLaunchAgentCurrentBundleStamp()
+      let publishedStamp = manifest.binaryStamp?.managedLaunchAgentBundleStamp
+      if publishedStamp == currentStamp {
+        state.pendingBundleStampRefresh = nil
+        return nil
+      }
+      return pendingRefresh
+    }
+    guard launchAgentManager.registrationState() == .enabled else {
+      return nil
+    }
+    guard
+      let publishedStamp = manifest.binaryStamp?.managedLaunchAgentBundleStamp,
+      let currentStamp = try managedLaunchAgentCurrentBundleStamp(),
+      publishedStamp != currentStamp
+    else {
+      return nil
+    }
+    return currentStamp
+  }
+
+  func refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
+    error: DaemonControlError,
+    state: inout WarmUpLoopState
+  ) throws -> Bool {
+    switch error {
+    case .manifestMissing, .manifestUnreadable:
+      break
+    default:
+      return false
+    }
+    return try refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(state: &state)
+  }
+
+  func refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(
+    state: inout WarmUpLoopState
+  ) throws -> Bool {
+    guard ownership == .managed else {
+      return false
+    }
+    guard state.refreshedManagedLaunchAgentDuringWarmUp == false else {
+      return false
+    }
+    guard let currentStamp = state.pendingBundleStampRefresh else {
+      return false
+    }
+    HarnessMonitorLogger.lifecycle.notice(
+      "Bundled managed daemon helper changed and no healthy daemon is available; refreshing launch agent"
+    )
+    try refreshManagedLaunchAgent(currentStamp: currentStamp)
+    state.pendingBundleStampRefresh = nil
+    state.refreshedManagedLaunchAgentDuringWarmUp = true
+    return true
   }
 }

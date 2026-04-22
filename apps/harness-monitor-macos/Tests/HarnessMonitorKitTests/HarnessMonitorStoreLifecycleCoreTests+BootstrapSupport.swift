@@ -91,6 +91,10 @@ actor DelayedWarmUpDaemonController: DaemonControlling {
     return client
   }
 
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
+  }
+
   func recordedWarmUpCallCount() -> Int {
     warmUpCallCount
   }

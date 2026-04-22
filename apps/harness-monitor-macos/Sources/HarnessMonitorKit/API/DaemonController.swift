@@ -18,6 +18,7 @@ public protocol DaemonControlling: Sendable {
   func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool
 }
 
 public struct DaemonController: DaemonControlling {
@@ -42,6 +43,7 @@ public struct DaemonController: DaemonControlling {
   let managedStaleManifestGracePeriod: Duration
   let expectedManagedDaemonVersion: @Sendable () -> String?
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
+  let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -99,6 +101,7 @@ public struct DaemonController: DaemonControlling {
     self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
     self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
+    self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -107,6 +110,24 @@ public struct DaemonController: DaemonControlling {
     )
     let connection = try loadConnection()
     return try await bootstrap(connection: connection)
+  }
+
+  public func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    guard let currentStamp = await managedLaunchAgentDeferredRefreshState.takePending() else {
+      return false
+    }
+    do {
+      HarnessMonitorLogger.lifecycle.notice(
+        "Applying deferred managed daemon helper refresh while startup-critical work is idle"
+      )
+      try refreshManagedLaunchAgent(currentStamp: currentStamp)
+      return true
+    } catch {
+      HarnessMonitorLogger.lifecycle.error(
+        "Deferred managed daemon helper refresh failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return false
+    }
   }
 
   func loadConnection() throws -> HarnessMonitorConnection {
