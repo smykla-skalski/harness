@@ -7,6 +7,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 PROJECT_PATH="$APP_ROOT/HarnessMonitor.xcodeproj"
 DERIVED_DATA_PATH="$REPO_ROOT/xcode-derived"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$APP_ROOT/Scripts/xcodebuild-with-lock.sh}"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
+source "$SCRIPT_DIR/lib/rtk-shell.sh"
 SHIPPING_SCHEME="HarnessMonitor"
 HOST_SCHEME="HarnessMonitorUITestHost"
 HOST_BUNDLE_ID="io.harnessmonitor.app.ui-testing"
@@ -1024,7 +1026,7 @@ PY
     printf 'xctrace record failed for %s / %s with exit %s and end reason "%s"\n' \
       "$template" "$scenario" "$record_status" "$end_reason" >&2
     printf 'xctrace log: %s\n' "$capture_log_path" >&2
-    tail -n 40 "$capture_log_path" >&2 || true
+    print_log_tail_compact 40 "$capture_log_path" >&2 || true
     exit "$record_status"
   fi
 

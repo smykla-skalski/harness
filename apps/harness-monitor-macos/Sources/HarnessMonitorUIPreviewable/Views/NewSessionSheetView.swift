@@ -65,48 +65,51 @@ struct NewSessionSheetView: View {
   // MARK: - Form
 
   private var formContent: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Form {
+    ScrollView {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         projectSection
         detailsSection
         advancedSection
-      }
-      .harnessNativeFormContainer()
 
-      if let error = viewModel.lastError {
-        errorBanner(for: error)
-          .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-          .padding(.bottom, HarnessMonitorTheme.spacingSM)
+        if let error = viewModel.lastError {
+          errorBanner(for: error)
+        }
       }
+      .padding(HarnessMonitorTheme.spacingLG)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
   private var projectSection: some View {
-    Section {
-      LabeledContent("Project folder") {
-        HStack(spacing: HarnessMonitorTheme.spacingSM) {
-          Picker("Project folder", selection: $viewModel.selectedBookmarkId) {
-            Text("Choose a folder…").tag(String?.none)
-            ForEach(bookmarks, id: \.id) { record in
-              Text(record.displayName)
-                .tag(Optional(record.id))
-            }
-          }
-          .pickerStyle(.menu)
-          .labelsHidden()
-          .harnessNativeFormControl()
-          .frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      fieldLabel("Project folder")
 
-          Button("Add Folder…") {
-            showImporter = true
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        Picker("Project folder", selection: $viewModel.selectedBookmarkId) {
+          Text("Choose a folder…").tag(String?.none)
+          ForEach(bookmarks, id: \.id) { record in
+            Text(record.displayName)
+              .tag(Optional(record.id))
           }
-          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .harnessNativeFormControl()
+        .frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
+
+        Button("Add Folder…") {
+          showImporter = true
+        }
+        .harnessActionButtonStyle(variant: .bordered)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       }
 
       if let selectedBookmark {
-        LabeledContent("Path") {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Path")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           Text(abbreviateHomePath(selectedBookmark.lastResolvedPath))
             .scaledFont(.caption.monospaced())
             .lineLimit(1)
@@ -114,15 +117,18 @@ struct NewSessionSheetView: View {
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .textSelection(.enabled)
         }
+      } else {
+        fieldHelp("Choose a Git project folder to start a session.")
       }
-    } footer: {
-      Text("Choose a Git project folder to start a session.")
     }
   }
 
   private var detailsSection: some View {
-    Section {
-      LabeledContent("Session title") {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      fieldBlock(
+        "Session title",
+        help: "Required. Keep it short so it stays readable in the sidebar and session history."
+      ) {
         TextField("Short summary", text: $viewModel.title)
           .harnessNativeFormControl()
           .focused($focusedField, equals: .title)
@@ -131,7 +137,10 @@ struct NewSessionSheetView: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTitle)
       }
 
-      LabeledContent("Context") {
+      fieldBlock(
+        "Context",
+        help: "Optional goals, links, or handoff notes. Multiline input stays enabled."
+      ) {
         TextField(
           "Optional goals, links, or handoff notes",
           text: $viewModel.context,
@@ -142,24 +151,48 @@ struct NewSessionSheetView: View {
         .lineLimit(4, reservesSpace: true)
         .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
       }
-    } footer: {
-      Text("Title is required. Context is optional and supports multiline notes.")
     }
   }
 
   private var advancedSection: some View {
-    Section {
-      LabeledContent("Base ref") {
-        TextField("origin/main", text: $viewModel.baseRef)
-          .harnessNativeFormControl()
-          .focused($focusedField, equals: .baseRef)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
-      }
-    } header: {
-      Text("Advanced")
-    } footer: {
-      Text("Leave blank to use the default branch.")
+    fieldBlock(
+      "Base ref",
+      help: "Optional. Leave blank to use the repository default branch."
+    ) {
+      TextField("origin/main", text: $viewModel.baseRef)
+        .harnessNativeFormControl()
+        .focused($focusedField, equals: .baseRef)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
     }
+  }
+
+  private func fieldBlock<Content: View>(
+    _ title: String,
+    help: String? = nil,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      fieldLabel(title)
+      content()
+
+      if let help {
+        fieldHelp(help)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func fieldLabel(_ title: String) -> some View {
+    Text(title)
+      .scaledFont(.caption.bold())
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+  }
+
+  private func fieldHelp(_ text: String) -> some View {
+    Text(text)
+      .scaledFont(.caption)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .fixedSize(horizontal: false, vertical: true)
   }
 
   private func errorBanner(for error: NewSessionViewModel.SubmitError) -> some View {

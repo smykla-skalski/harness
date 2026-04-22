@@ -89,7 +89,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     app.typeKey(.escape, modifierFlags: [])
   }
 
-  func testNewSessionSheetUsesNativeLabeledFieldsAndReadableSampleFolder() throws {
+  func testNewSessionSheetUsesStackedEditableFieldsAndReadableSampleFolder() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: [
@@ -120,13 +120,13 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(
       app.staticTexts["Base ref"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
-      "New Session should surface the advanced Base ref row"
+      "New Session should keep the Base ref field directly discoverable"
     )
 
     let baseRefField = editableField(in: app, identifier: Accessibility.newSessionBaseRef)
     XCTAssertTrue(
       baseRefField.waitForExistence(timeout: Self.fastActionTimeout),
-      "Base ref should be visible instead of hidden behind a broken disclosure row"
+      "Base ref should remain directly editable in the sheet"
     )
 
     selectMenuOption(
