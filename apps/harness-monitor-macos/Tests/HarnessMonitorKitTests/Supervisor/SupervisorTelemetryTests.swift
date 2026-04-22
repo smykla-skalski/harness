@@ -10,13 +10,13 @@ final class SupervisorTelemetryTests: XCTestCase {
     XCTAssertEqual(SupervisorTelemetry.actionExecuteSpanName, "supervisor.action.execute")
   }
 
+  func test_instrumentationNameIsStable() {
+    XCTAssertEqual(SupervisorTelemetry.instrumentationName, "io.harnessmonitor.supervisor")
+  }
+
   func test_tracerIsAvailable() {
     // Phase 1 smoke: the tracer provider is globally initialised so `tracer()` must never
     // return nil. Phase 2 tick-loop code will call the same accessor per tick.
     _ = SupervisorTelemetry.tracer()
-  }
-
-  func test_meterIsAvailable() {
-    _ = SupervisorTelemetry.meter()
   }
 }
