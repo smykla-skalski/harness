@@ -4,7 +4,7 @@ use super::*;
 fn removed_agent_loses_mutation_permissions() {
     with_temp_project(|project| {
         let state =
-            start_session("test", "", project, Some("claude"), Some("perm")).expect("start");
+            start_active_session("test", "", project, Some("claude"), Some("perm")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "perm",
@@ -51,7 +51,7 @@ fn removed_agent_loses_mutation_permissions() {
 fn assign_role_rejects_leader_changes() {
     with_temp_project(|project| {
         let state =
-            start_session("test", "", project, Some("claude"), Some("roles")).expect("start");
+            start_active_session("test", "", project, Some("claude"), Some("roles")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "roles",
@@ -87,7 +87,7 @@ fn assign_role_rejects_leader_changes() {
 fn assign_task_requires_active_assignee() {
     with_temp_project(|project| {
         let state =
-            start_session("test", "", project, Some("claude"), Some("assign")).expect("start");
+            start_active_session("test", "", project, Some("claude"), Some("assign")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "assign",
@@ -126,7 +126,7 @@ fn assign_task_requires_active_assignee() {
 #[test]
 fn improver_cannot_assign_tasks_under_swarm_contract() {
     with_temp_project(|project| {
-        let state = start_session_with_policy(
+        let state = start_active_session_with_policy(
             "assignment rules",
             "",
             project,
@@ -180,7 +180,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
 #[test]
 fn leader_cannot_assign_task_to_observer() {
     with_temp_project(|project| {
-        let state = start_session_with_policy(
+        let state = start_active_session_with_policy(
             "assignment rules",
             "",
             project,
@@ -234,7 +234,7 @@ fn leader_cannot_assign_task_to_observer() {
 fn transfer_leader_requires_active_target() {
     with_temp_project(|project| {
         let state =
-            start_session("test", "", project, Some("claude"), Some("transfer")).expect("start");
+            start_active_session("test", "", project, Some("claude"), Some("transfer")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "transfer",
@@ -264,7 +264,7 @@ fn transfer_leader_requires_active_target() {
 #[test]
 fn observer_transfer_leader_creates_pending_request() {
     with_temp_project(|project| {
-        let state = start_session(
+        let state = start_active_session(
             "test",
             "",
             project,
@@ -317,7 +317,7 @@ fn observer_transfer_leader_creates_pending_request() {
 #[test]
 fn current_leader_confirms_pending_transfer() {
     with_temp_project(|project| {
-        let state = start_session(
+        let state = start_active_session(
             "test",
             "",
             project,
@@ -393,7 +393,7 @@ fn current_leader_confirms_pending_transfer() {
 #[test]
 fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
     with_temp_project(|project| {
-        let state = start_session(
+        let state = start_active_session(
             "test",
             "",
             project,

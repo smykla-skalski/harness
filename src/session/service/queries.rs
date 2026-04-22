@@ -27,8 +27,8 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
 ///
 /// # Errors
 /// Returns `CliError` when the preset is unsupported, the session is not
-/// leaderless degraded, or the session policy does not allow the requested
-/// recovery preset.
+/// awaiting a leader or leaderless degraded, or the session policy does not
+/// allow the requested recovery preset.
 pub fn build_recovery_tui_request(
     session_id: &str,
     preset: &str,
@@ -37,9 +37,13 @@ pub fn build_recovery_tui_request(
 ) -> Result<AgentTuiStartRequest, CliError> {
     validate_policy_preset(Some(preset))?;
     let state = session_status(session_id, project_dir)?;
-    if state.status != SessionStatus::LeaderlessDegraded {
+    if !matches!(
+        state.status,
+        SessionStatus::AwaitingLeader | SessionStatus::LeaderlessDegraded
+    ) {
         return Err(CliErrorKind::session_agent_conflict(
-            "leader recovery is only valid for leaderless_degraded sessions".to_string(),
+            "leader recovery is only valid for awaiting_leader or leaderless_degraded sessions"
+                .to_string(),
         )
         .into());
     }
@@ -88,7 +92,7 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
         let summaries = client.list_sessions()?;
         let mut sessions: Vec<SessionState> = summaries
             .into_iter()
-            .filter(|summary| include_all || summary.status == SessionStatus::Active)
+            .filter(|summary| include_all || summary.status.is_default_visible())
             .map(|summary| summary_to_session_state(&summary))
             .collect();
         sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
@@ -128,7 +132,7 @@ pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliE
         let summaries = client.list_sessions()?;
         let mut sessions: Vec<SessionState> = summaries
             .into_iter()
-            .filter(|summary| include_all || summary.status == SessionStatus::Active)
+            .filter(|summary| include_all || summary.status.is_default_visible())
             .map(|summary| summary_to_session_state(&summary))
             .collect();
         sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));

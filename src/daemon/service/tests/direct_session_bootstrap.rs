@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn create_task_db_direct_bootstraps_file_backed_session() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "bootstrapped db-direct task",
             "",
             project,

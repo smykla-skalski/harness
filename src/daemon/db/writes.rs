@@ -1,6 +1,6 @@
 use super::{
     AgentRegistration, BTreeMap, CliError, Connection, DaemonDb, DiscoveredProject,
-    SessionLogEntry, SessionState, SessionStatus, TaskCheckpoint, WorkItem, daemon_timeline,
+    SessionLogEntry, SessionState, TaskCheckpoint, WorkItem, daemon_timeline,
     db_error, extract_transition_kind, i64_from_u64, normalize_change_scope,
     session_status_db_label, stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry,
     utc_now,
@@ -75,7 +75,7 @@ impl DaemonDb {
             .as_ref()
             .and_then(|transfer| serde_json::to_string(transfer).ok());
         let status = session_status_db_label(canonical_state.status)?;
-        let is_active = i32::from(canonical_state.status == SessionStatus::Active);
+        let is_active = i32::from(canonical_state.status.is_default_visible());
 
         let transaction = self
             .conn

@@ -11,8 +11,7 @@ use crate::errors::CliErrorKind;
 /// session root.
 ///
 /// # Errors
-/// Returns `CliError` when the runtime is unknown, the worktree cannot be
-/// created, or DB operations fail.
+/// Returns `CliError` when the worktree cannot be created or DB operations fail.
 pub fn start_session_direct(
     request: &super::protocol::SessionStartRequest,
     db: Option<&super::db::DaemonDb>,
@@ -30,7 +29,7 @@ pub fn start_session_direct(
             &request.context,
             &request.title,
             Path::new(&request.project_dir),
-            Some(&request.runtime),
+            None,
             request.session_id.as_deref(),
             request.policy_preset.as_deref(),
         );
@@ -53,11 +52,10 @@ pub fn start_session_direct(
         rollback_session_artifacts(&canonical_origin, &layout);
         return Err(error);
     }
-    let leader_id = state.leader_id.as_deref().unwrap_or("");
     db.append_log_entry(&build_log_entry(
         &state.session_id,
         session_service::log_session_started(&request.title, &request.context),
-        Some(leader_id),
+        None,
         None,
     ))?;
     db.bump_change(&state.session_id)?;
@@ -69,8 +67,7 @@ pub fn start_session_direct(
 /// Creates a per-session worktree; rolls it back on DB failure.
 ///
 /// # Errors
-/// Returns `CliError` when the runtime is unknown, the worktree cannot be
-/// created, or async DB operations fail.
+/// Returns `CliError` when the worktree cannot be created or async DB operations fail.
 pub(crate) async fn start_session_direct_async(
     request: &super::protocol::SessionStartRequest,
     async_db: &super::db::AsyncDaemonDb,
@@ -93,12 +90,11 @@ pub(crate) async fn start_session_direct_async(
         rollback_session_artifacts(&canonical_origin, &layout);
         return Err(error);
     }
-    let leader_id = state.leader_id.as_deref().unwrap_or("");
     async_db
         .append_log_entry(&build_log_entry(
             &state.session_id,
             session_service::log_session_started(&request.title, &request.context),
-            Some(leader_id),
+            None,
             None,
         ))
         .await?;

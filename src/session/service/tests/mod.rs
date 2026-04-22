@@ -19,7 +19,7 @@ mod task_flow;
 fn session_service_round_trip_smoke_covers_public_surface() {
     with_temp_project(|project| {
         let session_id = "service-smoke";
-        let state = start_session(
+        let state = start_active_session(
             "smoke goal",
             "Smoke",
             project,

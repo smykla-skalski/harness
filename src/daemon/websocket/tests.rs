@@ -131,11 +131,10 @@ pub(super) async fn start_async_session(
     session_id: &str,
 ) {
     let async_db = state.async_db.get().expect("async db");
-    start_session_direct_async(
+    let started = start_session_direct_async(
         &SessionStartRequest {
             title: format!("{session_id} title"),
             context: format!("{session_id} context"),
-            runtime: "claude".into(),
             session_id: Some(session_id.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),
             policy_preset: None,
@@ -145,6 +144,22 @@ pub(super) async fn start_async_session(
     )
     .await
     .expect("start session");
+
+    join_session_direct_async(
+        &started.session_id,
+        &SessionJoinRequest {
+            runtime: "claude".into(),
+            role: SessionRole::Leader,
+            fallback_role: None,
+            capabilities: vec![],
+            name: Some("leader".into()),
+            project_dir: project_dir.to_string_lossy().into_owned(),
+            persona: None,
+        },
+        async_db.as_ref(),
+    )
+    .await
+    .expect("join leader");
 }
 
 pub(super) async fn join_async_worker(

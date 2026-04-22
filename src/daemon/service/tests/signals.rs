@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn send_signal_returns_detail_with_pending_signal() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon signal request",
             "",
             project,
@@ -65,7 +65,7 @@ fn send_signal_returns_detail_with_pending_signal() {
 #[test]
 fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
     with_temp_project(|project| {
-        use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+        use crate::daemon::protocol::SessionJoinRequest;
 
         let db = Arc::new(Mutex::new(setup_db_with_project(project)));
         let db_slot = Arc::new(OnceLock::new());
@@ -75,19 +75,14 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
 
         {
             let db_guard = db.lock().expect("db lock");
-            start_session_direct(
-                &SessionStartRequest {
-                    title: "daemon active signal".into(),
-                    context: "wake idle tui".into(),
-                    runtime: "claude".into(),
-                    session_id: Some("daemon-active-signal".into()),
-                    project_dir: project.to_string_lossy().into(),
-                    policy_preset: None,
-                    base_ref: None,
-                },
-                Some(&db_guard),
-            )
-            .expect("start session");
+            start_direct_session(
+                &db_guard,
+                project,
+                "daemon-active-signal",
+                "daemon active signal",
+                "wake idle tui",
+                None,
+            );
         }
 
         let worker_session_id = "daemon-active-signal-worker";
@@ -192,7 +187,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
 #[test]
 fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
     with_temp_project(|project| {
-        use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+        use crate::daemon::protocol::SessionJoinRequest;
 
         let db = Arc::new(Mutex::new(setup_db_with_project(project)));
         let db_slot = Arc::new(OnceLock::new());
@@ -202,19 +197,14 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
 
         {
             let db_guard = db.lock().expect("db lock");
-            start_session_direct(
-                &SessionStartRequest {
-                    title: "daemon timed signal".into(),
-                    context: "warn when idle tui ignores wake".into(),
-                    runtime: "claude".into(),
-                    session_id: Some("daemon-timed-signal".into()),
-                    project_dir: project.to_string_lossy().into(),
-                    policy_preset: None,
-                    base_ref: None,
-                },
-                Some(&db_guard),
-            )
-            .expect("start session");
+            start_direct_session(
+                &db_guard,
+                project,
+                "daemon-timed-signal",
+                "daemon timed signal",
+                "warn when idle tui ignores wake",
+                None,
+            );
         }
 
         let worker_session_id = "daemon-timed-signal-worker";
@@ -323,7 +313,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
 #[test]
 fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon cancel request",
             "",
             project,
@@ -406,7 +396,7 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
 #[test]
 fn cancel_signal_errors_when_signal_not_pending() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon cancel missing",
             "",
             project,
