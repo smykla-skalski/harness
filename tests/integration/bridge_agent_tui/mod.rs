@@ -287,6 +287,113 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
 }
 
 #[test]
+fn bridge_does_not_resend_auto_join_for_cli_prompt_runtimes() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let project = tmp.path().join("project");
+    crate::integration::daemon_control::process::init_git_repo(&project);
+
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["bridge", "start", "--capability", "agent-tui"])
+            .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+            .env("XDG_DATA_HOME", tmp.path())
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
+
+    let _state = wait_for_bridge_state(tmp.path());
+    let prompt = "/harness:harness session join sess-cli-runtime --role worker --runtime claude";
+
+    temp_env::with_vars(
+        [
+            (
+                "HARNESS_DAEMON_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "HARNESS_HOST_HOME",
+                Some(host_home.to_str().expect("utf8 host home")),
+            ),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("HARNESS_SANDBOXED", None),
+        ],
+        || {
+            let client = BridgeClient::from_state_file().expect("bridge client");
+            let snapshot = client
+                .agent_tui_start(&AgentTuiStartSpec {
+                    session_id: "sess-cli-runtime".to_string(),
+                    agent_id: "agent-cli-runtime".to_string(),
+                    tui_id: "agent-tui-cli-runtime".to_string(),
+                    profile: AgentTuiLaunchProfile::from_argv(
+                        "claude",
+                        vec![
+                            "sh".to_string(),
+                            "-c".to_string(),
+                            "printf '\\342\\225\\255 ready\\n'; printf '%s\\n' \"$@\"; sleep 0.3; cat"
+                                .to_string(),
+                            "sh".to_string(),
+                        ],
+                    )
+                    .expect("launch profile"),
+                    project_dir: project.clone(),
+                    transcript_path: tmp.path().join("cli-runtime-transcript.log"),
+                    size: AgentTuiSize { rows: 24, cols: 80 },
+                    prompt: Some(prompt.to_string()),
+                    effort: None,
+                })
+                .expect("start agent tui");
+            assert_eq!(snapshot.tui_id, "agent-tui-cli-runtime");
+
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let latest = loop {
+                let latest = client
+                    .agent_tui_get("agent-tui-cli-runtime")
+                    .expect("refresh snapshot");
+                if latest.screen.text.contains(prompt) {
+                    break latest;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "initial CLI prompt never appeared in bridge-managed screen"
+                );
+                thread::sleep(Duration::from_millis(50));
+            };
+            assert_eq!(latest.screen.text.matches(prompt).count(), 1);
+
+            thread::sleep(Duration::from_millis(700));
+
+            let settled = client
+                .agent_tui_get("agent-tui-cli-runtime")
+                .expect("refresh settled snapshot");
+            assert_eq!(
+                settled.screen.text.matches(prompt).count(),
+                1,
+                "CLI prompt runtimes must not receive the same auto-join twice"
+            );
+        },
+    );
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "cleanup stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+}
+
+#[test]
 fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
