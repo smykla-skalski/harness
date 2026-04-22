@@ -168,6 +168,7 @@ extension AgentTuiWindowView {
     let sessionTitlesByID: [String: String]
     let sortedCodexRuns: [CodexRunSnapshot]
     let codexTitlesByID: [String: String]
+    let externalAgents: [AgentRegistration]
     let agentTuiUnavailable: Bool
     let codexUnavailable: Bool
 
@@ -179,11 +180,16 @@ extension AgentTuiWindowView {
       !sortedCodexRuns.isEmpty
     }
 
+    var hasExternalAgents: Bool {
+      !externalAgents.isEmpty
+    }
+
     init() {
       sortedAgentTuis = []
       sessionTitlesByID = [:]
       sortedCodexRuns = []
       codexTitlesByID = [:]
+      externalAgents = []
       agentTuiUnavailable = false
       codexUnavailable = false
     }
@@ -228,10 +234,21 @@ extension AgentTuiWindowView {
           agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
       }
 
+      let tuiAgentIds = Set(sortedAgentTuis.map(\.agentId))
+      let externalAgents = (store.selectedSession?.agents ?? [])
+        .filter { !tuiAgentIds.contains($0.agentId) }
+        .sorted { left, right in
+          if left.name != right.name {
+            return left.name.localizedStandardCompare(right.name) == .orderedAscending
+          }
+          return left.agentId < right.agentId
+        }
+
       self.sortedAgentTuis = sortedAgentTuis
       self.sessionTitlesByID = sessionTitlesByID
       self.sortedCodexRuns = sortedCodexRuns
       self.codexTitlesByID = codexTitlesByID
+      self.externalAgents = externalAgents
       self.agentTuiUnavailable = store.agentTuiUnavailable
       self.codexUnavailable = store.codexUnavailable
     }
