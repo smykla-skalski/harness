@@ -78,7 +78,6 @@ enum HarnessMonitorUITestAccessibility {
   static let taskNoteField = "harness.inspector.task-note-field"
   static let taskNoteAddButton = "harness.inspector.task-note-add"
   static let taskNotesUnavailable = "harness.inspector.task-notes-unavailable"
-  static let agentInspectorCard = "harness.inspector.agent-card"
   static let signalInspectorCard = "harness.inspector.signal-card"
   static let observerInspectorCard = "harness.inspector.observer-card"
   static let actionActorPicker = "harness.inspector.action-actor"
