@@ -47,7 +47,7 @@ extension AgentTuiWindowView {
     if let session = store.selectedSession,
       let agent = session.agents.first(where: { $0.agentId == agentID })
     {
-      AgentInspectorCard(
+      AgentDetailSection(
         store: store,
         agent: agent,
         activity: session.agentActivity.first(where: { $0.agentId == agentID })
