@@ -22,9 +22,6 @@ public struct ContentView<CornerContent: View>: View {
   private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
   @State private var showInspector = false
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
-  @State private var isSidebarSearchPresented = false
-  @State private var hasPendingSidebarSearchFocusRequest = false
-  @FocusState private var isSidebarSearchFocused: Bool
   @State private var shouldIgnoreNextInspectorMeasurement = false
   @State private var detailColumnLayoutSuppressionPhase = 0
   @State private var isLayoutAnimating = false
@@ -45,7 +42,6 @@ public struct ContentView<CornerContent: View>: View {
         contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit",
       "harness.view.column_visibility": columnVisibilityProfilingLabel,
       "harness.view.inspector_presented": showInspector ? "true" : "false",
-      "harness.view.search_presented": isSidebarSearchPresented ? "true" : "false",
     ]
   }
 
@@ -60,13 +56,6 @@ public struct ContentView<CornerContent: View>: View {
     // equality bucket on macOS. This window drives explicit visibility, so the
     // ambiguous branch represents the middle two-column state.
     return "doubleColumn"
-  }
-
-  private var sidebarSearchText: Binding<String> {
-    Binding(
-      get: { store.searchText },
-      set: { store.searchText = $0 }
-    )
   }
 
   private var inspectorPresentationBinding: Binding<Bool> {
@@ -116,28 +105,9 @@ public struct ContentView<CornerContent: View>: View {
       detailColumn
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .searchable(
-      text: sidebarSearchText,
-      isPresented: $isSidebarSearchPresented,
-      placement: .sidebar,
-      prompt: Text("Search sessions, projects, leaders")
-    )
-    .searchFocused($isSidebarSearchFocused)
-    .focusedSceneValue(\.harnessSidebarSearchFocusAction) {
-      requestSidebarSearchPresentation()
-    }
     .toolbarBackgroundVisibility(contentWindowToolbarBackgroundVisibility, for: .windowToolbar)
     .toolbar {
       contentToolbarItems
-    }
-    .onSubmit(of: .search) {
-      submitSidebarSearch()
-    }
-    .onChange(of: isStartupFocusParticipationEnabled, initial: true) { _, isEnabled in
-      guard isEnabled else {
-        return
-      }
-      applyPendingSidebarSearchPresentationRequestIfNeeded(isEnabled: isEnabled)
     }
     .onChange(of: persistedShowInspector) { _, newValue in
       applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
@@ -214,7 +184,7 @@ public struct ContentView<CornerContent: View>: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      isSidebarSearchPresented: isSidebarSearchPresented
+      canPresentSearch: isStartupFocusParticipationEnabled
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }
@@ -284,46 +254,6 @@ public struct ContentView<CornerContent: View>: View {
       return
     }
     inspectorColumnWidth = width
-  }
-
-  private func canPresentSidebarSearch() -> Bool {
-    isStartupFocusParticipationEnabled
-  }
-
-  private func schedulePendingSidebarSearchFocusRequest() {
-    hasPendingSidebarSearchFocusRequest = true
-  }
-
-  private func consumePendingSidebarSearchFocusRequest() -> Bool {
-    defer { hasPendingSidebarSearchFocusRequest = false }
-    return hasPendingSidebarSearchFocusRequest
-  }
-
-  private func presentSidebarSearchNow() {
-    (isSidebarSearchPresented, isSidebarSearchFocused) = (true, true)
-  }
-
-  private func submitSidebarSearch() {
-    store.flushPendingSearchRebuild()
-    guard store.sidebarUI.isPersistenceAvailable else {
-      return
-    }
-    _ = store.recordSearch(store.searchText)
-  }
-
-  private func requestSidebarSearchPresentation() {
-    guard canPresentSidebarSearch() else {
-      schedulePendingSidebarSearchFocusRequest()
-      return
-    }
-    presentSidebarSearchNow()
-  }
-
-  private func applyPendingSidebarSearchPresentationRequestIfNeeded(isEnabled: Bool) {
-    guard isEnabled, consumePendingSidebarSearchFocusRequest() else {
-      return
-    }
-    presentSidebarSearchNow()
   }
 
   private func enableStartupFocusParticipation() {

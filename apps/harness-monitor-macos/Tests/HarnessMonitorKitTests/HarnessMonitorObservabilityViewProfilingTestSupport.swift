@@ -60,7 +60,7 @@ func renderLaunchDashboardProfiledViews() -> HarnessMonitorStore {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      isSidebarSearchPresented: false
+      canPresentSearch: true
     ),
     width: 340,
     height: 900
