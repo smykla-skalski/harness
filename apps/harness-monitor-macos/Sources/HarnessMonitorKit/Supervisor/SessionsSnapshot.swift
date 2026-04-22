@@ -28,7 +28,7 @@ public struct SessionsSnapshot: Sendable, Hashable {
   /// An empty snapshot used by Phase 1 stubs and by Phase 2 rule tests that need a zero-state
   /// starting point. The `hash` is the empty string so idempotency keys that embed the snapshot
   /// id are deterministic across tests.
-  public static let empty = SessionsSnapshot(
+  public static let empty = Self(
     id: "",
     createdAt: Date(timeIntervalSince1970: 0),
     hash: "",
@@ -41,9 +41,9 @@ public struct SessionsSnapshot: Sendable, Hashable {
   public static func build(
     from store: HarnessMonitorStore,
     now: Date
-  ) -> SessionsSnapshot {
+  ) -> Self {
     _ = store
-    return SessionsSnapshot(
+    return Self(
       id: UUID().uuidString,
       createdAt: now,
       hash: "",

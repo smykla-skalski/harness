@@ -9,7 +9,7 @@ import Foundation
 final class TestClock: @unchecked Sendable {
   /// Current virtual time. Starts at `Date()` and Phase 2 code will tick it forward on
   /// `advance(by:)`.
-  var now: Date = Date()
+  var now = Date()
 
   /// Advance the virtual clock by the given duration. Phase 1 no-op.
   func advance(by duration: Duration) async {

@@ -6,7 +6,8 @@ import SwiftData
 /// of the Phase 1 signature freeze.
 @Model
 public final class PolicyConfigRow {
-  @Attribute(.unique) public var ruleID: String
+  @Attribute(.unique)
+  public var ruleID: String
   public var enabled: Bool
   public var defaultBehaviorRaw: String
   public var parametersJSON: String

@@ -17,6 +17,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   public private(set) var lastResponse: HarnessMonitorNotificationResponseSnapshot?
   public private(set) var settingsOpenRequestID = 0
 
+  /// Last decision id requested by a supervisor notification tap. Phase 2 worker 21 publishes
+  /// into this property from the response handler; the scene-support layer observes it and
+  /// calls `openWindow(id: .decisions)` with the selected decision.
+  public private(set) var decisionRequestedID: UUID?
+
   @ObservationIgnored private let center: UNUserNotificationCenter
   @ObservationIgnored private let assetWriter: HarnessMonitorNotificationAssetWriting
   @ObservationIgnored private var isActivated = false
