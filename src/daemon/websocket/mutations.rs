@@ -81,9 +81,11 @@ pub(crate) async fn dispatch_session_start(
     } else {
         ensure_shared_db(&state.db).and_then(|db| {
             let db_guard = db.lock().expect("db lock");
-            let response = service::start_session_direct(&body, Some(&db_guard))
-                .map(|session_state| SessionMutationResponse {
-                    state: session_state,
+            let response =
+                service::start_session_direct(&body, Some(&db_guard)).map(|session_state| {
+                    SessionMutationResponse {
+                        state: session_state,
+                    }
                 });
             if response.is_ok() {
                 service::broadcast_sessions_updated(&state.sender, Some(&db_guard));

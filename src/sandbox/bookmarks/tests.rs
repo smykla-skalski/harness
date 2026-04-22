@@ -26,7 +26,10 @@ fn round_trip_save_load() {
     let loaded = load(&path).unwrap();
     assert_eq!(loaded.bookmarks.len(), 1);
     assert_eq!(loaded.bookmarks[0].id, "B-test");
-    assert_eq!(loaded.bookmarks[0].handoff_bookmark_data, Some(vec![4, 5, 6]));
+    assert_eq!(
+        loaded.bookmarks[0].handoff_bookmark_data,
+        Some(vec![4, 5, 6])
+    );
 }
 
 #[test]
