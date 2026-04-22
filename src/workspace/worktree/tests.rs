@@ -44,7 +44,10 @@ fn git_output(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
 
 fn git_sha(dir: &std::path::Path, reference: &str) -> String {
     let output = git_output(dir, &["rev-parse", reference]);
-    assert!(output.status.success(), "git rev-parse failed for {reference}");
+    assert!(
+        output.status.success(),
+        "git rev-parse failed for {reference}"
+    );
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
@@ -207,7 +210,10 @@ fn resolve_base_ref_prefers_tracking_remote_head_over_local_head() {
         "local-only diverges from upstream/main",
     );
     let local_tip = git_sha(checkout.path(), "HEAD");
-    assert_ne!(local_tip, remote_tip, "test setup must diverge from upstream");
+    assert_ne!(
+        local_tip, remote_tip,
+        "test setup must diverge from upstream"
+    );
 
     let resolved = resolve_base_ref(checkout.path()).expect("resolve base ref");
     assert_eq!(resolved, "upstream/main");
