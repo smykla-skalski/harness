@@ -152,7 +152,7 @@ reconcile_shadowed_harness_binaries() {
   done
 
   if (( ${#unresolved_candidates[@]} > 0 )); then
-    printf 'unable to reconcile shadowed harness binary path(s); clean them up before using `harness`:\n' >&2
+    printf "unable to reconcile shadowed harness binary path(s); clean them up before using \`harness\`:\n" >&2
     for candidate in "${unresolved_candidates[@]}"; do
       printf '  - %s\n' "${candidate}" >&2
     done
@@ -194,7 +194,7 @@ warn_shadowed_harness_binaries() {
   fi
 
   if [[ "${printed_shell_guidance}" == "1" ]]; then
-    printf 'warning: if an existing shell still resolves an older harness binary, run `rehash` or start a new shell after removing the shadowed path\n' >&2
+    printf "warning: if an existing shell still resolves an older harness binary, run \`rehash\` or start a new shell after removing the shadowed path\n" >&2
   fi
 }
 

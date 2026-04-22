@@ -51,6 +51,14 @@ load_stack_env_defaults
 
 compose() {
   prepare_sqlite_exporter_env
+  if [ $# -gt 0 ] && command -v rtk >/dev/null 2>&1; then
+    case "$1" in
+      logs|ps|up)
+        rtk docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
+        return
+        ;;
+    esac
+  fi
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
@@ -734,16 +742,20 @@ resolve_local_harness_binary() {
 }
 
 # Use the built binary directly so long-lived smoke commands do not hold cargo-run locks.
+run_with_cleared_otel_env() {
+  OTEL_EXPORTER_OTLP_ENDPOINT='' \
+  OTEL_EXPORTER_OTLP_HEADERS='' \
+  OTEL_EXPORTER_OTLP_PROTOCOL='' \
+  HARNESS_OTEL_EXPORT='' \
+  HARNESS_OTEL_GRAFANA_URL='' \
+  HARNESS_OTEL_PYROSCOPE_URL='' \
+  "$@"
+}
+
 run_local_harness() {
   local binary_path
   binary_path="$(resolve_local_harness_binary)"
-  OTEL_EXPORTER_OTLP_ENDPOINT= \
-  OTEL_EXPORTER_OTLP_HEADERS= \
-  OTEL_EXPORTER_OTLP_PROTOCOL= \
-  HARNESS_OTEL_EXPORT= \
-  HARNESS_OTEL_GRAFANA_URL= \
-  HARNESS_OTEL_PYROSCOPE_URL= \
-  "$binary_path" "$@"
+  run_with_cleared_otel_env "$binary_path" "$@"
 }
 
 run_cli_smoke() {
@@ -819,24 +831,19 @@ run_monitor_smoke() {
   write_monitor_smoke_data_home_marker
   trap 'write_shared_config false >/dev/null || true; remove_monitor_smoke_data_home_marker; rm -f "$log_path"' RETURN
   if ! XDG_DATA_HOME="$(resolve_data_root)" \
-    OTEL_EXPORTER_OTLP_ENDPOINT= \
-    OTEL_EXPORTER_OTLP_HEADERS= \
-    OTEL_EXPORTER_OTLP_PROTOCOL= \
-    HARNESS_OTEL_EXPORT= \
-    HARNESS_OTEL_GRAFANA_URL= \
-    HARNESS_OTEL_PYROSCOPE_URL= \
-    "$ROOT/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" \
-      -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
-      -scheme "HarnessMonitor" \
-      -configuration Debug \
-      -derivedDataPath "$ROOT/xcode-derived" \
-      -skipPackagePluginValidation \
-      test \
-      CODE_SIGNING_ALLOWED=NO \
-      -destination 'platform=macOS' \
-      -skip-testing:HarnessMonitorUITests \
-      -only-testing:HarnessMonitorKitTests/HarnessMonitorObservabilitySmokeTests \
-      >"$log_path" 2>&1
+    run_with_cleared_otel_env \
+      "$ROOT/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" \
+        -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
+        -scheme "HarnessMonitor" \
+        -configuration Debug \
+        -derivedDataPath "$ROOT/xcode-derived" \
+        -skipPackagePluginValidation \
+        test \
+        CODE_SIGNING_ALLOWED=NO \
+        -destination 'platform=macOS' \
+        -skip-testing:HarnessMonitorUITests \
+        -only-testing:HarnessMonitorKitTests/HarnessMonitorObservabilitySmokeTests \
+        >"$log_path" 2>&1
   then
     cat "$log_path" >&2
     exit 1
