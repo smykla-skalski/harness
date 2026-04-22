@@ -9,17 +9,17 @@ extension HarnessMonitorStore {
     actionHint: String?,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client, let sessionID = selectedSessionID else { return false }
-    guard let actor = actionActor(for: actor) else { return false }
+    let actionName = "Send signal"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
-      actionName: "Send signal",
-      actionID: InspectorActionID.sendSignal(sessionID: sessionID, agentID: agentID).key,
-      using: client,
-      sessionID: sessionID,
+      actionName: actionName,
+      actionID: InspectorActionID.sendSignal(sessionID: action.sessionID, agentID: agentID).key,
+      using: action.client,
+      sessionID: action.sessionID,
       mutation: {
-        try await client.sendSignal(
-          sessionID: sessionID,
+        try await action.client.sendSignal(
+          sessionID: action.sessionID,
           request: SignalSendRequest(
             actor: actor,
             agentId: agentID,
@@ -38,17 +38,20 @@ extension HarnessMonitorStore {
     agentID: String,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client, let sessionID = selectedSessionID else { return false }
-    guard let actor = actionActor(for: actor) else { return false }
+    let actionName = "Cancel signal"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
-      actionName: "Cancel signal",
-      actionID: InspectorActionID.cancelSignal(sessionID: sessionID, signalID: signalID).key,
-      using: client,
-      sessionID: sessionID,
+      actionName: actionName,
+      actionID: InspectorActionID.cancelSignal(
+        sessionID: action.sessionID,
+        signalID: signalID
+      ).key,
+      using: action.client,
+      sessionID: action.sessionID,
       mutation: {
-        try await client.cancelSignal(
-          sessionID: sessionID,
+        try await action.client.cancelSignal(
+          sessionID: action.sessionID,
           request: SignalCancelRequest(
             actor: actor,
             agentId: agentID,
