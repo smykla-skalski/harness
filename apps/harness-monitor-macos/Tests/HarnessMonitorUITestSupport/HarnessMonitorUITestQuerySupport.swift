@@ -50,7 +50,9 @@ extension HarnessMonitorUITestCase {
         bestMatch = candidate
         continue
       }
-      if candidate.frame.width * candidate.frame.height < currentBest.frame.width * currentBest.frame.height {
+      if candidate.frame.width * candidate.frame.height
+        < currentBest.frame.width * currentBest.frame.height
+      {
         bestMatch = candidate
       }
     }

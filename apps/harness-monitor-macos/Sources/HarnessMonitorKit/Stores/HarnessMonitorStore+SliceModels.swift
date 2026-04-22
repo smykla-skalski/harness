@@ -178,6 +178,47 @@ extension HarnessMonitorStore {
 }
 
 extension HarnessMonitorStore {
+  private func sessionSummaryStatusTone(
+    status: SessionStatus,
+    isEstimated: Bool,
+    isLeaderless: Bool
+  ) -> StatusMessageTone {
+    if isEstimated {
+      return .secondary
+    }
+    if status == .awaitingLeader {
+      return .info
+    }
+    if isLeaderless {
+      return .caution
+    }
+    switch status {
+    case .awaitingLeader:
+      return .info
+    case .active:
+      return .success
+    case .leaderlessDegraded, .paused:
+      return .caution
+    case .ended:
+      return .secondary
+    }
+  }
+
+  private func sessionSummaryAgentStat(
+    for summary: SessionSummary,
+    usesLiveAgentPhrasing: Bool
+  ) -> SessionSummaryPresentation.SidebarStatPresentation {
+    let agentCount =
+      usesLiveAgentPhrasing
+      ? summary.metrics.activeAgentCount
+      : summary.metrics.agentCount
+    return SessionSummaryPresentation.SidebarStatPresentation(
+      symbolName: usesLiveAgentPhrasing ? "person.2.fill" : "person.2",
+      valueText: "\(agentCount)",
+      helpText: usesLiveAgentPhrasing ? "\(agentCount) active" : "\(agentCount) known"
+    )
+  }
+
   public func sessionSummaryPresentation(
     for summary: SessionSummary
   ) -> SessionSummaryPresentation {
@@ -200,48 +241,20 @@ extension HarnessMonitorStore {
       } else {
         summary.status.title
       }
-    let statusTone: StatusMessageTone
-    if isEstimated {
-      statusTone = .secondary
-    } else if summary.status == .awaitingLeader {
-      statusTone = .info
-    } else if isLeaderless {
-      statusTone = .caution
-    } else {
-      switch summary.status {
-      case .awaitingLeader:
-        statusTone = .info
-      case .active:
-        statusTone = .success
-      case .leaderlessDegraded:
-        statusTone = .caution
-      case .paused:
-        statusTone = .caution
-      case .ended:
-        statusTone = .secondary
-      }
-    }
+    let statusTone = sessionSummaryStatusTone(
+      status: summary.status,
+      isEstimated: isEstimated,
+      isLeaderless: isLeaderless
+    )
 
     let usesLiveAgentPhrasing =
       !isEstimated
       && !usesKnownAgentPhrasing
       && summary.status == .active
-    let agentStat: SessionSummaryPresentation.SidebarStatPresentation
-    if usesLiveAgentPhrasing {
-      let agentCount = summary.metrics.activeAgentCount
-      agentStat = SessionSummaryPresentation.SidebarStatPresentation(
-        symbolName: "person.2.fill",
-        valueText: "\(agentCount)",
-        helpText: "\(agentCount) active"
-      )
-    } else {
-      let agentCount = summary.metrics.agentCount
-      agentStat = SessionSummaryPresentation.SidebarStatPresentation(
-        symbolName: "person.2",
-        valueText: "\(agentCount)",
-        helpText: "\(agentCount) known"
-      )
-    }
+    let agentStat = sessionSummaryAgentStat(
+      for: summary,
+      usesLiveAgentPhrasing: usesLiveAgentPhrasing
+    )
     let movingTaskCount = summary.metrics.inProgressTaskCount
     let taskStat = SessionSummaryPresentation.SidebarStatPresentation(
       symbolName: "arrow.triangle.2.circlepath",

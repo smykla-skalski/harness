@@ -44,7 +44,10 @@ final class BookmarkStoreTests: XCTestCase {
     XCTAssertEqual(all.count, 1)
     XCTAssertEqual(second.id, first.id)
     XCTAssertEqual(all.first?.id, first.id)
-    XCTAssertEqual(all.first?.lastResolvedPath, target.standardizedFileURL.resolvingSymlinksInPath().path)
+    XCTAssertEqual(
+      all.first?.lastResolvedPath,
+      target.standardizedFileURL.resolvingSymlinksInPath().path
+    )
   }
 
   func testUnsupportedSchemaVersionThrows() async throws {
