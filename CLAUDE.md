@@ -21,7 +21,7 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `CLAUDE.md` - it covers XcodeGen, xcodebuild validation lanes, SwiftUI/UX rules, performance measurement, and daemon modes.
+For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `CLAUDE.md` - it covers XcodeGen, exact `xcodebuild` destination rules (`platform=macOS,arch=$(uname -m),name=My Mac` for local macOS lanes), SwiftUI/UX rules, performance measurement, and daemon modes.
 
 ## Agent asset architecture
 
