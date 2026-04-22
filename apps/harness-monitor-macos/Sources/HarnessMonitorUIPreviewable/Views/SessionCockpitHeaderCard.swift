@@ -23,19 +23,19 @@ struct SessionCockpitHeaderCard: View {
     )
   }
 
-  private var areLeaderActionsAvailable: Bool {
-    store.areSelectedLeaderActionsAvailable
+  private var areSessionActionsAvailable: Bool {
+    store.areSelectedSessionActionsAvailable
   }
 
   private var unavailableActionHelp: String {
-    store.selectedLeaderActionUnavailableMessage ?? ""
+    store.selectedSessionActionUnavailableMessage ?? ""
   }
 
   private var awaitingLeaderMessage: String? {
     guard detail.session.status == .awaitingLeader else {
       return nil
     }
-    return "This session is waiting for its first leader. Seed tasks now, then join a leader to unlock live controls."
+    return "This session is waiting for its first leader. You can still seed tasks, observe progress, or end it from the control plane."
   }
 
   var body: some View {
@@ -101,7 +101,7 @@ struct SessionCockpitHeaderCard: View {
       store: store,
       variant: .prominent,
       tint: nil,
-      isExternallyDisabled: !areLeaderActionsAvailable,
+      isExternallyDisabled: !areSessionActionsAvailable,
       accessibilityIdentifier: HarnessMonitorAccessibility.observeSessionButton,
       help: unavailableActionHelp,
       action: { observeSelectedSession() }
@@ -115,7 +115,7 @@ struct SessionCockpitHeaderCard: View {
       store: store,
       variant: .bordered,
       tint: .secondary,
-      isExternallyDisabled: !areLeaderActionsAvailable,
+      isExternallyDisabled: !areSessionActionsAvailable,
       accessibilityIdentifier: HarnessMonitorAccessibility.endSessionButton,
       help: unavailableActionHelp,
       action: { requestEndSessionConfirmation() }
