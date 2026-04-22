@@ -12,7 +12,7 @@ struct SessionActionDock: View {
 
   let detail: SessionDetail
   let inspectTask: (String) -> Void
-  let inspectAgent: (String) -> Void
+  let openAgent: (String) -> Void
   let inspectObserver: () -> Void
   let openAgents: () -> Void
 
@@ -123,7 +123,7 @@ struct SessionActionDock: View {
     guard let agentID = firstAgentID else {
       return
     }
-    inspectAgent(agentID)
+    openAgent(agentID)
   }
 
   private func focusObserver() {
@@ -146,7 +146,7 @@ extension View {
   SessionActionDock(
     detail: PreviewFixtures.detail,
     inspectTask: { _ in },
-    inspectAgent: { _ in },
+    openAgent: { _ in },
     inspectObserver: {},
     openAgents: {}
   )
