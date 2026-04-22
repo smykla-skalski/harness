@@ -1,0 +1,42 @@
+# Project-local RTK filters — commit this file with your repo.
+# Filters here override user-global and built-in filters.
+# Docs: https://github.com/rtk-ai/rtk#custom-filters
+schema_version = 1
+
+[filters.harness-monitor-run-quality-gates]
+description = "Compact Harness Monitor quality-gates output"
+match_command = "^run-quality-gates\\.sh(\\s|$)"
+strip_ansi = true
+keep_lines_matching = [
+  "^warning:",
+  "^error:",
+  "^Test (Suite|Case) ",
+  "^Executed \\d+ tests?,",
+  "^\\*\\* BUILD (SUCCEEDED|FAILED) \\*\\*$",
+  "^=== Sandbox violations detected ===$",
+]
+max_lines = 80
+on_empty = "run-quality-gates: ok"
+
+[[tests.harness-monitor-run-quality-gates]]
+name = "drops project generation and package target chatter on success"
+input = """
+⚙️  Generating plists...
+⚙️  Generating project...
+Target 'Lottie' in project 'Lottie'
+Target 'Lottie-Dynamic' in project 'Lottie'
+** BUILD SUCCEEDED **
+"""
+expected = "** BUILD SUCCEEDED **"
+
+[[tests.harness-monitor-run-quality-gates]]
+name = "keeps warnings and build failure"
+input = """
+⚙️  Generating plists...
+⚙️  Generating project...
+Target 'Lottie' in project 'Lottie'
+warning: variable 'x' was never used
+error: use of unresolved identifier 'foo'
+** BUILD FAILED **
+"""
+expected = "warning: variable 'x' was never used\nerror: use of unresolved identifier 'foo'\n** BUILD FAILED **"
