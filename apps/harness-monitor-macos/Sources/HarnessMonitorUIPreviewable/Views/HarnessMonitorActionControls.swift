@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 public struct HarnessMonitorActionButton: View {
@@ -166,6 +167,64 @@ private struct ProminentAwareLabel<Content: View>: View {
       content.foregroundStyle(prominentForeground)
     } else {
       content
+    }
+  }
+}
+
+struct CommandReturnKeyMonitor: NSViewRepresentable {
+  let isEnabled: Bool
+  let action: () -> Void
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator()
+  }
+
+  func makeNSView(context: Context) -> NSView {
+    context.coordinator.installMonitorIfNeeded()
+    let view = NSView()
+    view.alphaValue = 0
+    view.setAccessibilityHidden(true)
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    context.coordinator.isEnabled = isEnabled
+    context.coordinator.action = action
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    coordinator.removeMonitor()
+  }
+
+  final class Coordinator {
+    var isEnabled = false
+    var action: () -> Void = {}
+    private var monitor: Any?
+
+    deinit {
+      removeMonitor()
+    }
+
+    func installMonitorIfNeeded() {
+      guard monitor == nil else { return }
+      monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        guard let self else { return event }
+        guard self.isEnabled, Self.isCommandReturn(event) else { return event }
+        self.action()
+        return nil
+      }
+    }
+
+    func removeMonitor() {
+      guard let monitor else { return }
+      NSEvent.removeMonitor(monitor)
+      self.monitor = nil
+    }
+
+    private static func isCommandReturn(_ event: NSEvent) -> Bool {
+      let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+      guard modifiers == .command else { return false }
+      return event.keyCode == 36 || event.keyCode == 76
     }
   }
 }

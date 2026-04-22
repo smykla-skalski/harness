@@ -211,6 +211,28 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testCommandReturnSendsAgentInputFromEditor() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "command return send")
+
+    let inputField = editableField(in: app, identifier: Accessibility.agentTuiInputField)
+    XCTAssertTrue(waitForElement(inputField, timeout: Self.actionTimeout))
+
+    inputField.click()
+    inputField.typeText("cmd return send")
+    app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: .command)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let value = inputField.value as? String
+        return value?.isEmpty == true
+      },
+      "Cmd+Return should send the current input and clear the editor"
+    )
+  }
+
   func testDraggingViewportDividerResizesLiveTerminal() throws {
     let app = launchInCockpitPreview()
 
