@@ -102,19 +102,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct InspectorAgentSelectionState: Equatable, Sendable {
-    public let agent: AgentRegistration
-    public let activity: AgentToolActivitySummary?
-
-    public init(
-      agent: AgentRegistration,
-      activity: AgentToolActivitySummary?
-    ) {
-      self.agent = agent
-      self.activity = activity
-    }
-  }
-
   public struct SessionProjectionState: Equatable, Sendable {
     public var groupedSessions: [SessionGroup] = []
     public var filteredSessionCount = 0

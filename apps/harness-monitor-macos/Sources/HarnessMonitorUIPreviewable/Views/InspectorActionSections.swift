@@ -33,24 +33,6 @@ public struct InspectorActionSections: View {
         .id("task:\(context.detail.session.sessionId):\(selectedTask.taskId)")
       }
 
-      if let selectedAgent = context.selectedAgent {
-        let roleConsoleIdentity = [
-          "agent",
-          context.detail.session.sessionId,
-          selectedAgent.agentId,
-          selectedAgent.role.rawValue,
-          context.detail.session.leaderId ?? "-",
-        ].joined(separator: ":")
-
-        InspectorRoleMutationConsole(
-          store: store,
-          sessionID: context.detail.session.sessionId,
-          selectedAgent: selectedAgent,
-          leaderID: context.detail.session.leaderId
-        )
-        .id(roleConsoleIdentity)
-      }
-
       InspectorLeaderTransferConsole(
         store: store,
         detail: context.detail,

@@ -44,7 +44,6 @@ extension HarnessMonitorStore {
   public enum InspectorSelection: Equatable, Sendable {
     case none
     case task(String)
-    case agent(String)
     case signal(String)
     case observer
   }

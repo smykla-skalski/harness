@@ -95,13 +95,6 @@ extension HarnessMonitorStore {
     return selectedSession?.tasks.first(where: { $0.taskId == taskID })
   }
 
-  public var selectedAgent: AgentRegistration? {
-    guard case .agent(let agentID) = inspectorSelection else {
-      return nil
-    }
-    return selectedSession?.agents.first(where: { $0.agentId == agentID })
-  }
-
   public var selectedSignal: SessionSignalRecord? {
     guard case .signal(let signalID) = inspectorSelection else {
       return nil
