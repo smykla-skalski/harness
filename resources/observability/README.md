@@ -1,5 +1,9 @@
 # Local Observability Stack
 
+This stack exists for local debugging only.
+Rust CI does not enforce contracts for the shell helpers, dashboards, or Docker/Grafana/Tempo provisioning under `resources/observability/`.
+When you change this area, validate it manually with the repo-local scripts and whichever app-level checks matter for your workflow.
+
 Tempo Explore's Service Graph is the authoritative service map for the local Harness observability stack.
 Use the provisioned `Harness Service Map` dashboard as the landing page for supporting RED metrics, then jump into Tempo Explore for the built-in graph and span table.
 
