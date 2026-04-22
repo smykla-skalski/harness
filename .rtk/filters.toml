@@ -1,25 +1,51 @@
 # Project-local RTK filters — commit this file with your repo.
 # Filters here override user-global and built-in filters.
 # Docs: https://github.com/rtk-ai/rtk#custom-filters
+#
+# Activation: TOML filters fire when a command flows through the `rtk` binary.
+# The Claude Code hook auto-wraps certain commands (xcodebuild, cargo, git, ...).
+# Scripts are matched by basename (so `rtk Scripts/run-quality-gates.sh` activates
+# the `harness-monitor-run-quality-gates` filter).
 schema_version = 1
 
+# ---------------------------------------------------------------------------
+# Harness Monitor — apps/harness-monitor-macos quality gate
+# ---------------------------------------------------------------------------
 [filters.harness-monitor-run-quality-gates]
-description = "Compact Harness Monitor quality-gates output"
+description = "Compact Harness Monitor quality-gates output (SwiftLint + Swift Format + xcodebuild)"
 match_command = "^run-quality-gates\\.sh(\\s|$)"
 strip_ansi = true
+filter_stderr = true
 keep_lines_matching = [
-  "^warning:",
-  "^error:",
+  # SwiftLint / Swift Format findings (path:line:col: severity: message)
+  "^/.*\\.swift:\\d+:\\d+:\\s+(error|warning|note):",
+  # Compiler diagnostics
+  "^/.*:\\d+:\\d+:\\s+(error|warning|note):",
+  # XCUITest results
   "^Test (Suite|Case) ",
   "^Executed \\d+ tests?,",
-  "^\\*\\* BUILD (SUCCEEDED|FAILED) \\*\\*$",
+  "^\\s+XCTAssert",
+  "^\\s+failed - ",
+  # Build verdict + test verdict
+  "^\\*\\* (BUILD|TEST|TEST BUILD|CLEAN|ANALYZE) (SUCCEEDED|FAILED|PASSED) \\*\\*$",
+  # Sandbox / quality gate harness output
   "^=== Sandbox violations detected ===$",
+  "^Sandbox violation:",
+  "^error: ",
+  "^warning: ",
+  "^fatal: ",
+  # SwiftFormat diffs (keep only the change header)
+  "^[-+]{3} ",
+  # Script-level verdict lines
+  "^✅ ",
+  "^❌ ",
+  "^💥 ",
 ]
-max_lines = 80
+max_lines = 120
 on_empty = "run-quality-gates: ok"
 
 [[tests.harness-monitor-run-quality-gates]]
-name = "drops project generation and package target chatter on success"
+name = "drops project generation chatter on success"
 input = """
 ⚙️  Generating plists...
 ⚙️  Generating project...
@@ -30,13 +56,314 @@ Target 'Lottie-Dynamic' in project 'Lottie'
 expected = "** BUILD SUCCEEDED **"
 
 [[tests.harness-monitor-run-quality-gates]]
-name = "keeps warnings and build failure"
+name = "keeps warnings, errors and failure verdict"
 input = """
 ⚙️  Generating plists...
-⚙️  Generating project...
 Target 'Lottie' in project 'Lottie'
 warning: variable 'x' was never used
 error: use of unresolved identifier 'foo'
 ** BUILD FAILED **
 """
 expected = "warning: variable 'x' was never used\nerror: use of unresolved identifier 'foo'\n** BUILD FAILED **"
+
+[[tests.harness-monitor-run-quality-gates]]
+name = "keeps swiftlint violations with path line col"
+input = """
+⚙️  Generating project...
+/Users/x/Sources/HarnessMonitorKit/Foo.swift:42:3: error: Attributes Violation: Attributes should be on their own lines (attributes)
+/Users/x/Sources/HarnessMonitorKit/Bar.swift:7:1: warning: File Length Violation: File should contain 420 lines or less: currently contains 456 (file_length)
+"""
+expected = "/Users/x/Sources/HarnessMonitorKit/Foo.swift:42:3: error: Attributes Violation: Attributes should be on their own lines (attributes)\n/Users/x/Sources/HarnessMonitorKit/Bar.swift:7:1: warning: File Length Violation: File should contain 420 lines or less: currently contains 456 (file_length)"
+
+[[tests.harness-monitor-run-quality-gates]]
+name = "empty input returns on_empty"
+input = ""
+expected = "run-quality-gates: ok"
+
+# ---------------------------------------------------------------------------
+# HarnessMonitor-scoped xcodebuild — tighter filter for the project's scheme
+# Overrides built-in rtk xcodebuild filter for HarnessMonitor invocations only.
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-xcodebuild]
+description = "Aggressive xcodebuild filter for HarnessMonitor scheme — keep only diagnostics and verdict"
+match_command = "^xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor"
+strip_ansi = true
+keep_lines_matching = [
+  # Diagnostics (any path:line:col: error/warning/note:)
+  "^/.*:\\d+:\\d+:\\s+(error|warning|note):",
+  # Bare error/warning/fatal without file path
+  "^(error|warning|fatal):\\s",
+  "^\\s+error:\\s",
+  "^\\s+warning:\\s",
+  # Test lifecycle
+  "^Test Suite '.*' (started|passed|failed)",
+  "^Test Case '.*' (passed|failed)",
+  "^Executed \\d+ tests?, with \\d+ failures?",
+  # Test-level assertion context
+  "^\\s+XCTAssert",
+  "^\\s+failed - ",
+  # Build / test verdict
+  "^\\*\\* (BUILD|TEST|TEST BUILD|CLEAN|ANALYZE) (SUCCEEDED|FAILED|PASSED) \\*\\*$",
+  # Linker failures (keep the ld error header)
+  "^ld:\\s+",
+  "^Undefined symbols",
+  # Code signing failures
+  "^Code Sign error:",
+]
+max_lines = 150
+on_empty = "xcodebuild (HarnessMonitor): ok"
+
+[[tests.harness-monitor-xcodebuild]]
+name = "keeps swift compile errors, drops build graph"
+input = """
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project foo.xcodeproj -scheme HarnessMonitor build
+Resolve Package Graph
+Target 'HarnessMonitorUITests' in project 'HarnessMonitor'
+    ➜ Explicit dependency on target 'HarnessMonitorUITestHost' in project 'HarnessMonitor'
+CompileSwift normal arm64 /Users/x/Foo.swift
+    cd /Users/x
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -c
+/Users/x/Foo.swift:42:9: error: cannot find 'foo' in scope
+** BUILD FAILED **
+"""
+expected = "/Users/x/Foo.swift:42:9: error: cannot find 'foo' in scope\n** BUILD FAILED **"
+
+[[tests.harness-monitor-xcodebuild]]
+name = "keeps test results, drops build phases"
+input = """
+note: Building targets in dependency order
+Target 'HarnessMonitorKit' in project 'HarnessMonitor'
+CompileSwift normal arm64 /Users/x/Foo.swift
+Test Suite 'HarnessMonitorKitTests' started at 2026-04-22
+Test Case '-[HarnessMonitorKitTests testExample]' passed (0.001 seconds).
+Test Case '-[HarnessMonitorKitTests testFailing]' failed (0.002 seconds).
+Executed 2 tests, with 1 failure in 0.003 seconds
+** TEST FAILED **
+"""
+expected = "Test Suite 'HarnessMonitorKitTests' started at 2026-04-22\nTest Case '-[HarnessMonitorKitTests testExample]' passed (0.001 seconds).\nTest Case '-[HarnessMonitorKitTests testFailing]' failed (0.002 seconds).\nExecuted 2 tests, with 1 failure in 0.003 seconds\n** TEST FAILED **"
+
+[[tests.harness-monitor-xcodebuild]]
+name = "clean build success"
+input = """
+Resolve Package Graph
+Target 'HarnessMonitorKit' in project 'HarnessMonitor'
+CompileSwift normal arm64 /Users/x/Foo.swift
+Ld /Users/x/Build/Products/Debug/HarnessMonitor normal arm64
+** BUILD SUCCEEDED **
+"""
+expected = "** BUILD SUCCEEDED **"
+
+[[tests.harness-monitor-xcodebuild]]
+name = "empty returns on_empty message"
+input = ""
+expected = "xcodebuild (HarnessMonitor): ok"
+
+# ---------------------------------------------------------------------------
+# XcodeGen project regeneration
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-generate-project]
+description = "Compact XcodeGen output — keep warnings, errors, created-at path"
+match_command = "^generate-project\\.sh(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^Created project at ",
+  "^⚠️",
+  "^❌",
+  "^💥",
+  "^error:",
+  "^Error:",
+  "^warning:",
+  "^Warning:",
+  "^fatal:",
+  "^XcodeGen: ",
+]
+max_lines = 40
+on_empty = "generate-project: ok"
+
+[[tests.harness-monitor-generate-project]]
+name = "drops generation chatter, keeps created path"
+input = """
+⚙️  Generating plists...
+⚙️  Generating project...
+⚙️  Writing project...
+Created project at /Users/x/apps/harness-monitor-macos/HarnessMonitor.xcodeproj
+"""
+expected = "Created project at /Users/x/apps/harness-monitor-macos/HarnessMonitor.xcodeproj"
+
+[[tests.harness-monitor-generate-project]]
+name = "keeps xcodegen warnings"
+input = """
+⚙️  Generating project...
+warning: target Foo references missing file
+Created project at /Users/x/apps/harness-monitor-macos/HarnessMonitor.xcodeproj
+"""
+expected = "warning: target Foo references missing file\nCreated project at /Users/x/apps/harness-monitor-macos/HarnessMonitor.xcodeproj"
+
+[[tests.harness-monitor-generate-project]]
+name = "empty returns on_empty"
+input = ""
+expected = "generate-project: ok"
+
+# ---------------------------------------------------------------------------
+# Swift test runner wrapper
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-test-swift]
+description = "Compact test-swift.sh output — keep test verdicts and failures"
+match_command = "^test-swift\\.sh(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^/.*:\\d+:\\d+:\\s+(error|warning|note):",
+  "^Test (Suite|Case) ",
+  "^Executed \\d+ tests?,",
+  "^\\*\\* (BUILD|TEST) (SUCCEEDED|FAILED|PASSED) \\*\\*$",
+  "^\\s+XCTAssert",
+  "^\\s+failed - ",
+  "^error: ",
+  "^warning: ",
+  "^fatal: ",
+  "^✅ ",
+  "^❌ ",
+]
+max_lines = 120
+on_empty = "test-swift: ok"
+
+[[tests.harness-monitor-test-swift]]
+name = "keeps failing test context"
+input = """
+CompileSwift normal arm64 /Users/x/Foo.swift
+Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).
+    XCTAssertEqual failed: ("1") is not equal to ("2")
+Executed 1 test, with 1 failure in 0.01 seconds
+** TEST FAILED **
+"""
+expected = "Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).\n    XCTAssertEqual failed: (\"1\") is not equal to (\"2\")\nExecuted 1 test, with 1 failure in 0.01 seconds\n** TEST FAILED **"
+
+[[tests.harness-monitor-test-swift]]
+name = "empty returns on_empty"
+input = ""
+expected = "test-swift: ok"
+
+# ---------------------------------------------------------------------------
+# Instruments / xctrace performance audit
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-run-instruments-audit]
+description = "Compact xctrace audit output — keep metric totals and threshold verdicts"
+match_command = "^run-instruments-audit\\.sh(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^(Hitches|Hangs|CPU|Memory|Launch|Scroll|Frame)\\s",
+  "^Threshold ",
+  "^Regression ",
+  "^error: ",
+  "^Error: ",
+  "^warning: ",
+  "^fatal: ",
+  "^\\*\\* ",
+  "^✅ ",
+  "^❌ ",
+  "^💥 ",
+  "^Instruments: ",
+  "^Saved trace to ",
+]
+max_lines = 80
+on_empty = "run-instruments-audit: ok"
+
+[[tests.harness-monitor-run-instruments-audit]]
+name = "keeps metric rows and trace path"
+input = """
+Starting Instruments probe...
+Preparing device...
+CPU  average=12.3%  peak=45.1%  threshold=50%
+Hitches  total=2  threshold=5
+Saved trace to /tmp/audit.trace
+✅ all thresholds within budget
+"""
+expected = "CPU  average=12.3%  peak=45.1%  threshold=50%\nHitches  total=2  threshold=5\nSaved trace to /tmp/audit.trace\n✅ all thresholds within budget"
+
+[[tests.harness-monitor-run-instruments-audit]]
+name = "empty returns on_empty"
+input = ""
+expected = "run-instruments-audit: ok"
+
+# ---------------------------------------------------------------------------
+# SwiftUI preview render / smoke helpers
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-preview-render]
+description = "Compact preview-render.sh output — keep rendered previews and failures"
+match_command = "^preview-render\\.sh(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^Rendered ",
+  "^Preview: ",
+  "^Saved ",
+  "^Timeout ",
+  "^error: ",
+  "^warning: ",
+  "^fatal: ",
+  "^\\*\\* ",
+  "^✅ ",
+  "^❌ ",
+  "^💥 ",
+  "^[0-9]+/[0-9]+ previews",
+]
+max_lines = 60
+on_empty = "preview-render: ok"
+
+[[tests.harness-monitor-preview-render]]
+name = "keeps render results and final tally"
+input = """
+Starting XOJIT preview host...
+Compiling module...
+Rendered AgentTuiWindowView_Previews/Idle → tmp/previews/AgentTuiWindowView_Idle.png
+Rendered AgentTuiWindowView_Previews/Running → tmp/previews/AgentTuiWindowView_Running.png
+Timeout rendering FlakyPreview_Previews after 48s
+20/20 previews rendered
+"""
+expected = "Rendered AgentTuiWindowView_Previews/Idle → tmp/previews/AgentTuiWindowView_Idle.png\nRendered AgentTuiWindowView_Previews/Running → tmp/previews/AgentTuiWindowView_Running.png\nTimeout rendering FlakyPreview_Previews after 48s\n20/20 previews rendered"
+
+[[tests.harness-monitor-preview-render]]
+name = "empty returns on_empty"
+input = ""
+expected = "preview-render: ok"
+
+[filters.harness-monitor-preview-smoke]
+description = "Compact preview-smoke.sh output — keep canonical preview verdicts"
+match_command = "^preview-smoke\\.sh(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^Preview: ",
+  "^Canonical ",
+  "^[0-9]+/[0-9]+ previews",
+  "^error: ",
+  "^warning: ",
+  "^fatal: ",
+  "^\\*\\* ",
+  "^✅ ",
+  "^❌ ",
+  "^💥 ",
+]
+max_lines = 60
+on_empty = "preview-smoke: ok"
+
+[[tests.harness-monitor-preview-smoke]]
+name = "keeps canonical preview counters"
+input = """
+Starting smoke test...
+Compiling...
+Canonical preview AgentTuiWindowView_Previews/Idle rendered
+Canonical preview AgentTuiWindowView_Previews/Running rendered
+20/20 previews rendered
+✅ smoke passed
+"""
+expected = "Canonical preview AgentTuiWindowView_Previews/Idle rendered\nCanonical preview AgentTuiWindowView_Previews/Running rendered\n20/20 previews rendered\n✅ smoke passed"
+
+[[tests.harness-monitor-preview-smoke]]
+name = "empty returns on_empty"
+input = ""
+expected = "preview-smoke: ok"
