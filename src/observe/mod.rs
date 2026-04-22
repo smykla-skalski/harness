@@ -18,6 +18,9 @@ mod tests;
 
 pub use transport::{ObserveArgs, ObserveFilterArgs, ObserveMode, ObserveScanActionKind};
 
+pub(crate) use application::maintenance::{
+    is_observer_conflict, load_observer_state, save_observer_state,
+};
 pub(crate) use text::{
     DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, redact_details, truncate_at, truncate_details,
 };
