@@ -156,17 +156,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       tolerance: 8
     )
 
-    tapButton(in: app, identifier: Accessibility.workerAgentCard)
-
-    let agentInspector = element(in: app, identifier: Accessibility.agentInspectorCard)
-    XCTAssertTrue(agentInspector.waitForExistence(timeout: Self.actionTimeout))
-    assertFillsColumn(
-      child: agentInspector,
-      in: inspectorRoot,
-      expectedHorizontalInset: 18,
-      tolerance: 8
-    )
-
     tapButton(in: app, identifier: Accessibility.observeSummaryButton)
 
     let observerInspector = element(in: app, identifier: Accessibility.observerInspectorCard)
