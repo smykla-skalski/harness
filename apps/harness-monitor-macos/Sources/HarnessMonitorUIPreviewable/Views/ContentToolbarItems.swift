@@ -31,8 +31,7 @@ struct ContentWindowToolbarItems: ToolbarContent {
     self.model = model
   }
 
-  @ToolbarContentBuilder
-  var body: some ToolbarContent {
+  @ToolbarContentBuilder var body: some ToolbarContent {
     ContentNavigationToolbar(store: store, model: model)
     SidebarToolbarNewSessionToolbarItem(
       isEnabled: model.canStartNewSession,

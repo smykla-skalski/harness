@@ -36,9 +36,10 @@ extension HarnessMonitorUITestCase {
       let frameMarker = frameElement(in: app, identifier: "\(optionTitle).frame")
       if let coordinate = centerCoordinate(in: app, for: menuItem) {
         coordinate.tap()
-      } else if (frameMarker.exists || frameMarker.waitForExistence(timeout: Self.fastActionTimeout)),
-        let coordinate = centerCoordinate(in: app, for: frameMarker)
-      {
+      } else if let coordinate = frameMarkerCoordinate(
+        in: app,
+        frameMarker: frameMarker
+      ) {
         coordinate.tap()
       } else {
         XCTFail("Failed to select menu option \(optionTitle)")
@@ -50,7 +51,10 @@ extension HarnessMonitorUITestCase {
     nativePresentationElement(in: app, title: title)
   }
 
-  func confirmationDialogButton(in app: XCUIApplication, title: String) -> XCUIElement {
+  func confirmationDialogButton(
+    in app: XCUIApplication,
+    title: String
+  ) -> XCUIElement {
     nativePresentationElement(in: app, title: title)
   }
 
@@ -111,6 +115,16 @@ extension HarnessMonitorUITestCase {
     }
 
     return candidateQueries.last!.firstMatch
+  }
+
+  private func frameMarkerCoordinate(
+    in app: XCUIApplication,
+    frameMarker: XCUIElement
+  ) -> XCUICoordinate? {
+    guard frameMarker.exists || frameMarker.waitForExistence(timeout: Self.fastActionTimeout) else {
+      return nil
+    }
+    return centerCoordinate(in: app, for: frameMarker)
   }
 
   private func presentedMenuOption(in app: XCUIApplication, title: String) -> XCUIElement {

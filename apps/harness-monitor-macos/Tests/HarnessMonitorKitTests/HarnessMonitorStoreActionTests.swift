@@ -8,7 +8,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Create task sends request and refreshes the selected session")
   func createTaskSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.createTask(
       title: "Ship the cockpit action surface",
@@ -36,7 +36,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Assign task sends request and refreshes the selected session")
   func assignTaskSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.assignTask(
       taskID: PreviewFixtures.tasks[0].taskId,
@@ -66,7 +66,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Drop task sends target request and refreshes the selected session")
   func dropTaskSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.dropTask(
       taskID: PreviewFixtures.tasks[0].taskId,
@@ -97,7 +97,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Update task queue policy sends request and refreshes the selected session")
   func updateTaskQueuePolicySendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.updateTaskQueuePolicy(
       taskID: PreviewFixtures.tasks[0].taskId,
@@ -127,7 +127,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Update task status sends request and refreshes the selected session")
   func updateTaskStatusSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.updateTaskStatus(
       taskID: PreviewFixtures.tasks[0].taskId,
@@ -159,7 +159,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Checkpoint task sends request and refreshes the selected session")
   func checkpointTaskSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.checkpointTask(
       taskID: PreviewFixtures.tasks[0].taskId,
@@ -191,7 +191,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Change role sends request and refreshes the selected session")
   func changeRoleSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.changeRole(
       agentID: PreviewFixtures.agents[1].agentId,
@@ -221,7 +221,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Transfer leader sends request and refreshes the selected session")
   func transferLeaderSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.transferLeader(
       newLeaderID: PreviewFixtures.agents[1].agentId,
@@ -247,7 +247,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Remove agent sends request and refreshes the selected session")
   func removeAgentSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.removeAgent(agentID: PreviewFixtures.agents[1].agentId, actor: "leader-claude")
 
@@ -272,7 +272,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Observe selected session tracks the last action")
   func observeSelectedSessionTracksLastAction() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.observeSelectedSession(actor: "observer-gwen")
 
@@ -291,7 +291,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Mutation fallback refetches only the timeline")
   func mutationFallbackRefetchesOnlyTheTimeline() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
     store.sessionPushFallbackDelay = .milliseconds(20)
     let sessionID = PreviewFixtures.summary.sessionId
 
@@ -324,7 +324,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("End selected session tracks the last action and status")
   func endSelectedSessionTracksLastActionAndStatus() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     await store.endSelectedSession(actor: "leader-claude")
 
@@ -344,7 +344,7 @@ struct HarnessMonitorStoreActionTests {
   @Test("Offline session actions fail in read-only mode without sending daemon mutations")
   func offlineSessionActionsFailInReadOnlyMode() async {
     let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
     store.connectionState = .offline("daemon down")
 
     let created = await store.createTask(
@@ -361,106 +361,11 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.pendingConfirmation == nil)
   }
 
-  @Test("Awaiting-leader task creation uses the control-plane actor")
-  func awaitingLeaderTaskCreationUsesControlPlaneActor() async {
-    let client = actorlessClient()
-    let store = await actorlessStore(client: client)
-
-    let created = await store.createTask(
-      title: "Seed control-plane task",
-      context: "Fresh sessions should accept task seeding before any leader joins.",
-      severity: .medium
-    )
-
-    #expect(created)
-    #expect(store.areSelectedSessionActionsAvailable)
-    #expect(store.selectedSessionActionUnavailableMessage == nil)
-    #expect(store.areSelectedLeaderActionsAvailable == false)
-    #expect(store.selectedLeaderActionUnavailableMessage == expectedLeaderlessActionMessage)
-    #expect(
-      client.recordedCalls()
-        == [
-          .createTask(
-            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
-            title: "Seed control-plane task",
-            context: "Fresh sessions should accept task seeding before any leader joins.",
-            severity: .medium,
-            actor: "harness-app"
-          )
-        ]
-    )
-  }
-
-  @Test("Awaiting-leader control-plane session actions stay available")
-  func awaitingLeaderControlPlaneSessionActionsStayAvailable() async {
-    let client = actorlessClient()
-    let store = await actorlessStore(client: client)
-
-    let observed = await store.observeSelectedSession()
-
-    #expect(observed)
-    #expect(store.currentSuccessFeedbackMessage == "Observe session")
-
-    store.requestEndSelectedSessionConfirmation()
-
-    #expect(
-      store.pendingConfirmation
-        == .endSession(
-          sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
-          actorID: "harness-app"
-        )
-    )
-
-    await store.confirmPendingAction()
-
-    #expect(store.pendingConfirmation == nil)
-    #expect(
-      client.recordedCalls()
-        == [
-          .observeSession(
-            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
-            actor: "harness-app"
-          ),
-          .endSession(
-            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
-            actor: "harness-app"
-          ),
-        ]
-    )
-    #expect(store.selectedSession?.session.status == .ended)
-    #expect(store.currentSuccessFeedbackMessage == "End session")
-  }
-
-  @Test("Default task actions keep the control-plane actor")
-  func defaultTaskActionsKeepTheControlPlaneActor() async {
-    let client = RecordingHarnessClient()
-    let store = await selectedStore(client: client)
-
-    await store.createTask(
-      title: "Use the live leader",
-      context: "Default actor resolution should not send harness-app.",
-      severity: .medium
-    )
-
-    #expect(
-      client.recordedCalls()
-        == [
-          .createTask(
-            sessionID: PreviewFixtures.summary.sessionId,
-            title: "Use the live leader",
-            context: "Default actor resolution should not send harness-app.",
-            severity: .medium,
-            actor: "harness-app"
-          )
-        ]
-    )
-  }
-
   @Test("Create task uses scoped session action loading")
   func createTaskUsesScopedSessionActionLoading() async {
     let client = RecordingHarnessClient()
     client.configureMutationDelay(.milliseconds(150))
-    let store = await selectedStore(client: client)
+    let store = await selectedActionStore(client: client)
 
     let createTask = Task {
       await store.createTask(
@@ -480,32 +385,5 @@ struct HarnessMonitorStoreActionTests {
 
     #expect(store.isSessionActionInFlight == false)
     #expect(store.isBusy == false)
-  }
-
-  private func selectedStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
-    let store = await makeBootstrappedStore(client: client)
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-    return store
-  }
-
-  private func actorlessClient() -> RecordingHarnessClient {
-    HarnessMonitorStoreSelectionTestSupport.configuredClient(
-      summaries: [PreviewFixtures.emptyCockpitSummary],
-      detailsByID: [PreviewFixtures.emptyCockpitSummary.sessionId: PreviewFixtures.emptyCockpitDetail],
-      detail: PreviewFixtures.emptyCockpitDetail
-    )
-  }
-
-  private func actorlessStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
-    let store = await makeBootstrappedStore(client: client)
-    await store.selectSession(PreviewFixtures.emptyCockpitSummary.sessionId)
-    return store
-  }
-
-  private var expectedLeaderlessActionMessage: String {
-    """
-    Leader-only actions are unavailable until a real leader joins this session.
-    Observe, end session, and task controls remain available.
-    """
   }
 }

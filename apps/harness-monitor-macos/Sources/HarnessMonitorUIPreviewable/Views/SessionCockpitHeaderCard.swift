@@ -35,7 +35,10 @@ struct SessionCockpitHeaderCard: View {
     guard detail.session.status == .awaitingLeader else {
       return nil
     }
-    return "This session is waiting for its first leader. You can still seed tasks, observe progress, or end it from the control plane."
+    return """
+      This session is waiting for its first leader. You can still seed tasks,
+      observe progress, or end it from the control plane.
+      """
   }
 
   var body: some View {
