@@ -34,8 +34,10 @@
       let record = BookmarkStore.Record(
         id: "B-preseed",
         kind: .projectRoot,
-        displayName: "Sample Project Folder",
-        lastResolvedPath: FileManager.default.temporaryDirectory.path,
+        displayName: "harness",
+        lastResolvedPath: FileManager.default.temporaryDirectory
+          .appendingPathComponent("harness", isDirectory: true)
+          .path,
         bookmarkData: Data(),
         createdAt: .now,
         lastAccessedAt: .now,

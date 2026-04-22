@@ -32,7 +32,7 @@ final class AuthorizedFoldersTests: HarnessMonitorUITestCase {
     XCTAssertTrue(row.waitForExistence(timeout: Self.actionTimeout))
   }
 
-  func testPreseedBookmarkUsesReadableSampleFolderName() throws {
+  func testPreseedBookmarkUsesReadableHarnessName() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PRESEED_BOOKMARK": "1"]
@@ -50,10 +50,10 @@ final class AuthorizedFoldersTests: HarnessMonitorUITestCase {
     )
 
     XCTAssertTrue(
-      app.staticTexts["Sample Project Folder"].firstMatch.waitForExistence(
+      app.staticTexts["harness"].firstMatch.waitForExistence(
         timeout: Self.actionTimeout
       ),
-      "The seeded authorized folder should use a readable sample folder label"
+      "The seeded authorized folder should use a readable harness label"
     )
   }
 }

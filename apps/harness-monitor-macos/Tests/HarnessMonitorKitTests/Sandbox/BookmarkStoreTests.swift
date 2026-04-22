@@ -23,10 +23,10 @@ final class BookmarkStoreTests: XCTestCase {
   func testMRUCapEvictsOldest() async throws {
     let dir = try makeTempDir()
     let store = BookmarkStore(containerURL: dir)
-    let tmp = FileManager.default.temporaryDirectory
 
-    for _ in 0..<(BookmarkStore.mruCap + 5) {
-      _ = try await store.add(url: tmp, kind: .projectRoot)
+    for index in 0..<(BookmarkStore.mruCap + 5) {
+      let target = try makeTempDir(named: "mru-\(index)")
+      _ = try await store.add(url: target, kind: .projectRoot)
     }
     let all = await store.all()
     XCTAssertEqual(all.count, BookmarkStore.mruCap)
@@ -238,8 +238,12 @@ final class BookmarkStoreTests: XCTestCase {
   #endif
 
   private func makeTempDir() throws -> URL {
+    try makeTempDir(named: UUID().uuidString)
+  }
+
+  private func makeTempDir(named name: String) throws -> URL {
     let dir = FileManager.default.temporaryDirectory
-      .appendingPathComponent("BookmarkStoreTests-\(UUID())", isDirectory: true)
+      .appendingPathComponent("BookmarkStoreTests-\(name)", isDirectory: true)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir
   }
