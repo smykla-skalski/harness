@@ -72,7 +72,7 @@ fn session_id_from_path_extracts_known_layouts() {
                 &context_root.join("agents/observe/observe-watch-map/snapshot.json")
             )
             .expect("observe path"),
-            None
+            Some("watch-map".to_string())
         );
         assert_eq!(worker.agent_session_id.as_deref(), Some("worker-session"));
         assert_eq!(state.session_id, "watch-map");
@@ -203,6 +203,13 @@ fn watch_target_from_path_marks_runtime_transcripts_as_targeted_refreshes() {
                 runtime_name: "codex".to_string(),
                 runtime_session_id: "worker-session".to_string(),
             })
+        );
+        assert_eq!(
+            watch_target_from_path(
+                &context_root.join("agents/observe/observe-watch-map/snapshot.json")
+            )
+            .expect("observe target"),
+            Some(WatchPathTarget::Session("watch-map".to_string()))
         );
         assert_eq!(
             watch_target_from_path(
