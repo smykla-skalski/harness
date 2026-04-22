@@ -233,6 +233,7 @@ enum HarnessMonitorUITestAccessibility {
   static let agentTuiControls = "harness.sheet.agent-tui.controls"
   static let agentTuiInputField = "harness.sheet.agent-tui.input"
   static let agentTuiInputModePicker = "harness.sheet.agent-tui.input-mode"
+  static let agentTuiSubmitWithEnterToggle = "harness.sheet.agent-tui.submit-with-enter"
   static let agentTuiRefreshButton = "harness.sheet.agent-tui.refresh"
   static let agentTuiStartButton = "harness.sheet.agent-tui.start"
   static let agentTuiSendButton = "harness.sheet.agent-tui.send"

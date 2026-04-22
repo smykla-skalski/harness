@@ -86,21 +86,29 @@ extension AgentTuiWindowView {
       Text("Input")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      HarnessMonitorSegmentedPicker(
-        title: "Input mode",
-        selection: $viewModel.inputMode,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputModePicker
-      ) {
-        ForEach(AgentTuiInputMode.allCases) { mode in
-          Text(mode.title)
-            .tag(mode)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.agentTuiInputModePicker,
-                option: mode.title
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
+        HarnessMonitorSegmentedPicker(
+          title: "Input mode",
+          selection: $viewModel.inputMode,
+          accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputModePicker
+        ) {
+          ForEach(AgentTuiInputMode.allCases) { mode in
+            Text(mode.title)
+              .tag(mode)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentTuiInputModePicker,
+                  option: mode.title
+                )
               )
-            )
+          }
         }
+        Toggle("Send Enter after input", isOn: $submitSendsEnter)
+          .toggleStyle(ClickableSwitchStyle())
+          .scaledFont(.caption)
+          .controlSize(.mini)
+          .accessibilityHint("Sends an Enter key after the typed or pasted input")
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSubmitWithEnterToggle)
       }
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         multilineEditor(

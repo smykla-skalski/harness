@@ -18,6 +18,11 @@ public enum HarnessMonitorBackgroundDefaults {
   public static let recentKey = "harnessRecentBackgrounds"
 }
 
+public enum HarnessMonitorAgentTuiDefaults {
+  public static let submitSendsEnterKey = "harnessAgentTuiSubmitSendsEnter"
+  public static let submitSendsEnterDefault = false
+}
+
 public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendable {
   public enum Source: Equatable, Sendable {
     case bundled(HarnessMonitorBackgroundImage)
