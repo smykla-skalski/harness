@@ -24,22 +24,11 @@ the worktree on exit.
 EOF
 }
 
-resolve_common_repo_root() {
-  local common_git_dir
-  common_git_dir="$(git -C "$REPO_ROOT" rev-parse --git-common-dir)"
-  if [[ "$common_git_dir" != /* ]]; then
-    common_git_dir="$REPO_ROOT/$common_git_dir"
-  fi
-  CDPATH='' cd -- "$common_git_dir/.." && pwd
-}
-
 slugify() {
   printf '%s' "$1" \
     | tr '[:upper:]' '[:lower:]' \
     | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
 }
-
-COMMON_REPO_ROOT="$(resolve_common_repo_root)"
 
 ref=""
 audit_label=""

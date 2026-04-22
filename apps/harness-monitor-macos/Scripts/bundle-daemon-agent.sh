@@ -11,6 +11,7 @@ fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Shared helpers keep path selection testable without executing the bundle flow.
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-bundle-env.sh
 source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
 
 repo_root="$(resolve_repo_root)"
