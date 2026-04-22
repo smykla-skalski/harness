@@ -222,7 +222,9 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
     sessionID _: String, request _: LeaderTransferRequest
   ) async throws -> SessionDetail { throw error }
 
-  func startSession(request _: SessionStartRequest) async throws -> SessionSummary { throw error }
+  func startSession(request _: SessionStartRequest) async throws -> SessionStartResult {
+    throw error
+  }
 
   func endSession(
     sessionID _: String, request _: SessionEndRequest
