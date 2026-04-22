@@ -55,7 +55,7 @@ run = ["./scripts/version.sh check", "./scripts/check-scripts.sh", "./scripts/ca
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
-run = ["cargo fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
+run = ["./scripts/cargo-local.sh fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
 description = "Build release binary, sign it, install to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binary"
@@ -163,8 +163,8 @@ run = "./scripts/host-metrics.sh build-darwin-exporter"
 [tasks."mcp:test"]
 description = "Run harness MCP server unit and integration tests"
 run = [
-  "cargo test --lib mcp::",
-  "cargo test --test integration mcp:: -- --test-threads=1",
+  "./scripts/cargo-local.sh test --lib mcp::",
+  "./scripts/cargo-local.sh test --test integration mcp:: -- --test-threads=1",
 ]
 
 [tasks."mcp:build:input-helper"]
