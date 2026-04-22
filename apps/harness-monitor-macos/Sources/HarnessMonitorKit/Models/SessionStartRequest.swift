@@ -42,3 +42,23 @@ public struct SessionStartRequest: Codable, Equatable, Sendable {
     try container.encodeIfPresent(baseRef, forKey: .baseRef)
   }
 }
+
+public struct SessionStartResult: Equatable, Sendable {
+  public let sessionId: String
+
+  public init(sessionId: String) {
+    self.sessionId = sessionId
+  }
+}
+
+struct SessionStartMutationResponse: Decodable, Sendable {
+  struct State: Decodable, Sendable {
+    let sessionId: String
+  }
+
+  let state: State
+
+  var result: SessionStartResult {
+    SessionStartResult(sessionId: state.sessionId)
+  }
+}

@@ -80,7 +80,7 @@ public final class NewSessionViewModel {
     self.logSink = logSink
   }
 
-  public func submit() async -> Result<SessionSummary, SubmitError> {
+  public func submit() async -> Result<SessionStartResult, SubmitError> {
     let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedTitle.isEmpty else {
       let error = SubmitError.validation(.titleRequired)
@@ -135,9 +135,9 @@ public final class NewSessionViewModel {
       baseRef: baseRef.isEmpty ? nil : baseRef
     )
 
-    let summary: SessionSummary
+    let startedSession: SessionStartResult
     do {
-      summary = try await client.startSession(request: request)
+      startedSession = try await client.startSession(request: request)
     } catch {
       let submitError = classify(error: error)
       lastError = submitError
@@ -145,10 +145,10 @@ public final class NewSessionViewModel {
       return .failure(submitError)
     }
 
-    logSink.info("new-session submit succeeded id=\(summary.sessionId)")
-    await store.selectSession(summary.sessionId)
+    logSink.info("new-session submit succeeded id=\(startedSession.sessionId)")
+    await store.selectSession(startedSession.sessionId)
     lastError = nil
-    return .success(summary)
+    return .success(startedSession)
   }
 
   public func availableBookmarks() async -> [BookmarkStore.Record] {
