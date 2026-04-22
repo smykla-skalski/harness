@@ -48,7 +48,7 @@ struct AgentTuiSidebar: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
 
       if !externalAgents.isEmpty {
-        Section("External Agents") {
+        Section("Agents") {
           ForEach(externalAgents) { agent in
             HStack(spacing: HarnessMonitorTheme.spacingSM) {
               Image(systemName: "person.crop.circle")

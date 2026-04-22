@@ -64,7 +64,6 @@ struct SessionCockpitView: View {
           SessionActionDock(
             detail: detail,
             inspectTask: store.inspect(taskID:),
-            openAgent: openAgent,
             inspectObserver: store.inspectObserver,
             openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
