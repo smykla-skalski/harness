@@ -148,6 +148,10 @@ if [[ "${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE:-0}" != "1" ]]; then
     "com.apple.security.temporary-exception.files.home-relative-path"
   require_exact_entitlement \
     "$DAEMON_ENTITLEMENTS_PATH" \
+    "daemon missing user-selected.read-write" \
+    "com.apple.security.files.user-selected.read-write"
+  require_exact_entitlement \
+    "$DAEMON_ENTITLEMENTS_PATH" \
     "daemon missing bookmarks.app-scope" \
     "com.apple.security.files.bookmarks.app-scope"
 fi
