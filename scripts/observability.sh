@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
+source "$ROOT/apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh"
 STACK_ROOT="$ROOT/resources/observability"
 COMPOSE_FILE="$STACK_ROOT/docker-compose.yml"
 PROJECT_NAME="${HARNESS_OBSERVABILITY_PROJECT_NAME:-harness-observability}"
@@ -825,7 +827,9 @@ run_daemon_server_smoke() {
 }
 
 run_monitor_smoke() {
+  local destination
   local log_path
+  destination="$(harness_monitor_xcodebuild_destination)"
   log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-otel-smoke.XXXXXX.log")"
   write_shared_config true >/dev/null
   write_monitor_smoke_data_home_marker
@@ -840,7 +844,7 @@ run_monitor_smoke() {
         -skipPackagePluginValidation \
         test \
         CODE_SIGNING_ALLOWED=NO \
-        -destination 'platform=macOS' \
+        -destination "$destination" \
         -skip-testing:HarnessMonitorUITests \
         -only-testing:HarnessMonitorKitTests/HarnessMonitorObservabilitySmokeTests \
         >"$log_path" 2>&1
