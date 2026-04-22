@@ -194,6 +194,7 @@ pub fn record_hook_event(
                 &context,
                 &result,
             )?;
+            disconnect_managed_runtime_session_if_ended(&project_dir, agent, &context)?;
             if matches!(context.event, NormalizedEvent::SessionEnd) {
                 storage::clear_current_session_id(&project_dir, agent)?;
             }
@@ -259,6 +260,40 @@ fn reconcile_managed_runtime_session(
         project_dir,
     )?;
     Ok(())
+}
+
+fn disconnect_managed_runtime_session_if_ended(
+    project_dir: &Path,
+    agent: HookAgent,
+    context: &NormalizedHookContext,
+) -> Result<(), CliError> {
+    if context.event != NormalizedEvent::SessionEnd {
+        return Ok(());
+    }
+    let Some(runtime_session_id) = observed_runtime_session_id(context) else {
+        return Ok(());
+    };
+    let Some(resolved) = orchestration_service::resolve_session_agent_for_runtime_session(
+        project_dir,
+        adapter_for(agent).name(),
+        runtime_session_id,
+    )?
+    else {
+        return Ok(());
+    };
+    let state =
+        orchestration_service::session_status(&resolved.orchestration_session_id, project_dir)?;
+    let Some(agent_state) = state.agents.get(&resolved.agent_id) else {
+        return Ok(());
+    };
+    if !agent_state.status.is_alive() {
+        return Ok(());
+    }
+    orchestration_service::leave_session(
+        &resolved.orchestration_session_id,
+        &resolved.agent_id,
+        project_dir,
+    )
 }
 
 fn trimmed_env(key: &str) -> Option<String> {

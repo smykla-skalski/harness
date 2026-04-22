@@ -237,3 +237,99 @@ fn record_hook_event_registers_late_managed_runtime_session() {
         );
     });
 }
+
+#[test]
+fn record_hook_event_session_end_disconnects_managed_agent() {
+    with_temp_project_without_runtime_ids("project-session-end", |project| {
+        let started = session_service::start_session(
+            "managed session end cleanup",
+            "",
+            project,
+            Some("sess-managed-end"),
+        )
+        .expect("start session");
+        let session_id = started.session_id.clone();
+        let tui_id = "agent-tui-claude-1";
+        session_service::join_session(
+            &session_id,
+            SessionRole::Leader,
+            "claude",
+            &[
+                "agent-tui".into(),
+                format!("agent-tui:{tui_id}"),
+                "observe".into(),
+            ],
+            Some("Managed leader"),
+            project,
+            None,
+        )
+        .expect("join leader");
+
+        let context = NormalizedHookContext {
+            event: NormalizedEvent::SessionEnd,
+            session: SessionContext {
+                session_id: "claude-runtime-session".into(),
+                cwd: Some(project.to_path_buf()),
+                transcript_path: None,
+            },
+            tool: None,
+            agent: Some(AgentContext {
+                agent_id: None,
+                agent_type: Some("claude".into()),
+                prompt: Some("managed leader exit".into()),
+                response: Some("exit".into()),
+            }),
+            skill: SkillContext::inactive(),
+            raw: RawPayload::new(json!({
+                "session_id": "claude-runtime-session",
+                "cwd": project.to_string_lossy(),
+            })),
+        };
+
+        temp_env::with_vars(
+            [
+                ("HARNESS_SESSION_ID", Some(session_id.as_str())),
+                ("HARNESS_AGENT_TUI_ID", Some(tui_id)),
+            ],
+            || {
+                record_hook_event(
+                    HookAgent::Claude,
+                    "suite:run",
+                    "guard-stop",
+                    &context,
+                    &NormalizedHookResult::allow(),
+                )
+                .expect("record session end");
+            },
+        );
+
+        let updated = session_service::session_status(&session_id, project).expect("status");
+        let leader_id = updated.leader_id.clone();
+        let leader = updated
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "claude")
+            .expect("claude leader");
+        assert_eq!(
+            leader.agent_session_id.as_deref(),
+            Some("claude-runtime-session")
+        );
+        assert_eq!(
+            leader.status,
+            crate::session::types::AgentStatus::Disconnected
+        );
+        assert_eq!(
+            updated.status,
+            crate::session::types::SessionStatus::LeaderlessDegraded
+        );
+        assert!(
+            leader_id.is_none(),
+            "leader session end should clear leader id"
+        );
+        assert_eq!(updated.metrics.active_agent_count, 0);
+        assert_eq!(
+            storage::current_session_id(project, HookAgent::Claude).expect("current session id"),
+            None
+        );
+    });
+}
