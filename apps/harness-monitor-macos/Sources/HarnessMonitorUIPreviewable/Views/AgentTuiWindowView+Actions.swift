@@ -49,6 +49,11 @@ extension AgentTuiWindowView {
         } else {
           _ = await store.refreshSelectedCodexRuns()
         }
+      case .agent:
+        async let tuiRefresh = store.refreshSelectedAgentTuis()
+        async let codexRefresh = store.refreshSelectedCodexRuns()
+        _ = await tuiRefresh
+        _ = await codexRefresh
       }
       reconcileSheetState(afterRefresh: false)
       enforceExpectedSize()
@@ -355,6 +360,13 @@ extension AgentTuiWindowView {
       enforceExpectedSize()
     case .codex(let selectedRunID):
       guard store.selectedCodexRuns.contains(where: { $0.runId == selectedRunID }) else {
+        applyProgrammaticSelection(preferredSelection)
+        return
+      }
+    case .agent(let selectedAgentID):
+      guard
+        store.selectedSession?.agents.contains(where: { $0.agentId == selectedAgentID }) ?? false
+      else {
         applyProgrammaticSelection(preferredSelection)
         return
       }

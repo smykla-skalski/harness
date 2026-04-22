@@ -37,6 +37,7 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentShell])
     }
   }
+  public var pendingAgentsWindowSelection: AgentTuiSheetSelection?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   @ObservationIgnored var forcedHostBridgeCapabilities: Set<String> = []
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
