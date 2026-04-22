@@ -14,7 +14,8 @@ resolve_repo_root() {
 }
 
 default_cargo_target_dir() {
-  printf '%s/target/harness-monitor-xcode-daemon\n' "$repo_root"
+  local resolved_repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  printf '%s/target/harness-monitor-xcode-daemon\n' "$resolved_repo_root"
 }
 
 resolve_cargo_target_dir() {
@@ -28,5 +29,5 @@ resolve_cargo_target_dir() {
     return
   fi
 
-  default_cargo_target_dir
+  default_cargo_target_dir "${repo_root:-}"
 }

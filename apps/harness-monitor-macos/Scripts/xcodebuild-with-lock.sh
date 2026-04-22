@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
+source "$SCRIPT_DIR/lib/rtk-shell.sh"
 
 DEFAULT_DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
 LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
@@ -71,7 +73,7 @@ run_once() {
   local log_path status
   log_path="$(mktemp "${TMPDIR:-/tmp}/harness-xcodebuild.XXXXXX.log")"
   set +e
-  xcodebuild "${args[@]}" 2>&1 | tee "$log_path"
+  run_xcodebuild_command "${args[@]}" 2>&1 | tee "$log_path"
   status="${PIPESTATUS[0]}"
   set -e
 

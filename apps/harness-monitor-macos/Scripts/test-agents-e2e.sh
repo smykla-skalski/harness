@@ -6,6 +6,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 DESTINATION="${XCODEBUILD_DESTINATION:-platform=macOS}"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$ROOT/Scripts/xcodebuild-with-lock.sh}"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
+source "$ROOT/Scripts/lib/rtk-shell.sh"
 CODEX_BINARY="${HARNESS_MONITOR_E2E_CODEX_BINARY:-$(command -v codex || true)}"
 ONLY_TESTING="${XCODE_ONLY_TESTING:-HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests}"
 RUN_ID="${HARNESS_MONITOR_E2E_RUN_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
@@ -61,11 +63,11 @@ cleanup() {
     echo "Agents e2e data root preserved at: $DATA_ROOT"
     if [[ -f "$DAEMON_LOG" ]]; then
       echo "--- daemon log tail ---"
-      tail -n 80 "$DAEMON_LOG"
+      print_log_tail_compact 80 "$DAEMON_LOG"
     fi
     if [[ -f "$BRIDGE_LOG" ]]; then
       echo "--- bridge log tail ---"
-      tail -n 80 "$BRIDGE_LOG"
+      print_log_tail_compact 80 "$BRIDGE_LOG"
     fi
   } >&2
 }
