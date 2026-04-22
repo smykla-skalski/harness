@@ -1,6 +1,5 @@
 import Foundation
 import OpenTelemetryApi
-
 // MARK: - Internal transport mechanics
 
 private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
@@ -91,7 +90,10 @@ extension WebSocketTransport {
           if let error {
             let errorDescription = error.localizedDescription
             HarnessMonitorLogger.websocket.warning(
-              "WebSocket send failed for \(method.rawValue, privacy: .public): \(errorDescription, privacy: .public)"
+              """
+              WebSocket send failed for \(method.rawValue, privacy: .public): \
+              \(errorDescription, privacy: .public)
+              """
             )
             Task { await self.clearResponseBatchHandler(for: id) }
             Task { await self.clearPendingRPCMethod(for: id) }
@@ -381,68 +383,6 @@ extension WebSocketTransport {
       pending.resume(id: id, result: result)
     } else {
       pending.resume(id: id, result: .null)
-    }
-  }
-
-  func responseError(
-    method: WebSocketRPCMethod?,
-    error: WsErrorPayload
-  ) -> any Error {
-    guard let statusCode = error.statusCode else {
-      return WebSocketTransportError.serverError(
-        code: error.code,
-        message: error.message
-      )
-    }
-
-    if method == .sessionAdopt,
-      let adoptError = HarnessMonitorAPIClient.classifyAdoptError(
-        statusCode: statusCode,
-        payload: error.data
-      )
-    {
-      return adoptError
-    }
-
-    if let data = error.data,
-      let encoded = try? encoder.encode(data)
-    {
-      return HarnessMonitorAPIClient.decodeError(
-        statusCode: statusCode,
-        data: encoded
-      )
-    }
-
-    return HarnessMonitorAPIError.server(code: statusCode, message: error.message)
-  }
-
-  private func handlePushFrame(
-    event: String,
-    recordedAt: String,
-    sessionId: String?,
-    payload: JSONValue
-  ) {
-    if event == "config" {
-      handleConfigurationPush(payload: payload)
-      return
-    }
-    let streamEvent = StreamEvent(
-      event: event,
-      recordedAt: recordedAt,
-      sessionId: sessionId,
-      payload: payload
-    )
-    do {
-      let pushEvent = try DaemonPushEvent(streamEvent: streamEvent)
-      globalStreamContinuation?.yield(pushEvent)
-      if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
-        continuation.yield(pushEvent)
-      }
-    } catch {
-      let err = error.localizedDescription
-      HarnessMonitorLogger.websocket.warning(
-        "Dropping malformed push frame \(event, privacy: .public): \(err, privacy: .public)"
-      )
     }
   }
 

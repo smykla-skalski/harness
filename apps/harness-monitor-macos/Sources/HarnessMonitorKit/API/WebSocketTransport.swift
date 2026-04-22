@@ -6,8 +6,11 @@ private final class SemanticBatchDeliveryTracker: @unchecked Sendable {
 
 public actor WebSocketTransport: HarnessMonitorClientProtocol {
   typealias RPCSender =
-    @Sendable (_ method: WebSocketRPCMethod, _ params: JSONValue?, _ onSemanticBatch: ResponseBatchHandler?)
-      async throws -> JSONValue
+    @Sendable (
+      _ method: WebSocketRPCMethod,
+      _ params: JSONValue?,
+      _ onSemanticBatch: ResponseBatchHandler?
+    ) async throws -> JSONValue
 
   let connection: HarnessMonitorConnection
   let encoder: JSONEncoder
@@ -232,6 +235,36 @@ extension WebSocketTransport {
       await onBatch(entries, 0, 1)
     }
     return entries
+  }
+
+  func handlePushFrame(
+    event: String,
+    recordedAt: String,
+    sessionId: String?,
+    payload: JSONValue
+  ) {
+    if event == "config" {
+      handleConfigurationPush(payload: payload)
+      return
+    }
+    let streamEvent = StreamEvent(
+      event: event,
+      recordedAt: recordedAt,
+      sessionId: sessionId,
+      payload: payload
+    )
+    do {
+      let pushEvent = try DaemonPushEvent(streamEvent: streamEvent)
+      globalStreamContinuation?.yield(pushEvent)
+      if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
+        continuation.yield(pushEvent)
+      }
+    } catch {
+      let err = error.localizedDescription
+      HarnessMonitorLogger.websocket.warning(
+        "Dropping malformed push frame \(event, privacy: .public): \(err, privacy: .public)"
+      )
+    }
   }
 
   private func timelineWindowParams(

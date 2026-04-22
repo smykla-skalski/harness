@@ -116,7 +116,8 @@ extension AgentTuiWindowView {
           text: $viewModel.inputText,
           field: .input,
           minHeight: 72,
-          accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputField
+          accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputField,
+          onCommandReturn: { sendInput(to: tui) }
         )
         HarnessMonitorActionButton(
           title: "Send",
@@ -224,7 +225,8 @@ extension AgentTuiWindowView {
     text: Binding<String>,
     field: Field,
     minHeight: CGFloat,
-    accessibilityIdentifier: String
+    accessibilityIdentifier: String,
+    onCommandReturn: (() -> Void)? = nil
   ) -> some View {
     ZStack(alignment: .topLeading) {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -245,6 +247,14 @@ extension AgentTuiWindowView {
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
         .focused(focusedFieldBinding, equals: field)
+        .background {
+          if let onCommandReturn {
+            CommandReturnKeyMonitor(
+              isEnabled: focusedField == field,
+              action: onCommandReturn
+            )
+          }
+        }
     }
     .frame(minHeight: minHeight)
     .overlay {
