@@ -4,14 +4,16 @@ extension DaemonController {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
-    let refreshedManagedLaunchAgent = try refreshManagedLaunchAgentIfBundledHelperChanged()
+    let pendingBundleStampRefresh =
+      try managedLaunchAgentRefreshNeededForBundledHelperChange()
     let timeoutDesc = String(describing: timeout)
     HarnessMonitorLogger.lifecycle.trace(
       "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
     )
     let deadline = ContinuousClock.now + timeout
     var state = WarmUpLoopState(
-      refreshedManagedLaunchAgentDuringWarmUp: refreshedManagedLaunchAgent)
+      pendingBundleStampRefresh: pendingBundleStampRefresh
+    )
     while ContinuousClock.now < deadline {
       let shouldBreak = try await warmUpIteration(state: &state)
       if let client = shouldBreak.liveClient {
@@ -46,6 +48,7 @@ extension DaemonController {
     var skipFinalBootstrapProbe = false
     var managedStaleManifestTracker = ManagedStaleManifestTracker()
     var managedVersionMismatchTracker = ManagedStaleManifestTracker()
+    var pendingBundleStampRefresh: ManagedLaunchAgentBundleStamp?
     var refreshedManagedLaunchAgentDuringWarmUp = false
     var signaledManagedRecoveryManifestSignature: String?
   }
@@ -71,12 +74,11 @@ extension DaemonController {
         )
       }
       state.managedVersionMismatchTracker.reset()
-      if let mismatchOutcome = try handleManagedLiveHelperMismatch(
-        manifest: manifest,
-        state: &state
-      ) {
-        return mismatchOutcome
-      }
+      let deferredManagedLaunchAgentRefresh =
+        try managedLaunchAgentDeferredRefreshCandidate(
+          for: manifest,
+          state: &state
+        )
       let connection = try daemonConnection(from: manifest)
       let endpoint = connection.endpoint.absoluteString
       let manifestPid = manifest.pid
@@ -87,11 +89,30 @@ extension DaemonController {
         HarnessMonitorLogger.lifecycle.trace(
           "Warm-up confirmed live daemon endpoint \(endpoint, privacy: .public)"
         )
+        if let deferredManagedLaunchAgentRefresh {
+          await queueDeferredManagedLaunchAgentRefresh(deferredManagedLaunchAgentRefresh)
+          state.pendingBundleStampRefresh = nil
+          HarnessMonitorLogger.lifecycle.notice(
+            """
+            Managed daemon helper changed, but current daemon is healthy; \
+            deferring launch-agent refresh until app inactivity
+            """
+          )
+        } else {
+          await clearDeferredManagedLaunchAgentRefresh()
+        }
         let client = try await bootstrap(connection: connection)
         return WarmUpIterationOutcome(liveClient: client, stop: true)
       }
-      return handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
+      return try handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
     } catch let error as DaemonControlError {
+      if try refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
+        error: error,
+        state: &state
+      ) {
+        state.lastError = error
+        return .continueLoop
+      }
       state.managedStaleManifestTracker.reset()
       state.managedVersionMismatchTracker.reset()
       if case .invalidManifest = error, ownership == .external {
@@ -117,7 +138,7 @@ extension DaemonController {
     manifest: DaemonManifest,
     endpoint: String,
     state: inout WarmUpLoopState
-  ) -> WarmUpIterationOutcome {
+  ) throws -> WarmUpIterationOutcome {
     let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
     HarnessMonitorLogger.lifecycle.error(
       "\(Self.warmUpStaleManifestMessage(path: manifestPath, endpoint: endpoint), privacy: .public)"
@@ -129,18 +150,26 @@ extension DaemonController {
       )
       return .stopLoop
     }
-    return handleManagedStaleManifest(manifest: manifest, path: manifestPath, state: &state)
+    return try handleManagedStaleManifest(manifest: manifest, path: manifestPath, state: &state)
   }
 
   func handleManagedStaleManifest(
     manifest: DaemonManifest,
     path: String,
     state: inout WarmUpLoopState
-  ) -> WarmUpIterationOutcome {
+  ) throws -> WarmUpIterationOutcome {
     state.lastError = DaemonControlError.daemonDidNotStart
     let staleSignature = Self.managedStaleManifestSignature(for: manifest)
     let gracePeriod = String(describing: managedStaleManifestGracePeriod)
     if Self.processIsAlive(pid: manifest.pid) == false {
+      if try refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(state: &state) {
+        return handleManagedReplacementManifestWait(
+          signature: staleSignature,
+          path: path,
+          gracePeriod: gracePeriod,
+          state: &state
+        )
+      }
       if state.refreshedManagedLaunchAgentDuringWarmUp {
         return handleManagedReplacementManifestWait(
           signature: staleSignature,
@@ -204,45 +233,6 @@ extension DaemonController {
       "\(Self.warmUpManagedReplacementManifestWaitMessage(path: path), privacy: .public)"
     )
     return .continueLoop
-  }
-
-  func handleManagedLiveHelperMismatch(
-    manifest: DaemonManifest,
-    state: inout WarmUpLoopState
-  ) throws -> WarmUpIterationOutcome? {
-    guard ownership == .managed else {
-      return nil
-    }
-    guard launchAgentManager.registrationState() == .enabled else {
-      return nil
-    }
-    guard
-      let publishedStamp = manifest.binaryStamp?.managedLaunchAgentBundleStamp,
-      let currentStamp = try managedLaunchAgentCurrentBundleStamp(),
-      publishedStamp != currentStamp
-    else {
-      return nil
-    }
-
-    if state.refreshedManagedLaunchAgentDuringWarmUp == false {
-      HarnessMonitorLogger.lifecycle.notice(
-        "Managed daemon helper identity mismatch; refreshing launch agent in background"
-      )
-      try refreshManagedLaunchAgent(currentStamp: currentStamp)
-      state.refreshedManagedLaunchAgentDuringWarmUp = true
-    }
-    signalManagedRecoveryProcessIfNeeded(manifest: manifest, state: &state)
-
-    // After triggering refresh, proceed with the old daemon immediately.
-    // The old daemon is functional (version already validated above).
-    // When it exits, the manifest watcher will trigger reconnection.
-    HarnessMonitorLogger.lifecycle.trace(
-      """
-      Proceeding with current daemon pid=\(manifest.pid, privacy: .public) \
-      while refresh cycles in background
-      """
-    )
-    return nil
   }
 
   func handleManagedVersionMismatch(

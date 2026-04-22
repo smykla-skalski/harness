@@ -36,12 +36,14 @@ extension HarnessMonitorStore {
     stopAllStreams()
 
     guard let client else {
+      _ = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
       connectionState = .idle
       return
     }
 
     self.client = nil
     await client.shutdown()
+    _ = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
     connectionState = .idle
   }
 

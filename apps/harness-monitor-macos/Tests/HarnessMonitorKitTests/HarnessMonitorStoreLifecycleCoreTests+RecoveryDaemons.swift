@@ -92,6 +92,10 @@ actor ManagedWarmUpRecoveryDaemonController: DaemonControlling {
     return client
   }
 
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
+  }
+
   func recordedOperations() -> [String] {
     operations
   }
@@ -190,6 +194,10 @@ actor ManagedDaemonVersionRecoveryDaemonController: DaemonControlling {
     return client
   }
 
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
+  }
+
   func recordedOperations() -> [String] {
     operations
   }
@@ -273,6 +281,10 @@ actor ManagedLaunchAgentRefreshThrottleDaemonController: DaemonControlling {
   ) async throws -> any HarnessMonitorClientProtocol {
     operations.append("warm-up")
     throw DaemonControlError.daemonDidNotStart
+  }
+
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
   }
 
   func recordedOperations() -> [String] {
@@ -364,6 +376,10 @@ actor ManagedWarmUpLateBootstrapDaemonController: DaemonControlling {
   ) async throws -> any HarnessMonitorClientProtocol {
     operations.append("warm-up")
     throw DaemonControlError.daemonDidNotStart
+  }
+
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
   }
 
   func recordedOperations() -> [String] {

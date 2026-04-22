@@ -49,8 +49,8 @@ public enum HarnessMonitorPaths {
   ///
   /// Resolution order:
   /// 1. Explicit configured root (`HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME`).
-  /// 2. App group container override via `HARNESS_APP_GROUP_ID` env var.
-  /// 3. System `containerURL(forSecurityApplicationGroupIdentifier:)`.
+  /// 2. Native group-container resolution for the configured or default app group id.
+  /// 3. Home-relative app-group fallback via `HARNESS_APP_GROUP_ID`.
   /// 4. External-daemon bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1`, debug builds only):
   ///    returns `~/Library/Application Support` directly so dev mode skips the
   ///    group-container lookup and stays symmetric with the pre-Task-11 behaviour.
@@ -65,15 +65,15 @@ public enum HarnessMonitorPaths {
       return configuredRoot
     }
 
-    if let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines),
-      !value.isEmpty
-    {
-      return appGroupContainerURL(identifier: value, using: environment)
+    if let appGroupIdentifier = normalizedAppGroupIdentifier(using: environment) {
+      if let containerURL = nativeAppGroupContainerURL(identifier: appGroupIdentifier) {
+        return containerURL
+      }
+      return appGroupContainerURL(identifier: appGroupIdentifier, using: environment)
     }
 
-    if let containerURL = FileManager.default.containerURL(
-      forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
+    if let containerURL = nativeAppGroupContainerURL(
+      identifier: HarnessMonitorAppGroup.identifier
     ) {
       return containerURL
     }
@@ -85,6 +85,25 @@ public enum HarnessMonitorPaths {
     }
 
     return nil
+  }
+
+  private static func normalizedAppGroupIdentifier(
+    using environment: HarnessMonitorEnvironment
+  ) -> String? {
+    guard
+      let value = environment.values[HarnessMonitorAppGroup.environmentKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !value.isEmpty
+    else {
+      return nil
+    }
+    return value
+  }
+
+  private static func nativeAppGroupContainerURL(identifier: String) -> URL? {
+    FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: identifier
+    )
   }
 
   private static func appGroupContainerURL(
@@ -102,6 +121,10 @@ public enum HarnessMonitorPaths {
   ) -> URL {
     if let configuredRoot = configuredDataHomeRoot(using: environment) {
       return configuredRoot
+    }
+
+    if let baseRoot = resolveBaseRoot(using: environment, preferExternalDaemon: false) {
+      return baseRoot
     }
 
     return environment.homeDirectory

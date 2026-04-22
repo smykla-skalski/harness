@@ -400,6 +400,10 @@ actor HostBridgeRecoveryDaemonController: DaemonControlling {
     return restartedClient ?? initialClient
   }
 
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
+  }
+
   func recordedOperations() -> [String] {
     operations
   }

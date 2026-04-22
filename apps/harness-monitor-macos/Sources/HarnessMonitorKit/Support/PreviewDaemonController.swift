@@ -144,6 +144,10 @@ public actor PreviewDaemonController: DaemonControlling {
     return makeClient()
   }
 
+  public func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
+  }
+
   public func stopDaemon() async throws -> String {
     isDaemonRunning = false
     return "stopped"

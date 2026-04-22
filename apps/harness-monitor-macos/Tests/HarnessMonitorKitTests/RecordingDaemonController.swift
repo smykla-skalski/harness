@@ -9,8 +9,10 @@ actor RecordingDaemonController: DaemonControlling {
   private let statusReportOverride: DaemonStatusReport?
   private let bootstrapError: (any Error)?
   private let warmUpError: (any Error)?
+  private let deferredManagedLaunchAgentRefreshResult: Bool
   private var lastEventMessage = "daemon ready"
   private var registerLaunchAgentCallCount = 0
+  private var deferredRefreshCallCount = 0
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
@@ -18,7 +20,8 @@ actor RecordingDaemonController: DaemonControlling {
     registrationState: DaemonLaunchAgentRegistrationState? = nil,
     statusReport: DaemonStatusReport? = nil,
     bootstrapError: (any Error)? = nil,
-    warmUpError: (any Error)? = nil
+    warmUpError: (any Error)? = nil,
+    deferredManagedLaunchAgentRefreshResult: Bool = false
   ) {
     self.client = client
     self.launchAgentInstalled = launchAgentInstalled
@@ -26,6 +29,7 @@ actor RecordingDaemonController: DaemonControlling {
     self.statusReportOverride = statusReport
     self.bootstrapError = bootstrapError ?? warmUpError
     self.warmUpError = warmUpError
+    self.deferredManagedLaunchAgentRefreshResult = deferredManagedLaunchAgentRefreshResult
   }
 
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -75,6 +79,11 @@ actor RecordingDaemonController: DaemonControlling {
       throw warmUpError
     }
     return client
+  }
+
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    deferredRefreshCallCount += 1
+    return deferredManagedLaunchAgentRefreshResult
   }
 
   func stopDaemon() async throws -> String {
@@ -138,5 +147,9 @@ actor RecordingDaemonController: DaemonControlling {
 
   func recordedRegisterLaunchAgentCallCount() async -> Int {
     registerLaunchAgentCallCount
+  }
+
+  func recordedDeferredManagedLaunchAgentRefreshCallCount() async -> Int {
+    deferredRefreshCallCount
   }
 }
