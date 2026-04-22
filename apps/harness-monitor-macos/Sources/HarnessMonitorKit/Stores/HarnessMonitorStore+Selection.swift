@@ -360,7 +360,6 @@ extension HarnessMonitorStore {
   }
 
   public func inspect(taskID: String) { inspectorSelection = .task(taskID) }
-  public func inspect(agentID: String) { inspectorSelection = .agent(agentID) }
   public func inspect(signalID: String) { inspectorSelection = .signal(signalID) }
   public func inspectObserver() { inspectorSelection = .observer }
 

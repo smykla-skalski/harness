@@ -21,7 +21,6 @@ extension HarnessMonitorStore {
     let text: String
     switch inspectorSelection {
     case .task(let taskID): text = taskID
-    case .agent(let agentID): text = agentID
     case .signal(let signalID): text = signalID
     case .observer:
       text = selectedSession?.observer?.observeId ?? selectedSessionID ?? ""

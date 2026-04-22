@@ -5,16 +5,6 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store inspector")
 struct HarnessMonitorStoreInspectorTests {
-  @Test("Inspect agent sets inspector selection to agent")
-  func inspectAgentSetsSelection() async {
-    let store = await makeBootstrappedStore()
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    store.inspect(agentID: PreviewFixtures.agents[1].agentId)
-
-    #expect(store.inspectorSelection == .agent(PreviewFixtures.agents[1].agentId))
-  }
-
   @Test("Inspect signal sets inspector selection to signal")
   func inspectSignalSetsSelection() async {
     let store = await makeBootstrappedStore()
@@ -35,28 +25,6 @@ struct HarnessMonitorStoreInspectorTests {
     store.inspectObserver()
 
     #expect(store.inspectorSelection == .observer)
-  }
-
-  @Test("Selected agent resolves from loaded session detail")
-  func selectedAgentResolvesFromDetail() async {
-    let store = await makeBootstrappedStore()
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    store.inspect(agentID: PreviewFixtures.agents[1].agentId)
-
-    let agent = store.selectedAgent
-    #expect(agent?.agentId == PreviewFixtures.agents[1].agentId)
-    #expect(agent?.runtime == PreviewFixtures.agents[1].runtime)
-  }
-
-  @Test("Selected agent returns nil when inspector is not on an agent")
-  func selectedAgentReturnsNilForNonAgentSelection() async {
-    let store = await makeBootstrappedStore()
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    store.inspect(taskID: PreviewFixtures.tasks[0].taskId)
-
-    #expect(store.selectedAgent == nil)
   }
 
   @Test("Selected signal resolves from loaded session detail")
@@ -233,16 +201,16 @@ struct HarnessMonitorStoreInspectorTests {
     let didChange = await didInvalidate(
       { store.inspectorUI.primaryContent },
       after: {
-        store.inspect(agentID: PreviewFixtures.agents[1].agentId)
+        store.inspect(taskID: PreviewFixtures.tasks[0].taskId)
       }
     )
 
     #expect(didChange)
     switch store.inspectorUI.primaryContent {
-    case .agent(let selection):
-      #expect(selection.agent.agentId == PreviewFixtures.agents[1].agentId)
+    case .task(let selection):
+      #expect(selection.task.taskId == PreviewFixtures.tasks[0].taskId)
     default:
-      Issue.record("Expected inspector primary content to resolve the selected agent")
+      Issue.record("Expected inspector primary content to resolve the selected task")
     }
   }
 
@@ -263,7 +231,7 @@ struct HarnessMonitorStoreInspectorTests {
 
     guard
       let actionContext = index.actionContext(
-        inspectorSelection: .agent(PreviewFixtures.agents[1].agentId),
+        inspectorSelection: .task(PreviewFixtures.tasks[0].taskId),
         isPersistenceAvailable: true,
         selectedActionActorID: PreviewFixtures.summary.leaderId ?? "",
         isSessionReadOnly: false,
@@ -274,7 +242,7 @@ struct HarnessMonitorStoreInspectorTests {
       return
     }
 
-    #expect(actionContext.selectedAgent?.agentId == PreviewFixtures.agents[1].agentId)
+    #expect(actionContext.selectedTask?.taskId == PreviewFixtures.tasks[0].taskId)
     #expect(
       actionContext.actionActorOptions.contains { $0.agentId == PreviewFixtures.summary.leaderId }
     )

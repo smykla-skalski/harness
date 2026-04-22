@@ -40,7 +40,7 @@ struct HarnessMonitorContentSelectionTests {
         )
       },
       after: {
-        store.inspect(agentID: PreviewFixtures.agents[1].agentId)
+        store.inspect(taskID: PreviewFixtures.tasks[0].taskId)
       }
     )
 

@@ -240,61 +240,6 @@ struct InspectorTaskActionsSection: View {
   }
 }
 
-struct InspectorRoleActionsSection: View {
-  let store: HarnessMonitorStore
-  let sessionID: String
-  let agent: AgentRegistration
-  let leaderID: String?
-  @Binding var role: SessionRole
-  let areSessionActionsAvailable: Bool
-  let changeSelectedRole: @MainActor @Sendable () -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      HarnessMonitorActionHeader(
-        title: "Role Actions",
-        subtitle: "Change the selected agent role without leaving the inspector."
-      )
-      Text(agent.name)
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      if agent.agentId == leaderID {
-        Text("Transfer leadership before changing the leader's role.")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      } else {
-        Picker("Role", selection: $role) {
-          ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
-            Text(role.title).tag(role)
-          }
-        }
-        .harnessNativeFormControl()
-        HarnessInlineActionButton(
-          title: "Change Role",
-          actionID: .changeRole(sessionID: sessionID, agentID: agent.agentId),
-          store: store,
-          variant: .prominent,
-          tint: nil,
-          isExternallyDisabled: !areSessionActionsAvailable,
-          accessibilityIdentifier: HarnessMonitorAccessibility.changeRoleButton,
-          action: { changeSelectedRole() }
-        )
-      }
-      HarnessInlineActionButton(
-        title: "Remove Agent",
-        actionID: .removeAgent(sessionID: sessionID, agentID: agent.agentId),
-        store: store,
-        variant: .bordered,
-        tint: .red,
-        isExternallyDisabled: agent.agentId == leaderID || !areSessionActionsAvailable,
-        accessibilityIdentifier: HarnessMonitorAccessibility.removeAgentButton,
-        help: agent.agentId == leaderID ? "The session leader cannot be removed" : "",
-        action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
-      )
-    }
-    .disabled(!areSessionActionsAvailable)
-  }
-}
-
 struct InspectorLeaderTransferSection: View {
   let store: HarnessMonitorStore
   let detail: SessionDetail

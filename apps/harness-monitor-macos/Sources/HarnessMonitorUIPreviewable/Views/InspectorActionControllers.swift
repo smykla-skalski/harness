@@ -216,43 +216,6 @@ struct InspectorTaskMutationConsole: View {
   }
 }
 
-struct InspectorRoleMutationConsole: View {
-  let store: HarnessMonitorStore
-  let sessionID: String
-  let selectedAgent: AgentRegistration
-  let leaderID: String?
-
-  @State private var role: SessionRole = .worker
-
-  private var stateKey: String {
-    "\(selectedAgent.agentId)|\(selectedAgent.role.rawValue)|\(leaderID ?? "-")"
-  }
-
-  var body: some View {
-    InspectorRoleActionsSection(
-      store: store,
-      sessionID: sessionID,
-      agent: selectedAgent,
-      leaderID: leaderID,
-      role: $role,
-      areSessionActionsAvailable: store.areSelectedLeaderActionsAvailable,
-      changeSelectedRole: submitChangeSelectedRole
-    )
-    .task(id: stateKey) {
-      role = selectedAgent.role
-    }
-  }
-
-  private func submitChangeSelectedRole() {
-    Task { await changeSelectedRole() }
-  }
-
-  private func changeSelectedRole() async {
-    _ = await store.changeRole(agentID: selectedAgent.agentId, role: role)
-    role = selectedAgent.role
-  }
-}
-
 struct InspectorLeaderTransferConsole: View {
   let store: HarnessMonitorStore
   let detail: SessionDetail

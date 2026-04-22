@@ -10,7 +10,6 @@ private enum InspectorChromeMetrics {
 
 private enum InspectorPrimaryResetKey: Hashable {
   case task(taskID: String, notesSessionID: String?)
-  case agent(agentID: String)
 }
 
 struct InspectorColumnView: View {
@@ -68,13 +67,6 @@ private struct InspectorPrimaryContentBridge: View {
           notesSessionID: selection.notesSessionID
         )
       )
-    case .agent(let selection):
-      AgentInspectorCard(
-        store: store,
-        agent: selection.agent,
-        activity: selection.activity
-      )
-      .id(InspectorPrimaryResetKey.agent(agentID: selection.agent.agentId))
     case .signal(let signal):
       SignalInspectorCard(signal: signal)
     case .observer(let observer):
@@ -154,17 +146,6 @@ private struct InspectorPrimaryLoadingState: View {
 
 #Preview("Inspector - Task") {
   let store = inspectorPreviewStore(selection: .task(PreviewFixtures.tasks[0].taskId))
-
-  InspectorColumnView(
-    store: store,
-    inspectorUI: store.inspectorUI
-  )
-  .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
-  .frame(width: 420, height: 860)
-}
-
-#Preview("Inspector - Agent") {
-  let store = inspectorPreviewStore(selection: .agent(PreviewFixtures.agents[0].agentId))
 
   InspectorColumnView(
     store: store,

@@ -51,16 +51,6 @@ extension HarnessMonitorStore {
             isPersistenceAvailable: isPersistenceAvailable
           )
         )
-      case .agent(let agentID):
-        guard let agent = agent(for: agentID) else {
-          return .session(detail)
-        }
-        return .agent(
-          InspectorAgentSelectionState(
-            agent: agent,
-            activity: agentActivityByID[agent.agentId]
-          )
-        )
       case .signal(let signalID):
         guard let signal = signal(for: signalID) else {
           return .session(detail)
@@ -88,13 +78,6 @@ extension HarnessMonitorStore {
         selectedTask = nil
       }
 
-      let selectedAgent: AgentRegistration?
-      if case .agent(let agentID) = inspectorSelection {
-        selectedAgent = agent(for: agentID)
-      } else {
-        selectedAgent = nil
-      }
-
       let selectedObserver: ObserverSummary?
       if case .observer = inspectorSelection {
         selectedObserver = detail.observer
@@ -105,7 +88,6 @@ extension HarnessMonitorStore {
       return InspectorActionContext(
         detail: detail,
         selectedTask: selectedTask,
-        selectedAgent: selectedAgent,
         selectedObserver: selectedObserver,
         isPersistenceAvailable: isPersistenceAvailable,
         actionActorOptions: actionActorOptions(selectedActionActorID: selectedActionActorID),
@@ -147,7 +129,6 @@ extension HarnessMonitorStore {
     case loading(SessionSummary)
     case session(SessionDetail)
     case task(InspectorTaskSelectionState)
-    case agent(InspectorAgentSelectionState)
     case signal(SessionSignalRecord)
     case observer(ObserverSummary)
 
@@ -161,8 +142,6 @@ extension HarnessMonitorStore {
         return "session:\(detail.session.sessionId)"
       case .task(let selection):
         return "task:\(selection.task.taskId)"
-      case .agent(let selection):
-        return "agent:\(selection.agent.agentId)"
       case .signal(let signal):
         return "signal:\(signal.signal.signalId)"
       case .observer(let observer):
@@ -202,7 +181,6 @@ extension HarnessMonitorStore {
   public struct InspectorActionContext: Equatable, Sendable {
     public let detail: SessionDetail
     public let selectedTask: WorkItem?
-    public let selectedAgent: AgentRegistration?
     public let selectedObserver: ObserverSummary?
     public let isPersistenceAvailable: Bool
     public let actionActorOptions: [AgentRegistration]
@@ -213,7 +191,6 @@ extension HarnessMonitorStore {
     public init(
       detail: SessionDetail,
       selectedTask: WorkItem?,
-      selectedAgent: AgentRegistration?,
       selectedObserver: ObserverSummary?,
       isPersistenceAvailable: Bool,
       actionActorOptions: [AgentRegistration],
@@ -223,7 +200,6 @@ extension HarnessMonitorStore {
     ) {
       self.detail = detail
       self.selectedTask = selectedTask
-      self.selectedAgent = selectedAgent
       self.selectedObserver = selectedObserver
       self.isPersistenceAvailable = isPersistenceAvailable
       self.actionActorOptions = actionActorOptions
