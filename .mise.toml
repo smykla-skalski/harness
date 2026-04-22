@@ -92,6 +92,10 @@ run = "./scripts/observability.sh start"
 description = "Stop the local observability stack and remove the shared harness observability config"
 run = "./scripts/observability.sh stop"
 
+[tasks."observability:restart"]
+description = "Restart the local observability stack"
+run = "./scripts/observability.sh stop && ./scripts/observability.sh start"
+
 [tasks."observability:status"]
 description = "Show local observability stack status"
 run = "./scripts/observability.sh status"
