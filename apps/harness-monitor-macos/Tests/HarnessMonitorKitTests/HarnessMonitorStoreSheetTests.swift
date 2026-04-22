@@ -121,4 +121,25 @@ struct HarnessMonitorStoreSheetTests {
     #expect(inserted?.lastResolvedPath == folderURL.path)
     #expect(inserted?.kind == .projectRoot)
   }
+
+  @Test("handleImportedFolder reuses the existing bookmark for duplicate folder imports")
+  func handleImportedFolderReusesExistingBookmarkForDuplicateFolder() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let folderURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+
+    let first = await store.handleImportedFolder(.success([folderURL]))
+    let second = await store.handleImportedFolder(.success([folderURL]))
+    guard let bookmarkStore = store.bookmarkStore else {
+      Issue.record("Expected BookmarkStore in DEBUG test environment")
+      return
+    }
+
+    let bookmarks = await bookmarkStore.all()
+
+    #expect(first?.id == second?.id)
+    #expect(bookmarks.count == 1)
+    #expect(bookmarks.first?.displayName == folderURL.lastPathComponent)
+  }
 }

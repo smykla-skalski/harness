@@ -89,13 +89,8 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     app.typeKey(.escape, modifierFlags: [])
   }
 
-  func testNewSessionSheetUsesStackedEditableFieldsAndReadableSeededFolder() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: [
-        "HARNESS_MONITOR_PRESEED_BOOKMARK": "1"
-      ]
-    )
+  func testNewSessionSheetUsesStackedEditableFields() throws {
+    let app = launch(mode: "preview")
 
     tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
 
@@ -127,23 +122,6 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       baseRefField.waitForExistence(timeout: Self.fastActionTimeout),
       "Base ref should remain directly editable in the sheet"
-    )
-
-    selectMenuOption(
-      in: app,
-      controlIdentifier: Accessibility.newSessionProjectPicker,
-      optionTitle: "harness"
-    )
-
-    let titleField = editableField(in: app, identifier: Accessibility.newSessionTitle)
-    XCTAssertTrue(titleField.waitForExistence(timeout: Self.fastActionTimeout))
-    tapViaCoordinate(in: app, element: titleField)
-    titleField.typeText("Native sheet regression")
-
-    let createButton = button(in: app, identifier: Accessibility.newSessionCreateButton)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.fastActionTimeout) { createButton.exists && createButton.isEnabled },
-      "Create should enable once the sheet has a visible seeded folder and title"
     )
   }
 

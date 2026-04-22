@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class AuthorizedFoldersTests: HarnessMonitorUITestCase {
-  func testPreseedBookmarkShowsInPrefs() throws {
+  func testPreseedBookmarkShowsReadableHarnessNameInPrefs() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PRESEED_BOOKMARK": "1"]
@@ -30,24 +30,6 @@ final class AuthorizedFoldersTests: HarnessMonitorUITestCase {
       .matching(identifier: Accessibility.preferencesAuthorizedFolderRow("B-preseed"))
       .firstMatch
     XCTAssertTrue(row.waitForExistence(timeout: Self.actionTimeout))
-  }
-
-  func testPreseedBookmarkUsesReadableHarnessName() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PRESEED_BOOKMARK": "1"]
-    )
-
-    openSettings(in: app)
-
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
-
-    selectPreferencesSection(
-      in: app,
-      identifier: Accessibility.preferencesAuthorizedFoldersSection,
-      expectedTitle: "Authorized Folders"
-    )
 
     XCTAssertTrue(
       app.staticTexts["harness"].firstMatch.waitForExistence(
