@@ -13,6 +13,7 @@ mod codec;
 pub mod create;
 pub mod daemon;
 pub mod errors;
+pub(crate) mod git;
 pub mod hooks;
 pub mod infra;
 pub mod kernel;

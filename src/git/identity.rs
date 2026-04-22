@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
-use gix_discover::{
+use gix::discover::{
     path::from_plain_file as read_plain_git_path, repository::Path as GixRepositoryPath, upwards,
 };
 
@@ -262,13 +262,13 @@ mod tests {
     #[test]
     fn resolve_git_checkout_identity_returns_none_for_non_git_path() {
         let tmp = tempdir().expect("tempdir");
-        let path = tmp.path().join("plain-dir");
-        fs::create_dir_all(&path).expect("create plain dir");
+        let path = tmp.path().join("plain");
+        fs::create_dir_all(&path).expect("create plain path");
 
         assert!(resolve_git_checkout_identity(&path).is_none());
         assert_eq!(
             canonical_checkout_root(&path),
-            path.canonicalize().expect("canonicalize")
+            path.canonicalize().expect("canonicalize plain path")
         );
     }
 }
