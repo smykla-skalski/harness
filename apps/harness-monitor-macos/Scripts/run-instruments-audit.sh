@@ -9,6 +9,8 @@ DERIVED_DATA_PATH="$REPO_ROOT/xcode-derived"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$APP_ROOT/Scripts/xcodebuild-with-lock.sh}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
+source "$SCRIPT_DIR/lib/xcodebuild-destination.sh"
 SHIPPING_SCHEME="HarnessMonitor"
 HOST_SCHEME="HarnessMonitorUITestHost"
 HOST_BUNDLE_ID="io.harnessmonitor.app.ui-testing"
@@ -50,10 +52,10 @@ BUILD_SHIPPING="${HARNESS_MONITOR_AUDIT_BUILD_SHIPPING:-0}"
 STAGED_HOST_APP_PATH=""
 STAGED_HOST_BINARY_PATH=""
 STAGED_HOST_BUNDLE_ID=""
-STAGED_HOST_LAUNCHER_PATH=""
 AUDIT_DAEMON_BUNDLE_MODE="unknown"
 AUDIT_DAEMON_CARGO_TARGET_DIR=""
 AUDIT_BUILD_ARCH=""
+DESTINATION=""
 RETAINED_RUN_SIZE_BUDGET_KIB=10240
 
 if [[ ! -x "$XCODEBUILD_RUNNER" ]]; then
@@ -193,6 +195,7 @@ AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 DERIVED_DATA_PATH="$COMMON_REPO_ROOT/xcode-derived-instruments"
 AUDIT_DAEMON_CARGO_TARGET_DIR="${HARNESS_MONITOR_AUDIT_DAEMON_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/harness-monitor-audit-daemon}"
 AUDIT_BUILD_ARCH="${HARNESS_MONITOR_AUDIT_BUILD_ARCH:-$(uname -m)}"
+DESTINATION="$(harness_monitor_xcodebuild_destination)"
 HOST_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor UI Testing.app"
 HOST_BINARY_PATH="$HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
 SHIPPING_APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Harness Monitor.app"
@@ -229,6 +232,7 @@ build_release_targets() {
         -scheme "$SHIPPING_SCHEME" \
         -configuration Release \
         -derivedDataPath "$DERIVED_DATA_PATH" \
+        -destination "$DESTINATION" \
         clean \
         "${common_build_env[@]}" \
         CODE_SIGNING_ALLOWED=NO \
@@ -240,6 +244,7 @@ build_release_targets() {
       -scheme "$HOST_SCHEME" \
       -configuration Release \
       -derivedDataPath "$DERIVED_DATA_PATH" \
+      -destination "$DESTINATION" \
       clean \
       "${common_build_env[@]}" \
       CODE_SIGNING_ALLOWED=NO \
@@ -252,6 +257,7 @@ build_release_targets() {
       -scheme "$SHIPPING_SCHEME" \
       -configuration Release \
       -derivedDataPath "$DERIVED_DATA_PATH" \
+      -destination "$DESTINATION" \
       build \
       "${common_build_env[@]}" \
       "${daemon_bundle_env[@]}" \
@@ -268,6 +274,7 @@ build_release_targets() {
     -scheme "$HOST_SCHEME" \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
+    -destination "$DESTINATION" \
     build \
     "${common_build_env[@]}" \
     "${daemon_bundle_env[@]}" \
@@ -330,7 +337,6 @@ cleanup_host_processes() {
     ps -Ao pid=,command= \
       | awk '
         /Harness Monitor UI Testing[.]app\/Contents\/MacOS\/Harness Monitor UI Testing/ { print $1; next }
-        /launch-staged-host([[:space:]]|$)/ { print $1; next }
         /target\/debug\/harness daemon serve/ { print $1; next }
         /target\/debug\/harness bridge start/ { print $1; next }
         /[\/]mock-codex([[:space:]]|$)/ { print $1; next }
@@ -357,16 +363,13 @@ strip_app_attrs() {
 
 stage_launch_host() {
   local stage_root="$run_dir/launch-host"
-  local staged_bundle_name="Harness Monitor UI Testing.app"
+  local staged_bundle_name="Harness Monitor UI Testing ${run_id}.app"
   local staged_bundle_id_suffix
-  local launcher_source_path
   staged_bundle_id_suffix="$(printf '%s' "$run_id" | tr -cd '[:alnum:]')"
 
   STAGED_HOST_APP_PATH="$stage_root/$staged_bundle_name"
   STAGED_HOST_BINARY_PATH="$STAGED_HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
   STAGED_HOST_BUNDLE_ID="${HOST_BUNDLE_ID}.audit.${staged_bundle_id_suffix}"
-  STAGED_HOST_LAUNCHER_PATH="$stage_root/launch-staged-host"
-  launcher_source_path="$stage_root/launch-staged-host.c"
 
   rm -rf "$stage_root"
   mkdir -p "$stage_root"
@@ -376,41 +379,6 @@ stage_launch_host() {
   /usr/libexec/PlistBuddy \
     -c "Set :CFBundleIdentifier $STAGED_HOST_BUNDLE_ID" \
     "$STAGED_HOST_APP_PATH/Contents/Info.plist"
-
-  cat >"$launcher_source_path" <<EOF
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-int main(int argc, char *argv[]) {
-  const char *target = "$STAGED_HOST_BINARY_PATH";
-  char **child_argv = calloc((size_t)argc + 1U, sizeof(char *));
-  if (child_argv == NULL) {
-    perror("calloc");
-    return 127;
-  }
-
-  child_argv[0] = (char *)target;
-  for (int index = 1; index < argc; index++) {
-    child_argv[index] = argv[index];
-  }
-  child_argv[argc] = NULL;
-
-  execv(target, child_argv);
-  perror("execv");
-  free(child_argv);
-  return errno == 0 ? 127 : errno;
-}
-EOF
-
-  /usr/bin/clang \
-    -Os \
-    -Wall \
-    -Wextra \
-    -Werror \
-    -o "$STAGED_HOST_LAUNCHER_PATH" \
-    "$launcher_source_path"
 }
 
 trace_launched_process_path() {
@@ -931,6 +899,7 @@ printf 'Workspace fingerprint: %s\n' "$workspace_fingerprint"
 printf 'Build started at (UTC): %s\n' "$build_started_at_utc"
 printf 'Audit commit stamp: %s dirty=%s\n' "$git_commit" "$git_dirty"
 printf 'Audit daemon bundle mode: %s\n' "$AUDIT_DAEMON_BUNDLE_MODE"
+printf 'xcodebuild destination: %s\n' "$DESTINATION"
 if [[ "$AUDIT_DAEMON_BUNDLE_MODE" == "shared-cargo-target" ]]; then
   printf 'Audit daemon Cargo target dir: %s\n' "$AUDIT_DAEMON_CARGO_TARGET_DIR"
 fi
@@ -942,13 +911,7 @@ if [[ ! -x "$STAGED_HOST_BINARY_PATH" ]]; then
   exit 1
 fi
 
-if [[ ! -x "$STAGED_HOST_LAUNCHER_PATH" ]]; then
-  printf 'Expected staged host launcher not found at %s\n' "$STAGED_HOST_LAUNCHER_PATH" >&2
-  exit 1
-fi
-
 printf 'Using staged host app: %s\n' "$STAGED_HOST_APP_PATH"
-printf 'Using staged host launcher: %s\n' "$STAGED_HOST_LAUNCHER_PATH"
 printf 'Staged host bundle id: %s\n' "$STAGED_HOST_BUNDLE_ID"
 
 capture_records_file="$run_dir/captures.tsv"
@@ -997,7 +960,7 @@ record_capture() {
     --env "HARNESS_MONITOR_PREVIEW_SCENARIO=$preview_scenario" \
     --env "$WINDOW_WIDTH_ENV" \
     --env "$WINDOW_HEIGHT_ENV" \
-    --launch -- "$STAGED_HOST_LAUNCHER_PATH" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" \
+    --launch -- "$STAGED_HOST_APP_PATH" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" \
     >"$capture_log_path" 2>&1
   local record_status=$?
   set -e
@@ -1030,11 +993,10 @@ PY
     exit "$record_status"
   fi
 
-  if [[ "$launched_process_path" != "$STAGED_HOST_LAUNCHER_PATH" && "$launched_process_path" != "$STAGED_HOST_APP_PATH" && "$launched_process_path" != "$STAGED_HOST_BINARY_PATH" ]]; then
-    printf 'xctrace launched unexpected app for %s / %s: expected %s, %s, or %s but trace recorded %s\n' \
+  if [[ "$launched_process_path" != "$STAGED_HOST_APP_PATH" && "$launched_process_path" != "$STAGED_HOST_BINARY_PATH" ]]; then
+    printf 'xctrace launched unexpected app for %s / %s: expected %s or %s but trace recorded %s\n' \
       "$template" \
       "$scenario" \
-      "$STAGED_HOST_LAUNCHER_PATH" \
       "$STAGED_HOST_APP_PATH" \
       "$STAGED_HOST_BINARY_PATH" \
       "${launched_process_path:-<missing>}" >&2
@@ -1068,7 +1030,7 @@ macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_LAUNCHER_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$BUILD_SHIPPING" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$SKIP_DAEMON_BUNDLE" "$AUDIT_DAEMON_BUNDLE_MODE" "$AUDIT_DAEMON_CARGO_TARGET_DIR" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
+python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$BUILD_SHIPPING" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$SKIP_DAEMON_BUNDLE" "$AUDIT_DAEMON_BUNDLE_MODE" "$AUDIT_DAEMON_CARGO_TARGET_DIR" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -1097,7 +1059,6 @@ from pathlib import Path
     host_bundle_id,
     staged_host_app_path,
     staged_host_binary_path,
-    staged_host_launcher_path,
     staged_host_bundle_id,
     host_embedded_commit,
     host_embedded_dirty,
@@ -1216,7 +1177,6 @@ manifest = {
         "host_bundle_id": host_bundle_id,
         "staged_host_app_path": staged_host_app_path,
         "staged_host_binary_path": staged_host_binary_path,
-        "staged_host_launcher_path": staged_host_launcher_path,
         "staged_host_bundle_id": staged_host_bundle_id,
     },
     "build_provenance": {
