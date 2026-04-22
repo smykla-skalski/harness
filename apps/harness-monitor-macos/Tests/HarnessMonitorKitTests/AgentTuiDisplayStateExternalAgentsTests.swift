@@ -25,8 +25,8 @@ struct AgentTuiDisplayStateExternalAgentsTests {
     #expect(state.externalAgents.map(\.agentId) == ["alpha", "bravo"])
   }
 
-  @Test("Excludes agents that already back a TUI snapshot")
-  func excludesTuiBackedAgents() {
+  @Test("Includes agents even when a matching TUI snapshot exists")
+  func includesTuiBackedAgents() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSession = makeSessionDetail(agents: [
       makeAgent(id: "alpha", name: "Alpha"),
@@ -35,7 +35,7 @@ struct AgentTuiDisplayStateExternalAgentsTests {
     ])
     store.selectedAgentTuis = [makeTuiSnapshot(tuiID: "tui-bravo", agentID: "bravo")]
     let state = AgentTuiWindowView.AgentTuiDisplayState(store: store)
-    #expect(state.externalAgents.map(\.agentId) == ["alpha", "charlie"])
+    #expect(state.externalAgents.map(\.agentId) == ["alpha", "bravo", "charlie"])
   }
 
   @Test("Sorts external agents alphabetically by name")

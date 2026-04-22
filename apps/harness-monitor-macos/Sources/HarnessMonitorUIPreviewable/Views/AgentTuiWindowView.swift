@@ -235,6 +235,10 @@ public struct AgentTuiWindowView: View {
         viewModel.availableRuntimeModels = loadedRuntimeModels
       }
       reconcileSheetState(afterRefresh: true)
+      consumePendingAgentsWindowSelection()
+    }
+    .onChange(of: store.pendingAgentsWindowSelection) { _, _ in
+      consumePendingAgentsWindowSelection()
     }
     .onChange(of: store.selectedAgentTuis) { _, _ in
       reconcileSheetState(afterRefresh: false)
