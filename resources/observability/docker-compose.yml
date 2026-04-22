@@ -82,7 +82,10 @@ services:
       - "${HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR}:/srv/sqlite/monitor:rw"
 
   sqlite-exporter:
-    image: adonato/query-exporter:5.0.2
+    image: harness/sqlite-exporter:5.0.2-curl
+    build:
+      context: .
+      dockerfile: ./query-exporter/Dockerfile
     command:
       - -p
       - "9560"
@@ -95,7 +98,7 @@ services:
     ports:
       - "127.0.0.1:9560:9560"
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9560/metrics')"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:9560/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -83,6 +83,8 @@ The local stack now provisions a repo-managed forensic suite into the `Harness O
 - `Harness Storage & SQLite` - storage and SQLite forensic analysis
 - `Harness Service Flow` - service-edge metrics plus Tempo Explore pivots
 
+`sqlite-exporter` now builds from a tiny repo-managed wrapper image that adds `curl` on top of `adonato/query-exporter:5.0.2`, keeping the Docker healthcheck deterministic without changing exporter behavior.
+
 Use Tempo Explore's Service Graph for the authoritative topology view and use the suite dashboards for metric correlation, ranked offenders, and log or trace pivots.
 
 ### Submodule

@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -96,7 +97,7 @@ fn observability_script_smoke_restore_recreates_sqlite_snapshot_grafana_and_sqli
     assert!(
         log.contains(
             &format!(
-                "DOCKER=compose -p harness-observability -f {} up -d --force-recreate sqlite-snapshot sqlite-exporter grafana",
+                "DOCKER=compose -p harness-observability -f {} up -d --build --force-recreate sqlite-snapshot sqlite-exporter grafana",
                 repo.join("resources/observability/docker-compose.yml").display()
             )
         ),
@@ -208,4 +209,38 @@ fn sqlite_snapshot_sync_copies_live_databases_into_stable_read_targets() {
         .expect("read monitor snapshot row");
     assert_eq!(monitor_journal_mode, "delete");
     assert_eq!(monitor_title, "monitor snapshot");
+}
+
+#[test]
+fn grafana_star_initializer_uses_v2_uid_star_endpoint() {
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let script = fs::read_to_string(
+        repo.join("resources/observability/grafana/init-star-dashboards.sh"),
+    )
+    .expect("read init-star-dashboards.sh");
+
+    assert!(
+        script.contains("/api/user/stars/dashboard/uid/$uid"),
+        "expected Grafana star initializer to use the UID star endpoint for v2 dashboards, got: {script}"
+    );
+    assert!(
+        !script.contains("/api/user/stars/dashboard/$id"),
+        "star initializer should not rely on legacy numeric dashboard ids for v2 dashboards"
+    );
+}
+
+#[test]
+fn observability_v2_dashboard_verifier_uses_uid_not_legacy_provisioned_flag() {
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let script = fs::read_to_string(repo.join("scripts/observability.sh"))
+        .expect("read observability.sh");
+
+    assert!(
+        script.contains(".dashboard.uid == $uid"),
+        "expected v2 dashboard verification to match the stable dashboard uid, got: {script}"
+    );
+    assert!(
+        !script.contains(".meta.provisioned == true"),
+        "v2 dashboard verification should not rely on the legacy provisioned flag"
+    );
 }
