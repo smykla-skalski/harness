@@ -1,6 +1,5 @@
-use std::path::Path;
+use std::process::Command;
 
-use git2::{IndexAddOption, Repository, Signature, build::RepoBuilder};
 use harness_testkit::{git_branches_matching, git_head_sha, init_git_repo_with_seed};
 use tempfile::TempDir;
 
@@ -12,82 +11,74 @@ fn init_origin_repo(tmp: &std::path::Path) {
 }
 
 fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8], message: &str) {
-    let repo = Repository::open(dir).expect("open repo");
     std::fs::write(dir.join(path), contents).unwrap();
-    stage_path(&repo, Path::new(path));
-    commit_head(&repo, message);
+    run_git(dir, &["add", path]);
+    run_git(dir, &["-c", "commit.gpgsign=false", "commit", "-m", message]);
+}
+
+fn run_git(dir: &std::path::Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(output.status.success(), "git {:?} failed: {}", args, String::from_utf8_lossy(&output.stderr));
 }
 
 fn init_checkout_with_upstream_remote() -> TempDir {
     let upstream = TempDir::new().unwrap();
-    Repository::init_bare(upstream.path()).expect("init bare remote");
+
+    Command::new("git")
+        .args(["init", "--bare"])
+        .arg(upstream.path())
+        .output()
+        .expect("init bare remote");
 
     let seed = TempDir::new().unwrap();
     init_origin_repo(seed.path());
-    let seed_repo = Repository::open(seed.path()).expect("open seed repo");
-    let default_branch = current_branch_name(&seed_repo);
-    let mut remote = seed_repo
-        .remote(
-            "upstream",
-            upstream.path().to_str().expect("upstream path utf8"),
-        )
+
+    let repo = gix::open(seed.path()).expect("open seed repo");
+    let default_branch = repo
+        .head_name()
+        .expect("head name")
+        .expect("head is branch")
+        .shorten()
+        .to_string();
+
+    Command::new("git")
+        .args(["-C"])
+        .arg(seed.path())
+        .args(["remote", "add", "upstream"])
+        .arg(upstream.path())
+        .output()
         .expect("add upstream remote");
+
     let refspec = format!("refs/heads/{default_branch}:refs/heads/main");
-    remote.push(&[refspec.as_str()], None).expect("push seed");
-    Repository::open_bare(upstream.path())
-        .expect("open bare upstream")
-        .set_head("refs/heads/main")
+    Command::new("git")
+        .args(["-C"])
+        .arg(seed.path())
+        .args(["push", "upstream", &refspec])
+        .output()
+        .expect("push seed");
+
+    Command::new("git")
+        .args(["-C"])
+        .arg(upstream.path())
+        .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+        .output()
         .expect("set upstream HEAD");
 
     let checkout = TempDir::new().unwrap();
-    let mut builder = RepoBuilder::new();
-    builder.remote_create(|repo, _name, url| repo.remote("upstream", url));
-    builder
-        .clone(
-            upstream.path().to_str().expect("upstream path utf8"),
-            checkout.path(),
-        )
+
+    Command::new("git")
+        .args(["clone", "--origin", "upstream"])
+        .arg(upstream.path())
+        .arg(checkout.path())
+        .output()
         .expect("clone checkout from upstream");
+
     checkout
-}
-
-fn stage_path(repo: &Repository, path: &Path) {
-    let mut index = repo.index().expect("open index");
-    index
-        .add_all([path], IndexAddOption::DEFAULT, None)
-        .expect("stage path");
-    index.write().expect("write index");
-}
-
-fn commit_head(repo: &Repository, message: &str) {
-    let mut index = repo.index().expect("open index");
-    let tree_id = index.write_tree().expect("write tree");
-    let tree = repo.find_tree(tree_id).expect("find tree");
-    let signature = Signature::now("test", "test@example.com").expect("signature");
-    let parents = repo
-        .head()
-        .ok()
-        .and_then(|head| head.peel_to_commit().ok())
-        .into_iter()
-        .collect::<Vec<_>>();
-    let parent_refs = parents.iter().collect::<Vec<_>>();
-    repo.commit(
-        Some("HEAD"),
-        &signature,
-        &signature,
-        message,
-        &tree,
-        &parent_refs,
-    )
-    .expect("create commit");
-}
-
-fn current_branch_name(repo: &Repository) -> String {
-    repo.head()
-        .expect("repo head")
-        .shorthand()
-        .expect("branch shorthand")
-        .to_owned()
 }
 
 #[test]

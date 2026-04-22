@@ -153,33 +153,49 @@ pub fn canonical_checkout_root(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::process::Command;
+
     use fs_err as fs;
-    use git2::{IndexAddOption, Repository, Signature};
     use tempfile::tempdir;
 
     use super::{
         GitCheckoutKind, canonical_checkout_root, infer_known_worktree_identity,
         resolve_git_checkout_identity,
     };
+    use crate::git::mutation::create_linked_worktree;
 
-    fn init_repo(root: &std::path::Path) {
+    fn init_repo_with_commit(root: &std::path::Path) -> String {
         fs::create_dir_all(root).expect("create repo");
-        let repo = Repository::init(root).expect("init repo");
         fs::write(root.join("README.md"), "hello\n").expect("write readme");
-        let mut index = repo.index().expect("open index");
-        index
-            .add_all(
-                [std::path::Path::new("README.md")],
-                IndexAddOption::DEFAULT,
-                None,
-            )
-            .expect("stage readme");
-        index.write().expect("write index");
-        let tree_id = index.write_tree().expect("write tree");
-        let tree = repo.find_tree(tree_id).expect("find tree");
-        let signature = Signature::now("Harness Tests", "harness@example.com").expect("signature");
-        repo.commit(Some("HEAD"), &signature, &signature, "init", &tree, &[])
-            .expect("create init commit");
+
+        run_git(root, &["init"]);
+        run_git(root, &["config", "user.email", "test@example.com"]);
+        run_git(root, &["config", "user.name", "test"]);
+        run_git(root, &["add", "README.md"]);
+        run_git(root, &["-c", "commit.gpgsign=false", "commit", "-m", "init"]);
+
+        run_git_output(root, &["rev-parse", "HEAD"])
+    }
+
+    fn run_git(dir: &std::path::Path, args: &[&str]) {
+        let output = Command::new("git")
+            .args(["-C"])
+            .arg(dir)
+            .args(args)
+            .output()
+            .expect("run git");
+        assert!(output.status.success(), "git {:?} failed", args);
+    }
+
+    fn run_git_output(dir: &std::path::Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .args(["-C"])
+            .arg(dir)
+            .args(args)
+            .output()
+            .expect("run git");
+        assert!(output.status.success(), "git {:?} failed", args);
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
     }
 
     #[test]
@@ -187,7 +203,7 @@ mod tests {
         let tmp = tempdir().expect("tempdir");
         let repo_root = tmp.path().join("repo");
         let nested = repo_root.join("src/nested");
-        init_repo(&repo_root);
+        init_repo_with_commit(&repo_root);
         fs::create_dir_all(&nested).expect("create nested");
 
         let identity = resolve_git_checkout_identity(&nested).expect("identity");
@@ -205,22 +221,17 @@ mod tests {
         let repo_root = tmp.path().join("repo");
         let worktrees_root = repo_root.join(".claude/worktrees");
         let worktree = worktrees_root.join("feature-branch");
-        init_repo(&repo_root);
+        let head_sha = init_repo_with_commit(&repo_root);
         fs::create_dir_all(&worktrees_root).expect("create worktrees root");
-        let repo = Repository::open(&repo_root).expect("open repo");
-        let head_commit = repo
-            .head()
-            .expect("repo head")
-            .peel_to_commit()
-            .expect("head commit");
-        let branch = repo
-            .branch("feature-branch", &head_commit, false)
-            .expect("create branch");
-        let reference = branch.into_reference();
-        let mut options = git2::WorktreeAddOptions::new();
-        options.reference(Some(&reference));
-        repo.worktree("feature-branch", &worktree, Some(&options))
-            .expect("create worktree");
+
+        create_linked_worktree(
+            &repo_root,
+            "feature-branch",
+            &worktree,
+            "feature-branch",
+            &head_sha,
+        )
+        .expect("create worktree");
 
         let identity = resolve_git_checkout_identity(&worktree).expect("identity");
         let expected_repo = repo_root.canonicalize().expect("canonicalize repo");

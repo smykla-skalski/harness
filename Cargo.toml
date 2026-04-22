@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "29.0.6"
+version = "29.0.7"
 edition = "2024"
 rust-version = "1.94"
 include = [
@@ -59,8 +59,8 @@ tonic = { version = "0.14.1", default-features = false }
 pyroscope = { version = "2.0.0", features = ["backend-pprof-rs"] }
 fs2 = "0.4.3"
 fs-err = "3.3.0"
-gix = { version = "0.81.0", features = ["status"] }
-git2 = { version = "0.20.4", default-features = false }
+gix = { version = "0.81.0", features = ["status", "worktree-mutation", "index"] }
+pathdiff = "0.2.3"
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 tar = "0.4.44"
 user_dirs = "0.2.0"
