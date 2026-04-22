@@ -16,8 +16,9 @@ extension HarnessMonitorStore {
   /// Call this from any site that presents its own `.fileImporter`, including
   /// the main window handler in `HarnessMonitorApp` and sheets that need to
   /// present their own file picker over a modal context.
-  public func handleImportedFolder(_ result: Result<[URL], any Error>) async -> BookmarkStore.Record?
-  {
+  public func handleImportedFolder(
+    _ result: Result<[URL], any Error>
+  ) async -> BookmarkStore.Record? {
     switch result {
     case .success(let urls):
       guard let url = urls.first else { return nil }
