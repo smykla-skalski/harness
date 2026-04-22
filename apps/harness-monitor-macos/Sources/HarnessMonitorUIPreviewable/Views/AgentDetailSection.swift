@@ -34,6 +34,14 @@ struct AgentDetailSection: View {
     agent.capabilities.isEmpty ? ["No declared capabilities"] : agent.capabilities
   }
 
+  private var assignedTasks: [WorkItem] {
+    (store.selectedSession?.tasks ?? []).filter { $0.assignedTo == agent.agentId }
+  }
+
+  private var agentTimelineEntries: [TimelineEntry] {
+    Array(store.timeline.filter { $0.agentId == agent.agentId }.prefix(8))
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text(agent.name)
@@ -93,6 +101,70 @@ struct AgentDetailSection: View {
           }
         }
       }
+      InspectorSection(title: "Persona") {
+        if let persona = agent.persona {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+            Text(persona.name)
+              .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+            Text(persona.description)
+              .scaledFont(.subheadline)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          }
+        } else {
+          Text("No persona assigned")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailPersona)
+      InspectorSection(title: "Assigned Tasks") {
+        if assignedTasks.isEmpty {
+          Text("No assigned tasks")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        } else {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+            ForEach(assignedTasks) { task in
+              VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                  .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
+                Text(task.status.title)
+                  .scaledFont(.caption)
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              }
+            }
+          }
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailAssignedTasks)
+      InspectorSection(title: "Recent Activity") {
+        if agentTimelineEntries.isEmpty {
+          Text("No recent activity")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        } else {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+            ForEach(agentTimelineEntries) { entry in
+              VStack(alignment: .leading, spacing: 2) {
+                Text(entry.summary)
+                  .scaledFont(.subheadline)
+                HStack(spacing: HarnessMonitorTheme.spacingXS) {
+                  Text(entry.kind)
+                    .scaledFont(.caption.monospaced())
+                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                  Text(formatTimestamp(entry.recordedAt))
+                    .scaledFont(.caption)
+                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                }
+              }
+            }
+          }
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailTimeline)
       InspectorSection(title: "Role Actions") {
         if isLeader {
           Text("Transfer leadership before changing the leader's role.")
