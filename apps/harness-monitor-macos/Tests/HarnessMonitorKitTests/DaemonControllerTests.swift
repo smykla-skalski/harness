@@ -4,6 +4,21 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+private final class LockedEndpointBox: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value: String?
+
+  func set(_ endpoint: String) {
+    lock.withLock {
+      value = endpoint
+    }
+  }
+
+  func get() -> String? {
+    lock.withLock { value }
+  }
+}
+
 @Suite("Daemon controller service management")
 struct DaemonControllerTests {
   @Test(
@@ -129,6 +144,43 @@ struct DaemonControllerTests {
     #expect(webSocketClient.shutdownCallCount() == 0)
   }
 
+  @Test("bootstrapClient recovers a newer daemon endpoint from events when manifest is stale")
+  func bootstrapClientRecoversEndpointFromEventsLog() async throws {
+    try await withTempDaemonFixture(
+      pid: 555,
+      version: "29.0.7",
+      endpoint: "http://127.0.0.1:0"
+    ) { environment in
+      try writeTempDaemonFixtureEvents(
+        environment: environment,
+        events: [
+          DaemonAuditEventFixture(
+            recordedAt: "2026-04-22T15:41:50Z",
+            level: "info",
+            message: "daemon listening on http://127.0.0.1:58988"
+          )
+        ]
+      )
+      let client = RecordingHarnessClient()
+      let capturedEndpoint = LockedEndpointBox()
+      let controller = DaemonController(
+        environment: environment,
+        transportPreference: .http,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { connection in
+          capturedEndpoint.set(connection.endpoint.absoluteString)
+          return client
+        }
+      )
+
+      _ = try await controller.bootstrapClient()
+
+      #expect(capturedEndpoint.get() == "http://127.0.0.1:58988")
+      #expect(client.readCallCount(.health) == 1)
+    }
+  }
+
   @Test("awaitManifestWarmUp waits for managed manifest rewrite while the stale pid is still alive")
   func awaitManifestWarmUpWaitsForManagedManifestRewriteWhilePidIsAlive() async throws {
     try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
@@ -155,6 +207,45 @@ struct DaemonControllerTests {
 
       let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
       #expect(bootstrappedClient as AnyObject === client as AnyObject)
+    }
+  }
+
+  @Test("awaitManifestWarmUp uses a newer listening event when managed manifest endpoint is stale")
+  func awaitManifestWarmUpRecoversEndpointFromEventsLog() async throws {
+    try await withTempDaemonFixture(
+      pid: 555,
+      version: "29.0.7",
+      endpoint: "http://127.0.0.1:0"
+    ) { environment in
+      try writeTempDaemonFixtureEvents(
+        environment: environment,
+        events: [
+          DaemonAuditEventFixture(
+            recordedAt: "2026-04-22T15:41:50Z",
+            level: "info",
+            message: "daemon listening on http://127.0.0.1:58988"
+          )
+        ]
+      )
+      let client = PreviewHarnessClient()
+      let capturedEndpoint = LockedEndpointBox()
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        ownership: .managed,
+        sessionFactory: { connection in
+          capturedEndpoint.set(connection.endpoint.absoluteString)
+          return client
+        },
+        endpointProbe: { endpoint in
+          endpoint.port == 58_988
+        }
+      )
+
+      let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+
+      #expect(bootstrappedClient as AnyObject === client as AnyObject)
+      #expect(capturedEndpoint.get() == "http://127.0.0.1:58988")
     }
   }
 

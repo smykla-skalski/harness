@@ -88,6 +88,27 @@ func rewriteTempDaemonFixtureManifest(
   try manifestData.write(to: HarnessMonitorPaths.manifestURL(using: environment))
 }
 
+func writeTempDaemonFixtureEvents(
+  environment: HarnessMonitorEnvironment,
+  events: [DaemonAuditEventFixture]
+) throws {
+  let encoder = JSONEncoder()
+  encoder.keyEncodingStrategy = .convertToSnakeCase
+  let lines = try events.map { event in
+    let data = try encoder.encode(event)
+    guard let line = String(data: data, encoding: .utf8) else {
+      throw CocoaError(.fileWriteUnknown)
+    }
+    return line
+  }
+  let contents = lines.joined(separator: "\n") + "\n"
+  try contents.write(
+    to: HarnessMonitorPaths.daemonRoot(using: environment).appendingPathComponent("events.jsonl"),
+    atomically: true,
+    encoding: .utf8
+  )
+}
+
 func withSignalIgnoringSleepProcessPID(
   durationSeconds: Int = 60,
   perform: (UInt32) async throws -> Void
@@ -111,6 +132,12 @@ struct DaemonBinaryStampFixture: Codable, Equatable {
   let inode: UInt64
   let fileSize: UInt64
   let modificationTimeIntervalSince1970: Double
+}
+
+struct DaemonAuditEventFixture: Codable, Equatable {
+  let recordedAt: String
+  let level: String
+  let message: String
 }
 
 private struct DaemonManifestFixture: Codable {
