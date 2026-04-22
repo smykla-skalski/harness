@@ -17,6 +17,40 @@ struct HarnessMonitorSessionModelsTests {
     return encoder
   }()
 
+  private func makeSummary(
+    projectDir: String = "/tmp/project",
+    originPath: String = "/tmp/project"
+  ) -> SessionSummary {
+    SessionSummary(
+      projectId: "project-b72ed763e074d381",
+      projectName: "harness",
+      projectDir: projectDir,
+      contextRoot: "/tmp/harness/sessions/harness",
+      sessionId: "sig12345",
+      worktreePath: "/tmp/harness/sessions/harness/sig12345/workspace",
+      sharedPath: "/tmp/harness/sessions/harness/sig12345/memory",
+      originPath: originPath,
+      branchRef: "harness/sig12345",
+      title: "Signal decode proof",
+      context: "Signal decode proof",
+      status: .active,
+      createdAt: "2026-04-03T17:23:26Z",
+      updatedAt: "2026-04-03T17:23:32Z",
+      lastActivityAt: "2026-04-03T17:23:32Z",
+      leaderId: "claude-leader",
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 2,
+        activeAgentCount: 2,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+  }
+
   private let signalPayloadDefaultsFixture = """
     {
       "session": {
@@ -126,6 +160,29 @@ struct HarnessMonitorSessionModelsTests {
     #expect(item.assignedTo == nil)
     #expect(item.createdBy == nil)
     #expect(item.checkpointSummary == nil)
+  }
+
+  @Test("Repository origins keep repository checkout semantics")
+  func repositoryOriginsKeepRepositoryCheckoutSemantics() {
+    let summary = makeSummary()
+
+    #expect(summary.isWorktree == false)
+    #expect(summary.worktreeName == nil)
+    #expect(summary.checkoutId == summary.projectId)
+    #expect(summary.checkoutDisplayName == "Repository")
+    #expect(summary.worktreeDisplayName == "Repository")
+  }
+
+  @Test("Known worktree origins recover the worktree display name")
+  func knownWorktreeOriginsRecoverWorktreeDisplayName() {
+    let worktreeRoot = "/tmp/project/.claude/worktrees/feature-branch"
+    let summary = makeSummary(originPath: worktreeRoot)
+
+    #expect(summary.isWorktree)
+    #expect(summary.worktreeName == "feature-branch")
+    #expect(summary.checkoutId == worktreeRoot)
+    #expect(summary.checkoutDisplayName == "feature-branch")
+    #expect(summary.worktreeDisplayName == "feature-branch")
   }
 
   @Test("Work item decoding accepts queued daemon fields")

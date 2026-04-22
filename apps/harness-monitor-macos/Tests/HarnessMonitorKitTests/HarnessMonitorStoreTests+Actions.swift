@@ -122,9 +122,9 @@ extension HarnessMonitorStoreTests {
     let (projects, sessions) = makeToolbarCountFixtures()
     store.applySessionIndexSnapshot(projects: projects, sessions: sessions)
 
-    // All 3 sessions are worktree-backed in the new layout, so worktreeCount == sessionCount.
+    // Two distinct origin worktrees back the 3 sessions across the active projects.
     #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
-    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 3)
+    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 2)
     #expect(store.contentUI.toolbar.toolbarMetrics.sessionCount == 3)
   }
 
@@ -204,7 +204,7 @@ extension HarnessMonitorStoreTests {
       sessionId: "sessa001",
       worktreePath: "\(sessionsRoot)/harness/sessa001/workspace",
       sharedPath: "\(sessionsRoot)/harness/sessa001/memory",
-      originPath: project1.projectDir ?? "",
+      originPath: project1.worktrees.first?.checkoutRoot ?? project1.projectDir ?? "",
       branchRef: "harness/sessa001",
       title: "Primary",
       context: "Primary",
@@ -232,7 +232,7 @@ extension HarnessMonitorStoreTests {
       sessionId: "sessa002",
       worktreePath: "\(sessionsRoot)/harness/sessa002/workspace",
       sharedPath: "\(sessionsRoot)/harness/sessa002/memory",
-      originPath: project1.projectDir ?? "",
+      originPath: project1.worktrees.first?.checkoutRoot ?? project1.projectDir ?? "",
       branchRef: "harness/sessa002",
       title: "Secondary",
       context: "Secondary",
@@ -260,7 +260,7 @@ extension HarnessMonitorStoreTests {
       sessionId: "sessb001",
       worktreePath: "\(sessionsRoot)/kuma/sessb001/workspace",
       sharedPath: "\(sessionsRoot)/kuma/sessb001/memory",
-      originPath: project2.projectDir ?? "",
+      originPath: project2.worktrees.first?.checkoutRoot ?? project2.projectDir ?? "",
       branchRef: "harness/sessb001",
       title: "Kuma",
       context: "Kuma",

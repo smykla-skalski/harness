@@ -176,12 +176,59 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     self.metrics = metrics
   }
 
-  /// Display name for the worktree branch, derived from `branchRef`.
-  public var worktreeDisplayName: String {
-    if branchRef.hasPrefix("harness/") {
-      return String(branchRef.dropFirst("harness/".count))
+  public var checkoutRoot: String {
+    let normalizedOrigin = Self.normalizedPath(originPath)
+    if !normalizedOrigin.isEmpty {
+      return normalizedOrigin
     }
-    return branchRef.isEmpty ? sessionId : branchRef
+    let normalizedProjectDir = Self.normalizedPath(projectDir)
+    if !normalizedProjectDir.isEmpty {
+      return normalizedProjectDir
+    }
+    return contextRoot
+  }
+
+  public var isWorktree: Bool {
+    let normalizedOrigin = Self.normalizedPath(originPath)
+    guard !normalizedOrigin.isEmpty else {
+      return false
+    }
+    if Self.knownWorktreeName(from: normalizedOrigin) != nil {
+      return true
+    }
+    let normalizedProjectDir = Self.normalizedPath(projectDir)
+    guard !normalizedProjectDir.isEmpty else {
+      return false
+    }
+    return normalizedOrigin != normalizedProjectDir
+  }
+
+  public var worktreeName: String? {
+    guard isWorktree else {
+      return nil
+    }
+    if let knownWorktreeName = Self.knownWorktreeName(from: checkoutRoot) {
+      return knownWorktreeName
+    }
+    let lastComponent = URL(fileURLWithPath: checkoutRoot).lastPathComponent
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return lastComponent.isEmpty ? nil : lastComponent
+  }
+
+  public var checkoutId: String {
+    isWorktree ? checkoutRoot : projectId
+  }
+
+  public var checkoutDisplayName: String {
+    if isWorktree {
+      return worktreeName ?? URL(fileURLWithPath: checkoutRoot).lastPathComponent
+    }
+    return "Repository"
+  }
+
+  /// Display name for the origin checkout/worktree.
+  public var worktreeDisplayName: String {
+    checkoutDisplayName
   }
 
   enum CodingKeys: CodingKey {
@@ -220,6 +267,30 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
       adoptedAt: try container.decodeIfPresent(String.self, forKey: .adoptedAt),
       metrics: try container.decode(SessionMetrics.self, forKey: .metrics)
     )
+  }
+
+  private static func normalizedPath(_ path: String?) -> String {
+    guard let path else {
+      return ""
+    }
+    let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      return ""
+    }
+    return URL(fileURLWithPath: trimmed).standardizedFileURL.path
+  }
+
+  private static func knownWorktreeName(from path: String) -> String? {
+    let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
+    guard
+      let markerIndex = components.firstIndex(of: ".claude"),
+      components.indices.contains(markerIndex + 2),
+      components[markerIndex + 1] == "worktrees"
+    else {
+      return nil
+    }
+    let candidate = components[markerIndex + 2].trimmingCharacters(in: .whitespacesAndNewlines)
+    return candidate.isEmpty ? nil : candidate
   }
 }
 

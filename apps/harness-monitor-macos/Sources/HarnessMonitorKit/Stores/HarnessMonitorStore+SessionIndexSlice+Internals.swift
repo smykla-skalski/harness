@@ -206,12 +206,18 @@ extension HarnessMonitorStore.SessionIndexSlice {
 
     for summary in catalog.sessions {
       let checkout = CheckoutAccumulator(
-        checkoutId: summary.sessionId,
-        title: summary.worktreeDisplayName,
-        isWorktree: true,
+        checkoutId: summary.checkoutId,
+        title: summary.checkoutDisplayName,
+        isWorktree: summary.isWorktree,
         sessionIDs: [summary.sessionId]
       )
-      checkoutsByProject[summary.projectId, default: [:]][summary.sessionId] = checkout
+
+      if var existing = checkoutsByProject[summary.projectId]?[summary.checkoutId] {
+        existing.sessionIDs.append(summary.sessionId)
+        checkoutsByProject[summary.projectId]?[summary.checkoutId] = existing
+      } else {
+        checkoutsByProject[summary.projectId, default: [:]][summary.checkoutId] = checkout
+      }
     }
 
     return catalog.projects.map { project in
@@ -236,7 +242,10 @@ extension HarnessMonitorStore.SessionIndexSlice {
           )
         }
         .sorted { lhs, rhs in
-          lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+          if lhs.isWorktree != rhs.isWorktree {
+            return lhs.isWorktree == false
+          }
+          return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
         }
       return ProjectCatalog(project: project, checkouts: checkouts)
     }
