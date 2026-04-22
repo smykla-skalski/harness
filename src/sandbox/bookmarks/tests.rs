@@ -15,6 +15,7 @@ fn round_trip_save_load() {
             display_name: "kuma".into(),
             last_resolved_path: "/tmp/kuma".into(),
             bookmark_data: vec![1, 2, 3],
+            handoff_bookmark_data: Some(vec![4, 5, 6]),
             created_at: chrono::Utc::now(),
             last_accessed_at: chrono::Utc::now(),
             stale_count: 0,
@@ -25,6 +26,7 @@ fn round_trip_save_load() {
     let loaded = load(&path).unwrap();
     assert_eq!(loaded.bookmarks.len(), 1);
     assert_eq!(loaded.bookmarks[0].id, "B-test");
+    assert_eq!(loaded.bookmarks[0].handoff_bookmark_data, Some(vec![4, 5, 6]));
 }
 
 #[test]

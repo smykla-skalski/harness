@@ -65,8 +65,13 @@ public actor BookmarkStore {
   }
 
   public func add(url: URL, kind: Record.Kind) throws -> Record {
-    let bookmark = try url.bookmarkData(
+    let appBookmark = try url.bookmarkData(
       options: .withSecurityScope,
+      includingResourceValuesForKeys: nil,
+      relativeTo: nil
+    )
+    let handoffBookmark = try url.bookmarkData(
+      options: [],
       includingResourceValuesForKeys: nil,
       relativeTo: nil
     )
@@ -75,7 +80,8 @@ public actor BookmarkStore {
       kind: kind,
       displayName: url.lastPathComponent,
       lastResolvedPath: url.path,
-      bookmarkData: bookmark
+      bookmarkData: appBookmark,
+      handoffBookmarkData: handoffBookmark
     )
     store.bookmarks.insert(record, at: 0)
     if store.bookmarks.count > Self.mruCap {
@@ -120,6 +126,13 @@ public actor BookmarkStore {
     } catch {
       throw BookmarkStoreError.unresolvable(id: id, underlying: String(describing: error))
     }
+    if record.handoffBookmarkData == nil {
+      record.handoffBookmarkData = try url.bookmarkData(
+        options: [],
+        includingResourceValuesForKeys: nil,
+        relativeTo: nil
+      )
+    }
     if isStale {
       record.staleCount += 1
       Self.logger.warning(
@@ -129,7 +142,13 @@ public actor BookmarkStore {
         includingResourceValuesForKeys: nil,
         relativeTo: nil
       )
+      let refreshedHandoff = try url.bookmarkData(
+        options: [],
+        includingResourceValuesForKeys: nil,
+        relativeTo: nil
+      )
       record.bookmarkData = refreshed
+      record.handoffBookmarkData = refreshedHandoff
     }
     record.lastResolvedPath = url.path
     record.lastAccessedAt = .now
