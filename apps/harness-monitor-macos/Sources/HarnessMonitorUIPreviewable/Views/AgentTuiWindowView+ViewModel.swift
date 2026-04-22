@@ -278,9 +278,7 @@ extension AgentTuiWindowView {
           agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
       }
 
-      let tuiAgentIds = Set(sortedAgentTuis.map(\.agentId))
       let externalAgents = (store.selectedSession?.agents ?? [])
-        .filter { !tuiAgentIds.contains($0.agentId) }
         .sorted { left, right in
           if left.name != right.name {
             return left.name.localizedStandardCompare(right.name) == .orderedAscending

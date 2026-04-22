@@ -12,16 +12,11 @@ struct SessionActionDock: View {
 
   let detail: SessionDetail
   let inspectTask: (String) -> Void
-  let openAgent: (String) -> Void
   let inspectObserver: () -> Void
   let openAgents: () -> Void
 
   private var firstTaskID: String? {
     detail.tasks.first?.taskId
-  }
-
-  private var firstAgentID: String? {
-    detail.agents.first?.agentId
   }
 
   var body: some View {
@@ -57,16 +52,6 @@ struct SessionActionDock: View {
             accessibilityID: nil
           ),
           action: focusFirstTask,
-        )
-        flowButton(
-          FlowButtonDetails(
-            title: "People Flow",
-            subtitle: "Change roles and leadership",
-            symbol: "person.2",
-            helpText: "Jump to the first agent to inspect.",
-            accessibilityID: nil
-          ),
-          action: focusFirstAgent,
         )
         flowButton(
           FlowButtonDetails(
@@ -119,13 +104,6 @@ struct SessionActionDock: View {
     inspectTask(taskID)
   }
 
-  private func focusFirstAgent() {
-    guard let agentID = firstAgentID else {
-      return
-    }
-    openAgent(agentID)
-  }
-
   private func focusObserver() {
     inspectObserver()
   }
@@ -146,7 +124,6 @@ extension View {
   SessionActionDock(
     detail: PreviewFixtures.detail,
     inspectTask: { _ in },
-    openAgent: { _ in },
     inspectObserver: {},
     openAgents: {}
   )
